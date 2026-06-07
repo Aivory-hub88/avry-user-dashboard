@@ -1,0 +1,120 @@
+.summaryCard {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: 20px;
+  padding: 32px;
+  margin-top: 32px;
+}
+
+.summaryTitle {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 24px;
+}
+
+.summaryContent {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 32px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.scoreSection {
+  flex: 1;
+  text-align: center;
+}
+
+.scoreValue {
+  font-size: 56px;
+  font-weight: 300;
+  color: var(--text-primary);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.scoreLabel {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.maturitySection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.maturityLabel {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.maturityBadge {
+  background: var(--bg-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.ctaSection {
+  text-align: center;
+}
+
+.ctaText {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 20px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ctaButton {
+  background: #3b3a35;
+  border: none;
+  border-radius: 20px;
+  padding: 14px 32px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Inter Tight', sans-serif;
+}
+
+.ctaButton:hover {
+  background: #4a4944;
+}
+
+.ctaButton:active {
+  transform: scale(0.98);
+}
+
+@media (max-width: 768px) {
+  .summaryCard {
+    padding: 24px;
+  }
+
+  .summaryContent {
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .scoreValue {
+    font-size: 48px;
+  }
+
+  .ctaButton {
+    width: 100%;
+  }
+}

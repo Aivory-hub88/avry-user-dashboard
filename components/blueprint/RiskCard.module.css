@@ -1,0 +1,69 @@
+.riskCard {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: 20px;
+  padding: 24px;
+  height: 100%;
+}
+
+.cardTitle {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+}
+
+.section {
+  margin-bottom: 20px;
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+.sectionLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.risksList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.riskItem {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  padding-left: 18px;
+  position: relative;
+}
+
+.riskItem::before {
+  content: '!';
+  position: absolute;
+  left: 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.strategyText {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .riskCard {
+    padding: 20px;
+  }
+}

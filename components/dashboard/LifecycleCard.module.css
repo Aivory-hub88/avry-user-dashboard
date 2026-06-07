@@ -1,0 +1,171 @@
+/* FIXED: CARD GLASS — glassmorphism lifecycle card */
+.lifecycleCard {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  padding: 1.25rem 1.25rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.lifecycleCard:hover {
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+/* ADDED: CARD ICON ROW */
+.cardTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cardIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+}
+
+.lifecycleCard:hover .cardIcon {
+  background: rgba(0, 229, 158, 0.08);
+  border-color: rgba(0, 229, 158, 0.2);
+  color: #00e59e;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.description {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin: 0;
+  flex: 1;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+
+/* ADDED: STATUS ROW — color-coded badge */
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.35rem;
+}
+
+.statusLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+/* ADDED: STATUS BADGE — inline color pill */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.statusBadge.completed {
+  background: rgba(0, 229, 158, 0.1);
+  color: #00e59e;
+  border: 1px solid rgba(0, 229, 158, 0.2);
+}
+
+.statusBadge.in_progress {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.statusBadge.not_started,
+.statusBadge.none {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-tertiary);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.statusBadge.active {
+  background: rgba(99, 179, 237, 0.1);
+  color: #63b3ed;
+  border: 1px solid rgba(99, 179, 237, 0.2);
+}
+
+.statusBadge.draft {
+  background: rgba(167, 139, 250, 0.1);
+  color: #a78bfa;
+  border: 1px solid rgba(167, 139, 250, 0.2);
+}
+
+/* CTA BUTTON — full-width pill matching overview card style */
+.cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  text-align: center;
+  transition: all 0.18s ease;
+  cursor: pointer;
+  font-family: 'Inter Tight', sans-serif;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: auto;
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cta:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--text-primary);
+}
+
+.cta:active {
+  transform: scale(0.99);
+}
+
+@media (max-width: 768px) {
+  .lifecycleCard {
+    padding: 1rem;
+  }
+}

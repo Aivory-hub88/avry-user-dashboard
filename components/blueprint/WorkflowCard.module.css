@@ -1,0 +1,184 @@
+.workflowCard {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: 20px;
+  padding: 24px;
+  transition: border-color 0.2s ease;
+}
+
+.workflowCard:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.workflowName {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+}
+
+.triggerSection {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.triggerLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.triggerText {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.stepsSection {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.stepsLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.stepsList {
+  list-style: none;
+  counter-reset: step-counter;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stepItem {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  padding-left: 28px;
+  position: relative;
+  counter-increment: step-counter;
+}
+
+.stepItem::before {
+  content: counter(step-counter);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 20px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.moreSteps {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
+  padding-left: 28px;
+  font-style: italic;
+}
+
+.integrationsSection {
+  margin-bottom: 20px;
+}
+
+.integrationsLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.integrationsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.integrationChip {
+  background: var(--bg-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 400;
+}
+
+.actionsRow {
+  display: flex;
+  gap: 10px;
+}
+
+.actionButton {
+  flex: 1;
+  background: var(--bg-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  font-family: 'Inter Tight', sans-serif;
+  opacity: 0.5;
+}
+
+.primaryButton {
+  flex: 1;
+  background: #3b3a35;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Inter Tight', sans-serif;
+  text-align: center;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.primaryButton:hover {
+  background: #4a4944;
+}
+
+.primaryButton:active {
+  transform: scale(0.98);
+}
+
+@media (max-width: 768px) {
+  .workflowCard {
+    padding: 20px;
+  }
+
+  .actionsRow {
+    flex-direction: column;
+  }
+}

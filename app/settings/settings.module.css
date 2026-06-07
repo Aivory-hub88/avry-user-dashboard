@@ -1,0 +1,65 @@
+.settingsContainer {
+  padding: 2rem;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.pageTitle {
+  font-size: 28px;
+  font-weight: 300;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.pageDescription {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin-bottom: 2.5rem;
+  line-height: 1.5;
+}
+
+.section {
+  margin-bottom: 2.5rem;
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.sectionDescription {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+.languageCards {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.linkButton {
+  padding: 0.75rem 1.25rem;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  background: var(--bg-soft);
+  color: var(--text-primary);
+  border: 1px solid var(--border-soft);
+  transition: all 0.15s ease;
+}
+
+.linkButton:hover {
+  background: var(--bg-elevated);
+  border-color: rgba(255, 255, 255, 0.1);
+}

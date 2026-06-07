@@ -1,0 +1,205 @@
+/**
+ * WorkflowGenerationFlow Styles
+ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8e6e1;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  color: #a8a6a2;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: color 0.15s;
+}
+
+.closeBtn:hover {
+  color: #e8e6e1;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #a8a6a2;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.description,
+.text {
+  margin: 0;
+  font-size: 12px;
+  color: #a8a6a2;
+  line-height: 1.5;
+}
+
+.list,
+.warningList {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 12px;
+  color: #a8a6a2;
+  line-height: 1.6;
+}
+
+.warningList {
+  color: #fbbf24;
+}
+
+.warningList li {
+  margin-bottom: 4px;
+}
+
+.stepsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stepItem {
+  display: flex;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  align-items: flex-start;
+}
+
+.stepNumber {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 229, 158, 0.15);
+  border: 1px solid rgba(0, 229, 158, 0.3);
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #00e59e;
+}
+
+.stepContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.stepType {
+  font-size: 10px;
+  font-weight: 600;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.stepApp {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e8e6e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stepAction {
+  font-size: 11px;
+  color: #a8a6a2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.applyBtn,
+.cancelBtn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.applyBtn {
+  flex: 1;
+  background: rgba(0, 229, 158, 0.15);
+  color: #00e59e;
+  border: 1px solid rgba(0, 229, 158, 0.3);
+}
+
+.applyBtn:hover {
+  background: rgba(0, 229, 158, 0.25);
+  border-color: rgba(0, 229, 158, 0.5);
+}
+
+.cancelBtn {
+  background: rgba(255, 255, 255, 0.06);
+  color: #a8a6a2;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cancelBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+}

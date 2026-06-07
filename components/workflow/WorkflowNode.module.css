@@ -1,0 +1,197 @@
+/* =============================================================================
+   WorkflowNode.module.css — Design v2
+   Structure: node-wrapper > node-upper (always visible) + node-body (expanded only)
+   Connector dots on left and right sides
+   ============================================================================= */
+
+/* ── Wrapper ── */
+.nodeWrapper {
+  position: relative;
+  width: 260px;
+  background: #a4a4a4;
+  border-radius: 16px;
+  padding: 6px;
+  font-family: var(--font-nunito), 'Nunito', sans-serif !important;
+  font-weight: 700 !important;
+  cursor: pointer;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.nodeWrapper * {
+  font-family: var(--font-nunito), 'Nunito', sans-serif !important;
+}
+
+/* ── Selected state (glow on wrapper) ── */
+.nodeWrapper.selected {
+  border: 2px solid rgba(0, 229, 158, 0.6);
+  box-shadow: 0 0 0 2px rgba(0, 229, 158, 0.15);
+}
+
+/* ── Upper bar (always visible) ── */
+.upperBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #676b69;
+  border-radius: 11px;
+  position: relative;
+  z-index: 2;
+}
+
+/* ── Icon box ── */
+.iconBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+/* ── Title ── */
+.title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  flex: 1;
+  line-height: 1.2;
+}
+
+/* ── Chevron button ── */
+.chevronBtn {
+  width: 30px;
+  height: 30px;
+  background: #555958;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.chevronBtn:hover {
+  background: #666a69;
+}
+
+/* ── Node body (expanded only) ── */
+.nodeBody {
+  border-radius: 11px;
+  margin-top: 9px;
+  padding: 16px 18px;
+  --body-bg: #f7f5c7;
+  background: var(--body-bg);
+}
+
+.nodeBody p {
+  font-size: 14px;
+  font-weight: 700;
+  color: #3a3a1a;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.restTitle {
+  margin: 0 0 8px 0;
+}
+
+/* ── Connector dots (input/output handles) ── */
+.connectorDotLeft,
+.connectorDotRight {
+  width: 12px;
+  height: 12px;
+  background: #00d9a3;
+  border-radius: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.connectorDotLeft {
+  left: -6px;
+}
+
+.connectorDotRight {
+  right: -6px;
+}
+
+/* ── ReactFlow handles (hidden, for connections) ── */
+.handle {
+  width: 12px !important;
+  height: 12px !important;
+  background: #00d9a3 !important;
+  border: 2px solid #1a1a18 !important;
+  border-radius: 50% !important;
+  opacity: 0;
+}
+
+/* ── Action buttons container (hover reveal) ── */
+.actionButtons {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+.nodeWrapper:hover .actionButtons,
+.nodeWrapper.selected .actionButtons {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Action button base ── */
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.actionBtn:active {
+  transform: scale(0.94);
+}
+
+/* ── Action button variants ── */
+.infoBtn {
+  background: rgba(59, 130, 246, 0.85);
+  color: #fff;
+}
+.infoBtn:hover {
+  background: rgba(59, 130, 246, 1);
+}
+
+.addBtn {
+  background: rgba(0, 180, 120, 0.85);
+  color: #fff;
+}
+.addBtn:hover {
+  background: rgba(0, 180, 120, 1);
+}
+
+.deleteBtn {
+  background: rgba(200, 60, 60, 0.85);
+  color: #fff;
+}
+.deleteBtn:hover {
+  background: rgba(200, 60, 60, 1);
+}

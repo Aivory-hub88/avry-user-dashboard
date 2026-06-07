@@ -1,0 +1,40 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.svg {
+  overflow: visible;
+}
+
+.track {
+  fill: none;
+  stroke: #3a3a36;
+  stroke-width: 12;
+}
+
+.arc {
+  fill: none;
+  stroke: #00e59e;
+  stroke-width: 12;
+  stroke-linecap: round;
+  transition: stroke-dasharray 1s ease-out;
+}
+
+.centerScore {
+  font-size: 36px;
+  font-weight: 800;
+  fill: #e5e5e3;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+.centerMaturity {
+  font-size: 12px;
+  font-weight: 500;
+  fill: #a1a1aa;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}

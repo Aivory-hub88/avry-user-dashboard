@@ -1,0 +1,26 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.block {
+  background: #262623;
+  border-radius: 12px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.headerBlock { height: 64px; }
+.scorecardBlock { height: 280px; }
+.roiBlock { height: 200px; }
+.matrixBlock { height: 420px; }
+.riskBlock { height: 160px; }
+.contextBlock { height: 200px; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

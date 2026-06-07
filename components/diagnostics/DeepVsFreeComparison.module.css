@@ -1,0 +1,154 @@
+.section {
+  background: #353531;
+  padding: 2.5rem 0;
+}
+
+.title {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #f5f5f4;
+  margin: 0 0 2rem 0;
+}
+
+/* Two-column layout */
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Cards */
+.card {
+  background: #2a2926;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border-left: 3px solid transparent;
+}
+
+.deepCard {
+  border-left-color: #d97706;
+}
+
+.freeCard {
+  border-left-color: #78716c;
+}
+
+/* Card header */
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.cardName {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f5f5f4;
+}
+
+.badge {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.deepBadge {
+  background: rgba(217, 119, 6, 0.15);
+  color: #d97706;
+}
+
+.freeBadge {
+  background: rgba(120, 113, 108, 0.2);
+  color: #a8a29e;
+}
+
+/* Feature lists */
+.featureList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.featureItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+}
+
+.checkmark {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.deepCheckmark {
+  color: #d97706;
+}
+
+.freeCheckmark {
+  color: #78716c;
+}
+
+.featureText {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 0.9375rem;
+  color: #d4d0cb;
+  line-height: 1.5;
+}
+
+/* Common features section */
+.commonSection {
+  background: #2a2926;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid #44403c;
+}
+
+.commonTitle {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #a8a29e;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 1rem 0;
+}
+
+.commonList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+}
+
+.commonItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.commonCheckmark {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #78716c;
+}

@@ -1,0 +1,66 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.svg {
+  display: block;
+  overflow: visible;
+}
+
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legendLabel {
+  font-size: 12px;
+  color: #a1a1aa;
+  white-space: nowrap;
+}
+
+.axisLabel {
+  font-size: 11px;
+  fill: #a1a1aa;
+  text-anchor: middle;
+}
+
+.axisLabelY {
+  font-size: 11px;
+  fill: #a1a1aa;
+  text-anchor: middle;
+}
+
+.quadrantLabel {
+  font-size: 11px;
+  fill: #666864;
+  font-style: italic;
+}
+
+  .divider {
+    stroke: #ffffff;
+    stroke-width: 0.5;
+    stroke-dasharray: 4 4;
+  }
+
+.dot {
+  cursor: pointer;
+  transition: r 0.15s ease;
+}

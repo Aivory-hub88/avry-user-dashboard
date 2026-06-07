@@ -1,0 +1,335 @@
+.chatMessageRow {
+  display: flex;
+  margin-bottom: 24px;
+  gap: 10px;
+}
+
+.chatMessageRow.user {
+  justify-content: flex-end;
+}
+
+.chatMessageRow.ai {
+  justify-content: flex-start;
+}
+
+/* ── User bubble (unchanged) ── */
+.chatBubble {
+  max-width: 720px;
+  padding: 16px 22px;
+  border-radius: 14px;
+  font-size: 15px;
+  line-height: 1.7;
+  border: 1px solid var(--border-soft);
+  word-break: break-word;
+}
+
+.chatBubble.userBubble {
+  background: var(--bg-soft);
+  border-top-right-radius: 4px;
+  border-right: none;
+}
+
+/* ── AIRA flat content block (transparent, blends with console bg) ── */
+.airaCard {
+  width: 100%;
+  max-width: 720px;
+  padding: 16px 18px;
+  background: transparent;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  word-break: break-word;
+}
+
+.airaCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.airaCardAvatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.airaCardBody {
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+/* Compact variant for floating AIRA panel */
+.airaCardCompact {
+  padding: 10px 14px;
+}
+
+.airaCardCompact .airaCardHeader {
+  margin-bottom: 6px;
+}
+
+.airaCardCompact .airaCardBody {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.messageContent,
+.airaCardBody {
+  color: var(--text-primary);
+  word-wrap: break-word;
+  line-height: 1.7;
+  text-align: left;
+}
+
+/* Inline code styling */
+.inlineCode {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e879f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.9em;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Code block wrapper */
+.codeBlockWrapper {
+  margin: 12px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1e1e1e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Code block header with language and copy button */
+.codeBlockHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #2d2d2d;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.codeLanguage {
+  font-size: 12px;
+  color: #a0a0a0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Copy button styling */
+.copyButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: #a0a0a0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+}
+
+.copyButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.copyButton:active {
+  transform: scale(0.95);
+}
+
+.copyButton svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Markdown content styling */
+.messageContent p,
+.airaCardBody p {
+  margin: 0 0 14px 0;
+}
+
+.messageContent p:last-child,
+.airaCardBody p:last-child {
+  margin-bottom: 0;
+}
+
+.messageContent ul,
+.messageContent ol,
+.airaCardBody ul,
+.airaCardBody ol {
+  margin: 8px 0 14px 0;
+  padding-left: 24px;
+}
+
+.messageContent li,
+.airaCardBody li {
+  margin: 6px 0;
+  line-height: 1.65;
+}
+
+.messageContent h1,
+.messageContent h2,
+.messageContent h3,
+.messageContent h4,
+.messageContent h5,
+.messageContent h6,
+.airaCardBody h1,
+.airaCardBody h2,
+.airaCardBody h3,
+.airaCardBody h4,
+.airaCardBody h5,
+.airaCardBody h6 {
+  margin: 10px 0 4px 0;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.messageContent h1, .airaCardBody h1 { font-size: 1.5em; }
+.messageContent h2, .airaCardBody h2 { font-size: 1.3em; }
+.messageContent h3, .airaCardBody h3 { font-size: 1.1em; }
+
+.messageContent blockquote,
+.airaCardBody blockquote {
+  margin: 12px 0;
+  padding-left: 16px;
+  border-left: 3px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-secondary);
+}
+
+.messageContent a,
+.airaCardBody a {
+  color: #60a5fa;
+  text-decoration: none;
+}
+
+.messageContent a:hover,
+.airaCardBody a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  .chatBubble {
+    max-width: calc(100vw - 80px);
+    padding: 14px 18px;
+    font-size: 14px;
+  }
+
+  .airaCard {
+    padding: 12px 0;
+  }
+
+  .airaCardBody {
+    font-size: 13px;
+  }
+
+  .codeBlockWrapper {
+    margin: 10px -4px;
+  }
+
+  .codeBlockHeader {
+    padding: 6px 10px;
+  }
+
+  .copyButton {
+    padding: 3px 6px;
+  }
+}
+
+/* Tabs container */
+.tabsContainer {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 8px;
+}
+
+/* Individual tab button */
+.tab {
+  padding: 6px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 6px 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+/* Active tab styling */
+.activeTab {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.activeTab::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent-primary);
+  border-radius: 2px 2px 0 0;
+}
+
+@media (max-width: 768px) {
+  .tabsContainer {
+    gap: 2px;
+    margin-bottom: 12px;
+  }
+
+  .tab {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+}
+
+/* Compact variant — used in floating AIRA panel (card layout) */
+
+.compactContent {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.compactContent p {
+  margin: 0 0 8px 0;
+}
+
+.compactContent p:last-child {
+  margin-bottom: 0;
+}
+
+.compactContent ul,
+.compactContent ol {
+  margin: 6px 0 10px 0;
+  padding-left: 20px;
+}
+
+.compactContent li {
+  margin: 4px 0;
+  line-height: 1.55;
+}
+
+.compactContent h1,
+.compactContent h2,
+.compactContent h3 {
+  margin: 8px 0 4px 0;
+}

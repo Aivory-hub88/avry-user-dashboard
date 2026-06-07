@@ -1,0 +1,296 @@
+/* Node Configuration Panel Styling */
+
+.panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  height: 100vh;
+  width: 320px;
+  background: rgba(20, 19, 17, 0.95);
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.2s ease;
+  z-index: 1000;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Panel Header */
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.headerContent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.headerIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.headerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.headerTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e8e6e1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.headerType {
+  font-size: 10px;
+  color: #a8a6a2;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.closeButton {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #a8a6a2;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.closeButton:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #d4d2ce;
+}
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Panel Content */
+.panelContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Section */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sectionLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: #a8a6a2;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Select */
+.select {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #d4d2ce;
+  font-size: 12px;
+  padding: 8px 10px;
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.select:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.select:focus {
+  border-color: rgba(0, 229, 158, 0.4);
+  background: rgba(0, 229, 158, 0.02);
+}
+
+/* Warning */
+.warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #f87171;
+  padding: 8px 10px;
+  background: rgba(248, 113, 113, 0.05);
+  border: 1px solid rgba(248, 113, 113, 0.15);
+  border-radius: 6px;
+}
+
+.warning a {
+  color: #00e59e;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.15s ease;
+}
+
+.warning a:hover {
+  color: #00f5b0;
+  text-decoration: underline;
+}
+
+/* Parameters Container */
+.parametersContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.parameterField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.parameterLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: #a8a6a2;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.input,
+.textarea {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #d4d2ce;
+  font-size: 12px;
+  padding: 8px 10px;
+  outline: none;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.input:hover,
+.textarea:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.input:focus,
+.textarea:focus {
+  border-color: rgba(0, 229, 158, 0.4);
+  background: rgba(0, 229, 158, 0.02);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* Panel Footer */
+.panelFooter {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.deleteButton {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  color: #f87171;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.deleteButton:hover {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.closeButtonFooter {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(0, 229, 158, 0.1);
+  border: 1px solid rgba(0, 229, 158, 0.2);
+  color: #00e59e;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.closeButtonFooter:hover {
+  background: rgba(0, 229, 158, 0.2);
+  border-color: rgba(0, 229, 158, 0.4);
+}
+
+/* Scrollbar Styling */
+.panelContent::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panelContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panelContent::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+
+.panelContent::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.12);
+}

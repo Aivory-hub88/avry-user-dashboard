@@ -1,0 +1,113 @@
+.card {
+  background: #262623;
+  border: 1px solid #4a4a46;
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.colorDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e5e5e3;
+  margin: 0;
+}
+
+.quadrantBadge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(0, 229, 158, 0.12);
+  color: #00e59e;
+  border: 1px solid rgba(0, 229, 158, 0.25);
+  white-space: nowrap;
+}
+
+.metrics {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metricLabel {
+  font-size: 11px;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metricValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e5e5e3;
+}
+
+.roiNote {
+  font-size: 13px;
+  color: #a1a1aa;
+  font-style: italic;
+}
+
+.badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  color: #a1a1aa;
+}
+
+.badgeReady {
+  color: #00e59e;
+  border-color: rgba(0, 229, 158, 0.3);
+  background: rgba(0, 229, 158, 0.08);
+}
+
+.badgeNeedsPrep {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.3);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.badgeNotReady {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(248, 113, 113, 0.08);
+}

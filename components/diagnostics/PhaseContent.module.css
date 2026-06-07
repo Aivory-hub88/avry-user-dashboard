@@ -1,0 +1,333 @@
+.phaseContent {
+  width: 100%;
+}
+
+.phaseHeader {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.phaseTitle {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 18px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.86);
+  margin: 0 0 6px 0;
+  letter-spacing: 0;
+}
+
+.phaseDescription {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.88);
+  margin: 0;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+.questionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.questionItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.questionLabel {
+  display: flex;
+  gap: 8px;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f5f5f4;
+  cursor: pointer;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+.questionNumber {
+  flex-shrink: 0;
+  color: #66e5a6;
+  font-weight: 600;
+}
+
+.questionText {
+  flex: 1;
+}
+
+.requiredIndicator {
+  color: #f08f86;
+  margin-left: 0.25rem;
+  font-weight: 600;
+}
+
+.helperText {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.86);
+  margin: 0;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+.inputWrapper {
+  width: 100%;
+}
+
+/* Text / Number / Textarea / Select inputs */
+.textInput,
+.numberInput {
+  width: 100%;
+  min-height: auto;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 13px;
+  color: #f5f5f4;
+  transition: all 0.18s ease;
+  box-sizing: border-box;
+}
+
+.textInput:focus,
+.numberInput:focus {
+  outline: none;
+  border-color: rgba(102, 229, 166, 0.55);
+  box-shadow: 0 0 0 3px rgba(102, 229, 166, 0.08);
+}
+
+.textInput::placeholder,
+.numberInput::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.textareaInput {
+  width: 100%;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 13px;
+  color: #f5f5f4;
+  resize: vertical;
+  min-height: 80px;
+  transition: all 0.18s ease;
+  box-sizing: border-box;
+}
+
+.textareaInput:focus {
+  outline: none;
+  border-color: rgba(102, 229, 166, 0.55);
+  box-shadow: 0 0 0 3px rgba(102, 229, 166, 0.08);
+}
+
+.textareaInput::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.selectInput {
+  width: 100%;
+  min-height: auto;
+  padding: 9px 36px 9px 12px;
+  background-color: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 13px;
+  color: #f5f5f4;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23ffffff40' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 12px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  box-sizing: border-box;
+}
+
+.selectInput:focus {
+  outline: none;
+  border-color: rgba(102, 229, 166, 0.55);
+  box-shadow: 0 0 0 3px rgba(102, 229, 166, 0.08);
+}
+
+.selectInput option {
+  background: #1a1a1a;
+  color: #f5f5f4;
+}
+
+/* Radio Group */
+.radioGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.radioLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.radioLabel:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.radioLabel:has(.radioInput:checked) {
+  background: rgba(102, 229, 166, 0.07);
+  border-color: rgba(102, 229, 166, 0.36);
+}
+
+.radioLabel:has(.radioInput:focus) {
+  outline: 2px solid rgba(0, 229, 158, 0.3);
+  outline-offset: 2px;
+}
+
+.radioInput {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  accent-color: #66e5a6;
+  cursor: pointer;
+}
+
+.radioText {
+  flex: 1;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 13px;
+  color: #f5f5f4;
+  line-height: 1.5;
+}
+
+/* Multiselect / Checkbox Group */
+.multiselectGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.checkboxLabel:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.checkboxLabel:has(.checkboxInput:checked) {
+  background: rgba(102, 229, 166, 0.07);
+  border-color: rgba(102, 229, 166, 0.36);
+}
+
+.checkboxLabel:has(.checkboxInput:focus) {
+  outline: 2px solid rgba(0, 229, 158, 0.3);
+  outline-offset: 2px;
+}
+
+.checkboxInput {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  accent-color: #66e5a6;
+  cursor: pointer;
+}
+
+.checkboxText {
+  flex: 1;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 13px;
+  color: #f5f5f4;
+  line-height: 1.5;
+}
+
+/* Error State */
+.inputError {
+  border-color: rgba(239, 68, 68, 0.5) !important;
+}
+
+.inputError:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.08) !important;
+}
+
+.errorText {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 0.875rem;
+  color: #f87171;
+  margin: 0;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.errorText::before {
+  content: '!';
+  font-size: 1rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .phaseHeader {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+  }
+
+  .phaseTitle {
+    font-size: 1.25rem;
+  }
+
+  .questionsList {
+    gap: 1.5rem;
+  }
+
+  .textInput,
+  .textareaInput,
+  .selectInput,
+  .numberInput {
+    font-size: 0.875rem;
+    padding: 0.625rem 0.875rem;
+  }
+
+  .radioLabel,
+  .checkboxLabel {
+    padding: 0.75rem 0.875rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .textInput,
+  .textareaInput,
+  .selectInput,
+  .numberInput,
+  .radioLabel,
+  .checkboxLabel {
+    transition: none;
+  }
+}

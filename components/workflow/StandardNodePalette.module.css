@@ -1,0 +1,98 @@
+/* StandardNodePalette — draggable standard node cards */
+
+.section {
+  padding: 10px 0 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 4px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sectionTitle {
+  font-size: 10px;
+  font-weight: 700;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.chevron {
+  font-size: 10px;
+  color: #a1a1aa;
+  transition: transform 0.15s ease;
+}
+
+.chevron.open {
+  transform: rotate(90deg);
+}
+
+.nodeList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 8px;
+}
+
+.nodeCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: grab;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  user-select: none;
+}
+
+.nodeCard:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.nodeCard:active {
+  cursor: grabbing;
+}
+
+.nodeIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.nodeInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.nodeName {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d4d2ce;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nodeCategory {
+  font-size: 9px;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}

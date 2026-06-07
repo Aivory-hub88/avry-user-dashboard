@@ -1,0 +1,215 @@
+/* FIXED: CARD GLASS — glassmorphism overview card */
+.overviewCard {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 1.75rem 1.75rem 1.5rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255,255,255,0.04) inset;
+  transition: border-color 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  height: 100%;
+  min-height: 0;
+}
+
+.overviewCard:hover {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* FIXED: CARD HEADER — title only, no ring */
+.cardHeader {
+  margin-bottom: 0;
+}
+
+.titleBlock {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+/* PROGRESS RING — hidden in new layout */
+.ringWrap {
+  display: none;
+}
+
+.ring { display: none; }
+.ringBg { display: none; }
+.ringFill { display: none; }
+.ringTextBlock { display: none; }
+.ringCaption { display: none; }
+.ringNumberRow { display: none; }
+.ringLabel { display: none; }
+.ringSubLabel { display: none; }
+
+/* FIXED: STATUS GRID — 3-col metrics row */
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.statusItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.85rem 0.9rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  line-height: 1.4;
+}
+
+.value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.detail {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.placeholder {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* ADDED: STATUS BADGE — color-coded inline badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  width: fit-content;
+}
+
+.badgeGreen {
+  background: rgba(0, 229, 158, 0.1);
+  color: #00e59e;
+  border: 1px solid rgba(0, 229, 158, 0.2);
+}
+
+.badgeYellow {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.badgeRed {
+  background: rgba(248, 113, 113, 0.1);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+.badgeGray {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-tertiary);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ADDED: 2x2 CTA GRID — icon + label buttons */
+.ctaGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.ctaBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.85rem 1.1rem;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.18s ease;
+  cursor: pointer;
+  font-family: 'Inter Tight', sans-serif;
+  line-height: 1.3;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-primary);
+}
+
+.ctaBtn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.ctaBtn:active {
+  transform: scale(0.99) translateY(0);
+}
+
+.ctaBtnPrimary {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.ctaBtnPrimary:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.ctaIcon {
+  flex-shrink: 0;
+  opacity: 0.8;
+  transition: opacity 0.15s;
+}
+
+.ctaBtn:hover .ctaIcon {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .overviewCard {
+    padding: 1.25rem;
+    gap: 1rem;
+  }
+  .statusGrid {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  .ctaGrid {
+    grid-template-columns: 1fr;
+  }
+}

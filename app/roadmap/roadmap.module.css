@@ -1,0 +1,727 @@
+/* ── Base layout ─────────────────────────────────────────────── */
+.page {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-main, #353531);
+  color: var(--text-primary, #e8e6e3);
+  font-family: 'Inter Tight', 'Inter', system-ui, sans-serif;
+}
+
+.inner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 24px 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.headerLeft h1 {
+  font-size: 1.625rem;
+  font-weight: 300;
+  font-family: 'Inter Tight', sans-serif;
+  color: var(--text-primary, #e8e6e3);
+  margin: 0 0 6px !important;
+  letter-spacing: -0.3px;
+  line-height: 1.3;
+}
+
+.headerLeft p {
+  font-size: 0.9rem;
+  color: #f7f7f7;
+  margin: 0;
+}
+
+.headerRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.headerMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: #282827;
+  color: #dddac5;
+  border: 1px solid #666864;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.updatedAt {
+  font-size: 12px;
+  color: #dddac5;
+}
+
+/* ── Timeline bar ────────────────────────────────────────────── */
+.timelineWrap {
+  position: relative;
+  background: var(--card-bg, rgba(255,255,255,0.03));
+  backdrop-filter: var(--card-backdrop, blur(8px));
+  -webkit-backdrop-filter: var(--card-backdrop, blur(8px));
+  border: 1px solid #666864;
+  border-radius: var(--card-radius, 18px);
+  padding: 24px 28px 20px;
+  overflow-x: auto;
+  box-shadow: var(--card-shadow, 0 4px 20px rgba(0,0,0,0.3));
+}
+
+.timelineTrack {
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+  min-width: 480px;
+}
+
+.timelineItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+}
+
+.timelineConnector {
+  position: absolute;
+  top: 15px;
+  left: calc(50% + 16px);
+  right: calc(-50% + 16px);
+  height: 2px;
+  background: linear-gradient(to right, #666864, rgba(255,255,255,0.06));
+}
+
+.timelineNode {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.04);
+  border: 2px solid #666864;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.timelineNode.active {
+  border-color: #dddac5;
+  background: #282827;
+  box-shadow: 0 0 0 5px rgba(255,255,255,0.06), 0 0 16px rgba(0,0,0,0.2);
+}
+
+.timelineNodeNum {
+  font-size: 12px;
+  font-weight: 700;
+  color: #dddac5;
+}
+
+.timelineLabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: 10px;
+  text-align: center;
+  padding: 0 4px;
+}
+
+.timelineName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c8c6c3;
+  line-height: 1.3;
+}
+
+.timelineTime {
+  font-size: 11px;
+  color: #dddac5;
+}
+
+/* ── Phase cards ─────────────────────────────────────────────── */
+.phases {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.phaseCard {
+  background: var(--card-bg, rgba(255,255,255,0.03));
+  backdrop-filter: var(--card-backdrop, blur(8px));
+  -webkit-backdrop-filter: var(--card-backdrop, blur(8px));
+  border: 1px solid var(--card-border, rgba(255,255,255,0.05));
+  border-radius: var(--card-radius, 18px);
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-shadow: var(--card-shadow, 0 4px 20px rgba(0,0,0,0.3));
+}
+
+.phaseCard:hover {
+  border-color: rgba(255,255,255,0.09);
+  box-shadow: 0 6px 28px rgba(0,0,0,0.4);
+}
+
+.phaseCard.complete {
+  border-color: #666864;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset;
+}
+
+.phaseHeader {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  gap: 12px;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.phaseHeader:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.phaseHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.phaseIconBadge {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  flex-shrink: 0;
+  background: #282827;
+  border: 1px solid #666864;
+  color: #dddac5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.phaseCard.complete .phaseIconBadge {
+  background: #282827;
+  border-color: #666864;
+}
+
+.phaseTitleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.phaseTitle {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: #f0ede9;
+  line-height: 1.3;
+}
+
+.phaseTimeframe {
+  font-size: 0.8rem;
+  color: #dddac5;
+}
+
+.phaseHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.completeBadge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: #282827;
+  color: #dddac5;
+  border: 1px solid #666864;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.progressCount {
+  font-size: 11px;
+  color: #dddac5;
+  font-variant-numeric: tabular-nums;
+}
+
+.chevron {
+  color: #dddac5;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.chevron.open {
+  transform: rotate(90deg);
+}
+
+/* ── Progress bar ────────────────────────────────────────────── */
+.progressBar {
+  height: 3px;
+  background: rgba(255,255,255,0.04);
+  width: 100%;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(to right, #666864, #555553);
+  transition: width 0.4s ease;
+  border-radius: 0 2px 2px 0;
+}
+
+/* ── Phase body ──────────────────────────────────────────────── */
+.phaseBody {
+  padding: 0 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+.phaseDescription {
+  font-size: 0.9rem;
+  color: #dddac5;
+  line-height: 1.65;
+  margin: 14px 0 0;
+}
+
+/* ── Section label ───────────────────────────────────────────── */
+.sectionLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: #00e59e;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0 0 8px;
+}
+
+/* ── Milestones ──────────────────────────────────────────────── */
+.milestoneList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.milestoneItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.milestoneCheck {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  border: 1.5px solid rgba(255,255,255,0.18);
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s;
+  color: #0a0a0a;
+}
+
+.milestoneCheck:hover {
+  border-color: #666864;
+}
+
+.milestoneCheck.checked {
+  background: #dddac5;
+  border-color: #dddac5;
+}
+
+.milestoneText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.milestoneTitle {
+  font-size: 0.9rem;
+  color: #e8e6e3;
+  line-height: 1.45;
+  transition: color 0.15s;
+}
+
+.milestoneTitle.done {
+  color: #dddac5;
+  text-decoration: line-through;
+}
+
+.milestoneDesc {
+  font-size: 0.8rem;
+  color: #dddac5;
+  line-height: 1.5;
+}
+
+.workflowChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.workflowChip {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: #282827;
+  color: #dddac5;
+  border: 1px solid #666864;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+
+.workflowChip:hover {
+  background: #666864;
+}
+
+/* ── KPI grid ────────────────────────────────────────────────── */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.kpiCard {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kpiLabel {
+  font-size: 0.7rem;
+  color: #00e59e;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.kpiTarget {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #00e59e;
+  line-height: 1.2;
+  letter-spacing: -0.3px;
+}
+
+/* ── Phase actions ───────────────────────────────────────────── */
+.phaseActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.btnGhost {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: #f7f7f7;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btnGhost:hover:not(:disabled) {
+  border-color: #666864;
+  color: #dddac5;
+}
+
+.btnGhost:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btnComplete {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: #f7f7f7;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.btnComplete:hover,
+.btnComplete.active {
+  border-color: #666864;
+  color: #dddac5;
+  background: #282827;
+}
+
+.btnAira {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid #666864;
+  background: #282827;
+  color: #dddac5;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btnAira:hover {
+  border-color: #666864;
+  background: rgba(255,255,255,0.06);
+}
+
+.btnPrimary {
+  background: #353532;
+  color: var(--text-secondary, #f7f7f7);
+  border: 1px solid #666864;
+  border-radius: 20px;
+  padding: 13px 32px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.15s;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: #444440;
+}
+
+.btnPrimary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Bottom action row ───────────────────────────────────────── */
+.actionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 18px 20px;
+  background: var(--card-bg, rgba(255,255,255,0.03));
+  backdrop-filter: var(--card-backdrop, blur(8px));
+  -webkit-backdrop-filter: var(--card-backdrop, blur(8px));
+  border: 1px solid var(--card-border, rgba(255,255,255,0.05));
+  border-radius: var(--card-radius, 18px);
+  box-shadow: var(--card-shadow, 0 4px 20px rgba(0,0,0,0.3));
+}
+
+.actionHint {
+  font-size: 13px;
+  color: #dddac5;
+  flex: 1;
+  min-width: 180px;
+}
+
+.actionBtns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Error ───────────────────────────────────────────────────── */
+.error {
+  font-size: 0.875rem;
+  color: #f87171;
+  padding: 10px 14px;
+  background: rgba(239,68,68,0.07);
+  border: 1px solid rgba(239,68,68,0.18);
+  border-radius: 8px;
+  margin: 0;
+}
+
+/* ── Loading ─────────────────────────────────────────────────── */
+.loadingWrap {
+  height: 100%;
+  background: var(--bg-main, #353531);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 2.5px solid rgba(255,255,255,0.06);
+  border-top-color: #dddac5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinnerSm {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(10,10,10,0.25);
+  border-top-color: #0a0a0a;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Empty state ─────────────────────────────────────────────── */
+.emptyCard {
+  background: var(--card-bg, rgba(255,255,255,0.03));
+  backdrop-filter: var(--card-backdrop, blur(8px));
+  -webkit-backdrop-filter: var(--card-backdrop, blur(8px));
+  border: 1px solid var(--card-border, rgba(255,255,255,0.05));
+  border-radius: var(--card-radius, 18px);
+  padding: 60px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 20px;
+  box-shadow: var(--card-shadow, 0 4px 20px rgba(0,0,0,0.3));
+}
+
+.emptyIllustration {
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.emptyTitle {
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: #e8e6e3;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.emptyBody {
+  font-size: 0.9375rem;
+  color: #f7f7f7;
+  line-height: 1.7;
+  max-width: 480px;
+  margin: 0;
+}
+
+.proTip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid #282827;
+  border-radius: 10px;
+  max-width: 480px;
+  width: 100%;
+}
+
+.proTipText {
+  font-size: 0.8125rem;
+  color: #dddac5;
+  line-height: 1.5;
+}
+
+.proTipLinks {
+  display: flex;
+  gap: 8px;
+}
+
+.btnProTip {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: #f7f7f7;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.btnProTip:hover {
+  border-color: #666864;
+  color: #dddac5;
+}
+
+/* ── Roadmap title ───────────────────────────────────────────── */
+.roadmapTitle {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #c8c6c3;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .inner {
+    padding: 24px 16px 80px;
+  }
+  .header {
+    flex-direction: column;
+  }
+  .headerRight {
+    align-items: flex-start;
+  }
+  .emptyCard {
+    padding: 40px 20px;
+  }
+  .timelineTrack {
+    min-width: 360px;
+  }
+}

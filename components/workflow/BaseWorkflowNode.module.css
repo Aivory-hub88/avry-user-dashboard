@@ -1,0 +1,143 @@
+/* BaseWorkflowNode — shared wrapper for all canvas nodes */
+
+.wrapper {
+  position: relative;
+  display: block;
+  width: 100%;
+  border-radius: 999px;
+  font-family: var(--font-nunito), 'Nunito', sans-serif;
+  font-weight: 500;
+  overflow: visible;
+}
+
+/* Left/Right handles — hover-reveal */
+.handleLeft,
+.handleRight {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(0, 229, 158, 0.25);
+  border: 2px solid rgba(0, 229, 158, 0.45);
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  cursor: crosshair;
+  z-index: 10;
+  /* CRITICAL: must be interactable even when invisible so drag-to-connect works */
+  pointer-events: all !important;
+}
+
+.handleLeft {
+  left: -6px;
+}
+
+.handleRight {
+  right: -6px;
+}
+
+.wrapper:hover .handleLeft,
+.wrapper:hover .handleRight,
+.wrapper.selected .handleLeft,
+.wrapper.selected .handleRight {
+  opacity: 1;
+}
+
+.handleLeft:hover,
+.handleRight:hover {
+  background: #00e59e;
+  border-color: #00f5b0;
+  width: 12px;
+  height: 12px;
+}
+
+/* Hover edit button — floats above pill */
+.editBtn {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-26px);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.85);
+  border: none;
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 30;
+  padding: 0;
+}
+
+.wrapper:hover .editBtn,
+.wrapper.selected .editBtn {
+  opacity: 1;
+}
+
+/* Hover delete button — floats above pill */
+.deleteBtn {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(4px);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(200, 60, 60, 0.85);
+  border: none;
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 30;
+  padding: 0;
+}
+
+.wrapper:hover .deleteBtn,
+.wrapper.selected .deleteBtn {
+  opacity: 1;
+}
+
+/* "+" add-step button — appears further right so it doesn't block the source handle */
+.addBtn {
+  position: absolute;
+  right: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 229, 158, 0.12);
+  border: 1px solid rgba(0, 229, 158, 0.3);
+  color: #00e59e;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  z-index: 20;
+}
+
+.wrapper:hover .addBtn,
+.wrapper.selected .addBtn {
+  opacity: 1;
+}
+
+.addBtn:hover {
+  background: rgba(0, 229, 158, 0.25);
+  border-color: rgba(0, 229, 158, 0.5);
+}

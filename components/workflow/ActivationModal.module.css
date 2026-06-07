@@ -1,0 +1,280 @@
+/* ─────────────────────────────────────────────────────────
+   ActivationModal — dark warm theme matching workflows page
+   Color system:
+     Canvas bg:      var(--bg-main, #353531)
+     Card surface:   rgba(255,255,255,0.055)
+     Border:         rgba(255,255,255,0.08)
+     Body text:      #a8a6a2
+     Title text:     #e8e6e1
+     Input bg:       rgba(255,255,255,0.04)
+───────────────────────────────────────────────────────── */
+
+/* ── Overlay ────────────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Modal container ────────────────────────────────────── */
+.modal {
+  background: var(--bg-main, #353531);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  width: 480px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ── Form ───────────────────────────────────────────────── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px;
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 300;
+  font-family: 'Inter Tight', 'Inter', system-ui, sans-serif;
+  color: #e8e6e1;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #a8a6a2;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e8e6e1;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* ── Field groups ───────────────────────────────────────── */
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #a8a6a2;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.input {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  color: #d4d2ce;
+  font-size: 13px;
+  padding: 11px 14px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  border-color: #666864;
+}
+
+.input::placeholder {
+  color: #6b6a67;
+}
+
+/* ── Validation error ───────────────────────────────────── */
+.validationError {
+  font-size: 12px;
+  color: #c0504a;
+  margin-top: -2px;
+}
+
+/* ── API Key row with reveal toggle ─────────────────────── */
+.apiKeyRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.apiKeyRow .input {
+  flex: 1;
+}
+
+.revealBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: #a8a6a2;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.revealBtn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: #666864;
+  color: #e8e6e1;
+}
+
+/* ── Radio group (storage preference) ───────────────────── */
+.radioGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.radioOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.radioOption:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.radioOption input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  margin: 2px 0 0 0;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.radioOption input[type="radio"]:checked {
+  border-color: #a8a6a2;
+  background: radial-gradient(circle, #a8a6a2 40%, transparent 45%);
+}
+
+.radioContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.radioTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: #d4d2ce;
+}
+
+.radioDesc {
+  font-size: 11px;
+  color: #a8a6a2;
+  line-height: 1.5;
+}
+
+/* ── Actions ────────────────────────────────────────────── */
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.cancelBtn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  color: #a8a6a2;
+  font-size: 13px;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.cancelBtn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #e8e6e1;
+}
+
+.cancelBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.submitBtn {
+  background: #282827;
+  border: 1px solid #666864;
+  border-radius: 9px;
+  color: #e8e6e1;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: #3a3d3a;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.submitBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

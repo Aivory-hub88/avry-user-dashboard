@@ -1,0 +1,37 @@
+.tile {
+  background: #262623;
+  border: 1px solid #666864;
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #00e59e;
+  line-height: 1.2;
+}
+
+.insufficient {
+  font-size: 14px;
+  font-style: italic;
+  color: #666864;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: #888886;
+  font-style: italic;
+  margin-top: -4px;
+}

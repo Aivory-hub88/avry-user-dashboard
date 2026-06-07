@@ -1,0 +1,107 @@
+/* Trigger Node Styling */
+
+.triggerNode {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  min-width: 180px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.triggerNode.selected {
+  border-color: rgba(0, 229, 158, 0.35);
+  box-shadow: 0 0 0 2px rgba(0, 229, 158, 0.1), 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Node Header */
+.nodeHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.nodeIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.nodeName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e8e6e1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Node Content */
+.nodeContent {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nodeField {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.nodeLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: #a8a6a2;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.nodeSelect {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #d4d2ce;
+  font-size: 12px;
+  padding: 6px 8px;
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.nodeSelect:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.nodeSelect:focus {
+  border-color: rgba(0, 229, 158, 0.4);
+  background: rgba(0, 229, 158, 0.02);
+}
+
+/* Handles */
+.handle {
+  width: 8px;
+  height: 8px;
+  background: rgba(0, 229, 158, 0.3);
+  border: 2px solid rgba(0, 229, 158, 0.5);
+  border-radius: 50%;
+  transition: all 0.15s ease;
+}
+
+.handle:hover {
+  background: #00e59e;
+  border-color: #00f5b0;
+  width: 10px;
+  height: 10px;
+}

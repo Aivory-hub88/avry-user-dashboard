@@ -1,0 +1,77 @@
+/* N8N Adaptive Edge — walking ants animation + selection state */
+
+/* Default edge: dashed, animated marching ants */
+.n8nEdge {
+  stroke: #9ca3af;
+  stroke-width: 2px;
+  stroke-dasharray: 5 5;
+  stroke-linecap: round;
+  fill: none;
+  animation: n8nDash 1.5s linear infinite;
+  transition: stroke 0.15s ease, stroke-width 0.15s ease;
+}
+
+.n8nEdge:hover {
+  stroke: #d1d5db;
+  stroke-width: 2.5px;
+}
+
+/* Selected edge: solid, thicker, primary blue */
+.n8nEdgeSelected {
+  stroke: #3b82f6;
+  stroke-width: 2.5px;
+  stroke-dasharray: none;
+  animation: none;
+}
+
+.n8nEdgeSelected:hover {
+  stroke: #60a5fa;
+  stroke-width: 3px;
+}
+
+/* Walking-ants keyframe */
+@keyframes n8nDash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+/* Edge Label Container — only visible on hover */
+.edgeLabelContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 19, 17, 0.9);
+  border-radius: 4px;
+  padding: 2px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.edgeLabelContainer:hover {
+  opacity: 1;
+}
+
+/* Delete Button */
+.deleteButton {
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  color: #f87171;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 600;
+}
+
+.deleteButton:hover {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #ff8a8a;
+}
+
+.deleteButton:active {
+  background: rgba(248, 113, 113, 0.3);
+}

@@ -1,0 +1,103 @@
+.consoleTopbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-main);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.consoleBrand {
+  display: flex;
+  align-items: center;
+}
+
+.consoleBrandLabel {
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  font-weight: 300;
+}
+
+.topbarCenter {
+  display: flex;
+  align-items: center;
+}
+
+.modePills {
+  display: flex;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.modePill {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.modePill:hover {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.modePillActive {
+  background: rgba(0, 229, 158, 0.12);
+  color: #00e59e;
+}
+
+.modePillActive:hover {
+  background: rgba(0, 229, 158, 0.16);
+  color: #00e59e;
+}
+
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.newChatButton {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.newChatButton:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.newChatButton:active {
+  transform: scale(0.98);
+}
+
+@media (max-width: 768px) {
+  .consoleTopbar {
+    padding: 10px 16px;
+  }
+
+  .consoleBrandLabel {
+    font-size: 12px;
+  }
+}

@@ -1,0 +1,267 @@
+.headerContainer {
+  margin-bottom: 32px;
+  font-family: 'Inter Tight', sans-serif;
+  font-weight: 200;
+}
+
+.sampleBanner {
+  background: rgba(100, 150, 200, 0.08);
+  border: 1px solid rgba(100, 150, 200, 0.15);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bannerIcon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.bannerText {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* layout */
+.headerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.blueprintHeaderLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: 'Inter Tight', sans-serif;
+  font-weight: 200;
+  flex: 1;
+}
+
+.rightColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* company label */
+.companyLabel {
+  font-size: 11px;
+  font-weight: 200;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  font-family: 'Inter Tight', sans-serif;
+}
+
+/* company name */
+.companyName {
+  font-size: 18px;
+  font-weight: 200;
+  color: #fff;
+  margin: 0;
+  font-family: 'Inter Tight', sans-serif;
+}
+
+/* title row */
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.blueprintTitle {
+  font-size: 18px;
+  font-weight: 200;
+  color: #fff;
+  margin: 0;
+  line-height: 1.1;
+  font-family: 'Inter Tight', sans-serif;
+}
+
+.blueprintId {
+  font-size: 14px;
+  font-weight: 200;
+  color: #555;
+  font-family: 'Inter Tight', sans-serif;
+}
+
+/* version row */
+.versionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.versionDropdown {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 200;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Inter Tight', sans-serif;
+}
+
+.versionDropdown:hover {
+  background: var(--bg-soft);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.versionDropdown:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.versionText {
+  font-size: 13px;
+  font-weight: 200;
+  color: var(--text-secondary);
+  font-family: 'Inter Tight', sans-serif;
+}
+
+.separator {
+  color: var(--text-tertiary);
+  font-family: 'Inter Tight', sans-serif;
+  font-weight: 200;
+}
+
+.draftPill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.12);
+  color: #bbf7d0;
+  font-size: 12px;
+  font-weight: 200;
+  font-family: 'Inter Tight', sans-serif;
+}
+
+/* pills row */
+.pillsRow {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.pill {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pillLabel {
+  font-size: 13px;
+  font-weight: 200;
+  color: var(--text-secondary);
+  font-family: 'Inter Tight', sans-serif;
+}
+
+.pillValue {
+  font-size: 13px;
+  font-weight: 200;
+  color: var(--text-primary);
+  font-family: 'Inter Tight', sans-serif;
+}
+
+/* right side: status + actions */
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.draftBadge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  font-family: 'Inter Tight', sans-serif;
+  font-weight: 200;
+}
+
+.saveVersionBtn,
+.downloadBtn,
+.historyBtn,
+.generateRoadmapBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 200;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Inter Tight', sans-serif;
+  white-space: nowrap;
+}
+
+.saveVersionBtn:hover,
+.downloadBtn:hover,
+.historyBtn:hover,
+.generateRoadmapBtn:hover {
+  background: var(--bg-soft);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.saveVersionBtn:disabled,
+.downloadBtn:disabled,
+.historyBtn:disabled,
+.generateRoadmapBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.generateRoadmapBtn {
+  width: 100%;
+  justify-content: center;
+}
+
+/* responsive */
+@media (max-width: 768px) {
+  .headerContent {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .rightColumn {
+    align-items: flex-start;
+  }
+
+  .blueprintTitle {
+    font-size: 32px;
+  }
+
+  .pillsRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pill {
+    justify-content: space-between;
+  }
+}

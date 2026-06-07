@@ -1,0 +1,538 @@
+.page {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-main, #1e1d1a);
+  color: #e5e5e5;
+  padding: 32px;
+  font-family: var(--font-sans, sans-serif);
+}
+
+.header {
+  margin-bottom: 32px;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #f5f5f5;
+  margin: 0 0 6px;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: #a1a1aa;
+  margin: 0;
+}
+
+/* ── Section ── */
+.section {
+  margin-bottom: 44px;
+}
+
+.sectionTitle {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a1a1aa;
+  margin: 0 0 14px;
+}
+
+.emptyMsg {
+  font-size: 0.875rem;
+  color: #7a7875;
+  padding: 12px 0;
+  margin: 0;
+}
+
+/* ── Connections Table ── */
+.table {
+  border: 1px solid #1e1e1e;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 160px 1fr 130px 110px 160px;
+  padding: 10px 16px;
+  background: #0f0f0f;
+  border-bottom: 1px solid #1e1e1e;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7a7875;
+  gap: 12px;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 160px 1fr 130px 110px 160px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #141414;
+  align-items: center;
+  gap: 12px;
+  transition: background 0.1s;
+}
+
+.tableRow:last-child {
+  border-bottom: none;
+}
+
+.tableRow:hover {
+  background: #0d0d0d;
+}
+
+.tableAppCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tableAppIcon {
+  font-size: 1.1rem;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.tableAppIcon img[data-brand="slack"],
+.tableAppIcon img[data-brand="airtable"],
+.tableAppIcon img[data-brand="hubspot"],
+.tableAppIcon img[data-brand="jira"],
+.tableAppIcon img[data-brand="salesforce"],
+.tableAppIcon img[data-brand="sendgrid"] {
+  filter: none;
+}
+
+.tableAppIcon img[data-brand="github"],
+.tableAppIcon img[data-brand="openai"],
+.tableAppIcon img[data-brand="notion"],
+.tableAppIcon img[data-brand="http"],
+.tableAppIcon img:not([data-brand]) {
+  filter: brightness(0) invert(1);
+}
+
+.tableAppName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #d0d0d0;
+}
+
+.tableDisplayName {
+  font-size: 0.875rem;
+  color: #aaa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tableLastUsed {
+  font-size: 0.8rem;
+  color: #a1a1aa;
+}
+
+.tableActions {
+  display: flex;
+  gap: 6px;
+}
+
+.actionBtn {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  border-radius: 5px;
+  border: 1px solid #2a2a2a;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.actionBtn:hover {
+  border-color: #7a7875;
+  color: #ccc;
+}
+
+.actionBtnDanger {
+  border-color: #2a1515;
+  color: #c87070;
+}
+
+.actionBtnDanger:hover {
+  border-color: #4a2020;
+  color: #f87171;
+  background: #1a0a0a;
+}
+
+.actionBtnReauth {
+  border-color: #3a2e10;
+  color: #fbbf24;
+}
+
+.actionBtnReauth:hover {
+  border-color: #5a4a18;
+  color: #fde68a;
+  background: #1a1508;
+}
+
+/* ── Status Badges ── */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.statusBadge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.statusConnected {
+  background: #282827;
+  color: #dddac5;
+  border: 1px solid #666864;
+}
+
+.statusConnected::before {
+  background: #dddac5;
+}
+
+.statusRevoked {
+  background: rgba(248, 113, 113, 0.08);
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.15);
+}
+
+.statusRevoked::before {
+  background: #f87171;
+}
+
+.statusReauth {
+  background: rgba(251, 191, 36, 0.08);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.15);
+}
+
+.statusReauth::before {
+  background: #fbbf24;
+}
+
+/* ── App Grid ── */
+.appGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+}
+
+/* FIX: padding lebih lega, gap antar elemen lebih proporsional */
+.appCard {
+  background: #353532;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 9px;
+  padding: 20px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  transition: border-color 0.15s;
+  aspect-ratio: 1 / 1;
+  justify-content: center;
+}
+
+.appCard:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.appCardTop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.appIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  color: #ffffff;
+}
+
+.appIcon img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.appIcon img[data-brand="slack"],
+.appIcon img[data-brand="airtable"],
+.appIcon img[data-brand="hubspot"],
+.appIcon img[data-brand="jira"],
+.appIcon img[data-brand="salesforce"],
+.appIcon img[data-brand="sendgrid"] {
+  filter: none;
+}
+
+.appIcon img[data-brand="github"],
+.appIcon img[data-brand="openai"],
+.appIcon img[data-brand="notion"],
+.appIcon img[data-brand="http"],
+.appIcon img:not([data-brand]) {
+  filter: brightness(0) invert(1);
+}
+
+.appName {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #f0ede9;
+  margin: 0;
+}
+
+.appCategory {
+  font-size: 0.68rem;
+  color: #a1a1aa;
+  text-transform: capitalize;
+  margin: 0;
+  display: none;
+}
+
+/* FIX: font-size naik dari 9px → 12px, readable */
+.appDesc {
+  font-size: 0.75rem;
+  color: #a1a1aa;
+  line-height: 1.5;
+  flex: 0;
+  margin: 0;
+}
+
+/* FIX: margin-top: auto dorong button selalu nempel ke bawah */
+.connectBtn {
+  margin-top: 6px;
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: #a1a1aa;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  align-self: center;
+}
+
+.connectBtn:hover {
+  background: #3a3d3a;
+  border-color: #7a7a78;
+}
+
+/* ── Modal ── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal {
+  background: #111;
+  border: 1px solid #252525;
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.modalAppIcon {
+  font-size: 1.6rem;
+  line-height: 1;
+  flex-shrink: 0;
+  color: #ffffff;
+}
+
+.modalAppIcon img[data-brand="slack"],
+.modalAppIcon img[data-brand="airtable"],
+.modalAppIcon img[data-brand="hubspot"],
+.modalAppIcon img[data-brand="jira"],
+.modalAppIcon img[data-brand="salesforce"],
+.modalAppIcon img[data-brand="sendgrid"] {
+  filter: none;
+}
+
+.modalAppIcon img[data-brand="github"],
+.modalAppIcon img[data-brand="openai"],
+.modalAppIcon img[data-brand="notion"],
+.modalAppIcon img[data-brand="http"],
+.modalAppIcon img:not([data-brand]) {
+  filter: brightness(0) invert(1);
+}
+
+.modalTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f0f0f0;
+  margin: 0 0 3px;
+}
+
+.modalSubtitle {
+  font-size: 0.8rem;
+  color: #a1a1aa;
+  margin: 0;
+}
+
+.securityNote {
+  font-size: 0.78rem;
+  color: #a1a1aa;
+  background: #0d0d0d;
+  border: 1px solid #1e1e1e;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 0 0 16px;
+}
+
+.formField {
+  margin-bottom: 14px;
+}
+
+.formLabel {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.optionalTag {
+  font-weight: 400;
+  color: #a1a1aa;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.formInput {
+  width: 100%;
+  background: #0d0d0d;
+  border: 1px solid #252525;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.875rem;
+  color: #e5e5e5;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.formInput:focus {
+  border-color: #2dd4bf;
+}
+
+.modalActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.cancelBtn {
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  border-radius: 6px;
+  border: 1px solid #252525;
+  background: transparent;
+  color: #777;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.cancelBtn:hover {
+  border-color: #3a3a3a;
+  color: #bbb;
+}
+
+.saveBtn {
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid #2dd4bf;
+  background: #2dd4bf;
+  color: #0a0a0a;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.saveBtn:hover {
+  opacity: 0.85;
+}
+
+.saveBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.errorMsg {
+  font-size: 0.8rem;
+  color: #f87171;
+  margin: 8px 0 0;
+}
+
+/* ── ProviderButton (Task 8.1) ── */
+.providerBtn {
+  margin-top: 6px;
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #666864;
+  background: #282827;
+  color: #dddac5;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  align-self: center;
+  white-space: nowrap;
+}
+
+.providerBtn:hover {
+  background: #353532;
+  border-color: #7a7a78;
+}
+
+.providerBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Account Identifier (Task 8.2) ── */
+.accountIdentifier {
+  font-size: 0.85rem;
+  color: #a8a6a2;
+  font-style: italic;
+}

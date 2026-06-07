@@ -1,0 +1,417 @@
+/* Deep Diagnostic Result Page — dark teal-green accent theme */
+
+.pageContainer {
+  height: 100%;
+  overflow-y: auto;
+  background-color: var(--bg-main, #353531);
+  color: #f0f0f0;
+  font-family: 'Inter Tight', 'Inter', sans-serif;
+}
+
+/* ── Loading ─────────────────────────────────────────────── */
+
+.loadingContainer {
+  height: 100%;
+  overflow-y: auto;
+  background-color: var(--bg-main, #353531);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #2a2a2a;
+  border-top-color: #00e59e;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.pageContent {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+
+.pageHeader {
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.pageTitle {
+  font-size: 2rem;
+  font-weight: 300;
+  font-family: 'Inter Tight', sans-serif;
+  color: #f0f0f0;
+  margin: 0 0 10px;
+  line-height: 1.2;
+  letter-spacing: -0.3px;
+}
+
+.pageSubtitle {
+  font-size: 0.9375rem;
+  color: #888;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Generic section ─────────────────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+  .sectionTitle {
+    font-size: 1.125rem;
+    font-weight: 300;
+    color: #f0f0f0;
+    margin: 0;
+  }
+
+/* ── Dimension scores ────────────────────────────────────── */
+
+.dimensionsGrid {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dimensionRow {
+  display: grid;
+  grid-template-columns: 200px 1fr 48px;
+  align-items: center;
+  gap: 14px;
+}
+
+.dimensionLabel {
+  font-size: 0.875rem;
+  color: #ccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.barTrack {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background-color: #00e59e;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.dimensionScore {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #00e59e;
+  text-align: right;
+}
+
+/* ── Narrative ───────────────────────────────────────────── */
+
+.narrativeCard {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+
+.narrativeText {
+  font-size: 0.9375rem;
+  color: #ccc;
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* ── Recommendations ─────────────────────────────────────── */
+
+.recommendationsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recommendationItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 14px 18px;
+}
+
+.recNumber {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  background-color: #00e59e;
+  color: #0a0a0a;
+  border-radius: 50%;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.recText {
+  font-size: 0.9375rem;
+  color: #ccc;
+  line-height: 1.55;
+}
+
+/* ── Blueprint CTA ───────────────────────────────────────── */
+
+.blueprintCta {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 32px 28px;
+}
+
+.ctaContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+  .ctaTitle {
+    font-size: 1.375rem;
+    font-weight: 300;
+    color: #f0f0f0;
+    margin: 0;
+  }
+
+.ctaDescription {
+  font-size: 0.9375rem;
+  color: #888;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 600px;
+}
+
+.blueprintError {
+  font-size: 0.875rem;
+  color: #f87171;
+  margin: 0;
+  padding: 10px 14px;
+  background-color: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 6px;
+}
+
+.blueprintButton {
+  align-self: flex-start;
+  background-color: #353532;
+  color: var(--text-secondary, #f7f7f7);
+  border: 1px solid #666864;
+  border-radius: 20px;
+  padding: 13px 28px;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: 'Inter Tight', 'Inter', sans-serif;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+  margin-top: 4px;
+}
+
+.blueprintButton:hover:not(:disabled) {
+  background-color: #444440;
+}
+
+.blueprintButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.buttonSpinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(10,10,10,0.3);
+  border-top-color: #0a0a0a;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .pageContent {
+    padding: 24px 16px 48px;
+    gap: 24px;
+  }
+
+  .pageTitle {
+    font-size: 1.5rem;
+  }
+
+  .dimensionRow {
+    grid-template-columns: 1fr 48px;
+    grid-template-rows: auto auto;
+    gap: 6px 10px;
+  }
+
+  .dimensionLabel {
+    grid-column: 1 / -1;
+  }
+
+  .blueprintButton {
+    align-self: stretch;
+    justify-content: center;
+  }
+}
+
+/* ── Score card ──────────────────────────────────────────── */
+
+.scoreCard {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 28px 32px;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
+
+.scoreBlock {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.scoreNumber {
+  font-size: 3.5rem;
+  font-weight: 800;
+  color: #00e59e;
+  line-height: 1;
+}
+
+.scoreMax {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #a1a1aa;
+}
+
+.maturityBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.maturityLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.maturityBadge {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f0f0f0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 4px 12px;
+  display: inline-block;
+}
+
+/* ── List card (strengths / constraints / opportunities) ─── */
+
+.listCard {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+
+.bulletList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bulletItem {
+  font-size: 0.9375rem;
+  color: #ccc;
+  line-height: 1.55;
+  padding-left: 18px;
+  position: relative;
+}
+
+.bulletItem::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: #00e59e;
+  font-weight: 700;
+}
+
+/* ── Next step card ──────────────────────────────────────── */
+
+.nextStepCard {
+  background: rgba(0, 229, 158, 0.04);
+  border: 1px solid rgba(0, 229, 158, 0.2);
+  border-radius: 12px;
+  padding: 20px 24px;
+}
+
+.nextStepText {
+  font-size: 0.9375rem;
+  color: #a0f0d8;
+  line-height: 1.65;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .scoreCard {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 20px;
+  }
+
+  .scoreNumber {
+    font-size: 2.75rem;
+  }
+}

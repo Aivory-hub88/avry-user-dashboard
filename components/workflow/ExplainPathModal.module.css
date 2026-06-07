@@ -1,0 +1,224 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8e6e1;
+}
+
+.icon {
+  font-size: 16px;
+}
+
+.closeBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #a8a6a2;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  font-size: 14px;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #d4d2ce;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 20px;
+  color: #a8a6a2;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(0, 229, 158, 0.2);
+  border-top-color: #00e59e;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(248, 113, 113, 0.05);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  border-radius: 8px;
+  color: #f87171;
+}
+
+.errorIcon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.errorText {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.summary {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #d4d2ce;
+  padding: 12px 16px;
+  background: rgba(0, 229, 158, 0.05);
+  border-left: 3px solid rgba(0, 229, 158, 0.3);
+  border-radius: 4px;
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stepsTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: #a8a6a2;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.stepItem {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.stepItem.targetStep {
+  background: rgba(0, 229, 158, 0.08);
+  border-color: rgba(0, 229, 158, 0.2);
+}
+
+.stepNumber {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 229, 158, 0.1);
+  border: 1px solid rgba(0, 229, 158, 0.2);
+  color: #00e59e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.stepContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.stepId {
+  font-size: 12px;
+  font-weight: 600;
+  color: #00e59e;
+  font-family: monospace;
+}
+
+.stepExplanation {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #a8a6a2;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.closeActionBtn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: rgba(0, 229, 158, 0.1);
+  border: 1px solid rgba(0, 229, 158, 0.2);
+  color: #00e59e;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.closeActionBtn:hover {
+  background: rgba(0, 229, 158, 0.15);
+  border-color: rgba(0, 229, 158, 0.3);
+}

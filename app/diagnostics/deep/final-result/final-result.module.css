@@ -1,0 +1,418 @@
+/* ─── Page shell ─────────────────────────────────────────────────────────── */
+.page {
+  min-height: 100vh;
+  background: #2b2b28;
+  color: #e5e5e3;
+  font-family: 'Inter Tight', Inter, sans-serif;
+}
+
+.content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ─── Card wrapper (shared by every section) ─────────────────────────────── */
+.card {
+  background: #3a3a36;
+  border-radius: 12px;
+  padding: 28px 32px;
+  border: 1px solid #4a4a46;
+}
+
+/* ─── Section title ──────────────────────────────────────────────────────── */
+  .sectionTitle {
+    font-family: Nunito, 'Inter Tight', sans-serif;
+    font-size: 18px;
+    font-weight: 300;
+    color: #e5e5e3;
+    margin: 0 0 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #4a4a46;
+  }
+
+/* ─── Executive Scorecard ────────────────────────────────────────────────── */
+
+/* Top row: ScoreRing | RadarChart */
+.scorecardTopRow {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 32px;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 767px) {
+  .scorecardTopRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.scorecardRingCol {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.scorecardChartCol {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Bottom row: Strongest/Weakest | Assessment bullets */
+.scorecardBottomRow {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 40px;
+  align-items: start;
+  padding-top: 24px;
+  border-top: 1px solid #4a4a46;
+}
+
+@media (max-width: 767px) {
+  .scorecardBottomRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Left: Strongest / Weakest */
+.summaryRow {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summaryLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888884;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.summaryValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e5e5e3;
+  line-height: 1.2;
+}
+
+/* Colored underline bar below each value */
+.summaryBar {
+  display: block;
+  height: 2px;
+  width: 100%;
+  border-radius: 1px;
+  margin-top: 4px;
+}
+
+/* Right: bullet list */
+.assessmentList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assessmentItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.assessmentIcon {
+  font-size: 11px;
+  line-height: 1.6;
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
+
+.assessmentText {
+  font-size: 14px;
+  color: #c8c8c4;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ─── ROI Projection ─────────────────────────────────────────────────────── */
+.confidenceBanner {
+  border-left: 3px solid #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  border-radius: 0 6px 6px 0;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+
+.confidenceHeadline {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fbbf24;
+  margin: 0 0 6px;
+  text-transform: capitalize;
+}
+
+.confidenceBody {
+  font-size: 13px;
+  color: #a1a1aa;
+  margin: 0 0 6px;
+}
+
+.missingInputs {
+  font-size: 12px;
+  color: #666864;
+  margin: 0;
+}
+
+.roiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1023px) {
+  .roiGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 639px) {
+  .roiGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Opportunity Priority Matrix ────────────────────────────────────────── */
+.matrixLayout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+@media (max-width: 767px) {
+  .matrixLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.opportunityList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.emptyMessage {
+  font-size: 14px;
+  color: #666864;
+  font-style: italic;
+  padding: 20px 0;
+}
+
+/* ─── Risk Register ──────────────────────────────────────────────────────── */
+.riskList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ─── Diagnostic Context — 2-column free-flow ────────────────────────────── */
+.contextColumns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 48px;
+}
+
+@media (max-width: 767px) {
+  .contextColumns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.contextCol {
+  display: flex;
+  flex-direction: column;
+}
+
+.contextItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 0;
+  border-bottom: 1px solid #4a4a46;
+}
+
+.contextItem:last-child {
+  border-bottom: none;
+}
+
+/* Bold white label (like the screenshot) */
+.contextLabel {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e5e5e3;
+  line-height: 1.3;
+}
+
+/* Regular weight value, slightly muted */
+.contextValue {
+  font-size: 14px;
+  color: #b8b8b4;
+  line-height: 1.6;
+}
+
+/* "Not provided" — italic and dimmed */
+.notProvided {
+  color: #666864;
+  font-style: italic;
+}
+
+/* Bullet row for compliance / pain points */
+.contextValueBullet {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.contextBulletList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.contextBulletItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.contextBulletIcon {
+  color: #fbbf24;
+  font-size: 10px;
+  line-height: 1.8;
+  flex-shrink: 0;
+}
+
+/* ─── Generate Blueprint CTA ─────────────────────────────────────────────── */
+.blueprintCta {
+  background: linear-gradient(135deg, #1e2a1e 0%, #1a2a2a 100%);
+  border: 1px solid #2d4a2d;
+  border-radius: 12px;
+  padding: 28px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+@media (max-width: 767px) {
+  .blueprintCta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.blueprintCtaLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex: 1;
+}
+
+.blueprintCtaIcon {
+  color: #00e59e;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.blueprintCtaTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: #e5e5e3;
+  margin: 0 0 6px;
+}
+
+.blueprintCtaDesc {
+  font-size: 13px;
+  color: #8a9e8a;
+  margin: 0;
+  line-height: 1.6;
+  max-width: 520px;
+}
+
+.blueprintCtaRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.blueprintCtaError {
+  font-size: 12px;
+  color: #f87171;
+  margin: 0;
+  max-width: 240px;
+  text-align: right;
+}
+
+.blueprintBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #00e59e;
+  color: #1a1a18;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  white-space: nowrap;
+}
+
+.blueprintBtn:hover:not(:disabled) {
+  background: #00cc8a;
+}
+
+.blueprintBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.blueprintBtnDone {
+  background: #2d4a2d;
+  color: #00e59e;
+}
+
+/* Spinner for generating state */
+.blueprintSpinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(26, 26, 24, 0.3);
+  border-top-color: #1a1a18;
+  border-radius: 50%;
+  animation: blueprintSpin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes blueprintSpin {
+  to { transform: rotate(360deg); }
+}

@@ -1,0 +1,285 @@
+/* =============================================================================
+   CANONICAL WORKFLOW NODE STYLES — v2.1 (CACHE BUST: 2026-04-14)
+   Single source of truth for all canvas node visuals.
+   Imported globally by: app/layout.tsx
+   DO NOT add inline style overrides in node components — edit here instead.
+   UPDATED: Background #696d6b, Font Inter Tight 400
+   ============================================================================= */
+
+/* ── React Flow outer wrapper: strip default chrome, let CSS drive size ── */
+.react-flow__node-standardNode {
+  width: 260px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.react-flow__node-appNode {
+  width: 260px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+/* Strip default chrome for all other node types */
+.react-flow__node-default,
+.react-flow__node-input,
+.react-flow__node-output,
+.react-flow__node-workflowStep,
+.react-flow__node-triggerNode {
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  width: max-content !important;
+}
+
+/* Keep overflow visible on all nodes so handles + add-btn are not clipped */
+.react-flow__node {
+  overflow: visible !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* ── Canonical card ── */
+.workflow-node {
+  width: 100%;
+  height: auto;
+  min-height: 56px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  background: #3a3a37;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-nunito), 'Nunito', sans-serif;
+  font-weight: 500;
+}
+
+.workflow-node:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.065);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32), 0 1px 4px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+/* ── Selected state ── */
+.workflow-node[data-selected='true'] {
+  border-color: rgba(0, 229, 158, 0.5) !important;
+  box-shadow: 0 0 0 2px rgba(0, 229, 158, 0.15), 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ── Category accent borders ── */
+.workflow-node[data-category='trigger']   { border-color: rgba(251, 191, 36, 0.28);  background: rgba(251, 191, 36, 0.06); }
+.workflow-node[data-category='logic']     { border-color: rgba(139, 92, 246, 0.28);  background: rgba(139, 92, 246, 0.06); }
+.workflow-node[data-category='transform'] { border-color: rgba(59, 130, 246, 0.28);  background: rgba(59, 130, 246, 0.06); }
+.workflow-node[data-category='ai']        { border-color: rgba(0, 229, 158, 0.28);   background: rgba(0, 229, 158, 0.05); }
+.workflow-node[data-category='agent']     { border-color: rgba(0, 229, 158, 0.28);   background: rgba(0, 229, 158, 0.05); }
+.workflow-node[data-category='condition'] { border-color: rgba(251, 191, 36, 0.28);  background: rgba(251, 191, 36, 0.06); }
+.workflow-node[data-category='channel']   { border-color: rgba(59, 130, 246, 0.28);  background: rgba(59, 130, 246, 0.06); }
+.workflow-node[data-category='system']    { border-color: rgba(139, 92, 246, 0.28);  background: rgba(139, 92, 246, 0.06); }
+.workflow-node[data-category='app']       { border-color: rgba(129, 140, 248, 0.28); background: rgba(129, 140, 248, 0.06); }
+.workflow-node[data-category='action']    { border-color: rgba(255, 255, 255, 0.09); background: rgba(255, 255, 255, 0.045); }
+.workflow-node[data-category='utility']   { border-color: rgba(255, 255, 255, 0.07); background: rgba(255, 255, 255, 0.03); }
+
+/* ── Header row: icon + title side by side ── */
+.workflow-node-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+/* ── Icon container ── */
+.node-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 0;
+  background: transparent;
+  color: #f59e0b;
+  transition: color 0.15s ease, filter 0.15s ease;
+}
+
+/* Hover: slightly brighter, no glow, outline stays outline */
+.workflow-node:hover .node-icon {
+  filter: brightness(1.25);
+}
+
+/* Category icon colors — outline tint, no background */
+.node-icon[data-category='trigger']   { color: rgba(251, 191, 36, 0.85); }
+.node-icon[data-category='logic']     { color: rgba(139, 92, 246, 0.85); }
+.node-icon[data-category='transform'] { color: rgba(59, 130, 246, 0.85); }
+.node-icon[data-category='ai']        { color: rgba(0, 229, 158, 0.85); }
+.node-icon[data-category='agent']     { color: rgba(0, 229, 158, 0.85); }
+.node-icon[data-category='condition'] { color: rgba(251, 191, 36, 0.85); }
+.node-icon[data-category='channel']   { color: rgba(59, 130, 246, 0.85); }
+.node-icon[data-category='system']    { color: rgba(139, 92, 246, 0.85); }
+.node-icon[data-category='app']       { color: rgba(129, 140, 248, 0.85); }
+.node-icon[data-category='action']    { color: rgba(168, 166, 162, 0.82); }
+
+/* ── Text column ── */
+.workflow-node-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Primary title ── */
+.workflow-node .node-title {
+  font-family: var(--font-nunito), 'Nunito', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: #ffffff;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Subtitle ── */
+.workflow-node .node-subtitle {
+  font-family: var(--font-nunito), 'Nunito', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+/* ── Secondary description ── */
+.workflow-node .node-description {
+  font-size: 12px;
+  font-weight: 400;
+  color: #9a9896;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  margin-top: 1px;
+}
+
+/* ── Optional step label ── */
+.workflow-node .node-step {
+  font-size: 10px;
+  font-weight: 400;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+
+/* ── Connection handles (global) ── */
+.react-flow__handle {
+  width: 12px;
+  height: 12px;
+  background: #00e59e;
+  border: 2px solid #1a1a18;
+  border-radius: 50%;
+  transition: all 0.15s ease;
+}
+
+.react-flow__handle:hover {
+  background: #06e59f;
+  border-color: #06e59f;
+  width: 10px;
+  height: 10px;
+}
+
+/* ── Canonical edge style — smooth bezier dashed animated connectors ── */
+.react-flow__edge-path {
+  stroke: #e0e0e0 !important;
+  stroke-width: 2px;
+  stroke-dasharray: 8 4;
+  stroke-linecap: round;
+  fill: none;
+  shape-rendering: geometricPrecision;
+  animation: dashflow 1.5s linear infinite;
+  transition: stroke 0.15s ease, stroke-width 0.15s ease;
+}
+
+@keyframes dashflow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #f0f0f0 !important;
+  stroke-width: 2.5px;
+  animation-duration: 1.2s;
+}
+
+/* Selected edge highlight */
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #3b82f6 !important;
+  stroke-width: 2.5px;
+}
+
+/* Connection line while dragging */
+.react-flow__connection-path {
+  stroke: rgba(0, 229, 158, 0.5) !important;
+  stroke-width: 2px;
+  stroke-dasharray: 6 3;
+  stroke-linecap: round;
+  fill: none;
+  shape-rendering: geometricPrecision;
+}
+
+/* ── Arrowhead marker — primary hover indicator ── */
+.react-flow__edge marker path,
+.react-flow__edge marker polygon {
+  fill: #e0e0e0;
+  stroke: none;
+  transition: fill 0.15s ease;
+}
+
+.react-flow__edge:hover marker path,
+.react-flow__edge:hover marker polygon {
+  fill: #3b82f6;
+}
+
+/* ── Hover-reveal delete button on workflow nodes ── */
+.workflow-node-delete-btn {
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.workflow-node:hover .workflow-node-delete-btn {
+  opacity: 1;
+}
+
+.workflow-node-delete-btn:hover {
+  background: rgba(248, 113, 113, 0.35) !important;
+  border-color: rgba(248, 113, 113, 0.5) !important;
+  color: #ff8a8a !important;
+}

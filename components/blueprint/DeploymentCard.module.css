@@ -1,0 +1,62 @@
+.deploymentCard {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: 20px;
+  padding: 24px;
+  height: 100%;
+}
+
+.cardTitle {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+}
+
+.section {
+  margin-bottom: 20px;
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+.sectionLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.phaseText,
+.impactText {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.roiValue {
+  font-size: 32px;
+  font-weight: 300;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.roiUnit {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+@media (max-width: 768px) {
+  .deploymentCard {
+    padding: 20px;
+  }
+
+  .roiValue {
+    font-size: 28px;
+  }
+}

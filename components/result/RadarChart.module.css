@@ -1,0 +1,33 @@
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.svg {
+  overflow: visible;
+}
+
+  .guide {
+    fill: none;
+    stroke: #ffffff;
+    stroke-width: 0.5;
+  }
+
+.dataPolygon {
+  fill: rgba(0, 229, 158, 0.15);
+  stroke: #00e59e;
+  stroke-width: 2;
+}
+
+  .axisLine {
+    stroke: #ffffff;
+    stroke-width: 0.5;
+  }
+
+.axisLabel {
+  font-size: 11px;
+  fill: #a1a1aa;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}

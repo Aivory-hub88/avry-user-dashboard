@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="382.626" height="79.373" viewBox="0 0 382.626 79.373">
+  <defs>
+    <clipPath id="clip-path">
+      <rect id="Rectangle_2" data-name="Rectangle 2" width="314.5" height="46.244" transform="translate(0 0)" fill="none"/>
+    </clipPath>
+    <clipPath id="clip-Artboard_1">
+      <rect width="382.626" height="79.373"/>
+    </clipPath>
+  </defs>
+  <g id="Artboard_1" data-name="Artboard 1" clip-path="url(#clip-Artboard_1)">
+    <rect width="382.626" height="79.373" fill="rgba(255,255,255,0)"/>
+    <g id="Group_3" data-name="Group 3" transform="translate(34.063 16.564)">
+      <rect id="Rectangle_1" data-name="Rectangle 1" width="9.073" height="45.465" transform="translate(67.505 0.416)" fill="#fff"/>
+      <g id="Group_2" data-name="Group 2">
+        <g id="Group_1" data-name="Group 1" clip-path="url(#clip-path)">
+          <path id="Path_1" data-name="Path 1" d="M143.781.39,123.815,33.514c-6.027,10-9.982,12.341-25.333,12.341H80.871V.39H90V40.269c13.557,0,18.028.568,26.982-13.575L132.52.389Z" fill="#fff"/>
+          <path id="Path_2" data-name="Path 2" d="M203.056,23.122c0,12.86-4.9,23.122-30.608,23.122H171.13c-25.711,0-30.608-10.262-30.608-23.122S145.419,0,171.13,0h1.318c25.711,0,30.608,10.262,30.608,23.122m-10.538,0c0-16.511-9.051-17.506-18.393-17.506h-4.672c-9.2,0-18.393.995-18.393,17.506s9.2,17.971,18.393,17.971h4.672c9.342,0,18.393-1.46,18.393-17.971" fill="#fff"/>
+          <path id="Path_3" data-name="Path 3" d="M264.35,45.854c-3.923.016-3.055.054-5.691.054-4.533,0-9.149-2.652-14.8-8.952l-3.014-3.377H216.154V45.854H206.62V.39h36.635c14.691.065,18.128,5.719,17.834,16.692-.155,5.778-1.636,13.055-10.677,15.588ZM252.644,17.259c0-7.065-1.268-11.15-9.888-11.15h-26.6V26.782h26.6c4.71,0,9.888-1.436,9.888-9.523" fill="#fff"/>
+          <path id="Path_4" data-name="Path 4" d="M314.5.39,291.254,29.631V45.855h-8.947V29.877L258.5.39h10.315l18.158,22.732L304.216.39Z" fill="#fff"/>
+          <path id="Path_5" data-name="Path 5" d="M0,45.881,19.977,12.738C26.008,2.73,29.965.39,45.325.39H62.947V45.881H53.812V8.313c-13.564,0-18.718-.945-27,11.249L11.267,45.882Z" fill="#fff"/>
+          <path id="Path_6" data-name="Path 6" d="M42.568,36.465s-7.151-.719-10.991,1.376c-1.724.94-2.718,2.9-3.9,4.961l-1.585,3.079H42.568Z" fill="#00ffc0"/>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

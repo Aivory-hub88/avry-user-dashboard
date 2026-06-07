@@ -1,0 +1,385 @@
+/* AddWithAiraPanel Styles */
+
+.panel {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  max-width: 380px;
+  z-index: 1000;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #333;
+  background: #0f0f0f;
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.closeBtn:hover {
+  color: #fff;
+}
+
+.content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Context Display */
+.context {
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.contextLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.contextValue {
+  font-size: 13px;
+  color: #fff;
+  font-weight: 500;
+}
+
+/* Quick Action Presets */
+.presetsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.presetsLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.presetButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.presetBtn {
+  flex: 0 1 calc(50% - 3px);
+  padding: 8px 10px;
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #ccc;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.presetBtn:hover:not(:disabled) {
+  background: #2a2a2a;
+  border-color: #00e59e;
+  color: #00e59e;
+}
+
+.presetBtn:active:not(:disabled) {
+  background: #1a1a1a;
+  border-color: #00d48a;
+}
+
+.presetBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.presetIcon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* Input Group */
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ccc;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.textarea {
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 10px 12px;
+  resize: none;
+  transition: border-color 0.2s;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: #00e59e;
+  box-shadow: 0 0 0 2px rgba(0, 229, 158, 0.1);
+}
+
+.textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Error Message */
+.error {
+  background: rgba(255, 59, 48, 0.1);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.errorIcon {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.errorText {
+  font-size: 12px;
+  color: #ff6b6b;
+  line-height: 1.4;
+}
+
+/* Steps List */
+.stepsList {
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stepsTitle {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.stepItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+
+.stepNumber {
+  background: #00e59e;
+  color: #000;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.stepInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.stepApp {
+  font-size: 12px;
+  font-weight: 600;
+  color: #00e59e;
+  text-transform: capitalize;
+}
+
+.stepAction {
+  font-size: 11px;
+  color: #aaa;
+  text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Summary */
+.summary {
+  font-size: 13px;
+  color: #ccc;
+  line-height: 1.5;
+  padding: 8px;
+  background: #222;
+  border-radius: 6px;
+  border-left: 3px solid #00e59e;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.askAiraBtn,
+.manualBtn,
+.cancelBtn,
+.applyBtn {
+  flex: 1;
+  min-width: 80px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.askAiraBtn {
+  background: #00e59e;
+  color: #000;
+}
+
+.askAiraBtn:hover:not(:disabled) {
+  background: #00d48a;
+  box-shadow: 0 2px 8px rgba(0, 229, 158, 0.2);
+}
+
+.askAiraBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.applyBtn {
+  background: #00e59e;
+  color: #000;
+}
+
+.applyBtn:hover {
+  background: #00d48a;
+  box-shadow: 0 2px 8px rgba(0, 229, 158, 0.2);
+}
+
+.manualBtn {
+  background: #333;
+  color: #fff;
+}
+
+.manualBtn:hover:not(:disabled) {
+  background: #444;
+}
+
+.manualBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancelBtn {
+  background: #333;
+  color: #fff;
+}
+
+.cancelBtn:hover:not(:disabled) {
+  background: #444;
+}
+
+.cancelBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Info */
+.info {
+  font-size: 11px;
+  color: #888;
+  line-height: 1.4;
+  margin-top: 4px;
+}
+
+.info p {
+  margin: 0;
+}

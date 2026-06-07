@@ -1,0 +1,185 @@
+.phaseNavigator {
+  margin-bottom: 0;
+  /* Isolate from any inherited font-size inflation */
+  font-size: 16px;
+}
+
+.phaseList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 16px 0 0;
+}
+
+.phaseItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-height: auto;
+  padding: 16px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-left: 3px solid transparent;
+  border-radius: 0 12px 12px 0;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.phaseItem:focus-visible {
+  outline: 2px solid rgba(0, 229, 158, 0.4);
+  outline-offset: -2px;
+}
+
+/* Current phase */
+.phaseItem.current {
+  background: rgba(43, 44, 40, 0.8);
+  border-color: rgba(255, 255, 255, 0.04);
+  border-left-color: #00e59e;
+  cursor: default;
+}
+
+.phaseItem.current .phaseNumber {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #f5f5f4;
+  box-shadow: none;
+}
+
+.phaseItem.current .phaseTitle {
+  color: #f5f5f4;
+}
+
+/* Completed phase */
+.phaseItem.completed {
+  background: transparent;
+  border-left-color: transparent;
+}
+
+.phaseItem.completed:hover {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.phaseItem.completed .phaseNumber {
+  background: transparent;
+  border-color: rgba(102, 229, 166, 0.55);
+  color: #66e5a6;
+}
+
+/* Available phase */
+.phaseItem.available {
+  background: transparent;
+  border-left-color: transparent;
+}
+
+.phaseItem.available:hover {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Locked phase */
+.phaseItem.locked {
+  background: transparent;
+  border-left-color: transparent;
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.phaseNumber {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.18s ease;
+  margin-top: 2px;
+}
+
+.checkIcon {
+  width: 10px;
+  height: 10px;
+}
+
+.lockIcon {
+  width: 11px;
+  height: 11px;
+  color: rgba(255, 255, 255, 0.16);
+  flex-shrink: 0;
+  margin-left: auto;
+  margin-top: 1px;
+}
+
+.phaseContent {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.phaseTitle {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.46);
+  margin: 0 0 2px 0;
+  line-height: 1.3;
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.phaseDescription {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.62);
+  margin: 0;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+.phaseItem.current .phaseDescription {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+@media (max-width: 768px) {
+  .phaseItem {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .phaseNumber {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+  }
+
+  .lockIcon {
+    margin-top: 2px;
+  }
+
+  .phaseTitle {
+    font-size: 14px;
+  }
+
+  .phaseDescription {
+    font-size: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phaseItem,
+  .phaseNumber {
+    transition: none;
+  }
+}

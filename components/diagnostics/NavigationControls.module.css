@@ -1,0 +1,59 @@
+.navigationControls {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.navButton {
+  flex: 1;
+  padding: 0.875rem 1.5rem;
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.previousButton {
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.previousButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #f5f5f4;
+}
+
+.previousButton:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.nextButton {
+  background: rgba(0, 229, 158, 0.1);
+  color: #00e59e;
+  border: 1px solid rgba(0, 229, 158, 0.25);
+  font-weight: 600;
+}
+
+.nextButton:hover:not(:disabled) {
+  background: rgba(0, 229, 158, 0.18);
+  border-color: rgba(0, 229, 158, 0.4);
+  box-shadow: 0 0 16px rgba(0, 229, 158, 0.1);
+  transform: translateY(-1px);
+}
+
+.nextButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.navButton:focus-visible {
+  outline: 2px solid rgba(0, 229, 158, 0.4);
+  outline-offset: 2px;
+}

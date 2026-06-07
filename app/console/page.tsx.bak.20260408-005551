@@ -1,0 +1,355 @@
+"use client"
+
+import { useRouter } from "next/navigation"
+import { useState, useRef, useEffect, useCallback } from "react"
+import Image from "next/image"
+import ChatMessage from "@/components/ChatMessage"
+import ChatInput from "@/components/ChatInput"
+import ConsoleTopBar from "@/components/console/ConsoleTopBar"
+import { CopilotTogglePanel } from "@/components/workflow/CopilotTogglePanel"
+import FollowUpChips from "@/components/chat/FollowUpChips"
+import { RoutingSuggestBanner } from "@/components/chat/RoutingSuggestBanner"
+import { getSessionId, clearSession, generateSessionId, saveSession } from "@/lib/session"
+import { streamConsoleResponse, typewriterStream, validateFileSize } from "@/lib/streaming"
+import { extractTextFromFile } from "@/lib/fileExtractor"
+import { saveSessionMessages, loadSessionMessages, listSessions, ChatStorageError } from "@/lib/chatPersistence"
+import { useAgenticStream } from "@/hooks/useAgenticStream"
+import { useIntentRouter } from "@/hooks/useIntentRouter"
+import type { Attachment } from "@/components/UploadMenu"
+
+interface Message { id: string; role: "user" | "assistant"; content: string; isStreaming?: boolean }
+interface ChatSession { id: string; title: string; messages: Message[]; createdAt: number; pinned?: boolean }
+interface Toast { id: string; type: "success" | "error"; message: string }
+
+const QUICK_TEMPLATES = [
+  "Generate onboarding workflow", "Check compliance gap", "Summarize my diagnostics",
+  "Suggest automation opportunities", "Review my AI readiness",
+]
+const DEFAULT_SUGGESTIONS = [
+  "Can you elaborate on that?",
+  "Show me an example",
+  "What are the tradeoffs?",
+]
+const ALLOWED_TYPES = [
+  "text/plain", "text/csv", "text/markdown", "application/json", "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/png", "image/jpeg", "image/gif", "image/webp",
+]
+
+export default function ConsolePage() {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const router = useRouter()
+  const [currentSessionId, setCurrentSessionId] = useState<string>("")
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const [isDragging, setIsDragging] = useState(false)
+  const [followUpSuggestions, setFollowUpSuggestions] = useState<string[]>([])
+  const { agenticState, processEvent, reset: resetAgentic } = useAgenticStream()
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  // auto-scroll disabled
+  const { pendingRoute, triggerClassification, dismissRoute, acceptRoute } = useIntentRouter()
+
+  console.log('[Page] rendering messages, pendingRoute:', pendingRoute, 'lastAssistantId:', messages[messages.length - 1]?.id)
+
+  useEffect(() => {
+    const sid = getSessionId() || generateSessionId()
+    saveSession(sid)
+    setCurrentSessionId(sid)
+    // Load persisted messages for this session
+    const restored = loadSessionMessages(sid)
+    if (restored.length > 0) setMessages(restored)
+    // Load all sessions for sidebar
+    setSessions(listSessions())
+  }, [])
+
+  // Auto-scroll is now handled by useAutoScroll hook via scrollContainerRef
+
+  const addToast = useCallback((type: Toast["type"], message: string) => {
+    const id = Math.random().toString(36).slice(2)
+    setToasts(p => [...p, { id, type, message }])
+    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4000)
+  }, [])
+
+  const handleSend = useCallback(async (text: string, att?: Attachment) => {
+    console.log('[PAGE DEBUG] onSend called, text:', text, 'attachment:', att?.label, 'messages length:', messages.length)
+    if (!text.trim() && !att) {
+      console.log('[PAGE DEBUG] early return: empty text and no attachment')
+      return
+    }
+    setFollowUpSuggestions([])
+    const userMsg: Message = { id: Date.now().toString(), role: "user", content: text }
+    setMessages(p => [...p, userMsg])
+    setAttachments([])
+    setIsStreaming(true)
+    const assistantId = (Date.now() + 1).toString()
+    setMessages(p => [...p, { id: assistantId, role: "assistant", content: "", isStreaming: true }])
+    let finalContent = ""
+    let streamError = false
+    try {
+      console.log('[PAGE DEBUG] building allMessages')
+      const allMessages = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }))
+      console.log('[PAGE DEBUG] calling streamConsoleResponse')
+      const baseStream = streamConsoleResponse("/api/console/stream", {
+        session_id: currentSessionId,
+        organization_id: "default",
+        messages: allMessages,
+      })
+      console.log('[PAGE DEBUG] wrapping with typewriterStream')
+      const stream = typewriterStream(baseStream)
+      console.log('[STREAM DEBUG] start streaming')
+      for await (const chunk of stream) {
+        console.log('[STREAM DEBUG] got chunk', chunk)
+        processEvent(chunk as any)
+        if (chunk.type === "chunk" && chunk.content) {
+          finalContent = chunk.content
+          setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: chunk.content || "" } : m))
+        } else if (chunk.type === "done") {
+          console.log('[STREAM DEBUG] done')
+          setMessages(p => p.map(m => m.id === assistantId ? { ...m, isStreaming: false } : m))
+          // Set follow-up suggestions after the last AI message completes
+          setFollowUpSuggestions(DEFAULT_SUGGESTIONS)
+          // Trigger intent classification after AI stream ends
+          triggerClassification(text, finalContent)
+        } else if (chunk.type === "error") {
+          console.log('[STREAM DEBUG] error', chunk.error)
+          addToast("error", chunk.error || "Something went wrong.")
+          setMessages(p => p.filter(m => m.id !== assistantId))
+          streamError = true
+          break
+        }
+      }
+      console.log('[STREAM DEBUG] loop finished')
+    } catch (error) {
+      console.error('[PAGE DEBUG] catch block error:', error)
+      addToast("error", "Something went wrong. Please try again.")
+      setMessages(p => p.filter(m => m.id !== assistantId))
+      streamError = true
+    } finally {
+      setIsStreaming(false)
+      // Persist messages after streaming completes successfully
+      if (!streamError) {
+        try {
+          const updatedMessages = [...messages, userMsg, { id: assistantId, role: "assistant" as const, content: finalContent, isStreaming: false }]
+          saveSessionMessages(currentSessionId, updatedMessages)
+          setSessions(listSessions())
+        } catch (e) {
+          if (e instanceof ChatStorageError) {
+            addToast("error", "Chat history storage is full. Messages may not be saved.")
+          }
+        }
+      }
+    }
+  }, [currentSessionId, messages, addToast, processEvent, triggerClassification])
+
+  const handleNewChat = useCallback(() => {
+    // Save current session before clearing
+    if (messages.length > 0) {
+      try {
+        saveSessionMessages(currentSessionId, messages)
+      } catch (e) {
+        if (e instanceof ChatStorageError) {
+          addToast("error", "Chat history storage is full.")
+        }
+      }
+    }
+    clearSession()
+    const sid = generateSessionId()
+    saveSession(sid)
+    setCurrentSessionId(sid)
+    setMessages([])
+    resetAgentic()
+    setSessions(listSessions())
+  }, [currentSessionId, messages, addToast, resetAgentic])
+
+  const handleFileSelect = useCallback(async (files: FileList | null) => {
+    if (!files) return
+    for (const file of Array.from(files)) {
+      if (!ALLOWED_TYPES.includes(file.type)) { addToast("error", `Unsupported file: ${file.name}`); continue }
+      const err = validateFileSize(file.size, file.name)
+      if (err) { addToast("error", err); continue }
+      const text = await extractTextFromFile(file)
+      const attType: Attachment["type"] = file.type.startsWith("image/") ? "image" : "file"
+      setAttachments(p => [...p, { type: attType, label: file.name, filename: file.name, content: text }])
+    }
+  }, [addToast])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); setIsDragging(false)
+    handleFileSelect(e.dataTransfer.files)
+  }, [handleFileSelect])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(true) }, [])
+  const handleDragLeave = useCallback(() => setIsDragging(false), [])
+
+  return (
+    <div className="flex flex-col h-full bg-[#353531]" onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}>
+      <ConsoleTopBar onNewChat={handleNewChat} />
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {messages.length === 0 ? (
+          // Empty state: centered layout
+          <div className="flex-1 flex flex-col items-center justify-center px-6">
+            <div className="max-w-[800px] mx-auto text-center">
+              <div className="w-16 h-16 flex items-center justify-center mx-auto mb-6">
+                <Image
+                  src="/Aivory_Avatar.svg"
+                  alt="Aivory"
+                  width={40}
+                  height={40}
+                />
+              </div>
+              <h1 className="text-2xl font-semibold text-white mb-2">
+                What can I do for you today?
+              </h1>
+              <p className="text-sm text-[#d6d6c9] leading-relaxed">
+                Ask Aivory about your business goals, diagnostics, or AI System Blueprint, then turn them into workflows and automation.
+              </p>
+            </div>
+
+            <div className="w-full max-w-[800px] mt-6">
+              <ChatInput
+                onSend={(text: string, att?: Attachment) => handleSend(text, att)}
+                disabled={isStreaming}
+              />
+            </div>
+          </div>
+        ) : (
+          // Has messages: chat fills top, input floats at bottom
+          <>
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-8 py-8 pb-44">
+              <div className="max-w-[800px] mx-auto gap-0 flex flex-col">
+                {messages.map(m => (
+                  <div key={m.id}>
+                    <ChatMessage 
+                      role={m.role} 
+                      content={m.content} 
+                      isStreaming={m.isStreaming} 
+                      agenticState={m.role === 'assistant' && m.id === messages[messages.length - 1]?.id ? agenticState : undefined}
+                      onAcceptRoute={acceptRoute}
+                      onDismissRoute={dismissRoute}
+                    />
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+                {/* Intent routing banner - rendered at page level, independent of message renderer */}
+                {pendingRoute && messages.length > 0 && messages[messages.length - 1]?.role === 'assistant' && !messages[messages.length - 1]?.isStreaming && (
+                  <div className="mt-2">
+                    <RoutingSuggestBanner 
+                      intent={pendingRoute} 
+                      onAccept={acceptRoute} 
+                      onDismiss={dismissRoute} 
+                    />
+                  </div>
+                )}
+                {/* Follow-up chips - only show after the last AI message */}
+                {messages.length > 0 && messages[messages.length - 1].role === "assistant" && followUpSuggestions.length > 0 && (
+                  <FollowUpChips
+                    suggestions={followUpSuggestions}
+                    onSelect={(suggestion) => {
+                      setFollowUpSuggestions([])
+                      handleSend(suggestion, undefined)
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+            {/* Floating input bar — sticky at bottom, content scrolls behind it */}
+            <div className="sticky bottom-0 z-10 px-8 pt-2 pb-4" style={{ background: 'linear-gradient(to bottom, transparent, #353531 24px)' }}>
+              <div className="max-w-[800px] mx-auto">
+                <ChatInput
+                  onSend={(text: string, att?: Attachment) => handleSend(text, att)}
+                  disabled={isStreaming}
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Toast container */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map(toast => (
+          <div key={toast.id} className={`px-4 py-2 rounded-lg text-sm ${
+            toast.type === "success"
+              ? "bg-green-900/50 border border-green-700 text-green-300"
+              : "bg-red-900/50 border border-red-700 text-red-300"
+          }`}>
+            {toast.message}
+          </div>
+        ))}
+      </div>
+
+      {/* History sidebar */}
+      <aside
+        className={`fixed top-0 right-0 h-full w-72 z-40 flex flex-col transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "translate-x-full"}`}
+        style={{
+          background: "#353531",
+          backdropFilter: "blur(16px)",
+          borderLeft: "1px solid rgba(255, 255, 255, 0.08)",
+        }}
+      >
+        <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <span className="text-sm font-semibold text-text-primary">Chat History</span>
+          <button
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors duration-150"
+            style={{ background: "rgba(255,255,255,0.06)" }}
+            onClick={() => setSidebarOpen(false)}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto py-2">
+          {sessions.length === 0 ? (
+            <p className="text-sm text-text-secondary px-4 py-3">No chat history yet.</p>
+          ) : (
+            sessions.map(s => {
+              const isActive = s.id === currentSessionId
+              return (
+                <div
+                  key={s.id}
+                  className={`px-4 py-3 cursor-pointer text-sm text-text-secondary transition-colors duration-150 rounded-lg mx-2 ${isActive ? "bg-[rgba(0,229,158,0.08)] border-l-2 border-accent text-text-primary" : "hover:bg-[rgba(255,255,255,0.04)]"}`}
+                  onClick={() => {
+                    if (s.id === currentSessionId) return
+                    if (messages.length > 0) {
+                      try { saveSessionMessages(currentSessionId, messages) } catch {}
+                    }
+                    const loaded = loadSessionMessages(s.id)
+                    setMessages(loaded)
+                    setCurrentSessionId(s.id)
+                    setSessions(listSessions())
+                  }}
+                >
+                  <div className="truncate text-sm font-medium">
+                    {s.title || "New chat"}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </aside>
+
+      {isDragging && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none">
+          <div className="px-6 py-4 border-2 border-dashed border-emerald-400 rounded-2xl text-emerald-300 text-lg">
+            Drop files to attach
+          </div>
+        </div>
+      )}
+
+      <input ref={fileInputRef} type="file" multiple hidden accept={ALLOWED_TYPES.join(",")}
+        onChange={e => handleFileSelect(e.target.files)} />
+
+      {/* Aivory Copilot toggle panel */}
+      <div className="relative">
+        <CopilotTogglePanel currentSpec={null} />
+      </div>
+    </div>
+  )
+}

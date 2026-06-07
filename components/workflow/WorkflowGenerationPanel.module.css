@@ -1,0 +1,227 @@
+/**
+ * WorkflowGenerationPanel Styles
+ */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  color: #a8a6a2;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8e6e1;
+  letter-spacing: 0.3px;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: #a1a1aa;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a8a6a2;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.textarea {
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #e8e6e1;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  transition: all 0.15s;
+}
+
+.textarea:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(0, 229, 158, 0.3);
+  box-shadow: 0 0 0 2px rgba(0, 229, 158, 0.1);
+}
+
+.textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.charCounter {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 11px;
+  color: #a1a1aa;
+}
+
+.charCounter .warning {
+  color: #fbbf24;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #a8a6a2;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkboxLabel input {
+  cursor: pointer;
+  accent-color: #00e59e;
+}
+
+.checkboxLabel input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.hint {
+  margin: 0;
+  font-size: 11px;
+  color: #a1a1aa;
+  font-style: italic;
+}
+
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #f87171;
+}
+
+.errorIcon {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.errorText {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.generateBtn,
+.clearBtn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.generateBtn {
+  flex: 1;
+  background: rgba(0, 229, 158, 0.15);
+  color: #00e59e;
+  border: 1px solid rgba(0, 229, 158, 0.3);
+}
+
+.generateBtn:hover:not(:disabled) {
+  background: rgba(0, 229, 158, 0.25);
+  border-color: rgba(0, 229, 158, 0.5);
+}
+
+.generateBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clearBtn {
+  background: rgba(255, 255, 255, 0.06);
+  color: #a8a6a2;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.clearBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.clearBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.info {
+  padding: 10px 12px;
+  background: rgba(0, 229, 158, 0.05);
+  border: 1px solid rgba(0, 229, 158, 0.1);
+  border-radius: 6px;
+  font-size: 11px;
+  color: #a1a1aa;
+}
+
+.info p {
+  margin: 0;
+  line-height: 1.4;
+}
