@@ -110,7 +110,7 @@ export function AgentConfigPanel({
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
-                style={{ color: '#00e59e' }}
+                style={{ color: '#b7cba6' }}
               >
                 <circle cx="12" cy="12" r="10" opacity="0.3" />
                 <path d="M12 2a10 10 0 0 1 10 10" />
@@ -152,7 +152,7 @@ export function AgentConfigPanel({
             </p>
             <p style={{ fontSize: 12, color: '#5a5a58', margin: '4px 0 0 0' }}>
               Create an agent in the{' '}
-              <Link href="/agents" style={{ color: '#00e59e', textDecoration: 'none' }}>
+              <Link href="/agents" style={{ color: '#b7cba6', textDecoration: 'none' }}>
                 Agents
               </Link>{' '}
               section first
@@ -182,11 +182,11 @@ export function AgentConfigPanel({
                     padding: 12,
                     background:
                       selectedAgentId === agent.id
-                        ? 'rgba(0,229,158,0.1)'
+                        ? 'rgba(178, 204, 162,0.1)'
                         : 'rgba(255,255,255,0.02)',
                     border:
                       selectedAgentId === agent.id
-                        ? '1px solid rgba(0,229,158,0.3)'
+                        ? '1px solid rgba(178, 204, 162,0.3)'
                         : '1px solid rgba(255,255,255,0.05)',
                     borderRadius: 8,
                     cursor: 'pointer',
@@ -214,7 +214,7 @@ export function AgentConfigPanel({
                     style={{
                       marginTop: 2,
                       cursor: 'pointer',
-                      accentColor: '#00e59e',
+                      accentColor: '#b7cba6',
                     }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -261,8 +261,8 @@ export function AgentConfigPanel({
           <div
             style={{
               padding: 12,
-              background: 'rgba(0,229,158,0.05)',
-              border: '1px solid rgba(0,229,158,0.2)',
+              background: 'rgba(178, 204, 162,0.05)',
+              border: '1px solid rgba(178, 204, 162,0.2)',
               borderRadius: 8,
               marginBottom: 20,
             }}
@@ -270,7 +270,7 @@ export function AgentConfigPanel({
             <div style={{ fontSize: 11, color: '#5a5a58', marginBottom: 4 }}>
               Selected:
             </div>
-            <div style={{ fontSize: 13, fontWeight: 500, color: '#00e59e' }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: '#b7cba6' }}>
               {selectedAgent.name}
             </div>
           </div>

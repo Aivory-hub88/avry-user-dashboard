@@ -76,7 +76,7 @@ export default function NewAgentPage() {
       <div className="max-w-2xl mx-auto overflow-x-hidden">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/agents" className="text-[#00e59e] hover:text-[#00f5b0] text-sm font-medium mb-4 inline-block">
+          <Link href="/agents" className="text-[#b7cba6] hover:text-[#00f5b0] text-sm font-medium mb-4 inline-block">
             ← Back to Agents
           </Link>
           <h1 className="text-3xl font-bold text-zinc-100">Create New Agent</h1>
@@ -104,7 +104,7 @@ export default function NewAgentPage() {
               onChange={handleChange}
               placeholder="e.g., Customer Support Bot"
               required
-              className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[#00e59e] transition-colors"
+              className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[#b7cba6] transition-colors"
             />
           </div>
 
@@ -119,7 +119,7 @@ export default function NewAgentPage() {
               onChange={handleChange}
               placeholder="What does this agent do?"
               rows={3}
-              className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[#00e59e] transition-colors resize-none"
+              className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[#b7cba6] transition-colors resize-none"
             />
           </div>
 
@@ -153,7 +153,7 @@ export default function NewAgentPage() {
               value={formData.provider}
               onChange={handleChange}
               required
-              className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-[#00e59e] transition-colors"
+              className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-[#b7cba6] transition-colors"
             >
               {PROVIDERS.map(p => (
                 <option key={p} value={p} className="bg-[#2a2a26]">
@@ -172,7 +172,7 @@ export default function NewAgentPage() {
               name="runtime"
               value={formData.runtime}
               onChange={handleChange}
-              className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-[#00e59e] transition-colors"
+              className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-[#b7cba6] transition-colors"
             >
               {RUNTIMES.map(r => (
                 <option key={r} value={r} className="bg-[#2a2a26]">

@@ -165,13 +165,13 @@
 }
 
 .createBtn {
-  background: linear-gradient(135deg, #00e59e 0%, #00d48a 100%);
+  background: linear-gradient(135deg, #b7cba6 0%, #00d48a 100%);
   color: #000;
 }
 
 .createBtn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 229, 158, 0.3);
+  box-shadow: 0 4px 12px rgba(178, 204, 162, 0.3);
 }
 
 .backBtn {

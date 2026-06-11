@@ -9,7 +9,7 @@ export default function LogsPage() {
   const tCommon = useTranslations("common")
 
   return (
-    <div className={styles.placeholderContainer}>
+    <div className={`${styles.placeholderContainer} font-manrope`}>
       <div className={styles.content}>
         <h1 className={styles.title}>{t("title")}</h1>
         <p className={styles.description}>{t("description")}</p>

@@ -104,16 +104,16 @@ export const WorkflowNodeComponent: React.FC<{
         padding: '12px 14px',
         background: 'rgba(255, 255, 255, 0.08)',
         border: selected
-          ? '2px solid rgba(0, 229, 158, 0.6)'
+          ? '2px solid rgba(178, 204, 162, 0.6)'
           : isConnecting
-            ? '2px solid rgba(0, 229, 158, 0.3)'
+            ? '2px solid rgba(178, 204, 162, 0.3)'
             : '1px solid rgba(255, 255, 255, 0.12)',
         borderRadius: '8px',
         minWidth: '140px',
         textAlign: 'center',
         cursor: 'pointer',
         transition: 'all 0.15s',
-        boxShadow: selected ? '0 0 12px rgba(0, 229, 158, 0.2)' : 'none',
+        boxShadow: selected ? '0 0 12px rgba(178, 204, 162, 0.2)' : 'none',
       }}
     >
       <div style={{ fontSize: '18px', marginBottom: '6px' }}>

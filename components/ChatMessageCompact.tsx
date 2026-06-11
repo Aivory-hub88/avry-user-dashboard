@@ -39,7 +39,7 @@ const compactMarkdownComponents = {
     <em className="italic text-[#f7f7f7]">{children}</em>
   ),
   a: ({ href, children }: any) => (
-    <a href={href} className="text-[#00e59e] hover:text-[#00e59e]/80 underline underline-offset-2 transition-colors text-[13px]" target="_blank" rel="noopener noreferrer">
+    <a href={href} className="text-[#b7cba6] hover:text-[#b7cba6]/80 underline underline-offset-2 transition-colors text-[13px]" target="_blank" rel="noopener noreferrer">
       {children}
     </a>
   ),
@@ -81,7 +81,7 @@ const compactMarkdownComponents = {
     )
   },
   blockquote: ({ children }: any) => (
-    <blockquote className="my-2 pl-3 border-l-2 border-[#00e59e]/40 text-[#a1a1aa] italic text-[13px]">
+    <blockquote className="my-2 pl-3 border-l-2 border-[#b7cba6]/40 text-[#a1a1aa] italic text-[13px]">
       {children}
     </blockquote>
   ),
@@ -104,7 +104,7 @@ export default function ChatMessageCompact({
         </div>
       ) : (
         <div className="flex items-start gap-2.5">
-          <div className="w-6 h-6 rounded-full flex-shrink-0 mt-0.5 flex items-center justify-center bg-[#00e59e]/15 border border-[#00e59e]/20">
+          <div className="w-6 h-6 rounded-full flex-shrink-0 mt-0.5 flex items-center justify-center bg-[#b7cba6]/15 border border-[#b7cba6]/20">
             <Image src="/Aivory_Avatar.svg" alt="Aivory" width={13} height={13} />
           </div>
           <div className="flex-1 min-w-0 pt-0.5">
@@ -128,7 +128,7 @@ export default function ChatMessageCompact({
                   <p className="text-[13px] leading-[1.55] text-[#f7f7f7] whitespace-pre-wrap">
                     {content}
                     <span
-                      className="inline-block w-[2px] h-[13px] bg-[#00e59e] ml-0.5 align-middle rounded-sm"
+                      className="inline-block w-[2px] h-[13px] bg-[#b7cba6] ml-0.5 align-middle rounded-sm"
                       style={{ animation: 'blink 1s step-end infinite' }}
                       aria-hidden="true"
                     />

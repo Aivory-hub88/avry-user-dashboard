@@ -6,13 +6,13 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: #00e59e;
+  background: #b7cba6;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 20px rgba(0, 229, 158, 0.4);
+  box-shadow: 0 4px 20px rgba(178, 204, 162, 0.4);
   z-index: 1000;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
   flex-shrink: 0;
@@ -20,7 +20,7 @@
 
 .fab:hover {
   transform: scale(1.08);
-  box-shadow: 0 6px 28px rgba(0, 229, 158, 0.55);
+  box-shadow: 0 6px 28px rgba(178, 204, 162, 0.55);
 }
 
 .fab:active {
@@ -28,7 +28,7 @@
 }
 
 .fab:focus-visible {
-  outline: 2px solid #00e59e;
+  outline: 2px solid #b7cba6;
   outline-offset: 3px;
 }
 
@@ -115,7 +115,7 @@
 }
 
 .closeBtn:focus-visible {
-  outline: 2px solid #00e59e;
+  outline: 2px solid #b7cba6;
   outline-offset: 2px;
 }
 

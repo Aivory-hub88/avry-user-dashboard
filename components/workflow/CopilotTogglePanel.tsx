@@ -387,7 +387,7 @@ function CopilotPanelExpanded({
         />
         <textarea
           ref={textareaRef}
-          className="flex-1 bg-transparent border-none outline-none resize-none text-[#f7f7f7] text-[13px] leading-relaxed placeholder:text-white/30 min-h-[22px] max-h-[180px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden caret-teal-400 disabled:opacity-50 text-left"
+          className="flex-1 bg-transparent border-none outline-none resize-none text-[#f7f7f7] text-[13px] leading-relaxed placeholder:text-white/30 min-h-[22px] max-h-[180px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden caret-[#b7cba6] disabled:opacity-50 text-left"
           rows={1}
           value={input}
           onChange={handleInputChange}

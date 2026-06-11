@@ -51,11 +51,7 @@ function DashboardIcon() {
 function DiagnosticsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
-      <polyline points="14 2 14 8 20 8"/>
-      <line x1="16" y1="13" x2="8" y2="13"/>
-      <line x1="16" y1="17" x2="8" y2="17"/>
-      <line x1="10" y1="9" x2="8" y2="9"/>
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
     </svg>
   )
 }
@@ -63,11 +59,10 @@ function DiagnosticsIcon() {
 function BlueprintIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-      <polyline points="14 2 14 8 20 8"/>
-      <line x1="16" y1="13" x2="8" y2="13"/>
-      <line x1="16" y1="17" x2="8" y2="17"/>
-      <polyline points="10 9 9 9 8 9"/>
+      <path d="M5.5 8.5 9 12l-3.5 3.5L2 12l3.5-3.5Z" />
+      <path d="m12 2 3.5 3.5L12 9 8.5 5.5 12 2Z" />
+      <path d="M18.5 8.5 22 12l-3.5 3.5L15 12l3.5-3.5Z" />
+      <path d="m12 15 3.5 3.5L12 22l-3.5-3.5L12 15Z" />
     </svg>
   )
 }
@@ -121,11 +116,11 @@ function IntegrationsIcon() {
 function AgentsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="1" />
-      <path d="M12 1v6m0 6v6" />
-      <path d="M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24" />
-      <path d="M1 12h6m6 0h6" />
-      <path d="M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24" />
+      <rect x="3" y="11" width="18" height="10" rx="2"/>
+      <circle cx="12" cy="5" r="2"/>
+      <path d="M12 7v4"/>
+      <line x1="8" y1="16" x2="8" y2="16"/>
+      <line x1="16" y1="16" x2="16" y2="16"/>
     </svg>
   )
 }
@@ -157,6 +152,16 @@ function ProfileIcon() {
   )
 }
 
+function ExploreIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+      <polyline points="2 12 12 17 22 12"/>
+      <polyline points="2 17 12 22 22 17"/>
+    </svg>
+  )
+}
+
 const NAV_ICONS: Record<string, React.FC> = {
   console: ConsoleIcon,
   diagnostics: DiagnosticsIcon,
@@ -169,6 +174,7 @@ const NAV_ICONS: Record<string, React.FC> = {
   settings: SettingsIcon,
   home: HomeIcon,
   profile: ProfileIcon,
+  templates: ExploreIcon,
 }
 
 export default function Sidebar() {
@@ -196,9 +202,9 @@ export default function Sidebar() {
     { key: "workflows",     href: "/workflows", badge: workflowCount > 0 ? workflowCount : null },
     { key: "executionLogs", href: "/logs" },
     { key: "integrations",  href: "/integrations" },
+    { key: "templates",     href: "/templates", label: "Automation Templates" },
     { key: "agents",        href: "/agents" },
-    { key: "profile",       href: "/dashboard", label: "Profile" },
-    { key: "settings",      href: "/settings" },
+    { key: "profile",       href: "/overview", label: "Overview" },
   ]
 
   return (
@@ -238,7 +244,7 @@ export default function Sidebar() {
       </button>
 
       {/* Navigation */}
-      <nav className="flex flex-col gap-0.5 flex-1 px-2">
+      <nav className="flex flex-col gap-0.5 px-2 shrink-0">
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
           const Icon = NAV_ICONS[item.key]
@@ -280,7 +286,7 @@ export default function Sidebar() {
 
       {/* Conversation History */}
       <ConversationHistory collapsed={collapsed} />      {/* Bottom Section */}
-      <div className="mt-auto pt-4 border-t border-white/5">
+      <div className="mt-auto shrink-0 pt-4 border-t border-white/5">
         <UserProfile />
         <div className="px-2">
           <LanguagePill />

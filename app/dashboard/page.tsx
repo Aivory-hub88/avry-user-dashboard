@@ -419,7 +419,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('profile')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'profile'
-              ? 'bg-[#00e59e] text-[#1a1a24]'
+              ? 'bg-[#b7cba6] text-[#1a1a24]'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -429,7 +429,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('wallet')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'wallet'
-              ? 'bg-[#00e59e] text-[#1a1a24]'
+              ? 'bg-[#b7cba6] text-[#1a1a24]'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -439,7 +439,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('quota')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'quota'
-              ? 'bg-[#00e59e] text-[#1a1a24]'
+              ? 'bg-[#b7cba6] text-[#1a1a24]'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -449,7 +449,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('subscriptions')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'subscriptions'
-              ? 'bg-[#00e59e] text-[#1a1a24]'
+              ? 'bg-[#b7cba6] text-[#1a1a24]'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -459,7 +459,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('payments')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'payments'
-              ? 'bg-[#00e59e] text-[#1a1a24]'
+              ? 'bg-[#b7cba6] text-[#1a1a24]'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -475,7 +475,7 @@ export default function DashboardPage() {
             <div className="space-y-6">
               {/* Avatar Section */}
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#00e59e] to-[#00b87d] flex items-center justify-center flex-shrink-0">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#b7cba6] to-[#00b87d] flex items-center justify-center flex-shrink-0">
                   <span className="text-2xl font-semibold text-black">
                     {AuthManager.getUser()?.email?.charAt(0).toUpperCase()}
                   </span>
@@ -494,11 +494,11 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-400">Tier</span>
-                  <span className="text-sm text-[#00e59e] font-medium">{AuthManager.getUser()?.tier?.toUpperCase() || 'N/A'}</span>
+                  <span className="text-sm text-[#b7cba6] font-medium">{AuthManager.getUser()?.tier?.toUpperCase() || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-400">Subscription Status</span>
-                  <span className={`text-sm font-medium ${AuthManager.getUser()?.is_subscribed ? 'text-[#00e59e]' : 'text-gray-400'}`}>
+                  <span className={`text-sm font-medium ${AuthManager.getUser()?.is_subscribed ? 'text-[#b7cba6]' : 'text-gray-400'}`}>
                     {AuthManager.getUser()?.is_subscribed ? 'Active' : 'Inactive'}
                   </span>
                 </div>
@@ -551,10 +551,10 @@ export default function DashboardPage() {
               <p className="text-sm text-gray-400 mb-6">One-time purchases to unlock premium features and enable specific tabs</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* AI Readiness Deep Diagnostic */}
-                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.has_diagnostic ? 'border-[#00e59e] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
+                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.has_diagnostic ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
                   <div className="flex justify-between items-start mb-4">
                     <h3 className="text-lg font-medium text-white">AI Readiness Deep Diagnostic</h3>
-                    {AuthManager.getUser()?.has_diagnostic && <span className="text-xs font-medium px-2 py-1 bg-[#00e59e] text-black rounded">Active</span>}
+                    {AuthManager.getUser()?.has_diagnostic && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
                   </div>
                   <p className="text-sm text-gray-400 mb-4">Know exactly where your business stands on AI before you build anything.</p>
                   <div className="mb-6">
@@ -568,16 +568,16 @@ export default function DashboardPage() {
                     <li>✓ AI opportunity identification</li>
                     <li>✓ Data & process readiness</li>
                   </ul>
-                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.has_diagnostic ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#00e59e] text-black hover:bg-[#00d489]'}`} onClick={() => !AuthManager.getUser()?.has_diagnostic && handlePayment('ai_diagnostic', 29, 'AI Readiness Deep Diagnostic')} disabled={paymentLoading || AuthManager.getUser()?.has_diagnostic}>
+                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.has_diagnostic ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`} onClick={() => !AuthManager.getUser()?.has_diagnostic && handlePayment('ai_diagnostic', 29, 'AI Readiness Deep Diagnostic')} disabled={paymentLoading || AuthManager.getUser()?.has_diagnostic}>
                     {paymentLoading ? 'Processing...' : AuthManager.getUser()?.has_diagnostic ? 'Tab Unlocked' : 'Activate'}
                   </button>
                 </div>
 
                 {/* AI System Blueprint + Roadmap */}
-                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.has_blueprint ? 'border-[#00e59e] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
+                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.has_blueprint ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
                   <div className="flex justify-between items-start mb-4">
                     <h3 className="text-lg font-medium text-white">AI System Blueprint + Roadmap</h3>
-                    {AuthManager.getUser()?.has_blueprint && <span className="text-xs font-medium px-2 py-1 bg-[#00e59e] text-black rounded">Active</span>}
+                    {AuthManager.getUser()?.has_blueprint && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
                   </div>
                   <p className="text-sm text-gray-400 mb-4">Your full AI architecture and execution plan, built around your business, not a template.</p>
                   <div className="mb-6">
@@ -592,16 +592,16 @@ export default function DashboardPage() {
                     <li>✓ Phased implementation roadmap</li>
                     <li>✓ KPI targets per phase</li>
                   </ul>
-                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.has_blueprint ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#00e59e] text-black hover:bg-[#00d489]'}`} onClick={() => !AuthManager.getUser()?.has_blueprint && handlePayment('ai_blueprint', 85, 'AI System Blueprint + Roadmap')} disabled={paymentLoading || AuthManager.getUser()?.has_blueprint}>
+                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.has_blueprint ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`} onClick={() => !AuthManager.getUser()?.has_blueprint && handlePayment('ai_blueprint', 85, 'AI System Blueprint + Roadmap')} disabled={paymentLoading || AuthManager.getUser()?.has_blueprint}>
                     {paymentLoading ? 'Processing...' : AuthManager.getUser()?.has_blueprint ? 'Tab Unlocked' : 'Activate'}
                   </button>
                 </div>
 
                 {/* Full Stack Bundle */}
-                <div className={`rounded-lg border p-6 transition-all flex flex-col ${(AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) ? 'border-[#00e59e] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
+                <div className={`rounded-lg border p-6 transition-all flex flex-col ${(AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
                   <div className="flex justify-between items-start mb-4">
                     <h3 className="text-lg font-medium text-white">Full Stack Bundle</h3>
-                    {(AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) && <span className="text-xs font-medium px-2 py-1 bg-[#00e59e] text-black rounded">Active</span>}
+                    {(AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
                   </div>
                   <p className="text-sm text-gray-400 mb-4">Everything in one. Know, plan, execute in order.</p>
                   <div className="mb-6">
@@ -612,9 +612,9 @@ export default function DashboardPage() {
                     <li>✓ Deep Diagnostic</li>
                     <li>✓ Blueprint</li>
                     <li>✓ Roadmap</li>
-                    <li className="text-[#00e59e] font-medium">✓ Save $15 vs buying separately</li>
+                    <li className="text-[#b7cba6] font-medium">✓ Save $15 vs buying separately</li>
                   </ul>
-                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${(AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#00e59e] text-black hover:bg-[#00d489]'}`} onClick={() => !(AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) && handlePayment('ai_fullstack', 99, 'Full Stack Bundle')} disabled={paymentLoading || (AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint)}>
+                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${(AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`} onClick={() => !(AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) && handlePayment('ai_fullstack', 99, 'Full Stack Bundle')} disabled={paymentLoading || (AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint)}>
                     {paymentLoading ? 'Processing...' : (AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) ? 'All Tabs Unlocked' : 'Activate Bundle'}
                   </button>
                 </div>
@@ -627,10 +627,10 @@ export default function DashboardPage() {
               <p className="text-sm text-gray-400 mb-6">Choose your plan for ongoing credits and features</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Foundation */}
-                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.tier === 'foundation' ? 'border-[#00e59e] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
+                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.tier === 'foundation' ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
                   <div className="flex justify-between items-start mb-4">
                     <h3 className="text-lg font-medium text-white">Foundation</h3>
-                    {AuthManager.getUser()?.tier === 'foundation' && <span className="text-xs font-medium px-2 py-1 bg-[#00e59e] text-black rounded">Active</span>}
+                    {AuthManager.getUser()?.tier === 'foundation' && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
                   </div>
                   <p className="text-sm text-gray-400 mb-4">For individuals and solo professionals starting their AI journey.</p>
                   <div className="mb-6">
@@ -646,16 +646,16 @@ export default function DashboardPage() {
                     <li>✓ 1 active agent</li>
                     <li>✓ Telegram or Slack</li>
                   </ul>
-                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.tier === 'foundation' ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#00e59e] text-black hover:bg-[#00d489]'}`} onClick={() => AuthManager.getUser()?.tier !== 'foundation' && handlePayment('foundation', 20, 'Foundation Plan')} disabled={paymentLoading || AuthManager.getUser()?.tier === 'foundation'}>
+                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.tier === 'foundation' ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`} onClick={() => AuthManager.getUser()?.tier !== 'foundation' && handlePayment('foundation', 20, 'Foundation Plan')} disabled={paymentLoading || AuthManager.getUser()?.tier === 'foundation'}>
                     {paymentLoading ? 'Processing...' : AuthManager.getUser()?.tier === 'foundation' ? 'Current Plan' : 'Start With Foundation'}
                   </button>
                 </div>
 
                 {/* Pro */}
-                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.tier === 'acceleration' ? 'border-[#00e59e] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
+                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.tier === 'acceleration' ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
                   <div className="flex justify-between items-start mb-4">
                     <h3 className="text-lg font-medium text-white">Pro</h3>
-                    {AuthManager.getUser()?.tier === 'acceleration' && <span className="text-xs font-medium px-2 py-1 bg-[#00e59e] text-black rounded">Active</span>}
+                    {AuthManager.getUser()?.tier === 'acceleration' && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
                   </div>
                   <p className="text-sm text-gray-400 mb-4">For SMEs and founders running AI operations daily.</p>
                   <div className="mb-6">
@@ -672,16 +672,16 @@ export default function DashboardPage() {
                     <li>✓ Telegram & Slack</li>
                     <li>✓ Multi-step agent flows</li>
                   </ul>
-                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.tier === 'acceleration' ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#00e59e] text-black hover:bg-[#00d489]'}`} onClick={() => AuthManager.getUser()?.tier !== 'acceleration' && handlePayment('acceleration', 44, 'Pro Plan')} disabled={paymentLoading || AuthManager.getUser()?.tier === 'acceleration'}>
+                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.tier === 'acceleration' ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`} onClick={() => AuthManager.getUser()?.tier !== 'acceleration' && handlePayment('acceleration', 44, 'Pro Plan')} disabled={paymentLoading || AuthManager.getUser()?.tier === 'acceleration'}>
                     {paymentLoading ? 'Processing...' : AuthManager.getUser()?.tier === 'acceleration' ? 'Current Plan' : 'Start With Pro'}
                   </button>
                 </div>
 
                 {/* Enterprise */}
-                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.tier === 'intelligence' ? 'border-[#00e59e] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
+                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.tier === 'intelligence' ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
                   <div className="flex justify-between items-start mb-4">
                     <h3 className="text-lg font-medium text-white">Enterprise</h3>
-                    {AuthManager.getUser()?.tier === 'intelligence' && <span className="text-xs font-medium px-2 py-1 bg-[#00e59e] text-black rounded">Active</span>}
+                    {AuthManager.getUser()?.tier === 'intelligence' && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
                   </div>
                   <p className="text-sm text-gray-400 mb-4">For large organizations with advanced AI operations.</p>
                   <div className="mb-6">
@@ -699,7 +699,7 @@ export default function DashboardPage() {
                     <li>✓ SLA guarantee</li>
                     <li>✓ Multi-team workspace</li>
                   </ul>
-                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.tier === 'intelligence' ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#00e59e] text-black hover:bg-[#00d489]'}`} onClick={() => AuthManager.getUser()?.tier !== 'intelligence' && handlePayment('intelligence', 499, 'Enterprise Plan')} disabled={paymentLoading || AuthManager.getUser()?.tier === 'intelligence'}>
+                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.tier === 'intelligence' ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`} onClick={() => AuthManager.getUser()?.tier !== 'intelligence' && handlePayment('intelligence', 499, 'Enterprise Plan')} disabled={paymentLoading || AuthManager.getUser()?.tier === 'intelligence'}>
                     {paymentLoading ? 'Processing...' : AuthManager.getUser()?.tier === 'intelligence' ? 'Current Plan' : 'Contact Sales'}
                   </button>
                 </div>

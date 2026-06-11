@@ -319,7 +319,7 @@
 .sectionLabel {
   font-size: 10px;
   font-weight: 700;
-  color: #00e59e;
+  color: #b7cba6;
   text-transform: uppercase;
   letter-spacing: 0.8px;
   margin: 0 0 8px;
@@ -434,7 +434,7 @@
 
 .kpiLabel {
   font-size: 0.7rem;
-  color: #00e59e;
+  color: #b7cba6;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.6px;
@@ -443,7 +443,7 @@
 .kpiTarget {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #00e59e;
+  color: #b7cba6;
   line-height: 1.2;
   letter-spacing: -0.3px;
 }

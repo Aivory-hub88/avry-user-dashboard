@@ -181,11 +181,11 @@ export default function FinalResultPage() {
 
   // Assessment broken into individual bullet lines matching the screenshot
   const assessmentBullets: { icon: string; color: string; text: string }[] = [
-    { icon: '▲', color: '#00e59e', text: `${context.company} scores ${scores.composite}/100, placing it at ${scores.maturityLevel} maturity.` },
-    { icon: '▲', color: '#00e59e', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension)}.` },
+    { icon: '▲', color: '#b7cba6', text: `${context.company} scores ${scores.composite}/100, placing it at ${scores.maturityLevel} maturity.` },
+    { icon: '▲', color: '#b7cba6', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension)}.` },
     { icon: '▽', color: '#fbbf24', text: `Greatest gap: ${humanizeDimensionKey(scores.weakestDimension)}.` },
     { icon: '▽', color: '#fbbf24', text: `${highRiskCount} high-severity risk${highRiskCount !== 1 ? 's' : ''} identified.` },
-    { icon: '▶', color: '#00e59e', text: `${quickWinCount} quick-win opportunit${quickWinCount !== 1 ? 'ies' : 'y'} available.` },
+    { icon: '▶', color: '#b7cba6', text: `${quickWinCount} quick-win opportunit${quickWinCount !== 1 ? 'ies' : 'y'} available.` },
   ]
 
   const sortedRisks = [...risks].sort((a, b) => {
@@ -226,7 +226,7 @@ export default function FinalResultPage() {
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>Strongest</span>
                 <span className={styles.summaryValue}>{humanizeDimensionKey(scores.strongestDimension)}</span>
-                <span className={styles.summaryBar} style={{ background: '#00e59e' }} />
+                <span className={styles.summaryBar} style={{ background: '#b7cba6' }} />
               </div>
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>Weakest</span>

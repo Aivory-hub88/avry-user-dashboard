@@ -12,8 +12,8 @@
 }
 
 .triggerNode.selected {
-  border-color: rgba(0, 229, 158, 0.35);
-  box-shadow: 0 0 0 2px rgba(0, 229, 158, 0.1), 0 6px 20px rgba(0, 0, 0, 0.3);
+  border-color: rgba(178, 204, 162, 0.35);
+  box-shadow: 0 0 0 2px rgba(178, 204, 162, 0.1), 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
 /* Node Header */
@@ -85,22 +85,22 @@
 }
 
 .nodeSelect:focus {
-  border-color: rgba(0, 229, 158, 0.4);
-  background: rgba(0, 229, 158, 0.02);
+  border-color: rgba(178, 204, 162, 0.4);
+  background: rgba(178, 204, 162, 0.02);
 }
 
 /* Handles */
 .handle {
   width: 8px;
   height: 8px;
-  background: rgba(0, 229, 158, 0.3);
-  border: 2px solid rgba(0, 229, 158, 0.5);
+  background: rgba(178, 204, 162, 0.3);
+  border: 2px solid rgba(178, 204, 162, 0.5);
   border-radius: 50%;
   transition: all 0.15s ease;
 }
 
 .handle:hover {
-  background: #00e59e;
+  background: #b7cba6;
   border-color: #00f5b0;
   width: 10px;
   height: 10px;

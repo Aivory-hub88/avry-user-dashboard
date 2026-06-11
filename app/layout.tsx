@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { Inter_Tight, Nunito } from "next/font/google"
+import { Inter_Tight, Nunito, Manrope } from "next/font/google"
 import Sidebar from "@/components/shared/Sidebar"
 import ClientShell from "@/components/ClientShell"
 import LocaleWrapper from "@/components/LocaleWrapper"
@@ -24,6 +24,13 @@ const nunito = Nunito({
   variable: "--font-nunito",
 })
 
+const manrope = Manrope({
+  subsets: ["latin"],
+  weight: ["200", "300", "400", "500", "600"],
+  display: "swap",
+  variable: "--font-manrope",
+})
+
 export const metadata: Metadata = {
   title: "Aivory Dashboard",
   description: "AI-powered workflow automation dashboard",
@@ -38,7 +45,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${interTight.variable} ${nunito.variable}`}>
+    <html lang="en" className={`${interTight.variable} ${nunito.variable} ${manrope.variable}`}>
       <body className={`flex h-screen bg-[#353531] overflow-hidden ${interTight.className}`}>
         <TokenInitializer />
         <LocaleWrapper>

@@ -380,7 +380,7 @@ export default function AiraFloatingAssistant() {
                 }
               }}
               disabled={isLoading}
-              className="w-full bg-transparent border-none outline-none resize-none text-white/80 text-sm font-light placeholder:text-white/30 min-h-[24px] max-h-[140px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden caret-teal-400 leading-relaxed disabled:opacity-50"
+              className="w-full bg-transparent border-none outline-none resize-none text-white/80 text-sm font-light placeholder:text-white/30 min-h-[24px] max-h-[140px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden caret-[#b7cba6] leading-relaxed disabled:opacity-50"
             />
             <div className="flex items-center justify-between">
               <button

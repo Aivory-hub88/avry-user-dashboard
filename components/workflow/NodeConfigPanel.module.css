@@ -152,8 +152,8 @@
 }
 
 .select:focus {
-  border-color: rgba(0, 229, 158, 0.4);
-  background: rgba(0, 229, 158, 0.02);
+  border-color: rgba(178, 204, 162, 0.4);
+  background: rgba(178, 204, 162, 0.02);
 }
 
 /* Warning */
@@ -170,7 +170,7 @@
 }
 
 .warning a {
-  color: #00e59e;
+  color: #b7cba6;
   text-decoration: none;
   font-weight: 600;
   transition: color 0.15s ease;
@@ -223,8 +223,8 @@
 
 .input:focus,
 .textarea:focus {
-  border-color: rgba(0, 229, 158, 0.4);
-  background: rgba(0, 229, 158, 0.02);
+  border-color: rgba(178, 204, 162, 0.4);
+  background: rgba(178, 204, 162, 0.02);
 }
 
 .textarea {
@@ -263,9 +263,9 @@
   flex: 1;
   padding: 8px 12px;
   border-radius: 6px;
-  background: rgba(0, 229, 158, 0.1);
-  border: 1px solid rgba(0, 229, 158, 0.2);
-  color: #00e59e;
+  background: rgba(178, 204, 162, 0.1);
+  border: 1px solid rgba(178, 204, 162, 0.2);
+  color: #b7cba6;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
@@ -273,8 +273,8 @@
 }
 
 .closeButtonFooter:hover {
-  background: rgba(0, 229, 158, 0.2);
-  border-color: rgba(0, 229, 158, 0.4);
+  background: rgba(178, 204, 162, 0.2);
+  border-color: rgba(178, 204, 162, 0.4);
 }
 
 /* Scrollbar Styling */

@@ -17,7 +17,7 @@
 
 .arc {
   fill: none;
-  stroke: #00e59e;
+  stroke: #b7cba6;
   stroke-width: 12;
   stroke-linecap: round;
   transition: stroke-dasharray 1s ease-out;

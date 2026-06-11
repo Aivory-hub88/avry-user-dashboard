@@ -210,7 +210,7 @@
 .workflowListItem:hover { background: rgba(255,255,255,0.03); }
 .workflowListItemActive {
   background: #282827 !important;
-  border-left-color: #00e59e;
+  border-left-color: #b7cba6;
 }
 .wliTop {
   display: flex;

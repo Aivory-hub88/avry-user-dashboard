@@ -44,9 +44,9 @@ export default function IfForm({ config, onChange, errors }: Props) {
           {(['AND', 'OR'] as const).map((op) => (
             <button key={op} type="button" onClick={() => onChange({ ...config, combinator: op })}
               style={{ padding: '4px 12px', borderRadius: 5, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: '1px solid', fontFamily: 'inherit', transition: 'all 0.15s',
-                background: config.combinator === op ? 'rgba(0,229,158,0.15)' : 'rgba(255,255,255,0.04)',
-                borderColor: config.combinator === op ? 'rgba(0,229,158,0.3)' : 'rgba(255,255,255,0.08)',
-                color: config.combinator === op ? '#00e59e' : '#a8a6a2',
+                background: config.combinator === op ? 'rgba(178, 204, 162,0.15)' : 'rgba(255,255,255,0.04)',
+                borderColor: config.combinator === op ? 'rgba(178, 204, 162,0.3)' : 'rgba(255,255,255,0.08)',
+                color: config.combinator === op ? '#b7cba6' : '#a8a6a2',
               }}>{op}</button>
           ))}
         </div>

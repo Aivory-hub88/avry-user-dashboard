@@ -7,16 +7,13 @@
 
 import { useEffect, useState } from 'react'
 import { logout, getUser } from '@/lib/auth'
+import { SettingsModal, User } from '@/components/settings/SettingsModal'
 
-interface User {
-  user_id: string
-  email: string
-  account_type: string
-}
-
+// User interface moved to SettingsModal
 export function UserProfile() {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     const loadUser = () => {
@@ -71,26 +68,39 @@ export function UserProfile() {
     return null
   }
 
-  if (!user) {
-    return null
-  }
+  const displayEmail = user?.email || 'guest@aivory.id'
+  const displayUsername = user ? user.email.split('@')[0] : 'Guest'
+  const displayTier = user?.account_type === 'superadmin' ? 'Admin' : 'Pro'
+  const initial = displayUsername.charAt(0).toUpperCase()
 
   return (
-    <div className="flex items-center gap-4 px-4 py-2 border-t border-[#453f3b]">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-white/80 truncate">{user.email}</p>
-        <p className="text-xs text-white/50">
-          {user.account_type === 'superadmin' ? 'Admin User' : 'User'}
-        </p>
-      </div>
-      <button
-        onClick={handleLogout}
-        className="px-3 py-1 text-xs font-medium text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded transition-colors"
-        title="Logout and return to homepage"
+    <>
+      <button 
+        onClick={() => setIsModalOpen(true)}
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-t border-white/5 text-left group"
       >
-        Logout
+        <div className="w-8 h-8 rounded-full bg-[#b7cba6] flex items-center justify-center text-[#1a0b2e] font-bold text-sm shrink-0">
+          {initial}
+        </div>
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <p className="text-sm font-semibold text-white truncate">{displayUsername}</p>
+          <p className="text-[11px] font-bold text-[#b7cba6] uppercase tracking-wider">{displayTier}</p>
+        </div>
+        <div className="text-white/30 group-hover:text-white/70 transition-colors">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="1"></circle>
+            <circle cx="19" cy="12" r="1"></circle>
+            <circle cx="5" cy="12" r="1"></circle>
+          </svg>
+        </div>
       </button>
-    </div>
+
+      <SettingsModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        user={user} 
+      />
+    </>
   )
 }
 

@@ -16,10 +16,10 @@ const T = {
   cardHover:    'rgba(255,255,255,0.05)',
   border:       'rgba(255,255,255,0.07)',
   borderGreen:  '#666864',
-  green:        '#00e59e',
+  green:        '#b7cba6',
   greenDim:     '#282827',
   greenGlow:    'rgba(255,255,255,0.08)',
-  purple:       '#00e59e',
+  purple:       '#b7cba6',
   purpleDim:    '#282827',
   purpleBorder: '#666864',
   text:         '#f0ede9',
@@ -442,8 +442,8 @@ function EmptyState({ generating, error, onGenerate, router }: {
           <g key={cx}>
             <circle cx={cx} cy="36" r="14" fill="#161614" stroke={i === 0 ? T.green : '#2e2e2c'} strokeWidth="1.5"/>
             <text x={cx} y="41" textAnchor="middle" fontSize="11" fontWeight="700"
-              fill={i === 0 ? T.green : '#444'} fontFamily="Inter Tight, sans-serif">{i + 1}</text>
-            <text x={cx} y="60" textAnchor="middle" fontSize="9" fill="#444" fontFamily="Inter Tight, sans-serif">
+              fill={i === 0 ? T.green : '#444'} fontFamily="var(--font-manrope), Manrope, sans-serif">{i + 1}</text>
+            <text x={cx} y="60" textAnchor="middle" fontSize="9" fill="#444" fontFamily="var(--font-manrope), Manrope, sans-serif">
               {['Build','Scale','Optimize'][i]}
             </text>
           </g>
@@ -585,17 +585,17 @@ export default function RoadmapPage() {
 
   const togglePhase = (id: string) => setOpenPhases(prev => ({ ...prev, [id]: !prev[id] }));
 
-  const font = "'Inter Tight','Inter',system-ui,sans-serif";
+  const font = "var(--font-manrope), 'Manrope', system-ui, sans-serif";
 
   if (loading) return (
-    <div style={{ height: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div className="font-manrope" style={{ height: '100%', background: T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <style>{`@keyframes rm-spin{to{transform:rotate(360deg)}}`}</style>
       <div style={{ width: 36, height: 36, border: '2.5px solid rgba(255,255,255,0.06)', borderTopColor: T.green, borderRadius: '50%', animation: 'rm-spin 0.8s linear infinite' }} />
     </div>
   );
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', background: T.bg, color: T.text, fontFamily: font }}>
+    <div className="font-manrope" style={{ height: '100%', overflowY: 'auto', background: T.bg, color: T.text, fontFamily: font }}>
       {routingNotice !== null && (
         <ContinuedFromConsole summary={routingNotice} onDismiss={() => setRoutingNotice(null)} />
       )}

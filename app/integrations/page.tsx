@@ -403,7 +403,7 @@ function IntegrationsContent() {
   )
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} font-manrope`}>
       {routingNotice !== null && (
         <ContinuedFromConsole summary={routingNotice} onDismiss={() => setRoutingNotice(null)} />
       )}

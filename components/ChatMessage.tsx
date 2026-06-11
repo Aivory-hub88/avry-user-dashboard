@@ -194,7 +194,7 @@ const markdownComponents = {
   ),
 
   a: ({ href, children }: any) => (
-    <a href={href} className="text-[#00e59e] hover:text-[#00e59e]/80 underline underline-offset-2 transition-colors" target="_blank" rel="noopener noreferrer">
+    <a href={href} className="text-[#b7cba6] hover:text-[#b7cba6]/80 underline underline-offset-2 transition-colors" target="_blank" rel="noopener noreferrer">
       {children}
     </a>
   ),
@@ -221,7 +221,7 @@ const markdownComponents = {
   },
 
   blockquote: ({ children }: any) => (
-    <blockquote className="my-5 pl-4 border-l-2 border-[#00e59e]/40 text-[#a1a1aa] italic">
+    <blockquote className="my-5 pl-4 border-l-2 border-[#b7cba6]/40 text-[#a1a1aa] italic">
       {children}
     </blockquote>
   ),
@@ -338,7 +338,7 @@ export default function ChatMessage({ role, content, isStreaming = false, agenti
                 {/* Streaming cursor — brand color blinking bar */}
                 {isStreaming && (
                   <span
-                    className="inline-block w-[3px] h-[1.125rem] bg-[#00e59e] ml-0.5 align-middle rounded-sm"
+                    className="inline-block w-[3px] h-[1.125rem] bg-[#b7cba6] ml-0.5 align-middle rounded-sm"
                     style={{ animation: 'blink 1s step-end infinite' }}
                     aria-hidden="true"
                   />

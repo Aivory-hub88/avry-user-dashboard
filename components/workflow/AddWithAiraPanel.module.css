@@ -119,8 +119,8 @@
 
 .presetBtn:hover:not(:disabled) {
   background: #2a2a2a;
-  border-color: #00e59e;
-  color: #00e59e;
+  border-color: #b7cba6;
+  color: #b7cba6;
 }
 
 .presetBtn:active:not(:disabled) {
@@ -167,8 +167,8 @@
 
 .textarea:focus {
   outline: none;
-  border-color: #00e59e;
-  box-shadow: 0 0 0 2px rgba(0, 229, 158, 0.1);
+  border-color: #b7cba6;
+  box-shadow: 0 0 0 2px rgba(178, 204, 162, 0.1);
 }
 
 .textarea:disabled {
@@ -229,7 +229,7 @@
 }
 
 .stepNumber {
-  background: #00e59e;
+  background: #b7cba6;
   color: #000;
   width: 24px;
   height: 24px;
@@ -253,7 +253,7 @@
 .stepApp {
   font-size: 12px;
   font-weight: 600;
-  color: #00e59e;
+  color: #b7cba6;
   text-transform: capitalize;
 }
 
@@ -274,7 +274,7 @@
   padding: 8px;
   background: #222;
   border-radius: 6px;
-  border-left: 3px solid #00e59e;
+  border-left: 3px solid #b7cba6;
 }
 
 /* Actions */
@@ -305,13 +305,13 @@
 }
 
 .askAiraBtn {
-  background: #00e59e;
+  background: #b7cba6;
   color: #000;
 }
 
 .askAiraBtn:hover:not(:disabled) {
   background: #00d48a;
-  box-shadow: 0 2px 8px rgba(0, 229, 158, 0.2);
+  box-shadow: 0 2px 8px rgba(178, 204, 162, 0.2);
 }
 
 .askAiraBtn:disabled {
@@ -320,13 +320,13 @@
 }
 
 .applyBtn {
-  background: #00e59e;
+  background: #b7cba6;
   color: #000;
 }
 
 .applyBtn:hover {
   background: #00d48a;
-  box-shadow: 0 2px 8px rgba(0, 229, 158, 0.2);
+  box-shadow: 0 2px 8px rgba(178, 204, 162, 0.2);
 }
 
 .manualBtn {

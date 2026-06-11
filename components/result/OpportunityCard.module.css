@@ -42,9 +42,9 @@
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 4px;
-  background: rgba(0, 229, 158, 0.12);
-  color: #00e59e;
-  border: 1px solid rgba(0, 229, 158, 0.25);
+  background: rgba(178, 204, 162, 0.12);
+  color: #b7cba6;
+  border: 1px solid rgba(178, 204, 162, 0.25);
   white-space: nowrap;
 }
 
@@ -95,9 +95,9 @@
 }
 
 .badgeReady {
-  color: #00e59e;
-  border-color: rgba(0, 229, 158, 0.3);
-  background: rgba(0, 229, 158, 0.08);
+  color: #b7cba6;
+  border-color: rgba(178, 204, 162, 0.3);
+  background: rgba(178, 204, 162, 0.08);
 }
 
 .badgeNeedsPrep {

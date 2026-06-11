@@ -45,9 +45,9 @@
 }
 
 .lifecycleCard:hover .cardIcon {
-  background: rgba(0, 229, 158, 0.08);
-  border-color: rgba(0, 229, 158, 0.2);
-  color: #00e59e;
+  background: rgba(178, 204, 162, 0.08);
+  border-color: rgba(178, 204, 162, 0.2);
+  color: #b7cba6;
 }
 
 .title {
@@ -100,9 +100,9 @@
 }
 
 .statusBadge.completed {
-  background: rgba(0, 229, 158, 0.1);
-  color: #00e59e;
-  border: 1px solid rgba(0, 229, 158, 0.2);
+  background: rgba(178, 204, 162, 0.1);
+  color: #b7cba6;
+  border: 1px solid rgba(178, 204, 162, 0.2);
 }
 
 .statusBadge.in_progress {

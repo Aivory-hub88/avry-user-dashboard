@@ -192,7 +192,7 @@ export default function CreditPurchaseTab() {
       <div className="bg-white/[0.05] rounded-lg p-6 border border-white/[0.07]">
         <div className="flex justify-between items-start mb-4">
           <span className="text-sm text-gray-400">Available Credits</span>
-          <span className="text-3xl font-bold text-[#00e59e]">
+          <span className="text-3xl font-bold text-[#b7cba6]">
             {AuthManager.getUser()?.credits || 0}
           </span>
         </div>
@@ -216,7 +216,7 @@ export default function CreditPurchaseTab() {
         <div className="h-2 bg-white/[0.05] rounded-full overflow-hidden">
           {(AuthManager.getUser()?.credits_max || 0) > 0 ? (
             <div
-              className="h-full bg-[#00e59e] rounded-full transition-all"
+              className="h-full bg-[#b7cba6] rounded-full transition-all"
               style={{
                 width: `${
                   Math.max(0, (AuthManager.getUser()?.credits_max || 0) - (AuthManager.getUser()?.credits || 0)) /
@@ -268,7 +268,7 @@ export default function CreditPurchaseTab() {
                 loading
                   ? "opacity-50 cursor-not-allowed"
                   : pkg.popular
-                  ? "border-[#00e59e] bg-white/[0.03] hover:border-[#00d489]"
+                  ? "border-[#b7cba6] bg-white/[0.03] hover:border-[#00d489]"
                   : "border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]"
               }`}
             >
@@ -276,14 +276,14 @@ export default function CreditPurchaseTab() {
                 <span className="font-medium text-white">{pkg.credits.toLocaleString()} IC</span>
                 <span
                   className={`text-xs ${
-                    pkg.popular ? "text-[#00e59e]" : "text-gray-400"
+                    pkg.popular ? "text-[#b7cba6]" : "text-gray-400"
                   }`}
                 >
                   {pkg.label}
                 </span>
               </div>
               <div className="mb-3">
-                <span className="text-2xl font-bold text-[#00e59e]">${pkg.price}</span>
+                <span className="text-2xl font-bold text-[#b7cba6]">${pkg.price}</span>
                 <span className="text-xs text-gray-400 ml-2">
                   ${(pkg.price / pkg.credits).toFixed(3)}/IC
                 </span>
@@ -293,7 +293,7 @@ export default function CreditPurchaseTab() {
                   loading
                     ? "bg-white/[0.1] text-white/60 cursor-not-allowed"
                     : pkg.popular
-                    ? "bg-[#00e59e] text-black hover:bg-[#00d489]"
+                    ? "bg-[#b7cba6] text-black hover:bg-[#00d489]"
                     : "bg-white/[0.05] text-white hover:bg-white/[0.1]"
                 }`}
               >
@@ -313,7 +313,7 @@ export default function CreditPurchaseTab() {
               value={customAmount}
               onChange={(e) => setCustomAmount(e.target.value)}
               disabled={loading}
-              className="flex-1 px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.07] text-white placeholder-gray-500 text-sm focus:outline-none focus:border-[#00e59e] disabled:opacity-50"
+              className="flex-1 px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.07] text-white placeholder-gray-500 text-sm focus:outline-none focus:border-[#b7cba6] disabled:opacity-50"
             />
             <button
               onClick={handleCustomPurchase}

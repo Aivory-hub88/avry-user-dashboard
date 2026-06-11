@@ -190,7 +190,7 @@ export default function DeepDiagnosticPage() {
 
   return (
     <DiagnosticErrorBoundary>
-    <div className={styles.pageContainer}>
+    <div className={`${styles.pageContainer} font-manrope`}>
       {/* Resume banner */}
       {savedProgress && (
         <div className={styles.resumeBanner} role="alert">

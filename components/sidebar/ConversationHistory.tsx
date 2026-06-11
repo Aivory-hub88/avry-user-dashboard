@@ -28,7 +28,7 @@ export default function ConversationHistory({ collapsed }: ConversationHistoryPr
   const hasAnyConversations = groups.some((g) => filteredConversations[g].length > 0)
 
   return (
-    <div className="flex flex-col h-full mt-6">
+    <div className="flex flex-col flex-1 min-h-0 mt-6 shrink min-h-0">
       <SearchBar value={searchQuery} onChange={setSearchQuery} />
       <div
         className="flex-1 overflow-y-auto scrollbar-invisible"

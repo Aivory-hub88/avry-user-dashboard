@@ -161,9 +161,9 @@ function OutputTab({ testResult }: { testResult: import('@/types/workflow-node')
     <div>
       <div style={{
         display: 'inline-block', borderRadius: 5, padding: '2px 8px', fontSize: 10, fontWeight: 600, marginBottom: 8,
-        background: testResult.success ? 'rgba(0,229,158,0.1)' : 'rgba(248,113,113,0.1)',
-        color: testResult.success ? '#00e59e' : '#f87171',
-        border: `1px solid ${testResult.success ? 'rgba(0,229,158,0.2)' : 'rgba(248,113,113,0.2)'}`,
+        background: testResult.success ? 'rgba(178, 204, 162,0.1)' : 'rgba(248,113,113,0.1)',
+        color: testResult.success ? '#b7cba6' : '#f87171',
+        border: `1px solid ${testResult.success ? 'rgba(178, 204, 162,0.2)' : 'rgba(248,113,113,0.2)'}`,
       }}>
         {testResult.success ? 'Success' : 'Failed'}
       </div>

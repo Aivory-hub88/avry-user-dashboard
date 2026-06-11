@@ -1,9 +1,9 @@
 /* Blueprint v1 — dark teal-green accent theme */
 
 /* ── Design tokens ───────────────────────────────────────── */
-/* accent:       #00e59e  (teal-green primary) */
+/* accent:       #b7cba6  (teal-green primary) */
 /* accent-hover: #00f5b0  (brighter on hover)  */
-/* accent-glow:  rgba(0,229,158,0.18) */
+/* accent-glow:  rgba(178, 204, 162,0.18) */
 /* bg-page:      #121212  */
 /* bg-card:      #1a1a1a  */
 /* bg-elevated:  #222222  */
@@ -41,7 +41,7 @@
   width: 40px;
   height: 40px;
   border: 3px solid rgba(255,255,255,0.06);
-  border-top-color: #00e59e;
+  border-top-color: #b7cba6;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -166,9 +166,9 @@
 }
 
 .statusBadge {
-  background-color: rgba(0,229,158,0.1);
-  color: #00e59e;
-  border: 1px solid rgba(0,229,158,0.35);
+  background-color: rgba(178, 204, 162,0.1);
+  color: #b7cba6;
+  border: 1px solid rgba(178, 204, 162,0.35);
   border-radius: 6px;
   padding: 4px 12px;
   font-size: 0.8125rem;
@@ -199,8 +199,8 @@
 }
 
 .saveVersionBtn:hover {
-  background: rgba(0,229,158,0.14);
-  border-color: rgba(0,229,158,0.5);
+  background: rgba(178, 204, 162,0.14);
+  border-color: rgba(178, 204, 162,0.5);
 }
 
 .historyBtn {
@@ -224,9 +224,9 @@
 
 .roadmapBtn {
   background-color: transparent;
-  border: 1px solid rgba(0, 229, 158, 0.35);
+  border: 1px solid rgba(178, 204, 162, 0.35);
   border-radius: 8px;
-  color: #00e59e;
+  color: #b7cba6;
   font-size: 13px;
   font-weight: 600;
   padding: 8px 14px;
@@ -237,8 +237,8 @@
 }
 
 .roadmapBtn:hover:not(:disabled) {
-  background-color: rgba(0, 229, 158, 0.08);
-  border-color: #00e59e;
+  background-color: rgba(178, 204, 162, 0.08);
+  border-color: #b7cba6;
 }
 
 .roadmapBtn:disabled {
@@ -333,7 +333,7 @@
 }
 .downloadMenuItem:hover {
   background: rgba(255,255,255,0.05);
-  color: #00e59e;
+  color: #b7cba6;
 }
 
 /* ── Toast notification ─────────────────────────────────── */
@@ -343,9 +343,9 @@
   left: 50%;
   transform: translateX(-50%);
   background: #1e1e1e;
-  border: 1px solid rgba(0,229,158,0.35);
+  border: 1px solid rgba(178, 204, 162,0.35);
   border-radius: 10px;
-  color: #00e59e;
+  color: #b7cba6;
   font-size: 13px;
   font-weight: 500;
   padding: 12px 24px;
@@ -471,9 +471,9 @@
 }
 
 .versionLoadBtn {
-  background-color: rgba(0,229,158,0.12);
-  color: #00e59e;
-  border: 1px solid rgba(0,229,158,0.3);
+  background-color: rgba(178, 204, 162,0.12);
+  color: #b7cba6;
+  border: 1px solid rgba(178, 204, 162,0.3);
   border-radius: 7px;
   padding: 5px 14px;
   font-size: 0.8125rem;
@@ -484,7 +484,7 @@
 }
 
 .versionLoadBtn:hover {
-  background-color: rgba(0,229,158,0.22);
+  background-color: rgba(178, 204, 162,0.22);
 }
 
 .versionCompareBtn {
@@ -585,7 +585,7 @@
 
 .kpiTdAccent {
   font-size: 0.9375rem;
-  color: #00e59e;
+  color: #b7cba6;
   font-weight: 600;
   padding: 10px 0;
   border-bottom: 1px solid var(--card-border, rgba(255,255,255,0.05));
@@ -617,7 +617,7 @@
 .archNodeLabel {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #00e59e;
+  color: #b7cba6;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -688,7 +688,7 @@
 }
 
 .workflowCard:hover {
-  border-color: rgba(0,229,158,0.2);
+  border-color: rgba(178, 204, 162,0.2);
 }
 
 .workflowCardHeader {
@@ -725,9 +725,9 @@
 }
 
 .generateWorkflowBtn:hover:not(:disabled) {
-  background: rgba(0,229,158,0.07);
-  border-color: rgba(0,229,158,0.25);
-  color: #00e59e;
+  background: rgba(178, 204, 162,0.07);
+  border-color: rgba(178, 204, 162,0.25);
+  color: #b7cba6;
 }
 
 .generateWorkflowBtn:disabled {
@@ -784,10 +784,10 @@
   margin-top: 2px;
 }
 
-.badgeIngestion    { background: rgba(0,229,158,0.07); color: rgba(0,229,158,0.75); border-color: rgba(0,229,158,0.12); }
-.badgeAi           { background: rgba(0,229,158,0.07); color: rgba(0,229,158,0.75); border-color: rgba(0,229,158,0.12); }
+.badgeIngestion    { background: rgba(178, 204, 162,0.07); color: rgba(178, 204, 162,0.75); border-color: rgba(178, 204, 162,0.12); }
+.badgeAi           { background: rgba(178, 204, 162,0.07); color: rgba(178, 204, 162,0.75); border-color: rgba(178, 204, 162,0.12); }
 .badgeDecision     { background: rgba(255,255,255,0.04); color: var(--text-secondary, #a8a6a2); border-color: rgba(255,255,255,0.06); }
-.badgeExecution    { background: rgba(0,229,158,0.07); color: rgba(0,229,158,0.75); border-color: rgba(0,229,158,0.12); }
+.badgeExecution    { background: rgba(178, 204, 162,0.07); color: rgba(178, 204, 162,0.75); border-color: rgba(178, 204, 162,0.12); }
 .badgeNotification { background: rgba(255,255,255,0.04); color: var(--text-secondary, #a8a6a2); border-color: rgba(255,255,255,0.06); }
 .badgeHuman        { background: rgba(255,255,255,0.04); color: var(--text-secondary, #a8a6a2); border-color: rgba(255,255,255,0.06); }
 
@@ -834,7 +834,7 @@
 .generatedWorkflowToggle {
   background: none;
   border: none;
-  color: #00e59e;
+  color: #b7cba6;
   font-size: 0.8125rem;
   font-weight: 600;
   font-family: 'Inter Tight', 'Inter', sans-serif;
@@ -877,7 +877,7 @@
 }
 
 .gwAutomationPct {
-  color: #00e59e;
+  color: #b7cba6;
   font-weight: 700;
 }
 
@@ -900,8 +900,8 @@
   flex-shrink: 0;
   width: 22px;
   height: 22px;
-  background-color: rgba(0,229,158,0.12);
-  color: #00e59e;
+  background-color: rgba(178, 204, 162,0.12);
+  color: #b7cba6;
   border-radius: 50%;
   font-size: 0.75rem;
   font-weight: 700;
@@ -987,7 +987,7 @@
   content: '•';
   position: absolute;
   left: 0;
-  color: #00e59e;
+  color: #b7cba6;
 }
 
 .mitigationList {
@@ -1012,9 +1012,9 @@
   flex-shrink: 0;
   width: 24px;
   height: 24px;
-  background: rgba(0,229,158,0.1);
-  color: #00e59e;
-  border: 1px solid rgba(0,229,158,0.25);
+  background: rgba(178, 204, 162,0.1);
+  color: #b7cba6;
+  border: 1px solid rgba(178, 204, 162,0.25);
   border-radius: 50%;
   font-size: 0.75rem;
   font-weight: 600;
@@ -1087,8 +1087,8 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: rgba(0,229,158,0.15);
-  border: 2px solid rgba(0,229,158,0.5);
+  background: rgba(178, 204, 162,0.15);
+  border: 2px solid rgba(178, 204, 162,0.5);
   flex-shrink: 0;
   z-index: 1;
   margin-bottom: 12px;
@@ -1192,8 +1192,8 @@
 }
 
 .modalInput:focus {
-  border-color: rgba(0,229,158,0.5);
-  box-shadow: 0 0 0 3px rgba(0,229,158,0.08);
+  border-color: rgba(178, 204, 162,0.5);
+  box-shadow: 0 0 0 3px rgba(178, 204, 162,0.08);
 }
 
 .modalActions {
@@ -1221,9 +1221,9 @@
 }
 
 .modalSave {
-  background: rgba(0,229,158,0.1);
-  color: #00e59e;
-  border: 1px solid rgba(0,229,158,0.3);
+  background: rgba(178, 204, 162,0.1);
+  color: #b7cba6;
+  border: 1px solid rgba(178, 204, 162,0.3);
   border-radius: 9px;
   padding: 9px 24px;
   font-size: 0.875rem;
@@ -1234,8 +1234,8 @@
 }
 
 .modalSave:hover:not(:disabled) {
-  background: rgba(0,229,158,0.18);
-  border-color: rgba(0,229,158,0.5);
+  background: rgba(178, 204, 162,0.18);
+  border-color: rgba(178, 204, 162,0.5);
 }
 
 .modalSave:disabled {
@@ -1320,10 +1320,10 @@
   gap: 6px;
   margin-top: 10px;
   padding: 8px 16px;
-  background: rgba(0, 229, 158, 0.12);
-  border: 1px solid rgba(0, 229, 158, 0.3);
+  background: rgba(178, 204, 162, 0.12);
+  border: 1px solid rgba(178, 204, 162, 0.3);
   border-radius: 10px;
-  color: #00e59e;
+  color: #b7cba6;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -1331,7 +1331,7 @@
   font-family: 'Inter Tight', sans-serif;
 }
 .viewInWorkflowsBtn:hover {
-  background: rgba(0, 229, 158, 0.2);
+  background: rgba(178, 204, 162, 0.2);
 }
 
 /* ── Blueprint Insights Cards ────────────────────────────── */
@@ -1392,7 +1392,7 @@
 
 .heroRingFill {
   fill: none;
-  stroke: #00e59e;
+  stroke: #b7cba6;
   stroke-width: 6;
   stroke-linecap: round;
   stroke-dasharray: 251.2;
@@ -1441,9 +1441,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(0,229,158,0.1);
-  color: #00e59e;
-  border: 1px solid rgba(0,229,158,0.3);
+  background: rgba(178, 204, 162,0.1);
+  color: #b7cba6;
+  border: 1px solid rgba(178, 204, 162,0.3);
   border-radius: 20px;
   padding: 4px 14px;
   font-size: 0.8125rem;
@@ -1455,7 +1455,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #00e59e;
+  background: #b7cba6;
   flex-shrink: 0;
 }
 
@@ -1485,7 +1485,7 @@
 .heroLeverLabel {
   font-size: 0.6875rem;
   font-weight: 700;
-  color: #00e59e;
+  color: #b7cba6;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -1536,7 +1536,7 @@
 .insightSubheading {
   font-size: 0.8125rem;
   font-weight: 700;
-  color: #00e59e;
+  color: #b7cba6;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 4px 0 0;
@@ -1569,7 +1569,7 @@
 }
 
 .metricsTable td:last-child {
-  color: #00e59e;
+  color: #b7cba6;
   font-weight: 600;
 }
 
@@ -1597,7 +1597,7 @@
 .archPipelineIcon {
   width: 28px;
   height: 28px;
-  color: #00e59e;
+  color: #b7cba6;
   opacity: 0.85;
   flex-shrink: 0;
 }
@@ -1605,7 +1605,7 @@
 .archPipelineLabel {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #00e59e;
+  color: #b7cba6;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -1652,7 +1652,7 @@
 }
 
 .workflowModuleCard:hover {
-  border-color: rgba(0,229,158,0.15);
+  border-color: rgba(178, 204, 162,0.15);
 }
 
 .workflowModuleName {
@@ -1668,9 +1668,9 @@
   gap: 5px;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #00e59e;
-  background: rgba(0,229,158,0.08);
-  border: 1px solid rgba(0,229,158,0.2);
+  color: #b7cba6;
+  background: rgba(178, 204, 162,0.08);
+  border: 1px solid rgba(178, 204, 162,0.2);
   border-radius: 20px;
   padding: 2px 10px;
   width: fit-content;
@@ -1731,10 +1731,10 @@
 
 .roadmapWaveTimeline {
   font-size: 0.8125rem;
-  color: #00e59e;
+  color: #b7cba6;
   font-weight: 600;
-  background: rgba(0,229,158,0.08);
-  border: 1px solid rgba(0,229,158,0.2);
+  background: rgba(178, 204, 162,0.08);
+  border: 1px solid rgba(178, 204, 162,0.2);
   border-radius: 20px;
   padding: 2px 12px;
   white-space: nowrap;
@@ -1769,7 +1769,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #00e59e;
+  background: #b7cba6;
   flex-shrink: 0;
   margin-top: 7px;
 }
@@ -1814,9 +1814,9 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: rgba(0,229,158,0.12);
-  color: #00e59e;
-  border: 1px solid rgba(0,229,158,0.25);
+  background: rgba(178, 204, 162,0.12);
+  color: #b7cba6;
+  border: 1px solid rgba(178, 204, 162,0.25);
   font-size: 0.75rem;
   font-weight: 700;
   display: flex;
@@ -1859,7 +1859,7 @@
 
 .riskThemeAction::before {
   content: '→';
-  color: #00e59e;
+  color: #b7cba6;
   flex-shrink: 0;
   font-size: 0.75rem;
   margin-top: 1px;
@@ -1886,9 +1886,9 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: rgba(0,229,158,0.1);
-  color: #00e59e;
-  border: 1px solid rgba(0,229,158,0.25);
+  background: rgba(178, 204, 162,0.1);
+  color: #b7cba6;
+  border: 1px solid rgba(178, 204, 162,0.25);
   font-size: 0.8125rem;
   font-weight: 700;
   display: flex;
@@ -1993,9 +1993,9 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: rgba(0,229,158,0.12);
-  color: #00e59e;
-  border: 1px solid rgba(0,229,158,0.25);
+  background: rgba(178, 204, 162,0.12);
+  color: #b7cba6;
+  border: 1px solid rgba(178, 204, 162,0.25);
   font-size: 0.75rem;
   font-weight: 700;
   display: flex;

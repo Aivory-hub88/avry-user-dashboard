@@ -223,6 +223,8 @@ export default function ConsolePage() {
                 <h1
                   className="font-light"
                   style={{
+                    fontFamily: "var(--font-manrope), sans-serif",
+                    fontWeight: 300,
                     fontSize: "clamp(26px, 4.5vw, 42px)",
                     letterSpacing: "-0.025em",
                     color: "rgba(255,255,255,0.92)",
@@ -241,17 +243,7 @@ export default function ConsolePage() {
                   </svg>
                   Attach Context
                 </button>
-                <button className="console-pill inline-flex items-center gap-1.5">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="8" y1="6" x2="21" y2="6"/>
-                    <line x1="8" y1="12" x2="21" y2="12"/>
-                    <line x1="8" y1="18" x2="21" y2="18"/>
-                    <line x1="3" y1="6" x2="3.01" y2="6"/>
-                    <line x1="3" y1="12" x2="3.01" y2="12"/>
-                    <line x1="3" y1="18" x2="3.01" y2="18"/>
-                  </svg>
-                  Execution Log
-                </button>
+
                 <button className="console-pill inline-flex items-center gap-1.5">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="3"/>
@@ -552,7 +544,7 @@ export default function ConsolePage() {
               return (
                 <div
                   key={s.id}
-                  className={`px-4 py-3 cursor-pointer text-sm text-text-secondary transition-colors duration-150 rounded-lg mx-2 ${isActive ? "bg-[rgba(0,229,158,0.08)] border-l-2 border-accent text-text-primary" : "hover:bg-[rgba(255,255,255,0.04)]"}`}
+                  className={`px-4 py-3 cursor-pointer text-sm text-text-secondary transition-colors duration-150 rounded-lg mx-2 ${isActive ? "bg-[rgba(178, 204, 162,0.08)] border-l-2 border-accent text-text-primary" : "hover:bg-[rgba(255,255,255,0.04)]"}`}
                   onClick={() => {
                     if (s.id === currentSessionId) return
                     switchSession(s.id)

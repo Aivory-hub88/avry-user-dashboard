@@ -335,7 +335,7 @@
 }
 
 .blueprintCtaIcon {
-  color: #00e59e;
+  color: #b7cba6;
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -376,7 +376,7 @@
   align-items: center;
   gap: 8px;
   padding: 12px 24px;
-  background: #00e59e;
+  background: #b7cba6;
   color: #1a1a18;
   border: none;
   border-radius: 8px;
@@ -398,7 +398,7 @@
 
 .blueprintBtnDone {
   background: #2d4a2d;
-  color: #00e59e;
+  color: #b7cba6;
 }
 
 /* Spinner for generating state */

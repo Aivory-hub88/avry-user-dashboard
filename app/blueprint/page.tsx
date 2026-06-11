@@ -565,7 +565,7 @@ function BlueprintInsightsSection({
                 <tr key={i}>
                   <td style={{ color: '#ccc' }}>{row.metric}</td>
                   <td>{row.current}</td>
-                  <td style={{ color: '#00e59e', fontWeight: 600 }}>{row.target}</td>
+                  <td style={{ color: '#b7cba6', fontWeight: 600 }}>{row.target}</td>
                   <td>{row.impact}</td>
                 </tr>
               ))}
@@ -583,7 +583,7 @@ function BlueprintInsightsSection({
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {s.currentState.highlights.map((h, i) => (
               <li key={i} style={{ fontSize: '0.875rem', color: '#888', paddingLeft: 14, position: 'relative', lineHeight: 1.5 }}>
-                <span style={{ position: 'absolute', left: 0, color: '#00e59e' }}>•</span>
+                <span style={{ position: 'absolute', left: 0, color: '#b7cba6' }}>•</span>
                 {typeof h === 'string' ? h : coerceToString(h, 'Highlight')}
               </li>
             ))}
@@ -769,7 +769,7 @@ function BlueprintInsightsSection({
               </div>
               <div className={styles.deployMetaItem}>
                 <span className={styles.deployMetaLabel}>Estimated ROI</span>
-                <span className={styles.deployMetaValue} style={{ color: '#00e59e', fontWeight: 600 }}>{deploymentPlan.estimated_roi_months} months</span>
+                <span className={styles.deployMetaValue} style={{ color: '#b7cba6', fontWeight: 600 }}>{deploymentPlan.estimated_roi_months} months</span>
               </div>
             </div>
             <p className={styles.insightParagraph}>{deploymentPlan.estimated_impact}</p>
@@ -1232,7 +1232,7 @@ export default function BlueprintPage() {
   const { organization, diagnostic_summary } = blueprint
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} font-manrope`}>
       {routingNotice !== null && (
         <ContinuedFromConsole summary={routingNotice} onDismiss={() => setRoutingNotice(null)} />
       )}

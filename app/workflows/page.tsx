@@ -1232,7 +1232,7 @@ function WorkflowsPageInner() {
   }
 
   return (
-    <div className={styles.workflowsLayout}>
+    <div className={`${styles.workflowsLayout} font-manrope`}>
       {routingNotice !== null && (
         <ContinuedFromConsole summary={routingNotice} onDismiss={() => setRoutingNotice(null)} />
       )}

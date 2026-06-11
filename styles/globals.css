@@ -10,8 +10,8 @@
   --text-primary: #f7f7f7;
   --text-secondary: #f7f7f7;
   --text-tertiary: #a1a1aa;
-  --accent: #00e59e;
-  --accent-dim: rgba(0, 229, 158, 0.12);
+  --accent: #b7cba6;
+  --accent-dim: rgba(183, 203, 166, 0.12);
 
   --surface-secondary: #353531;
   --surface-tertiary: #3a3a36;
@@ -25,6 +25,10 @@
   --card-backdrop: blur(8px);
 }
 
+.font-manrope {
+  font-family: var(--font-manrope), sans-serif;
+}
+
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
@@ -34,7 +38,7 @@
   display: inline-block;
   width: 3px;
   height: 1.125em;
-  background-color: #00e59e;
+  background-color: #b7cba6;
   border-radius: 1px;
   vertical-align: middle;
   margin-left: 2px;
@@ -711,7 +715,7 @@ main li {
 main blockquote {
   margin: 1.25rem 0;
   padding-left: 1rem;
-  border-left: 2px solid rgba(0, 229, 158, 0.4);
+  border-left: 2px solid rgba(183, 203, 166, 0.4);
   color: var(--text-tertiary);
   font-style: italic;
 }
@@ -937,9 +941,9 @@ h1, h2, h3, h4, h5, h6,
 }
 
 .console-chip--active {
-  background: rgba(0, 229, 158, 0.12);
-  border-color: rgba(0, 229, 158, 0.3);
-  color: rgba(0, 229, 158, 0.95);
+  background: rgba(178, 204, 162, 0.12);
+  border-color: rgba(178, 204, 162, 0.3);
+  color: rgba(178, 204, 162, 0.95);
 }
 
 .console-dropdown {
@@ -1042,4 +1046,28 @@ h1, h2, h3, h4, h5, h6,
 [class*="descriptionText"],
 [class*="bottomSection"] p {
   color: #1a1a18 !important;
+}
+
+/* ─── Spotlight Card (cursor-follow radial gradient) ─── */
+.spotlight-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.spotlight-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: radial-gradient(300px circle at var(--mouse-x, 0px) var(--mouse-y, 0px),
+      rgba(111, 142, 91, 0.15),
+      transparent 40%);
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  transition: opacity 0.5s ease;
+  opacity: 0;
+}
+
+.spotlight-card:hover::before {
+  opacity: 1;
 }

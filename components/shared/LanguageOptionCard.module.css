@@ -20,8 +20,8 @@
 }
 
 .card.active {
-  border-color: #00e59e;
-  background: rgba(0, 229, 158, 0.06);
+  border-color: #b7cba6;
+  background: rgba(178, 204, 162, 0.06);
 }
 
 .label {
@@ -40,7 +40,7 @@
   position: absolute;
   top: 12px;
   right: 14px;
-  color: #00e59e;
+  color: #b7cba6;
   font-size: 16px;
   font-weight: 700;
 }

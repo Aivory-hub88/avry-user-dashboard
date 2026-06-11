@@ -217,7 +217,7 @@ export default function UploadMenu({ isOpen, onClose, onAttach, onToast, onExtra
 
       {/* Extracting indicator */}
       {extracting && (
-        <div className="upload-size-warning" role="status" style={{ color: '#00e59e' }}>
+        <div className="upload-size-warning" role="status" style={{ color: '#b7cba6' }}>
           Extracting file content…
         </div>
       )}

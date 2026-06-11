@@ -85,16 +85,16 @@
 
 /* ── Selected state ── */
 .workflow-node[data-selected='true'] {
-  border-color: rgba(0, 229, 158, 0.5) !important;
-  box-shadow: 0 0 0 2px rgba(0, 229, 158, 0.15), 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+  border-color: rgba(178, 204, 162, 0.5) !important;
+  box-shadow: 0 0 0 2px rgba(178, 204, 162, 0.15), 0 4px 16px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* ── Category accent borders ── */
 .workflow-node[data-category='trigger']   { border-color: rgba(251, 191, 36, 0.28);  background: rgba(251, 191, 36, 0.06); }
 .workflow-node[data-category='logic']     { border-color: rgba(139, 92, 246, 0.28);  background: rgba(139, 92, 246, 0.06); }
 .workflow-node[data-category='transform'] { border-color: rgba(59, 130, 246, 0.28);  background: rgba(59, 130, 246, 0.06); }
-.workflow-node[data-category='ai']        { border-color: rgba(0, 229, 158, 0.28);   background: rgba(0, 229, 158, 0.05); }
-.workflow-node[data-category='agent']     { border-color: rgba(0, 229, 158, 0.28);   background: rgba(0, 229, 158, 0.05); }
+.workflow-node[data-category='ai']        { border-color: rgba(178, 204, 162, 0.28);   background: rgba(178, 204, 162, 0.05); }
+.workflow-node[data-category='agent']     { border-color: rgba(178, 204, 162, 0.28);   background: rgba(178, 204, 162, 0.05); }
 .workflow-node[data-category='condition'] { border-color: rgba(251, 191, 36, 0.28);  background: rgba(251, 191, 36, 0.06); }
 .workflow-node[data-category='channel']   { border-color: rgba(59, 130, 246, 0.28);  background: rgba(59, 130, 246, 0.06); }
 .workflow-node[data-category='system']    { border-color: rgba(139, 92, 246, 0.28);  background: rgba(139, 92, 246, 0.06); }
@@ -134,8 +134,8 @@
 .node-icon[data-category='trigger']   { color: rgba(251, 191, 36, 0.85); }
 .node-icon[data-category='logic']     { color: rgba(139, 92, 246, 0.85); }
 .node-icon[data-category='transform'] { color: rgba(59, 130, 246, 0.85); }
-.node-icon[data-category='ai']        { color: rgba(0, 229, 158, 0.85); }
-.node-icon[data-category='agent']     { color: rgba(0, 229, 158, 0.85); }
+.node-icon[data-category='ai']        { color: rgba(178, 204, 162, 0.85); }
+.node-icon[data-category='agent']     { color: rgba(178, 204, 162, 0.85); }
 .node-icon[data-category='condition'] { color: rgba(251, 191, 36, 0.85); }
 .node-icon[data-category='channel']   { color: rgba(59, 130, 246, 0.85); }
 .node-icon[data-category='system']    { color: rgba(139, 92, 246, 0.85); }
@@ -202,7 +202,7 @@
 .react-flow__handle {
   width: 12px;
   height: 12px;
-  background: #00e59e;
+  background: #b7cba6;
   border: 2px solid #1a1a18;
   border-radius: 50%;
   transition: all 0.15s ease;
@@ -247,7 +247,7 @@
 
 /* Connection line while dragging */
 .react-flow__connection-path {
-  stroke: rgba(0, 229, 158, 0.5) !important;
+  stroke: rgba(178, 204, 162, 0.5) !important;
   stroke-width: 2px;
   stroke-dasharray: 6 3;
   stroke-linecap: round;

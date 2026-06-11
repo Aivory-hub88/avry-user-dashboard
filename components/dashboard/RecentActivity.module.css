@@ -104,9 +104,9 @@
 }
 
 .eventIconWrap.diagnostic {
-  background: rgba(0, 229, 158, 0.07);
-  border-color: rgba(0, 229, 158, 0.15);
-  color: #00e59e;
+  background: rgba(178, 204, 162, 0.07);
+  border-color: rgba(178, 204, 162, 0.15);
+  color: #b7cba6;
 }
 
 .eventIconWrap.blueprint {

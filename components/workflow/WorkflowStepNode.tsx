@@ -46,9 +46,9 @@ const CategoryIcons: Record<string, React.ReactNode> = {
 
 // ── Category config ──────────────────────────────────────
 const categoryConfig: Record<string, { label: string; accent: string; labelColor: string }> = {
-  trigger:   { label: 'Trigger',    accent: '#00e59e', labelColor: '#00e59e' },
+  trigger:   { label: 'Trigger',    accent: '#b7cba6', labelColor: '#b7cba6' },
   action:    { label: 'Action',     accent: 'rgba(255,255,255,0.12)', labelColor: '#a8a6a2' },
-  ai:        { label: 'AI',         accent: '#00e59e', labelColor: '#00e59e' },
+  ai:        { label: 'AI',         accent: '#b7cba6', labelColor: '#b7cba6' },
   condition: { label: 'Condition',  accent: 'rgba(251,191,36,0.5)', labelColor: '#fbbf24' },
   channel:   { label: 'Channel',    accent: 'rgba(255,255,255,0.12)', labelColor: '#a8a6a2' },
   system:    { label: 'System',     accent: 'rgba(255,255,255,0.12)', labelColor: '#a8a6a2' },
@@ -56,7 +56,7 @@ const categoryConfig: Record<string, { label: string; accent: string; labelColor
 };
 
 const handleStyle: React.CSSProperties = {
-  background: '#00e59e',
+  background: '#b7cba6',
   width: 8,
   height: 8,
   border: '2px solid #353531',

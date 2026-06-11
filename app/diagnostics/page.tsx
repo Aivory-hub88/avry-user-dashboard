@@ -42,7 +42,7 @@ export default function DiagnosticsPage() {
   }, [])
 
   return (
-    <div className={styles.pageContainer}>
+    <div className={`${styles.pageContainer} font-manrope`}>
       <div className={styles.pageContent}>
         {routingNotice !== null && (
           <ContinuedFromConsole
@@ -71,7 +71,7 @@ export default function DiagnosticsPage() {
               <div className={styles.completedState}>
                 <div className={styles.scoreDisplay}>
                   <span className={styles.scoreLabel}>Status:</span>
-                  <span className={styles.scoreValue} style={{ color: '#00e59e', fontSize: '0.9rem' }}>Report Ready</span>
+                  <span className={styles.scoreValue} style={{ color: '#b7cba6', fontSize: '0.9rem' }}>Report Ready</span>
                 </div>
                 <div className={styles.completedActions}>
                   <Link href="/diagnostics/deep/final-result" className={styles.diagnosticCta}>

@@ -21,7 +21,7 @@
   width: 40px;
   height: 40px;
   border: 3px solid rgba(255, 255, 255, 0.08);
-  border-top-color: #00e59e;
+  border-top-color: #b7cba6;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -90,7 +90,7 @@
 .phaseNumber {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #00e59e;
+  color: #b7cba6;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -196,9 +196,9 @@
 }
 
 .submitButton {
-  background: rgba(0, 229, 158, 0.1);
-  color: #00e59e;
-  border: 1px solid rgba(0, 229, 158, 0.25);
+  background: rgba(178, 204, 162, 0.1);
+  color: #b7cba6;
+  border: 1px solid rgba(178, 204, 162, 0.25);
   border-radius: 10px;
   padding: 12px 32px;
   font-size: 1rem;
@@ -212,9 +212,9 @@
 }
 
 .submitButton:hover:not(:disabled) {
-  background: rgba(0, 229, 158, 0.18);
-  border-color: rgba(0, 229, 158, 0.4);
-  box-shadow: 0 0 16px rgba(0, 229, 158, 0.1);
+  background: rgba(178, 204, 162, 0.18);
+  border-color: rgba(178, 204, 162, 0.4);
+  box-shadow: 0 0 16px rgba(178, 204, 162, 0.1);
   transform: translateY(-1px);
 }
 
@@ -228,8 +228,8 @@
   display: inline-block;
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(0, 229, 158, 0.3);
-  border-top-color: #00e59e;
+  border: 2px solid rgba(178, 204, 162, 0.3);
+  border-top-color: #b7cba6;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   flex-shrink: 0;

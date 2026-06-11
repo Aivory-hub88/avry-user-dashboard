@@ -26,8 +26,8 @@
 
 /* ── Selected state (glow on wrapper) ── */
 .nodeWrapper.selected {
-  border: 2px solid rgba(0, 229, 158, 0.6);
-  box-shadow: 0 0 0 2px rgba(0, 229, 158, 0.15);
+  border: 2px solid rgba(178, 204, 162, 0.6);
+  box-shadow: 0 0 0 2px rgba(178, 204, 162, 0.15);
 }
 
 /* ── Upper bar (always visible) ── */

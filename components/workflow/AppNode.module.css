@@ -27,8 +27,8 @@
 }
 
 .appNode.selected {
-  border-color: rgba(0, 229, 158, 0.5);
-  box-shadow: 0 0 0 2px rgba(0, 229, 158, 0.15), 0 4px 16px rgba(0, 0, 0, 0.3);
+  border-color: rgba(178, 204, 162, 0.5);
+  box-shadow: 0 0 0 2px rgba(178, 204, 162, 0.15), 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 /* ── TOP SECTION (always visible) ── */
