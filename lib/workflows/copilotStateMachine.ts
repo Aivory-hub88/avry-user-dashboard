@@ -221,14 +221,14 @@ function buildNodeConfigsFromSetupReport(report?: WorkflowSetupReport): NodeConf
   return report.nodeRequirements.map((node) => ({
     stepId: node.nodeId,
     title: node.nodeName,
-    configDetails: `${node.nodeName} membutuhkan konfigurasi sebelum workflow diaktifkan.`,
+    configDetails: `${node.nodeName} requires configuration before the workflow is activated.`,
     requiredFields: node.requiredFields.map((field) => ({
       field: field.label,
       value: field.example || (field.type === 'oauth' ? 'Connect account' : ''),
       description:
         field.type === 'oauth'
-          ? `Hubungkan akun untuk ${node.nodeName}.`
-          : `Isi field ${field.label} untuk ${node.nodeName}.`,
+          ? `Connect account for ${node.nodeName}.`
+          : `Fill in the ${field.label} field for ${node.nodeName}.`,
     })),
   }))
 }
@@ -284,8 +284,12 @@ class BridgeClient {
    */
   private async post<T>(path: string, body: unknown): Promise<T> {
     const isServer = typeof window === 'undefined'
+    // Server-side: use internal URL to self-fetch through the copilot proxy route.
+    // The proxy route handles body transformation + VPS Bridge routing.
+    // Client-side: use relative URL (browser → same origin).
+    const serverBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || '3000'}`).replace(/\/$/, '')
     const url = isServer
-      ? `${(process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000').replace(/\/$/, '')}/api/copilot${path}`
+      ? `${serverBaseUrl}/api/copilot${path}`
       : `/api/copilot${path}`
 
     const bodyRecord = body && typeof body === 'object' ? body as Record<string, unknown> : {}
@@ -399,7 +403,7 @@ class BridgeClient {
       params,
     )
     if (!result.dummyTest) {
-      throw new Error('VPS Bridge tidak mengembalikan hasil sandbox test.')
+      throw new Error('VPS Bridge did not return sandbox test results.')
     }
     return result
   }
@@ -522,7 +526,7 @@ export class CopilotStateMachine {
         cause:      error instanceof Error ? error.message : String(error),
       })
       return this.handleError(
-        `Gagal memproses permintaan Anda: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to process your request: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
     }
   }
@@ -532,7 +536,7 @@ export class CopilotStateMachine {
 
     if (intent === 'cancel') {
       this.state.stage = 'IDLE'
-      return this.setAssistantMessage('Baik, dibatalkan. Ada yang bisa saya bantu?')
+      return this.setAssistantMessage('Okay, canceled. Is there anything else I can help you with?')
     }
 
     // Multi-turn clarification: call clarify again with updated history.
@@ -549,6 +553,12 @@ export class CopilotStateMachine {
       const msg = result.message ?? ''
       const isStillClarifying =
         msg.trim().endsWith('?') ||
+        msg.toLowerCase().includes('please') ||
+        msg.toLowerCase().includes('can you tell') ||
+        msg.toLowerCase().includes('confirm') ||
+        msg.toLowerCase().includes('how much') ||
+        msg.toLowerCase().includes('when') ||
+        msg.toLowerCase().includes('what') ||
         msg.toLowerCase().includes('tolong') ||
         msg.toLowerCase().includes('bisa ceritakan') ||
         msg.toLowerCase().includes('konfirmasi') ||
@@ -623,7 +633,7 @@ export class CopilotStateMachine {
             ? result.message
             : (workflow && typeof workflow.summary === 'string' && workflow.summary.trim())
               ? workflow.summary
-              : 'Maaf, saya belum bisa menyusun workflow dari permintaan ini. Coba jelaskan lebih spesifik — misalnya trigger, apps yang dipakai, dan hasil yang diharapkan.'
+              : 'Sorry, I cannot build a workflow from this request yet. Please explain more specifically — for example, the trigger, apps to use, and expected outcome.'
 
         this.state.stage = 'IDLE'
         this.state.generatedWorkflow = null
@@ -649,7 +659,7 @@ export class CopilotStateMachine {
     } catch (error: unknown) {
       console.error('[Copilot] generateWorkflow error:', error)
       return this.handleError(
-        `Gagal membuat workflow: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to create workflow: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
     }
   }
@@ -662,7 +672,7 @@ export class CopilotStateMachine {
         this.state.userApprovals.confirmedWorkflow = true
         // Tampilkan pesan status sebelum testing dimulai
         const statusMsg =
-          '🧪 Siap! Saya akan melakukan sandbox testing workflow sekarang...\n\n_(Ini mungkin memakan waktu beberapa detik)_'
+          '🧪 Ready! I will perform a sandbox test of the workflow now...\n\n_(This might take a few seconds)_'
         this.state.lastMessage = statusMsg
         this.addMessage('assistant', statusMsg)
         this.updateTimestamp()
@@ -676,12 +686,12 @@ export class CopilotStateMachine {
       case 'reject':
         this.state.stage = 'CLARIFYING'
         return this.setAssistantMessage(
-          'Oke, ceritakan apa yang kurang sesuai atau perlu diubah dari workflow ini?',
+          'Okay, tell me what is incorrect or needs to be changed in this workflow?',
         )
 
       case 'cancel':
         this.state.stage = 'IDLE'
-        return this.setAssistantMessage('Workflow dibatalkan. Ada yang bisa saya bantu?')
+        return this.setAssistantMessage('Workflow canceled. Is there anything else I can help you with?')
 
       default:
         this.state.stage = 'EDITING'
@@ -695,7 +705,7 @@ export class CopilotStateMachine {
     this.updateTimestamp()
 
     if (!this.state.generatedWorkflow) {
-      return this.handleError('Tidak ada workflow untuk di-test.')
+      return this.handleError('No workflow to test.')
     }
 
     try {
@@ -732,8 +742,8 @@ export class CopilotStateMachine {
               status: (node.status === 'success' || node.status === 'structure_validated') ? 'success' : 'error',
               message:
                 (node.status === 'success' || node.status === 'structure_validated')
-                  ? `${node.nodeName} berhasil diuji di sandbox.`
-                  : `${node.nodeName} gagal saat pengujian sandbox.`,
+                  ? `${node.nodeName} successfully tested in the sandbox.`
+                  : `${node.nodeName} failed during sandbox testing.`,
               outputData: { validationMode: bridgeResult.dummyTest?.validationMode },
               errorDetail:
                 (node.status === 'success' || node.status === 'structure_validated') ? null : node.status,
@@ -743,8 +753,8 @@ export class CopilotStateMachine {
               stepId: step.id,
               status: bridgeResult.dummyTest?.passed ? 'success' : 'error',
               message: bridgeResult.dummyTest?.passed
-                ? `${step.title} berhasil divalidasi di sandbox.`
-                : `${step.title} gagal divalidasi di sandbox.`,
+                ? `${step.title} successfully validated in the sandbox.`
+                : `${step.title} failed sandbox validation.`,
               outputData: { validationMode: bridgeResult.dummyTest?.validationMode },
               errorDetail:
                 bridgeResult.dummyTest?.errors?.map((e) => e.message).join('; ') || null,
@@ -762,11 +772,11 @@ export class CopilotStateMachine {
       if (attempt < 3) {
         this.state.stage = 'FIXING'
         this.setAssistantMessage(
-          `⚠️ ${failedSteps.length} langkah gagal saat testing (percobaan ${attempt}/3):\n` +
+          `⚠️ ${failedSteps.length} steps failed during testing (attempt ${attempt}/3):\n` +
             failedSteps
               .map((f) => `• **${f.stepId}**: ${f.errorDetail || f.message}`)
               .join('\n') +
-            `\n\n🔧 ZeroClaw sedang memperbaiki otomatis...`,
+            `\n\n🔧 ZeroClaw is automatically repairing...`,
         )
         await this.repairWorkflow(failedSteps)
         return this.runTests(attempt + 1)
@@ -776,13 +786,13 @@ export class CopilotStateMachine {
         .map((f) => `• **${f.stepId}**: ${f.errorDetail || f.message}`)
         .join('\n')
       return this.handleError(
-        `Workflow gagal setelah ${attempt}x perbaikan otomatis.\n\nError yang tersisa:\n${errorSummary}\n\nSilakan jelaskan detail teknis tambahan agar saya bisa membantu memperbaiki secara manual.`,
+        `Workflow failed after ${attempt} automatic repair attempts.\n\nRemaining errors:\n${errorSummary}\n\nPlease provide additional technical details so I can help fix this manually.`,
       )
     } catch (error: unknown) {
       console.error('[Copilot] runTests error:', error)
       const message =
-        error instanceof Error ? error.message : 'Terjadi error saat testing.'
-      return this.handleError(`Terjadi error saat sandbox testing: ${message}`)
+        error instanceof Error ? error.message : 'An error occurred during testing.'
+      return this.handleError(`An error occurred during sandbox testing: ${message}`)
     }
   }
 
@@ -865,7 +875,7 @@ export class CopilotStateMachine {
         console.warn('[Copilot] handleEditing: ZeroClaw returned invalid workflow, keeping current state')
         const message = typeof result?.message === 'string' && result.message.trim()
           ? result.message
-          : 'Saya belum bisa memproses perubahan itu. Coba jelaskan dengan lebih detail langkah yang ingin diubah.'
+          : 'I cannot process that change yet. Please explain the step you want to change in more detail.'
         return this.setAssistantMessage(message)
       }
 
@@ -894,7 +904,7 @@ export class CopilotStateMachine {
     } catch (error: unknown) {
       console.error('[Copilot] handleEditing error:', error)
       return this.handleError(
-        'Gagal mengedit workflow. Coba jelaskan perubahan yang diinginkan.',
+        'Failed to edit the workflow. Please explain the desired changes.',
       )
     }
   }
@@ -906,7 +916,7 @@ export class CopilotStateMachine {
       this.state.userApprovals.approvedTest = true
       this.state.stage = 'AWAITING_APPLY_APPROVAL'
       return this.setAssistantMessage(
-        `Workflow sudah lolos sandbox test. Klik tombol **Apply to canvas** untuk menaruh workflow "${this.state.generatedWorkflow?.workflowName}" ke canvas.`,
+        `The workflow has passed the sandbox test. Click the **Apply to canvas** button to place the workflow "${this.state.generatedWorkflow?.workflowName}" onto the canvas.`,
       )
     }
 
@@ -918,12 +928,12 @@ export class CopilotStateMachine {
     if (intent === 'reject' || intent === 'cancel') {
       this.state.stage = 'IDLE'
       return this.setAssistantMessage(
-        'Baik, workflow tidak diterapkan. Tersimpan sebagai draft. Ada yang bisa saya bantu?',
+        'Okay, the workflow was not applied. It is saved as a draft. Is there anything else I can help you with?',
       )
     }
 
     return this.setAssistantMessage(
-      'Apakah Anda ingin menerapkan workflow ini ke canvas? Balas **ya** untuk apply atau **tidak** untuk batalkan.',
+      'Do you want to apply this workflow to the canvas? Reply **yes** to apply or **no** to cancel.',
     )
   }
 
@@ -943,16 +953,16 @@ export class CopilotStateMachine {
 
     if (isEdit) {
       return (
-        `✏️ Workflow sudah diperbarui!\n\n${stepList}${summary}\n\n` +
-        `Apakah sudah sesuai sekarang? Balas **ya** untuk lanjut testing.`
+        `✏️ Workflow has been updated!\n\n${stepList}${summary}\n\n` +
+        `Does it look good now? Reply **yes** to continue testing.`
       )
     }
 
     return (
-      `✅ Saya sudah membuat workflow **"${workflowName}"** dengan ${steps.length} langkah:\n\n` +
+      `✅ I have created the workflow **"${workflowName}"** with ${steps.length} steps:\n\n` +
       `${stepList}${summary}\n\n` +
-      `Apakah sudah sesuai dengan kebutuhan Anda? Balas **ya** untuk lanjut testing, ` +
-      `**edit** untuk mengubah, atau jelaskan apa yang perlu diperbaiki.`
+      `Does this meet your needs? Reply **yes** to continue testing, ` +
+      `**edit** to change it, or explain what needs to be fixed.`
     )
   }
 
@@ -965,7 +975,7 @@ export class CopilotStateMachine {
     const skipped = results.filter((r) => r.status === 'skipped').length
     const total = results.length
     const attemptNote =
-      attempts > 1 ? `_(Berhasil setelah ${attempts}x perbaikan otomatis)_\n\n` : ''
+      attempts > 1 ? `_(Succeeded after ${attempts} automatic repairs)_\n\n` : ''
 
     const testSummary = results
       .map((r) => {
@@ -978,7 +988,7 @@ export class CopilotStateMachine {
     let nodeDetails = ''
     if (wf.nodeConfigs.length > 0) {
       nodeDetails =
-        '\n\n---\n📋 **Konfigurasi Detail Setiap Node:**\n\n' +
+        '\n\n---\n📋 **Detailed Node Configuration:**\n\n' +
         wf.nodeConfigs
           .map((nc, i) => {
             const fields = nc.requiredFields
@@ -993,12 +1003,12 @@ export class CopilotStateMachine {
     }
 
     return (
-      `✅ **Sandbox testing selesai! ${passed} berhasil, ${skipped} dilewati, dari ${total} langkah total.**\n_Validasi: ${wf.dummyTest?.validationMode || 'sandbox'}_\n\n` +
+      `✅ **Sandbox testing complete! ${passed} succeeded, ${skipped} skipped, out of ${total} total steps.**\n_Validation: ${wf.dummyTest?.validationMode || 'sandbox'}_\n\n` +
       attemptNote +
       `${testSummary}\n\n` +
-      `---\n📌 **Ringkasan Workflow:**\n${wf.summary}` +
+      `---\n📌 **Workflow Summary:**\n${wf.summary}` +
       nodeDetails +
-      `\n\n---\n🚀 **Workflow "${wf.workflowName}" siap diterapkan. Klik tombol Apply to canvas untuk menaruhnya ke canvas.**`
+      `\n\n---\n🚀 **The workflow "${wf.workflowName}" is ready to be applied. Click the Apply to canvas button to place it onto the canvas.**`
     )
   }
 
