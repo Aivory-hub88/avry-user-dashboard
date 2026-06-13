@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
 import { DashboardData, getPlaceholderData } from "@/types/dashboard"
-import { FreeDiagnosticService } from "@/services/freeDiagnostic"
-import { DeepDiagnosticService } from "@/services/deepDiagnostic"
 import OverviewCard from "@/components/dashboard/OverviewCard"
 import LifecycleCard from "@/components/dashboard/LifecycleCard"
 import RecentActivity from "@/components/dashboard/RecentActivity"
@@ -23,8 +21,6 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [authLoading, setAuthLoading] = useState(true)
-  const [freeDiagnosticScore, setFreeDiagnosticScore] = useState<number | null>(null)
-  const [freeDiagnosticCompleted, setFreeDiagnosticCompleted] = useState(false)
   const [deepDiagnosticCompleted, setDeepDiagnosticCompleted] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
   const [paymentLoading, setPaymentLoading] = useState(false)
@@ -51,12 +47,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboardData()
-
-    const result = FreeDiagnosticService.getResult()
-    if (result) {
-      setFreeDiagnosticCompleted(true)
-      setFreeDiagnosticScore(result.score)
-    }
 
     const deepContext = localStorage.getItem('aivory_diagnostic_context')
     if (deepContext) {

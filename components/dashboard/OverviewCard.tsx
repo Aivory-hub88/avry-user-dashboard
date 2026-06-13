@@ -4,8 +4,7 @@ import styles from "./OverviewCard.module.css"
 
 interface OverviewCardProps {
   data: DashboardData
-  freeDiagnosticScore?: number | null
-  freeDiagnosticCompleted?: boolean
+  deepDiagnosticCompleted?: boolean
 }
 
 // PROGRESS RING — horizontal layout: ring left, label+number right
@@ -54,10 +53,8 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`${styles.badge} ${entry.cls}`}>{entry.label}</span>
 }
 
-export default function OverviewCard({ data, freeDiagnosticScore, freeDiagnosticCompleted }: OverviewCardProps) {
-  const score = freeDiagnosticCompleted && freeDiagnosticScore != null
-    ? Math.round(freeDiagnosticScore)
-    : data.diagnostic.score ?? 0
+export default function OverviewCard({ data, deepDiagnosticCompleted }: OverviewCardProps) {
+  const score = data.diagnostic.score ?? 0
 
   const maturity = score >= 70 ? 'Advanced' : score >= 40 ? 'Emerging' : 'Foundational'
 
@@ -76,8 +73,8 @@ export default function OverviewCard({ data, freeDiagnosticScore, freeDiagnostic
       <div className={styles.statusGrid}>
         <div className={styles.statusItem}>
           <span className={styles.label}>Last Diagnostic</span>
-          <StatusBadge status={freeDiagnosticCompleted ? 'completed' : data.diagnostic.status} />
-          {(freeDiagnosticCompleted || data.diagnostic.score) && (
+          <StatusBadge status={deepDiagnosticCompleted ? 'completed' : data.diagnostic.status} />
+          {(deepDiagnosticCompleted || data.diagnostic.score) && (
             <span className={styles.detail}>
               Score: <span className="text-brand-mint font-semibold">{score}</span>/100
               {data.diagnostic.date ? ` • ${data.diagnostic.date}` : ''}

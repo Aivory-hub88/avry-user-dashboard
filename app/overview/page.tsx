@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
 import { DashboardData, getPlaceholderData } from "@/types/dashboard"
-import { FreeDiagnosticService } from "@/services/freeDiagnostic"
 import { DeepDiagnosticService } from "@/services/deepDiagnostic"
 import OverviewCard from "@/components/dashboard/OverviewCard"
 import LifecycleCard from "@/components/dashboard/LifecycleCard"
@@ -17,8 +16,6 @@ import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole'
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [freeDiagnosticScore, setFreeDiagnosticScore] = useState<number | null>(null)
-  const [freeDiagnosticCompleted, setFreeDiagnosticCompleted] = useState(false)
   const [deepDiagnosticCompleted, setDeepDiagnosticCompleted] = useState(false)
   const t = useTranslations("dashboard")
 
@@ -35,13 +32,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboardData()
-
-    // Check free diagnostic status
-    const result = FreeDiagnosticService.getResult()
-    if (result) {
-      setFreeDiagnosticCompleted(true)
-      setFreeDiagnosticScore(result.score)
-    }
 
     // Check deep diagnostic status — presence of aivory_diagnostic_context means complete
     const deepContext = localStorage.getItem('aivory_diagnostic_context')
@@ -63,24 +53,18 @@ export default function DashboardPage() {
     return <ErrorState onRetry={fetchDashboardData} />
   }
 
-  // Determine diagnostics card state — deep takes priority over free
-  const diagnosticsStatus = deepDiagnosticCompleted ? 'completed' : freeDiagnosticCompleted ? 'completed' : data.diagnostic.status
+  // Diagnostics card state — deep diagnostic only (free diagnostic moved to landing page)
+  const diagnosticsStatus = deepDiagnosticCompleted ? 'completed' : data.diagnostic.status
   const diagnosticsHref = deepDiagnosticCompleted
     ? '/diagnostics/deep/final-result'
-    : freeDiagnosticCompleted
-    ? '/diagnostics/free/result'
-    : '/diagnostics'
+    : '/diagnostics/deep'
   const diagnosticsCta = deepDiagnosticCompleted
     ? 'View AI Report'
-    : freeDiagnosticCompleted
-    ? t('diagnosticsCard.viewResults')
     : data.diagnostic.status === 'not_started'
     ? t('diagnosticsCard.startDiagnostic')
     : t('diagnosticsCard.continueDiagnostic')
   const diagnosticsDescription = deepDiagnosticCompleted
     ? 'Deep diagnostic complete — your AI readiness report is ready.'
-    : freeDiagnosticCompleted
-    ? t('diagnosticsCard.descriptionCompleted', { score: Math.round(freeDiagnosticScore || 0) })
     : t('diagnosticsCard.descriptionNotStarted')
 
   return (
@@ -96,8 +80,7 @@ export default function DashboardPage() {
       <div className={styles.mainContent}>
         <OverviewCard
           data={data}
-          freeDiagnosticScore={freeDiagnosticScore}
-          freeDiagnosticCompleted={freeDiagnosticCompleted}
+          deepDiagnosticCompleted={deepDiagnosticCompleted}
         />
       </div>
 
