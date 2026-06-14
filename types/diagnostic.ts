@@ -283,6 +283,22 @@ export interface ROIProjection {
   hasEnoughDataForProjection: boolean
   confidenceLevel: 'high' | 'medium' | 'low'
   missingInputs: string[]
+  /**
+   * Transparency fields (methodology fix): the explicit assumptions behind the
+   * savings and ROI numbers so users can see how figures were derived.
+   */
+  /** Hourly labor rate (USD) applied to reclaimed hours. */
+  assumedHourlyRateUSD: number | null
+  /** Hourly labor rate in the user's selected local currency. */
+  assumedHourlyRateLocal: number | null
+  /** Budget midpoint (USD) used as the investment base for payback & 3-year ROI. */
+  assumedBudgetMidpointUSD: number | null
+  /** Budget midpoint in the user's selected local currency. */
+  assumedBudgetMidpointLocal: number | null
+  /** Efficiency factor applied to reclaimed-hours savings (0–1). */
+  efficiencyFactor: number
+  /** Whether the small-team opportunity-cost rate adjustment was applied. */
+  smallTeamRateApplied: boolean
   /** @deprecated Use annualLaborSavingsLocal — kept for backward compat with stored contexts */
   annualLaborSavingsIDR?: number | null
   /** @deprecated Use annualProcessSavingsLocal — kept for backward compat with stored contexts */
@@ -330,6 +346,30 @@ export interface RankedOpportunity {
   estimatedSavingsIDR?: number | null
 }
 
+/**
+ * A single "Room for Improvement" item — what should be improved, why it matters
+ * operationally, and a concrete before → after picture. Feeds the AI System Blueprint.
+ */
+export interface ImprovementItem {
+  id: string
+  /** Dimension or area this improvement targets. */
+  area: string
+  /** Short title of the improvement. */
+  title: string
+  /** Priority derived from severity / score gap. */
+  priority: 'high' | 'medium' | 'low'
+  /** What is wrong / suboptimal today. */
+  currentState: string
+  /** Concrete action(s) recommended to close the gap. */
+  recommendedAction: string
+  /** How fixing this affects day-to-day operations. */
+  operationalImpact: string
+  /** Operational picture before the improvement. */
+  before: string
+  /** Operational picture after the improvement. */
+  after: string
+}
+
 export interface DiagnosticContext {
   company: string
   /** ISO currency code selected by the user (e.g. 'IDR', 'USD') */
@@ -352,6 +392,8 @@ export interface DiagnosticContext {
   scores: DimensionScores
   opportunities: RankedOpportunity[]
   risks: RiskFlag[]
+  /** Prioritized improvement areas with operational before/after — feeds the AI System Blueprint. */
+  roomForImprovement?: ImprovementItem[]
   qualitative: {
     primaryObjective: string
     topPainPoints: string
@@ -366,6 +408,8 @@ export interface DiagnosticContext {
     dataResidency: string
     /** Raw annual_revenue answer — used for pre-revenue framing in UI */
     annualRevenue?: string
+    /** Raw industry answer — used to re-derive the labor rate when upgrading old results. */
+    industry?: string
   }
 }
 

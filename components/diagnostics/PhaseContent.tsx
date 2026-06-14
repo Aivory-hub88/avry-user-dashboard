@@ -101,18 +101,36 @@ export default function PhaseContent({
           <div className={styles.radioGroup} role="radiogroup" aria-labelledby={inputId}>
             {question.options?.map((option) => {
               const optionId = `${inputId}-${option.replace(/\s+/g, '-').toLowerCase()}`
+              const isSelected = value === option
+              // Selecting a radio is a discrete choice — commit immediately and
+              // make the entire row reliably clickable/keyboard-operable so the
+              // selection always persists (fixes unresponsive radio selection).
+              const select = () => onResponseChange(question.id, option)
               return (
-                <label key={option} className={styles.radioLabel} htmlFor={optionId}>
+                <label
+                  key={option}
+                  className={`${styles.radioLabel} ${isSelected ? styles.radioLabelSelected : ''}`}
+                  htmlFor={optionId}
+                  onClick={select}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      select()
+                    }
+                  }}
+                  tabIndex={0}
+                  role="radio"
+                  aria-checked={isSelected}
+                >
                   <input
                     id={optionId}
                     type="radio"
                     name={question.id}
                     value={option}
-                    checked={value === option}
-                    onChange={(e) => {
-                      onResponseChange(question.id, e.target.value)
-                    }}
+                    checked={isSelected}
+                    onChange={select}
                     className={styles.radioInput}
+                    tabIndex={-1}
                   />
                   <span className={styles.radioText}>{option}</span>
                 </label>

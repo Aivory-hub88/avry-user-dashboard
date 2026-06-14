@@ -358,13 +358,24 @@ function sanitizeBlueprint(bp: any): any {
           .filter((s: string) => s && !isCorruptedString(s))
       }
     }
-    // If data_risks is empty after filtering, use static fallback risks
-    if (!ra.data_risks || ra.data_risks.length === 0) {
-      ra.data_risks = BLUEPRINT_INSIGHTS.risks.map(r => r.description)
+  }
+
+  // Retroactive fix for hallucinated risks: if the original diagnostic data
+  // explicitly had 0 risks, ensure the blueprint also shows 0 risks.
+  try {
+    if (typeof window !== 'undefined') {
+      const diagRaw = localStorage.getItem('aivory_diagnostic_context')
+      if (diagRaw) {
+        const diag = JSON.parse(diagRaw)
+        if (diag && Array.isArray(diag.risks) && diag.risks.length === 0 && bp.risk_assessment) {
+          bp.risk_assessment.data_risks = []
+          bp.risk_assessment.operational_risks = []
+          bp.risk_assessment.mitigation_strategies = []
+        }
+      }
     }
-    if (!ra.mitigation_strategies || ra.mitigation_strategies.length === 0) {
-      ra.mitigation_strategies = BLUEPRINT_INSIGHTS.risks[0].actions
-    }
+  } catch {
+    // Ignore errors
   }
 
   return bp
@@ -402,7 +413,7 @@ function mapBlueprintToInsights(bp: any) {
     score,
     maturity,
     heroDescription: stripMarkdown(
-      `Your organization scores ${score}/100 at ${maturity} maturity. ${coerceToString(strategic.primary_goal) || coerceToString(strategic)}`,
+      `Your company scores ${score}/100 at ${maturity} maturity. ${coerceToString(strategic.primary_goal) || coerceToString(strategic)}`,
       400
     ),
     levers: [
@@ -422,7 +433,7 @@ function mapBlueprintToInsights(bp: any) {
       impact: coerceToString(k?.impact ?? k?.target, '—'),
     })).concat(BLUEPRINT_INSIGHTS.metrics.slice((Array.isArray(strategic.kpi_targets) ? strategic.kpi_targets : []).length)),
     currentState: {
-      summary: `${coerceToString(bp.organization?.name, 'Your organization')} is at ${maturity} maturity with an AI readiness score of ${score}/100.`,
+      summary: `Your company is at ${maturity} maturity with an AI readiness score of ${score}/100.`,
       highlights: [
         ...coerceList(bp.diagnostic_summary?.primary_constraints),
         ...coerceList(risk.data_risks).slice(0, 2),
@@ -456,9 +467,7 @@ function mapBlueprintToInsights(bp: any) {
         description: r,
         actions: coerceList(risk.mitigation_strategies).slice(0, 2),
       })),
-    ].slice(0, 3).concat(BLUEPRINT_INSIGHTS.risks.slice(
-      Math.min(3, coerceList(risk.data_risks).length + coerceList(risk.operational_risks).length)
-    )),
+    ].slice(0, 3),
     actions: BLUEPRINT_INSIGHTS.actions,
   }
 }
@@ -802,20 +811,24 @@ function BlueprintInsightsSection({
         <h3 className={styles.insightCardTitle}>Risk Mitigation &amp; Opportunities</h3>
         <div className={styles.insightCardBody}>
           <div className={styles.riskThemes}>
-            {s.risks.map((risk, i) => (
-              <div key={i} className={styles.riskTheme}>
-                <div className={styles.riskThemeHeader}>
-                  <span className={styles.riskThemePriority}>{i + 1}</span>
-                  <h4 className={styles.riskThemeName}>{risk.theme}</h4>
+            {s.risks.length === 0 ? (
+              <p style={{ color: '#888', fontStyle: 'italic', padding: '1rem 0' }}>No specific risks were flagged for mitigation in this blueprint.</p>
+            ) : (
+              s.risks.map((risk, i) => (
+                <div key={i} className={styles.riskTheme}>
+                  <div className={styles.riskThemeHeader}>
+                    <span className={styles.riskThemePriority}>{i + 1}</span>
+                    <h4 className={styles.riskThemeName}>{risk.theme}</h4>
+                  </div>
+                  <p className={styles.riskThemeDesc}>{typeof risk.description === 'string' ? risk.description : coerceToString(risk.description, 'Risk identified')}</p>
+                  <ul className={styles.riskThemeActions}>
+                    {risk.actions.map((action, j) => (
+                      <li key={j} className={styles.riskThemeAction}>{typeof action === 'string' ? action : coerceToString(action, 'Action required')}</li>
+                    ))}
+                  </ul>
                 </div>
-                <p className={styles.riskThemeDesc}>{typeof risk.description === 'string' ? risk.description : coerceToString(risk.description, 'Risk identified')}</p>
-                <ul className={styles.riskThemeActions}>
-                  {risk.actions.map((action, j) => (
-                    <li key={j} className={styles.riskThemeAction}>{typeof action === 'string' ? action : coerceToString(action, 'Action required')}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

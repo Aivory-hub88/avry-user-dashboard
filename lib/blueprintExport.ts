@@ -4,6 +4,7 @@
  */
 
 import type { BlueprintV1 } from '@/types/blueprint'
+import { applyPremiumCovers } from '@/lib/pdfExport'
 
 function dateStr() {
   return new Date().toISOString().slice(0, 10)
@@ -101,35 +102,7 @@ export async function exportBlueprintPDF(
   const gap = (n = 4) => { y += n }
 
   // ── Cover page ──────────────────────────────────────────
-  doc.setFillColor(28, 28, 28)
-  doc.rect(0, 0, pageW, pageH, 'F')
-
-  doc.setFontSize(22)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(0, 229, 158)
-  doc.text('AI System Blueprint', pageW / 2, 70, { align: 'center' })
-
-  doc.setFontSize(16)
-  doc.setTextColor(240, 240, 240)
-  doc.text(companyName, pageW / 2, 84, { align: 'center' })
-
-  if (blueprint.organization?.industry) {
-    doc.setFontSize(10)
-    doc.setTextColor(150, 150, 150)
-    doc.text(blueprint.organization.industry, pageW / 2, 93, { align: 'center' })
-  }
-
-  doc.setDrawColor(0, 229, 158)
-  doc.setLineWidth(0.5)
-  doc.line(margin + 20, 100, pageW - margin - 20, 100)
-
-  doc.setFontSize(9)
-  doc.setTextColor(130, 130, 130)
-  doc.text(`Version: ${versionLabel}`, pageW / 2, 110, { align: 'center' })
-  doc.text(`AI Readiness Score: ${diagnostic_summary?.ai_readiness_score ?? '—'}  |  ${diagnostic_summary?.maturity_level ?? ''}`, pageW / 2, 117, { align: 'center' })
-  doc.text(`Generated: ${date}`, pageW / 2, 124, { align: 'center' })
-
-  addFooter()
+  await applyPremiumCovers(doc, 'front', 'AI System\nBlueprint')
   doc.addPage()
   pageNum++
   y = margin
@@ -236,6 +209,8 @@ export async function exportBlueprintPDF(
   }
 
   addFooter()
+  doc.addPage()
+  await applyPremiumCovers(doc, 'back')
   doc.save(`Aivory-Blueprint-${safeFilename(companyName)}-${versionLabel}-${date}.pdf`)
 }
 

@@ -4,6 +4,7 @@ import styles from './RadarChart.module.css'
 
 interface RadarChartProps {
   scores: Pick<DimensionScores, 'strategy' | 'data' | 'process' | 'people' | 'governance'>
+  isPrintMode?: boolean
 }
 
 const CENTER_X = 150
@@ -41,7 +42,7 @@ function guidePolygon(pct: number): string {
   }).join(' ')
 }
 
-export default function RadarChart({ scores }: RadarChartProps) {
+export default function RadarChart({ scores, isPrintMode }: RadarChartProps) {
   const dataPoints = RADAR_AXES.map(({ key, angle }) => {
     const score = scores[key] ?? 0
     return vertex(score, angle)
@@ -65,6 +66,7 @@ export default function RadarChart({ scores }: RadarChartProps) {
             key={pct}
             className={styles.guide}
             points={guidePolygon(pct)}
+            stroke={isPrintMode ? '#e0e0e0' : undefined}
           />
         ))}
 
@@ -79,6 +81,7 @@ export default function RadarChart({ scores }: RadarChartProps) {
               y1={CENTER_Y}
               x2={tip.x}
               y2={tip.y}
+              stroke={isPrintMode ? '#e0e0e0' : undefined}
             />
           )
         })}
@@ -87,6 +90,8 @@ export default function RadarChart({ scores }: RadarChartProps) {
         <polygon
           className={styles.dataPolygon}
           points={dataPolygon}
+          fill={isPrintMode ? 'rgba(74, 92, 57, 0.15)' : undefined}
+          stroke={isPrintMode ? '#4a5c39' : undefined}
         />
 
         {/* Axis labels */}
@@ -95,7 +100,7 @@ export default function RadarChart({ scores }: RadarChartProps) {
           const lx = CENTER_X + labelR * Math.cos(toRad(angle))
           const ly = CENTER_Y + labelR * Math.sin(toRad(angle))
           return (
-            <text key={key} className={styles.axisLabel} x={lx} y={ly}>
+            <text key={key} className={styles.axisLabel} x={lx} y={ly} fill={isPrintMode ? '#3d3d3d' : undefined}>
               {humanizeDimensionKey(key)}
             </text>
           )

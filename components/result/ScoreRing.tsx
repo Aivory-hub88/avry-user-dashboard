@@ -6,12 +6,13 @@ import styles from './ScoreRing.module.css'
 interface ScoreRingProps {
   score: number
   maturityLevel: string
+  isPrintMode?: boolean
 }
 
 const RADIUS = 80
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
-export default function ScoreRing({ score, maturityLevel }: ScoreRingProps) {
+export default function ScoreRing({ score, maturityLevel, isPrintMode }: ScoreRingProps) {
   const [animated, setAnimated] = useState(false)
 
   useEffect(() => {
@@ -40,6 +41,7 @@ export default function ScoreRing({ score, maturityLevel }: ScoreRingProps) {
           cx="100"
           cy="100"
           r={RADIUS}
+          stroke={isPrintMode ? '#e0e0e0' : undefined}
         />
         {/* Value arc — starts at 12 o'clock */}
         <circle
@@ -49,13 +51,14 @@ export default function ScoreRing({ score, maturityLevel }: ScoreRingProps) {
           r={RADIUS}
           strokeDasharray={dashArray}
           transform="rotate(-90 100 100)"
+          stroke={isPrintMode ? '#4a5c39' : undefined}
         />
         {/* Center score */}
-        <text className={styles.centerScore} x="100" y="92">
+        <text className={styles.centerScore} x="100" y="92" fill={isPrintMode ? '#3d3d3d' : undefined}>
           {clampedScore}
         </text>
         {/* Maturity label */}
-        <text className={styles.centerMaturity} x="100" y="118">
+        <text className={styles.centerMaturity} x="100" y="118" fill={isPrintMode ? '#888884' : undefined}>
           {maturityLevel}
         </text>
       </svg>

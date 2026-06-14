@@ -15,7 +15,9 @@ export default function ROIMetricTile({ label, value, formatter, subtitle }: ROI
       {value === null ? (
         <span className={styles.insufficient}>Insufficient data</span>
       ) : (
-        <span className={styles.value}>{formatter(value)}</span>
+        <span className={styles.value} style={value < 0 ? { color: '#f87171' } : undefined}>
+          {formatter(value)}
+        </span>
       )}
     </div>
   )

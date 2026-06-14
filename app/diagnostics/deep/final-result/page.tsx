@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { DiagnosticContext } from '@/types/diagnostic'
+import { upgradeDiagnosticContext, DeepDiagnosticService } from '@/services/deepDiagnostic'
 import HeaderBar from '@/components/result/HeaderBar'
 import ScoreRing from '@/components/result/ScoreRing'
 import RadarChart from '@/components/result/RadarChart'
@@ -12,6 +13,8 @@ import OpportunityCard from '@/components/result/OpportunityCard'
 import RiskCard from '@/components/result/RiskCard'
 import LoadingState from '@/components/result/LoadingState'
 import ErrorCard from '@/components/result/ErrorCard'
+import PrintableReport from '@/components/result/PrintableReport'
+import { exportReportToPdf } from '@/lib/pdfExport'
 import {
   formatCurrency,
   formatPercent,
@@ -57,9 +60,23 @@ export default function FinalResultPage() {
     | { status: 'done' }
     | { status: 'error'; message: string }
   >({ status: 'idle' })
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   useEffect(() => {
     const loadContext = async () => {
+      const findIndustryHint = (): string | undefined => {
+        try {
+          const progress = DeepDiagnosticService.loadProgress()
+          if (!progress?.phases) return undefined
+          for (const phase of Object.values(progress.phases)) {
+            const rec = phase as unknown as Record<string, unknown>
+            if (rec && typeof rec === 'object' && typeof rec.industry === 'string') {
+              return rec.industry
+            }
+          }
+        } catch { /* ignore */ }
+        return undefined
+      }
       // Try Supabase first (Req 6.5–6.8), fall back to localStorage
       let raw: string | null = null
       try {
@@ -68,7 +85,7 @@ export default function FinalResultPage() {
         if (supabaseCtx) {
           const context = validateContext(supabaseCtx)
           if (context) {
-            setState({ status: 'loaded', context })
+            setState({ status: 'loaded', context: upgradeDiagnosticContext(context, findIndustryHint()) })
             return
           }
         }
@@ -94,7 +111,7 @@ export default function FinalResultPage() {
         setState({ status: 'error', message: 'Diagnostic data is malformed or incomplete. Please run the diagnostic again.' })
         return
       }
-      setState({ status: 'loaded', context })
+      setState({ status: 'loaded', context: upgradeDiagnosticContext(context, findIndustryHint()) })
     }
     loadContext()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -161,6 +178,17 @@ export default function FinalResultPage() {
     }
   }
 
+  const handleDownloadPdf = async () => {
+    setIsExportingPdf(true)
+    try {
+      await exportReportToPdf('pdf-print-layout', context.company, context)
+    } catch (error) {
+      console.error('Failed to generate PDF', error)
+    } finally {
+      setIsExportingPdf(false)
+    }
+  }
+
   // Bug 1 fix: derive currency from context, never hardcode IDR
   const currencyCode: CurrencyCode = parseCurrencyCode(context.currency)
   const fmtCurrency = (v: number | null | undefined) => formatCurrency(v, currencyCode)
@@ -201,9 +229,14 @@ export default function FinalResultPage() {
 
   return (
     <div className={styles.page}>
-      <HeaderBar company={context.company} submittedAt={context.submittedAt} />
+      <HeaderBar 
+        company={context.company} 
+        submittedAt={context.submittedAt} 
+        onDownloadPdf={handleDownloadPdf}
+        isExportingPdf={isExportingPdf}
+      />
 
-      <div className={styles.content}>
+      <div className={styles.content} id="diagnostic-report">
 
         {/* ── Executive Scorecard ── */}
         <div className={styles.card}>
@@ -291,6 +324,84 @@ export default function FinalResultPage() {
               }
             />
           </div>
+
+          {calculations.hasEnoughDataForProjection && (
+            <div className={styles.assumptionsNote}>
+              <p className={styles.assumptionsTitle}>How these figures were calculated</p>
+              <ul className={styles.assumptionsList}>
+                <li>
+                  <strong>Step 1 — Hours reclaimed/year:</strong>{' '}
+                  {calculations.hoursReclaimedPerYear} hrs
+                  {' = '}manual hours/week × 52 weeks × automation gap × {Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}% efficiency factor
+                </li>
+                <li>
+                  <strong>Step 2 — Labor savings:</strong>{' '}
+                  {fmtCurrency(calculations.annualLaborSavingsLocal)} = {calculations.hoursReclaimedPerYear} hrs × <strong>{fmtCurrency(calculations.assumedHourlyRateLocal)}/hr</strong>
+                  {calculations.smallTeamRateApplied
+                    ? ' (opportunity-cost rate for teams of 1–5 FTEs — 50% of industry blended rate)'
+                    : ' (industry blended rate)'}
+                </li>
+                <li>
+                  <strong>Step 3 — Process savings:</strong>{' '}
+                  {fmtCurrency(calculations.annualProcessSavingsLocal)} = 20% of labor savings (operational overhead reduction)
+                </li>
+                <li>
+                  <strong>Step 4 — Total annual savings:</strong>{' '}
+                  <strong>{fmtCurrency(calculations.totalAnnualSavingsLocal)}</strong> = labor + process savings
+                </li>
+                {calculations.assumedBudgetMidpointLocal != null && (
+                  <li>
+                    <strong>Step 5 — Payback period:</strong>{' '}
+                    {calculations.paybackMonths != null ? `${Math.round(calculations.paybackMonths)} months` : '—'}{' '}
+                    = <strong>{fmtCurrency(calculations.assumedBudgetMidpointLocal)}</strong> investment ÷ {fmtCurrency(calculations.totalAnnualSavingsLocal)}/yr × 12
+                    {' '}(midpoint of your selected budget range)
+                  </li>
+                )}
+                {calculations.assumedBudgetMidpointLocal != null && (
+                  <li>
+                    <strong>Step 6 — 3-Year ROI:</strong>{' '}
+                    <strong style={{ color: calculations.threeYearROIPercent != null && calculations.threeYearROIPercent < 0 ? '#f87171' : '#4ade80' }}>
+                      {calculations.threeYearROIPercent != null ? `${calculations.threeYearROIPercent.toFixed(1)}%` : '—'}
+                    </strong>
+                    {' = '}({fmtCurrency(calculations.totalAnnualSavingsLocal)}/yr × 3 − {fmtCurrency(calculations.assumedBudgetMidpointLocal)}) ÷ {fmtCurrency(calculations.assumedBudgetMidpointLocal)} × 100
+
+                    {calculations.threeYearROIPercent != null && calculations.threeYearROIPercent < 0 && calculations.totalAnnualSavingsLocal != null && calculations.assumedBudgetMidpointLocal != null && (() => {
+                      const savings3yr = calculations.totalAnnualSavingsLocal! * 3
+                      const budget = calculations.assumedBudgetMidpointLocal!
+                      const shortfall = budget - savings3yr
+                      const breakEvenYears = budget / calculations.totalAnnualSavingsLocal!
+                      const savingsNeededPerYear = budget / 3
+                      return (
+                        <ul className={styles.roiNegativeList}>
+                          <li className={styles.roiNegativeReason}>
+                            <span className={styles.roiNegativeLabel}>⚠ Why negative?</span>
+                            Your 3-year cumulative savings (<strong>{fmtCurrency(savings3yr)}</strong>) fall{' '}
+                            <strong style={{ color: '#f87171' }}>{fmtCurrency(shortfall)} short</strong>{' '}
+                            of the full investment ({fmtCurrency(budget)}). Break-even is at{' '}
+                            <strong>~{breakEvenYears.toFixed(1)} years</strong>, not 3.
+                          </li>
+                          <li>
+                            <span className={styles.roiFixLabel}>Fix A — Reduce initial budget scope</span>
+                            Start with a budget of <strong>{fmtCurrency(savings3yr)}</strong> or less.
+                            That amount is fully recovered by year 3 at your current saving rate.
+                          </li>
+                          <li>
+                            <span className={styles.roiFixLabel}>Fix B — Increase automation depth</span>
+                            Automate more hours or close a larger automation gap to push annual savings to at least{' '}
+                            <strong>{fmtCurrency(savingsNeededPerYear)}/yr</strong> (currently {fmtCurrency(calculations.totalAnnualSavingsLocal)}/yr).
+                          </li>
+                        </ul>
+                      )
+                    })()}
+
+                    {calculations.threeYearROIPercent != null && calculations.threeYearROIPercent >= 0 &&
+                      <span style={{ color: '#86efac', marginLeft: 6 }}>✓ Fully recovered within 3 years.</span>
+                    }
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* ── Opportunity Priority Matrix ── */}
@@ -433,6 +544,51 @@ export default function FinalResultPage() {
           </div>
         </div>
 
+        {/* ── Room for Improvement ── */}
+        {Array.isArray(context.roomForImprovement) && context.roomForImprovement.length > 0 && (
+          <div className={styles.card}>
+            <h2 className={styles.sectionTitle}>Room for Improvement</h2>
+            <p className={styles.improvementIntro}>
+              Prioritized areas to strengthen before and during AI adoption. These feed directly
+              into your AI System Blueprint.
+            </p>
+            <div className={styles.improvementList}>
+              {context.roomForImprovement.map((item) => (
+                <div key={item.id} className={styles.improvementItem}>
+                  <div className={styles.improvementHeader}>
+                    <span className={styles.improvementTitle}>{item.title}</span>
+                    <span className={`${styles.improvementBadge} ${styles[`priority_${item.priority}`]}`}>
+                      {item.priority} priority
+                    </span>
+                    <span className={styles.improvementArea}>{item.area}</span>
+                  </div>
+                  <div className={styles.improvementBody}>
+                    <p className={styles.improvementField}>
+                      <span className={styles.improvementFieldLabel}>What to improve</span>
+                      {item.recommendedAction}
+                    </p>
+                    <p className={styles.improvementField}>
+                      <span className={styles.improvementFieldLabel}>Operational impact</span>
+                      {item.operationalImpact}
+                    </p>
+                  </div>
+                  <div className={styles.beforeAfter}>
+                    <div className={`${styles.baCell} ${styles.baBefore}`}>
+                      <span className={styles.baLabel}>Before</span>
+                      <span className={styles.baText}>{item.before}</span>
+                    </div>
+                    <div className={styles.baArrow} aria-hidden="true">→</div>
+                    <div className={`${styles.baCell} ${styles.baAfter}`}>
+                      <span className={styles.baLabel}>After</span>
+                      <span className={styles.baText}>{item.after}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Generate Blueprint CTA ── */}
         <div className={styles.blueprintCta}>
           <div className={styles.blueprintCtaLeft}>
@@ -485,6 +641,11 @@ export default function FinalResultPage() {
           </div>
         </div>
 
+      </div>
+
+      {/* Hidden printable layout for PDF generation */}
+      <div id="pdf-print-layout" style={{ display: 'none' }}>
+        <PrintableReport context={context} />
       </div>
     </div>
   )

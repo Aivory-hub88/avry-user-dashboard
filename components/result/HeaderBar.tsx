@@ -4,9 +4,11 @@ import styles from './HeaderBar.module.css'
 interface HeaderBarProps {
   company: string
   submittedAt: string
+  onDownloadPdf?: () => void
+  isExportingPdf?: boolean
 }
 
-export default function HeaderBar({ company, submittedAt }: HeaderBarProps) {
+export default function HeaderBar({ company, submittedAt, onDownloadPdf, isExportingPdf }: HeaderBarProps) {
   return (
     <header className={styles.bar}>
       <div className={styles.meta}>
@@ -15,8 +17,13 @@ export default function HeaderBar({ company, submittedAt }: HeaderBarProps) {
         <span className={styles.date}>{formatDate(submittedAt)}</span>
       </div>
       <div className={styles.actions}>
-        {/* TODO: implement PDF export — disabled until export service is available */}
-        <button disabled className={styles.btnFilled}>Download Full Report</button>
+        <button 
+          className={styles.btnFilled}
+          onClick={onDownloadPdf}
+          disabled={!onDownloadPdf || isExportingPdf}
+        >
+          {isExportingPdf ? 'Generating...' : 'Download Full Report'}
+        </button>
       </div>
     </header>
   )

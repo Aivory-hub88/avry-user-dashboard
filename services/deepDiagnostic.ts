@@ -298,6 +298,7 @@ import type {
   RankedOpportunity,
   RiskFlag,
   OpportunityQuadrant,
+  ImprovementItem,
 } from '@/types/diagnostic'
 import { parseCurrencyCode, formatCurrency, type CurrencyCode } from '@/lib/resultFormatters'
 
@@ -428,12 +429,23 @@ function calculateROI(
   const confidence: ROIProjection['confidenceLevel'] =
     missing.length === 0 ? 'high' : missing.length === 1 ? 'medium' : 'low'
 
-  // FIX #3: Use industry-aware hourly rate
-  // Fix 2 (Run 3): For solo/micro teams (1–5 FTEs), reclaimed hours are
-  // opportunity cost, not payroll savings — use $8/hr instead of the full
-  // industry blended rate. 6+ FTEs use the normal industry rate.
+  // FIX #3: Use industry-aware hourly rate.
+  // Methodology fix: For solo/micro teams (1–5 FTEs), reclaimed hours are
+  // opportunity cost rather than direct payroll savings, so we apply a
+  // discount FACTOR to the real industry rate — NOT a flat $8/hr that throws
+  // away the industry signal. The previous flat $8/hr made a Tech/Software
+  // team's reclaimed time worth less than minimum wage, producing absurd
+  // payback periods (e.g. 104 months) and negative 3-year ROI.
+  //
+  // SMALL_TEAM_RATE_FACTOR (0.5) reflects that for small teams the saved time
+  // converts to opportunity value (rework, growth, billable work) at roughly
+  // half the fully-loaded employment cost. A Tech team at $65/hr → $32.5/hr.
+  const SMALL_TEAM_RATE_FACTOR = 0.5
   const baseHourlyRateUSD = getHourlyRateUSD(industry)
-  const hourlyRateUSD = (q.fteCountInScope ?? 1) <= 5 ? 8 : baseHourlyRateUSD
+  const smallTeamRateApplied = (q.fteCountInScope ?? 1) <= 5
+  const hourlyRateUSD = smallTeamRateApplied
+    ? Math.round(baseHourlyRateUSD * SMALL_TEAM_RATE_FACTOR)
+    : baseHourlyRateUSD
 
   const weeklyHours = q.totalManualHoursWeekly ?? 0
   const hoursPerYear = weeklyHours * 52
@@ -488,8 +500,15 @@ function calculateROI(
   // so the formula is auditable: ((totalAnnualSavingsUSD × 3 − investment) / investment) × 100
   if (process.env.NODE_ENV !== 'test') {
     console.log('[ROI Audit]', {
+      industry: industry ?? 'unknown',
+      baseHourlyRateUSD,
+      hourlyRateUSD,
+      smallTeamRateApplied,
+      efficiencyFactor: EFFICIENCY_FACTOR,
+      hoursReclaimedPerYear,
       budgetMidpointUSD: budgetUSD,
       totalAnnualSavingsUSD,
+      paybackMonths: paybackMonths !== null ? Math.round(paybackMonths * 10) / 10 : null,
       rawThreeYearROI: rawThreeYearROI !== null ? Math.round(rawThreeYearROI * 10) / 10 : null,
       threeYearROIPercent,
       capped: rawThreeYearROI !== null && rawThreeYearROI > 999,
@@ -510,6 +529,13 @@ function calculateROI(
     hasEnoughDataForProjection: hasEnough,
     confidenceLevel: confidence,
     missingInputs: missing,
+    // Methodology transparency fields — expose the assumptions behind the numbers
+    assumedHourlyRateUSD: hourlyRateUSD,
+    assumedHourlyRateLocal: hourlyRateUSD * rate,
+    assumedBudgetMidpointUSD: budgetUSD,
+    assumedBudgetMidpointLocal: budgetUSD !== null ? budgetUSD * rate : null,
+    efficiencyFactor: EFFICIENCY_FACTOR,
+    smallTeamRateApplied,
     // Backward-compat aliases for any stored DiagnosticContext that still uses *IDR names
     annualLaborSavingsIDR: annualLaborSavingsUSD ? annualLaborSavingsUSD * rate : null,
     annualProcessSavingsIDR: annualProcessSavingsUSD ? annualProcessSavingsUSD * rate : null,
@@ -895,6 +921,154 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
   return risks.sort((rA, rB) => order[rA.severity] - order[rB.severity])
 }
 
+// ---- Room for Improvement ----
+
+/**
+ * Derives a prioritized list of improvement areas from the dimension scores,
+ * detected risks, and quantitative inputs. Each item carries an operational
+ * impact statement plus a concrete before → after picture. This is consumed by
+ * the result page AND fed into the AI System Blueprint generator as extra
+ * context, so it must be deterministic (no LLM / randomness).
+ */
+function buildRoomForImprovement(
+  scores: DimensionScores,
+  q: DiagnosticContext['quantitative'],
+  a: DiagnosticAnswers,
+): ImprovementItem[] {
+  const items: ImprovementItem[] = []
+
+  const priorityFromScore = (score: number): ImprovementItem['priority'] =>
+    score < 45 ? 'high' : score < 70 ? 'medium' : 'low'
+
+  const currentAuto = q.currentAutomationPct ?? null
+  const targetAuto = q.targetAutomationPct ?? null
+  const manualHrs = q.totalManualHoursWeekly
+
+  // --- Process dimension ---
+  if (scores.process < 75) {
+    items.push({
+      id: 'rfi-process',
+      area: 'Process',
+      title: 'Document & standardize core workflows',
+      priority: priorityFromScore(scores.process),
+      currentState:
+        a.process_documentation
+          ? `Processes are ${String(a.process_documentation).toLowerCase()} documented and ${String(a.workflow_standardization || 'partially standardized').toLowerCase()}.`
+          : 'Key processes are only partially documented and standardized, making automation fragile.',
+      recommendedAction:
+        'Map the top 3–5 highest-volume processes end-to-end, capture inputs/outputs and decision rules, and standardize variations into a single canonical flow before automating.',
+      operationalImpact:
+        'Standardized, documented processes reduce automation rework, shorten onboarding, and make AI agents far more reliable because they act on consistent inputs.',
+      before: 'Each team member runs the process slightly differently; tribal knowledge lives in people’s heads.',
+      after: 'One documented, standardized flow per process — ready to hand to an AI agent or new hire without retraining.',
+    })
+  }
+
+  // --- Data dimension ---
+  if (scores.data < 75) {
+    items.push({
+      id: 'rfi-data',
+      area: 'Data',
+      title: 'Centralize & clean operational data',
+      priority: priorityFromScore(scores.data),
+      currentState:
+        a.data_centralization
+          ? `Data is ${String(a.data_centralization).toLowerCase()}; quality is ${String(a.data_quality || 'mixed').toLowerCase()}.`
+          : 'Data is spread across systems with inconsistent quality, limiting AI accuracy.',
+      recommendedAction:
+        'Consolidate the data sources that feed the priority workflows into a single source of truth (or connect them via APIs), then add basic validation to fix quality issues at entry.',
+      operationalImpact:
+        'Clean, centralized data is the single biggest driver of AI output quality — it cuts manual reconciliation and reduces error-handling downstream.',
+      before: 'Staff manually pull and reconcile data from multiple tools before any decision or report.',
+      after: 'A single connected data layer feeds workflows automatically — no manual reconciliation step.',
+    })
+  }
+
+  // --- Automation gap (operational) ---
+  if (currentAuto !== null && targetAuto !== null && targetAuto - currentAuto >= 15) {
+    const gap = Math.round(targetAuto - currentAuto)
+    items.push({
+      id: 'rfi-automation-gap',
+      area: 'Automation Coverage',
+      title: `Close the ${gap}pp automation gap`,
+      priority: gap >= 40 ? 'high' : 'medium',
+      currentState: `Current automation is ~${Math.round(currentAuto)}% against a target of ${Math.round(targetAuto)}%.`,
+      recommendedAction:
+        'Sequence automation in phases — start with the highest-volume, lowest-complexity tasks (quick wins) to build momentum, then expand to multi-step workflows.',
+      operationalImpact:
+        manualHrs
+          ? `Closing this gap targets the ~${manualHrs} manual hours/week currently spent on repetitive work, freeing the team for higher-value tasks.`
+          : 'Closing this gap redirects repetitive manual effort toward higher-value work.',
+      before: `Roughly ${100 - Math.round(currentAuto)}% of in-scope work is still manual and repetitive.`,
+      after: `Up to ${Math.round(targetAuto)}% of in-scope work runs automatically with human oversight only on exceptions.`,
+    })
+  }
+
+  // --- Strategy dimension ---
+  if (scores.strategy < 70) {
+    items.push({
+      id: 'rfi-strategy',
+      area: 'Strategy',
+      title: 'Tie automation to measurable KPIs',
+      priority: priorityFromScore(scores.strategy),
+      currentState:
+        a.kpi_tracking
+          ? `Success is tracked via ${String(a.kpi_tracking).toLowerCase()}; objectives are not yet fully quantified.`
+          : 'Goals are not yet tied to specific, tracked metrics.',
+      recommendedAction:
+        'Define 2–3 quantified KPIs per automation (e.g. hours saved/week, cycle time, error rate) and wire them into an automated dashboard from day one.',
+      operationalImpact:
+        'Measurable KPIs let you prove ROI early, prioritize the next automation, and catch regressions before they compound.',
+      before: 'Impact of automation is felt anecdotally but not measured.',
+      after: 'Every automation reports live metrics, making ROI and next priorities obvious.',
+    })
+  }
+
+  // --- People dimension ---
+  if (scores.people < 65) {
+    items.push({
+      id: 'rfi-people',
+      area: 'People',
+      title: 'Build internal AI ownership',
+      priority: priorityFromScore(scores.people),
+      currentState:
+        a.internal_capability
+          ? `Internal capability: ${String(a.internal_capability).toLowerCase()}.`
+          : 'Limited internal capability to own and extend automations.',
+      recommendedAction:
+        'Designate an internal "automation champion", pair them with the implementation, and document runbooks so the team can maintain workflows without external help.',
+      operationalImpact:
+        'Internal ownership prevents automations from going stale and reduces dependence on outside vendors for every change.',
+      before: 'Every workflow change requires external help or stalls.',
+      after: 'An internal owner maintains and extends automations independently.',
+    })
+  }
+
+  // --- Governance dimension ---
+  if (scores.governance < 65) {
+    items.push({
+      id: 'rfi-governance',
+      area: 'Governance',
+      title: 'Establish budget & oversight guardrails',
+      priority: priorityFromScore(scores.governance),
+      currentState:
+        a.budget_allocated
+          ? `Budget posture: ${String(a.budget_allocated).toLowerCase()}; leadership alignment: ${String(a.leadership_alignment || 'unclear').toLowerCase()}.`
+          : 'Budget ownership and oversight for automation are not yet formalized.',
+      recommendedAction:
+        'Secure a ring-fenced budget line for automation, define a simple approval and review cadence, and assign clear accountability for outcomes.',
+      operationalImpact:
+        'Clear guardrails prevent mid-project stalls and ensure automations stay funded, reviewed, and aligned with priorities.',
+      before: 'Automation work competes ad-hoc for funding and attention.',
+      after: 'A dedicated budget and review cadence keep the program on track.',
+    })
+  }
+
+  // Sort by priority: high → medium → low
+  const order: Record<ImprovementItem['priority'], number> = { high: 0, medium: 1, low: 2 }
+  return items.sort((x, y) => order[x.priority] - order[y.priority])
+}
+
 // ---- Main export ----
 
 export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticContext {
@@ -931,6 +1105,7 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
 
   const opportunities = rankOpportunities(answers, scores, currencyCode, totalAnnualSavingsUSD)
   const risks = classifyRisks(answers, scores)
+  const roomForImprovement = buildRoomForImprovement(scores, quantitative, answers)
 
   const compliance: string[] = Array.isArray(answers.compliance_requirements)
     ? answers.compliance_requirements.filter((c: string) => c !== 'None')
@@ -949,6 +1124,7 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     errorTolerance: answers.risk_tolerance || '',
     dataResidency: answers.data_residency || '',
     annualRevenue: answers.annual_revenue || '',
+    industry: answers.industry || '',
   }
 
   const context: DiagnosticContext = {
@@ -960,6 +1136,7 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     scores,
     opportunities,
     risks,
+    roomForImprovement,
     qualitative,
   }
 
@@ -979,4 +1156,104 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
   }
 
   return context
+}
+
+
+// ---- Backward-compatible upgrade for stored (old) diagnostic contexts ----
+
+/**
+ * Upgrades a previously-stored DiagnosticContext so that results created before
+ * the ROI methodology fix and the "Room for Improvement" feature show the new
+ * data WITHOUT requiring the user to retake the diagnostic.
+ *
+ * It recomputes:
+ *  - `calculations` using the corrected labor-rate methodology + transparency
+ *    fields (only when the stored context lacks `assumedHourlyRateUSD`).
+ *  - `roomForImprovement` from the stored scores + quantitative inputs
+ *    (only when missing).
+ *
+ * Everything else (scores, opportunities, risks, qualitative) is preserved.
+ * The upgraded context is re-persisted to localStorage so the blueprint
+ * generator and subsequent loads also benefit, and we avoid recomputing on
+ * every render. The function is idempotent and pure for already-upgraded input.
+ */
+export function upgradeDiagnosticContext(
+  context: DiagnosticContext,
+  industryHint?: string,
+): DiagnosticContext {
+  if (!context || typeof context !== 'object') return context
+
+  let changed = false
+  let calculations = context.calculations
+
+  // Old calculations lack the transparency fields → they were produced by the
+  // buggy flat-$8/hr or flat-$15/hr methodology. Recompute with the corrected logic.
+  //
+  // We re-run ROI if:
+  //   a) The transparency fields are missing entirely (very old context), OR
+  //   b) assumedHourlyRateUSD is ≤ 15 — indicates the old buggy $8 or $15 fallback
+  //      was used instead of the industry-aware rate.
+  const calc = calculations as Partial<ROIProjection> | undefined
+  const storedRate = calc?.assumedHourlyRateUSD
+  const needsRoiUpgrade =
+    !!context.quantitative &&
+    (
+      !calc ||
+      storedRate === undefined ||
+      storedRate === null ||
+      storedRate <= 15   // $8 or $15 = old default fallback, not industry-aware
+    )
+
+  if (needsRoiUpgrade) {
+    const currencyCode = parseCurrencyCode(context.currency)
+
+    // Industry resolution priority:
+    //  1. Explicit hint passed in (from saved progress)
+    //  2. Stored in qualitative.industry (new contexts)
+    //  3. Infer from scores: high strategy (≥70) + high data (≥60) → Tech proxy
+    //  4. Use $30/hr default (not $15) if completely unknown
+    let industry = industryHint ?? context.qualitative?.industry ?? undefined
+
+    if (!industry && context.scores) {
+      const { strategy = 0, data = 0, people = 0 } = context.scores
+      if (strategy >= 70 && data >= 50 && people >= 70) {
+        // High-scoring orgs in all three dimensions are typically tech/software companies
+        industry = 'Technology / Software'
+      } else if (data >= 60) {
+        industry = 'Finance / Banking'  // data-heavy but lower people/strategy
+      }
+      // Otherwise leave undefined → DEFAULT_HOURLY_RATE_USD ($30) kicks in
+    }
+
+    calculations = calculateROI(context.quantitative, currencyCode, industry)
+    changed = true
+  }
+
+  // Generate Room for Improvement if the stored context predates the feature.
+  let roomForImprovement = context.roomForImprovement
+  if (
+    (!Array.isArray(roomForImprovement) || roomForImprovement.length === 0) &&
+    context.scores &&
+    context.quantitative
+  ) {
+    roomForImprovement = buildRoomForImprovement(context.scores, context.quantitative, {
+      // Provide whatever descriptive hints we still have; the builder falls
+      // back to generic copy when specific answer fields are absent.
+      internal_capability: context.qualitative?.aiCapability,
+      leadership_alignment: context.qualitative?.leadershipAlignment,
+    })
+    changed = true
+  }
+
+  if (!changed) return context
+
+  const upgraded: DiagnosticContext = { ...context, calculations, roomForImprovement }
+
+  try {
+    localStorage.setItem('aivory_diagnostic_context', JSON.stringify(upgraded))
+  } catch {
+    // localStorage unavailable — return the upgraded object anyway
+  }
+
+  return upgraded
 }

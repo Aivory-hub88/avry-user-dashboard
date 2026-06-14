@@ -331,3 +331,14 @@
     transition: none;
   }
 }
+
+/* Explicit selected state — reliable even where :has() is unsupported, and
+   focus ring for the now keyboard-focusable radio row (UX fix). */
+.radioLabelSelected {
+  background: rgba(102, 229, 166, 0.07);
+  border-color: rgba(102, 229, 166, 0.36);
+}
+.radioLabel:focus-visible {
+  outline: 2px solid rgba(0, 229, 158, 0.3);
+  outline-offset: 2px;
+}

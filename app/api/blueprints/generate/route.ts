@@ -75,7 +75,7 @@ function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
         .slice(0, 300)
     : ''
 
-  const fallbackScore = scores.overall ?? scores.ai_readiness_score ?? 0
+  const fallbackScore = scores.composite ?? scores.overall ?? scores.ai_readiness_score ?? 0
   const extractedScore = scoreMatch ? Math.max(0, Math.min(100, parseInt(scoreMatch[1], 10))) : fallbackScore
   const fallbackMaturity = scores.maturityLevel || 'Emerging'
   const extractedMaturity = maturityMatch ? maturityMatch[1].trim() : fallbackMaturity
@@ -106,7 +106,7 @@ function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
     },
     system_architecture: {
       data_sources: ['Diagnostic context'],
-      processing_layers: ['VPS Bridge', 'Zeroclaw AI Gateway'],
+      processing_layers: ['Aivory High Intelligence Deterministic Engine'],
       decision_engine: 'AI-assisted blueprint generation',
       memory_layer: 'Supabase blueprint storage',
       execution_layer: ['Aivory Console']
@@ -178,7 +178,24 @@ export async function POST(request: NextRequest) {
           messages: [
             {
               role: 'user',
-              content: `Generate an AI system blueprint from this diagnostic data. Return a complete blueprint.\n\n${JSON.stringify(diagnostic)}`
+              content: `Generate an AI system blueprint from this diagnostic data. Return a complete blueprint in strict JSON format. Do not include markdown formatting or wrappers like \`\`\`json. The JSON MUST match this TypeScript interface exactly:
+interface BlueprintV1 {
+  blueprint_id: string;
+  version: string;
+  status: 'draft' | 'published';
+  organization: { name: string; industry: string; size: string };
+  diagnostic_summary: { ai_readiness_score: number; maturity_level: string; primary_constraints: string[] };
+  strategic_objective: { primary_goal: string; kpi_targets: { metric: string; target: string }[] };
+  system_architecture: { data_sources: string[]; processing_layers: string[]; decision_engine: string; memory_layer: string; execution_layer: string[] };
+  workflow_modules: { workflow_id: string; name: string; trigger: string; steps: { type: string; action: string }[]; integrations_required: string[] }[];
+  risk_assessment: { data_risks: string[]; operational_risks: string[]; mitigation_strategies: string[] };
+  deployment_plan: { phase: string; estimated_impact: string; estimated_roi_months: number; waves: { name: string; included_workflows: string[]; notes: string }[] };
+}
+
+IMPORTANT: The diagnostic includes a "roomForImprovement" array — each item has the area, the recommended action, its operational impact, and a concrete before/after. Use these improvement items to shape the blueprint's workflows, deployment phases, and expected operational outcomes (map each high-priority improvement to at least one workflow or phase). Make sure to map the exact "composite" score and "maturityLevel" from the diagnostic data to "ai_readiness_score" and "maturity_level". For \`system_architecture.processing_layers\`, always use exactly ["Aivory High Intelligence Deterministic Engine"] and do not mention VPS Bridge, Zeroclaw, or n8n. If the diagnostic data contains no risks (the risks array is empty or missing), do NOT hallucinate or invent risks. You MUST return empty arrays for data_risks, operational_risks, and mitigation_strategies.
+
+Diagnostic Data:
+${JSON.stringify(diagnostic)}`
             }
           ]
         }),

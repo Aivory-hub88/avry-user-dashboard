@@ -1,0 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+.printContainer {
+  font-family: 'Manrope', sans-serif !important;
+  color: #3d3d3d;
+  background-color: #ffffff;
+  width: 794px; /* A4 width */
+  min-height: 1123px; /* A4 height */
+  padding: 60px 50px;
+  box-sizing: border-box;
+}
+
+.header {
+  border-bottom: 3px solid #1a1a18;
+  padding-bottom: 20px;
+  margin-bottom: 40px;
+}
+
+.title {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: #1a1a18;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: 16px;
+  font-weight: 500;
+  color: #666864;
+  margin: 0;
+}
+
+.section {
+  margin-bottom: 50px;
+  page-break-inside: avoid;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a18;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 12px;
+  margin-bottom: 24px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.scorecardRow {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin-bottom: 32px;
+  background: #fcfcfc;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  padding: 30px;
+}
+
+.bulletList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.bulletItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #3d3d3d;
+}
+
+.bulletIcon {
+  color: #4a5c39;
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.tile {
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-left: 4px solid #4a5c39;
+  border-radius: 6px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+}
+
+.tileLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: #888884;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+
+.tileValue {
+  font-size: 24px;
+  font-weight: 800;
+  color: #1a1a18;
+  letter-spacing: -0.02em;
+}
