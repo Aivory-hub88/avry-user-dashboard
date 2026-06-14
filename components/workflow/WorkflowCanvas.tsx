@@ -47,6 +47,8 @@ type Props = {
   n8nWorkflowId?: string;
   fallbackSteps?: Array<{ step: number; action: string; tool: string; output: string; type?: string }>;
   onInjectNodes?: (inject: (nodes: Node[], edges: Edge[]) => void) => void;
+  onHistoryChange?: (canUndo: boolean) => void;
+  registerUndo?: (undoFn: () => void) => void;
 };
 
 type SyncState = 'idle' | 'loading' | 'saving' | 'saved' | 'error';
@@ -135,7 +137,7 @@ function rehydrateNodeCallbacks(
   }));
 }
 
-export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fallbackSteps, onInjectNodes }: Props) {
+export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fallbackSteps, onInjectNodes, onHistoryChange, registerUndo }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<WorkflowNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [rawWorkflow, setRawWorkflow] = useState<any>(null);
@@ -177,6 +179,35 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     ) as Node<WorkflowNodeData>[];
   }, []);
 
+  // ── History tracking ─────────────────────────────────────
+  const [past, setPast] = useState<{nodes: Node<WorkflowNodeData>[], edges: Edge[]}[]>([]);
+
+  const pushHistory = useCallback((currentNodes: Node<WorkflowNodeData>[], currentEdges: Edge[]) => {
+    setPast(p => {
+      const newPast = [...p.slice(-19), { nodes: currentNodes, edges: currentEdges }];
+      if (onHistoryChange) onHistoryChange(newPast.length > 0);
+      return newPast;
+    });
+  }, [onHistoryChange]);
+
+  const popHistory = useCallback(() => {
+    setPast(p => {
+      if (p.length === 0) return p;
+      const last = p[p.length - 1];
+      const newPast = p.slice(0, -1);
+      
+      setNodes(rehydrate(last.nodes));
+      setEdges(normalizeEdges(last.edges, last.nodes));
+      
+      if (onHistoryChange) onHistoryChange(newPast.length > 0);
+      return newPast;
+    });
+  }, [setNodes, setEdges, rehydrate, onHistoryChange]);
+
+  useEffect(() => {
+    if (registerUndo) registerUndo(popHistory);
+  }, [registerUndo, popHistory]);
+
   // ── Listen for edit-node events from BaseWorkflowNode edit button ──
   useEffect(() => {
     const handler = (e: Event) => {
@@ -189,19 +220,23 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
 
   // ── Connect handler ──────────────────────────────────────
   const onConnect = useCallback(
-    (params: RFConnection) => setEdges((eds) => addEdge({
-      ...params,
-      animated: false,
-      type: 'n8nAdaptive',
-      markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12, color: '#9ca3af' },
-    }, eds)),
-    [setEdges]
+    (params: RFConnection) => {
+      pushHistory(nodes, edges);
+      setEdges((eds) => addEdge({
+        ...params,
+        animated: false,
+        type: 'n8nAdaptive',
+        markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12, color: '#9ca3af' },
+      }, eds));
+    },
+    [setEdges, pushHistory, nodes, edges]
   );
 
   // ── Inject nodes from outside (Aivory generation) ──────────
   useEffect(() => {
     if (!onInjectNodes) return;
     onInjectNodes((newNodes: Node[], newEdges: Edge[]) => {
+      pushHistory(nodes, edges);
       setNodes((nds) => {
         const offsetY = nds.length > 0 ? (nds.length * 160) : 0;
         const positioned = newNodes.map((n, i) => ({
@@ -229,6 +264,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       // ── Standard node drop ──────────────────────────────
       const stdData = event.dataTransfer.getData('application/aivory-standard-node');
       if (stdData) {
+        pushHistory(nodes, edges);
         try {
           const nodeDef = JSON.parse(stdData);
           const reactFlowBounds = (event.target as HTMLElement).getBoundingClientRect();
@@ -288,6 +324,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       // ── Dynamic node drop ──────────────────────────────
       const nodeData = event.dataTransfer.getData('application/aivory-node');
       if (nodeData) {
+        pushHistory(nodes, edges);
         try {
           const nodeDef = JSON.parse(nodeData);
           const reactFlowBounds = (event.target as HTMLElement).getBoundingClientRect();
@@ -324,6 +361,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       const appData = event.dataTransfer.getData('application/aivory-app');
       if (!appData) return;
 
+      pushHistory(nodes, edges);
       try {
         const app = JSON.parse(appData);
         const reactFlowBounds = (event.target as HTMLElement).getBoundingClientRect();
@@ -523,19 +561,21 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
 
   const handleInspectorChange = useCallback(
     (nodeId: string, updates: Partial<WorkflowNodeData>) => {
+      pushHistory(nodes, edges);
       setNodes((nds) => nds.map((n) => n.id === nodeId ? { ...n, data: { ...n.data, ...updates } } : n));
     },
-    [setNodes]
+    [setNodes, pushHistory, nodes, edges]
   );
 
   const handleInspectorDelete = useCallback(
     (nodeId: string) => {
+      pushHistory(nodes, edges);
       setNodes((nds) => nds.filter((n) => n.id !== nodeId));
       setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
       setSelectedNodeId(null);
       setInspectorOpen(false);
     },
-    [setNodes, setEdges]
+    [setNodes, setEdges, pushHistory, nodes, edges]
   );
 
   const loadExecutions = useCallback(async () => {
@@ -770,6 +810,9 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                   onConnect={onConnect}
                   nodesConnectable
                   deleteKeyCode={['Delete', 'Backspace']}
+                  onNodesDelete={() => pushHistory(nodes, edges)}
+                  onEdgesDelete={() => pushHistory(nodes, edges)}
+                  onNodeDragStart={() => pushHistory(nodes, edges)}
                   onNodeClick={(_, node) => {
                     // Single click: select only, do NOT open inspector
                   }}

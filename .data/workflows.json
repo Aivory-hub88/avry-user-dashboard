@@ -1,0 +1,18 @@
+[
+  {
+    "title": "Blank Workflow",
+    "status": "draft",
+    "source": "n8n",
+    "company_name": "",
+    "trigger": "",
+    "steps": [],
+    "integrations": [],
+    "estimated_time": "0",
+    "automation_percentage": "0",
+    "error_handling": "",
+    "notes": "",
+    "id": "eca08ba4-616b-43a7-8b29-b24794e0d473",
+    "createdAt": "2026-06-14T04:05:02.867Z",
+    "updatedAt": "2026-06-14T04:05:02.867Z"
+  }
+]

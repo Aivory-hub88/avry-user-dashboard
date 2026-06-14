@@ -1,9 +1,9 @@
 /* ─── Page shell ─────────────────────────────────────────────────────────── */
 .page {
   min-height: 100vh;
-  background: #2b2b28;
+  background: #353532;
   color: #e5e5e3;
-  font-family: 'Inter Tight', Inter, sans-serif;
+  font-family: var(--font-manrope), sans-serif;
 }
 
 .content {
@@ -25,7 +25,7 @@
 
 /* ─── Section title ──────────────────────────────────────────────────────── */
   .sectionTitle {
-    font-family: Nunito, 'Inter Tight', sans-serif;
+    font-family: var(--font-manrope), sans-serif;
     font-size: 18px;
     font-weight: 300;
     color: #e5e5e3;
@@ -335,7 +335,7 @@
 }
 
 .blueprintCtaIcon {
-  color: #b7cba6;
+  color: #afd199;
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -376,7 +376,7 @@
   align-items: center;
   gap: 8px;
   padding: 12px 24px;
-  background: #b7cba6;
+  background: #afd199;
   color: #1a1a18;
   border: none;
   border-radius: 8px;
@@ -398,7 +398,7 @@
 
 .blueprintBtnDone {
   background: #2d4a2d;
-  color: #b7cba6;
+  color: #afd199;
 }
 
 /* Spinner for generating state */

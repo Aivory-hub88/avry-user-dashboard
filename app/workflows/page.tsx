@@ -656,6 +656,8 @@ function WorkflowsPageInner() {
   const canvasInjectRef = useRef<((nodes: any[], edges: any[]) => void) | null>(null)
   // Pending handoff nodes/edges to inject once the canvas mounts
   const pendingHandoffRef = useRef<{ nodes: any[]; edges: any[] } | null>(null)
+  const [canvasCanUndo, setCanvasCanUndo] = useState(false)
+  const undoCanvasRef = useRef<(() => void) | null>(null)
 
   const { pendingContext, clearPendingContext } = useRouterContext()
   const [routingNotice, setRoutingNotice] = useState<string | null>(null)
@@ -892,6 +894,11 @@ function WorkflowsPageInner() {
   }
 
   const handleUndo = async () => {
+    if (canvasCanUndo && undoCanvasRef.current) {
+      undoCanvasRef.current()
+      return
+    }
+
     if (!undoStack.length || !selected) return
     const prev = undoStack[undoStack.length - 1]
     setUndoStack(s => s.slice(0, -1))
@@ -1191,6 +1198,36 @@ function WorkflowsPageInner() {
     showToast('New workflow generated', 'success')
     setShowGenerationModal(false)
   }
+  // ── Open Workflow Builder (Blank) ────────────────────────
+  const handleOpenWorkflowBuilder = async () => {
+    const newWorkflow: SavedWorkflow = {
+      workflow_id: `workflow_${Date.now()}`,
+      title: `Blank Workflow`,
+      status: 'draft',
+      source: 'n8n',
+      company_name: '',
+      trigger: '',
+      steps: [],
+      integrations: [],
+      estimated_time: '0',
+      automation_percentage: '0',
+      error_handling: '',
+      notes: '',
+      created_at: new Date().toISOString(),
+    }
+    
+    let workflowId = newWorkflow.workflow_id
+    try {
+      const created = await createWorkflow(savedToSpec(newWorkflow))
+      await refreshWorkflows()
+      workflowId = created.id
+      setSelectedId(created.id)
+    } catch {
+      saveWorkflow(newWorkflow)
+      setLocalWorkflows(loadWorkflows())
+      setSelectedId(newWorkflow.workflow_id)
+    }
+  }
 
   // ── Empty state ──────────────────────────────────────────
   if (workflows.length === 0) {
@@ -1220,6 +1257,12 @@ function WorkflowsPageInner() {
               {t('goToBlueprint')}
             </button>
           </p>
+          <button 
+            className={styles.onboardingWorkflowBuilderBtn}
+            onClick={handleOpenWorkflowBuilder}
+          >
+            Open Workflow Builder
+          </button>
         </div>
 
         {/* Copilot panel renders over the overlay */}
@@ -1490,9 +1533,9 @@ function WorkflowsPageInner() {
               <button
                 className={`${styles.undoBtn} btn-style-a`}
                 onClick={handleUndo}
-                disabled={!undoStack.length}
+                disabled={!undoStack.length && !canvasCanUndo}
                 title={t('undoLastChange')}
-                style={!undoStack.length ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
+                style={(!undoStack.length && !canvasCanUndo) ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
               >
                 {Icons.undo}
                 {t('undo')}
@@ -1611,6 +1654,8 @@ function WorkflowsPageInner() {
                   fn(pNodes, pEdges)
                 }
               }}
+              onHistoryChange={setCanvasCanUndo}
+              registerUndo={(fn) => { undoCanvasRef.current = fn }}
             />
 
             {/* Meta footer — absolutely positioned overlay */}
@@ -1646,8 +1691,8 @@ function WorkflowsPageInner() {
             <button
               className={styles.canvasUndoBtn}
               onClick={handleUndo}
-              aria-disabled={!undoStack.length}
-              title={undoStack.length ? t('undoLastChange') : t('nothingToUndo')}
+              aria-disabled={!undoStack.length && !canvasCanUndo}
+              title={(undoStack.length || canvasCanUndo) ? t('undoLastChange') : t('nothingToUndo')}
             >
               {Icons.undo}
               {t('undoLastChange')}

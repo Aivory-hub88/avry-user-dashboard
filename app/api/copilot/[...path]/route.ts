@@ -262,6 +262,9 @@ export async function POST(
       message: bodyRecord.user_request ?? '',
       session_id: bodyRecord.session_id ?? 'copilot',
       organization_id: bodyRecord.organization_id ?? 'default',
+      mode: 'console',
+      channel: 'console_ui',
+      entrypoint: 'workflow_clarify',
       context: {
         mode: 'workflow_clarify',
         source_tab: 'workflows',
@@ -269,6 +272,9 @@ export async function POST(
           ? bodyRecord.conversation_history
           : [],
       },
+      history: Array.isArray(bodyRecord.conversation_history)
+        ? bodyRecord.conversation_history
+        : [],
     }
   } else if (isGenerate) {
     effectiveTargetUrl = `${VPS_BRIDGE_URL}/console/stream`

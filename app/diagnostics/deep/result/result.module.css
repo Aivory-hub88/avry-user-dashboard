@@ -5,7 +5,7 @@
   overflow-y: auto;
   background-color: var(--bg-main, #353531);
   color: #f0f0f0;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: var(--font-manrope), sans-serif;
 }
 
 /* ── Loading ─────────────────────────────────────────────── */
@@ -23,7 +23,7 @@
   width: 40px;
   height: 40px;
   border: 3px solid #2a2a2a;
-  border-top-color: #b7cba6;
+  border-top-color: #afd199;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -51,7 +51,7 @@
 .pageTitle {
   font-size: 2rem;
   font-weight: 300;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: var(--font-manrope), sans-serif;
   color: #f0f0f0;
   margin: 0 0 10px;
   line-height: 1.2;
@@ -117,7 +117,7 @@
 
 .barFill {
   height: 100%;
-  background-color: #b7cba6;
+  background-color: #afd199;
   border-radius: 4px;
   transition: width 0.4s ease;
 }
@@ -125,7 +125,7 @@
 .dimensionScore {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #b7cba6;
+  color: #afd199;
   text-align: right;
 }
 
@@ -171,7 +171,7 @@
   flex-shrink: 0;
   width: 26px;
   height: 26px;
-  background-color: #b7cba6;
+  background-color: #afd199;
   color: #0a0a0a;
   border-radius: 50%;
   font-size: 0.8125rem;
@@ -238,7 +238,7 @@
   padding: 13px 28px;
   font-size: 1rem;
   font-weight: 700;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: var(--font-manrope), sans-serif;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -317,7 +317,7 @@
 .scoreNumber {
   font-size: 3.5rem;
   font-weight: 800;
-  color: #b7cba6;
+  color: #afd199;
   line-height: 1;
 }
 
@@ -383,7 +383,7 @@
   content: '•';
   position: absolute;
   left: 0;
-  color: #b7cba6;
+  color: #afd199;
   font-weight: 700;
 }
 
@@ -398,7 +398,7 @@
 
 .nextStepText {
   font-size: 0.9375rem;
-  color: #a0f0d8;
+  color: #afd199;
   line-height: 1.65;
   margin: 0;
 }

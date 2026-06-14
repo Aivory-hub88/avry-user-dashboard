@@ -146,9 +146,31 @@ function CopilotPanelExpanded({
   const [input, setInput] = useState('')
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
   const [appliedToCanvas, setAppliedToCanvas] = useState(false)
+  const [panelHeight, setPanelHeight] = useState(360)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const startResize = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const startY = e.clientY
+    const startHeight = panelHeight
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const deltaY = moveEvent.clientY - startY
+      // Constrain height between 140px and 80vh
+      const newHeight = Math.max(140, Math.min(startHeight + deltaY, window.innerHeight * 0.8))
+      setPanelHeight(newHeight)
+    }
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -266,13 +288,13 @@ function CopilotPanelExpanded({
 
       {/* ── Body ── */}
       {!hasMessages ? (
-        <div className="flex items-center justify-center px-6 py-8 shrink-0 min-h-[140px]">
+        <div className="flex items-center justify-center px-6 py-8 shrink-0" style={{ height: `${panelHeight}px` }}>
           <p className="text-[22px] font-normal text-[#f7f7f7] text-center tracking-tight">
             What do you want to automate?
           </p>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2.5" style={{ maxHeight: '360px' }}>
+        <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2.5" style={{ height: `${panelHeight}px` }}>
           {messages.map((msg, i) => (
             <div key={i} className={`flex items-start gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
               {msg.role === 'assistant' && (
@@ -376,7 +398,8 @@ function CopilotPanelExpanded({
       )}
 
       {/* ── Input area ── */}
-      <div className="bg-[#2e2e2c] border-t border-white/[0.07] px-4 py-3.5 flex items-end gap-3 shrink-0">
+      <div className="px-3 pb-2 pt-2 shrink-0">
+        <div className="bg-[#2e2e2c] border border-white/[0.07] rounded-[14px] pl-4 pr-3 py-2.5 flex items-end gap-3 shadow-md">
         <input
           ref={fileInputRef}
           type="file"
@@ -418,6 +441,15 @@ function CopilotPanelExpanded({
             <polyline points="5 12 12 5 19 12"/>
           </svg>
         </button>
+        </div>
+      </div>
+
+      {/* ── Vertical Resize Handle ── */}
+      <div
+        className="w-full h-3 cursor-ns-resize flex items-center justify-center hover:bg-white/[0.05] transition-colors group shrink-0"
+        onMouseDown={startResize}
+      >
+        <div className="w-8 h-1 rounded-full bg-white/20 group-hover:bg-white/40 transition-colors" />
       </div>
     </div>
   )

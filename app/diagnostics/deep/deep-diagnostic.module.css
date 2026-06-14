@@ -5,7 +5,7 @@
   overflow: hidden;
   background-color: var(--bg-main, #353531);
   color: #f5f5f4;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: var(--font-manrope), sans-serif;
   display: flex;
   flex-direction: column;
 }
@@ -25,7 +25,7 @@
   width: 40px;
   height: 40px;
   border: 3px solid rgba(255, 255, 255, 0.08);
-  border-top-color: #b7cba6;
+  border-top-color: #afd199;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -69,7 +69,7 @@
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.86);
-  font-family: 'Inter Tight', sans-serif;
+  font-family: var(--font-manrope), sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -89,7 +89,7 @@
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.9);
-  font-family: 'Inter Tight', sans-serif;
+  font-family: var(--font-manrope), sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -172,7 +172,7 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.6);
-  font-family: 'Inter Tight', sans-serif;
+  font-family: var(--font-manrope), sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -197,7 +197,7 @@
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.92);
-  font-family: 'Inter Tight', sans-serif;
+  font-family: var(--font-manrope), sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -217,7 +217,7 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.86);
-  font-family: 'Inter Tight', sans-serif;
+  font-family: var(--font-manrope), sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -289,7 +289,7 @@
   font-weight: 600;
   color: #f5f5f4;
   margin-bottom: 8px;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: var(--font-manrope), sans-serif;
 }
 
 .companyNameInput {
@@ -299,7 +299,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   color: #f5f5f4;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: var(--font-manrope), sans-serif;
   font-size: 13px;
   padding: 9px 12px;
   outline: none;
@@ -329,5 +329,5 @@
   margin-top: 6px;
   font-size: 0.8rem;
   color: #f87171;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: var(--font-manrope), sans-serif;
 }

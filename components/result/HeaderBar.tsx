@@ -15,8 +15,6 @@ export default function HeaderBar({ company, submittedAt }: HeaderBarProps) {
         <span className={styles.date}>{formatDate(submittedAt)}</span>
       </div>
       <div className={styles.actions}>
-        {/* TODO: implement card export — disabled until export service is available */}
-        <button disabled className={styles.btnOutlined}>Download Diagnostic Card</button>
         {/* TODO: implement PDF export — disabled until export service is available */}
         <button disabled className={styles.btnFilled}>Download Full Report</button>
       </div>

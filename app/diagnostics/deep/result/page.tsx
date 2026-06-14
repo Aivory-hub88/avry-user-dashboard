@@ -30,7 +30,7 @@ export default function DeepDiagnosticResultPageRedirect() {
       <div style={{
         width: 32,
         height: 32,
-        border: '2px solid #b7cba6',
+        border: '2px solid #afd199',
         borderTopColor: 'transparent',
         borderRadius: '50%',
         animation: 'spin 0.8s linear infinite'
