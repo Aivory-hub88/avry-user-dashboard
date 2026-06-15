@@ -28,6 +28,7 @@ export async function* streamConsoleResponse(
     session_id: string
     organization_id: string
     messages: Array<{ role: 'user' | 'assistant'; content: string }>
+    user_state?: string
   }
 ): AsyncGenerator<StreamChunk, void, unknown> {
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null

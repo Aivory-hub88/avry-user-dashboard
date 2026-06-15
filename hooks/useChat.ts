@@ -5,6 +5,7 @@ import { streamConsoleResponse, typewriterStream } from '@/lib/streaming'
 import { saveSessionMessages, loadSessionMessages, listSessions, ChatStorageError } from '@/lib/chatPersistence'
 import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
+import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
 import { useSession } from './useSession'
 import type { Attachment } from '@/components/UploadMenu'
 
@@ -96,6 +97,7 @@ export function useChat({
         session_id: currentSessionId,
         organization_id: "default",
         messages: allMessages,
+        user_state: formatUserContextForAI(buildUserContextState()),
       })
       const stream = typewriterStream(baseStream)
       for await (const chunk of stream) {

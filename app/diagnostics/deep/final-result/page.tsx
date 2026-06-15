@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { DiagnosticContext } from '@/types/diagnostic'
 import { upgradeDiagnosticContext, DeepDiagnosticService } from '@/services/deepDiagnostic'
@@ -54,13 +55,35 @@ export default function FinalResultPage() {
   const router = useRouter()
   const [state, setState] = useState<PageState>({ status: 'loading' })
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
-  const [blueprintState, setBlueprintState] = useState<
-    | { status: 'idle' }
-    | { status: 'generating' }
-    | { status: 'done' }
-    | { status: 'error'; message: string }
-  >({ status: 'idle' })
+
   const [isExportingPdf, setIsExportingPdf] = useState(false)
+  const [isGeneratingBlueprint, setIsGeneratingBlueprint] = useState(false)
+
+  const handleGenerateBlueprint = async () => {
+    if (state.status !== 'loaded') {
+      router.push('/blueprint')
+      return
+    }
+    try {
+      setIsGeneratingBlueprint(true)
+      const diagnosticData = state.context
+      const diagnosticId = (diagnosticData as any).id || 'current'
+      
+      await DeepDiagnosticService.generateBlueprint(
+        diagnosticId,
+        'demo_org',
+        diagnosticData.qualitative?.primaryObjective || 'AI readiness improvement',
+        diagnosticData
+      )
+      
+      router.push('/blueprint')
+    } catch (err) {
+      console.error('Failed to generate blueprint:', err)
+      alert('Failed to generate blueprint. Please try again.')
+    } finally {
+      setIsGeneratingBlueprint(false)
+    }
+  }
 
   useEffect(() => {
     const loadContext = async () => {
@@ -123,60 +146,6 @@ export default function FinalResultPage() {
   const { context } = state
   const { scores, calculations, opportunities, risks, qualitative } = context
 
-  const handleGenerateBlueprint = async () => {
-    setBlueprintState({ status: 'generating' })
-    try {
-      const orgId = context.company.toLowerCase().replace(/\s+/g, '_') || 'demo_org'
-
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 120_000)
-
-      let res: Response
-      try {
-        res = await fetch('/api/blueprints/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ diagnostic: context }),
-          signal: controller.signal,
-        })
-      } finally {
-        clearTimeout(timeout)
-      }
-
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '')
-        let errMsg = `Blueprint generation failed (${res.status})`
-        try {
-          const errJson = JSON.parse(errText)
-          errMsg = errJson.message || errJson.error?.message || errMsg
-        } catch { /* use status code message */ }
-        throw new Error(errMsg)
-      }
-
-      const blueprint = await res.json()
-
-      // Dual-write: Supabase + localStorage via the storage service
-      try {
-        const { saveBlueprint } = await import('@/lib/supabaseStorage')
-        await saveBlueprint(blueprint, orgId)
-      } catch {
-        // Supabase unavailable — fall back to localStorage only
-        try { localStorage.setItem('aivory_blueprint', JSON.stringify(blueprint)) } catch { /* ignore */ }
-      }
-
-      setBlueprintState({ status: 'done' })
-      // Small delay so the user sees the success state before navigating
-      setTimeout(() => router.push('/blueprint'), 800)
-    } catch (err: unknown) {
-      const isAbort = err instanceof Error && err.name === 'AbortError'
-      setBlueprintState({
-        status: 'error',
-        message: isAbort
-          ? 'Blueprint generation timed out. Please try again.'
-          : err instanceof Error ? err.message : 'Blueprint generation failed',
-      })
-    }
-  }
 
   const handleDownloadPdf = async () => {
     setIsExportingPdf(true)
@@ -209,7 +178,7 @@ export default function FinalResultPage() {
 
   // Assessment broken into individual bullet lines matching the screenshot
   const assessmentBullets: { icon: string; color: string; text: string }[] = [
-    { icon: '▲', color: '#afd199', text: `${context.company} scores ${scores.composite}/100, placing it at ${scores.maturityLevel} maturity.` },
+    { icon: '▲', color: '#afd199', text: `Your company / organization scores ${scores.composite}/100, placing it at ${scores.maturityLevel} maturity.` },
     { icon: '▲', color: '#afd199', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension)}.` },
     { icon: '▽', color: '#fbbf24', text: `Greatest gap: ${humanizeDimensionKey(scores.weakestDimension)}.` },
     { icon: '▽', color: '#fbbf24', text: `${highRiskCount} high-severity risk${highRiskCount !== 1 ? 's' : ''} identified.` },
@@ -229,14 +198,13 @@ export default function FinalResultPage() {
 
   return (
     <div className={styles.page}>
-      <HeaderBar 
-        company={context.company} 
-        submittedAt={context.submittedAt} 
-        onDownloadPdf={handleDownloadPdf}
-        isExportingPdf={isExportingPdf}
-      />
-
       <div className={styles.content} id="diagnostic-report">
+        <HeaderBar 
+          company={context.company} 
+          submittedAt={context.submittedAt} 
+          onDownloadPdf={handleDownloadPdf}
+          isExportingPdf={isExportingPdf}
+        />
 
         {/* ── Executive Scorecard ── */}
         <div className={styles.card}>
@@ -577,7 +545,9 @@ export default function FinalResultPage() {
                       <span className={styles.baLabel}>Before</span>
                       <span className={styles.baText}>{item.before}</span>
                     </div>
-                    <div className={styles.baArrow} aria-hidden="true">→</div>
+                    <div className={styles.baArrow} aria-hidden="true">
+                      <ArrowRight size={20} strokeWidth={2} />
+                    </div>
                     <div className={`${styles.baCell} ${styles.baAfter}`}>
                       <span className={styles.baLabel}>After</span>
                       <span className={styles.baText}>{item.after}</span>
@@ -592,52 +562,21 @@ export default function FinalResultPage() {
         {/* ── Generate Blueprint CTA ── */}
         <div className={styles.blueprintCta}>
           <div className={styles.blueprintCtaLeft}>
-            <div className={styles.blueprintCtaIcon} aria-hidden="true">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-                <polyline points="10 9 9 9 8 9"/>
-              </svg>
-            </div>
-            <div>
-              <p className={styles.blueprintCtaTitle}>Generate AI Blueprint</p>
-              <p className={styles.blueprintCtaDesc}>
-                Turn this diagnostic into a full AI implementation roadmap — architecture, workflows, and deployment plan tailored to {context.company}.
-              </p>
-            </div>
+            <h2 className={styles.blueprintCtaTitle}>Next steps: AI System Blueprint</h2>
+            <p className={styles.blueprintCtaText}>
+              With this diagnostic result, your AI System Blueprint is ready to generate.
+              Purchase the Blueprint + AI Roadmap to transform these insights into a deployment-ready architecture and actionable execution plan.
+            </p>
           </div>
-
           <div className={styles.blueprintCtaRight}>
-            {blueprintState.status === 'error' && (
-              <p className={styles.blueprintCtaError}>{blueprintState.message}</p>
-            )}
-            {blueprintState.status === 'done' ? (
-              <button className={`${styles.blueprintBtn} ${styles.blueprintBtnDone}`} disabled>
-                ✓ Blueprint ready — redirecting…
-              </button>
-            ) : (
-              <button
-                className={styles.blueprintBtn}
-                onClick={handleGenerateBlueprint}
-                disabled={blueprintState.status === 'generating'}
-              >
-                {blueprintState.status === 'generating' ? (
-                  <>
-                    <span className={styles.blueprintSpinner} aria-hidden="true" />
-                    Generating blueprint…
-                  </>
-                ) : (
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                    </svg>
-                    Generate Blueprint
-                  </>
-                )}
-              </button>
-            )}
+            <button
+              className={styles.generateBlueprintButton}
+              onClick={handleGenerateBlueprint}
+              disabled={isGeneratingBlueprint}
+            >
+              {isGeneratingBlueprint ? 'Generating...' : 'Generate Blueprint'}
+            </button>
+            <span className={styles.blueprintPrice}>$85 One time</span>
           </div>
         </div>
 

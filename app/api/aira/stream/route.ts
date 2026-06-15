@@ -46,7 +46,12 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
         message: messages.filter((m: { role: string }) => m.role === 'user').at(-1)?.content ?? '',
-        context: { session_id, organization_id, history: messages, ...context }
+        context: { 
+          session_id, 
+          organization_id, 
+          history: messages.length > 0 && messages[messages.length - 1].role === 'user' ? messages.slice(0, -1) : messages, 
+          ...context 
+        }
       }),
         signal: controller.signal,
       })

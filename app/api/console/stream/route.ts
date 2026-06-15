@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     try {
       const bridgePayload = {
         message: messages.filter((m: { role: string }) => m.role === 'user').at(-1)?.content ?? '',
-        history: messages,
+        history: messages.length > 0 && messages[messages.length - 1].role === 'user' ? messages.slice(0, -1) : messages,
         mode: 'console',
         channel: 'console_ui',
         entrypoint: 'console',
@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
           user_id,
           page: 'console',
           source_tab: 'console',
+          user_state: body.user_state || null,
         },
       }
       console.log('[debug] bridgeUrl:', bridgeUrl)

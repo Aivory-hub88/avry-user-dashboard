@@ -910,7 +910,7 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
   ) {
     risks.push({
       id: 'risk-automation-gap',
-      risk: `Current automation coverage (~${Math.round(currentAuto)}%) vs target (${Math.round(targetAuto)}%) represents a ${Math.round(targetAuto - currentAuto)}pp gap — aggressive for a 12-month window and may require phased re-scoping.`,
+      risk: `Current automation coverage (~${Math.round(currentAuto)}%) vs target (${Math.round(targetAuto)}%) represents a ${Math.round(targetAuto - currentAuto)}% gap — ambitious for a 12-month timeline and may require phased implementation.`,
       severity: 'LOW',
       source: 'automation_current',
       detected: true,
@@ -990,9 +990,9 @@ function buildRoomForImprovement(
     items.push({
       id: 'rfi-automation-gap',
       area: 'Automation Coverage',
-      title: `Close the ${gap}pp automation gap`,
+      title: `Close the Automation Gap (${gap}%)`,
       priority: gap >= 40 ? 'high' : 'medium',
-      currentState: `Current automation is ~${Math.round(currentAuto)}% against a target of ${Math.round(targetAuto)}%.`,
+      currentState: `An automation gap of ${gap}% means that roughly ${gap}% of your repetitive operational tasks are still handled manually despite your automation goals. Closing this gap represents your most immediate opportunity for untapped efficiency.`,
       recommendedAction:
         'Sequence automation in phases — start with the highest-volume, lowest-complexity tasks (quick wins) to build momentum, then expand to multi-step workflows.',
       operationalImpact:
@@ -1232,7 +1232,7 @@ export function upgradeDiagnosticContext(
   // Generate Room for Improvement if the stored context predates the feature.
   let roomForImprovement = context.roomForImprovement
   if (
-    (!Array.isArray(roomForImprovement) || roomForImprovement.length === 0) &&
+    (true /* always regenerate roomForImprovement from latest logic */) &&
     context.scores &&
     context.quantitative
   ) {
