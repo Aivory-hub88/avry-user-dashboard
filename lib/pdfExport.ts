@@ -11,19 +11,19 @@ import jsPDF from 'jspdf'
 import type { DiagnosticContext, ImprovementItem } from '@/types/diagnostic'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
-const INK       = '#0a1a0f'   // primary text, display values
-const ACCENT    = '#3a7a3a'   // section labels, bars, badges, ring arc
-const MUTED     = '#888888'   // body text, descriptions
-const LABEL     = '#bbbbbb'   // small labels, sub notes
-const LABEL_A   = '#aaaaaa'   // metric labels
-const UNIT_C    = '#999999'   // unit text
-const TRACK     = '#e8e8e4'   // bar tracks, grid borders, cell dividers
-const RULE      = '#e0e0d8'   // section-label rule, card borders
-const FOOTER_C  = '#cccccc'   // footer text
-const SEC_LBL   = '#6a9a6a'   // section label text
-const VAL_MID   = '#444444'   // diagnostic context values
-const CONTENT_C = '#666666'   // improvement content
-const WARN_AMB  = '#a07010'   // amber badge text
+export const INK       = '#0a1a0f'   // primary text, display values
+export const ACCENT    = '#3a7a3a'   // section labels, bars, badges, ring arc
+export const MUTED     = '#888888'   // body text, descriptions
+export const LABEL     = '#bbbbbb'   // small labels, sub notes
+export const LABEL_A   = '#aaaaaa'   // metric labels
+export const UNIT_C    = '#999999'   // unit text
+export const TRACK     = '#e8e8e4'   // bar tracks, grid borders, cell dividers
+export const RULE      = '#e0e0d8'   // section-label rule, card borders
+export const FOOTER_C  = '#cccccc'   // footer text
+export const SEC_LBL   = '#6a9a6a'   // section label text
+export const VAL_MID   = '#444444'   // diagnostic context values
+export const CONTENT_C = '#666666'   // improvement content
+export const WARN_AMB  = '#a07010'   // amber badge text
 
 // Badges
 const BADGE_G_BG  = '#eaf4e4'
@@ -36,26 +36,26 @@ const COVER_BG  = '#1e3327'
 const COVER_TXT = '#3a5a3a'
 
 // ── Layout ─────────────────────────────────────────────────────────────────────
-const PAGE_W = 210
-const PAGE_H = 297
-const ML = 18
-const MR = 18
-const CW = PAGE_W - ML - MR // 174 mm
+export const PAGE_W = 210
+export const PAGE_H = 297
+export const ML = 18
+export const MR = 18
+export const CW = PAGE_W - ML - MR // 174 mm
 
 // ── Font helpers ───────────────────────────────────────────────────────────────
 // Manrope / Doto are design-intent fonts; helvetica is the jsPDF fallback.
 // To embed true Manrope/Doto, bundle base64-encoded TTF files (follow-up).
 let FONT_LOADED = false
-const F  = () => FONT_LOADED ? 'Manrope' : 'helvetica'
-const FB = () => FONT_LOADED ? 'Manrope' : 'helvetica'
-const FD = () => 'helvetica' // Doto fallback (for score ring numbers)
+export const F  = () => FONT_LOADED ? 'Manrope' : 'helvetica'
+export const FB = () => FONT_LOADED ? 'Manrope' : 'helvetica'
+export const FD = () => 'helvetica' // Doto fallback (for score ring numbers)
 
 // ── Utility functions ──────────────────────────────────────────────────────────
-function hexToRgb(hex: string): [number, number, number] {
+export function hexToRgb(hex: string): [number, number, number] {
   return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]
 }
 
-function setC(pdf: jsPDF, hex: string, t: 'fill' | 'text' | 'draw' = 'fill') {
+export function setC(pdf: jsPDF, hex: string, t: 'fill' | 'text' | 'draw' = 'fill') {
   const [r, g, b] = hexToRgb(hex)
   if (t === 'fill') pdf.setFillColor(r, g, b)
   else if (t === 'text') pdf.setTextColor(r, g, b)
@@ -79,7 +79,7 @@ function cap(s: string): string {
 }
 
 /** Letter-spaced text — simulates CSS letter-spacing (spacing in mm). */
-function spacedText(
+export function spacedText(
   pdf: jsPDF, text: string, x: number, y: number, spacing: number,
   opts?: { align?: 'left' | 'center' | 'right' },
 ): number {
@@ -99,7 +99,7 @@ function spacedText(
 }
 
 // ── Font loader (Manrope — future TTF bundle) ─────────────────────────────────
-async function loadManrope(_pdf: jsPDF): Promise<void> {
+export async function loadManrope(_pdf: jsPDF): Promise<void> {
   FONT_LOADED = false
 }
 
@@ -187,13 +187,13 @@ async function renderTextToPngDataUrl(
 // ══════════════════════════════════════════════════════════════════════════════
 
 /** White background fill for every inner page. */
-function pageBg(pdf: jsPDF) {
+export function pageBg(pdf: jsPDF) {
   setC(pdf, '#ffffff', 'fill')
   pdf.rect(0, 0, PAGE_W, PAGE_H, 'F')
 }
 
 /** Footer: AIVORY™ · CONFIDENTIAL left, aivory.uk right, divider above. */
-function pageFooter(pdf: jsPDF) {
+export function pageFooter(pdf: jsPDF) {
   const fY = PAGE_H - 8
   // Divider line above footer
   setC(pdf, TRACK, 'draw')
@@ -208,7 +208,7 @@ function pageFooter(pdf: jsPDF) {
 }
 
 /** Section label: 9px uppercase #6a9a6a, 0.5px rule extending right, 10mm margin-bottom. */
-function sectionLabel(pdf: jsPDF, y: number, title: string): number {
+export function sectionLabel(pdf: jsPDF, y: number, title: string): number {
   setC(pdf, SEC_LBL, 'text')
   pdf.setFont(FB(), 'bold')
   pdf.setFontSize(7) // 9px
@@ -223,7 +223,7 @@ function sectionLabel(pdf: jsPDF, y: number, title: string): number {
 }
 
 /** Renders a narrative block and returns the new Y position. */
-function renderNarrative(pdf: jsPDF, y: number, text: string): number {
+export function renderNarrative(pdf: jsPDF, y: number, text: string): number {
   setC(pdf, CONTENT_C, 'text')
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(10) // Increased for better readability
@@ -235,7 +235,7 @@ function renderNarrative(pdf: jsPDF, y: number, text: string): number {
 }
 
 /** 0.5px horizontal divider in TRACK colour. */
-function thinDiv(pdf: jsPDF, y: number, x1 = ML, x2 = ML + CW): number {
+export function thinDiv(pdf: jsPDF, y: number, x1 = ML, x2 = ML + CW): number {
   setC(pdf, TRACK, 'draw')
   pdf.setLineWidth(0.18)
   pdf.line(x1, y, x2, y)
