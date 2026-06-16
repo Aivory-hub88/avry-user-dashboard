@@ -617,14 +617,6 @@ export async function applyPremiumCovers(
 
   if (type === 'front') {
     // ── Top row: Report ID left · CONFIDENTIAL right ──
-    pdf.setGState(new (pdf as any).GState({ opacity: 0.4 }))
-    setC(pdf, '#ffffff', 'text')
-    pdf.setFont(F(), 'normal')
-    pdf.setFontSize(7)
-    spacedText(pdf, (meta?.reportId ?? '').toUpperCase(), ML, 14, 0.35)
-    spacedText(pdf, 'CONFIDENTIAL', PAGE_W - MR, 14, 0.35, { align: 'right' })
-    pdf.setGState(new (pdf as any).GState({ opacity: 1 }))
-
     // ── Headline ──
     const titleText = title || `AI Readiness\nAssessment Report`
     const titleImg = await renderTextToPngDataUrl(
@@ -633,36 +625,38 @@ export async function applyPremiumCovers(
     if (titleImg) {
       const wMm = titleImg.width * 0.264583
       const hMm = titleImg.height * 0.264583
-      pdf.addImage(titleImg.dataUrl, 'PNG', ML, 45, wMm, hMm, undefined, 'FAST') // Moved up
+      pdf.addImage(titleImg.dataUrl, 'PNG', ML, 35, wMm, hMm, undefined, 'FAST')
     } else {
       setC(pdf, '#ffffff', 'text')
       pdf.setFont(F(), 'normal')
       pdf.setFontSize(27)
       titleText.split('\n').forEach((line, i) => {
-        pdf.text(line, ML, 55 + i * 14)
+        pdf.text(line, ML, 45 + i * 14)
       })
     }
 
-    // ── Client name + date ──
-    if (meta?.company) {
-      pdf.setGState(new (pdf as any).GState({ opacity: 0.8 })) // White
-      setC(pdf, '#ffffff', 'text')
-      pdf.setFont(F(), 'normal')
-      pdf.setFontSize(10)
-      pdf.setLineHeightFactor(1.8)
-      const clientLines = [meta.company]
-      if (meta.date) clientLines.push(meta.date)
-      // Client info just below title instead of bottom, because bottom has logo!
-      pdf.text(clientLines, ML, 100)
-      pdf.setLineHeightFactor(1.15)
-      pdf.setGState(new (pdf as any).GState({ opacity: 1 }))
+    // ── Date (Right aligned, above gradient) ──
+    if (meta?.date) {
+      let formattedDate = meta.date;
+      const d = new Date(meta.date);
+      if (!isNaN(d.getTime())) {
+        formattedDate = `${String(d.getDate()).padStart(2, '0')} ${String(d.getMonth() + 1).padStart(2, '0')} ${d.getFullYear()}`;
+      }
+      const dateImg = await renderTextToPngDataUrl(
+        formattedDate, '300 32px "Manrope", sans-serif', '#ffffff',
+      )
+      if (dateImg) {
+        const wMm = dateImg.width * 0.264583
+        const hMm = dateImg.height * 0.264583
+        pdf.addImage(dateImg.dataUrl, 'PNG', PAGE_W - MR - wMm, 185, wMm, hMm, undefined, 'FAST')
+      }
     }
 
     // ── Logo and Tagline at Bottom (per Image 4) ──
-    const baseY = PAGE_H - 25
+    const baseY = PAGE_H - 20
 
     if (logo) {
-      const lw = 40
+      const lw = 55
       const lh = lw * (80 / 251)
       // Logo on the LEFT
       pdf.addImage(logo, 'PNG', ML, baseY - lh / 2, lw, lh, undefined, 'FAST')
