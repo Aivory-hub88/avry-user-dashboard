@@ -286,7 +286,7 @@ async function scoreArc(
   if (scoreImg) {
     const swMm = scoreImg.width * 0.264583
     const shMm = scoreImg.height * 0.264583
-    pdf.addImage(scoreImg.dataUrl, 'PNG', cx - swMm / 2, cy - shMm / 2 + 1.5, swMm, shMm)
+    pdf.addImage(scoreImg.dataUrl, 'PNG', cx - swMm / 2, cy - shMm / 2 + 1.5, swMm, shMm, undefined, 'FAST')
   } else {
     setC(pdf, INK, 'text')
     pdf.setFont(FD(), 'normal')
@@ -603,13 +603,13 @@ export async function applyPremiumCovers(
   meta?: { company?: string; date?: string; eyebrow?: string; reportId?: string },
 ) {
   const [bg, logo] = await Promise.all([
-    loadImage(type === 'front' ? '/cover-back-bg.jpg' : '/cover-back-gradient.png'),
+    loadImage(type === 'front' ? '/cover-back-bg.jpg' : '/cover-back-gradient.jpg'),
     loadSvgAsPngDataUrl('/aivory-logo-cover.svg', 251, 80),
   ])
 
   // Background — image or solid fallback
   if (bg) {
-    pdf.addImage(bg, 'JPEG', 0, 0, PAGE_W, PAGE_H)
+    pdf.addImage(bg, 'JPEG', 0, 0, PAGE_W, PAGE_H, undefined, 'FAST')
   } else {
     setC(pdf, COVER_BG, 'fill')
     pdf.rect(0, 0, PAGE_W, PAGE_H, 'F')
@@ -631,14 +631,14 @@ export async function applyPremiumCovers(
     spacedText(pdf, meta?.eyebrow ?? 'AIVORY \u00b7 OUTPUT REPORT', ML, 35, 0.4) // Moved up
 
     // ── Headline ──
-    const titleText = title || 'AI Readiness\nAssessment Report'
+    const titleText = title || `AI Readiness\nAssessment Report`
     const titleImg = await renderTextToPngDataUrl(
       titleText, '300 48px "Manrope", sans-serif', '#ffffff',
     )
     if (titleImg) {
       const wMm = titleImg.width * 0.264583
       const hMm = titleImg.height * 0.264583
-      pdf.addImage(titleImg.dataUrl, 'PNG', ML, 45, wMm, hMm) // Moved up
+      pdf.addImage(titleImg.dataUrl, 'PNG', ML, 45, wMm, hMm, undefined, 'FAST') // Moved up
     } else {
       setC(pdf, '#ffffff', 'text')
       pdf.setFont(F(), 'normal')
@@ -670,7 +670,7 @@ export async function applyPremiumCovers(
       const lw = 40
       const lh = lw * (80 / 251)
       // Logo on the LEFT
-      pdf.addImage(logo, 'PNG', ML, baseY - lh / 2, lw, lh)
+      pdf.addImage(logo, 'PNG', ML, baseY - lh / 2, lw, lh, undefined, 'FAST')
       
       // Tagline on the RIGHT
       const subImg = await renderTextToPngDataUrl(
@@ -679,7 +679,7 @@ export async function applyPremiumCovers(
       if (subImg) {
         const wMm = subImg.width * 0.264583
         const hMm = subImg.height * 0.264583
-        pdf.addImage(subImg.dataUrl, 'PNG', PAGE_W - MR - wMm, baseY - hMm / 2, wMm, hMm)
+        pdf.addImage(subImg.dataUrl, 'PNG', PAGE_W - MR - wMm, baseY - hMm / 2, wMm, hMm, undefined, 'FAST')
       }
     }
 
@@ -691,7 +691,7 @@ export async function applyPremiumCovers(
     if (logo) {
       const lw = 60
       const lh = lw * (80 / 251)
-      pdf.addImage(logo, 'PNG', cx - lw / 2, cy - lh / 2 - 2, lw, lh)
+      pdf.addImage(logo, 'PNG', cx - lw / 2, cy - lh / 2 - 2, lw, lh, undefined, 'FAST')
 
       const tagImg = await renderTextToPngDataUrl(
         'Make AI make sense\u00AE', '300 18px "Manrope", sans-serif', '#ffffff',
@@ -699,7 +699,7 @@ export async function applyPremiumCovers(
       if (tagImg) {
         const twMm = tagImg.width * 0.264583
         const thMm = tagImg.height * 0.264583
-        pdf.addImage(tagImg.dataUrl, 'PNG', cx - twMm / 2, cy + lh / 2 - 0.5, twMm, thMm)
+        pdf.addImage(tagImg.dataUrl, 'PNG', cx - twMm / 2, cy + lh / 2 - 0.5, twMm, thMm, undefined, 'FAST')
       }
     }
     
@@ -744,7 +744,7 @@ export async function exportReportToPdf(
   // ════════════════════════════════════════════════════════════════════════════
   // PAGE 1 — COVER
   // ════════════════════════════════════════════════════════════════════════════
-  await applyPremiumCovers(pdf, 'front', 'AI Readiness\nAssessment Report', {
+  await applyPremiumCovers(pdf, 'front', `AI Readiness\nAssessment Report`, {
     company: context.company,
     date: dateStr,
     eyebrow: 'ASSESSMENT ENGINE \u00b7 OUTPUT REPORT',
