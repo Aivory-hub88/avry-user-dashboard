@@ -787,7 +787,7 @@ async function exportRoadmapPdf(
       doc.setFontSize(9.5);
       doc.setFont(FB(), 'normal');
       doc.setTextColor(isChecked ? 136 : 30, isChecked ? 136 : 30, isChecked ? 136 : 30);
-      doc.text(`${isChecked ? '☑' : '☐'}  ${m.title}`, ML + 2, y);
+      doc.text(`>  ${m.title}`, ML + 2, y);
       y += 6;
     }
     y += 4;
