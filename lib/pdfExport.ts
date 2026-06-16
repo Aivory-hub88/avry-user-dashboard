@@ -603,7 +603,7 @@ export async function applyPremiumCovers(
   meta?: { company?: string; date?: string; eyebrow?: string; reportId?: string },
 ) {
   const [bg, logo] = await Promise.all([
-    loadImage(type === 'front' ? '/cover-back-bg.jpg' : '/cover-front-bg.jpg'),
+    loadImage(type === 'front' ? '/cover-back-bg.jpg' : '/cover-back-gradient.png'),
     loadSvgAsPngDataUrl('/aivory-logo-cover.svg', 251, 80),
   ])
 
@@ -691,16 +691,16 @@ export async function applyPremiumCovers(
     if (logo) {
       const lw = 60
       const lh = lw * (80 / 251)
-      pdf.addImage(logo, 'PNG', cx - lw / 2, cy - lh / 2 - 8, lw, lh)
-    }
+      pdf.addImage(logo, 'PNG', cx - lw / 2, cy - lh / 2 - 2, lw, lh)
 
-    const tagImg = await renderTextToPngDataUrl(
-      'Make AI make sense\u00AE', '300 18px "Manrope", sans-serif', '#ffffff',
-    )
-    if (tagImg) {
-      const twMm = tagImg.width * 0.264583
-      const thMm = tagImg.height * 0.264583
-      pdf.addImage(tagImg.dataUrl, 'PNG', cx - twMm / 2, cy + 8, twMm, thMm)
+      const tagImg = await renderTextToPngDataUrl(
+        'Make AI make sense\u00AE', '300 18px "Manrope", sans-serif', '#ffffff',
+      )
+      if (tagImg) {
+        const twMm = tagImg.width * 0.264583
+        const thMm = tagImg.height * 0.264583
+        pdf.addImage(tagImg.dataUrl, 'PNG', cx - twMm / 2, cy + lh / 2 - 0.5, twMm, thMm)
+      }
     }
     
     // URL and copyright at the very bottom
