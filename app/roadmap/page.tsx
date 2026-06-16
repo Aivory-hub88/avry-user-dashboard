@@ -707,7 +707,8 @@ async function exportRoadmapPdf(
   const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 
   // Cover
-  await applyPremiumCovers(doc, 'front', `AI Implementation\nRoadmap`, {
+  await applyPremiumCovers(doc, 'front', `AI Implementation
+Roadmap`, {
     company: roadmap.title,
     date: dateStr,
     eyebrow: 'AIVORY · OUTPUT REPORT',
