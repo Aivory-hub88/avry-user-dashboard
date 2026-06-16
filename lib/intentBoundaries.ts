@@ -7,6 +7,7 @@ export type IntentRoute =
   | 'settings'
   | 'dashboard'
   | 'console'
+  | 'pricing'
 
 export const INTENT_BOUNDARIES: Record<IntentRoute, { tabLabel: string; positive: string[]; negative: string[] }> = {
   diagnostic: {
@@ -47,6 +48,11 @@ export const INTENT_BOUNDARIES: Record<IntentRoute, { tabLabel: string; positive
   console: {
     tabLabel: 'Console',
     positive: ['general chat', 'unclear', 'fallback', 'help', 'explain'],
+    negative: [],
+  },
+  pricing: {
+    tabLabel: 'Pricing',
+    positive: ['price', 'cost', 'subscription', 'buy', 'purchase', 'pricing'],
     negative: [],
   },
 }
