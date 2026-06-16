@@ -18,6 +18,8 @@ export interface UserContextState {
   diagnostic_summary: string | null
   blueprint_summary: string | null
   tier: string | null
+  is_subscription_member: boolean
+  has_purchased_onetime_service: boolean
 }
 
 /**
@@ -32,6 +34,8 @@ export function buildUserContextState(): UserContextState {
     diagnostic_summary: null,
     blueprint_summary: null,
     tier: null,
+    is_subscription_member: false,
+    has_purchased_onetime_service: false,
   }
 
   try {
@@ -91,10 +95,36 @@ export function buildUserContextState(): UserContextState {
       state.has_roadmap = true
     }
 
-    // Check tier
+    // Check tier and subscription
     const tierRaw = localStorage.getItem('aivory_tier') || localStorage.getItem('user_tier')
     if (tierRaw) {
       state.tier = tierRaw
+      if (['pro', 'enterprise', 'premium', 'active'].includes(tierRaw.toLowerCase())) {
+        state.is_subscription_member = true
+      }
+    }
+    
+    // Explicit subscription flag
+    if (localStorage.getItem('aivory_subscription_status') === 'active') {
+      state.is_subscription_member = true
+    }
+
+    // Check one-time service purchases
+    const purchasesRaw = localStorage.getItem('aivory_purchased_services')
+    if (purchasesRaw) {
+      try {
+        const purchases = JSON.parse(purchasesRaw)
+        if (Array.isArray(purchases) && purchases.length > 0) {
+          state.has_purchased_onetime_service = true
+        }
+      } catch {
+        state.has_purchased_onetime_service = true // fallback if it's just a boolean or string
+      }
+    }
+    
+    // If they have diagnostic/blueprint/roadmap, imply they purchased or unlocked them
+    if (state.has_diagnostic || state.has_blueprint || state.has_roadmap) {
+      state.has_purchased_onetime_service = true
     }
   } catch {
     // localStorage unavailable or parse error — return defaults
@@ -137,6 +167,14 @@ export function formatUserContextForAI(state: UserContextState): string {
 
   if (state.tier) {
     parts.push(` Tier: ${state.tier}.`)
+  }
+
+  if (state.is_subscription_member) {
+    parts.push(` Active Subscription Member.`)
+  }
+
+  if (state.has_purchased_onetime_service) {
+    parts.push(` Purchased One-Time Services.`)
   }
 
   parts.push(`]`)

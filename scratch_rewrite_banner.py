@@ -1,3 +1,6 @@
+import re
+
+content = """
 "use client"
 
 import { useState, useEffect } from 'react'
@@ -104,4 +107,8 @@ export function RoutingSuggestBanner({ intent: originalIntent, onAccept, onDismi
       </div>
     </div>
   )
-}\n
+}
+"""
+
+with open('/Users/ireichmann/Documents/Aivory V2/frontend/avry-user-dashboard/components/chat/RoutingSuggestBanner.tsx', 'w') as f:
+    f.write(content.strip() + "\\n")
