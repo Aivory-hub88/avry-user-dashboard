@@ -78,8 +78,7 @@ export async function exportBlueprintPDF(
   const gap = (n = 4) => { y += n }
 
   // ── Cover page ──────────────────────────────────────────
-  await applyPremiumCovers(doc, 'front', `AI System
-Blueprint`, {
+  await applyPremiumCovers(doc, 'front', 'AI System\nBlueprint', {
     company: companyName,
     date: date,
     eyebrow: 'AIVORY · OUTPUT REPORT',

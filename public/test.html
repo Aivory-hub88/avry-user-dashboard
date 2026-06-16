@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+<button onclick="test()">Test PDF</button>
+<script>
+function test() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.text("Front Cover", 10, 10);
+  doc.addPage();
+  doc.setFillColor('#0b2e23');
+  doc.rect(0, 0, 210, 297, 'F');
+  doc.setTextColor('#ffffff');
+  doc.text("Back Cover", 10, 10);
+  doc.save("test.pdf");
+}
+</script>
+</body>
+</html>
