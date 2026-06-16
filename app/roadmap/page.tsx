@@ -37,11 +37,14 @@ const LS_KPI_ACTUALS    = 'aivory_roadmap_kpi_actuals';
 const LS_START_DATE     = 'aivory_roadmap_start_date';
 const LS_PHASE_COMPLETE = 'aivory_roadmap_phase_complete';
 
+// ─── Cover page intro ─────────────────────────────────────────
+const COVER_INTRO = 'This AI Implementation Roadmap translates the findings from your AI Readiness Assessment and the architectural decisions captured in your System Blueprint into a phased, milestone-driven execution plan. Use it to track deployment progress by checking off milestones, recording KPI actuals against targets, and exporting a snapshot at the end of each phase for stakeholder review. Successful completion at Month 12 means your organization will have automated 62.5% of targeted workflows, reclaimed 361 hours of annual capacity, and established a repeatable framework for the next investment cycle.';
+
 // ─── Contextual phase descriptions (Feature 3) ───────────────
 const PHASE_DESCRIPTIONS: Record<number, string> = {
-  0: 'Start here. The goal is to prove AI works in your environment by shipping 3 automated workflows in 90 days. Automated Reporting goes first — it has the shortest time to value (5 weeks) and creates the data foundation the other workflows depend on.',
-  1: 'With quick wins validated, this phase expands automation into the core revenue-impacting area: CS Ticket Automation. Connecting CRM and communication tools in this phase is a prerequisite — do not skip it.',
-  2: 'Shift from building to measuring. Use this phase to validate whether the 361 hrs/year and $14,296 savings projections are being realized, and identify the next automation layer.',
+  0: 'Start here. The goal is to prove AI works in your environment by shipping 3 automated workflows in 90 days. Every 90 days of delay costs your organization approximately $3,525 in unrealized savings, so speed matters more than perfection in this phase. Automated Reporting goes first because its 5-week time to value is the fastest of all modules, and the data pipelines it establishes become the foundation that CS Ticket Automation and Process Automation depend on. Phase 1 is complete when your team has three workflows running in production, at least 10 hours per week are being reclaimed, and your internal stakeholders can point to measurable proof that AI delivers results in your environment.',
+  1: 'With quick wins validated, this phase expands automation into the core revenue-impacting area: CS Ticket Automation. The 40% automation coverage target is deliberately conservative — this phase prioritizes operational stability over speed, ensuring each workflow is reliable before adding the next. Connecting your CRM and communication tools is a hard prerequisite because CS Ticket Automation cannot function without real-time access to customer data and routing logic. Do not advance to Phase 3 until you have at least 5 workflows running in production; proceeding earlier creates measurement gaps that undermine the ROI validation work ahead.',
+  2: 'Shift from building to measuring. If your actual annual savings are tracking below the $14,296 target, check two factors first: the efficiency factor applied to each automated workflow and whether automation coverage has genuinely reached the projected 62.5%. The 80% team adoption rate target means more than login frequency — it means team members are incorporating AI tools into their daily workflow without being prompted, a behavioral shift that typically requires 4–6 weeks of reinforcement after deployment. Success at Month 12 builds the quantitative case for the next investment cycle, demonstrating that your $30,000 initial investment is on track to deliver a 43% return over three years.',
 };
 
 // ─── Milestone resource links (Feature 4) ─────────────────────
@@ -720,8 +723,17 @@ async function exportRoadmapPdf(
   doc.text(`Exported: ${now.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })} · ${now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, ML, 132);
   doc.setGState(new (doc as any).GState({ opacity: 1 }));
 
-  // Inner pages
+  // Cover page intro (first inner page)
+  doc.addPage();
+  pageBg(doc);
+  pageFooter(doc);
   let y = ML;
+  y = sectionLabel(doc, y, 'About This Roadmap');
+  y = renderNarrative(doc, y, COVER_INTRO);
+  y += 6;
+  thinDiv(doc, y);
+
+  // Inner pages
   const FB = () => 'Helvetica';
 
   const checkPage = (need: number) => {
