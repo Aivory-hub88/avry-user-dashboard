@@ -711,7 +711,6 @@ async function exportRoadmapPdf(
 Roadmap`, {
     company: roadmap.title,
     date: dateStr,
-    eyebrow: 'AIVORY · OUTPUT REPORT',
     reportId: `RM-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-001`
   });
 

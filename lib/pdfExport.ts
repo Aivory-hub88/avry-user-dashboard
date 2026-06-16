@@ -600,7 +600,7 @@ export async function applyPremiumCovers(
   pdf: jsPDF,
   type: 'front' | 'back',
   title: string = '',
-  meta?: { company?: string; date?: string; eyebrow?: string; reportId?: string },
+  meta?: { company?: string; date?: string; reportId?: string },
 ) {
   const [bg, logo] = await Promise.all([
     loadImage(type === 'front' ? '/cover-front-bg.jpg' : '/cover-back-gradient.jpg'),
@@ -624,11 +624,6 @@ export async function applyPremiumCovers(
     spacedText(pdf, (meta?.reportId ?? '').toUpperCase(), ML, 14, 0.35)
     spacedText(pdf, 'CONFIDENTIAL', PAGE_W - MR, 14, 0.35, { align: 'right' })
     pdf.setGState(new (pdf as any).GState({ opacity: 1 }))
-
-    // ── Eyebrow ──
-    setC(pdf, '#ffffff', 'text') // Changed to white
-    pdf.setFontSize(6.5)
-    spacedText(pdf, meta?.eyebrow ?? 'AIVORY \u00b7 OUTPUT REPORT', ML, 35, 0.4) // Moved up
 
     // ── Headline ──
     const titleText = title || `AI Readiness\nAssessment Report`
@@ -747,7 +742,6 @@ export async function exportReportToPdf(
   await applyPremiumCovers(pdf, 'front', `AI Readiness\nAssessment Report`, {
     company: context.company,
     date: dateStr,
-    eyebrow: 'ASSESSMENT ENGINE \u00b7 OUTPUT REPORT',
     reportId,
   })
 

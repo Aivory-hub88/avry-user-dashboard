@@ -81,7 +81,6 @@ export async function exportBlueprintPDF(
   await applyPremiumCovers(doc, 'front', 'AI System\nBlueprint', {
     company: companyName,
     date: date,
-    eyebrow: 'AIVORY · OUTPUT REPORT',
     reportId: `BP-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-001`
   })
   
