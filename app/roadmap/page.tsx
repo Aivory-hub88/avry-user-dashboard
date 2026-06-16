@@ -711,12 +711,14 @@ async function exportRoadmapPdf(
     reportId: `RM-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-001`
   });
 
-  // Progress summary on cover
-  doc.setFontSize(12);
+  // Progress summary on front cover (dark green area, below client info)
+  doc.setGState(new (doc as any).GState({ opacity: 0.7 }));
+  doc.setFontSize(10);
   doc.setTextColor(255, 255, 255);
-  doc.text(`Overall Progress: ${overallPct}%  ·  ${checkedMilestones}/${totalMilestones} milestones`, ML, PAGE_H - 40);
-  doc.setFontSize(9);
-  doc.text(`Exported: ${now.toISOString().replace('T', ' ').slice(0, 19)}`, ML, PAGE_H - 33);
+  doc.text(`Overall Progress: ${overallPct}%  ·  ${checkedMilestones}/${totalMilestones} milestones`, ML, 125);
+  doc.setFontSize(8);
+  doc.text(`Exported: ${now.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })} · ${now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, ML, 132);
+  doc.setGState(new (doc as any).GState({ opacity: 1 }));
 
   // Inner pages
   let y = ML;
