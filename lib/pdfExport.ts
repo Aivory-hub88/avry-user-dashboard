@@ -636,19 +636,20 @@ export async function applyPremiumCovers(
     }
 
     // ── Company Name ──
-    const companyText = meta?.company || 'Company name'
-    const companyImg = await renderTextToPngDataUrl(
-      companyText, '300 22px "Manrope", sans-serif', '#ffffff',
-    )
-    if (companyImg) {
-      const cwMm = companyImg.width * 0.264583
-      const chMm = companyImg.height * 0.264583
-      pdf.addImage(companyImg.dataUrl, 'PNG', ML, 70, cwMm, chMm, undefined, 'FAST')
-    } else {
-      setC(pdf, '#ffffff', 'text')
-      pdf.setFont(F(), 'normal')
-      pdf.setFontSize(12)
-      pdf.text(companyText, ML, 75)
+    if (meta?.company) {
+      const companyImg = await renderTextToPngDataUrl(
+        meta.company, '300 22px "Manrope", sans-serif', '#ffffff',
+      )
+      if (companyImg) {
+        const cwMm = companyImg.width * 0.264583
+        const chMm = companyImg.height * 0.264583
+        pdf.addImage(companyImg.dataUrl, 'PNG', ML, 70, cwMm, chMm, undefined, 'FAST')
+      } else {
+        setC(pdf, '#ffffff', 'text')
+        pdf.setFont(F(), 'normal')
+        pdf.setFontSize(12)
+        pdf.text(meta.company, ML, 75)
+      }
     }
 
     // ── Date (Right aligned, above gradient) ──
