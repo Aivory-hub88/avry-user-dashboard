@@ -603,7 +603,7 @@ export async function applyPremiumCovers(
   meta?: { company?: string; date?: string; eyebrow?: string; reportId?: string },
 ) {
   const [bg, logo] = await Promise.all([
-    loadImage(type === 'front' ? '/cover-back-bg.jpg' : '/cover-back-gradient.jpg'),
+    loadImage(type === 'front' ? '/cover-front-bg.jpg' : '/cover-back-gradient.jpg'),
     loadSvgAsPngDataUrl('/aivory-logo-cover.svg', 251, 80),
   ])
 
