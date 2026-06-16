@@ -3,12 +3,15 @@ export type AiryRoadmapMilestone = {
   title: string;
   description?: string;
   linkedWorkflowIds?: string[];
+  resourceLink?: string;
+  resourceLabel?: string;
 };
 
 export type AiryRoadmapKpi = {
   id: string;
   label: string;
   target: string;
+  actual?: string;
 };
 
 export type AiryRoadmapPhase = {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { loadRoadmap, saveRoadmap } from '@/hooks/useRoadmap';
@@ -27,6 +27,64 @@ const T = {
   textMuted:    '#dddac5',
   red:          '#f87171',
   redDim:       'rgba(248,113,113,0.08)',
+  yellow:       '#fbbf24',
+  yellowDim:    'rgba(251,191,36,0.10)',
+};
+
+// ─── localStorage keys ────────────────────────────────────────
+const LS_CHECKED_PREFIX = 'aivory_roadmap_checked_';
+const LS_KPI_ACTUALS    = 'aivory_roadmap_kpi_actuals';
+const LS_START_DATE     = 'aivory_roadmap_start_date';
+const LS_PHASE_COMPLETE = 'aivory_roadmap_phase_complete';
+
+// ─── Contextual phase descriptions (Feature 3) ───────────────
+const PHASE_DESCRIPTIONS: Record<number, string> = {
+  0: 'Start here. The goal is to prove AI works in your environment by shipping 3 automated workflows in 90 days. Automated Reporting goes first — it has the shortest time to value (5 weeks) and creates the data foundation the other workflows depend on.',
+  1: 'With quick wins validated, this phase expands automation into the core revenue-impacting area: CS Ticket Automation. Connecting CRM and communication tools in this phase is a prerequisite — do not skip it.',
+  2: 'Shift from building to measuring. Use this phase to validate whether the 361 hrs/year and $14,296 savings projections are being realized, and identify the next automation layer.',
+};
+
+// ─── Milestone resource links (Feature 4) ─────────────────────
+const MILESTONE_RESOURCES: Record<string, { link: string; label: string }> = {
+  'deploy first': { link: '/blueprint#workflow-module-1', label: 'Blueprint: Workflow Module 1' },
+  'first automated workflow': { link: '/blueprint#workflow-module-1', label: 'Blueprint: Workflow Module 1' },
+  'connect crm': { link: '/blueprint#data-sources', label: 'Blueprint: Data Sources' },
+  'communication tools': { link: '/blueprint#data-sources', label: 'Blueprint: Data Sources' },
+  'review kpi': { link: '/diagnostics/deep/result#roi', label: 'Readiness Report: ROI Projection' },
+  'kpi performance': { link: '/diagnostics/deep/result#roi', label: 'Readiness Report: ROI Projection' },
+};
+
+function getResourceForMilestone(title: string): { link: string; label: string } | null {
+  const lower = title.toLowerCase();
+  for (const [keyword, resource] of Object.entries(MILESTONE_RESOURCES)) {
+    if (lower.includes(keyword)) return resource;
+  }
+  return null;
+}
+
+// ─── KPI color indicator logic (Feature 2) ────────────────────
+function parseNumeric(v: string): number | null {
+  const cleaned = v.replace(/[^0-9.]/g, '');
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
+}
+
+function getKpiStatus(target: string, actual: string | undefined): 'green' | 'yellow' | 'red' | 'none' {
+  if (!actual || actual.trim() === '') return 'none';
+  const t = parseNumeric(target);
+  const a = parseNumeric(actual);
+  if (t === null || a === null || t === 0) return 'none';
+  const ratio = a / t;
+  if (ratio >= 1) return 'green';
+  if (ratio >= 0.5) return 'yellow';
+  return 'red';
+}
+
+const STATUS_COLORS = {
+  green:  { bg: 'rgba(76,175,80,0.12)', border: 'rgba(76,175,80,0.35)', dot: '#4CAF50' },
+  yellow: { bg: T.yellowDim, border: 'rgba(251,191,36,0.3)', dot: T.yellow },
+  red:    { bg: T.redDim, border: 'rgba(248,113,113,0.25)', dot: T.red },
+  none:   { bg: 'transparent', border: 'transparent', dot: 'transparent' },
 };
 
 // ─── AIRA trigger ─────────────────────────────────────────────
@@ -69,7 +127,129 @@ const IconChevron = ({ open }: { open: boolean }) => (
     <path d="M5 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
+const IconHelp = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+    <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.2"/>
+    <path d="M5.5 5.5a1.5 1.5 0 1 1 1.5 1.5v1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    <circle cx="7" cy="10.5" r="0.5" fill="currentColor"/>
+  </svg>
+);
+const IconLink = () => (
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+    <path d="M5 7l2-2M4.5 8.5l-1.3 1.3a1.5 1.5 0 0 1-2.1-2.1L2.4 6.4M7.5 3.5l1.3-1.3a1.5 1.5 0 0 1 2.1 2.1L9.6 5.6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+  </svg>
+);
+const IconDownload = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+    <path d="M7 2v7M4 7l3 3 3-3M3 12h8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
 const PHASE_ICONS = [<IconGear key="g"/>, <IconArrows key="a"/>, <IconChart key="c"/>];
+
+// ─── Overall Progress Bar (Feature 1) ─────────────────────────
+function OverallProgressBar({ phases, allChecked, activeIdx, onNodeClick }: {
+  phases: AiryRoadmapPhase[];
+  allChecked: Record<string, Record<string, boolean>>;
+  activeIdx: number;
+  onNodeClick: (idx: number) => void;
+}) {
+  const [startDate, setStartDate] = useState<string>('');
+  const [daysElapsed, setDaysElapsed] = useState<number | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(LS_START_DATE);
+    if (stored) {
+      setStartDate(stored);
+      setDaysElapsed(Math.floor((Date.now() - new Date(stored).getTime()) / 86400000));
+    }
+  }, []);
+
+  const handleDateChange = (val: string) => {
+    setStartDate(val);
+    localStorage.setItem(LS_START_DATE, val);
+    if (val) {
+      setDaysElapsed(Math.floor((Date.now() - new Date(val).getTime()) / 86400000));
+    } else {
+      setDaysElapsed(null);
+    }
+  };
+
+  const totalMilestones = phases.reduce((sum, p) => sum + p.milestones.length, 0);
+  const checkedMilestones = phases.reduce((sum, p) => {
+    const phaseChecked = allChecked[p.id] || {};
+    return sum + Object.values(phaseChecked).filter(Boolean).length;
+  }, 0);
+  const overallPct = totalMilestones > 0 ? Math.round((checkedMilestones / totalMilestones) * 100) : 0;
+
+  return (
+    <div style={{
+      position: 'sticky', top: 0, zIndex: 20,
+      background: 'rgba(53,53,49,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+      borderBottom: `1px solid ${T.border}`,
+      padding: '12px 20px',
+      display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+    }}>
+      {/* Overall % */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: '50%',
+          background: `conic-gradient(${T.green} ${overallPct * 3.6}deg, rgba(255,255,255,0.06) 0deg)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: '50%', background: '#353531',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 10, fontWeight: 700, color: T.green,
+          }}>{overallPct}%</div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: T.text }}>
+            {checkedMilestones}/{totalMilestones} milestones
+          </span>
+          <span style={{ fontSize: 10, color: T.textMuted }}>completed</span>
+        </div>
+      </div>
+
+      {/* Phase pills */}
+      <div style={{ display: 'flex', gap: 4, flex: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
+        {phases.map((p, i) => (
+          <button key={p.id} onClick={() => onNodeClick(i)} style={{
+            fontSize: 11, fontWeight: i === activeIdx ? 700 : 500,
+            padding: '4px 12px', borderRadius: 20, cursor: 'pointer', fontFamily: 'inherit',
+            background: i === activeIdx ? T.greenDim : 'transparent',
+            color: i === activeIdx ? T.green : T.textMuted,
+            border: `1px solid ${i === activeIdx ? T.borderGreen : 'transparent'}`,
+            transition: 'all 0.15s', whiteSpace: 'nowrap',
+          }}>
+            Phase {i + 1}
+          </button>
+        ))}
+      </div>
+
+      {/* Days elapsed + start date */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        {daysElapsed !== null && (
+          <span style={{ fontSize: 11, color: T.textMuted, fontVariantNumeric: 'tabular-nums' }}>
+            Day {daysElapsed}
+          </span>
+        )}
+        <input
+          type="date"
+          value={startDate}
+          onChange={e => handleDateChange(e.target.value)}
+          title="Set project start date"
+          style={{
+            fontSize: 11, padding: '4px 8px', borderRadius: 6,
+            background: 'rgba(255,255,255,0.04)', color: T.textSub,
+            border: `1px solid ${T.border}`, fontFamily: 'inherit',
+            outline: 'none', cursor: 'pointer',
+            colorScheme: 'dark',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 
 // ─── CSS Timeline (pure CSS, no React Flow) ───────────────────
 function RoadmapTimeline({ phases, activeIdx, onNodeClick }: {
@@ -143,11 +323,22 @@ function RoadmapTimeline({ phases, activeIdx, onNodeClick }: {
   );
 }
 
-// ─── Milestone item ───────────────────────────────────────────
+// ─── Milestone item (Feature 4 + 5) ──────────────────────────
 function MilestoneRow({ m, checked, onToggle, onWorkflow }: {
   m: AiryRoadmapMilestone; checked: boolean;
   onToggle: () => void; onWorkflow: (id: string) => void;
 }) {
+  const [helpHover, setHelpHover] = useState(false);
+  const resource = m.resourceLink ? { link: m.resourceLink, label: m.resourceLabel || 'View resource' } : getResourceForMilestone(m.title);
+  const router = useRouter();
+
+  const handleAskHelp = () => {
+    openAira(
+      `How do I complete "${m.title}" for a company dealing with manual data entry, slow customer onboarding, and repetitive content approval workflows?`,
+      { milestone: m.title, context: 'roadmap_milestone_help' }
+    );
+  };
+
   return (
     <li style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
       <button
@@ -163,80 +354,139 @@ function MilestoneRow({ m, checked, onToggle, onWorkflow }: {
       >
         {checked && <IconCheck />}
       </button>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{
-          fontSize: '0.875rem', color: checked ? T.textMuted : T.text,
-          textDecoration: checked ? 'line-through' : 'none', lineHeight: 1.45, transition: 'color 0.15s',
-        }}>{m.title}</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            fontSize: '0.875rem', color: checked ? T.textMuted : T.text,
+            textDecoration: checked ? 'line-through' : 'none', lineHeight: 1.45, transition: 'color 0.15s',
+          }}>{m.title}</span>
+
+          {/* Feature 5: Contextual help button */}
+          <button
+            onClick={handleAskHelp}
+            onMouseEnter={() => setHelpHover(true)}
+            onMouseLeave={() => setHelpHover(false)}
+            title={`Ask: How do I complete "${m.title}"?`}
+            style={{
+              width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+              background: helpHover ? 'rgba(255,255,255,0.08)' : 'transparent',
+              border: `1px solid ${helpHover ? T.borderGreen : 'rgba(255,255,255,0.08)'}`,
+              color: helpHover ? T.green : T.textMuted,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: 0, transition: 'all 0.15s',
+            }}
+          >
+            <IconHelp />
+          </button>
+        </div>
+
         {m.description && <span style={{ fontSize: '0.78rem', color: T.textMuted, lineHeight: 1.5 }}>{m.description}</span>}
-        {m.linkedWorkflowIds?.length ? (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 3 }}>
-            {m.linkedWorkflowIds.map(id => (
-              <button key={id} onClick={() => onWorkflow(id)} style={{
-                fontSize: 11, padding: '2px 9px', borderRadius: 20,
-                background: '#282827', color: '#dddac5',
-                border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', fontFamily: 'inherit',
-              }}>{id}</button>
-            ))}
-          </div>
-        ) : null}
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 3 }}>
+          {/* Feature 4: Resource link */}
+          {resource && (
+            <button onClick={() => router.push(resource.link)} style={{
+              fontSize: 10, padding: '2px 9px', borderRadius: 20,
+              background: 'rgba(76,175,80,0.08)', color: T.green,
+              border: '1px solid rgba(76,175,80,0.2)', cursor: 'pointer', fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 4, transition: 'all 0.15s',
+            }}>
+              <IconLink />
+              {resource.label}
+            </button>
+          )}
+          {/* Linked workflow pills */}
+          {m.linkedWorkflowIds?.map(id => (
+            <button key={id} onClick={() => onWorkflow(id)} style={{
+              fontSize: 11, padding: '2px 9px', borderRadius: 20,
+              background: '#282827', color: '#dddac5',
+              border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', fontFamily: 'inherit',
+            }}>{id}</button>
+          ))}
+        </div>
       </div>
     </li>
   );
 }
 
-// ─── KPI card ─────────────────────────────────────────────────
-function KpiCard({ kpi }: { kpi: AiryRoadmapKpi }) {
+// ─── KPI card (Feature 2) ─────────────────────────────────────
+function KpiCard({ kpi, actual, onActualChange }: {
+  kpi: AiryRoadmapKpi; actual: string; onActualChange: (val: string) => void;
+}) {
+  const status = getKpiStatus(kpi.target, actual);
+  const colors = STATUS_COLORS[status];
+  const [focused, setFocused] = useState(false);
+
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.03)', border: `1px solid rgba(255,255,255,0.06)`,
+      background: status !== 'none' ? colors.bg : 'rgba(255,255,255,0.03)',
+      border: `1px solid ${status !== 'none' ? colors.border : 'rgba(255,255,255,0.06)'}`,
       borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 5,
+      transition: 'all 0.2s',
     }}>
-      <span style={{ fontSize: '0.68rem', color: T.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-        {kpi.label}
-      </span>
-      <span style={{ fontSize: '1.25rem', fontWeight: 700, color: T.green, letterSpacing: '-0.3px' }}>
-        {kpi.target}
-      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {status !== 'none' && (
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: colors.dot, flexShrink: 0 }} />
+        )}
+        <span style={{ fontSize: '0.68rem', color: T.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+          {kpi.label}
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span style={{ fontSize: 10, color: T.textMuted, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>TARGET</span>
+          <span style={{ fontSize: '1.1rem', fontWeight: 700, color: T.green, letterSpacing: '-0.3px' }}>
+            {kpi.target}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 10, color: T.textMuted, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>ACTUAL</span>
+          <input
+            type="text"
+            value={actual}
+            onChange={e => onActualChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder="Enter actual"
+            style={{
+              fontSize: '0.95rem', fontWeight: 600,
+              color: status === 'green' ? '#4CAF50' : status === 'yellow' ? T.yellow : status === 'red' ? T.red : T.textSub,
+              background: 'rgba(255,255,255,0.03)',
+              border: `1px solid ${focused ? T.borderGreen : 'rgba(255,255,255,0.06)'}`,
+              borderRadius: 6, padding: '4px 8px', width: '100%',
+              outline: 'none', fontFamily: 'inherit', transition: 'all 0.15s',
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
 
 // ─── Phase section ────────────────────────────────────────────
-function PhaseSection({ phase, index, open, phaseRef, onToggle, onWorkflow }: {
+function PhaseSection({ phase, index, open, phaseRef, onToggle, onWorkflow, checked, onMilestoneToggle, kpiActuals, onKpiActualChange, phaseComplete, onPhaseComplete }: {
   phase: AiryRoadmapPhase; index: number; open: boolean;
   phaseRef: { current: HTMLDivElement | null };
   onToggle: () => void; onWorkflow: (id: string) => void;
+  checked: Record<string, boolean>;
+  onMilestoneToggle: (milestoneId: string) => void;
+  kpiActuals: Record<string, string>;
+  onKpiActualChange: (kpiId: string, val: string) => void;
+  phaseComplete: boolean;
+  onPhaseComplete: () => void;
 }) {
   const t = useTranslations("roadmap");
-  const storageKey = `aivory_roadmap_checked_${phase.id}`;
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
-
-  // Hydrate from localStorage after mount (localStorage is not available during SSR)
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) setChecked(JSON.parse(stored));
-    } catch { /* localStorage unavailable */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageKey]);
-  const [complete, setComplete] = useState(false);
   const [hov, setHov] = useState(false);
-
-  const toggle = (id: string) => setChecked(prev => {
-    const next = { ...prev, [id]: !prev[id] };
-    localStorage.setItem(storageKey, JSON.stringify(next));
-    return next;
-  });
 
   const checkedN = Object.values(checked).filter(Boolean).length;
   const total = phase.milestones.length;
-  const pct = complete ? 100 : total > 0 ? Math.round((checkedN / total) * 100) : 0;
+  const pct = phaseComplete ? 100 : total > 0 ? Math.round((checkedN / total) * 100) : 0;
   const icon = PHASE_ICONS[index % 3];
+  const contextDescription = PHASE_DESCRIPTIONS[index] || phase.description;
 
   return (
     <div ref={phaseRef} style={{
-      background: T.card, border: `1px solid ${complete ? T.borderGreen : T.border}`,
+      background: T.card, border: `1px solid ${phaseComplete ? T.borderGreen : T.border}`,
       borderRadius: 14, overflow: 'hidden',
       backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
       boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
@@ -258,8 +508,8 @@ function PhaseSection({ phase, index, open, phaseRef, onToggle, onWorkflow }: {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <span style={{
             width: 40, height: 40, borderRadius: 11, flexShrink: 0,
-            background: complete ? '#282827' : T.greenDim,
-            border: `1px solid ${complete ? '#666864' : T.borderGreen}`,
+            background: phaseComplete ? '#282827' : T.greenDim,
+            border: `1px solid ${phaseComplete ? '#666864' : T.borderGreen}`,
             color: T.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>{icon}</span>
           <div>
@@ -270,14 +520,14 @@ function PhaseSection({ phase, index, open, phaseRef, onToggle, onWorkflow }: {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-          {complete && (
+          {phaseComplete && (
             <span style={{
               fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
               background: T.greenDim, color: T.green, border: `1px solid ${T.borderGreen}`,
               textTransform: 'uppercase', letterSpacing: '0.3px',
             }}>{t("complete")}</span>
           )}
-          {!complete && total > 0 && (
+          {!phaseComplete && total > 0 && (
             <span style={{ fontSize: 11, color: T.textMuted, fontVariantNumeric: 'tabular-nums' }}>
               {checkedN}/{total}
             </span>
@@ -298,9 +548,10 @@ function PhaseSection({ phase, index, open, phaseRef, onToggle, onWorkflow }: {
       {/* body */}
       {open && (
         <div style={{ padding: '0 20px 22px', display: 'flex', flexDirection: 'column', gap: 20, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-          {phase.description && (
+          {/* Feature 3: Contextual description */}
+          {contextDescription && (
             <p style={{ fontSize: '0.9rem', color: T.textSub, lineHeight: 1.65, margin: '14px 0 0' }}>
-              {phase.description}
+              {contextDescription}
             </p>
           )}
 
@@ -312,7 +563,7 @@ function PhaseSection({ phase, index, open, phaseRef, onToggle, onWorkflow }: {
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 9 }}>
                 {phase.milestones.map(m => (
                   <MilestoneRow key={m.id} m={m} checked={!!checked[m.id]}
-                    onToggle={() => toggle(m.id)} onWorkflow={onWorkflow} />
+                    onToggle={() => onMilestoneToggle(m.id)} onWorkflow={onWorkflow} />
                 ))}
               </ul>
             </div>
@@ -323,15 +574,19 @@ function PhaseSection({ phase, index, open, phaseRef, onToggle, onWorkflow }: {
               <div style={{ fontSize: 10, fontWeight: 700, color: T.textMuted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>
                 {t("kpiTargets")}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-                {phase.kpis.map(k => <KpiCard key={k.id} kpi={k} />)}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+                {phase.kpis.map(k => (
+                  <KpiCard key={k.id} kpi={k}
+                    actual={kpiActuals[k.id] || ''}
+                    onActualChange={(val) => onKpiActualChange(k.id, val)} />
+                ))}
               </div>
             </div>
           )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-            <BtnComplete active={complete} onClick={() => setComplete(v => !v)}>
-              {complete ? t("markedComplete") : t("markComplete")}
+            <BtnComplete active={phaseComplete} onClick={onPhaseComplete}>
+              {phaseComplete ? t("markedComplete") : t("markComplete")}
             </BtnComplete>
             <BtnAira onClick={() => openAira(
               `Help me work on "${phase.name}" of my AI Roadmap.\nMilestones:\n${phase.milestones.map(m => `- ${m.title}`).join('\n')}`,
@@ -421,6 +676,154 @@ function BtnPrimary({ onClick, disabled, loading, children }: {
   );
 }
 
+// ─── Export PDF (Feature 6) ───────────────────────────────────
+async function exportRoadmapPdf(
+  roadmap: AiryRoadmap,
+  allChecked: Record<string, Record<string, boolean>>,
+  kpiActuals: Record<string, string>,
+  phaseCompletes: Record<string, boolean>,
+) {
+  const { default: jsPDF } = await import('jspdf');
+  const { applyPremiumCovers, loadManrope, pageBg, pageFooter, sectionLabel, renderNarrative, thinDiv } = await import('@/lib/pdfExport');
+
+  const doc = new jsPDF('p', 'mm', 'a4');
+  await loadManrope(doc);
+
+  const ML = 18;
+  const PAGE_W = 210;
+  const PAGE_H = 297;
+
+  // Overall stats
+  const totalMilestones = roadmap.phases.reduce((s, p) => s + p.milestones.length, 0);
+  const checkedMilestones = roadmap.phases.reduce((s, p) => {
+    const pc = allChecked[p.id] || {};
+    return s + Object.values(pc).filter(Boolean).length;
+  }, 0);
+  const overallPct = totalMilestones > 0 ? Math.round((checkedMilestones / totalMilestones) * 100) : 0;
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  // Cover
+  await applyPremiumCovers(doc, 'front', `AI Implementation\nRoadmap`, {
+    company: roadmap.title,
+    date: dateStr,
+    eyebrow: 'AIVORY · OUTPUT REPORT',
+    reportId: `RM-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-001`
+  });
+
+  // Progress summary on cover
+  doc.setFontSize(12);
+  doc.setTextColor(255, 255, 255);
+  doc.text(`Overall Progress: ${overallPct}%  ·  ${checkedMilestones}/${totalMilestones} milestones`, ML, PAGE_H - 40);
+  doc.setFontSize(9);
+  doc.text(`Exported: ${now.toISOString().replace('T', ' ').slice(0, 19)}`, ML, PAGE_H - 33);
+
+  // Inner pages
+  let y = ML;
+  const FB = () => 'Helvetica';
+
+  const checkPage = (need: number) => {
+    if (y + need > PAGE_H - 20) {
+      doc.addPage();
+      pageBg(doc);
+      pageFooter(doc);
+      y = ML;
+    }
+  };
+
+  for (let i = 0; i < roadmap.phases.length; i++) {
+    const phase = roadmap.phases[i];
+    doc.addPage();
+    pageBg(doc);
+    pageFooter(doc);
+    y = ML;
+
+    // Phase header
+    y = sectionLabel(doc, y, `Phase ${i + 1}: ${phase.name}`);
+    doc.setFontSize(9);
+    doc.setTextColor(136, 136, 136);
+    doc.text(phase.timeframe, ML, y);
+    y += 6;
+
+    if (phaseCompletes[phase.id]) {
+      doc.setFontSize(9);
+      doc.setTextColor(76, 175, 80);
+      doc.text('✓ PHASE COMPLETE', PAGE_W - ML - 40, ML + 5);
+    }
+
+    // Description
+    const desc = PHASE_DESCRIPTIONS[i] || phase.description;
+    if (desc) {
+      y = renderNarrative(doc, y, desc);
+      y += 4;
+    }
+
+    // Milestones
+    checkPage(16);
+    doc.setFontSize(8);
+    doc.setFont(FB(), 'bold');
+    doc.setTextColor(136, 136, 136);
+    doc.text('MILESTONES', ML, y);
+    y += 6;
+
+    const phaseChecked = allChecked[phase.id] || {};
+    for (const m of phase.milestones) {
+      checkPage(8);
+      const isChecked = !!phaseChecked[m.id];
+      doc.setFontSize(9.5);
+      doc.setFont(FB(), 'normal');
+      doc.setTextColor(isChecked ? 136 : 30, isChecked ? 136 : 30, isChecked ? 136 : 30);
+      doc.text(`${isChecked ? '☑' : '☐'}  ${m.title}`, ML + 2, y);
+      y += 6;
+    }
+    y += 4;
+
+    // KPIs
+    if (phase.kpis.length > 0) {
+      checkPage(16);
+      doc.setFontSize(8);
+      doc.setFont(FB(), 'bold');
+      doc.setTextColor(136, 136, 136);
+      doc.text('KPI TARGETS', ML, y);
+      y += 6;
+
+      for (const k of phase.kpis) {
+        checkPage(12);
+        const actual = kpiActuals[k.id] || '—';
+        const status = getKpiStatus(k.target, kpiActuals[k.id]);
+        const statusLabel = status === 'green' ? '● On Track' : status === 'yellow' ? '● Progressing' : status === 'red' ? '● Below Target' : '';
+
+        doc.setFontSize(9);
+        doc.setFont(FB(), 'bold');
+        doc.setTextColor(30, 30, 30);
+        doc.text(k.label, ML + 2, y);
+        y += 5;
+
+        doc.setFont(FB(), 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(80, 80, 80);
+        doc.text(`Target: ${k.target}  ·  Actual: ${actual}`, ML + 4, y);
+
+        if (statusLabel) {
+          const sColor = status === 'green' ? [76, 175, 80] : status === 'yellow' ? [251, 191, 36] : [248, 113, 113];
+          doc.setTextColor(sColor[0], sColor[1], sColor[2]);
+          doc.text(`  ${statusLabel}`, ML + 4 + doc.getTextWidth(`Target: ${k.target}  ·  Actual: ${actual}`), y);
+        }
+        y += 7;
+      }
+    }
+
+    thinDiv(doc, y);
+    y += 6;
+  }
+
+  // Back cover
+  doc.addPage();
+  await applyPremiumCovers(doc, 'back', '', {});
+
+  doc.save(`AI_Roadmap_${now.toISOString().slice(0, 10)}.pdf`);
+}
+
 // ─── Empty state ──────────────────────────────────────────────
 function EmptyState({ generating, error, onGenerate, router }: {
   generating: boolean; error: string | null;
@@ -508,6 +911,13 @@ export default function RoadmapPage() {
   const [activeIdx, setActiveIdx] = useState(0);
   const phaseRefs = useRef<Array<{ current: HTMLDivElement | null }>>([]);
 
+  // Lifted state for cross-phase milestone tracking (Feature 1)
+  const [allChecked, setAllChecked] = useState<Record<string, Record<string, boolean>>>({});
+  // KPI actuals state (Feature 2)
+  const [kpiActuals, setKpiActuals] = useState<Record<string, string>>({});
+  // Phase complete state
+  const [phaseCompletes, setPhaseCompletes] = useState<Record<string, boolean>>({});
+
   const { pendingContext, clearPendingContext } = useRouterContext()
   const [routingNotice, setRoutingNotice] = useState<string | null>(null)
 
@@ -519,37 +929,74 @@ export default function RoadmapPage() {
     clearPendingContext()
   }, [pendingContext, clearPendingContext])
 
+  // Hydrate all persisted state from localStorage
+  useEffect(() => {
+    // KPI actuals
+    try {
+      const stored = localStorage.getItem(LS_KPI_ACTUALS);
+      if (stored) setKpiActuals(JSON.parse(stored));
+    } catch { /* ignore */ }
+    // Phase completes
+    try {
+      const stored = localStorage.getItem(LS_PHASE_COMPLETE);
+      if (stored) setPhaseCompletes(JSON.parse(stored));
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     // Load roadmap: try Supabase first, fall back to localStorage (Req 5.4–5.6)
     const loadRoadmapData = async () => {
+      let rm: AiryRoadmap | null = null;
       try {
         const { loadRoadmapFromSupabase } = await import('@/lib/supabaseStorage')
         const result = await loadRoadmapFromSupabase('demo_org')
-        if (result) {
-          setRoadmap(result)
-          setOpenPhases({ [result.phases[0]?.id ?? '']: true })
-          phaseRefs.current = result.phases.map(() => ({ current: null }))
-        } else {
-          // Supabase returned nothing — fall back to localStorage
-          const rm = loadRoadmap()
-          setRoadmap(rm)
-          if (rm) {
-            setOpenPhases({ [rm.phases[0]?.id ?? '']: true })
-            phaseRefs.current = rm.phases.map(() => ({ current: null }))
-          }
-        }
+        rm = result || loadRoadmap();
       } catch {
-        // Supabase unavailable — fall back to localStorage
-        const rm = loadRoadmap()
-        setRoadmap(rm)
-        if (rm) {
-          setOpenPhases({ [rm.phases[0]?.id ?? '']: true })
-          phaseRefs.current = rm.phases.map(() => ({ current: null }))
-        }
+        rm = loadRoadmap();
       }
-      setLoading(false)
-    }
-    loadRoadmapData()
+
+      setRoadmap(rm);
+      if (rm) {
+        setOpenPhases({ [rm.phases[0]?.id ?? '']: true });
+        phaseRefs.current = rm.phases.map(() => ({ current: null }));
+        // Hydrate milestone checked state for all phases
+        const checkedState: Record<string, Record<string, boolean>> = {};
+        for (const phase of rm.phases) {
+          try {
+            const stored = localStorage.getItem(LS_CHECKED_PREFIX + phase.id);
+            if (stored) checkedState[phase.id] = JSON.parse(stored);
+            else checkedState[phase.id] = {};
+          } catch { checkedState[phase.id] = {}; }
+        }
+        setAllChecked(checkedState);
+      }
+      setLoading(false);
+    };
+    loadRoadmapData();
+  }, []);
+
+  const handleMilestoneToggle = useCallback((phaseId: string, milestoneId: string) => {
+    setAllChecked(prev => {
+      const phaseChecked = { ...(prev[phaseId] || {}), [milestoneId]: !prev[phaseId]?.[milestoneId] };
+      localStorage.setItem(LS_CHECKED_PREFIX + phaseId, JSON.stringify(phaseChecked));
+      return { ...prev, [phaseId]: phaseChecked };
+    });
+  }, []);
+
+  const handleKpiActualChange = useCallback((kpiId: string, val: string) => {
+    setKpiActuals(prev => {
+      const next = { ...prev, [kpiId]: val };
+      localStorage.setItem(LS_KPI_ACTUALS, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const handlePhaseComplete = useCallback((phaseId: string) => {
+    setPhaseCompletes(prev => {
+      const next = { ...prev, [phaseId]: !prev[phaseId] };
+      localStorage.setItem(LS_PHASE_COMPLETE, JSON.stringify(next));
+      return next;
+    });
   }, []);
 
   const handleGenerate = async () => {
@@ -568,6 +1015,10 @@ export default function RoadmapPage() {
       setOpenPhases({ [data.roadmap.phases[0]?.id ?? '']: true });
       phaseRefs.current = data.roadmap.phases.map(() => ({ current: null }));
       setActiveIdx(0);
+      // Init checked state for new roadmap
+      const newChecked: Record<string, Record<string, boolean>> = {};
+      for (const phase of data.roadmap.phases) { newChecked[phase.id] = {}; }
+      setAllChecked(newChecked);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to generate roadmap');
     } finally { setGenerating(false); }
@@ -585,6 +1036,11 @@ export default function RoadmapPage() {
 
   const togglePhase = (id: string) => setOpenPhases(prev => ({ ...prev, [id]: !prev[id] }));
 
+  const handleExportPdf = useCallback(() => {
+    if (!roadmap) return;
+    exportRoadmapPdf(roadmap, allChecked, kpiActuals, phaseCompletes);
+  }, [roadmap, allChecked, kpiActuals, phaseCompletes]);
+
   const font = "var(--font-manrope), 'Manrope', system-ui, sans-serif";
 
   if (loading) return (
@@ -600,6 +1056,17 @@ export default function RoadmapPage() {
         <ContinuedFromConsole summary={routingNotice} onDismiss={() => setRoutingNotice(null)} />
       )}
       <style>{`@keyframes rm-spin{to{transform:rotate(360deg)}}`}</style>
+
+      {/* Feature 1: Overall progress sticky bar */}
+      {roadmap && (
+        <OverallProgressBar
+          phases={roadmap.phases}
+          allChecked={allChecked}
+          activeIdx={activeIdx}
+          onNodeClick={handleNodeClick}
+        />
+      )}
+
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '40px 24px 100px', display: 'flex', flexDirection: 'column', gap: 28 }}>
 
         {/* header */}
@@ -651,6 +1118,12 @@ export default function RoadmapPage() {
                     phaseRef={phaseRefs.current[idx]}
                     onToggle={() => togglePhase(phase.id)}
                     onWorkflow={id => router.push(`/workflows?selected=${encodeURIComponent(id)}`)}
+                    checked={allChecked[phase.id] || {}}
+                    onMilestoneToggle={(mId) => handleMilestoneToggle(phase.id, mId)}
+                    kpiActuals={kpiActuals}
+                    onKpiActualChange={handleKpiActualChange}
+                    phaseComplete={!!phaseCompletes[phase.id]}
+                    onPhaseComplete={() => handlePhaseComplete(phase.id)}
                   />
                 );
               })}
@@ -677,7 +1150,13 @@ export default function RoadmapPage() {
                 <BtnGhost onClick={handleGenerate} disabled={generating}>
                   {generating ? t("regenerating") : t("regenerate")}
                 </BtnGhost>
-                <BtnGhost disabled title={t("comingSoon")}>{t("exportPdf")}</BtnGhost>
+                {/* Feature 6: Export PDF now functional */}
+                <BtnGhost onClick={handleExportPdf}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <IconDownload />
+                    {t("exportPdf")}
+                  </span>
+                </BtnGhost>
                 <BtnAira onClick={() => openAira(
                   `Review and refine my AI Roadmap based on these phases and KPIs.\n${roadmap.phases.map((p, i) => `Phase ${i + 1}: ${p.name} (${p.timeframe})`).join('\n')}`,
                   {
