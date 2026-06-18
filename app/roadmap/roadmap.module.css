@@ -4,7 +4,7 @@
   overflow-y: auto;
   background: var(--bg-main, #353531);
   color: var(--text-primary, #e8e6e3);
-  font-family: 'Inter Tight', 'Inter', system-ui, sans-serif;
+  font-family: 'Manrope', 'Manrope', system-ui, sans-serif;
 }
 
 .inner {
@@ -30,7 +30,7 @@
 .headerLeft h1 {
   font-size: 1.625rem;
   font-weight: 300;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   color: var(--text-primary, #e8e6e3);
   margin: 0 0 6px !important;
   letter-spacing: -0.3px;

@@ -142,7 +142,7 @@
   font-weight: 500;
   color: var(--text-secondary);
   cursor: not-allowed;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   opacity: 0.5;
 }
 
@@ -157,7 +157,7 @@
   color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   text-align: center;
   text-decoration: none;
   display: flex;

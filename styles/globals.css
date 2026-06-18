@@ -51,7 +51,7 @@ html {
 }
 
 body {
-  font-family: var(--font-inter-tight), 'Inter Tight', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-manrope), 'Manrope', Manrope, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: #353531;
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -222,7 +222,7 @@ body {
   outline: none;
   font-size: 15px;
   line-height: 1.6;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   min-height: 24px;
   max-height: 200px;
   padding: 6px 0;
@@ -251,7 +251,7 @@ body {
   transition: all 0.2s ease;
   font-size: 14px;
   font-weight: 500;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   white-space: nowrap;
 }
 
@@ -629,7 +629,7 @@ body {
 .app-main-content h1,
 .app-main-content h2,
 .app-main-content h3 {
-  font-family: 'Inter Tight', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 300;
   line-height: 1.3;
   color: var(--text-primary);
@@ -741,7 +741,7 @@ main td {
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* ── Global heading typography — Inter Tight weight 200 ── */
+/* ── Global heading typography — Manrope weight 200 ── */
 /* FIXED: exclude workflow/node classes to prevent Nunito override */
 h1, h2, h3, h4, h5, h6,
 [class*="title"]:not([class*="node"]):not([class*="workflow"]):not([class*="label"]):not([class*="Node"]):not([class*="Workflow"]),
@@ -752,7 +752,7 @@ h1, h2, h3, h4, h5, h6,
 [class*="sectionTitle"]:not([class*="node"]):not([class*="workflow"]),
 [class*="cardHeading"]:not([class*="node"]):not([class*="workflow"]),
 [class*="sectionHeading"]:not([class*="node"]):not([class*="workflow"]) {
-  font-family: 'Inter Tight', sans-serif !important;
+  font-family: 'Manrope', sans-serif !important;
   font-weight: 200 !important;
 }
 
@@ -818,7 +818,7 @@ h1, h2, h3, h4, h5, h6,
   outline: none;
   font-size: 15px;
   line-height: 1.6;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   min-height: 48px;
   max-height: 180px;
   overflow-y: auto;
@@ -987,7 +987,7 @@ h1, h2, h3, h4, h5, h6,
   color: rgba(255, 255, 255, 0.75);
   padding: 10px 20px;
   font-size: 0.9rem;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -1009,7 +1009,7 @@ h1, h2, h3, h4, h5, h6,
   color: rgba(255, 255, 255, 0.75);
   padding: 10px 20px;
   font-size: 0.9rem;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   cursor: pointer;
   transition: all 0.15s ease;
 }

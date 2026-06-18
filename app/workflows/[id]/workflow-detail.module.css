@@ -65,7 +65,7 @@
   color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
 }
 
 .backButton:hover {
@@ -87,7 +87,7 @@
   color: var(--text-secondary);
   cursor: pointer;
   transition: color 0.2s ease;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 14px;
   padding: 0;
 }
@@ -330,7 +330,7 @@
   cursor: not-allowed;
   opacity: 0.5;
   transition: all 0.2s ease;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   position: relative;
 }
 
@@ -350,7 +350,7 @@
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
 }
 
 .secondaryActionButton:hover {

@@ -9,7 +9,7 @@
 }
 
 .phaseTitle {
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 18px;
   font-weight: 300;
   color: rgba(255, 255, 255, 0.86);
@@ -18,7 +18,7 @@
 }
 
 .phaseDescription {
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.88);
   margin: 0;
@@ -43,7 +43,7 @@
 .questionLabel {
   display: flex;
   gap: 8px;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 13px;
   font-weight: 600;
   color: #f5f5f4;
@@ -69,7 +69,7 @@
 }
 
 .helperText {
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.86);
   margin: 0;
@@ -90,7 +90,7 @@
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 13px;
   color: #f5f5f4;
   transition: all 0.18s ease;
@@ -115,7 +115,7 @@
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 13px;
   color: #f5f5f4;
   resize: vertical;
@@ -141,7 +141,7 @@
   background-color: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 13px;
   color: #f5f5f4;
   cursor: pointer;
@@ -210,7 +210,7 @@
 
 .radioText {
   flex: 1;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 13px;
   color: #f5f5f4;
   line-height: 1.5;
@@ -261,7 +261,7 @@
 
 .checkboxText {
   flex: 1;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 13px;
   color: #f5f5f4;
   line-height: 1.5;
@@ -277,7 +277,7 @@
 }
 
 .errorText {
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   font-size: 0.875rem;
   color: #f87171;
   margin: 0;

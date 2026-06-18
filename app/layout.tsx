@@ -10,11 +10,11 @@ import { RouterProvider } from "@/contexts/RouterContext"
 import "@/styles/globals.css"
 import "@/styles/workflow-nodes.css"
 
-const interTight = Inter_Tight({
+const manrope = Manrope({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["300", "400", "500", "600", "700"],
   display: "swap",
-  variable: "--font-inter-tight",
+  variable: "--font-manrope",
 })
 
 const nunito = Nunito({
@@ -45,8 +45,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${interTight.variable} ${nunito.variable} ${manrope.variable}`}>
-      <body className={`flex h-screen bg-[#353531] overflow-hidden ${interTight.className}`}>
+    <html lang="en" className={`${manrope.variable} ${nunito.variable}`}>
+      <body className={`flex h-screen bg-[#353531] overflow-hidden ${manrope.className}`}>
         <TokenInitializer />
         <LocaleWrapper>
           <ModeProvider>

@@ -15,7 +15,7 @@
   overflow-y: auto;
   background-color: var(--bg-main, #353531);
   color: var(--text-primary, #e8e6e3);
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
 }
 
 .content {
@@ -98,7 +98,7 @@
   padding: 12px 28px;
   font-size: 0.9375rem;
   font-weight: 700;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
   text-decoration: none;
   cursor: pointer;
   transition: background-color 0.15s ease;
@@ -139,7 +139,7 @@
 .orgName {
   font-size: 1.5rem;
   font-weight: 300;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   color: var(--text-primary, #e8e6e3);
   margin: 0 0 6px;
   letter-spacing: -0.3px;
@@ -192,7 +192,7 @@
   padding: 9px 20px;
   font-size: 0.875rem;
   font-weight: 600;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
@@ -211,7 +211,7 @@
   padding: 9px 16px;
   font-size: 0.875rem;
   font-weight: 600;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
@@ -259,7 +259,7 @@
   border-radius: 8px;
   font-size: 0.8125rem;
   font-weight: 600;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
@@ -293,7 +293,7 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
   white-space: nowrap;
 }
 .downloadBtn:hover:not(:disabled) {
@@ -478,7 +478,7 @@
   padding: 5px 14px;
   font-size: 0.8125rem;
   font-weight: 600;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
@@ -495,7 +495,7 @@
   padding: 5px 14px;
   font-size: 0.8125rem;
   font-weight: 600;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -508,7 +508,7 @@
   padding: 5px 14px;
   font-size: 0.8125rem;
   font-weight: 600;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
@@ -528,7 +528,7 @@
 .sectionTitle {
   font-size: 1rem;
   font-weight: 300;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   color: var(--text-primary, #e8e6e3);
   margin: 0;
   letter-spacing: -0.2px;
@@ -715,7 +715,7 @@
   padding: 8px 16px;
   font-size: 0.8125rem;
   font-weight: 500;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -837,7 +837,7 @@
   color: #b7cba6;
   font-size: 0.8125rem;
   font-weight: 600;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
   cursor: pointer;
   padding: 0;
   transition: color 0.15s ease;
@@ -1181,7 +1181,7 @@
   border-radius: 10px;
   padding: 11px 14px;
   font-size: 0.9375rem;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
   color: #f0f0f0;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -1210,7 +1210,7 @@
   padding: 9px 20px;
   font-size: 0.875rem;
   font-weight: 600;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -1228,7 +1228,7 @@
   padding: 9px 24px;
   font-size: 0.875rem;
   font-weight: 600;
-  font-family: 'Inter Tight', 'Inter', sans-serif;
+  font-family: 'Manrope', 'Manrope', sans-serif;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -1328,7 +1328,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
 }
 .viewInWorkflowsBtn:hover {
   background: rgba(178, 204, 162, 0.2);
@@ -1345,7 +1345,7 @@
 .insightsSectionTitle {
   font-size: 1.125rem;
   font-weight: 300;
-  font-family: 'Inter Tight', sans-serif;
+  font-family: 'Manrope', sans-serif;
   color: var(--text-primary, #e8e6e3);
   margin: 0;
   letter-spacing: -0.3px;

@@ -3,7 +3,7 @@
    Single source of truth for all canvas node visuals.
    Imported globally by: app/layout.tsx
    DO NOT add inline style overrides in node components — edit here instead.
-   UPDATED: Background #696d6b, Font Inter Tight 400
+   UPDATED: Background #696d6b, Font Manrope 400
    ============================================================================= */
 
 /* ── React Flow outer wrapper: strip default chrome, let CSS drive size ── */

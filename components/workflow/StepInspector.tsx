@@ -88,7 +88,7 @@ export function StepInspector({ selectedNodeId, nodeData, onChange, collapsed = 
           <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#5a5a58' }}>
             Edit Step
           </span>
-          <span style={{ fontSize: 13, fontWeight: 300, color: '#e8e6e3', fontFamily: "'Inter Tight', sans-serif", letterSpacing: '-0.1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 13, fontWeight: 300, color: '#e8e6e3', fontFamily: "'Manrope', sans-serif", letterSpacing: '-0.1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {categoryLabel}
           </span>
         </div>
