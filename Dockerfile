@@ -41,6 +41,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # which is not routable in the Docker build network and causes font fetch to fail.
 ENV NODE_OPTIONS=--dns-result-order=ipv4first
 
+ENV TURBOPACK=0
+ENV TURBOPACK=0
 RUN npm run build
 
 # Production image, copy all the files and run next
@@ -65,9 +67,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
-EXPOSE 3000
+EXPOSE 9001
 
-ENV PORT=3000
+ENV PORT=9001
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]

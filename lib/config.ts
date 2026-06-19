@@ -72,9 +72,9 @@ export function validateConfig(): { valid: boolean; missingVars: string[] } {
  *   - dashboard (nextjs-console) → http://localhost:3000
  *   - marketing (frontend-nextjs) → http://localhost:9000
  */
-export const DASHBOARD_URL_PROD = 'https://dashboard.aivory.id'
+export const DASHBOARD_URL_PROD = 'http://129.226.155.216/dashboard'
 export const DASHBOARD_URL_LOCAL = 'http://localhost:3000'
-export const MARKETING_URL_PROD = 'https://aivory.id'
+export const MARKETING_URL_PROD = 'http://129.226.155.216'
 export const MARKETING_URL_LOCAL = 'http://localhost:9000'
 
 /**

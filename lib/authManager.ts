@@ -116,6 +116,11 @@ export const AuthManager = {
     
     // Check for localStorage token (cross-port authentication from port 9000)
     if (typeof localStorage !== 'undefined') {
+      // Check shared aivory_auth session (from homepage login)
+      const aivoryRaw = localStorage.getItem('aivory_auth')
+      if (aivoryRaw) {
+        try { const s = JSON.parse(aivoryRaw); if (s?.access_token) return true } catch {}
+      }
       const token = localStorage.getItem('auth_token')
       const userData = localStorage.getItem('user_data')
       if (token && userData) {
@@ -141,6 +146,14 @@ export const AuthManager = {
     
     // Check for localStorage user (cross-port authentication from port 9000)
     if (typeof localStorage !== 'undefined') {
+      // Try aivory_auth first
+      const _aiRaw = localStorage.getItem('aivory_auth')
+      if (_aiRaw) {
+        try {
+          const _s = JSON.parse(_aiRaw); const _u = _s?.user
+          if (_u) return { user_id: _u.id, email: _u.email, account_type: _u.user_metadata?.account_type || 'free', company_name: _u.user_metadata?.company_name, tier: _u.user_metadata?.tier || 'free', is_subscribed: false, has_diagnostic: false, has_snapshot: false, has_blueprint: false, credits: 0, credits_max: 0 } as any
+        } catch {}
+      }
       const userStr = localStorage.getItem('user_data')
       if (userStr) {
         try {
