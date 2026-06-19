@@ -74,7 +74,7 @@ export interface DashboardAccess {
  * this exact code grants access regardless of authentication or tier (Req 3.1).
  */
 export const SUPER_ADMIN_PARAM = 'superadmin'
-export const SUPER_ADMIN_CODE = 'GrandMasterRCH'
+export const SUPER_ADMIN_CODE = "" // RETIRED: URL super-admin backdoor disabled; use a credentialed superadmin account instead
 
 /** Tier-lookup endpoint (Req 3.7). Path is fixed by the spec. */
 const TIER_LOOKUP_PATH = '/api/v1/users/me'
@@ -247,7 +247,7 @@ export function useDashboardAccess(): DashboardAccess {
 
     const run = async () => {
       const hasSuperAdminCode =
-        new URLSearchParams(win.location.search).get(SUPER_ADMIN_PARAM) === SUPER_ADMIN_CODE
+        false // RETIRED: URL super-admin code bypass removed (superadmin = authenticated account only)
       const authenticated = AuthManager.isAuthenticated()
       const superAdminAccount = authenticated && AuthManager.isSuperAdmin()
 
