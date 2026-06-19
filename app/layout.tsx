@@ -10,13 +10,6 @@ import { RouterProvider } from "@/contexts/RouterContext"
 import "@/styles/globals.css"
 import "@/styles/workflow-nodes.css"
 
-const manrope = Manrope({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  display: "swap",
-  variable: "--font-manrope",
-})
-
 const nunito = Nunito({
   subsets: ["latin"],
   weight: ["500", "600"],
