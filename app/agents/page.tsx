@@ -1,4 +1,5 @@
 'use client';
+import { asset } from "@/lib/asset";
 
 import { useState, useRef } from 'react';
 import Image from 'next/image';
@@ -130,7 +131,7 @@ function DeployModal({ isOpen, onClose, agentName }: { isOpen: boolean, onClose:
           {/* Slack Option */}
           <button className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group">
             <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden shrink-0">
-              <Image src="/integrations/icons/slack.svg" alt="Slack" width={20} height={20} />
+              <Image src={asset("/integrations/icons/slack.svg")} alt="Slack" width={20} height={20} />
             </div>
             <div>
               <div className="text-white/90 font-medium text-[14px]">Slack</div>
@@ -146,7 +147,7 @@ function DeployModal({ isOpen, onClose, agentName }: { isOpen: boolean, onClose:
           {/* Telegram Option */}
           <button className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group">
             <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
-              <Image src="/integrations/icons/telegram.svg" alt="Telegram" width={40} height={40} />
+              <Image src={asset("/integrations/icons/telegram.svg")} alt="Telegram" width={40} height={40} />
             </div>
             <div>
               <div className="text-white/90 font-medium text-[14px]">Telegram</div>
@@ -162,7 +163,7 @@ function DeployModal({ isOpen, onClose, agentName }: { isOpen: boolean, onClose:
           {/* WhatsApp Option */}
           <button className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group">
             <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
-              <Image src="/integrations/icons/whatsapp.svg" alt="WhatsApp" width={40} height={40} />
+              <Image src={asset("/integrations/icons/whatsapp.svg")} alt="WhatsApp" width={40} height={40} />
             </div>
             <div>
               <div className="text-white/90 font-medium text-[14px]">WhatsApp</div>
@@ -275,10 +276,10 @@ export default function AgentsPage() {
           <div className="flex flex-col items-start gap-4">
             <div className="flex items-center gap-5">
               <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-lg hover:scale-105 transition-transform cursor-pointer overflow-hidden">
-                <Image src="/integrations/icons/slack.svg" alt="Slack" width={22} height={22} />
+                <Image src={asset("/integrations/icons/slack.svg")} alt="Slack" width={22} height={22} />
               </div>
               <div className="w-11 h-11 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform cursor-pointer overflow-hidden">
-                <Image src="/integrations/icons/telegram.svg" alt="Telegram" width={44} height={44} />
+                <Image src={asset("/integrations/icons/telegram.svg")} alt="Telegram" width={44} height={44} />
               </div>
             </div>
             <span className="text-white/40 text-[11px] uppercase tracking-wider font-medium">Available for all tier</span>
@@ -287,7 +288,7 @@ export default function AgentsPage() {
           {/* Enterprise Integrations */}
           <div className="flex flex-col items-start gap-4">
             <div className="w-11 h-11 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform cursor-pointer overflow-hidden">
-              <Image src="/integrations/icons/whatsapp.svg" alt="WhatsApp" width={44} height={44} />
+              <Image src={asset("/integrations/icons/whatsapp.svg")} alt="WhatsApp" width={44} height={44} />
             </div>
             <span className="text-white/40 text-[11px] uppercase tracking-wider font-medium">Available on Enterprise plan only</span>
           </div>

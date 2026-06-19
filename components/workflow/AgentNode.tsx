@@ -1,4 +1,5 @@
 'use client';
+import { asset } from "@/lib/asset";
 
 import React, { memo, useState } from 'react';
 import { Handle, Position, useReactFlow, useNodeId } from '@xyflow/react';
@@ -76,7 +77,7 @@ const AgentNode = memo(({ data, selected, isConnecting }: AgentNodeProps) => {
             <img src={agentIcon} alt="" width={48} height={48} className={styles.icon} />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src="/icons/ai-agent.svg" alt="AI Agent" width={48} height={48} className={styles.icon} />
+            <img src={asset("/icons/ai-agent.svg")} alt="AI Agent" width={48} height={48} className={styles.icon} />
           )}
         </div>
         <div className={styles.agentName}>{agentName}</div>

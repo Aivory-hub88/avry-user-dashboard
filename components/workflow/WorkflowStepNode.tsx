@@ -1,4 +1,5 @@
 'use client';
+import { asset } from "@/lib/asset";
 
 import { memo } from 'react';
 import { Handle, Position, useReactFlow, useNodeId, type NodeProps } from '@xyflow/react';
@@ -97,7 +98,7 @@ function WorkflowStepNodeBase({ data, selected }: NodeProps & { data: WorkflowNo
       <div className="workflow-node-text">
         {data.iconPath && (
           <img
-            src={data.iconPath}
+            src={asset(data.iconPath)}
             alt=""
             style={{ width: 20, height: 20, flexShrink: 0, marginTop: 2 }}
           />

@@ -1,4 +1,5 @@
 "use client"
+import { asset } from "@/lib/asset";
 
 import { useRouter } from "next/navigation"
 import { useState, useRef, useEffect, useCallback } from "react"
@@ -214,7 +215,7 @@ export default function ConsolePage() {
                 style={{ alignItems: 'center' }}
               >
                 <img
-                  src="/Aivory_Avatar.svg"
+                  src={asset("/Aivory_Avatar.svg")}
                   alt="Aivory"
                   width={44}
                   height={44}
@@ -340,7 +341,7 @@ export default function ConsolePage() {
                   >
                     <span>connect your tools to</span>
                     <Image 
-                      src="/Aivory_logo_2026.svg" 
+                      src={asset("/Aivory_logo_2026.svg")} 
                       alt="Aivory" 
                       width={48} 
                       height={12} 
@@ -356,7 +357,7 @@ export default function ConsolePage() {
                         >
                           {integration.iconPath && (
                             <Image
-                              src={integration.iconPath}
+                              src={asset(integration.iconPath)}
                               alt={integration.name}
                               width={16}
                               height={16}
@@ -611,7 +612,7 @@ export default function ConsolePage() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/5">
                       {app.iconPath ? (
                         <Image
-                          src={app.iconPath}
+                          src={asset(app.iconPath)}
                           alt={app.name}
                           width={28}
                           height={28}

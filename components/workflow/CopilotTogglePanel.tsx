@@ -11,6 +11,7 @@
  * - isTesting indicator shown during TESTING / FIXING stages
  * - Text size matched to floating assistant: text-[13px]
  */
+import { asset } from "@/lib/asset";
 
 import { useRef, useState, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -37,7 +38,7 @@ function getFileIcon(name: string) {
 function AivoryLogo() {
   return (
     <img
-      src="/Aivory_logo_2026.svg"
+      src={asset("/Aivory_logo_2026.svg")}
       alt="Aivory"
       className="h-6 object-contain"
       aria-label="Aivory"
@@ -110,7 +111,7 @@ function CopilotBarCollapsed({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       aria-label="Open Aivory Copilot"
     >
-      <img src="/Aivory_logo_2026.svg" alt="" className="h-4 object-contain" aria-hidden="true" />
+      <img src={asset("/Aivory_logo_2026.svg")} alt="" className="h-4 object-contain" aria-hidden="true" />
       <span>Aivory Copilot</span>
       <span className="text-[11px] text-[#a1a1aa] ml-1">/ or &#8984;K</span>
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#a1a1aa] ml-0.5">
@@ -299,7 +300,7 @@ function CopilotPanelExpanded({
             <div key={i} className={`flex items-start gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
               {msg.role === 'assistant' && (
                 <div className="shrink-0 mt-0.5">
-                  <img src="/Aivory_Avatar.svg" alt="Aivory" className="w-4 h-4" />
+                  <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" className="w-4 h-4" />
                 </div>
               )}
               <div className={`flex flex-col gap-1 max-w-[85%] ${msg.role === 'user' ? 'items-end' : ''}`}>
@@ -321,7 +322,7 @@ function CopilotPanelExpanded({
           {loading && (
             <div className="flex items-start gap-2">
               <div className="shrink-0 mt-0.5">
-                <img src="/Aivory_Avatar.svg" alt="Aivory" className="w-4 h-4" />
+                <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" className="w-4 h-4" />
               </div>
               <div className="flex flex-col gap-1.5 px-3 py-2 bg-white/[0.04] border border-white/5 rounded-[10px] rounded-bl-[2px]">
                 <div className="flex gap-1">

@@ -1,3 +1,4 @@
+import { asset } from "@/lib/asset";
 import React from "react";
 
 const ICON_MAP: Record<string, string> = {
@@ -17,7 +18,7 @@ export default function AppIcon({ app }: { app: string }) {
   if (iconUrl) {
     return (
       <img 
-        src={iconUrl} 
+        src={asset(iconUrl)} 
         alt={app} 
         className="w-[22px] h-[22px] object-contain" 
       />

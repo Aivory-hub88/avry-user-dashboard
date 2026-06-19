@@ -1,4 +1,5 @@
 "use client"
+import { asset } from "@/lib/asset";
 
 import Link from "next/link"
 import Image from "next/image"
@@ -214,7 +215,7 @@ export default function Sidebar() {
         {!collapsed ? (
           <div className="flex items-center">
             <Image
-              src="/Aivory_logo_2026.svg"
+              src={asset("/Aivory_logo_2026.svg")}
               alt="Aivory"
               width={100}
               height={28}
@@ -224,7 +225,7 @@ export default function Sidebar() {
         ) : (
           <div className="flex items-center justify-center w-full py-1">
             <Image
-              src="/Aivory_icon_2026.svg"
+              src={asset("/Aivory_icon_2026.svg")}
               alt="Aivory"
               width={32}
               height={32}

@@ -1,4 +1,5 @@
 'use client'
+import { asset } from "@/lib/asset";
 
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -146,7 +147,7 @@ function ConnectModal({ app, existingId, onClose, onSaved }: ConnectModalProps) 
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           {app.iconPath ? (
-            <img src={app.iconPath} alt="" className={styles.modalAppIcon} data-brand={app.id.toLowerCase()} style={{ width: 28, height: 28 }} />
+            <img src={asset(app.iconPath)} alt="" className={styles.modalAppIcon} data-brand={app.id.toLowerCase()} style={{ width: 28, height: 28 }} />
           ) : (
             <span className={styles.modalAppIcon}>{app.icon}</span>
           )}
@@ -456,7 +457,7 @@ function IntegrationsContent() {
                 <div key={conn.id} className={styles.tableRow}>
                   <span className={styles.tableAppCell}>
                     {app?.iconPath ? (
-                      <img src={app.iconPath} alt="" className={styles.tableAppIcon} data-brand={app.id.toLowerCase()} style={{ width: 20, height: 20 }} />
+                      <img src={asset(app.iconPath)} alt="" className={styles.tableAppIcon} data-brand={app.id.toLowerCase()} style={{ width: 20, height: 20 }} />
                     ) : (
                       <span className={styles.tableAppIcon}>{conn.appIcon}</span>
                     )}
@@ -506,7 +507,7 @@ function IntegrationsContent() {
               <div key={app.id} className={styles.appCard}>
                 <div className={styles.appCardTop}>
                   {app.iconPath ? (
-                    <img src={app.iconPath} alt="" className={styles.appIcon} data-brand={app.id.toLowerCase()} style={{ width: 32, height: 32 }} />
+                    <img src={asset(app.iconPath)} alt="" className={styles.appIcon} data-brand={app.id.toLowerCase()} style={{ width: 32, height: 32 }} />
                   ) : (
                     <div className={styles.appIcon}>{app.icon}</div>
                   )}

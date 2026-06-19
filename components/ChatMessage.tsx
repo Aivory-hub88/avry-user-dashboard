@@ -1,4 +1,5 @@
 "use client"
+import { asset } from "@/lib/asset";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import Image from 'next/image'
@@ -292,7 +293,7 @@ export default function ChatMessage({ role, content, isStreaming = false, agenti
           {/* Avatar */}
           <div className="w-9 h-9 rounded-full flex-shrink-0 mt-0.5 flex items-center justify-center bg-accent/20">
             <Image
-              src="/Aivory_Avatar.svg"
+              src={asset("/Aivory_Avatar.svg")}
               alt="Aivory"
               width={18}
               height={18}

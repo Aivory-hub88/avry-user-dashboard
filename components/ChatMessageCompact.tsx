@@ -1,4 +1,5 @@
 "use client"
+import { asset } from "@/lib/asset";
 
 import React, { useMemo } from 'react'
 import Image from 'next/image'
@@ -105,7 +106,7 @@ export default function ChatMessageCompact({
       ) : (
         <div className="flex items-start gap-2.5">
           <div className="w-6 h-6 rounded-full flex-shrink-0 mt-0.5 flex items-center justify-center bg-[#b7cba6]/15 border border-[#b7cba6]/20">
-            <Image src="/Aivory_Avatar.svg" alt="Aivory" width={13} height={13} />
+            <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={13} height={13} />
           </div>
           <div className="flex-1 min-w-0 pt-0.5">
             {isStreaming && !content && (

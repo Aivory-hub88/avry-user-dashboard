@@ -1,4 +1,5 @@
 'use client';
+import { asset } from "@/lib/asset";
 
 import React, { useState } from 'react';
 import styles from './StandardNodePalette.module.css';
@@ -80,7 +81,7 @@ const Icons: Record<string, React.ReactNode> = {
   ),
   agent: (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src="/icons/ai-agent.svg" alt="AI Agent" width={15} height={15} style={{ objectFit: 'contain' }} />
+    <img src={asset("/icons/ai-agent.svg")} alt="AI Agent" width={15} height={15} style={{ objectFit: 'contain' }} />
   ),
 };
 

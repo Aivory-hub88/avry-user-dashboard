@@ -1,4 +1,5 @@
 'use client';
+import { asset } from "@/lib/asset";
 
 import React, { memo, useState } from 'react';
 import { Handle, Position, useReactFlow, useNodeId } from '@xyflow/react';
@@ -173,7 +174,7 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
   const renderIcon = () => {
     if (iconPath) {
       return (
-        <img src={iconPath} alt={label}
+        <img src={asset(iconPath)} alt={label}
           style={{ width: 36, height: 36, objectFit: 'contain' }}
           onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.removeAttribute('style'); }}
         />

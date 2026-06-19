@@ -1,4 +1,5 @@
 'use client'
+import { asset } from "@/lib/asset";
 
 import { useEffect, useState, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -139,7 +140,7 @@ const Icons = {
     </svg>
   ),
   aivoryAvatar: (
-    <img src="/Aivory_Avatar.svg" alt="Aivory" style={{ width: '18px', height: '18px' }} />
+    <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" style={{ width: '18px', height: '18px' }} />
   ),
   robot: (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -1235,7 +1236,7 @@ function WorkflowsPageInner() {
       <div className={styles.onboardingOverlay}>
         <div className={styles.onboardingContent}>
           <div className={styles.onboardingAvatarWrap}>
-            <img src="/Aivory_Avatar.svg" alt="Aivory" width={28} height={28} />
+            <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={28} height={28} />
           </div>
           <h2 className={styles.onboardingTitle}>{t('onboardingTitle')}</h2>
           <p className={styles.onboardingSubtitle}>
@@ -1245,7 +1246,7 @@ function WorkflowsPageInner() {
             className={styles.onboardingCTA}
             onClick={() => {}}
           >
-            <img src="/Aivory_Avatar.svg" alt="" width={16} height={16} aria-hidden="true" />
+            <img src={asset("/Aivory_Avatar.svg")} alt="" width={16} height={16} aria-hidden="true" />
             {t('askAiraCopilot')}
           </button>
           <p className={styles.onboardingHotkey}>
@@ -1441,7 +1442,7 @@ function WorkflowsPageInner() {
                   title={`Drag ${app.name} to canvas`}
                 >
                   {app.iconPath ? (
-                    <img src={app.iconPath} alt="" className={styles.appItemIcon} data-brand={app.id.toLowerCase()} />
+                    <img src={asset(app.iconPath)} alt="" className={styles.appItemIcon} data-brand={app.id.toLowerCase()} />
                   ) : (
                     <span className={styles.appItemIcon}>{app.icon}</span>
                   )}
