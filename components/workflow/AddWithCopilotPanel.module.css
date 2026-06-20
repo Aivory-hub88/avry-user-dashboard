@@ -1,4 +1,4 @@
-/* AddWithAiraPanel Styles */
+/* AddWithCopilotPanel Styles */
 
 .panel {
   background: #1a1a1a;
@@ -284,7 +284,7 @@
   flex-wrap: wrap;
 }
 
-.askAiraBtn,
+.askCopilotBtn,
 .manualBtn,
 .cancelBtn,
 .applyBtn {
@@ -304,17 +304,17 @@
   white-space: nowrap;
 }
 
-.askAiraBtn {
+.askCopilotBtn {
   background: #b7cba6;
   color: #000;
 }
 
-.askAiraBtn:hover:not(:disabled) {
+.askCopilotBtn:hover:not(:disabled) {
   background: #00d48a;
   box-shadow: 0 2px 8px rgba(178, 204, 162, 0.2);
 }
 
-.askAiraBtn:disabled {
+.askCopilotBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

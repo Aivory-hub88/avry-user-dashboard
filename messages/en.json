@@ -52,7 +52,7 @@
     "designWorkflow": "Design Workflow",
     "onboardingTitle": "What would you like to automate?",
     "onboardingSubtitle": "Describe a process and Aivory will generate a workflow for you — or head to Blueprint to build one from a diagnostic.",
-    "askAiraCopilot": "Ask Aivory Copilot to generate workflow",
+    "askAivoryCopilot": "Ask Aivory Copilot to generate workflow",
     "hotkeyHint": "Press {key1} or {key2} anytime to open Aivory Copilot",
     "alreadyHaveBlueprint": "Already have a blueprint?",
     "goToBlueprint": "Go to Blueprint →",
@@ -80,8 +80,8 @@
     "editStep": "Edit Step {index}",
     "editStepWithAI": "Edit Step {index} with AI",
     "editTrigger": "Edit Trigger",
-    "editWithAira": "Edit with Aivory",
-    "editWithAiraDesc": "Let Aivory help you rewrite and configure this step",
+    "editWithAivory": "Edit with Aivory",
+    "editWithAivoryDesc": "Let Aivory help you rewrite and configure this step",
     "toolService": "Tool / Service used",
     "whatProduces": "What this produces",
     "savedConnection": "SAVED CONNECTION",
@@ -116,10 +116,10 @@
       "errorNetwork": "Could not reach server. Check your connection."
     }
   },
-  "aira": {
+  "aivory": {
     "name": "Aivory",
     "fullName": "Aivory Intelligence & Reasoning Agent",
-    "meetAira": "Meet Aivory",
+    "meetAivory": "Meet Aivory",
     "tagline": "Ask Aivory about your business goals, diagnostics, or AI System Blueprint, then turn them into workflows and automation.",
     "isThinking": "Aivory is thinking",
     "emptyResponse": "Aivory returned an empty response. Please try again.",
@@ -317,8 +317,8 @@
     "markComplete": "Mark phase as complete",
     "markedComplete": "Marked complete",
     "complete": "Complete",
-    "askAiraHelp": "Ask Aivory for help",
-    "askAiraRefine": "Ask Aivory to refine roadmap",
+    "askAivoryHelp": "Ask Aivory for help",
+    "askAivoryRefine": "Ask Aivory to refine roadmap",
     "exportPdf": "Export PDF",
     "comingSoon": "Coming soon",
     "bottomHint": "Use this roadmap to plan execution with Workflows and Aivory.",

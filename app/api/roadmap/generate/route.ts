@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const diagnosticContext: Record<string, any> = body.diagnosticContext ?? {};
     const blueprintContext: Record<string, any> = body.blueprintContext ?? {};
 
-    // Build a prompt for AIRA to generate a structured roadmap
+    // Build a prompt for Aivory to generate a structured roadmap
     const contextParts: string[] = [];
 
     if (diagnosticContext && Object.keys(diagnosticContext).length > 0) {

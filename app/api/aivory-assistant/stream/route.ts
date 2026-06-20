@@ -1,12 +1,12 @@
 /**
- * CANONICAL AIRA ENTRY POINT — do NOT add alternative routes or branch by tab here.
- * All AIRA chat traffic from every tab (console, roadmap, diagnostic, workflow, blueprint)
+ * CANONICAL Aivory ENTRY POINT — do NOT add alternative routes or branch by tab here.
+ * All Aivory chat traffic from every tab (console, roadmap, diagnostic, workflow, blueprint)
  * flows through this single route.
  *
- * Path: AiraFloatingAssistant → POST /api/aira/stream → /bridge/aira → Zeroclaw → OpenRouter
+ * Path: AivoryAssistant → POST /api/aivory-assistant/stream → /bridge/aivory-assistant → Zeroclaw → OpenRouter
  *
  * Tab-specific context (source_tab + pageContext) is forwarded via `context` field.
- * Proxies to /bridge/aira on the VPS bridge (Zeroclaw-orchestrated).
+ * Proxies to /bridge/aivory-assistant on the VPS bridge (Zeroclaw-orchestrated).
  * Keeps /api/console/stream untouched for the main AI Console tab.
  */
 
@@ -29,9 +29,9 @@ export async function POST(request: NextRequest) {
     }
 
     const config = getConfig()
-    // FIXED: Use /aria/stream on VPS Bridge (thin proxy) which forwards to Zeroclaw /webhook
-    // Previous code used /bridge/aira which doesn't exist in thin-proxy server.js
-    const bridgeUrl = `${config.VPS_BRIDGE_URL}/aria/stream`
+    // FIXED: Use /aivory-assistant/stream on VPS Bridge (thin proxy) which forwards to Zeroclaw /webhook
+    // Previous code used /bridge/aivory-assistant which doesn't exist in thin-proxy server.js
+    const bridgeUrl = `${config.VPS_BRIDGE_URL}/aivory-assistant/stream`
 
     // FIXED: TIMEOUT INCREASE — abort after 115s
     const controller = new AbortController()
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && error.name === 'AbortError') {
       return Response.json({ error: true, message: 'Request timed out' }, { status: 504 })
     }
-    console.error('[aira/stream] error:', error)
+    console.error('[aivory/stream] error:', error)
     return Response.json({ error: true, message: 'Internal error' }, { status: 500 })
   }
 }

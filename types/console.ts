@@ -29,7 +29,7 @@ export interface ConsoleStreamRequest {
  * - "chunk": text content token from the AI response
  * - "done": stream completed successfully
  * - "error": an error occurred
- * - "workflow_spec": AIRA detected a workflow intent and produced a structured
+ * - "workflow_spec": Aivory detected a workflow intent and produced a structured
  *   workflow specification that can be sent to the Workflow canvas
  */
 export interface StreamChunk {

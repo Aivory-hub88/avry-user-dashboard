@@ -503,7 +503,7 @@
   background: #282827;
 }
 
-.btnAira {
+.btnAivory {
   font-size: 12px;
   font-weight: 500;
   padding: 7px 14px;
@@ -517,7 +517,7 @@
   white-space: nowrap;
 }
 
-.btnAira:hover {
+.btnAivory:hover {
   border-color: #666864;
   background: rgba(255,255,255,0.06);
 }

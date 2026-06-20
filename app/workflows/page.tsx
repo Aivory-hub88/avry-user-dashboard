@@ -388,11 +388,11 @@ function RightPanel({
             <button 
               className={styles.fieldAIEditButton} 
               onClick={() => setShowStepAI(true)} 
-              title={t('editWithAiraDesc')}
-              aria-label={t('editWithAiraDesc')}
+              title={t('editWithAivoryDesc')}
+              aria-label={t('editWithAivoryDesc')}
             >
               {Icons.aivoryAvatar}
-              <span className={styles.fieldAIEditButtonLabel}>{t('editWithAira')}</span>
+              <span className={styles.fieldAIEditButtonLabel}>{t('editWithAivory')}</span>
             </button>
           )}
         </div>
@@ -1247,7 +1247,7 @@ function WorkflowsPageInner() {
             onClick={() => {}}
           >
             <img src={asset("/Aivory_Avatar.svg")} alt="" width={16} height={16} aria-hidden="true" />
-            {t('askAiraCopilot')}
+            {t('askAivoryCopilot')}
           </button>
           <p className={styles.onboardingHotkey}>
             Press <kbd>/</kbd> or <kbd>⌘K</kbd> anytime to open Aivory Copilot

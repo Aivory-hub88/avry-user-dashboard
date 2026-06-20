@@ -17,8 +17,8 @@ export async function POST(request: NextRequest) {
     }
 
     const config = getConfig()
-    // Route through /aria/stream — correct thin-proxy endpoint
-    const bridgeUrl = `${config.VPS_BRIDGE_URL}/aria/stream`
+    // Route through /aivory-assistant/stream — correct thin-proxy endpoint
+    const bridgeUrl = `${config.VPS_BRIDGE_URL}/aivory-assistant/stream`
 
     // FIXED: TIMEOUT INCREASE — abort after 115s
     const controller = new AbortController()
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error && error.name === 'AbortError') {
       return Response.json({ error: true, message: 'Request timed out' }, { status: 504 })
     }
-    console.error('[aira/ask] error:', error)
+    console.error('[aivory/ask] error:', error)
     // Return specific error message for context tab fix as per requirements
     return Response.json(
       { error: true, message: 'Aivory tidak dapat membaca context tab ini. Coba refresh halaman.' },

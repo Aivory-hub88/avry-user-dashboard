@@ -6,7 +6,7 @@
  *
  * Usage:
  *   import { postToBridge } from '@/lib/bridgeClient'
- *   const res = await postToBridge('/bridge/aira', { message: '...' })
+ *   const res = await postToBridge('/bridge/aivory-assistant', { message: '...' })
  *
  * The base URL is read from environment variables:
  *   VPS_BRIDGE_URL        — server-side (API routes)
@@ -28,7 +28,7 @@ if (!BASE_URL) {
  * POST to a VPS Bridge endpoint.
  * Automatically injects Content-Type header.
  *
- * @param path   - Endpoint path, e.g. '/bridge/aira'
+ * @param path   - Endpoint path, e.g. '/bridge/aivory-assistant'
  * @param body   - JSON-serializable request body
  * @param options - Additional fetch options (headers, signal, etc.)
  */

@@ -2,11 +2,11 @@
 
 import dynamic from "next/dynamic"
 
-const AiraFloatingAssistant = dynamic(
-  () => import("./AiraFloatingAssistant"),
+const AivoryAssistant = dynamic(
+  () => import("./AivoryAssistant"),
   { ssr: false }
 )
 
 export default function ClientShell() {
-  return <AiraFloatingAssistant />
+  return <AivoryAssistant />
 }

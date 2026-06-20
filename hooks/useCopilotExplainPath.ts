@@ -9,18 +9,18 @@ export interface ExplainPathResult {
   }>
 }
 
-export interface UseAiraExplainPathState {
+export interface UseAivoryExplainPathState {
   isExplaining: boolean
   result: ExplainPathResult | null
   error: string | null
 }
 
-export interface UseAiraExplainPathActions {
+export interface UseAivoryExplainPathActions {
   explainPath: (workflow: AivoryWorkflowSpec, targetStepId: string) => Promise<void>
   clearResult: () => void
 }
 
-export function useAiraExplainPath(): UseAiraExplainPathState & UseAiraExplainPathActions {
+export function useCopilotExplainPath(): UseAivoryExplainPathState & UseAivoryExplainPathActions {
   const [isExplaining, setIsExplaining] = useState(false)
   const [result, setResult] = useState<ExplainPathResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -32,7 +32,7 @@ export function useAiraExplainPath(): UseAiraExplainPathState & UseAiraExplainPa
       setResult(null)
 
       try {
-        const response = await fetch('/api/workflows/aira-explain-path', {
+        const response = await fetch('/api/workflows/aivory-explain-path', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ workflow, targetStepId }),

@@ -3,19 +3,19 @@
 import { useState } from 'react'
 import { SavedWorkflow } from '@/hooks/useWorkflows'
 import { requestWorkflowEdit } from '@/lib/workflowAIEditor'
-import type { AiraErrorResponse } from '@/types/aira'
+import type { CopilotErrorResponse } from '@/types/copilot'
 
-interface WorkflowAiraRefineModalProps {
+interface WorkflowCopilotRefineModalProps {
   workflow: SavedWorkflow
   onClose: () => void
   onApply: (updatedWorkflow: SavedWorkflow) => void
 }
 
-export function WorkflowAiraRefineModal({
+export function WorkflowCopilotRefineModal({
   workflow,
   onClose,
   onApply,
-}: WorkflowAiraRefineModalProps) {
+}: WorkflowCopilotRefineModalProps) {
   const [instruction, setInstruction] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -36,29 +36,29 @@ export function WorkflowAiraRefineModal({
       })
 
       // Store the updated workflow for apply
-      ;(window as any).__airaRefineWorkflow = response.updatedWorkflow
+      ;(window as any).__copilotRefineWorkflow = response.updatedWorkflow
     } catch (err: any) {
       const errorData = err as any
       if (errorData?.errorCode) {
-        const airaError = errorData as AiraErrorResponse
-        if (airaError.errorCode === 'UNSUPPORTED') {
+        const aivoryError = errorData as CopilotErrorResponse
+        if (aivoryError.errorCode === 'UNSUPPORTED') {
           setError("Aivory can't safely perform that change. Try a more specific instruction.")
-        } else if (airaError.errorCode === 'TIMEOUT' || airaError.errorCode === 'LLM_ERROR') {
+        } else if (aivoryError.errorCode === 'TIMEOUT' || aivoryError.errorCode === 'LLM_ERROR') {
           setError('Aivory ran into an issue. Please try again.')
         } else {
-          setError(airaError.errorMessage || 'An error occurred')
+          setError(aivoryError.errorMessage || 'An error occurred')
         }
       } else {
         setError(err instanceof Error ? err.message : 'An error occurred')
       }
-      console.error('[WorkflowAiraRefineModal] Error:', err)
+      console.error('[WorkflowCopilotRefineModal] Error:', err)
     } finally {
       setLoading(false)
     }
   }
 
   const handleApply = () => {
-    const updatedWorkflow = (window as any).__airaRefineWorkflow
+    const updatedWorkflow = (window as any).__copilotRefineWorkflow
     if (updatedWorkflow) {
       onApply(updatedWorkflow)
       onClose()

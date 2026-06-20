@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
   try {
     // 8s hard timeout — intent classification is best-effort, never blocks the user
-    const res = await fetch(`${bridgeUrl}/aria/stream`, {
+    const res = await fetch(`${bridgeUrl}/aivory-assistant/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -4,7 +4,7 @@ export function getNodeIcon(label: string): React.ReactNode {
   const l = label?.toLowerCase() || '';
 
   // AI / LLM
-  if (l.includes('ai') || l.includes('llm') || l.includes('agent') || l.includes('analyze') || l.includes('generate') || l.includes('aira')) {
+  if (l.includes('ai') || l.includes('llm') || l.includes('agent') || l.includes('analyze') || l.includes('generate') || l.includes('aivory')) {
     return (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round">
         <path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 0 6h-1v1a4 4 0 0 1-8 0v-1H7a3 3 0 0 1 0-6h1V6a4 4 0 0 1 4-4z" />

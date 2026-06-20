@@ -1,7 +1,7 @@
 /**
  * Client-side file text extraction utility
  * Extracts readable text from PDF, DOCX, and plain text files
- * before sending to AIRA — never sends raw binary to the LLM.
+ * before sending to Aivory — never sends raw binary to the LLM.
  *
  * Debug logs prefixed with [fileExtractor] — check browser console.
  */

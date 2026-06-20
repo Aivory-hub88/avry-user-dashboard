@@ -28,7 +28,7 @@ export class ChatStorageError extends Error {
   }
 }
 
-const SESSIONS_KEY = "aira_chat_sessions"
+const SESSIONS_KEY = "aivory_chat_sessions"
 
 /**
  * Load all persisted sessions from localStorage.

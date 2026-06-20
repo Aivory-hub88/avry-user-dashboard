@@ -52,7 +52,7 @@
     "designWorkflow": "Desain Alur Kerja",
     "onboardingTitle": "Apa yang ingin Anda otomasi?",
     "onboardingSubtitle": "Jelaskan sebuah proses dan Aivory akan membuat alur kerja untuk Anda — atau buka Cetak Biru untuk membuatnya dari diagnostik.",
-    "askAiraCopilot": "Minta Aivory Copilot membuat alur kerja",
+    "askAivoryCopilot": "Minta Aivory Copilot membuat alur kerja",
     "hotkeyHint": "Tekan {key1} atau {key2} kapan saja untuk membuka Aivory Copilot",
     "alreadyHaveBlueprint": "Sudah punya cetak biru?",
     "goToBlueprint": "Buka Cetak Biru →",
@@ -80,8 +80,8 @@
     "editStep": "Edit Langkah {index}",
     "editStepWithAI": "Edit Langkah {index} dengan AI",
     "editTrigger": "Edit Pemicu",
-    "editWithAira": "Edit dengan Aivory",
-    "editWithAiraDesc": "Biarkan Aivory membantu menulis ulang dan mengonfigurasi langkah ini",
+    "editWithAivory": "Edit dengan Aivory",
+    "editWithAivoryDesc": "Biarkan Aivory membantu menulis ulang dan mengonfigurasi langkah ini",
     "toolService": "Alat / Layanan yang digunakan",
     "whatProduces": "Apa yang dihasilkan",
     "savedConnection": "KONEKSI TERSIMPAN",
@@ -116,10 +116,10 @@
       "errorNetwork": "Tidak dapat menjangkau server. Periksa koneksi Anda."
     }
   },
-  "aira": {
+  "aivory": {
     "name": "Aivory",
     "fullName": "Aivory Intelligence & Reasoning Agent",
-    "meetAira": "Kenalkan Aivory",
+    "meetAivory": "Kenalkan Aivory",
     "tagline": "Tanyakan Aivory tentang tujuan bisnis, diagnostik, atau Cetak Biru Sistem AI Anda, lalu ubah menjadi alur kerja dan otomasi.",
     "isThinking": "Aivory sedang berpikir",
     "emptyResponse": "Aivory mengembalikan respons kosong. Silakan coba lagi.",
@@ -317,8 +317,8 @@
     "markComplete": "Tandai fase selesai",
     "markedComplete": "Ditandai selesai",
     "complete": "Selesai",
-    "askAiraHelp": "Minta bantuan Aivory",
-    "askAiraRefine": "Minta Aivory menyempurnakan peta jalan",
+    "askAivoryHelp": "Minta bantuan Aivory",
+    "askAivoryRefine": "Minta Aivory menyempurnakan peta jalan",
     "exportPdf": "Ekspor PDF",
     "comingSoon": "Segera hadir",
     "bottomHint": "Gunakan peta jalan ini untuk merencanakan eksekusi dengan Alur Kerja dan Aivory.",

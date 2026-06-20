@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react'
 import { AivoryWorkflowSpec, WorkflowStep } from '@/types/workflows'
-import { useAiraExplainPath } from '@/hooks/useAiraExplainPath'
+import { useCopilotExplainPath } from '@/hooks/useCopilotExplainPath'
 import styles from './ExplainPathModal.module.css'
 
 export interface ExplainPathModalProps {
@@ -16,7 +16,7 @@ export const ExplainPathModal: React.FC<ExplainPathModalProps> = ({
   targetStep,
   onClose,
 }) => {
-  const { isExplaining, result, error, explainPath, clearResult } = useAiraExplainPath()
+  const { isExplaining, result, error, explainPath, clearResult } = useCopilotExplainPath()
 
   useEffect(() => {
     explainPath(workflow, targetStep.id)

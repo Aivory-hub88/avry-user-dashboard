@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const config = getConfig()
     // FIXED: Use /console/stream on VPS Bridge (thin proxy) which forwards to Zeroclaw /webhook
-    // Previous code used /bridge/aira which doesn't exist in thin-proxy server.js
+    // Previous code used /bridge/aivory-assistant which doesn't exist in thin-proxy server.js
     const bridgeUrl = `${config.VPS_BRIDGE_URL}/console/stream`
 
     const controller = new AbortController()

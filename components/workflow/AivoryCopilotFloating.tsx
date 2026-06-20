@@ -39,7 +39,7 @@ interface Props {
   clearMessages?: () => void
 }
 
-export function AiraCopilotFloating({
+export function AivoryCopilotFloating({
   isOpen, onOpenChange, messages, loading, error,
   lastSuggestion, onSendChat, onBuildWorkflow,
   onApplySuggestion, currentWorkflowName, clearMessages,

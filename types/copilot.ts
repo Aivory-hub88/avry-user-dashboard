@@ -5,9 +5,9 @@
 
 import { SavedWorkflow } from '@/hooks/useWorkflows'
 
-export type AiraWorkflowEditMode = 'EDIT_WORKFLOW' | 'EDIT_STEP'
+export type AivoryWorkflowEditMode = 'EDIT_WORKFLOW' | 'EDIT_STEP'
 
-export type AiraChangeOp = 'ADD_STEP' | 'REMOVE_STEP' | 'UPDATE_STEP' | 'MOVE_STEP'
+export type AivoryChangeOp = 'ADD_STEP' | 'REMOVE_STEP' | 'UPDATE_STEP' | 'MOVE_STEP'
 
 export interface WorkflowStep {
   step: number
@@ -16,39 +16,39 @@ export interface WorkflowStep {
   output: string
 }
 
-export interface AiraConstraints {
+export interface AivoryConstraints {
   maxStepsAdded?: number
   allowedNodeTypes?: string[]
   maxTokensSummary?: number
 }
 
-export interface AiraWorkflowEditRequest {
-  mode: AiraWorkflowEditMode
+export interface AivoryWorkflowEditRequest {
+  mode: AivoryWorkflowEditMode
   workflow: SavedWorkflow
   targetStepId?: string
   instruction: string
-  constraints?: AiraConstraints
+  constraints?: AivoryConstraints
   editSessionId?: string
 }
 
-export interface AiraChange {
-  op: AiraChangeOp
+export interface AivoryChange {
+  op: AivoryChangeOp
   stepId?: string
   afterStepId?: string
   step?: WorkflowStep
   fields?: Partial<WorkflowStep>
 }
 
-export interface AiraWorkflowEditResponse {
+export interface AivoryWorkflowEditResponse {
   status: 'ok' | 'error'
-  changes?: AiraChange[]
+  changes?: AivoryChange[]
   updatedWorkflow?: SavedWorkflow
   summary?: string[]
   errorCode?: string
   errorMessage?: string
 }
 
-export interface AiraErrorResponse {
+export interface CopilotErrorResponse {
   status: 'error'
   errorCode: 'INVALID_REQUEST' | 'TIMEOUT' | 'LLM_ERROR' | 'VALIDATION_ERROR' | 'UNSUPPORTED'
   errorMessage: string

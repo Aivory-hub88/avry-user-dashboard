@@ -29,8 +29,8 @@
   border-right: none;
 }
 
-/* ── AIRA flat content block (transparent, blends with console bg) ── */
-.airaCard {
+/* ── Aivory flat content block (transparent, blends with console bg) ── */
+.aivoryCard {
   width: 100%;
   max-width: 720px;
   padding: 16px 18px;
@@ -41,43 +41,43 @@
   word-break: break-word;
 }
 
-.airaCardHeader {
+.aivoryCardHeader {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
 }
 
-.airaCardAvatar {
+.aivoryCardAvatar {
   width: 22px;
   height: 22px;
   border-radius: 999px;
   flex-shrink: 0;
 }
 
-.airaCardBody {
+.aivoryCardBody {
   color: var(--text-primary);
   font-size: 14px;
   line-height: 1.6;
   word-wrap: break-word;
 }
 
-/* Compact variant for floating AIRA panel */
-.airaCardCompact {
+/* Compact variant for floating Aivory panel */
+.aivoryCardCompact {
   padding: 10px 14px;
 }
 
-.airaCardCompact .airaCardHeader {
+.aivoryCardCompact .aivoryCardHeader {
   margin-bottom: 6px;
 }
 
-.airaCardCompact .airaCardBody {
+.aivoryCardCompact .aivoryCardBody {
   font-size: 13px;
   line-height: 1.55;
 }
 
 .messageContent,
-.airaCardBody {
+.aivoryCardBody {
   color: var(--text-primary);
   word-wrap: break-word;
   line-height: 1.7;
@@ -154,25 +154,25 @@
 
 /* Markdown content styling */
 .messageContent p,
-.airaCardBody p {
+.aivoryCardBody p {
   margin: 0 0 14px 0;
 }
 
 .messageContent p:last-child,
-.airaCardBody p:last-child {
+.aivoryCardBody p:last-child {
   margin-bottom: 0;
 }
 
 .messageContent ul,
 .messageContent ol,
-.airaCardBody ul,
-.airaCardBody ol {
+.aivoryCardBody ul,
+.aivoryCardBody ol {
   margin: 8px 0 14px 0;
   padding-left: 24px;
 }
 
 .messageContent li,
-.airaCardBody li {
+.aivoryCardBody li {
   margin: 6px 0;
   line-height: 1.65;
 }
@@ -183,23 +183,23 @@
 .messageContent h4,
 .messageContent h5,
 .messageContent h6,
-.airaCardBody h1,
-.airaCardBody h2,
-.airaCardBody h3,
-.airaCardBody h4,
-.airaCardBody h5,
-.airaCardBody h6 {
+.aivoryCardBody h1,
+.aivoryCardBody h2,
+.aivoryCardBody h3,
+.aivoryCardBody h4,
+.aivoryCardBody h5,
+.aivoryCardBody h6 {
   margin: 10px 0 4px 0;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.messageContent h1, .airaCardBody h1 { font-size: 1.5em; }
-.messageContent h2, .airaCardBody h2 { font-size: 1.3em; }
-.messageContent h3, .airaCardBody h3 { font-size: 1.1em; }
+.messageContent h1, .aivoryCardBody h1 { font-size: 1.5em; }
+.messageContent h2, .aivoryCardBody h2 { font-size: 1.3em; }
+.messageContent h3, .aivoryCardBody h3 { font-size: 1.1em; }
 
 .messageContent blockquote,
-.airaCardBody blockquote {
+.aivoryCardBody blockquote {
   margin: 12px 0;
   padding-left: 16px;
   border-left: 3px solid rgba(255, 255, 255, 0.2);
@@ -207,13 +207,13 @@
 }
 
 .messageContent a,
-.airaCardBody a {
+.aivoryCardBody a {
   color: #60a5fa;
   text-decoration: none;
 }
 
 .messageContent a:hover,
-.airaCardBody a:hover {
+.aivoryCardBody a:hover {
   text-decoration: underline;
 }
 
@@ -224,11 +224,11 @@
     font-size: 14px;
   }
 
-  .airaCard {
+  .aivoryCard {
     padding: 12px 0;
   }
 
-  .airaCardBody {
+  .aivoryCardBody {
     font-size: 13px;
   }
 
@@ -302,7 +302,7 @@
   }
 }
 
-/* Compact variant — used in floating AIRA panel (card layout) */
+/* Compact variant — used in floating Aivory panel (card layout) */
 
 .compactContent {
   font-size: 13px;

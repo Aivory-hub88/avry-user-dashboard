@@ -47,7 +47,7 @@ export function useWorkflowExtend(): UseWorkflowExtendState & UseWorkflowExtendA
       setResult(null)
 
       try {
-        const response = await fetch('/api/workflows/aira-extend', {
+        const response = await fetch('/api/workflows/aivory-extend', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

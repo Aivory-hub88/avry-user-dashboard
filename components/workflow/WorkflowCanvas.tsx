@@ -22,9 +22,9 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 // workflow-nodes.css is imported globally in app/layout.tsx
-import { StepAiraEditModal } from './StepAiraEditModal';
-import { WorkflowAiraRefineModal } from './WorkflowAiraRefineModal';
-import { AddWithAiraPanel } from './AddWithAiraPanel';
+import { StepCopilotEditModal } from './StepCopilotEditModal';
+import { WorkflowCopilotRefineModal } from './WorkflowCopilotRefineModal';
+import { AddWithCopilotPanel } from './AddWithCopilotPanel';
 import { ExplainPathModal } from './ExplainPathModal';
 import { AgentConfigPanel } from './AgentConfigPanel';
 import { WorkflowNode } from './WorkflowNode';
@@ -97,8 +97,8 @@ function normalizeEdges(edges: Edge[], nodes?: Node[]): Edge[] {
  */
 function rehydrateNodeCallbacks(
   nodes: Node[],
-  setAiraSourceStepId: (id: string) => void,
-  setShowAddWithAiraPanel: (show: boolean) => void,
+  setCopilotSourceStepId: (id: string) => void,
+  setShowAddWithCopilotPanel: (show: boolean) => void,
   setAgentConfigNodeId: (id: string) => void,
   setShowAgentConfigPanel: (show: boolean) => void,
   setExplainTargetStep: (step: WorkflowStep) => void,
@@ -109,8 +109,8 @@ function rehydrateNodeCallbacks(
     data: {
       ...n.data,
       onAddStep: () => {
-        setAiraSourceStepId(n.id);
-        setShowAddWithAiraPanel(true);
+        setCopilotSourceStepId(n.id);
+        setShowAddWithCopilotPanel(true);
       },
       ...((n.data as any)?.category === 'agent' ? {
         onConfigureAgent: () => {
@@ -150,15 +150,15 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
   const [executions, setExecutions] = useState<any[]>([]);
   const [execLoading, setExecLoading] = useState(false);
   const [execError, setExecError] = useState<string | null>(null);
-  // AIRA modals state
-  const [showStepAiraModal, setShowStepAiraModal] = useState(false);
-  const [stepAiraIndex, setStepAiraIndex] = useState<number | null>(null);
-  const [showWorkflowAiraModal, setShowWorkflowAiraModal] = useState(false);
+  // Aivory modals state
+  const [showStepCopilotModal, setShowStepCopilotModal] = useState(false);
+  const [stepCopilotIndex, setStepCopilotIndex] = useState<number | null>(null);
+  const [showWorkflowCopilotModal, setShowWorkflowCopilotModal] = useState(false);
   const [currentWorkflow, setCurrentWorkflow] = useState<SavedWorkflow | null>(null);
-  const [airaLoading, setAiraLoading] = useState(false);
+  const [copilotLoading, setCopilotLoading] = useState(false);
   // Add with Aivory panel state
-  const [showAddWithAiraPanel, setShowAddWithAiraPanel] = useState(false);
-  const [airaSourceStepId, setAiraSourceStepId] = useState<string | null>(null);
+  const [showAddWithCopilotPanel, setShowAddWithCopilotPanel] = useState(false);
+  const [copilotSourceStepId, setCopilotSourceStepId] = useState<string | null>(null);
   // Explain path modal state
   const [showExplainModal, setShowExplainModal] = useState(false);
   const [explainTargetStep, setExplainTargetStep] = useState<WorkflowStep | null>(null);
@@ -170,8 +170,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
   const rehydrate = useCallback((loadedNodes: Node[]): Node<WorkflowNodeData>[] => {
     return rehydrateNodeCallbacks(
       loadedNodes,
-      setAiraSourceStepId,
-      setShowAddWithAiraPanel,
+      setCopilotSourceStepId,
+      setShowAddWithCopilotPanel,
       setAgentConfigNodeId,
       setShowAgentConfigPanel,
       setExplainTargetStep,
@@ -291,8 +291,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                   setShowAgentConfigPanel(true);
                 },
                 onAddStep: () => {
-                  setAiraSourceStepId(newId);
-                  setShowAddWithAiraPanel(true);
+                  setCopilotSourceStepId(newId);
+                  setShowAddWithCopilotPanel(true);
                 },
               } as any,
             };
@@ -308,8 +308,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                 category: nodeDef.category,
                 title: nodeDef.label,
                 onAddStep: () => {
-                  setAiraSourceStepId(newId);
-                  setShowAddWithAiraPanel(true);
+                  setCopilotSourceStepId(newId);
+                  setShowAddWithCopilotPanel(true);
                 },
               } as any,
             };
@@ -345,8 +345,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
               description: nodeDef.description,
               color: nodeDef.color,
               onAddStep: () => {
-                setAiraSourceStepId(newId);
-                setShowAddWithAiraPanel(true);
+                setCopilotSourceStepId(newId);
+                setShowAddWithCopilotPanel(true);
               },
             } as any,
           };
@@ -396,8 +396,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
             connectionId: undefined,
             connectionName: undefined,
             onAddStep: () => {
-              setAiraSourceStepId(nodeId);
-              setShowAddWithAiraPanel(true);
+              setCopilotSourceStepId(nodeId);
+              setShowAddWithCopilotPanel(true);
             },
             onExplainPath: () => {
               const step: WorkflowStep = {
@@ -693,14 +693,14 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                     automation_percentage: '0',
                   }
                   setCurrentWorkflow(workflowData)
-                  setShowWorkflowAiraModal(true)
+                  setShowWorkflowCopilotModal(true)
                 }}
-                disabled={airaLoading || isEmpty}
+                disabled={copilotLoading || isEmpty}
                 style={{
                   borderRadius: 7, background: '#282827', padding: '5px 14px',
                   fontSize: 11, fontWeight: 600, color: '#dddac5',
-                  border: '1px solid #666864', cursor: airaLoading || isEmpty ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-                  opacity: (airaLoading || isEmpty) ? 0.5 : 1,
+                  border: '1px solid #666864', cursor: copilotLoading || isEmpty ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                  opacity: (copilotLoading || isEmpty) ? 0.5 : 1,
                   transition: 'all 0.15s',
                 }}
                 title={isEmpty ? 'Add steps to refine workflow' : 'Refine workflow with Aivory'}
@@ -894,11 +894,11 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
         />
       )}
 
-      {/* ── AIRA Modals ── */}
-      {showWorkflowAiraModal && currentWorkflow && (
-        <WorkflowAiraRefineModal
+      {/* ── Aivory Modals ── */}
+      {showWorkflowCopilotModal && currentWorkflow && (
+        <WorkflowCopilotRefineModal
           workflow={currentWorkflow}
-          onClose={() => setShowWorkflowAiraModal(false)}
+          onClose={() => setShowWorkflowCopilotModal(false)}
           onApply={(updatedWorkflow) => {
             // Update nodes and edges based on updated workflow
             const updatedNodes = updatedWorkflow.steps.map((step, i) => {
@@ -931,23 +931,23 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
             }))
             setNodes(updatedNodes)
             setEdges(normalizeEdges(updatedEdges, updatedNodes))
-            setShowWorkflowAiraModal(false)
+            setShowWorkflowCopilotModal(false)
           }}
         />
       )}
 
       {/* ── Add with Aivory Panel ── */}
-      {showAddWithAiraPanel && airaSourceStepId && nodes.find(n => n.id === airaSourceStepId) && (
+      {showAddWithCopilotPanel && copilotSourceStepId && nodes.find(n => n.id === copilotSourceStepId) && (
         <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} onClick={() => setShowAddWithAiraPanel(false)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} onClick={() => setShowAddWithCopilotPanel(false)} />
           <div style={{ position: 'relative', zIndex: 1001 }}>
-            <AddWithAiraPanel
+            <AddWithCopilotPanel
               workflow={rawWorkflow}
-              sourceStep={nodes.find(n => n.id === airaSourceStepId)?.data as any}
+              sourceStep={nodes.find(n => n.id === copilotSourceStepId)?.data as any}
               onApply={(result) => {
                 // Add new steps and edges to canvas
                 const newSteps = result.newSteps.map((step, i) => ({
-                  id: `${airaSourceStepId}-ext-${i}`,
+                  id: `${copilotSourceStepId}-ext-${i}`,
                   type: 'appNode' as const,
                   position: { x: 0, y: (i + 1) * 180 },
                   data: {
@@ -960,8 +960,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                     connectionId: step.connectionId,
                     connectionName: step.connectionId,
                     onAddStep: () => {
-                      setAiraSourceStepId(`${airaSourceStepId}-ext-${i}`);
-                      setShowAddWithAiraPanel(true);
+                      setCopilotSourceStepId(`${copilotSourceStepId}-ext-${i}`);
+                      setShowAddWithCopilotPanel(true);
                     },
                   } as any,
                 }));
@@ -975,12 +975,12 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                 }));
                 setNodes((nds) => [...nds, ...newSteps]);
                 setEdges((eds) => [...eds, ...normalizeEdges(newEdges, newSteps)]);
-                setShowAddWithAiraPanel(false);
+                setShowAddWithCopilotPanel(false);
               }}
-              onCancel={() => setShowAddWithAiraPanel(false)}
+              onCancel={() => setShowAddWithCopilotPanel(false)}
               onManualAdd={() => {
                 // TODO: Open manual step addition UI
-                setShowAddWithAiraPanel(false);
+                setShowAddWithCopilotPanel(false);
               }}
             />
           </div>

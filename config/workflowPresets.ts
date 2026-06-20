@@ -2,7 +2,7 @@
  * Workflow Extension Quick-Action Presets
  * 
  * Predefined instruction templates for common workflow patterns.
- * These are used in AddWithAiraPanel to provide quick shortcuts for users.
+ * These are used in AddWithCopilotPanel to provide quick shortcuts for users.
  */
 
 import { WorkflowStep } from '@/types/workflows'

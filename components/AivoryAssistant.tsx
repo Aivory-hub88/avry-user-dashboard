@@ -37,7 +37,7 @@ const ACTION_CHIPS = [
   { id: "upload", label: "upload file", icon: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>) },
 ]
 
-export default function AiraFloatingAssistant() {
+export default function AivoryAssistant() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
@@ -80,7 +80,7 @@ export default function AiraFloatingAssistant() {
   // Hydration guard
   useEffect(() => { setMounted(true) }, [])
 
-  // Listen for aira:open events from other pages (e.g. Roadmap)
+  // Listen for aivory-assistant:open events from other pages (e.g. Roadmap)
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ prefill?: string; sourceTab?: string; pageContext?: Record<string, unknown> }>).detail
@@ -95,8 +95,8 @@ export default function AiraFloatingAssistant() {
         setActivePageContext(detail.pageContext)
       }
     }
-    window.addEventListener('aira:open', handler)
-    return () => window.removeEventListener('aira:open', handler)
+    window.addEventListener('aivory-assistant:open', handler)
+    return () => window.removeEventListener('aivory-assistant:open', handler)
   }, [])
 
   // Auto-scroll on new messages
@@ -197,7 +197,7 @@ export default function AiraFloatingAssistant() {
     ])
 
     try {
-      // Single canonical path for ALL tabs: /api/aira/stream → /bridge/aira → Zeroclaw
+      // Single canonical path for ALL tabs: /api/aivory-assistant/stream → /bridge/aivory-assistant → Zeroclaw
       // Tab-specific context (source_tab + pageContext) is passed via the `context` field.
       // When on roadmap page, include mode=roadmap_explain and the full AiryRoadmap object.
       const effectiveSourceTab = activeSourceTab || pageContext || "unknown"
@@ -216,7 +216,7 @@ export default function AiraFloatingAssistant() {
       let accumulated = ""
       let hasError = false
 
-      const baseStream = streamConsoleResponse("/api/aira/stream", {
+      const baseStream = streamConsoleResponse("/api/aivory-assistant/stream", {
         session_id: sessionId,
         organization_id: "demo_org",
         messages: apiMessages,

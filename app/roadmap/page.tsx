@@ -90,11 +90,11 @@ const STATUS_COLORS = {
   none:   { bg: 'transparent', border: 'transparent', dot: 'transparent' },
 };
 
-// ─── AIRA trigger ─────────────────────────────────────────────
-// Context (page/mode/roadmap) is driven by the current route in AiraFloatingAssistant,
+// ─── Aivory trigger ─────────────────────────────────────────────
+// Context (page/mode/roadmap) is driven by the current route in AivoryAssistant,
 // NOT by the prefill text. The pageContext here is supplementary metadata only.
-const openAira = (msg: string, pageContext?: Record<string, unknown>) =>
-  window.dispatchEvent(new CustomEvent('aira:open', {
+const openAivoryAssistant = (msg: string, pageContext?: Record<string, unknown>) =>
+  window.dispatchEvent(new CustomEvent('aivory-assistant:open', {
     detail: {
       prefill: msg,
       sourceTab: 'roadmap',
@@ -336,7 +336,7 @@ function MilestoneRow({ m, checked, onToggle, onWorkflow }: {
   const router = useRouter();
 
   const handleAskHelp = () => {
-    openAira(
+    openAivoryAssistant(
       `How do I complete "${m.title}" for a company dealing with manual data entry, slow customer onboarding, and repetitive content approval workflows?`,
       { milestone: m.title, context: 'roadmap_milestone_help' }
     );
@@ -591,14 +591,14 @@ function PhaseSection({ phase, index, open, phaseRef, onToggle, onWorkflow, chec
             <BtnComplete active={phaseComplete} onClick={onPhaseComplete}>
               {phaseComplete ? t("markedComplete") : t("markComplete")}
             </BtnComplete>
-            <BtnAira onClick={() => openAira(
+            <BtnAivory onClick={() => openAivoryAssistant(
               `Help me work on "${phase.name}" of my AI Roadmap.\nMilestones:\n${phase.milestones.map(m => `- ${m.title}`).join('\n')}`,
               {
                 roadmapTitle: phase.name,
                 currentPhase: phase.name,
                 milestones: phase.milestones.map(m => m.title),
               }
-            )}>{t("askAiraHelp")}</BtnAira>
+            )}>{t("askAivoryHelp")}</BtnAivory>
           </div>
         </div>
       )}
@@ -624,7 +624,7 @@ function BtnGhost({ onClick, disabled, title, children }: {
   );
 }
 
-function BtnAira({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+function BtnAivory({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   const [h, setH] = useState(false);
   return (
     <button onClick={onClick} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
@@ -1171,14 +1171,14 @@ export default function RoadmapPage() {
                     {t("exportPdf")}
                   </span>
                 </BtnGhost>
-                <BtnAira onClick={() => openAira(
+                <BtnAivory onClick={() => openAivoryAssistant(
                   `Review and refine my AI Roadmap based on these phases and KPIs.\n${roadmap.phases.map((p, i) => `Phase ${i + 1}: ${p.name} (${p.timeframe})`).join('\n')}`,
                   {
                     roadmapTitle: roadmap.title ?? 'AI Roadmap',
                     currentPhase: roadmap.phases[activeIdx]?.name ?? '',
                     milestones: roadmap.phases.flatMap(p => p.milestones.map(m => m.title)),
                   }
-                )}>{t("askAiraRefine")}</BtnAira>
+                )}>{t("askAivoryRefine")}</BtnAivory>
               </div>
             </div>
           </>

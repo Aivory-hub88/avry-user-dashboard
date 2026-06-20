@@ -3,9 +3,9 @@
 import { useState } from 'react'
 import { SavedWorkflow } from '@/hooks/useWorkflows'
 import { requestStepEdit } from '@/lib/workflowAIEditor'
-import type { AiraErrorResponse } from '@/types/aira'
+import type { CopilotErrorResponse } from '@/types/copilot'
 
-interface StepAiraEditModalProps {
+interface StepCopilotEditModalProps {
   stepIndex: number
   stepAction: string
   stepTool?: string
@@ -14,14 +14,14 @@ interface StepAiraEditModalProps {
   onApply: (updatedWorkflow: SavedWorkflow) => void
 }
 
-export function StepAiraEditModal({
+export function StepCopilotEditModal({
   stepIndex,
   stepAction,
   stepTool,
   workflow,
   onClose,
   onApply,
-}: StepAiraEditModalProps) {
+}: StepCopilotEditModalProps) {
   const [instruction, setInstruction] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -50,18 +50,18 @@ export function StepAiraEditModal({
     } catch (err: any) {
       const errorData = err as any
       if (errorData?.errorCode) {
-        const airaError = errorData as AiraErrorResponse
-        if (airaError.errorCode === 'UNSUPPORTED') {
+        const aivoryError = errorData as CopilotErrorResponse
+        if (aivoryError.errorCode === 'UNSUPPORTED') {
           setError("Aivory can't safely perform that change. Try a more specific instruction.")
-        } else if (airaError.errorCode === 'TIMEOUT' || airaError.errorCode === 'LLM_ERROR') {
+        } else if (aivoryError.errorCode === 'TIMEOUT' || aivoryError.errorCode === 'LLM_ERROR') {
           setError('Aivory ran into an issue. Please try again.')
         } else {
-          setError(airaError.errorMessage || 'An error occurred')
+          setError(aivoryError.errorMessage || 'An error occurred')
         }
       } else {
         setError(err instanceof Error ? err.message : 'An error occurred')
       }
-      console.error('[StepAiraEditModal] Error:', err)
+      console.error('[StepCopilotEditModal] Error:', err)
     } finally {
       setLoading(false)
     }

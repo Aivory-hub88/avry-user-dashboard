@@ -34,7 +34,7 @@ export const SERVICES = {
   N8N_API_KEY: process.env.N8N_API_KEY || '',
 
   /** ARIA n8n webhook — routed via VPS Bridge */
-  ARIA_WEBHOOK: process.env.ARIA_WEBHOOK_URL || 'https://api.aivory.id/webhook/755fcac8-dc36-49e3-9553-67e62bac82e8',
+  AIVORY_ASSISTANT_WEBHOOK: process.env.AIVORY_ASSISTANT_WEBHOOK_URL || 'https://api.aivory.id/webhook/755fcac8-dc36-49e3-9553-67e62bac82e8',
 
   /** OpenRouter API base URL */
   OPENROUTER: 'https://openrouter.ai/api/v1',

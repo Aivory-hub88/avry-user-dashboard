@@ -46,12 +46,12 @@ export async function planWorkflowFromNaturalLanguage(
   const timer = setTimeout(() => controller.abort(), 30000);
 
   try {
-    // /bridge/aira calls Zeroclaw directly via callZeroclawWithSkill
+    // /bridge/aivory-assistant calls Zeroclaw directly via callZeroclawWithSkill
     // Only requires: message (no session_id, no organization_id)
     // Returns: { message, final_text, raw_agent_response, model, skill }
     const fullMessage = `${DECOMPOSE_INSTRUCTION}${userInput}`;
 
-    const res = await fetch(`${VPS_BRIDGE_URL}/bridge/aira`, {
+    const res = await fetch(`${VPS_BRIDGE_URL}/bridge/aivory-assistant`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -69,7 +69,7 @@ export async function planWorkflowFromNaturalLanguage(
     }
 
     const data = await res.json();
-    // /bridge/aira returns: { message, final_text, raw_agent_response, model, skill }
+    // /bridge/aivory-assistant returns: { message, final_text, raw_agent_response, model, skill }
     const rawText = data?.final_text || data?.message || data?.raw_agent_response || data?.response || '';
 
     // FIX: Remove extra backslashes

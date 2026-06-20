@@ -1,7 +1,7 @@
 /**
- * AddWithAiraPanel Component
+ * AddWithCopilotPanel Component
  * 
- * Mini panel for adding follow-up steps with AIRA after a specific node.
+ * Mini panel for adding follow-up steps with Aivory after a specific node.
  * Anchored to the node and shows context about the current step.
  */
 
@@ -11,9 +11,9 @@ import React, { useState, useCallback } from 'react'
 import { AivoryWorkflowSpec, WorkflowStep } from '@/types/workflows'
 import { useWorkflowExtend } from '@/hooks/useWorkflowExtend'
 import { QUICK_ACTION_PRESETS, getPresetInstruction } from '@/config/workflowPresets'
-import styles from './AddWithAiraPanel.module.css'
+import styles from './AddWithCopilotPanel.module.css'
 
-export interface AddWithAiraPanelProps {
+export interface AddWithCopilotPanelProps {
   workflow: AivoryWorkflowSpec
   sourceStep: WorkflowStep
   onApply: (result: { newSteps: WorkflowStep[]; newEdges: any[] }) => void
@@ -22,12 +22,12 @@ export interface AddWithAiraPanelProps {
 }
 
 /**
- * AddWithAiraPanel
+ * AddWithCopilotPanel
  * 
  * Shows a mini panel with node context and instruction input.
- * Allows user to ask AIRA to generate follow-up steps or fall back to manual.
+ * Allows user to ask Aivory to generate follow-up steps or fall back to manual.
  */
-export const AddWithAiraPanel: React.FC<AddWithAiraPanelProps> = ({
+export const AddWithCopilotPanel: React.FC<AddWithCopilotPanelProps> = ({
   workflow,
   sourceStep,
   onApply,
@@ -39,7 +39,7 @@ export const AddWithAiraPanel: React.FC<AddWithAiraPanelProps> = ({
     `Add a follow-up step after this ${sourceStep?.appId ?? sourceStep?.id ?? 'step'} step`
   )
 
-  const handleAskAira = useCallback(async () => {
+  const handleAskCopilot = useCallback(async () => {
     await extendWorkflow(workflow, sourceStep.id, instruction)
   }, [extendWorkflow, workflow, sourceStep.id, instruction])
 
@@ -142,11 +142,11 @@ export const AddWithAiraPanel: React.FC<AddWithAiraPanelProps> = ({
 
         {/* Instruction Input */}
         <div className={styles.inputGroup}>
-          <label htmlFor="aira-instruction" className={styles.label}>
+          <label htmlFor="aivory-instruction" className={styles.label}>
             What should happen next?
           </label>
           <textarea
-            id="aira-instruction"
+            id="aivory-instruction"
             className={styles.textarea}
             placeholder="e.g., Send a Slack notification with the result"
             value={instruction}
@@ -167,8 +167,8 @@ export const AddWithAiraPanel: React.FC<AddWithAiraPanelProps> = ({
         {/* Action Buttons */}
         <div className={styles.actions}>
           <button
-            className={styles.askAiraBtn}
-            onClick={handleAskAira}
+            className={styles.askCopilotBtn}
+            onClick={handleAskCopilot}
             disabled={loading || !instruction.trim()}
             title={loading ? 'Generating...' : 'Ask Aivory to generate follow-up steps'}
           >
