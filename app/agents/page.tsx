@@ -1,7 +1,7 @@
 'use client';
 import { asset } from "@/lib/asset";
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 
 const NoiseOverlay = () => (
@@ -243,6 +243,25 @@ function AgentCard({ agent, onDeploy }: { agent: typeof AGENTS[0], onDeploy: () 
 
 export default function AgentsPage() {
   const [deployingAgent, setDeployingAgent] = useState<string | null>(null);
+  const [dynamicAgents, setDynamicAgents] = useState<any[]>([]);
+  useEffect(() => {
+    fetch('/dashboard/api/agent-catalog')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (!Array.isArray(data)) return;
+        const grads = Object.values(AGENT_GRADIENTS);
+        setDynamicAgents(
+          data.map((a: any, i: number) => ({
+            title: a.name,
+            description: a.description || '',
+            gradient: grads[i % grads.length],
+            icon: AGENTS[0].icon,
+          }))
+        );
+      })
+      .catch(() => {});
+  }, []);
+  const allAgents = [...AGENTS, ...dynamicAgents];
 
   return (
     <div className="min-h-screen bg-[#353531] text-white p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
@@ -296,7 +315,7 @@ export default function AgentsPage() {
 
         {/* 4-Column Grid for Agent Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
-          {AGENTS.map((agent, idx) => (
+          {allAgents.map((agent, idx) => (
             <AgentCard key={idx} agent={agent} onDeploy={() => setDeployingAgent(agent.title)} />
           ))}
         </div>
