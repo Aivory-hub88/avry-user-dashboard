@@ -65,7 +65,7 @@ Generate 3-4 phases. Each phase should have 2-4 milestones and 2-3 KPIs. Be spec
     let roadmap: AiryRoadmap;
 
     try {
-      const aiRes = await fetch(`${SERVICES.VPS_BRIDGE}/api/console/stream`, {
+      const aiRes = await fetch(`${SERVICES.VPS_BRIDGE}/console/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -82,8 +82,16 @@ Generate 3-4 phases. Each phase should have 2-4 milestones and 2-3 KPIs. Be spec
         throw new Error(`AI service returned ${aiRes.status}`);
       }
 
-      const aiData = await aiRes.json();
-      const rawText: string = aiData.response || aiData.content || aiData.message || '';
+      // Bridge /console/stream returns SSE (data: {type:'chunk',content}) — accumulate it
+      const sseText = await aiRes.text();
+      let rawText = '';
+      for (const line of sseText.split('\n')) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const evt = JSON.parse(line.slice(6));
+          if (evt && typeof evt.content === 'string') rawText += evt.content;
+        } catch { /* ignore non-JSON SSE lines */ }
+      }
 
       // Extract JSON from the response
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
