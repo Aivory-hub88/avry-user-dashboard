@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       updatedWorkflow: hasWf ? wf : workflow,
       changes: Array.isArray(data?.changes) ? data.changes : [],
-      summary: [data?.message || wf?.summary || 'Workflow updated'],
+      summary: [wf?.summary || 'Workflow updated'],
     })
   } catch (err) {
     return NextResponse.json(
