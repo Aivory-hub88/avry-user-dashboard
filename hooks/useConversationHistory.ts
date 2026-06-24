@@ -2,20 +2,9 @@
 import { useState, useMemo, useCallback, useEffect } from "react"
 import { Conversation, ConversationGroup } from "@/types/conversation"
 
-const STORAGE_KEY = "aivory_conversation_history"
+const STORAGE_KEY = "aivory_conversation_history_v2"
 
-const seedConversations: Conversation[] = [
-  { id: "1", title: "Project Architecture Discussion", updatedAt: new Date(), pinned: true },
-  { id: "2", title: "API Design Review", updatedAt: new Date(), pinned: false },
-  { id: "3", title: "Database Schema Planning", updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000), pinned: true },
-  { id: "4", title: "Frontend Component Structure", updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), pinned: false },
-  { id: "5", title: "Authentication Flow", updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), pinned: false },
-  { id: "6", title: "Performance Optimization", updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), pinned: false },
-  { id: "7", title: "Security Audit", updatedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000), pinned: false },
-  { id: "8", title: "Deployment Strategy", updatedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), pinned: false },
-  { id: "9", title: "Monitoring Setup", updatedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000), pinned: false },
-  { id: "10", title: "Legacy Code Migration", updatedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000), pinned: false },
-]
+const seedConversations: Conversation[] = []
 
 export function useConversationHistory() {
   const [conversations, setConversations] = useState<Conversation[]>(seedConversations)
