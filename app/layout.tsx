@@ -27,9 +27,6 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: "Aivory Dashboard",
   description: "AI-powered workflow automation dashboard",
-  icons: {
-    icon: '/dashboard/Favicon_Aivory.svg',
-  },
 }
 
 export default function RootLayout({
