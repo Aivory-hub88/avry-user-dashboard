@@ -59,41 +59,56 @@ export class DeepDiagnosticService {
     organizationId: string,
     phases: Record<PhaseId, Record<string, any>>
   ): Promise<DeepDiagnosticResponse> {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 120_000)
-
-    let response: Response
+    // 1) Enqueue the deep diagnostic — the bridge returns a job_id immediately.
+    let submitRes: Response
     try {
-      response = await fetch('/api/diagnostics/run', {
+      submitRes = await fetch('/api/diagnostics/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ organization_id: organizationId, mode: 'deep', phases }),
-        signal: controller.signal,
       })
     } catch (err: any) {
-      if (err?.name === 'AbortError') throw new Error('Request timed out. Please try again.')
-      throw err
-    } finally {
-      clearTimeout(timeout)
+      throw new Error(err?.message || 'Failed to submit diagnostic')
     }
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Failed to submit diagnostic' }))
+    if (!submitRes.ok) {
+      const error = await submitRes.json().catch(() => ({ message: 'Failed to submit diagnostic' }))
       throw new Error(error.message || 'Failed to submit diagnostic')
     }
+    const queued = await submitRes.json().catch(() => ({} as any))
+    const jobId = queued?.job_id
+    if (!jobId) throw new Error('Invalid response format from server')
 
-    const result: DeepDiagnosticResponse = await response.json()
-    if (!result.diagnostic_id) throw new Error('Invalid response format from server')
+    // 2) Poll for the result until complete (avoids the Cloudflare ~100s timeout
+    //    that broke the old synchronous request).
+    const deadline = Date.now() + 180_000
+    const POLL_INTERVAL_MS = 3_000
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
+      let pollRes: Response
+      try {
+        pollRes = await fetch(`/api/diagnostics/result/${jobId}`)
+      } catch {
+        continue // transient network blip — keep polling
+      }
+      if (!pollRes.ok) {
+        const error = await pollRes.json().catch(() => ({ message: 'Diagnostic failed' }))
+        throw new Error(error.message || 'Diagnostic failed')
+      }
+      const data = await pollRes.json().catch(() => ({} as any))
+      if (data?.status && data.status !== 'success') continue // still running
 
-    if (
-      typeof (result as any).ai_readiness_score === 'number' &&
-      typeof result.score !== 'number'
-    ) {
-      (result as any).score = (result as any).ai_readiness_score
+      const result = data as DeepDiagnosticResponse
+      if (!result.diagnostic_id) throw new Error('Invalid response format from server')
+      if (
+        typeof (result as any).ai_readiness_score === 'number' &&
+        typeof result.score !== 'number'
+      ) {
+        (result as any).score = (result as any).ai_readiness_score
+      }
+      if (typeof result.score !== 'number') throw new Error('Invalid response format from server')
+      return result
     }
-
-    if (typeof result.score !== 'number') throw new Error('Invalid response format from server')
-    return result
+    throw new Error('Diagnostic timed out. Please try again.')
   }
 
   /**
