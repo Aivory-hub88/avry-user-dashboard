@@ -59,14 +59,12 @@ export default async function TemplateDetailPage({ params }: { params: Promise<{
                       <img 
                         src={asset(template.author.avatar)} 
                         alt={template.author.name} 
-                        className={template.author.name === "Aivory Tech Lab" ? "h-6 w-auto object-contain brightness-0 invert opacity-90" : "w-6 h-6 rounded-full"} 
+                        className={template.author.name === "Aivory Tech Lab" ? "h-10 w-auto object-contain brightness-0 invert opacity-90" : "w-6 h-6 rounded-full"} 
                       />
                     ) : (
                       <div className="w-6 h-6 rounded-full bg-white/10" />
                     )}
-                    {template.author.name !== "Aivory Tech Lab" && (
-                      <span className="text-[13px] text-white/80">{template.author.name}</span>
-                    )}
+                    <span className="text-[13px] text-white/80">{template.author.name}</span>
                   </div>
                 </div>
               )}
