@@ -42,7 +42,7 @@ export const TEMPLATES: Template[] = [
     category: "Communication",
     author: {
       name: "Aivory Tech Lab",
-      avatar: "/Aivory_icon_2026.svg"
+      avatar: "/aivory-tech-lab-v2.svg"
     },
     lastUpdated: "June 10 05:15",
     nodesList: [
