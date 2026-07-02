@@ -11,6 +11,7 @@ import {
   loadDeepDiagnosticResult as _supabaseLoadResult,
 } from '@/lib/supabaseStorage'
 import { isMisconfigured as _supabaseMisconfigured } from '@/lib/supabaseClient'
+import { CURRENCY_RATES, FX_AS_OF } from '@/lib/currencyConfig'
 
 // In-memory fallback when localStorage is unavailable
 let _memoryProgress: DeepDiagnosticProgress | null = null
@@ -393,17 +394,7 @@ function parseFteCount(val: string | undefined): number | null {
 
 // ---- Currency ----
 
-const CURRENCY_RATES: Record<CurrencyCode, number> = {
-  USD: 1,
-  EUR: 0.92,
-  GBP: 0.79,
-  IDR: 15_600,
-  SGD: 1.35,
-  MYR: 4.72,
-  AUD: 1.53,
-  JPY: 149,
-  INR: 83,
-}
+// CURRENCY_RATES + FX_AS_OF now sourced from @/lib/currencyConfig
 
 // FIX #3: Industry-aware labor hourly rate (USD).
 // Previously hardcoded at $15/hr which is unrealistic for Tech/Software.
@@ -511,11 +502,48 @@ function calculateROI(
     ? totalAnnualSavingsUSD * (90 / 365)
     : null
 
+  // ── Ongoing run cost + net economics (enterprise credibility) ───────────
+  // Year-1 investment (budget) alone overstates ROI; real programs carry an
+  // annual run cost (licenses, maintenance, support, monitoring). Assume it is
+  // a fraction of the initial investment per year.
+  const ONGOING_COST_RATE = 0.20
+  const annualOngoingCostUSD = budgetUSD !== null ? Math.round(budgetUSD * ONGOING_COST_RATE) : null
+  const netAnnualSavingsUSD =
+    totalAnnualSavingsUSD !== null && annualOngoingCostUSD !== null
+      ? totalAnnualSavingsUSD - annualOngoingCostUSD
+      : totalAnnualSavingsUSD
+  const netPaybackMonths =
+    netAnnualSavingsUSD && netAnnualSavingsUSD > 0 && budgetUSD
+      ? Math.round((budgetUSD / netAnnualSavingsUSD) * 12 * 10) / 10
+      : null
+  const netThreeYearROIRaw =
+    netAnnualSavingsUSD !== null && budgetUSD && budgetUSD > 0
+      ? ((netAnnualSavingsUSD * 3 - budgetUSD) / budgetUSD) * 100
+      : null
+  const netThreeYearROIPercent =
+    netThreeYearROIRaw !== null ? Math.min(Math.round(netThreeYearROIRaw), 999) : null
+
+  // Scenario range: vary the efficiency factor conservative..optimistic.
+  const scenarioNetRoi = (eff: number): number | null => {
+    if (!q.totalManualHoursWeekly || annualOngoingCostUSD === null || !budgetUSD || budgetUSD <= 0) return null
+    const reclaimed = hoursPerYear * incrementalAutoPct * eff
+    const labor = reclaimed * hourlyRateUSD
+    const total = labor + labor * 0.2
+    const net = total - annualOngoingCostUSD
+    return Math.min(Math.round(((net * 3 - budgetUSD) / budgetUSD) * 100), 999)
+  }
+  const scenarioThreeYearROI = {
+    low: scenarioNetRoi(0.5),
+    base: netThreeYearROIPercent,
+    high: scenarioNetRoi(0.9),
+  }
+
   // Bug 3 — Audit log: always log budgetMidpointUSD alongside the ROI result
   // so the formula is auditable: ((totalAnnualSavingsUSD × 3 − investment) / investment) × 100
   if (process.env.NODE_ENV !== 'test') {
     console.log('[ROI Audit]', {
       industry: industry ?? 'unknown',
+      fxAsOf: FX_AS_OF,
       baseHourlyRateUSD,
       hourlyRateUSD,
       smallTeamRateApplied,
@@ -551,6 +579,15 @@ function calculateROI(
     assumedBudgetMidpointLocal: budgetUSD !== null ? budgetUSD * rate : null,
     efficiencyFactor: EFFICIENCY_FACTOR,
     smallTeamRateApplied,
+    // Ongoing cost + net economics + scenario range
+    ongoingCostRate: ONGOING_COST_RATE,
+    annualOngoingCostUSD,
+    annualOngoingCostLocal: annualOngoingCostUSD !== null ? annualOngoingCostUSD * rate : null,
+    netAnnualSavingsUSD,
+    netAnnualSavingsLocal: netAnnualSavingsUSD !== null ? netAnnualSavingsUSD * rate : null,
+    netPaybackMonths,
+    netThreeYearROIPercent,
+    scenarioThreeYearROI,
     // Backward-compat aliases for any stored DiagnosticContext that still uses *IDR names
     annualLaborSavingsIDR: annualLaborSavingsUSD ? annualLaborSavingsUSD * rate : null,
     annualProcessSavingsIDR: annualProcessSavingsUSD ? annualProcessSavingsUSD * rate : null,
@@ -580,6 +617,9 @@ function scoreData(a: DiagnosticAnswers): number {
   else if (a.data_quality?.includes('Moderate')) s += 5
   if (a.system_integration?.includes('Fully integrated')) s += 15
   else if (a.system_integration?.includes('Some integration')) s += 7
+  if (a.data_infrastructure?.includes('Modern data platform')) s += 15
+  else if (a.data_infrastructure?.includes('warehouse') || a.data_infrastructure?.includes('lake')) s += 10
+  else if (a.data_infrastructure?.includes('Databases')) s += 5
   return Math.min(100, s)
 }
 
@@ -618,6 +658,10 @@ function scoreGovernance(a: DiagnosticAnswers): number {
   else if (a.risk_tolerance?.includes('Low')) s += 5
   if (a.budget_allocated?.includes('specific allocation')) s += 15
   else if (a.budget_allocated?.includes('flexible')) s += 8
+  if (a.ai_governance?.includes('Formal AI governance')) s += 12
+  else if (a.ai_governance?.includes('Informal')) s += 6
+  if (a.ai_data_privacy?.includes('Formal privacy')) s += 10
+  else if (a.ai_data_privacy?.includes('Basic')) s += 5
   return Math.min(100, s)
 }
 

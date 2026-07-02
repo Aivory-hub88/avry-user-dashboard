@@ -299,6 +299,20 @@ export interface ROIProjection {
   efficiencyFactor: number
   /** Whether the small-team opportunity-cost rate adjustment was applied. */
   smallTeamRateApplied: boolean
+  /** Assumed annual ongoing cost as a fraction of the initial investment. */
+  ongoingCostRate?: number
+  /** Annual ongoing run cost (licenses/maintenance/support), USD and local. */
+  annualOngoingCostUSD?: number | null
+  annualOngoingCostLocal?: number | null
+  /** Net annual savings after ongoing cost, USD and local. */
+  netAnnualSavingsUSD?: number | null
+  netAnnualSavingsLocal?: number | null
+  /** Payback on net savings (months). */
+  netPaybackMonths?: number | null
+  /** 3-year ROI computed on net savings (%). */
+  netThreeYearROIPercent?: number | null
+  /** Conservative / base / optimistic 3-year ROI range (%). */
+  scenarioThreeYearROI?: { low: number | null; base: number | null; high: number | null }
   /** @deprecated Use annualLaborSavingsLocal — kept for backward compat with stored contexts */
   annualLaborSavingsIDR?: number | null
   /** @deprecated Use annualProcessSavingsLocal — kept for backward compat with stored contexts */

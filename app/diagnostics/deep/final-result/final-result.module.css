@@ -440,3 +440,54 @@
 .roiNegativeReason { background: rgba(248, 113, 113, 0.07); border-radius: 6px; padding: 8px 12px; }
 .roiNegativeLabel { display: block; font-size: 12px; font-weight: 700; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
 .roiFixLabel { display: block; font-size: 12px; font-weight: 700; color: #afd199; margin-bottom: 3px; }
+
+
+/* ── AI Analysis section ── */
+.aiNarrative {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--dd-text, #e5e7eb);
+  margin: 0 0 1rem;
+}
+.aiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.aiColTitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dd-muted, #9ca3af);
+  margin: 0 0 0.5rem;
+}
+.aiList {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.aiNextStep {
+  font-size: 0.92rem;
+  line-height: 1.6;
+  border-left: 3px solid #afd199;
+  padding-left: 0.75rem;
+  margin: 0 0 0.75rem;
+}
+.aiDisclaimer,
+.aiUnavailable {
+  font-size: 0.78rem;
+  color: var(--dd-muted, #9ca3af);
+  margin: 0;
+}
+
+.scenarioRow { display:flex; flex-direction:column; gap:.35rem; margin:.75rem 0 1rem; padding:.75rem 1rem; border:1px solid rgba(255,255,255,.08); border-radius:10px; }
+.scenarioLabel { font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; color:var(--dd-muted,#9ca3af); }
+.scenarioValues { display:flex; gap:1.25rem; flex-wrap:wrap; font-size:.95rem; font-weight:600; }
+.scenarioLow { color:#fbbf24; } .scenarioBase { color:#afd199; } .scenarioHigh { color:#60a5fa; }
+.scenarioNote { font-size:.75rem; color:var(--dd-muted,#9ca3af); }
