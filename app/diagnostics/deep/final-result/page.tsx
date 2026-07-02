@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { DiagnosticContext } from '@/types/diagnostic'
-import { upgradeDiagnosticContext, DeepDiagnosticService } from '@/services/deepDiagnostic'
+import { upgradeDiagnosticContext, DeepDiagnosticService, maturityFromScore } from '@/services/deepDiagnostic'
 import HeaderBar from '@/components/result/HeaderBar'
 import ScoreRing from '@/components/result/ScoreRing'
 import RadarChart from '@/components/result/RadarChart'
@@ -188,8 +188,17 @@ export default function FinalResultPage() {
   const quickWinCount = opportunities.filter(o => o.quadrant === 'quick_win').length
 
   // Assessment broken into individual bullet lines matching the screenshot
+  const _llmScore =
+    typeof (llmResult as any)?.score === 'number' ? (llmResult as any).score
+    : typeof (llmResult as any)?.ai_readiness_score === 'number' ? (llmResult as any).ai_readiness_score
+    : null
+  const _blended = _llmScore != null ? Math.round(scores.composite * 0.7 + _llmScore * 0.3) : scores.composite
+  const displayScores = _llmScore != null
+    ? { ...scores, composite: _blended, maturityLevel: maturityFromScore(_blended) }
+    : scores
+
   const assessmentBullets: { icon: string; color: string; text: string }[] = [
-    { icon: '▲', color: '#afd199', text: `Your company / organization scores ${scores.composite}/100, placing it at ${scores.maturityLevel} maturity.` },
+    { icon: '▲', color: '#afd199', text: `Your company / organization scores ${displayScores.composite}/100, placing it at ${displayScores.maturityLevel} maturity.${_llmScore != null ? ' (composite blended 70% deterministic + 30% AI assessment)' : ''}` },
     { icon: '▲', color: '#afd199', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension)}.` },
     { icon: '▽', color: '#fbbf24', text: `Greatest gap: ${humanizeDimensionKey(scores.weakestDimension)}.` },
     { icon: '▽', color: '#fbbf24', text: `${highRiskCount} high-severity risk${highRiskCount !== 1 ? 's' : ''} identified.` },
@@ -224,7 +233,7 @@ export default function FinalResultPage() {
           {/* Top row: ScoreRing | RadarChart */}
           <div className={styles.scorecardTopRow}>
             <div className={styles.scorecardRingCol}>
-              <ScoreRing score={scores.composite} maturityLevel={scores.maturityLevel} />
+              <ScoreRing score={displayScores.composite} maturityLevel={displayScores.maturityLevel} />
             </div>
             <div className={styles.scorecardChartCol}>
               <RadarChart scores={scores} />
@@ -358,6 +367,7 @@ export default function FinalResultPage() {
               value={calculations.threeYearROIPercent}
               formatter={(v) => v >= 999 ? '>999%' : formatPercent(v)}
             />
+            <ROIMetricTile label="3-Year NPV" value={(calculations as any).npv3YearLocal ?? null} formatter={fmtCurrency} subtitle="Net present value @ 10% discount" />
             <ROIMetricTile label="Annual Ongoing Cost" value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtCurrency} subtitle="Est. licenses, maintenance & support" />
             <ROIMetricTile label="Net Annual Savings" value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtCurrency} subtitle="After ongoing cost" />
             <ROIMetricTile label="Net Payback Period" value={(calculations as any).netPaybackMonths ?? null} formatter={formatMonths} subtitle="On net savings" />
@@ -684,7 +694,7 @@ export default function FinalResultPage() {
 
       {/* Hidden printable layout for PDF generation */}
       <div id="pdf-print-layout" style={{ display: 'none' }}>
-        <PrintableReport context={context} />
+        <PrintableReport context={context} llmResult={llmResult ?? undefined} />
       </div>
     </div>
   )

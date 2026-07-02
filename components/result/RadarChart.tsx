@@ -3,7 +3,7 @@ import { humanizeDimensionKey } from '@/lib/resultFormatters'
 import styles from './RadarChart.module.css'
 
 interface RadarChartProps {
-  scores: Pick<DimensionScores, 'strategy' | 'data' | 'process' | 'people' | 'governance'>
+  scores: Pick<DimensionScores, 'strategy' | 'data' | 'process' | 'people' | 'governance' | 'security'>
   isPrintMode?: boolean
 }
 
@@ -15,10 +15,11 @@ const LABEL_OFFSET = 18
 // Hardcoded axis order — 5 axes at 72° intervals starting from top (−90°)
 const RADAR_AXES: { key: DimensionKey; angle: number }[] = [
   { key: 'strategy',   angle: -90  }, // top
-  { key: 'data',       angle: -18  }, // upper-right
-  { key: 'process',    angle: 54   }, // lower-right
-  { key: 'people',     angle: 126  }, // lower-left
-  { key: 'governance', angle: 198  }, // upper-left
+  { key: 'data',       angle: -30  },
+  { key: 'process',    angle: 30   },
+  { key: 'people',     angle: 90   }, // bottom
+  { key: 'governance', angle: 150  },
+  { key: 'security',   angle: 210  },
 ]
 
 function toRad(deg: number): number {

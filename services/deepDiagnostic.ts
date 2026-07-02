@@ -538,6 +538,15 @@ function calculateROI(
     high: scenarioNetRoi(0.9),
   }
 
+  // NPV of 3-year net cash flows (discounted) — enterprise cash-flow view.
+  const DISCOUNT_RATE = 0.10
+  const npv3YearUSD =
+    netAnnualSavingsUSD !== null && budgetUSD !== null
+      ? Math.round(
+          [1, 2, 3].reduce((acc, t) => acc + (netAnnualSavingsUSD as number) / Math.pow(1 + DISCOUNT_RATE, t), 0) - budgetUSD
+        )
+      : null
+
   // Bug 3 — Audit log: always log budgetMidpointUSD alongside the ROI result
   // so the formula is auditable: ((totalAnnualSavingsUSD × 3 − investment) / investment) × 100
   if (process.env.NODE_ENV !== 'test') {
@@ -588,6 +597,9 @@ function calculateROI(
     netPaybackMonths,
     netThreeYearROIPercent,
     scenarioThreeYearROI,
+    discountRate: DISCOUNT_RATE,
+    npv3YearUSD,
+    npv3YearLocal: npv3YearUSD !== null ? npv3YearUSD * rate : null,
     // Backward-compat aliases for any stored DiagnosticContext that still uses *IDR names
     annualLaborSavingsIDR: annualLaborSavingsUSD ? annualLaborSavingsUSD * rate : null,
     annualProcessSavingsIDR: annualProcessSavingsUSD ? annualProcessSavingsUSD * rate : null,
@@ -658,14 +670,24 @@ function scoreGovernance(a: DiagnosticAnswers): number {
   else if (a.risk_tolerance?.includes('Low')) s += 5
   if (a.budget_allocated?.includes('specific allocation')) s += 15
   else if (a.budget_allocated?.includes('flexible')) s += 8
-  if (a.ai_governance?.includes('Formal AI governance')) s += 12
-  else if (a.ai_governance?.includes('Informal')) s += 6
-  if (a.ai_data_privacy?.includes('Formal privacy')) s += 10
-  else if (a.ai_data_privacy?.includes('Basic')) s += 5
   return Math.min(100, s)
 }
 
-function maturityFromScore(composite: number): MaturityLevel {
+function scoreSecurity(a: DiagnosticAnswers): number {
+  // Dedicated Security & Governance dimension (enterprise gate).
+  let s = 30
+  if (a.ai_governance?.includes('Formal AI governance')) s += 22
+  else if (a.ai_governance?.includes('Informal')) s += 11
+  if (a.ai_data_privacy?.includes('Formal privacy')) s += 22
+  else if (a.ai_data_privacy?.includes('Basic')) s += 11
+  if (Array.isArray(a.compliance_requirements) &&
+      a.compliance_requirements.length > 0 &&
+      !a.compliance_requirements.includes('None')) s += 10
+  if (a.data_residency && !a.data_residency.includes('Not sure')) s += 6
+  return Math.min(100, s)
+}
+
+export function maturityFromScore(composite: number): MaturityLevel {
   if (composite >= 80) return 'Optimizing'
   if (composite >= 65) return 'Defined'
   if (composite >= 50) return 'Developing'
@@ -679,18 +701,21 @@ function calculateDimensionScores(a: DiagnosticAnswers): DimensionScores {
   const process = scoreProcess(a)
   const people = scorePeople(a)
   const governance = scoreGovernance(a)
+  // security computed below
+
+  const security = scoreSecurity(a)
 
   const composite = Math.round(
-    strategy * 0.25 + data * 0.25 + process * 0.2 + people * 0.15 + governance * 0.15
+    strategy * 0.2 + data * 0.2 + process * 0.15 + people * 0.15 + governance * 0.15 + security * 0.15
   )
 
-  const dims: Record<DimensionKey, number> = { strategy, data, process, people, governance }
+  const dims: Record<DimensionKey, number> = { strategy, data, process, people, governance, security }
   const entries = Object.entries(dims) as [DimensionKey, number][]
   const strongest = entries.reduce((a, b) => (b[1] > a[1] ? b : a))[0]
   const weakest = entries.reduce((a, b) => (b[1] < a[1] ? b : a))[0]
 
   return {
-    strategy, data, process, people, governance,
+    strategy, data, process, people, governance, security,
     composite,
     maturityLevel: maturityFromScore(composite),
     strongestDimension: strongest,

@@ -265,7 +265,7 @@ export interface DiagnosticResponse {
 // Deep Diagnostic Result Page — DiagnosticContext types (v2)
 // ============================================================================
 
-export type DimensionKey = 'strategy' | 'data' | 'process' | 'people' | 'governance'
+export type DimensionKey = 'strategy' | 'data' | 'process' | 'people' | 'governance' | 'security'
 export type MaturityLevel = 'Nascent' | 'Initiating' | 'Developing' | 'Defined' | 'Optimizing'
 export type OpportunityQuadrant = 'quick_win' | 'major_project' | 'fill_in' | 'thankless_task'
 
@@ -313,6 +313,11 @@ export interface ROIProjection {
   netThreeYearROIPercent?: number | null
   /** Conservative / base / optimistic 3-year ROI range (%). */
   scenarioThreeYearROI?: { low: number | null; base: number | null; high: number | null }
+  /** Annual discount rate used for NPV. */
+  discountRate?: number
+  /** Net present value of 3-year net cash flows minus investment (USD, local). */
+  npv3YearUSD?: number | null
+  npv3YearLocal?: number | null
   /** @deprecated Use annualLaborSavingsLocal — kept for backward compat with stored contexts */
   annualLaborSavingsIDR?: number | null
   /** @deprecated Use annualProcessSavingsLocal — kept for backward compat with stored contexts */
@@ -329,6 +334,7 @@ export interface DimensionScores {
   process: number
   people: number
   governance: number
+  security: number
   composite: number
   maturityLevel: MaturityLevel
   weakestDimension: DimensionKey
