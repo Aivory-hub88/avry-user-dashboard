@@ -299,16 +299,80 @@ export function thinDiv(pdf: jsPDF, y: number, x1 = ML, x2 = ML + CW): number {
   return y + 4
 }
 
+/**
+ * Only starts a new page when the next block genuinely won't fit — replaces
+ * the old pattern of an unconditional pdf.addPage() before every named
+ * section, which forced short sections (e.g. a single opportunity card, or
+ * 3 next-step rows) onto their own near-empty page and broke reading flow.
+ * `needed` is a conservative estimate of the space the upcoming block's
+ * header + opening content requires.
+ */
+export function ensureSpace(pdf: jsPDF, y: number, needed: number): number {
+  if (y + needed > PAGE_H - 16) {
+    pdf.addPage()
+    pageBg(pdf)
+    pageFooter(pdf)
+    return 16
+  }
+  return y
+}
+
+/**
+ * A short connective sentence bridging two sections — gives the report a
+ * narrated, editorial flow instead of reading as disconnected data blocks.
+ * Styled as a left-accent-bar callout so it reads distinctly from both the
+ * section narrative above it and the section label below it.
+ */
+export function renderTransition(pdf: jsPDF, y: number, text: string): number {
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(9.5)
+  pdf.setLineHeightFactor(1.55)
+  const lines = pdf.splitTextToSize(text, CW - 8)
+  const textH = lines.length * 4.9
+  const blockH = textH + 8
+
+  setC(pdf, ACCENT, 'fill')
+  pdf.rect(ML, y, 0.7, textH + 1, 'F')
+
+  setC(pdf, '#3f5c3f', 'text')
+  pdf.text(lines, ML + 6, y + 4.2)
+  pdf.setLineHeightFactor(1.15)
+
+  return y + blockH + 6
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 //  COMPONENTS
 // ══════════════════════════════════════════════════════════════════════════════
 
-/** Score arc — ring with accent progress, Doto number, maturity label. */
+/** Linearly interpolate between two hex colours (0-1). */
+function lerpHex(a: string, b: string, t: number): [number, number, number] {
+  const [ar, ag, ab] = hexToRgb(a)
+  const [br, bg, bb] = hexToRgb(b)
+  return [ar + (br - ar) * t, ag + (bg - ag) * t, ab + (bb - ab) * t]
+}
+
+/**
+ * Score arc — ring with a gradient progress sweep (deep forest → bright
+ * mint, matching the on-screen ScoreRing), a soft outer halo, and gauge
+ * tick marks at 0/25/50/75/100. jsPDF has no native SVG-style gradient
+ * stroke, so the gradient is faked by interpolating the stroke colour
+ * segment-by-segment along the arc.
+ */
 async function scoreArc(
   pdf: jsPDF, cx: number, cy: number, r: number, score: number, label: string,
 ) {
   const pct = score / 100
   const start = -Math.PI / 2
+
+  // Soft ambient halo behind the ring — low-opacity accent disc
+  const gs = (pdf as unknown as { GState: new (p: Record<string, number>) => unknown; setGState: (g: unknown) => void })
+  if (gs.GState) {
+    gs.setGState(new gs.GState({ opacity: 0.07 }))
+    setC(pdf, ACCENT, 'fill')
+    pdf.circle(cx, cy, r + 5, 'F')
+    gs.setGState(new gs.GState({ opacity: 1 }))
+  }
 
   // Round linecaps for the arc strokes
   pdf.setLineCap(1) // round
@@ -323,15 +387,34 @@ async function scoreArc(
     pdf.line(cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a2), cy + r * Math.sin(a2))
   }
 
-  // Progress arc — #3a7a3a, 7px ≈ 2.5mm
-  setC(pdf, ACCENT, 'draw')
+  // Tick marks at 0/25/50/75/100 — instrument-panel detail
+  setC(pdf, '#b8b8b0', 'draw')
+  pdf.setLineWidth(0.5)
+  ;[0, 25, 50, 75, 100].forEach((tick) => {
+    const a = start + 2 * Math.PI * (tick / 100)
+    const inner = r - 5
+    const outer = r - 2.2
+    pdf.line(cx + inner * Math.cos(a), cy + inner * Math.sin(a), cx + outer * Math.cos(a), cy + outer * Math.sin(a))
+  })
+
+  // Progress arc — gradient sweep from deep forest (#7fae6f) to bright
+  // mint (#d9ecc9), 7px ≈ 2.5mm, interpolated per segment.
   pdf.setLineWidth(2.5)
   const end = start + 2 * Math.PI * pct
   const segs = Math.max(1, Math.round(80 * pct))
   for (let i = 0; i < segs; i++) {
+    const t = segs > 1 ? i / (segs - 1) : 0
+    const [rr, gg, bb] = lerpHex('#7fae6f', '#d9ecc9', t)
+    pdf.setDrawColor(rr, gg, bb)
     const a1 = start + (end - start) * (i / segs)
     const a2 = start + (end - start) * ((i + 1) / segs)
     pdf.line(cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a2), cy + r * Math.sin(a2))
+  }
+
+  // Bright tip dot — reinforces the "gauge needle" read
+  if (pct > 0) {
+    setC(pdf, '#eef6e6', 'fill')
+    pdf.circle(cx + r * Math.cos(end), cy + r * Math.sin(end), 1.6, 'F')
   }
 
   pdf.setLineCap(0) // reset to butt
@@ -379,12 +462,27 @@ function dimBar(
   pdf.setFontSize(10) // 13px
   pdf.text(String(score), x + w, y + 3, { align: 'right' })
 
-  // 1.5px track ≈ 0.53mm
+  // Track + fill — 1.5px, rounded ends and a gradient fill (matching the
+  // on-screen dimension bars) instead of a flat rectangle.
   const barY = y + 6
+  const barH = 0.9
   setC(pdf, TRACK, 'fill')
-  pdf.rect(x, barY, w, 0.53, 'F')
-  setC(pdf, ACCENT, 'fill')
-  pdf.rect(x, barY, w * (score / 100), 0.53, 'F')
+  pdf.roundedRect(x, barY - barH / 2, w, barH, barH / 2, barH / 2, 'F')
+  const fillW = w * (score / 100)
+  if (fillW > 0) {
+    const segN = Math.max(1, Math.round(fillW / 3))
+    for (let i = 0; i < segN; i++) {
+      const t0 = i / segN
+      const t1 = (i + 1) / segN
+      const [rr, gg, bb] = lerpHex('#5f8f52', '#a9c99a', (t0 + t1) / 2)
+      pdf.setFillColor(rr, gg, bb)
+      pdf.rect(x + fillW * t0, barY - barH / 2, fillW * (t1 - t0) + 0.1, barH, 'F')
+    }
+    setC(pdf, '#a9c99a', 'fill')
+    pdf.circle(x + fillW - barH / 2, barY, barH / 2, 'F')
+    setC(pdf, '#5f8f52', 'fill')
+    pdf.circle(x + barH / 2, barY, barH / 2, 'F')
+  }
 
   return y + 14
 }
@@ -514,6 +612,35 @@ function nextStepRow(
   pdf.setLineHeightFactor(1.15)
 
   return y + 10 + bl.length * 5.2 + 7 // ~20px padding-bottom
+}
+
+/**
+ * Pre-measures the height an improvementBlock will actually need, mirroring
+ * its own line-splitting exactly. The previous code checked a flat 60mm
+ * threshold before drawing, but a block with 3 long paragraphs plus a
+ * before/after card easily exceeds 100mm — the block would start near the
+ * bottom of the page and run straight through the footer.
+ */
+function measureImprovementBlockHeight(pdf: jsPDF, item: ImprovementItem): number {
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(8.5)
+  const cLines = pdf.splitTextToSize(item.currentState, CW - 4)
+  const aLines = pdf.splitTextToSize(item.recommendedAction, CW - 4)
+  const iLines = pdf.splitTextToSize(item.operationalImpact, CW - 4)
+
+  let h = 14 // title + badge
+  h += cLines.length * 5 + 5 + 4 // label + lines + gap
+  h += aLines.length * 5 + 5 + 4
+  h += iLines.length * 5 + 4 + 4
+
+  if (item.before && item.after) {
+    const bLines = pdf.splitTextToSize(item.before, (CW - 14) / 2 - 4)
+    const afLines = pdf.splitTextToSize(item.after, (CW - 14) / 2 - 4)
+    const bHeight = Math.max(bLines.length, afLines.length) * 4 + 10
+    h += bHeight + 6
+  }
+
+  return h + 9 // bottom divider + margin
 }
 
 /** Improvement block: title + priority badge + 3 labeled content rows. */
@@ -722,7 +849,9 @@ export async function applyPremiumCovers(
       if (dateImg) {
         const wMm = dateImg.width * 0.264583
         const hMm = dateImg.height * 0.264583
-        pdf.addImage(dateImg.dataUrl, 'PNG', PAGE_W - MR - wMm, 185, wMm, hMm, undefined, 'FAST')
+        // Sits just above the gradient band (which starts ~73% down the cover
+        // image) — was 185mm, leaving a large dead-air gap above the gradient.
+        pdf.addImage(dateImg.dataUrl, 'PNG', PAGE_W - MR - wMm, 199, wMm, hMm, undefined, 'FAST')
       }
     }
 
@@ -776,6 +905,86 @@ export async function applyPremiumCovers(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+//  EDITORIAL SPREAD — a full-bleed "thesis" page between the cover and the
+//  data pages, in the style of a consulting-firm opening provocation. Gives
+//  the report a premium editorial rhythm (cover → thesis → data → close)
+//  instead of jumping straight from cover into charts.
+// ══════════════════════════════════════════════════════════════════════════════
+function editorialSpread(pdf: jsPDF, context: DiagnosticContext) {
+  pdf.addPage()
+  setC(pdf, COVER_BG, 'fill')
+  pdf.rect(0, 0, PAGE_W, PAGE_H, 'F')
+
+  const cx = ML
+  const companyLabel = context.company || 'your team'
+  const topOppTitle = context.opportunities?.[0]?.title
+
+  // Eyebrow
+  setC(pdf, '#8fb87f', 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(7.5)
+  spacedText(pdf, 'A NOTE FROM AIVORY', cx, 58, 0.5)
+
+  // Salutation
+  setC(pdf, '#ffffff', 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(17)
+  pdf.text(`Dear ${companyLabel},`, cx, 78)
+
+  // Letter body — a short, warm framing of what the report contains,
+  // in place of the earlier pull-quote treatment (which read as an
+  // out-of-context KPI statement rather than an actual thesis).
+  setC(pdf, '#dce8d6', 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(11.5)
+  pdf.setLineHeightFactor(1.7)
+
+  const p1 = `Thank you for completing the AI Readiness Assessment. What follows is a diagnostic of where ${companyLabel} stands today: not a generic scorecard, but a reading of your own answers, your goals, your constraints, and the gap between where you are and where you're aiming to be.`
+  const p1Lines = pdf.splitTextToSize(p1, CW - 10)
+  pdf.text(p1Lines, cx, 94)
+  let ny = 94 + p1Lines.length * 6.3 + 8
+
+  const p2 = topOppTitle
+    ? `The findings point to a clear starting point: ${topOppTitle.toLowerCase()}, alongside the financial case and a sequenced plan to act on it. Every number that follows traces back to what you told us.`
+    : `The pages ahead lay out your composite readiness score, the opportunities with the fastest path to ROI, and a sequenced plan to act on them. Every number that follows traces back to what you told us.`
+  const p2Lines = pdf.splitTextToSize(p2, CW - 10)
+  pdf.text(p2Lines, cx, ny)
+  ny += p2Lines.length * 6.3 + 14
+  pdf.setLineHeightFactor(1.15)
+
+  setC(pdf, '#8fb87f', 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(11)
+  pdf.text('Warmly, The Aivory Team', cx, ny)
+
+  // Bottom supporting data strip — composite score as a grounding stat
+  const stripY = PAGE_H - 46
+  setC(pdf, '#3f5c46', 'draw')
+  pdf.setLineWidth(0.18)
+  pdf.line(ML, stripY, ML + CW, stripY)
+
+  setC(pdf, '#8fb87f', 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(6.4)
+  spacedText(pdf, 'COMPOSITE READINESS SCORE', ML, stripY + 9, 0.3)
+
+  setC(pdf, '#ffffff', 'text')
+  pdf.setFont(FD(), 'normal')
+  pdf.setFontSize(15)
+  pdf.text(`${Math.round(context.scores.composite)}`, ML, stripY + 20)
+
+  setC(pdf, '#a9c4a0', 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(6.4)
+  const mLabel = context.scores.maturityLevel.toUpperCase()
+  spacedText(pdf, mLabel, ML + CW, stripY + 20, 0.3, { align: 'right' })
+  setC(pdf, '#a9c4a0', 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(6.4)
+  spacedText(pdf, 'MATURITY LEVEL', ML + CW, stripY + 9, 0.3, { align: 'right' })
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 //  MAIN EXPORT
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -814,7 +1023,12 @@ export async function exportReportToPdf(
   })
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 2 — EXECUTIVE SCORECARD
+  // PAGE 2 — EDITORIAL SPREAD (thesis / pull-quote page)
+  // ════════════════════════════════════════════════════════════════════════════
+  editorialSpread(pdf, context)
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // PAGE 3 — EXECUTIVE SCORECARD
   // ════════════════════════════════════════════════════════════════════════════
   pdf.addPage()
   pageBg(pdf)
@@ -847,7 +1061,7 @@ export async function exportReportToPdf(
   const gap = 0.4
   const bdr = 0.2
   const cellW = (CW - gap - 2 * bdr) / 2
-  const cellH = 33
+  const cellH = 40 // was 33 — too tight, crowded the divider against the unit text
   const gridH = cellH * 2 + gap + 2 * bdr
   const gridY = y
 
@@ -871,13 +1085,15 @@ export async function exportReportToPdf(
   pdf.setLineWidth(0.18)
   pdf.roundedRect(ML, gridY, CW, gridH, 2, 2, 'S')
 
-  // Tile content rendering helper
+  // Tile content rendering helper — vertical rhythm reworked so the divider
+  // sits clear of the unit text above it (was 1mm, nearly touching) and the
+  // sub-label has even breathing room on both sides of that divider.
   function tileContent(
     tx: number, ty: number, tw: number,
     label: string, value: string, unit: string, sub: string,
   ) {
-    const padX = 7.5 // ~22px
-    const padY = 7   // ~20px
+    const padX = 8
+    const padY = 9
     const ix = tx + padX
     const iy = ty + padY
 
@@ -891,23 +1107,23 @@ export async function exportReportToPdf(
     setC(pdf, INK, 'text')
     pdf.setFont(F(), 'normal') // weight 300 → normal
     pdf.setFontSize(19) // 26px
-    pdf.text(value, ix, iy + 10)
+    pdf.text(value, ix, iy + 11)
 
     // Unit — 11px #999
     setC(pdf, UNIT_C, 'text')
     pdf.setFont(FB(), 'bold')
     pdf.setFontSize(8.5) // 11px
-    pdf.text(unit, ix, iy + 15.5)
+    pdf.text(unit, ix, iy + 17)
 
     // Sub — divider + 9px #bbb uppercase, letter-spacing 0.06em
-    const subDivY = ty + cellH - 9.5
+    const subDivY = iy + 21
     setC(pdf, TRACK, 'draw')
     pdf.setLineWidth(0.18)
     pdf.line(ix, subDivY, tx + tw - padX, subDivY)
     setC(pdf, LABEL, 'text')
     pdf.setFont(F(), 'normal')
     pdf.setFontSize(7) // 9px
-    spacedText(pdf, sub.toUpperCase(), ix, subDivY + 4.5, 0.15) // 0.06em
+    spacedText(pdf, sub.toUpperCase(), ix, subDivY + 5.5, 0.15) // 0.06em
   }
 
   // Tile 1 — Total Annual Savings
@@ -947,14 +1163,14 @@ export async function exportReportToPdf(
 
   y = gridY + gridH + 4
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 3 — OPPORTUNITY ANALYSIS
-  // ════════════════════════════════════════════════════════════════════════════
-  pdf.addPage()
-  pageBg(pdf)
-  pageFooter(pdf)
-  y = 16
+  // ── Transition into Opportunity Analysis ──
+  y = ensureSpace(pdf, y, 26)
+  y = renderTransition(pdf, y, `These scores translate into a concrete set of opportunities, starting with the fastest path to measurable ROI.`)
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // OPPORTUNITY ANALYSIS
+  // ════════════════════════════════════════════════════════════════════════════
+  y = ensureSpace(pdf, y, 55)
   y = sectionLabel(pdf, y, 'Opportunity Analysis')
 
   y = renderNarrative(pdf, y, `Targeted automation offers immediate relief for your company/organization's core pain points in slow customer onboarding and repetitive content generation. Deploying quick wins can deliver tangible results in as little as 5 to 8 weeks. These initial initiatives directly address manual bottlenecks while requiring relatively low implementation effort. Securing these early operational victories will establish momentum for more complex, multi-step agent deployments in the future.`)
@@ -976,14 +1192,14 @@ export async function exportReportToPdf(
     }
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 4 — NEXT STEPS
-  // ════════════════════════════════════════════════════════════════════════════
-  pdf.addPage()
-  pageBg(pdf)
-  pageFooter(pdf)
-  y = 16
+  // ── Transition into Next Steps ──
+  y = ensureSpace(pdf, y, 26)
+  y = renderTransition(pdf, y, `Turning this analysis into results starts with a clear, sequenced set of actions.`)
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // NEXT STEPS
+  // ════════════════════════════════════════════════════════════════════════════
+  y = ensureSpace(pdf, y, 45)
   y = sectionLabel(pdf, y, 'Next Steps')
 
   // Dynamic content
@@ -1010,20 +1226,24 @@ export async function exportReportToPdf(
 
 
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 5 — ROI PROJECTION
-  // ════════════════════════════════════════════════════════════════════════════
-  pdf.addPage()
-  pageBg(pdf)
-  pageFooter(pdf)
-  y = 16
+  // ── Transition into ROI Projection ──
+  y = ensureSpace(pdf, y, 26)
+  y = renderTransition(pdf, y, `Here is the financial case underpinning that sequence.`)
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // ROI PROJECTION
+  // ════════════════════════════════════════════════════════════════════════════
+  y = ensureSpace(pdf, y, 70)
   y = sectionLabel(pdf, y, 'ROI Projection')
 
   y = renderNarrative(pdf, y, `An initial AI infrastructure investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} is projected to generate a strong ${fmtPct(calculations.threeYearROIPercent)} three-year ROI and reclaim ${Math.round(calculations.hoursReclaimedPerYear || 0).toLocaleString()} hours of team capacity annually. The financial model indicates full payback in ${((calculations.paybackMonths || 0) / 12).toFixed(1)} years, driven by ${fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD)} in continuous annual savings. Crucially, delaying this deployment incurs a direct "cost of inaction" totaling ${fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR)} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`)
 
   // ── 3 primary metrics across top ──
-  const roiW = (CW - 1) / 3 // 0.5mm divider between
+  // gap gives each column breathing room on both sides of its divider —
+  // the previous 0.5mm gap let the divider run straight through the "3" of
+  // "3-YEAR ROI", a cramped/cheap-looking collision.
+  const roiGap = 6
+  const roiW = (CW - roiGap * 2) / 3
   const roiMetrics = [
     {
       l: 'Total Annual Savings',
@@ -1045,7 +1265,7 @@ export async function exportReportToPdf(
 
   const roiTop = y
   roiMetrics.forEach((m, i) => {
-    const rx = ML + i * (roiW + 0.5)
+    const rx = ML + i * (roiW + roiGap)
 
     // Label — 8.5px #aaa
     setC(pdf, LABEL_A, 'text')
@@ -1065,11 +1285,12 @@ export async function exportReportToPdf(
     pdf.setFontSize(7)
     pdf.text(m.n, rx, roiTop + 18)
 
-    // Vertical divider between metrics
+    // Vertical divider between metrics — centred in the gap, clear of text
     if (i < roiMetrics.length - 1) {
       setC(pdf, TRACK, 'draw')
       pdf.setLineWidth(0.18)
-      pdf.line(rx + roiW + 0.25, roiTop - 2, rx + roiW + 0.25, roiTop + 20)
+      const dividerX = rx + roiW + roiGap / 2
+      pdf.line(dividerX, roiTop - 2, dividerX, roiTop + 20)
     }
   })
 
@@ -1198,14 +1419,14 @@ export async function exportReportToPdf(
     )
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 6 — DIAGNOSTIC CONTEXT
-  // ════════════════════════════════════════════════════════════════════════════
-  pdf.addPage()
-  pageBg(pdf)
-  pageFooter(pdf)
-  y = 16
+  // ── Transition into Diagnostic Context ──
+  y = ensureSpace(pdf, y, 26)
+  y = renderTransition(pdf, y, `These projections are grounded in the specific context your team described in this assessment.`)
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // DIAGNOSTIC CONTEXT
+  // ════════════════════════════════════════════════════════════════════════════
+  y = ensureSpace(pdf, y, 45)
   y = sectionLabel(pdf, y, 'Diagnostic Context')
 
   const ctxRows: [string, string][] = [
@@ -1249,21 +1470,21 @@ export async function exportReportToPdf(
   })
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 7 — ROOM FOR IMPROVEMENT + RISK REGISTER
+  // ROOM FOR IMPROVEMENT + RISK REGISTER
   // ════════════════════════════════════════════════════════════════════════════
   if (Array.isArray(roomForImprovement) && roomForImprovement.length > 0) {
-    pdf.addPage()
-    pageBg(pdf)
-    pageFooter(pdf)
-    y = 16
+    // ── Transition into Room for Improvement ──
+    y = ensureSpace(pdf, y, 26)
+    y = renderTransition(pdf, y, `Against that context, this is where the greatest friction and opportunity lie.`)
 
+    y = ensureSpace(pdf, y, 55)
     y = sectionLabel(pdf, y, 'Room for Improvement')
 
     const gap = (context.quantitative.targetAutomationPct ?? 0) - (context.quantitative.currentAutomationPct ?? 0)
     y = renderNarrative(pdf, y, `Your company/organization currently maintains ${context.quantitative.currentAutomationPct ?? 0}% automation coverage against a strategic target of ${context.quantitative.targetAutomationPct ?? 0}%. This ${gap}% gap represents the manual effort continuously wasted on routine data entry and unoptimized tasks. Closing this deficit requires standardizing undocumented core workflows, which is the root cause of the lower Process score. Bridging this gap will ensure consistent, reliable inputs for AI agents and drastically reduce ongoing operational friction.`)
 
     roomForImprovement.forEach((item) => {
-      if (y > PAGE_H - 60) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
+      y = ensureSpace(pdf, y, measureImprovementBlockHeight(pdf, item))
       y = improvementBlock(pdf, item, y)
     })
 
@@ -1361,6 +1582,36 @@ export async function exportReportToPdf(
       y += Math.max(rl.length * 4.5 + 6, 8) + (risk.source ? 5 : 0)
     })
   }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // CLOSING NOTE — synthesizes the report into a single closing statement
+  // before the back cover, so the document ends on a narrated conclusion
+  // rather than stopping mid-data on the last risk row.
+  // ════════════════════════════════════════════════════════════════════════════
+  pdf.addPage()
+  pageBg(pdf)
+  pageFooter(pdf)
+  y = 16
+
+  y = sectionLabel(pdf, y, 'Closing Note')
+
+  const companyLabel = context.company || 'Your organization'
+  const gapPct = (context.quantitative.targetAutomationPct ?? 0) - (context.quantitative.currentAutomationPct ?? 0)
+  const closingTopOpp = opportunities[0]
+  const closingSavings = fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD)
+
+  y = renderNarrative(pdf, y, `${companyLabel} enters this next phase with a composite readiness score of ${Math.round(scores.composite)}, a "${scores.maturityLevel}" foundation strong enough to move from isolated wins to systemic execution. The path forward is not abstract: it starts with ${closingTopOpp ? closingTopOpp.title.toLowerCase() : 'the highest-impact opportunity identified in this assessment'}${gapPct > 0 ? `, and closes the ${gapPct}% automation gap` : ''} one phase at a time. Every figure in this report traces back to the answers your team provided, and every recommendation is sized to what is realistically achievable within the next planning cycle.`)
+
+  y += 2
+  y = renderNarrative(pdf, y, `None of this requires a leap of faith. The next step is simply to turn this diagnostic into a deployment plan, and begin compounding the ${closingSavings} in annual savings this analysis identified.`)
+
+  y += 6
+  thinDiv(pdf, y)
+  y += 8
+  setC(pdf, SEC_LBL, 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(9.5)
+  pdf.text('Warmly, The Aivory Team', ML, y)
 
   // ════════════════════════════════════════════════════════════════════════════
   // BACK COVER
