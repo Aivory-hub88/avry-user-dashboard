@@ -71,9 +71,37 @@ export default function FinalResultPage() {
     }
     try {
       setIsGeneratingBlueprint(true)
-      const diagnosticData = state.context
+      // Send the same blended composite the user sees on this page (70%
+      // deterministic + 30% AI assessment) so the blueprint's
+      // ai_readiness_score matches the on-screen report instead of the raw
+      // deterministic composite. Also attach the AI analysis narrative so
+      // blueprint generation can build on it.
+      const llmScore =
+        typeof (llmResult as any)?.score === 'number' ? (llmResult as any).score
+        : typeof (llmResult as any)?.ai_readiness_score === 'number' ? (llmResult as any).ai_readiness_score
+        : null
+      const blendedComposite = llmScore != null
+        ? Math.round(state.context.scores.composite * 0.7 + llmScore * 0.3)
+        : state.context.scores.composite
+      const diagnosticData = {
+        ...state.context,
+        scores: {
+          ...state.context.scores,
+          composite: blendedComposite,
+          maturityLevel: llmScore != null ? maturityFromScore(blendedComposite) : state.context.scores.maturityLevel,
+        },
+        ...(llmResult ? {
+          ai_analysis: {
+            summary: (llmResult as any).summary ?? null,
+            strengths: (llmResult as any).strengths ?? null,
+            constraints: (llmResult as any).constraints ?? null,
+            automation_opportunities: (llmResult as any).automation_opportunities ?? null,
+            recommended_next_step: (llmResult as any).recommended_next_step ?? null,
+          },
+        } : {}),
+      }
       const diagnosticId = (diagnosticData as any).id || 'current'
-      
+
       await DeepDiagnosticService.generateBlueprint(
         diagnosticId,
         'demo_org',

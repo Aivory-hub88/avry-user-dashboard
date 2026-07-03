@@ -12,6 +12,7 @@ import {
 } from '@/lib/supabaseStorage'
 import { isMisconfigured as _supabaseMisconfigured } from '@/lib/supabaseClient'
 import { CURRENCY_RATES, FX_AS_OF } from '@/lib/currencyConfig'
+import { asset } from '@/lib/asset'
 
 // In-memory fallback when localStorage is unavailable
 let _memoryProgress: DeepDiagnosticProgress | null = null
@@ -216,7 +217,9 @@ export class DeepDiagnosticService {
 
     let response: Response
     try {
-      response = await fetch('/api/blueprints/generate', {
+      // asset() prepends the /dashboard basePath — raw fetch() paths don't
+      // get it automatically (same gotcha as the PDF cover assets).
+      response = await fetch(asset('/api/blueprints/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

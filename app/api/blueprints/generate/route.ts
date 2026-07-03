@@ -15,13 +15,19 @@ import type { BlueprintV1 } from '@/types/blueprint'
 
 export const maxDuration = 120
 
-function extractSseContent(raw: string): string {
-  return raw
+function extractSseContent(raw: string): { content: string; error: string | null } {
+  let error: string | null = null
+  const content = raw
     .split('\n')
     .filter(line => line.startsWith('data: '))
     .map(line => {
       try {
         const data = JSON.parse(line.slice(6))
+        // Surface error events instead of silently dropping them — a failed
+        // generation used to look identical to an empty success here.
+        if (data.type === 'error' && !error) {
+          error = typeof data.error === 'string' ? data.error : JSON.stringify(data.error)
+        }
         return data.type === 'chunk' ? data.content || '' : ''
       } catch {
         return ''
@@ -29,6 +35,7 @@ function extractSseContent(raw: string): string {
     })
     .join('')
     .trim()
+  return { content, error }
 }
 
 function parseBlueprintContent(content: string): BlueprintV1 | null {
@@ -101,15 +108,20 @@ function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
     strategic_objective: {
       primary_goal: primaryGoal,
       kpi_targets: [
-        { metric: 'AI readiness', target: 'Improve readiness through prioritized automation initiatives' }
+        {
+          metric: 'AI readiness score',
+          current: `${extractedScore}/100`,
+          target: 'Improve through prioritized automation initiatives',
+          expected_impact: 'Higher automation coverage and reduced manual workload'
+        }
       ]
     },
     system_architecture: {
       data_sources: ['Diagnostic context'],
-      processing_layers: ['Aivory High Intelligence Deterministic Engine'],
-      decision_engine: 'AI-assisted blueprint generation',
-      memory_layer: 'Supabase blueprint storage',
-      execution_layer: ['Aivory Console']
+      processing_layers: ['Aivory Workflow Builder'],
+      decision_engine: 'Rule-based routing with AI-assisted decisions',
+      memory_layer: 'Centralized operational data store',
+      execution_layer: ['Built with Aivory Workflow Builder, deployed to n8n for execution']
     },
     workflow_modules: opportunities.slice(0, 3).map((opportunity: any, index: number) => ({
       workflow_id: `WF_${index + 1}`,
@@ -185,14 +197,22 @@ interface BlueprintV1 {
   status: 'draft' | 'published';
   organization: { name: string; industry: string; size: string };
   diagnostic_summary: { ai_readiness_score: number; maturity_level: string; primary_constraints: string[] };
-  strategic_objective: { primary_goal: string; kpi_targets: { metric: string; target: string }[] };
+  strategic_objective: { primary_goal: string; kpi_targets: { metric: string; current: string; target: string; expected_impact: string }[] };
   system_architecture: { data_sources: string[]; processing_layers: string[]; decision_engine: string; memory_layer: string; execution_layer: string[] };
   workflow_modules: { workflow_id: string; name: string; trigger: string; steps: { type: string; action: string }[]; integrations_required: string[] }[];
   risk_assessment: { data_risks: string[]; operational_risks: string[]; mitigation_strategies: string[] };
   deployment_plan: { phase: string; estimated_impact: string; estimated_roi_months: number; waves: { name: string; included_workflows: string[]; notes: string }[] };
 }
 
-IMPORTANT: The diagnostic includes a "roomForImprovement" array — each item has the area, the recommended action, its operational impact, and a concrete before/after. Use these improvement items to shape the blueprint's workflows, deployment phases, and expected operational outcomes (map each high-priority improvement to at least one workflow or phase). Make sure to map the exact "composite" score and "maturityLevel" from the diagnostic data to "ai_readiness_score" and "maturity_level". For \`system_architecture.processing_layers\`, always use exactly ["Aivory High Intelligence Deterministic Engine"] and do not mention VPS Bridge, Zeroclaw, or n8n. If the diagnostic data contains no risks (the risks array is empty or missing), do NOT hallucinate or invent risks. You MUST return empty arrays for data_risks, operational_risks, and mitigation_strategies.
+IMPORTANT: The diagnostic includes a "roomForImprovement" array — each item has the area, the recommended action, its operational impact, and a concrete before/after. Use these improvement items to shape the blueprint's workflows, deployment phases, and expected operational outcomes (map each high-priority improvement to at least one workflow or phase). If the diagnostic includes an "ai_analysis" object (summary, strengths, constraints, automation_opportunities, recommended_next_step), treat it as prior analysis of this organization and keep the blueprint consistent with it. Make sure to map the exact "composite" score and "maturityLevel" from the diagnostic data to "ai_readiness_score" and "maturity_level".
+
+KPI TARGETS: For each kpi_targets entry, "current" is the baseline value taken from the diagnostic data (e.g. "$4.20 per ticket", "22% automation coverage"), "target" is the goal value (e.g. "$1.80 per ticket"), and "expected_impact" is the BUSINESS OUTCOME of reaching that target (e.g. "~57% lower support cost, ≈$22,500/yr saved") — expected_impact must NEVER be a copy of the target value.
+
+ARCHITECTURE GROUNDING: Aivory's actual product suite is: Deep Diagnostic (AI readiness scoring), AI System Blueprint, Implementation Roadmap, AI Console (assistant), Workflow Builder (designs automation workflows from natural language and DEPLOYS THEM TO n8n — automations execute on n8n, not on Aivory), Agents, Automation Templates, and Connectors (Slack, WhatsApp, Telegram, Gmail, HubSpot, Notion, Salesforce, and similar). The system_architecture must be honest and grounded in this reality: "processing_layers" should name the client's real processing needs (e.g. intent classification, data validation) plus "Aivory Workflow Builder" where workflow design fits; "decision_engine" describes the client's decision logic (rules, LLM-assisted routing); "execution_layer" must lead with exactly "Built with Aivory Workflow Builder, deployed to n8n for execution" as its first item, followed by the specific Connectors/integrations needed (each as a short, plain phrase). Recommend third-party tools by name where they genuinely fit (n8n, a CRM API, a helpdesk platform). Do NOT invent Aivory products that do not exist (there is no "Aivory Workflow Engine" runtime and no "Aivory High Intelligence Deterministic Engine" in the client's architecture), and do not mention VPS Bridge or Zeroclaw.
+
+DEPLOYMENT WAVES: In deployment_plan.waves, "included_workflows" must contain the exact "name" values of workflows from workflow_modules (human-readable names, never workflow_id codes).
+
+If the diagnostic data contains no risks (the risks array is empty or missing), do NOT hallucinate or invent risks. You MUST return empty arrays for data_risks, operational_risks, and mitigation_strategies.
 
 Diagnostic Data:
 ${JSON.stringify(diagnostic)}`
@@ -233,10 +253,33 @@ ${JSON.stringify(diagnostic)}`
     }
 
     const raw = await response.text()
-    const content = extractSseContent(raw)
-    const data = parseBlueprintContent(content) || buildBlueprintFromText(content, diagnostic)
+    const { content, error: sseError } = extractSseContent(raw)
 
-    return Response.json(data)
+    // A generation failure must be a visible failure, not a silent template.
+    // Previously an SSE error event or empty stream fell through to
+    // buildBlueprintFromText with empty text, producing a generic canned
+    // blueprint that looked like a real AI result.
+    if (!content) {
+      return Response.json(
+        createErrorResponse(
+          'GenerationError',
+          'Blueprint generation failed. Please try again.',
+          sseError ? { upstream: sseError } : undefined
+        ),
+        { status: 502 }
+      )
+    }
+
+    const parsed = parseBlueprintContent(content)
+    if (parsed) {
+      return Response.json(parsed)
+    }
+
+    // The model returned prose instead of JSON — salvage what we can, but
+    // mark the result so the UI can tell the user this is a simplified
+    // fallback rather than a full AI-generated blueprint.
+    const fallback = buildBlueprintFromText(content, diagnostic)
+    return Response.json({ ...fallback, fallback_generated: true })
 
   } catch (error) {
     // Handle configuration errors
