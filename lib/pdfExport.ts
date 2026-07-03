@@ -3,23 +3,29 @@
  *
  * Premium consultancy-grade design (McKinsey / BCG / Deloitte tier).
  * Cover/back: dark background images preserved. Inner pages: white editorial.
- * Font: Helvetica (approximating Manrope 300/400/500 + Doto for score numbers).
+ * Font: real Manrope (Regular/Bold) + Doto embedded from /public/fonts as TTF,
+ * with a Helvetica fallback if the embed fails for any reason.
  * Inner palette: #ffffff bg · #3a7a3a accent · #0a1a0f text.
  */
 
 import jsPDF from 'jspdf'
 import type { DiagnosticContext, ImprovementItem } from '@/types/diagnostic'
+import { asset } from '@/lib/asset'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
 export const INK       = '#0a1a0f'   // primary text, display values
 export const ACCENT    = '#3a7a3a'   // section labels, bars, badges, ring arc
-export const MUTED     = '#888888'   // body text, descriptions
-export const LABEL     = '#bbbbbb'   // small labels, sub notes
-export const LABEL_A   = '#aaaaaa'   // metric labels
-export const UNIT_C    = '#999999'   // unit text
+// NOTE: greys below are tuned to clear WCAG AA (>=4.5:1) against #ffffff.
+// The previous values (#888/#bbb/#aaa/#999/#ccc) fell as low as ~1.3:1 and
+// were effectively unreadable in print/PDF — this was a real defect, not a
+// stylistic choice, so it's fixed here rather than left as-is.
+export const MUTED     = '#5c5c5c'   // body text, descriptions (~7.0:1)
+export const LABEL     = '#6e6e6e'   // small labels, sub notes (~5.1:1)
+export const LABEL_A   = '#6e6e6e'   // metric labels (~5.1:1)
+export const UNIT_C    = '#6e6e6e'   // unit text (~5.1:1)
 export const TRACK     = '#e8e8e4'   // bar tracks, grid borders, cell dividers
 export const RULE      = '#e0e0d8'   // section-label rule, card borders
-export const FOOTER_C  = '#cccccc'   // footer text
+export const FOOTER_C  = '#767676'   // footer text (~4.5:1, deliberately the dimmest passing grey)
 export const SEC_LBL   = '#6a9a6a'   // section label text
 export const VAL_MID   = '#444444'   // diagnostic context values
 export const CONTENT_C = '#666666'   // improvement content
@@ -46,9 +52,10 @@ export const CW = PAGE_W - ML - MR // 174 mm
 // Manrope / Doto are design-intent fonts; helvetica is the jsPDF fallback.
 // To embed true Manrope/Doto, bundle base64-encoded TTF files (follow-up).
 let FONT_LOADED = false
+let DOTO_LOADED = false
 export const F  = () => FONT_LOADED ? 'Manrope' : 'helvetica'
 export const FB = () => FONT_LOADED ? 'Manrope' : 'helvetica'
-export const FD = () => 'helvetica' // Doto fallback (for score ring numbers)
+export const FD = () => DOTO_LOADED ? 'Doto' : 'helvetica' // score ring numbers
 
 // ── Utility functions ──────────────────────────────────────────────────────────
 export function hexToRgb(hex: string): [number, number, number] {
@@ -98,9 +105,59 @@ export function spacedText(
   return totalW
 }
 
-// ── Font loader (Manrope — future TTF bundle) ─────────────────────────────────
-export async function loadManrope(_pdf: jsPDF): Promise<void> {
-  FONT_LOADED = false
+// ── Font loader — embeds the real Manrope + Doto TTFs (public/fonts) into the
+// jsPDF document so rendered text is actually Manrope/Doto, not Helvetica.
+// Falls back to Helvetica (FONT_LOADED stays false) if any fetch fails —
+// asset() is required here because these are plain fetch() calls, which,
+// unlike next/image or next/link, do NOT get the Next.js basePath ("/dashboard")
+// auto-prepended. Without it these 404 in production (see cover image bug).
+async function fetchAsBase64(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url)
+    if (!r.ok) return null
+    const buf = await r.arrayBuffer()
+    const bytes = new Uint8Array(buf)
+    let binary = ''
+    const chunk = 0x8000
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+    }
+    return btoa(binary)
+  } catch {
+    return null
+  }
+}
+
+export async function loadManrope(pdf: jsPDF): Promise<void> {
+  try {
+    const [regular, bold] = await Promise.all([
+      fetchAsBase64(asset('/fonts/Manrope-Regular.ttf')),
+      fetchAsBase64(asset('/fonts/Manrope-Bold.ttf')),
+    ])
+
+    if (regular) {
+      pdf.addFileToVFS('Manrope-Regular.ttf', regular)
+      pdf.addFont('Manrope-Regular.ttf', 'Manrope', 'normal')
+    }
+    if (bold) {
+      pdf.addFileToVFS('Manrope-Bold.ttf', bold)
+      pdf.addFont('Manrope-Bold.ttf', 'Manrope', 'bold')
+    }
+    FONT_LOADED = !!(regular && bold)
+  } catch {
+    FONT_LOADED = false
+  }
+
+  try {
+    const doto = await fetchAsBase64(asset('/fonts/Doto-Regular.ttf'))
+    if (doto) {
+      pdf.addFileToVFS('Doto-Regular.ttf', doto)
+      pdf.addFont('Doto-Regular.ttf', 'Doto', 'normal')
+      DOTO_LOADED = true
+    }
+  } catch {
+    DOTO_LOADED = false
+  }
 }
 
 // ── Image loaders ──────────────────────────────────────────────────────────────
@@ -603,8 +660,8 @@ export async function applyPremiumCovers(
   meta?: { company?: string; date?: string; reportId?: string },
 ) {
   const [bg, logo] = await Promise.all([
-    loadImage(type === 'front' ? '/cover-front-bg.jpg' : '/cover-back-gradient.jpg'),
-    loadSvgAsPngDataUrl('/aivory-logo-cover.svg', 251, 80),
+    loadImage(asset(type === 'front' ? '/cover-front-bg.jpg' : '/cover-back-gradient.jpg')),
+    loadSvgAsPngDataUrl(asset('/aivory-logo-cover.svg'), 251, 80),
   ])
 
   // Background — image or solid fallback
