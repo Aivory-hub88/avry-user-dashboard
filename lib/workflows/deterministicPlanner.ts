@@ -150,7 +150,16 @@ function step(
   description: string,
   config: Record<string, unknown> = {},
 ): GeneratedWorkflowStep {
-  return { id, type, title, description, config, testable: true }
+  // Promote app/action to the step root — the bridge's draft service reads
+  // step.app as its primary node-resolution signal (config.app is only a
+  // fallback).
+  const app = typeof config.app === 'string' ? config.app : undefined
+  const action = typeof config.action === 'string' ? config.action : undefined
+  return {
+    id, type, title, description, config, testable: true,
+    ...(app ? { app } : {}),
+    ...(action ? { action } : {}),
+  }
 }
 
 /**
@@ -277,6 +286,9 @@ export function sanitizeWorkflow(rawSteps: unknown): SanitizeResult {
     const description = typeof s.description === 'string' ? s.description : ''
     const config = s.config && typeof s.config === 'object' ? s.config as Record<string, unknown> : {}
     const nodeType = typeof s.nodeType === 'string' && s.nodeType ? s.nodeType : undefined
+    // app/action drive the draft service's node resolution — never drop them.
+    const app = typeof s.app === 'string' && s.app ? s.app.toLowerCase() : undefined
+    const action = typeof s.action === 'string' && s.action ? s.action : undefined
 
     return {
       id,
@@ -286,6 +298,8 @@ export function sanitizeWorkflow(rawSteps: unknown): SanitizeResult {
       config,
       testable: s.testable !== false,
       ...(nodeType ? { nodeType } : {}),
+      ...(app ? { app } : {}),
+      ...(action ? { action } : {}),
     }
   })
 

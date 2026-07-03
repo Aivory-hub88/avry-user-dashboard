@@ -49,6 +49,14 @@ export interface GeneratedWorkflowStep {
   testable: boolean
   /** Resolved by n8n MCP inspection, written back after each sandbox test */
   nodeType?: string
+  /**
+   * Integration/service name (lowercase, e.g. "slack", "gmail") and its
+   * operation. The bridge's draft service uses `app` as the definitive
+   * signal when resolving steps to concrete n8n nodes — without it, node
+   * matching falls back to fuzzy title-text search.
+   */
+  app?: string
+  action?: string
 }
 
 export interface NodeConfig {
@@ -277,6 +285,10 @@ function workflowStepToBridgeStep(step: GeneratedWorkflowStep) {
     title: step.title,
     description: step.description || '',
     config: step.config || {},
+    // app/action are the draft service's primary node-resolution signal —
+    // dropping them (as this mapper used to) forces fuzzy title matching.
+    ...(step.app ? { app: step.app } : {}),
+    ...(step.action ? { action: step.action } : {}),
     ...(step.nodeType ? { nodeType: step.nodeType } : {}),
   }
 }

@@ -179,11 +179,17 @@ export function normalizeZeroclawToWorkflow(
 
 // ── Outbound body builders (mirrors what the bridge/Zeroclaw expects) ────────
 
+// Canonical workflow JSON schema — kept in sync with the bridge's wfSchema
+// (server.js, workflow_* entrypoints) and GeneratedWorkflowStep. "app" names
+// the integration so sandbox MCP node resolution has a concrete service to
+// match against instead of guessing from the title text.
 const WORKFLOW_JSON_HINT =
   '\n\n[IMPORTANT: Respond ONLY with a single JSON object matching this schema, ' +
   'no prose, no markdown fences: ' +
-  '{"workflowName": string, "steps": [{"id": string, "type": string, "title": string, "description": string, "config": object}], ' +
-  '"estimate_hours": number, "automation_score": number, "summary": string}]'
+  '{"workflowName": string, "steps": [{"id": string, "type": "trigger"|"action"|"condition"|"channel", "app": string, "action": string, "title": string, "description": string, "config": object}], ' +
+  '"estimate_hours": number, "automation_score": number, "summary": string}. ' +
+  '"app" is the lowercase integration/service (e.g. slack, gmail, hubspot, webhook, schedule); "action" is the operation. ' +
+  'The first step must be type "trigger".]'
 
 function buildOutbound(op: CopilotOperation, bodyRecord: Record<string, unknown>): { targetPath: string; outbound: unknown } {
   const history = Array.isArray(bodyRecord.conversation_history)
