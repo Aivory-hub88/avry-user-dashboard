@@ -195,6 +195,12 @@ export default function Sidebar() {
     }
   }, [])
 
+  // The Deep Diagnostic report is a standalone, full-screen document (see
+  // app/diagnostics/deep/layout.tsx) — the app nav competes with it for space
+  // and undermines the "exportable report" feel, so it's intentionally hidden
+  // here. All hooks above must still run unconditionally before this return.
+  if (pathname.startsWith("/diagnostics/deep")) return null
+
   const navItems = [
     { key: "console",       href: "/console" },
     { key: "diagnostics",   href: "/diagnostics" },

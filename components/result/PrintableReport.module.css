@@ -28,7 +28,7 @@
 .subtitle {
   font-size: 16px;
   font-weight: 500;
-  color: #666864;
+  color: #5c5c5c;
   margin: 0;
 }
 
@@ -99,7 +99,7 @@
 .tileLabel {
   font-size: 12px;
   font-weight: 700;
-  color: #888884;
+  color: #5c5c5c;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 10px;

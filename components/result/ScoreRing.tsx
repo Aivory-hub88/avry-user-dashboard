@@ -58,7 +58,7 @@ export default function ScoreRing({ score, maturityLevel, isPrintMode }: ScoreRi
           {clampedScore}
         </text>
         {/* Maturity label */}
-        <text className={styles.centerMaturity} x="100" y="118" fill={isPrintMode ? '#888884' : undefined}>
+        <text className={styles.centerMaturity} x="100" y="118" fill={isPrintMode ? '#5c5c5c' : undefined}>
           {maturityLevel}
         </text>
       </svg>
