@@ -36,29 +36,43 @@
   white-space: nowrap;
 }
 
+.axis {
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 0.75;
+}
+
 .axisLabel {
   font-size: 11px;
-  fill: #a1a1aa;
+  fill: #a3a39c;
   text-anchor: middle;
 }
 
 .axisLabelY {
   font-size: 11px;
-  fill: #a1a1aa;
+  fill: #a3a39c;
   text-anchor: middle;
 }
 
 .quadrantLabel {
-  font-size: 11px;
-  fill: #a3a39c;
-  font-style: italic;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
-  .divider {
-    stroke: #ffffff;
-    stroke-width: 0.5;
-    stroke-dasharray: 4 4;
-  }
+.labelQuickWin { fill: #b7cba6; }
+.labelThankless { fill: #e08a8a; }
+.labelNeutral { fill: #8f9089; }
+
+.quadQuickWin { fill: rgba(175, 209, 153, 0.06); }
+.quadMajorProject { fill: rgba(96, 165, 250, 0.04); }
+.quadFillIn { fill: rgba(255, 255, 255, 0.015); }
+.quadThankless { fill: rgba(248, 113, 113, 0.05); }
+
+.divider {
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 0.75;
+  stroke-dasharray: 3 4;
+}
 
 .dot {
   cursor: pointer;

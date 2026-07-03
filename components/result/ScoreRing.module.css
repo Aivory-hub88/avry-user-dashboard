@@ -9,9 +9,21 @@
   overflow: visible;
 }
 
+.halo {
+  fill: #b7cba6;
+  opacity: 0.06;
+  filter: blur(10px);
+}
+
+.tick {
+  stroke: #55564f;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
 .track {
   fill: none;
-  stroke: #3a3a36;
+  stroke: #45463f;
   stroke-width: 12;
 }
 
@@ -20,12 +32,19 @@
   stroke: #b7cba6;
   stroke-width: 12;
   stroke-linecap: round;
-  transition: stroke-dasharray 1s ease-out;
+  transition: stroke-dasharray 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.arcTip {
+  fill: #eef6e6;
+  filter: drop-shadow(0 0 4px rgba(183, 203, 166, 0.9));
+  transition: opacity 0.4s ease-out 0.9s;
 }
 
 .centerScore {
+  font-family: var(--font-doto), sans-serif;
   font-size: 36px;
-  font-weight: 800;
+  font-weight: 700;
   fill: #e5e5e3;
   text-anchor: middle;
   dominant-baseline: middle;

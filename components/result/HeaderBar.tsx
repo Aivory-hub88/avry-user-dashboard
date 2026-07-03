@@ -20,7 +20,7 @@ export default function HeaderBar({ company, submittedAt, onDownloadPdf, isExpor
 
       <div className="relative z-10 max-w-2xl flex flex-col gap-2">
         <span className="text-[#a3a39c] text-xs uppercase tracking-wider font-semibold">AI READINESS REPORT</span>
-        <h1 className="text-3xl md:text-4xl font-semibold text-white tracking-tight">
+        <h1 className={`text-3xl md:text-4xl font-semibold text-white tracking-tight ${styles.companyName}`}>
           {company}
         </h1>
         <span className="text-[#a1a1aa] text-base font-light">{formatDate(submittedAt)}</span>

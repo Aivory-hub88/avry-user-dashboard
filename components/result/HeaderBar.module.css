@@ -13,12 +13,8 @@
 
 .meta { display: flex; flex-direction: column; gap: 0.15rem; }
 
-.company {
-  font-family: 'Nunito', sans-serif;
-  font-size: 1rem;
-  font-weight: 700;
-  color: #e8e8e4;
-  margin: 0;
+.companyName {
+  font-weight: 600 !important;
 }
 
 .label {
