@@ -5,7 +5,7 @@
 // =============================================================================
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   useNodesState,
@@ -14,6 +14,7 @@ import {
   type Node,
   type Edge,
   type Connection as RFConnection,
+  type ReactFlowInstance,
   Background,
   Controls,
   MiniMap,
@@ -182,27 +183,25 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
   // ── History tracking ─────────────────────────────────────
   const [past, setPast] = useState<{nodes: Node<WorkflowNodeData>[], edges: Edge[]}[]>([]);
 
+  // NOTE: notify the parent (onHistoryChange) outside the setPast updater —
+  // React runs updaters during render, so setState calls inside them trigger
+  // "Cannot update a component while rendering a different component".
   const pushHistory = useCallback((currentNodes: Node<WorkflowNodeData>[], currentEdges: Edge[]) => {
-    setPast(p => {
-      const newPast = [...p.slice(-19), { nodes: currentNodes, edges: currentEdges }];
-      if (onHistoryChange) onHistoryChange(newPast.length > 0);
-      return newPast;
-    });
+    setPast(p => [...p.slice(-19), { nodes: currentNodes, edges: currentEdges }]);
+    if (onHistoryChange) onHistoryChange(true);
   }, [onHistoryChange]);
 
   const popHistory = useCallback(() => {
-    setPast(p => {
-      if (p.length === 0) return p;
-      const last = p[p.length - 1];
-      const newPast = p.slice(0, -1);
-      
-      setNodes(rehydrate(last.nodes));
-      setEdges(normalizeEdges(last.edges, last.nodes));
-      
-      if (onHistoryChange) onHistoryChange(newPast.length > 0);
-      return newPast;
-    });
-  }, [setNodes, setEdges, rehydrate, onHistoryChange]);
+    if (past.length === 0) return;
+    const last = past[past.length - 1];
+    const newPast = past.slice(0, -1);
+
+    setPast(newPast);
+    setNodes(rehydrate(last.nodes));
+    setEdges(normalizeEdges(last.edges, last.nodes));
+
+    if (onHistoryChange) onHistoryChange(newPast.length > 0);
+  }, [past, setNodes, setEdges, rehydrate, onHistoryChange]);
 
   useEffect(() => {
     if (registerUndo) registerUndo(popHistory);
@@ -252,9 +251,35 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
   }, [onInjectNodes]);
 
   // ── Drag and drop support ────────────────────────────────
+  const rfInstanceRef = useRef<ReactFlowInstance<Node<WorkflowNodeData>, Edge> | null>(null);
+
+  // Map StandardNodePalette iconKeys to real n8n node types so dropped nodes
+  // get a typed config (inspector forms + setup copilot checklist).
+  const STANDARD_ICON_TO_N8N: Record<string, string> = {
+    webhook: 'n8n-nodes-base.webhook',
+    schedule: 'n8n-nodes-base.scheduleTrigger',
+    manual: 'n8n-nodes-base.manualTrigger',
+    branch: 'n8n-nodes-base.if',
+    edit: 'n8n-nodes-base.set',
+    http: 'n8n-nodes-base.httpRequest',
+    respond: 'n8n-nodes-base.respondToWebhook',
+  };
+
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  // Convert a drop event's screen coordinates to flow coordinates.
+  // Falls back to coordinates relative to the drop container when the
+  // ReactFlow instance isn't mounted yet (empty-canvas state).
+  const dropPosition = useCallback((event: React.DragEvent) => {
+    const instance = rfInstanceRef.current;
+    if (instance) {
+      return instance.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    }
+    const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
   }, []);
 
   const onDrop = useCallback(
@@ -267,11 +292,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
         pushHistory(nodes, edges);
         try {
           const nodeDef = JSON.parse(stdData);
-          const reactFlowBounds = (event.target as HTMLElement).getBoundingClientRect();
-          const position = {
-            x: event.clientX - reactFlowBounds.left,
-            y: event.clientY - reactFlowBounds.top,
-          };
+          const position = dropPosition(event);
           const newId = `std-${Date.now()}`;
 
           // Handle agent node type specially
@@ -298,6 +319,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
             };
             setNodes((nds) => [...nds, newNode]);
           } else {
+            const n8nType = STANDARD_ICON_TO_N8N[nodeDef.icon];
             const newNode: Node<WorkflowNodeData> = {
               id: newId,
               type: 'standardNode',
@@ -307,6 +329,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                 icon: nodeDef.icon,
                 category: nodeDef.category,
                 title: nodeDef.label,
+                ...(n8nType ? { rawN8n: { type: n8nType, parameters: {} } } : {}),
                 onAddStep: () => {
                   setCopilotSourceStepId(newId);
                   setShowAddWithCopilotPanel(true);
@@ -315,6 +338,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
             };
             setNodes((nds) => [...nds, newNode]);
           }
+          setIsEmpty(false);
         } catch (err) {
           console.error('[onDrop standard]', err);
         }
@@ -327,11 +351,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
         pushHistory(nodes, edges);
         try {
           const nodeDef = JSON.parse(nodeData);
-          const reactFlowBounds = (event.target as HTMLElement).getBoundingClientRect();
-          const position = {
-            x: event.clientX - reactFlowBounds.left,
-            y: event.clientY - reactFlowBounds.top,
-          };
+          const position = dropPosition(event);
           const newId = `node-${Date.now()}`;
           const newNode: Node<WorkflowNodeData> = {
             id: newId,
@@ -344,6 +364,11 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
               title: nodeDef.label,
               description: nodeDef.description,
               color: nodeDef.color,
+              // Palette defs carry the real n8n type — keep it so the node
+              // gets a typed config (inspector forms + setup copilot).
+              ...(typeof nodeDef.type === 'string' && nodeDef.type.includes('.')
+                ? { rawN8n: { type: nodeDef.type, parameters: {} } }
+                : {}),
               onAddStep: () => {
                 setCopilotSourceStepId(newId);
                 setShowAddWithCopilotPanel(true);
@@ -351,6 +376,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
             } as any,
           };
           setNodes((nds) => [...nds, newNode]);
+          setIsEmpty(false);
         } catch (err) {
           console.error('[onDrop dynamic]', err);
         }
@@ -364,11 +390,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       pushHistory(nodes, edges);
       try {
         const app = JSON.parse(appData);
-        const reactFlowBounds = (event.target as HTMLElement).getBoundingClientRect();
-        const position = {
-          x: event.clientX - reactFlowBounds.left,
-          y: event.clientY - reactFlowBounds.top,
-        };
+        const position = dropPosition(event);
 
         // Extract app name - handle both direct name and nested structure
         const appName = app.name || app.title || 'App';
@@ -416,11 +438,12 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
         };
 
         setNodes((nds) => [...nds, newNode]);
+        setIsEmpty(false);
       } catch (err) {
         console.error('[onDrop]', err);
       }
     },
-    [setNodes]
+    [setNodes, nodes, edges, pushHistory, dropPosition]
   );
 
   // ── Fetch workflow ───────────────────────────────────────
@@ -771,7 +794,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
             {inspectorOpen ? '›' : '‹'}
           </button>
           {activeTab === 'canvas' ? (
-            <div style={{ position: 'absolute', inset: 0 }}>
+            <div style={{ position: 'absolute', inset: 0 }} onDragOver={onDragOver} onDrop={onDrop}>
               {syncState === 'loading' ? (
                 <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: 13, color: '#a8a6a2' }}>Loading workflow…</span>
@@ -795,7 +818,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                 <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: 13, color: '#a8a6a2', marginBottom: 4 }}>This workflow has no steps yet</p>
-                    <p style={{ fontSize: 11, color: '#5a5a58' }}>Edit the workflow to add nodes.</p>
+                    <p style={{ fontSize: 11, color: '#5a5a58' }}>Drag nodes from the side panel onto the canvas to get started.</p>
                   </div>
                 </div>
               ) : (
@@ -821,8 +844,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                     setInspectorOpen(true);
                   }}
                   onPaneClick={() => { setSelectedNodeId(null); setInspectorOpen(false); }}
-                  onDragOver={onDragOver}
-                  onDrop={onDrop}
+                  onInit={(instance) => { rfInstanceRef.current = instance; }}
                   connectionLineType={ConnectionLineType.Bezier}
                   proOptions={{ hideAttribution: true }}
                   fitView
@@ -936,14 +958,22 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
         />
       )}
 
-      {/* ── Add with Aivory Panel ── */}
+      {/* ── Aivory Node Copilot Panel ── */}
       {showAddWithCopilotPanel && copilotSourceStepId && nodes.find(n => n.id === copilotSourceStepId) && (
         <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} onClick={() => setShowAddWithCopilotPanel(false)} />
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} onClick={() => setShowAddWithCopilotPanel(false)} />
           <div style={{ position: 'relative', zIndex: 1001 }}>
             <AddWithCopilotPanel
               workflow={rawWorkflow}
-              sourceStep={nodes.find(n => n.id === copilotSourceStepId)?.data as any}
+              sourceNode={nodes.find(n => n.id === copilotSourceStepId)!}
+              onApplyConfig={(config) => {
+                handleInspectorChange(copilotSourceStepId, { config });
+              }}
+              onOpenInspector={() => {
+                setShowAddWithCopilotPanel(false);
+                setSelectedNodeId(copilotSourceStepId);
+                setInspectorOpen(true);
+              }}
               onApply={(result) => {
                 // Add new steps and edges to canvas
                 const newSteps = result.newSteps.map((step, i) => ({
