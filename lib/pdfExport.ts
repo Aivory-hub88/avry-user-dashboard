@@ -11,6 +11,7 @@
 import jsPDF from 'jspdf'
 import type { DiagnosticContext, ImprovementItem } from '@/types/diagnostic'
 import { asset } from '@/lib/asset'
+import { COVER_FRONT_BG, COVER_BACK_BG, COVER_WORDMARK, COVER_MICROGRAPHIC, COVER_FOOTER_BADGE } from '@/lib/pdfAssets'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
 export const INK       = '#0a1a0f'   // primary text, display values
@@ -244,9 +245,45 @@ async function renderTextToPngDataUrl(
 // ══════════════════════════════════════════════════════════════════════════════
 
 /** White background fill for every inner page. */
+// Soft warm-white radial gradient shared with the free-diagnostic card
+// (radial-gradient(120% 90% at 28% 0%, #fff, #fbfaf7 45%, #f2f0ea)). Rendered
+// once to a canvas and cached, so every inner page carries the same subtle
+// paper texture instead of flat white. Falls back to flat white if the canvas
+// is unavailable (SSR / no DOM) — the page still prints.
+let _contentBgCache: string | null = null
+function getContentBg(): string | null {
+  if (_contentBgCache) return _contentBgCache
+  try {
+    if (typeof document === 'undefined') return null
+    const canvas = document.createElement('canvas')
+    const scale = 3
+    canvas.width = PAGE_W * scale
+    canvas.height = PAGE_H * scale
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    const cx = canvas.width * 0.28
+    const r = Math.max(canvas.width, canvas.height) * 1.05
+    const grad = ctx.createRadialGradient(cx, 0, 0, cx, 0, r)
+    grad.addColorStop(0, '#ffffff')
+    grad.addColorStop(0.45, '#fbfaf7')
+    grad.addColorStop(1, '#f2f0ea')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    _contentBgCache = canvas.toDataURL('image/png')
+    return _contentBgCache
+  } catch {
+    return null
+  }
+}
+
 export function pageBg(pdf: jsPDF) {
-  setC(pdf, '#ffffff', 'fill')
-  pdf.rect(0, 0, PAGE_W, PAGE_H, 'F')
+  const bg = getContentBg()
+  if (bg) {
+    pdf.addImage(bg, 'PNG', 0, 0, PAGE_W, PAGE_H, undefined, 'FAST')
+  } else {
+    setC(pdf, '#ffffff', 'fill')
+    pdf.rect(0, 0, PAGE_W, PAGE_H, 'F')
+  }
 }
 
 /** Footer: AIVORY™ · CONFIDENTIAL left, aivory.uk right, divider above. */
@@ -786,121 +823,84 @@ export async function applyPremiumCovers(
   title: string = '',
   meta?: { company?: string; date?: string; reportId?: string },
 ) {
-  const [bg, logo] = await Promise.all([
-    loadImage(asset(type === 'front' ? '/cover-front-bg.jpg' : '/cover-back-gradient.jpg')),
-    loadSvgAsPngDataUrl(asset('/aivory-logo-cover.svg'), 251, 80),
-  ])
+  // Tighter cover margin (matches the mockups' ~12mm).
+  const CML = 12
 
-  // Background — image or solid fallback
-  if (bg) {
-    pdf.addImage(bg, 'JPEG', 0, 0, PAGE_W, PAGE_H, undefined, 'FAST')
-  } else {
-    setC(pdf, COVER_BG, 'fill')
-    pdf.rect(0, 0, PAGE_W, PAGE_H, 'F')
-  }
+  // Every graphic on the covers is an INLINE base64 image (see lib/pdfAssets.ts):
+  // pdf.addImage() gets the bytes directly, so a logo/background can never go
+  // missing from a fetch/canvas/basePath failure. All cover TEXT is drawn with
+  // pdf.text() using the Manrope font embedded into the PDF (loadManrope), so it
+  // is vector-crisp and does not depend on the browser having the web font.
+
+  // Full-bleed background
+  pdf.addImage(type === 'front' ? COVER_FRONT_BG : COVER_BACK_BG, 'JPEG', 0, 0, PAGE_W, PAGE_H, undefined, 'FAST')
 
   if (type === 'front') {
-    // ── Top row: Report ID left · CONFIDENTIAL right ──
-    // ── Headline ──
-    const titleText = title || `AI Readiness\nAssessment Report`
-    const titleImg = await renderTextToPngDataUrl(
-      titleText, '300 48px "Manrope", sans-serif', '#ffffff',
-    )
-    if (titleImg) {
-      const wMm = titleImg.width * 0.264583
-      const hMm = titleImg.height * 0.264583
-      pdf.addImage(titleImg.dataUrl, 'PNG', ML, 35, wMm, hMm, undefined, 'FAST')
-    } else {
+    // Top-right: slim all-white AIVORY wordmark (900x187 → 4.813:1)
+    const wmW = 42
+    const wmH = wmW * (187 / 900)
+    pdf.addImage(COVER_WORDMARK, 'PNG', PAGE_W - CML - wmW, 13, wmW, wmH, undefined, 'FAST')
+
+    // Headline — uppercase, 2 lines, tight leading, lower-left. Width-fitted so
+    // the longest line lands at ~122mm regardless of font metrics.
+    const titleLines = (title || 'AI Readiness\nAssessment Report').toUpperCase().split('\n')
+    setC(pdf, '#ffffff', 'text')
+    pdf.setFont(F(), 'normal')
+    let tfs = 40
+    pdf.setFontSize(tfs)
+    const widest = Math.max(...titleLines.map((l) => pdf.getTextWidth(l)))
+    if (widest > 0) tfs = tfs * (122 / widest)
+    pdf.setFontSize(tfs)
+    const lineGap = tfs * 0.3528 * 1.04 // pt→mm, tight leading
+    const titleTopBaseline = 165 // baseline of first line (mm)
+    titleLines.forEach((l, i) => pdf.text(l, CML, titleTopBaseline + i * lineGap))
+    const titleWmm = Math.max(...titleLines.map((l) => pdf.getTextWidth(l)))
+
+    // Ring glyph, right of the second title line (vector — nothing to load)
+    setC(pdf, '#ffffff', 'draw')
+    pdf.setLineWidth(0.7)
+    pdf.circle(CML + titleWmm + 12, titleTopBaseline + lineGap - tfs * 0.3528 * 0.36, 6.3, 'S')
+
+    // Company Name — large, shrink-to-fit so long names never overflow
+    if (meta?.company) {
       setC(pdf, '#ffffff', 'text')
       pdf.setFont(F(), 'normal')
-      pdf.setFontSize(27)
-      titleText.split('\n').forEach((line, i) => {
-        pdf.text(line, ML, 45 + i * 14)
-      })
+      let cfs = 26
+      pdf.setFontSize(cfs)
+      const cw = pdf.getTextWidth(meta.company)
+      const maxW = PAGE_W - 2 * CML
+      if (cw > maxW) { cfs = cfs * (maxW / cw); pdf.setFontSize(cfs) }
+      pdf.text(meta.company, CML, 210)
     }
 
-    // ── Company Name ──
-    if (meta?.company) {
-      const companyImg = await renderTextToPngDataUrl(
-        meta.company, '300 22px "Manrope", sans-serif', '#ffffff',
-      )
-      if (companyImg) {
-        const cwMm = companyImg.width * 0.264583
-        const chMm = companyImg.height * 0.264583
-        pdf.addImage(companyImg.dataUrl, 'PNG', ML, 70, cwMm, chMm, undefined, 'FAST')
-      } else {
-        setC(pdf, '#ffffff', 'text')
-        pdf.setFont(F(), 'normal')
-        pdf.setFontSize(12)
-        pdf.text(meta.company, ML, 75)
-      }
-    }
-
-    // ── Date (Right aligned, above gradient) ──
+    // Date — DD MM YY, muted, wide-spaced
     if (meta?.date) {
-      let formattedDate = meta.date;
-      const d = new Date(meta.date);
+      let fd = meta.date
+      const d = new Date(meta.date)
       if (!isNaN(d.getTime())) {
-        formattedDate = `${String(d.getDate()).padStart(2, '0')} ${String(d.getMonth() + 1).padStart(2, '0')} ${d.getFullYear()}`;
+        fd = `${String(d.getDate()).padStart(2, '0')}  ${String(d.getMonth() + 1).padStart(2, '0')}  ${String(d.getFullYear()).slice(-2)}`
       }
-      const dateImg = await renderTextToPngDataUrl(
-        formattedDate, '300 32px "Manrope", sans-serif', '#ffffff',
-      )
-      if (dateImg) {
-        const wMm = dateImg.width * 0.264583
-        const hMm = dateImg.height * 0.264583
-        // Sits just above the gradient band (which starts ~73% down the cover
-        // image) — was 185mm, leaving a large dead-air gap above the gradient.
-        pdf.addImage(dateImg.dataUrl, 'PNG', PAGE_W - MR - wMm, 199, wMm, hMm, undefined, 'FAST')
-      }
+      setC(pdf, '#a9bfa4', 'text')
+      pdf.setFont(F(), 'normal')
+      pdf.setFontSize(15)
+      spacedText(pdf, fd, CML, 223, 0.4)
     }
 
-    // ── Logo and Tagline at Bottom (per Image 4) ──
-    const baseY = PAGE_H - 20
-
-    if (logo) {
-      const lw = 55
-      const lh = lw * (80 / 251)
-      // Logo on the LEFT
-      pdf.addImage(logo, 'PNG', ML, baseY - lh / 2, lw, lh, undefined, 'FAST')
-      
-      // Tagline on the RIGHT
-      const subImg = await renderTextToPngDataUrl(
-        'Make AI make sense\u00AE', '300 16px "Manrope", sans-serif', '#ffffff',
-      )
-      if (subImg) {
-        const wMm = subImg.width * 0.264583
-        const hMm = subImg.height * 0.264583
-        pdf.addImage(subImg.dataUrl, 'PNG', PAGE_W - MR - wMm, baseY - hMm / 2, wMm, hMm, undefined, 'FAST')
-      }
-    }
-
-  } else {
-    // ── Back cover (per Image 3) ──
-    const cx = PAGE_W / 2
-    const cy = PAGE_H / 2
-
-    if (logo) {
-      const lw = 60
-      const lh = lw * (80 / 251)
-      pdf.addImage(logo, 'PNG', cx - lw / 2, cy - lh / 2 - 2, lw, lh, undefined, 'FAST')
-
-      const tagImg = await renderTextToPngDataUrl(
-        'Make AI make sense\u00AE', '300 18px "Manrope", sans-serif', '#ffffff',
-      )
-      if (tagImg) {
-        const twMm = tagImg.width * 0.264583
-        const thMm = tagImg.height * 0.264583
-        pdf.addImage(tagImg.dataUrl, 'PNG', cx - twMm / 2, cy + lh / 2 - 0.5, twMm, thMm, undefined, 'FAST')
-      }
-    }
-    
-    // URL and copyright at the very bottom
+    // Tagline bottom-left
+    setC(pdf, '#ffffff', 'text')
     pdf.setFont(F(), 'normal')
-    pdf.setTextColor('#ffffff')
-    pdf.setFontSize(8)
-    pdf.text('www.aivory.uk', ML, PAGE_H - 12)
-    pdf.text('\u00A9 2026 Aivory\u2122', PAGE_W - MR, PAGE_H - 12, { align: 'right' })
+    pdf.setFontSize(11)
+    pdf.text('Make AI make sense®', CML, PAGE_H - 14)
+
+    // Footer credential strip, bottom-right (1700x165 → 10.30:1)
+    const fW = 76
+    const fH = fW * (165 / 1700)
+    pdf.addImage(COVER_FOOTER_BADGE, 'PNG', PAGE_W - CML - fW, PAGE_H - 12 - fH, fW, fH, undefined, 'FAST')
+  } else {
+    // Back cover — single centred all-white AIVORY lockup (1900x545 → 3.486:1)
+    const mW = 99
+    const mH = mW * (545 / 1900)
+    pdf.addImage(COVER_MICROGRAPHIC, 'PNG', PAGE_W / 2 - mW / 2, 154 - mH / 2, mW, mH, undefined, 'FAST')
   }
 }
 
