@@ -687,7 +687,7 @@ async function exportRoadmapPdf(
   phaseCompletes: Record<string, boolean>,
 ) {
   const { default: jsPDF } = await import('jspdf');
-  const { applyPremiumCovers, loadManrope, pageBg, pageFooter, sectionLabel, renderNarrative, thinDiv } = await import('@/lib/pdfExport');
+  const { applyPremiumCovers, renderAivoryNote, loadManrope, pageBg, pageFooter, sectionLabel, renderNarrative, thinDiv } = await import('@/lib/pdfExport');
 
   const doc = new jsPDF('p', 'mm', 'a4');
   await loadManrope(doc);
@@ -714,14 +714,18 @@ Roadmap`, {
     reportId: `RM-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-001`
   });
 
-  // Progress summary on front cover (dark green area, below client info)
-  doc.setGState(new (doc as any).GState({ opacity: 0.7 }));
-  doc.setFontSize(10);
-  doc.setTextColor(255, 255, 255);
-  doc.text(`Overall Progress: ${overallPct}%  ·  ${checkedMilestones}/${totalMilestones} milestones`, ML, 125);
-  doc.setFontSize(8);
-  doc.text(`Exported: ${now.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })} · ${now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, ML, 132);
-  doc.setGState(new (doc as any).GState({ opacity: 1 }));
+  // ── A note from Aivory ───────────────────────────────────
+  renderAivoryNote(doc, {
+    greeting: `Dear ${roadmap.title},`,
+    paragraphs: [
+      `This is your AI Implementation Roadmap: the phased, milestone-by-milestone plan that turns your blueprint into deployed, working systems. It sequences what to build, in what order, and how to measure that each phase is landing.`,
+      `Use it as a living document. As your team checks off milestones and records KPI actuals, the roadmap tracks how far you have progressed toward a fully operational AI capability.`,
+    ],
+    footerStats: [
+      { label: 'Overall Progress', value: `${overallPct}%` },
+      { label: 'Milestones', value: `${checkedMilestones}/${totalMilestones}`, align: 'right' },
+    ],
+  });
 
   // Cover page intro (first inner page)
   doc.addPage();

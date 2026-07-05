@@ -1000,6 +1000,78 @@ function editorialSpread(pdf: jsPDF, context: DiagnosticContext) {
   spacedText(pdf, 'MATURITY LEVEL', ML + CW, stripY + 9, 0.3, { align: 'right' })
 }
 
+/**
+ * Reusable dark "A NOTE FROM AIVORY" letter page — the same treatment as the
+ * diagnostic's editorialSpread, exported so the Blueprint and Roadmap exports
+ * can open with the identical premium note (with the white Aivory signature).
+ * Adds its own page. footerStats renders the grounding data strip.
+ */
+export function renderAivoryNote(
+  doc: jsPDF,
+  opts: {
+    greeting: string
+    paragraphs: string[]
+    footerStats?: Array<{ label: string; value: string; align?: 'left' | 'right' }>
+  },
+) {
+  doc.addPage()
+  setC(doc, COVER_BG, 'fill')
+  doc.rect(0, 0, PAGE_W, PAGE_H, 'F')
+
+  const cx = ML
+
+  setC(doc, '#8fb87f', 'text')
+  doc.setFont(FB(), 'bold')
+  doc.setFontSize(7.5)
+  spacedText(doc, 'A NOTE FROM AIVORY', cx, 58, 0.5)
+
+  setC(doc, '#ffffff', 'text')
+  doc.setFont(F(), 'normal')
+  doc.setFontSize(17)
+  doc.text(opts.greeting, cx, 78)
+
+  setC(doc, '#dce8d6', 'text')
+  doc.setFont(F(), 'normal')
+  doc.setFontSize(11.5)
+  doc.setLineHeightFactor(1.7)
+  let ny = 94
+  opts.paragraphs.forEach((p) => {
+    const lines = doc.splitTextToSize(p, CW - 10)
+    doc.text(lines, cx, ny)
+    ny += lines.length * 6.3 + 8
+  })
+  doc.setLineHeightFactor(1.15)
+
+  ny += 6
+  setC(doc, '#8fb87f', 'text')
+  doc.setFont(F(), 'normal')
+  doc.setFontSize(11)
+  doc.text('Warmly, The Aivory Team', cx, ny)
+
+  const sigW = 46
+  const sigH = sigW * (62.9 / 498.7)
+  doc.addImage(SIGNATURE_WHITE, 'PNG', cx, ny + 8, sigW, sigH, undefined, 'FAST')
+
+  if (opts.footerStats?.length) {
+    const stripY = PAGE_H - 46
+    setC(doc, '#3f5c46', 'draw')
+    doc.setLineWidth(0.18)
+    doc.line(ML, stripY, ML + CW, stripY)
+    opts.footerStats.forEach((st) => {
+      const align = st.align ?? 'left'
+      const x = align === 'right' ? ML + CW : ML
+      setC(doc, '#8fb87f', 'text')
+      doc.setFont(FB(), 'bold')
+      doc.setFontSize(6.4)
+      spacedText(doc, st.label.toUpperCase(), x, stripY + 9, 0.3, { align })
+      setC(doc, '#ffffff', 'text')
+      doc.setFont(F(), 'normal')
+      doc.setFontSize(13)
+      spacedText(doc, st.value, x, stripY + 20, 0.2, { align })
+    })
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 //  MAIN EXPORT
 // ══════════════════════════════════════════════════════════════════════════════

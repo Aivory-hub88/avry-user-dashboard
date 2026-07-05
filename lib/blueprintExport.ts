@@ -5,7 +5,7 @@
 
 import type { BlueprintV1 } from '@/types/blueprint'
 import {
-  applyPremiumCovers, loadManrope, pageBg, pageFooter, sectionLabel,
+  applyPremiumCovers, renderAivoryNote, loadManrope, pageBg, pageFooter, sectionLabel,
   renderNarrative, spacedText, thinDiv, setC,
   INK, MUTED, LABEL, TRACK, RULE, CONTENT_C,
   PAGE_W, PAGE_H, ML, MR, CW, F, FB
@@ -83,7 +83,20 @@ export async function exportBlueprintPDF(
     date: date,
     reportId: `BP-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-001`
   })
-  
+
+  // ── A note from Aivory ───────────────────────────────────
+  renderAivoryNote(doc, {
+    greeting: `Dear ${companyName},`,
+    paragraphs: [
+      `This AI System Blueprint turns your readiness assessment into a concrete build. What follows is not a generic architecture, but the specific system your operation needs: the data sources it draws on, the agents that do the work, and the sequence in which to deploy them.`,
+      `Every module and phase ahead is scoped to your objectives and constraints, so your team can align stakeholders, sequence the technical work, and start executing with confidence.`,
+    ],
+    footerStats: [
+      { label: 'Document', value: 'AI System Blueprint' },
+      { label: 'Prepared', value: date, align: 'right' },
+    ],
+  })
+
   doc.addPage()
   pageBg(doc)
   pageNum++
