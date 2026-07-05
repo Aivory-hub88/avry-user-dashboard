@@ -30,6 +30,8 @@ const ASSETS = [
   { name: 'COVER_WORDMARK',     file: 'wordmark.svg',     kind: 'svg', width: 900 },
   { name: 'COVER_MICROGRAPHIC', file: 'micrographic.svg', kind: 'svg', width: 1900 },
   { name: 'COVER_FOOTER_BADGE', file: 'footer.svg',       kind: 'svg', width: 1700 },
+  { name: 'SIGNATURE_WHITE',    file: 'signature-white.svg', kind: 'svg', width: 1000 },
+  { name: 'SIGNATURE_DARK',     file: 'signature-dark.svg',  kind: 'svg', width: 1000 },
 ]
 
 async function encode(a) {

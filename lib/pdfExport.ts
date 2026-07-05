@@ -11,7 +11,7 @@
 import jsPDF from 'jspdf'
 import type { DiagnosticContext, ImprovementItem } from '@/types/diagnostic'
 import { asset } from '@/lib/asset'
-import { COVER_FRONT_BG, COVER_BACK_BG, COVER_WORDMARK, COVER_MICROGRAPHIC, COVER_FOOTER_BADGE } from '@/lib/pdfAssets'
+import { COVER_FRONT_BG, COVER_BACK_BG, COVER_WORDMARK, COVER_MICROGRAPHIC, COVER_FOOTER_BADGE, SIGNATURE_WHITE, SIGNATURE_DARK } from '@/lib/pdfAssets'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
 export const INK       = '#0a1a0f'   // primary text, display values
@@ -623,6 +623,15 @@ function oppCard(
 function nextStepRow(
   pdf: jsPDF, y: number, stepNum: string, title: string, body: string,
 ): number {
+  // Guarantee the whole row fits on the current page before drawing — a long
+  // body used to run straight through the page footer (no per-row page break).
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(8.5)
+  pdf.setLineHeightFactor(1.65)
+  const measured = pdf.splitTextToSize(body, CW - 13)
+  pdf.setLineHeightFactor(1.15)
+  y = ensureSpace(pdf, y, 7 + 10 + measured.length * 5.2 + 7)
+
   thinDiv(pdf, y)
   y += 7 // ~20px padding-top
 
@@ -956,6 +965,13 @@ function editorialSpread(pdf: jsPDF, context: DiagnosticContext) {
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(11)
   pdf.text('Warmly, The Aivory Team', cx, ny)
+
+  // Aivory signature (white) beneath the sign-off — inline asset, cannot fail.
+  {
+    const sigW = 46
+    const sigH = sigW * (62.9 / 498.7)
+    pdf.addImage(SIGNATURE_WHITE, 'PNG', cx, ny + 8, sigW, sigH, undefined, 'FAST')
+  }
 
   // Bottom supporting data strip — composite score as a grounding stat
   const stripY = PAGE_H - 46
@@ -1612,6 +1628,14 @@ export async function exportReportToPdf(
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(9.5)
   pdf.text('Warmly, The Aivory Team', ML, y)
+
+  // Aivory signature (grey, colour-adjusted for the light page) closing the
+  // document — inline asset, cannot fail.
+  {
+    const sigW = 46
+    const sigH = sigW * (62.9 / 498.7)
+    pdf.addImage(SIGNATURE_DARK, 'PNG', ML, y + 6, sigW, sigH, undefined, 'FAST')
+  }
 
   // ════════════════════════════════════════════════════════════════════════════
   // BACK COVER
