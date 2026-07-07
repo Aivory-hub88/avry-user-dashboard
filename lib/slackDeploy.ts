@@ -6,7 +6,7 @@
  * getSlackLinkStatus() until "connected" (user approved the install).
  */
 
-import { AuthManager } from './authManager'
+import { authedFetch } from './deployAuth'
 import type { TelegramAgentType, LinkStatus } from './telegramDeploy'
 
 const BACKEND_URL =
@@ -20,20 +20,11 @@ export interface SlackDeployLink {
   expires_at: string
 }
 
-const authHeaders = (): Record<string, string> => {
-  const token = AuthManager.getAccessToken()
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
-}
-
 export async function createSlackDeployLink(
   agentType: TelegramAgentType
 ): Promise<SlackDeployLink> {
-  const res = await fetch(`${BACKEND_URL}/api/v1/slack/deploy-link`, {
+  const res = await authedFetch(`${BACKEND_URL}/api/v1/slack/deploy-link`, {
     method: 'POST',
-    headers: authHeaders(),
     body: JSON.stringify({ agent_type: agentType }),
   })
   if (!res.ok) {
@@ -46,9 +37,8 @@ export async function createSlackDeployLink(
 export async function getSlackLinkStatus(
   token: string
 ): Promise<{ status: LinkStatus; team_id?: string }> {
-  const res = await fetch(
-    `${BACKEND_URL}/api/v1/slack/link-status/${encodeURIComponent(token)}`,
-    { headers: authHeaders() }
+  const res = await authedFetch(
+    `${BACKEND_URL}/api/v1/slack/link-status/${encodeURIComponent(token)}`
   )
   if (!res.ok) return { status: 'not_found' }
   return res.json()
