@@ -11,6 +11,11 @@ import {
   LinkStatus,
   TelegramAgentType,
 } from '@/lib/telegramDeploy';
+import {
+  createSlackDeployLink,
+  getSlackLinkStatus,
+  SlackDeployLink,
+} from '@/lib/slackDeploy';
 
 const NoiseOverlay = () => (
   <>
@@ -211,8 +216,9 @@ function IntegrationsRow() {
 }
 
 function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolean, onClose: () => void, agentName: string | null, agentType: TelegramAgentType | null }) {
-  const [view, setView] = useState<'channels' | 'telegram'>('channels');
+  const [view, setView] = useState<'channels' | 'telegram' | 'slack'>('channels');
   const [deployLink, setDeployLink] = useState<DeployLink | null>(null);
+  const [slackLink, setSlackLink] = useState<SlackDeployLink | null>(null);
   const [linkStatus, setLinkStatus] = useState<LinkStatus>('pending');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -228,12 +234,41 @@ function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolea
       stopPolling();
       setView('channels');
       setDeployLink(null);
+      setSlackLink(null);
       setLinkStatus('pending');
       setError(null);
       setLoading(false);
     }
     return stopPolling;
   }, [isOpen, stopPolling]);
+
+  const startSlackDeploy = async () => {
+    if (!agentType) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const link = await createSlackDeployLink(agentType);
+      setSlackLink(link);
+      setLinkStatus('pending');
+      setView('slack');
+      // Open Slack's consent screen in a new tab; polling below picks up the result
+      window.open(link.install_url, '_blank', 'noopener,noreferrer');
+      stopPolling();
+      pollRef.current = setInterval(async () => {
+        try {
+          const res = await getSlackLinkStatus(link.token);
+          if (res.status === 'connected' || res.status === 'expired') {
+            setLinkStatus(res.status);
+            stopPolling();
+          }
+        } catch { /* keep polling */ }
+      }, 2500);
+    } catch (e: any) {
+      setError(e?.message || 'Could not start the Slack install. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const startTelegramDeploy = async () => {
     if (!agentType) return;
@@ -286,18 +321,26 @@ function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolea
 
             <div className="space-y-3">
               {/* Slack Option */}
-              <button className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group">
+              <button
+                onClick={startSlackDeploy}
+                disabled={!agentType || loading}
+                className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden shrink-0">
                   <Image src={asset("/integrations/icons/slack.svg")} alt="Slack" width={20} height={20} />
                 </div>
                 <div>
                   <div className="text-white/90 font-medium text-[14px]">Slack</div>
-                  <div className="text-white/40 text-[12px] mt-0.5">Connect to a Slack workspace</div>
+                  <div className="text-white/40 text-[12px] mt-0.5">{loading ? 'Preparing install…' : 'Connect to a Slack workspace'}</div>
                 </div>
                 <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                  </svg>
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-[#b7cba6]/30 border-t-[#b7cba6] rounded-full animate-spin" />
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                    </svg>
+                  )}
                 </div>
               </button>
 
@@ -340,6 +383,86 @@ function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolea
                   </svg>
                 </div>
               </button>
+            </div>
+          </>
+        )}
+
+        {view === 'slack' && slackLink && (
+          <>
+            <button onClick={() => { stopPolling(); setView('channels'); }} className="flex items-center gap-1.5 text-white/40 hover:text-white text-[12px] transition-colors mb-4 -mt-2">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+              Back
+            </button>
+
+            <h3 style={{ fontSize: 20, fontWeight: 300, color: '#fff', margin: '0 0 8px', lineHeight: 1.3 }}>
+              {linkStatus === 'connected' ? 'Agent connected' : 'Deploy to Slack'}
+            </h3>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 24px' }}>
+              {linkStatus === 'connected'
+                ? <>Your <strong className="text-white font-medium">{slackLink.agent_name}</strong> is live in your Slack workspace. DM it or @mention it in a channel.</>
+                : linkStatus === 'expired'
+                ? 'This install link has expired. Generate a new one to continue.'
+                : <>Approve the install in the Slack tab that just opened to connect your <strong className="text-white font-medium">{slackLink.agent_name}</strong>.</>}
+            </p>
+
+            <div className="flex flex-col items-center">
+              <div className={`w-[216px] h-[216px] rounded-2xl border flex flex-col items-center justify-center gap-3 ${linkStatus === 'connected' ? 'bg-[#b7cba6]/10 border-[#b7cba6]/30' : 'bg-white/[0.03] border-white/10'}`}>
+                {linkStatus === 'connected' ? (
+                  <>
+                    <div className="w-14 h-14 rounded-full bg-[#b7cba6]/20 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7 text-[#b7cba6]">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    </div>
+                    <span className="text-[#b7cba6] text-[13px] font-medium">Connected</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center">
+                      <Image src={asset("/integrations/icons/slack.svg")} alt="Slack" width={28} height={28} />
+                    </div>
+                    {linkStatus === 'expired' ? (
+                      <button
+                        onClick={startSlackDeploy}
+                        disabled={loading}
+                        className="px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-[#b7cba6]/50 transition-all"
+                      >
+                        {loading ? 'Generating…' : 'Generate new link'}
+                      </button>
+                    ) : (
+                      <span className="text-white/50 text-[12px] px-6 text-center">Waiting for Slack authorization…</span>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {linkStatus === 'pending' && (
+                <>
+                  <div className="flex items-center gap-2 mt-5 text-white/50 text-[12px]">
+                    <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-[#b7cba6] rounded-full animate-spin" />
+                    Waiting for approval…
+                  </div>
+                  <a
+                    href={slackLink.install_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 text-[#b7cba6]/80 hover:text-[#b7cba6] text-[12px] underline underline-offset-2 transition-colors"
+                  >
+                    Re-open the Slack authorization page
+                  </a>
+                </>
+              )}
+
+              {linkStatus === 'connected' && (
+                <button
+                  onClick={onClose}
+                  className="mt-5 w-full py-2.5 rounded-lg bg-[#b7cba6]/20 hover:bg-[#b7cba6]/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-[#b7cba6]/30"
+                >
+                  Done
+                </button>
+              )}
             </div>
           </>
         )}
