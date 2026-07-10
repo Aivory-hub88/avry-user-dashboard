@@ -15,7 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getComposioClient, getComposioRedirectUrl } from '@/lib/composio'
+import { getComposioClient, getComposioRedirectUrl, getOrCreateAuthConfigId } from '@/lib/composio'
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   let body: { appId?: string; userId?: string }
@@ -44,13 +44,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const composio    = getComposioClient()
-    const entity      = composio.getEntity(userId)
-    const redirectUrl = getComposioRedirectUrl()
+    const composio     = getComposioClient()
+    const redirectUrl  = getComposioRedirectUrl()
+    // v3 requires an auth config id; entity.initiateConnection({ appName })
+    // no longer exists. link() (not initiate()) is the current method —
+    // Composio retired initiate() for Composio-managed OAuth on 2026-07-03.
+    const authConfigId = await getOrCreateAuthConfigId(composio, appId)
 
-    const connectionRequest = await entity.initiateConnection({
-      appName:     appId,
-      redirectUri: redirectUrl,
+    const connectionRequest = await composio.connectedAccounts.link(userId, authConfigId, {
+      callbackUrl: redirectUrl,
     })
 
     console.log('[integrations/oauth/connect] initiated', {
@@ -60,8 +62,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     })
 
     return NextResponse.json({
-      redirectUrl: connectionRequest.redirectUrl,
-      connectionId: connectionRequest.connectedAccountId ?? null,
+      redirectUrl: connectionRequest.redirectUrl ?? null,
+      connectionId: connectionRequest.id ?? null,
     })
   } catch (err: unknown) {
     const details = err instanceof Error ? err.message : String(err)

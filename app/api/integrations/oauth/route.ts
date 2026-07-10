@@ -73,25 +73,22 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     // 2. Fetch connected accounts from Composio
     try {
-      const composio = getComposioClient()
-      const entity   = composio.getEntity(userId)
-      const connections = await entity.getConnections()
+      const composio    = getComposioClient()
+      const { items }   = await composio.connectedAccounts.list({ userIds: [userId] })
 
-      const connectedApps = Array.isArray(connections)
-        ? connections.map((c: Record<string, unknown>) => {
-            const composioStatus = String(c.status ?? '').toUpperCase()
-            const normalizedStatus =
-              composioStatus === 'ACTIVE' ? 'connected' :
-              composioStatus === 'NEEDS_REAUTH' || composioStatus === 'EXPIRED' ? 'needs_reauth' :
-              'needs_reauth'
-            return {
-              appName:     c.appName     ?? c.appUniqueId ?? null,
-              status:      normalizedStatus,
-              connectedAt: c.createdAt   ?? null,
-              accountId:   c.id          ?? null,
-            }
-          })
-        : []
+      const connectedApps = items.map((c) => {
+        const composioStatus = String(c.status ?? '').toUpperCase()
+        const normalizedStatus =
+          composioStatus === 'ACTIVE' ? 'connected' :
+          composioStatus === 'NEEDS_REAUTH' || composioStatus === 'EXPIRED' ? 'needs_reauth' :
+          'needs_reauth'
+        return {
+          appName:     c.toolkit?.slug ?? null,
+          status:      normalizedStatus,
+          connectedAt: c.createdAt ?? null,
+          accountId:   c.id ?? null,
+        }
+      })
 
       const now = new Date().toISOString()
 
@@ -152,15 +149,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
 
     try {
-      const composio    = getComposioClient()
-      const entity      = composio.getEntity(userId)
-      const rawConns    = await entity.getConnections()
-      const connections = Array.isArray(rawConns) ? rawConns : []
+      const composio  = getComposioClient()
+      const { items } = await composio.connectedAccounts.list({ userIds: [userId] })
 
-      // Map Composio's raw connection objects → AivoryConnection shape.
+      // Map Composio's connected-account objects → AivoryConnection shape.
       // Composio status values: ACTIVE | INITIATED | FAILED | EXPIRED | NEEDS_REAUTH
       // AivoryConnection status: connected | revoked | needs_reauth
-      const mapped = connections.map((c: Record<string, unknown>) => {
+      const mapped = items.map((c) => {
         const composioStatus = String(c.status ?? '').toUpperCase()
         let status: 'connected' | 'revoked' | 'needs_reauth'
         if (composioStatus === 'ACTIVE') {
@@ -172,26 +167,24 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
           status = 'needs_reauth'
         }
 
-        // Derive a stable appId: prefer appUniqueId, fall back to lowercased appName
-        const rawAppName = String(c.appName ?? c.appUniqueId ?? '')
+        // toolkit.slug replaces the old appName/appUniqueId fields
+        const rawAppName = String(c.toolkit?.slug ?? '')
         const appId = rawAppName.toLowerCase().replace(/\s+/g, '-')
 
         return {
-          id:                String(c.id ?? c.connectedAccountId ?? ''),
+          id:                String(c.id ?? ''),
           tenantId:          userId,
           appId,
           appName:           rawAppName,
           appIcon:           '',
-          displayName:       String(c.displayName ?? rawAppName),
+          displayName:       rawAppName,
           status,
           authType:          'oauth' as const,
           storageRef:        '',
           createdAt:         String(c.createdAt ?? new Date().toISOString()),
           updatedAt:         String(c.updatedAt ?? new Date().toISOString()),
-          lastUsedAt:        (c.lastUsedAt as string | null) ?? null,
-          accountIdentifier: (c.accountIdentifier as string | null) ??
-                             (c.email as string | null) ??
-                             (c.username as string | null) ?? null,
+          lastUsedAt:        null,
+          accountIdentifier: null,
           oauthProvider:     appId,
         }
       })
@@ -268,7 +261,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     try {
       const composio = getComposioClient()
-      await composio.connectedAccounts.delete({ connectedAccountId: accountId })
+      await composio.connectedAccounts.delete(accountId)
       return NextResponse.json({ success: true })
     } catch (err: unknown) {
       const details = err instanceof Error ? err.message : String(err)
