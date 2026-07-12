@@ -70,11 +70,21 @@ export async function listDeployments(): Promise<AgentDeployment[]> {
   if (tgRes.status === 'fulfilled' && tgRes.value.ok) {
     const data = await tgRes.value.json().catch(() => null)
     for (const b of data?.bindings ?? []) {
+      // For private chats, chat_title is the connecting user's OWN Telegram
+      // name/username (not the bot's) — showing it reads as a random person's
+      // handle. Groups have a real chat_title worth showing; private chats
+      // should identify the bot persona instead.
+      const label =
+        b.chat_type === 'group' && b.chat_title
+          ? b.chat_title
+          : b.bot_username
+            ? `@${b.bot_username}`
+            : 'Telegram chat'
       out.push({
         kind: 'telegram',
         id: b.binding_id,
         agentType: b.agent_type,
-        label: b.chat_title || b.bot_username || 'Telegram chat',
+        label,
       })
     }
   }
