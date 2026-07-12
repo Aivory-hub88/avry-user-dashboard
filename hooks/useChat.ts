@@ -6,6 +6,9 @@ import { saveSessionMessages, loadSessionMessages, listSessions, ChatStorageErro
 import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
+import { sendAgentMessage } from '@/lib/agentChat'
+import type { TelegramAgentType } from '@/lib/telegramDeploy'
+import { useMode } from '@/contexts/ModeContext'
 import { useSession } from './useSession'
 import type { Attachment } from '@/components/UploadMenu'
 
@@ -43,6 +46,7 @@ export function useChat({
   const [isClarification, setIsClarification] = useState(false)
   const messagesRef = useRef<Message[]>([])
   const session = useSession(addToast)
+  const { agentTarget } = useMode()
 
   // Keep ref in sync with state so handleSend can read current messages without stale closure
   useEffect(() => {
@@ -92,6 +96,43 @@ export function useChat({
 
     let finalContent = ""
     let streamError = false
+
+    // Deployable-agent chat: single JSON reply (the agent may run tools
+    // before answering), no SSE stream — the placeholder keeps the typing UI.
+    if (agentTarget) {
+      try {
+        finalContent = await sendAgentMessage(
+          agentTarget as TelegramAgentType,
+          userContent,
+          currentSessionId
+        )
+        setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent, isStreaming: false } : m))
+      } catch (error) {
+        addToast("error", error instanceof Error ? error.message : "Agent is unavailable right now.")
+        setMessages(p => p.filter(m => m.id !== assistantId))
+        streamError = true
+      } finally {
+        setIsStreaming(false)
+        if (!streamError) {
+          try {
+            setMessages(prev => {
+              const updated = prev.map(m =>
+                m.id === assistantId ? { ...m, content: finalContent, isStreaming: false } : m
+              )
+              saveSessionMessages(currentSessionId, updated)
+              setSessions(listSessions())
+              return updated
+            })
+          } catch (e) {
+            if (e instanceof ChatStorageError) {
+              addToast("error", "Chat history storage is full. Messages may not be saved.")
+            }
+          }
+        }
+      }
+      return
+    }
+
     try {
       const baseStream = streamConsoleResponse("/api/console/stream", {
         session_id: currentSessionId,
@@ -145,7 +186,7 @@ export function useChat({
         }
       }
     }
-  }, [currentSessionId, addToast, processEvent, triggerClassification, clearAttachments])
+  }, [currentSessionId, agentTarget, addToast, processEvent, triggerClassification, clearAttachments])
 
   const handleNewChat = useCallback(() => {
     if (messages.length > 0) {

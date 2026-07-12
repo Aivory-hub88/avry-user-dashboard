@@ -17,6 +17,7 @@ import {
   SlackDeployLink,
 } from '@/lib/slackDeploy';
 import { listAgentActions, AgentAction } from '@/lib/agentActions';
+import { listDeployments, deleteDeployment, AgentDeployment } from '@/lib/agentChat';
 
 const NoiseOverlay = () => (
   <>
@@ -572,7 +573,45 @@ function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolea
   );
 }
 
-function AgentCard({ agent, onDeploy }: { agent: typeof AGENTS[0], onDeploy: () => void }) {
+function DeploymentRow({ deployment, onDisconnect }: { deployment: AgentDeployment, onDisconnect: (d: AgentDeployment) => void }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#b7cba6]/[0.05] border border-[#b7cba6]/[0.12]">
+      <span className="w-1.5 h-1.5 rounded-full bg-[#b7cba6] shrink-0" />
+      <Image
+        src={asset(`/integrations/icons/${deployment.kind}.svg`)}
+        alt={deployment.kind}
+        width={12}
+        height={12}
+        className="shrink-0"
+      />
+      <span className="text-[10.5px] text-white/65 truncate flex-1" title={deployment.label}>
+        {deployment.label}
+      </span>
+      <button
+        onClick={async () => {
+          if (busy) return;
+          if (!window.confirm(`Disconnect this agent from ${deployment.kind === 'telegram' ? 'Telegram chat' : 'Slack workspace'} "${deployment.label}"?`)) return;
+          setBusy(true);
+          try { await onDisconnect(deployment); } finally { setBusy(false); }
+        }}
+        title="Disconnect deployment"
+        className="shrink-0 text-white/30 hover:text-red-400/90 transition-colors disabled:opacity-40"
+        disabled={busy}
+      >
+        {busy ? (
+          <span className="block w-3 h-3 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+}
+
+function AgentCard({ agent, deployments, onDeploy, onDisconnect }: { agent: typeof AGENTS[0], deployments: AgentDeployment[], onDeploy: () => void, onDisconnect: (d: AgentDeployment) => void }) {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -654,6 +693,15 @@ function AgentCard({ agent, onDeploy }: { agent: typeof AGENTS[0], onDeploy: () 
                 </svg>
                 {tool}
               </span>
+            ))}
+          </div>
+        )}
+
+        {/* Live deployments (with disconnect) */}
+        {deployments.length > 0 && (
+          <div className="flex flex-col gap-1.5 mt-3.5">
+            {deployments.map((d) => (
+              <DeploymentRow key={`${d.kind}_${d.id}`} deployment={d} onDisconnect={onDisconnect} />
             ))}
           </div>
         )}
@@ -801,6 +849,22 @@ function AgentActivity() {
 export default function AgentsPage() {
   const [deployingAgent, setDeployingAgent] = useState<{ title: string, agentType: TelegramAgentType | null } | null>(null);
   const [dynamicAgents, setDynamicAgents] = useState<any[]>([]);
+  const [deployments, setDeployments] = useState<AgentDeployment[]>([]);
+
+  const refreshDeployments = useCallback(() => {
+    listDeployments().then(setDeployments).catch(() => {});
+  }, []);
+  useEffect(() => { refreshDeployments(); }, [refreshDeployments]);
+
+  const handleDisconnect = useCallback(async (d: AgentDeployment) => {
+    try {
+      await deleteDeployment(d);
+      setDeployments(prev => prev.filter(x => !(x.kind === d.kind && x.id === d.id)));
+    } catch {
+      // refetch to resync if the delete failed server-side
+      refreshDeployments();
+    }
+  }, [refreshDeployments]);
   useEffect(() => {
     fetch('/dashboard/api/agent-catalog')
       .then((r) => (r.ok ? r.json() : []))
@@ -840,7 +904,13 @@ export default function AgentsPage() {
         {/* 4-Column Grid for Agent Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
           {allAgents.map((agent, idx) => (
-            <AgentCard key={idx} agent={agent} onDeploy={() => setDeployingAgent({ title: agent.title, agentType: (agent as any).agentType ?? null })} />
+            <AgentCard
+              key={idx}
+              agent={agent}
+              deployments={deployments.filter((d) => d.agentType === (agent as any).agentType)}
+              onDeploy={() => setDeployingAgent({ title: agent.title, agentType: (agent as any).agentType ?? null })}
+              onDisconnect={handleDisconnect}
+            />
           ))}
         </div>
 
@@ -852,7 +922,7 @@ export default function AgentsPage() {
       {/* Deploy Modal */}
       <DeployModal
         isOpen={!!deployingAgent}
-        onClose={() => setDeployingAgent(null)}
+        onClose={() => { setDeployingAgent(null); refreshDeployments(); }}
         agentName={deployingAgent?.title ?? null}
         agentType={deployingAgent?.agentType ?? null}
       />
