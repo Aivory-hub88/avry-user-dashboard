@@ -80,6 +80,13 @@ const AGENT_GRADIENTS = {
     'radial-gradient(ellipse 70% 80% at 10% 80%, #7c2d12 0%, transparent 50%)',
     'linear-gradient(135deg, #1a0e08 0%, #2a1408 50%, #140a04 100%)',
   ].join(', '),
+  office: [
+    'radial-gradient(ellipse 110% 130% at 85% 10%, #4338ca 0%, transparent 55%)',
+    'radial-gradient(ellipse 90% 110% at 15% 85%, #b45309 0%, transparent 45%)',
+    'radial-gradient(ellipse 100% 100% at 40% 40%, #6d28d9 0%, transparent 55%)',
+    'radial-gradient(ellipse 60% 80% at 10% 15%, #0e7490 0%, transparent 50%)',
+    'linear-gradient(135deg, #14122e 0%, #1c1440 50%, #0e0a24 100%)',
+  ].join(', '),
 };
 
 const AGENTS = [
@@ -128,6 +135,19 @@ const AGENTS = [
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
         <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+      </svg>
+    )
+  },
+  {
+    agentType: 'office_assistant' as TelegramAgentType,
+    title: 'Office Assistant',
+    description: 'Save 4 hours per week by automatically extracting action items and syncing decisions to your workspace.',
+    tools: ['Meeting summaries', 'Action items', 'Notion sync', 'Slack alerts', 'Sheets log'],
+    enterprise: true,
+    gradient: AGENT_GRADIENTS.office,
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
       </svg>
     )
   }
@@ -585,8 +605,18 @@ function AgentCard({ agent, onDeploy }: { agent: typeof AGENTS[0], onDeploy: () 
       {/* Top Half: Grainy Noise Gradient Header */}
       <div className="relative h-[92px] shrink-0 flex flex-col items-start justify-start pt-4 px-5 gap-2" style={{ background: agent.gradient }}>
         <NoiseOverlay />
-        <div className="relative z-10 w-8 h-8 rounded-full bg-white/15 backdrop-blur-md ring-1 ring-white/20 shadow-md flex items-center justify-center text-white/95">
-          {agent.icon}
+        <div className="relative z-10 w-full flex items-start justify-between">
+          <div className="w-8 h-8 rounded-full bg-white/15 backdrop-blur-md ring-1 ring-white/20 shadow-md flex items-center justify-center text-white/95">
+            {agent.icon}
+          </div>
+          {(agent as any).enterprise && (
+            <span className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-black/30 backdrop-blur-md border border-[#e8b96a]/30 text-[#e8b96a] text-[9px] font-semibold uppercase tracking-[0.1em]">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 shrink-0">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+              Enterprise
+            </span>
+          )}
         </div>
         <div className="relative z-10 text-white font-medium text-[14px] leading-snug tracking-wide drop-shadow-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>
           {agent.title}
@@ -609,6 +639,18 @@ function AgentCard({ agent, onDeploy }: { agent: typeof AGENTS[0], onDeploy: () 
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 text-[#b7cba6]/80">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085" />
+                </svg>
+                {tool}
+              </span>
+            ))}
+            {Array.isArray((agent as any).enterpriseTools) && (agent as any).enterpriseTools.map((tool: string) => (
+              <span
+                key={tool}
+                className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-[#e8b96a]/[0.06] border border-[#e8b96a]/[0.18] text-[#e8b96a]/85 text-[10px] font-medium tracking-wide"
+                title="Enterprise plan only"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 shrink-0">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                 </svg>
                 {tool}
               </span>
@@ -640,6 +682,7 @@ const ACTION_META: Record<string, { label: string; emoji: string }> = {
   anomaly: { label: 'Anomaly flagged', emoji: '🚩' },
   workflow: { label: 'Workflow triggered', emoji: '⚡' },
   integration: { label: 'Integration action', emoji: '🔗' },
+  meeting: { label: 'Meeting summarized', emoji: '📝' },
 };
 
 const AGENT_TITLES: Record<string, string> = {
@@ -647,6 +690,7 @@ const AGENT_TITLES: Record<string, string> = {
   customer_service: 'Customer Service Agent',
   leads_qualifier: 'Leads Qualifier Agent',
   finance_invoice_ops: 'Finance & Invoice Ops Agent',
+  office_assistant: 'Office Assistant',
 };
 
 function actionSummary(action: AgentAction): string {
@@ -677,6 +721,12 @@ function actionSummary(action: AgentAction): string {
       return [pick('invoice_ref'), pick('anomaly_type') && `· ${pick('anomaly_type').replace(/_/g, ' ')}`].filter(Boolean).join(' ');
     case 'workflow':
       return pick('workflow').replace(/_/g, ' ');
+    case 'meeting': {
+      const decisions = Array.isArray((p as Record<string, unknown>).decisions) ? ((p as Record<string, unknown>).decisions as unknown[]).length : 0;
+      const items = Array.isArray((p as Record<string, unknown>).action_items) ? ((p as Record<string, unknown>).action_items as unknown[]).length : 0;
+      const counts = [decisions && `${decisions} decisions`, items && `${items} action items`].filter(Boolean).join(', ');
+      return [pick('title'), counts && `· ${counts}`].filter(Boolean).join(' ');
+    }
     case 'integration':
       return pick('tool').replace(/_/g, ' ').toLowerCase();
     default:

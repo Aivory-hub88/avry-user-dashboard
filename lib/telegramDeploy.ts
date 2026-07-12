@@ -16,6 +16,7 @@ export type TelegramAgentType =
   | 'customer_service'
   | 'leads_qualifier'
   | 'finance_invoice_ops'
+  | 'office_assistant'
 
 export interface DeployLink {
   token: string

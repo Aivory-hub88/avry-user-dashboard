@@ -20,6 +20,7 @@ export type AgentActionType =
   | 'anomaly'
   | 'workflow'
   | 'integration'
+  | 'meeting'
 
 export interface AgentAction {
   action_id: string
