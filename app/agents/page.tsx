@@ -16,6 +16,7 @@ import {
   getSlackLinkStatus,
   SlackDeployLink,
 } from '@/lib/slackDeploy';
+import { listAgentActions, AgentAction } from '@/lib/agentActions';
 
 const NoiseOverlay = () => (
   <>
@@ -86,6 +87,7 @@ const AGENTS = [
     agentType: 'autonomous' as TelegramAgentType,
     title: 'Autonomous Agent',
     description: 'Deploy autonomous agents inside your communication hubs. They triage, respond, and update your CRM 24/7.',
+    tools: ['Web search', 'Leads & tickets', 'Invoices', 'Workflows', 'Integrations'],
     gradient: AGENT_GRADIENTS.autonomous,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
@@ -97,6 +99,7 @@ const AGENTS = [
     agentType: 'customer_service' as TelegramAgentType,
     title: 'Customer Service Agent',
     description: 'Handle inbound support 24/7. Automatically triage, resolve, and escalate to a human if necessary.',
+    tools: ['Support tickets', 'Human handoff', 'Web search', 'SLA workflows'],
     gradient: AGENT_GRADIENTS.service,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
@@ -108,6 +111,7 @@ const AGENTS = [
     agentType: 'leads_qualifier' as TelegramAgentType,
     title: 'Leads Qualifier Agent',
     description: 'Filter inbound leads using the BANT framework. Qualified leads are automatically routed to sales.',
+    tools: ['BANT scoring', 'Lead capture', 'Sales routing', 'Web search'],
     gradient: AGENT_GRADIENTS.leads,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
@@ -119,6 +123,7 @@ const AGENTS = [
     agentType: 'finance_invoice_ops' as TelegramAgentType,
     title: 'Finance & Invoice Ops Agent',
     description: 'Automate invoice processing, anomaly detection, and multi-tier approval routing - end to end.',
+    tools: ['Invoice ledger', 'Anomaly flags', 'Approval routing', 'Calculator'],
     gradient: AGENT_GRADIENTS.finance,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
@@ -594,6 +599,23 @@ function AgentCard({ agent, onDeploy }: { agent: typeof AGENTS[0], onDeploy: () 
           {agent.description}
         </div>
 
+        {/* Tool capability chips */}
+        {Array.isArray((agent as any).tools) && (agent as any).tools.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-3.5">
+            {(agent as any).tools.map((tool: string) => (
+              <span
+                key={tool}
+                className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-white/[0.05] border border-white/[0.08] text-white/55 text-[10px] font-medium tracking-wide"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 text-[#b7cba6]/80">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085" />
+                </svg>
+                {tool}
+              </span>
+            ))}
+          </div>
+        )}
+
         <div className="mt-auto pt-5">
           <button
             onClick={onDeploy}
@@ -608,6 +630,122 @@ function AgentCard({ agent, onDeploy }: { agent: typeof AGENTS[0], onDeploy: () 
       </div>
     </div>
   )
+}
+
+const ACTION_META: Record<string, { label: string; emoji: string }> = {
+  lead: { label: 'Lead saved', emoji: '🎯' },
+  ticket: { label: 'Ticket created', emoji: '🎫' },
+  escalation: { label: 'Escalated to human', emoji: '🙋' },
+  invoice: { label: 'Invoice recorded', emoji: '🧾' },
+  anomaly: { label: 'Anomaly flagged', emoji: '🚩' },
+  workflow: { label: 'Workflow triggered', emoji: '⚡' },
+  integration: { label: 'Integration action', emoji: '🔗' },
+};
+
+const AGENT_TITLES: Record<string, string> = {
+  autonomous: 'Autonomous Agent',
+  customer_service: 'Customer Service Agent',
+  leads_qualifier: 'Leads Qualifier Agent',
+  finance_invoice_ops: 'Finance & Invoice Ops Agent',
+};
+
+function actionSummary(action: AgentAction): string {
+  const p = action.payload || {};
+  const pick = (...keys: string[]) => {
+    for (const k of keys) {
+      const v = (p as Record<string, unknown>)[k];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+    return '';
+  };
+  switch (action.action_type) {
+    case 'lead': {
+      const who = [pick('name'), pick('company')].filter(Boolean).join(' — ');
+      const status = pick('status');
+      return [who, status && `(${status.replace(/_/g, ' ')})`].filter(Boolean).join(' ');
+    }
+    case 'ticket':
+      return [pick('subject'), pick('priority') && `· ${pick('priority')}`].filter(Boolean).join(' ');
+    case 'escalation':
+      return pick('reason', 'summary');
+    case 'invoice': {
+      const amt = (p as Record<string, unknown>).amount;
+      const amount = typeof amt === 'number' ? amt.toLocaleString() : '';
+      return [pick('vendor'), amount && `· ${pick('currency') || ''} ${amount}`.trim()].filter(Boolean).join(' ');
+    }
+    case 'anomaly':
+      return [pick('invoice_ref'), pick('anomaly_type') && `· ${pick('anomaly_type').replace(/_/g, ' ')}`].filter(Boolean).join(' ');
+    case 'workflow':
+      return pick('workflow').replace(/_/g, ' ');
+    case 'integration':
+      return pick('tool').replace(/_/g, ' ').toLowerCase();
+    default:
+      return '';
+  }
+}
+
+function timeAgo(iso: string): string {
+  const then = new Date(iso.endsWith('Z') || iso.includes('+') ? iso : `${iso}Z`).getTime();
+  if (Number.isNaN(then)) return '';
+  const mins = Math.max(0, Math.floor((Date.now() - then) / 60000));
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function AgentActivity() {
+  const [actions, setActions] = useState<AgentAction[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    listAgentActions(20)
+      .then(setActions)
+      .catch(() => setFailed(true));
+  }, []);
+
+  if (failed) return null; // quietly hide the feed if the log isn't reachable
+
+  return (
+    <div className="mt-10">
+      <div className="flex items-center gap-2.5 mb-4">
+        <h3 style={{ fontSize: 16, fontWeight: 400, color: '#fff', margin: 0 }}>Agent Activity</h3>
+        <span className="text-white/35 text-[11px]">actions your deployed agents took</span>
+      </div>
+
+      <div className="rounded-xl bg-white/[0.025] border border-white/[0.06] divide-y divide-white/[0.05]">
+        {actions === null ? (
+          <div className="px-5 py-6 text-white/40 text-[12px]">Loading activity…</div>
+        ) : actions.length === 0 ? (
+          <div className="px-5 py-6 text-white/40 text-[12px]">
+            No activity yet. Once a deployed agent saves a lead, opens a ticket, records an invoice, or runs a workflow, it will show up here.
+          </div>
+        ) : (
+          actions.map((a) => {
+            const meta = ACTION_META[a.action_type] || { label: a.action_type, emoji: '•' };
+            const summary = actionSummary(a);
+            return (
+              <div key={a.action_id} className="flex items-center gap-3.5 px-5 py-3">
+                <span className="text-[15px] leading-none shrink-0">{meta.emoji}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-white/85 text-[12.5px] font-medium truncate">
+                    {meta.label}
+                    {summary && <span className="text-white/55 font-normal"> — {summary}</span>}
+                  </div>
+                  <div className="text-white/35 text-[11px] mt-0.5">
+                    {AGENT_TITLES[a.agent_type] || a.agent_type}
+                    {a.channel ? ` · via ${a.channel}` : ''}
+                  </div>
+                </div>
+                <span className="text-white/30 text-[11px] shrink-0">{timeAgo(a.created_at)}</span>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function AgentsPage() {
@@ -655,6 +793,9 @@ export default function AgentsPage() {
             <AgentCard key={idx} agent={agent} onDeploy={() => setDeployingAgent({ title: agent.title, agentType: (agent as any).agentType ?? null })} />
           ))}
         </div>
+
+        {/* Recent actions taken by deployed agents */}
+        <AgentActivity />
 
       </div>
 
