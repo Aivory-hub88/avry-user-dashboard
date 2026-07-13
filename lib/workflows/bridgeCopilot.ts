@@ -87,22 +87,30 @@ export function normalizeZeroclawToWorkflow(
     !!obj && typeof obj === 'object' &&
     typeof (obj as Record<string, unknown>).workflowName === 'string'
 
+  // Once a workflow is successfully parsed, the raw model text is JSON — never
+  // surface it as the chat message (test users saw the whole JSON blob in the
+  // copilot bubble). An empty message lets the state machine build its own
+  // step-list summary.
+  const summaryOf = (wf: Record<string, unknown>): string =>
+    typeof wf.summary === 'string' ? wf.summary.trim() : ''
+
   if (trimmed) {
     try {
       const parsed = JSON.parse(trimmed) as unknown
       if (looksLikeWorkflow(parsed)) {
-        return { workflow: parsed, message: trimmed }
+        return { workflow: parsed, message: summaryOf(parsed) }
       }
       if (
         parsed && typeof parsed === 'object' &&
         'workflow' in parsed &&
         looksLikeWorkflow((parsed as Record<string, unknown>).workflow)
       ) {
+        const wf = (parsed as Record<string, unknown>).workflow as Record<string, unknown>
         return {
-          workflow: (parsed as Record<string, unknown>).workflow as Record<string, unknown>,
+          workflow: wf,
           message: typeof (parsed as Record<string, unknown>).message === 'string'
             ? (parsed as Record<string, unknown>).message as string
-            : trimmed,
+            : summaryOf(wf),
         }
       }
     } catch {
@@ -115,16 +123,17 @@ export function normalizeZeroclawToWorkflow(
     try {
       const parsed = JSON.parse(fenceMatch[1].trim()) as unknown
       if (looksLikeWorkflow(parsed)) {
-        return { workflow: parsed, message: trimmed }
+        return { workflow: parsed, message: summaryOf(parsed) }
       }
       if (
         parsed && typeof parsed === 'object' &&
         'workflow' in parsed &&
         looksLikeWorkflow((parsed as Record<string, unknown>).workflow)
       ) {
+        const wf = (parsed as Record<string, unknown>).workflow as Record<string, unknown>
         return {
-          workflow: (parsed as Record<string, unknown>).workflow as Record<string, unknown>,
-          message: trimmed,
+          workflow: wf,
+          message: summaryOf(wf),
         }
       }
     } catch {
@@ -153,7 +162,10 @@ export function normalizeZeroclawToWorkflow(
             try {
               const parsed = JSON.parse(candidate) as unknown
               if (looksLikeWorkflow(parsed)) {
-                return { workflow: parsed, message: trimmed }
+                // Keep any prose around the JSON block as the chat message;
+                // drop the JSON itself.
+                const prose = (trimmed.slice(0, start) + trimmed.slice(i + 1)).trim()
+                return { workflow: parsed, message: prose || summaryOf(parsed) }
               }
             } catch {
               // Continue scanning

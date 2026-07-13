@@ -526,7 +526,11 @@ export class CopilotStateMachine {
       })
 
       this.state.clarifyRounds = 1
-      return this.setAssistantMessage(result.message)
+      // If the model skipped straight to emitting workflow JSON, don't show
+      // it — generate properly instead.
+      const clarifyMsg = chatSafeMessage(result.message)
+      if (!clarifyMsg) return this.generateWorkflow()
+      return this.setAssistantMessage(clarifyMsg)
     } catch (error: unknown) {
       console.error('[CopilotStateMachine] CLARIFYING error', {
         session_id: this.state.sessionId,
@@ -572,7 +576,7 @@ export class CopilotStateMachine {
         conversation_history: this.state.conversationHistory,
       })
 
-      const msg = (result.message ?? '').trim()
+      const msg = chatSafeMessage(result.message) ?? ''
       // A response is "still clarifying" only if it actually asks something —
       // a question mark in the last two lines. The old keyword heuristic
       // ("what", "when", "please", "apa"...) matched nearly every sentence
@@ -642,11 +646,10 @@ export class CopilotStateMachine {
 
       if (!hasValidWorkflow) {
         const fallbackMessage =
-          typeof result?.message === 'string' && result.message.trim()
-            ? result.message
-            : (workflow && typeof workflow.summary === 'string' && workflow.summary.trim())
-              ? workflow.summary
-              : 'Sorry, I cannot build a workflow from this request yet. Please explain more specifically — for example, the trigger, apps to use, and expected outcome.'
+          chatSafeMessage(result?.message) ??
+          ((workflow && typeof workflow.summary === 'string' && workflow.summary.trim())
+            ? workflow.summary
+            : 'Sorry, I cannot build a workflow from this request yet. Please explain more specifically — for example, the trigger, apps to use, and expected outcome.')
 
         this.state.stage = 'IDLE'
         this.state.generatedWorkflow = null
@@ -675,9 +678,13 @@ export class CopilotStateMachine {
 
       this.state.stage = 'AWAITING_CONFIRMATION'
 
-      const displayMessage =
-        result.message ??
-        this.buildWorkflowSummaryMessage(workflow.steps, workflow.workflowName)
+      // Always show the structured step-list summary. result.message is the
+      // model's raw output on this path (often the workflow JSON itself) and
+      // must never be surfaced verbatim in chat.
+      const displayMessage = this.buildWorkflowSummaryMessage(
+        this.state.generatedWorkflow.steps,
+        this.state.generatedWorkflow.workflowName,
+      )
 
       return this.setAssistantMessage(displayMessage)
     } catch (error: unknown) {
@@ -922,9 +929,9 @@ export class CopilotStateMachine {
 
       if (!editedStepsValid) {
         console.warn('[Copilot] handleEditing: ZeroClaw returned invalid workflow, keeping current state')
-        const message = typeof result?.message === 'string' && result.message.trim()
-          ? result.message
-          : 'I cannot process that change yet. Please explain the step you want to change in more detail.'
+        const message =
+          chatSafeMessage(result?.message) ??
+          'I cannot process that change yet. Please explain the step you want to change in more detail.'
         return this.setAssistantMessage(message)
       }
 
@@ -941,13 +948,13 @@ export class CopilotStateMachine {
       this.state.testAttempts = 0
       this.state.stage = 'AWAITING_CONFIRMATION'
 
-      const displayMessage =
-        result.message ??
-        this.buildWorkflowSummaryMessage(
-          this.state.generatedWorkflow.steps,
-          this.state.generatedWorkflow.workflowName,
-          true,
-        )
+      // Same as generate: never surface result.message (raw model JSON) —
+      // show the structured "workflow updated" step list instead.
+      const displayMessage = this.buildWorkflowSummaryMessage(
+        this.state.generatedWorkflow.steps,
+        this.state.generatedWorkflow.workflowName,
+        true,
+      )
 
       return this.setAssistantMessage(displayMessage)
     } catch (error: unknown) {
@@ -1093,6 +1100,24 @@ export class CopilotStateMachine {
 }
 
 // ============================================================
+// MESSAGE SAFETY
+// ============================================================
+
+/**
+ * Bridge/Zeroclaw responses on workflow_* entrypoints are often the raw
+ * workflow JSON (the bridge instructs "output ONLY a single JSON object").
+ * A chat bubble must never show that payload — accept a bridge message only
+ * when it reads like prose.
+ */
+export function chatSafeMessage(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('```')) return null
+  return trimmed
+}
+
+// ============================================================
 // INTENT DETECTION
 // ============================================================
 
@@ -1107,6 +1132,11 @@ export function detectUserIntent(
     )
   )
     return 'confirm'
+
+  // "Publish it", "publikasikan", "go live" — treat as confirmation so the
+  // flow proceeds to sandbox testing instead of falling through to EDIT
+  // (which echoes the whole workflow back through the LLM).
+  if (/\b(publish|publikasikan|terbitkan|go.?live)\b/i.test(lower)) return 'confirm'
 
   if (
     /^(tidak|no|nope|gak|engga|batal|cancel|ndak|nggak|jangan|stop)$/i.test(lower)
