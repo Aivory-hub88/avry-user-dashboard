@@ -58,41 +58,41 @@ function PricingCard({
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#b7cba6] to-transparent opacity-70" />
       )}
 
-      <div className="p-8 flex flex-col flex-1 relative z-10">
+      <div className="p-5 lg:p-6 flex flex-col flex-1 relative z-10">
         {/* Header */}
-        <div className="min-h-[100px] mb-2">
-          <div className="flex justify-between items-start mb-4 h-6">
+        <div className="min-h-[75px] mb-2">
+          <div className="flex justify-between items-start mb-3 h-5">
             {highlight && !isActive && (
-              <span className="inline-flex items-center px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#b7cba6] bg-[#b7cba6]/10 border border-[#b7cba6]/20 rounded-full">
+              <span className="inline-flex items-center px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.15em] text-[#b7cba6] bg-[#b7cba6]/10 border border-[#b7cba6]/20 rounded-full">
                 Most Popular
               </span>
             )}
             {isActive && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#242424] bg-[#b7cba6] rounded-full">
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.15em] text-[#242424] bg-[#b7cba6] rounded-full">
+                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
                 Active
               </span>
             )}
           </div>
-          <h3 className="text-[22px] lg:text-[24px] font-normal leading-tight text-white whitespace-pre-line mb-1">
+          <h3 className="text-[17px] lg:text-[19px] font-medium leading-tight text-white whitespace-pre-line mb-1">
             {title}
           </h3>
           {subtitle && (
-            <p className="text-[13px] font-medium text-[#b7cba6] mt-2">
+            <p className="text-[12px] font-medium text-[#b7cba6] mt-1.5">
               {subtitle}
             </p>
           )}
         </div>
 
         {/* Price */}
-        <div className="flex items-end justify-start gap-3 py-4 mb-2">
-          <span className="text-[42px] font-bold leading-none text-white tracking-tight">
+        <div className="flex items-end justify-start gap-2.5 py-3 mb-1">
+          <span className="text-[32px] font-bold leading-none text-white tracking-tight">
             ${price}
           </span>
           <div className="flex flex-col pb-1">
-            <span className="text-[14px] font-medium text-gray-400 mb-1.5">
+            <span className="text-[12px] font-medium text-gray-400 mb-1">
               {frequency}
             </span>
             <div className={`w-full h-[3px] rounded-full ${isActive ? 'bg-[#b7cba6]' : highlight ? 'bg-[#b7cba6]/50' : 'bg-white/10'}`} />
@@ -100,15 +100,15 @@ function PricingCard({
         </div>
 
         {/* Description */}
-        <p className="text-[14px] leading-relaxed text-gray-400 mb-8 min-h-[60px]">
+        <p className="text-[13px] leading-relaxed text-gray-400 mb-6 min-h-[50px]">
           {description}
         </p>
 
         {/* Features */}
-        <ul className="space-y-3.5 mb-8 flex-1">
+        <ul className="space-y-2 mb-6 flex-1">
           {features.map((f: string, i: number) => (
-            <li key={i} className="flex items-start gap-3 text-[14px] text-gray-300">
-              <svg className={`w-5 h-5 shrink-0 mt-0.5 ${isActive ? 'text-[#b7cba6]' : 'text-gray-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <li key={i} className="flex items-start gap-2.5 text-[13px] text-gray-300">
+              <svg className={`w-4 h-4 shrink-0 mt-0.5 ${isActive ? 'text-[#b7cba6]' : 'text-gray-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
               <span className="leading-snug">{f}</span>
@@ -118,7 +118,7 @@ function PricingCard({
 
         {/* Savings */}
         {savings && (
-          <div className="mb-6 inline-flex items-center justify-center bg-[#b7cba6]/10 border border-[#b7cba6]/20 px-4 py-2 rounded-lg text-[13px] font-semibold text-[#b7cba6]">
+          <div className="mb-5 inline-flex items-center justify-center bg-[#b7cba6]/10 border border-[#b7cba6]/20 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-[#b7cba6]">
             {savings}
           </div>
         )}
@@ -128,7 +128,7 @@ function PricingCard({
           <button
             onClick={onActivate}
             disabled={isLoading || isActive}
-            className={`w-full py-3 rounded-xl text-[14px] font-medium transition-all flex items-center justify-center gap-2 group/btn ${
+            className={`w-full py-2.5 rounded-xl text-[13px] font-medium transition-all flex items-center justify-center gap-2 group/btn ${
               isActive
                 ? 'bg-white/[0.03] text-gray-500 border border-white/[0.05] shadow-none cursor-default'
                 : isLoading
@@ -149,7 +149,7 @@ function PricingCard({
               <>
                 {actionText}
                 {!isActive && !isLoading && (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-4 h-4 opacity-0 -translate-x-1 group-hover/btn:opacity-100 group-hover/btn:translate-x-0 transition-all duration-200 ${highlight ? 'text-[#242424]' : 'text-[#b7cba6]'}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover/btn:opacity-100 group-hover/btn:translate-x-0 transition-all duration-200 ${highlight ? 'text-[#242424]' : 'text-[#b7cba6]'}`}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
                   </svg>
                 )}
@@ -176,24 +176,24 @@ export function ActivateFeaturesSection() {
   const hasFullStack = hasDiagnostic && hasBlueprint
 
   return (
-    <div className="py-2">
+    <div className="py-1 lg:py-2">
       {paymentError && (
-        <div className="mb-8 rounded-xl bg-red-500/[0.1] border border-red-500/[0.3] p-4 flex items-center gap-3">
-          <svg className="w-5 h-5 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className="mb-6 rounded-xl bg-red-500/[0.1] border border-red-500/[0.3] p-3 flex items-center gap-3">
+          <svg className="w-4 h-4 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          <p className="text-sm text-red-300 font-medium">{paymentError}</p>
+          <p className="text-[13px] text-red-300 font-medium">{paymentError}</p>
         </div>
       )}
 
-      <div className="mb-10">
-        <h3 className="text-[24px] font-medium text-white mb-3">Activate Features</h3>
-        <p className="text-[15px] text-gray-400 max-w-2xl leading-relaxed">
+      <div className="mb-6 lg:mb-8">
+        <h3 className="text-[20px] lg:text-[22px] font-medium text-white mb-2">Activate Features</h3>
+        <p className="text-[14px] text-gray-400 max-w-2xl leading-relaxed">
           Unlock premium features and enable specific tabs. Choose a single product or get the bundle for the complete experience.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8 items-stretch">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 lg:gap-6 items-stretch">
         <PricingCard
           title="AI Readiness Deep Diagnostic"
           price={29}
