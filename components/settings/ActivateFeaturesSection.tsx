@@ -133,8 +133,6 @@ function PricingCard({
                 ? 'bg-white/[0.03] text-gray-500 border border-white/[0.05] shadow-none cursor-default'
                 : isLoading
                 ? 'bg-white/[0.05] text-white/50 border border-white/10 cursor-wait'
-                : highlight
-                ? 'bg-[#b7cba6] text-[#242424] hover:bg-[#cde4bc] border border-[#b7cba6] shadow-[0_0_20px_rgba(183,203,166,0.2)]'
                 : 'bg-gradient-to-b from-white/[0.09] to-white/[0.03] hover:from-[#b7cba6]/25 hover:to-[#b7cba6]/10 text-white/95 hover:text-white border border-white/10 hover:border-[#b7cba6]/30 shadow-[0_1px_0_rgba(255,255,255,0.08)_inset,0_4px_12px_rgba(0,0,0,0.25)]'
             }`}
           >
@@ -149,7 +147,7 @@ function PricingCard({
               <>
                 {actionText}
                 {!isActive && !isLoading && (
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={`w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover/btn:opacity-100 group-hover/btn:translate-x-0 transition-all duration-200 ${highlight ? 'text-[#242424]' : 'text-[#b7cba6]'}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover/btn:opacity-100 group-hover/btn:translate-x-0 transition-all duration-200 text-[#b7cba6]">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
                   </svg>
                 )}
