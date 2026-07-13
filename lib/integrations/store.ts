@@ -177,7 +177,9 @@ export const APP_CATALOG: AivoryApp[] = [
     fields: [],
   },
   {
-    id: 'google-drive',
+    // id must equal the real Composio toolkit slug — this appId is sent
+    // straight to Composio on connect with no translation layer.
+    id: 'googledrive',
     name: 'Google Drive',
     description: 'Read and write files in Google Drive.',
     icon: '',
@@ -191,7 +193,7 @@ export const APP_CATALOG: AivoryApp[] = [
     fields: [],
   },
   {
-    id: 'google-sheets',
+    id: 'googlesheets',
     name: 'Google Sheets',
     description: 'Read and write data in Google Sheets.',
     icon: '',
@@ -205,7 +207,7 @@ export const APP_CATALOG: AivoryApp[] = [
     fields: [],
   },
   {
-    id: 'google-calendar',
+    id: 'googlecalendar',
     name: 'Google Calendar',
     description: 'Create and manage calendar events.',
     icon: '',
@@ -237,7 +239,8 @@ export const APP_CATALOG: AivoryApp[] = [
     fields: [],
   },
   {
-    id: 'microsoft-teams',
+    // Composio's slug uses an underscore, not a hyphen.
+    id: 'microsoft_teams',
     name: 'Microsoft Teams',
     description: 'Send messages to Microsoft Teams channels.',
     icon: '',
