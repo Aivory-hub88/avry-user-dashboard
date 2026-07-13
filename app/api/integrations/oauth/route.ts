@@ -19,36 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getComposioClient } from '@/lib/composio'
-
-// ── User resolution ───────────────────────────────────────────────────────────
-// Priority order:
-//   1. x-tenant-id header (server-to-server / curl testing)
-//   2. x-user-id header
-//   3. Cookie-based session (when the browser hits this from the integrations page)
-//   4. Fallback to 'default' tenant so the browser flow never gets a 401
-//
-// When real auth (JWT/session) is wired up, replace the fallback with a proper
-// session lookup and remove the 'default' fallback.
-
-function resolveUserId(req: NextRequest): string | null {
-  // 1. Explicit header (curl / server-to-server)
-  const tenantId = req.headers.get('x-tenant-id')
-  if (tenantId && tenantId.trim() !== '') return tenantId.trim()
-
-  const userId = req.headers.get('x-user-id')
-  if (userId && userId.trim() !== '') return userId.trim()
-
-  // 2. Cookie-based session (Next.js sets this via middleware or auth)
-  const sessionCookie =
-    req.cookies.get('session')?.value ||
-    req.cookies.get('next-auth.session-token')?.value ||
-    req.cookies.get('__session')?.value
-  if (sessionCookie) return sessionCookie
-
-  // 3. Fallback: use 'default' so the browser integrations page always works.
-  //    Replace this with a real auth check once sessions are implemented.
-  return 'default'
-}
+import { resolveUserId } from '@/lib/integrations/resolveUserId'
 
 // ── GET handler ───────────────────────────────────────────────────────────────
 
