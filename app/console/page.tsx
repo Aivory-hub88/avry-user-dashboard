@@ -42,14 +42,9 @@ const CHIPS: ChipData[] = [
       { text: "Direct me to deep diagnostic tab", action: "redirect", tab: "/diagnostics/deep" },
     ],
   },
-  {
-    id: "blueprint",
-    label: "Blueprint",
-    options: [
-      { text: "Help me build an AI system blueprint in the console", action: "assist" },
-      { text: "Direct me to blueprint tab", action: "redirect", tab: "/blueprint" },
-    ],
-  },
+  // No "Blueprint" chip: the "Blueprint Mode" button right above the input
+  // already gets you there in one click — a chip here would just be a
+  // second, slower path to the same place.
   {
     id: "integration",
     label: "Integration",
@@ -67,10 +62,14 @@ const CHIPS: ChipData[] = [
     ],
   },
   {
+    // Redirect-only: to actually talk to an agent, switch to it via the
+    // Agent Selector (top-left) — that's a better experience than a canned
+    // "help me configure an agent" prompt. This chip's job is just to jump
+    // to the Agents page for deployment status, tools, and activity, none
+    // of which the console itself surfaces.
     id: "agents",
     label: "Agents",
     options: [
-      { text: "Help me configure or deploy an agent", action: "assist" },
       { text: "Direct me to agents tab", action: "redirect", tab: "/agents" },
     ],
   },
@@ -157,8 +156,15 @@ export default function ConsolePage() {
     ? connectedIntegrations.length - MAX_VISIBLE_INTEGRATIONS
     : 0
 
-  const openChip = (chipId: string, chipEl: HTMLButtonElement) => {
+  const openChip = (chip: ChipData, chipEl: HTMLButtonElement) => {
+    // A chip with exactly one redirect option has nothing to choose between —
+    // skip the submenu and navigate straight there.
+    if (chip.options.length === 1 && chip.options[0].action === "redirect" && chip.options[0].tab) {
+      router.push(chip.options[0].tab)
+      return
+    }
     if (!chipsWrapRef.current) return
+    const chipId = chip.id
     if (activeChip === chipId) {
       setActiveChip(null)
       return
@@ -391,7 +397,7 @@ export default function ConsolePage() {
                 {CHIPS.map((chip) => (
                   <button
                     key={chip.id}
-                    onClick={(e) => openChip(chip.id, e.currentTarget)}
+                    onClick={(e) => openChip(chip, e.currentTarget)}
                     className={`console-chip ${activeChip === chip.id ? "console-chip--active" : ""}`}
                   >
                     {chip.label}
