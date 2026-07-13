@@ -11,10 +11,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@composio/core": "^0.13.1",
     "@supabase/supabase-js": "^2.49.4",
     "@tailwindcss/postcss": "^4.2.2",
     "@xyflow/react": "^12.10.1",
-    "composio-core": "0.5.39",
     "docx": "^9.6.0",
     "file-saver": "^2.0.5",
     "gsap": "^3.15.0",
@@ -28,6 +28,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
+    "react-qr-code": "^2.2.0",
     "react-syntax-highlighter": "^16.1.1",
     "remark-gfm": "^4.0.1",
     "zod": "^4.3.6"

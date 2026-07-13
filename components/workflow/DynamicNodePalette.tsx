@@ -63,21 +63,13 @@ export function DynamicNodePalette({ onDragStart }: Props) {
       {open && (
         <>
           {/* Search Bar */}
-          <div style={{ padding: '8px 4px' }}>
+          <div style={{ padding: '8px 8px 10px' }}>
             <input
               type="text"
               placeholder="Search nodes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '6px 8px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '12px',
-                backgroundColor: '#fff',
-                color: '#374151',
-              }}
+              className={styles.searchInput}
             />
           </div>
 

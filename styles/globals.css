@@ -1105,3 +1105,23 @@ h1, h2, h3, h4, h5, h6,
 }
 .copilot-chat blockquote { margin: 4px 0 !important; }
 .copilot-chat table { font-size: 12px !important; }
+
+/* ── Thinking dots — shared AI-loading indicator ──────────────
+   Same 7-dot circular pulse as the landing page's loader-wave demo
+   (frontend-nextjs), recolored from olive/sage to near-white for the
+   dashboard's dark chat surfaces. See components/ui/ThinkingDots.tsx. */
+.thinking-dots {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.thinking-dots__dot {
+  position: absolute;
+  border-radius: 9999px;
+  animation: thinkingDotsWave 1.2s infinite ease-in-out;
+}
+@keyframes thinkingDotsWave {
+  0%   { transform: scale(0.5); opacity: 0.3;  background-color: rgba(247, 247, 247, 0.55); }
+  50%  { transform: scale(1.2); opacity: 1;    background-color: #f7f7f7; }
+  100% { transform: scale(0.5); opacity: 0.3;  background-color: rgba(247, 247, 247, 0.55); }
+}

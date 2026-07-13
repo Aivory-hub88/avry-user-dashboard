@@ -20,6 +20,7 @@ import { useCopilotPanel } from '@/hooks/useCopilotPanel'
 import { useWorkflowCopilot } from '@/hooks/useWorkflowCopilot'
 import type { CopilotMessage } from '@/hooks/useWorkflowCopilot'
 import type { GeneratedWorkflow } from '@/lib/workflows/copilotClient'
+import { ThinkingDots } from '@/components/ui/ThinkingDots'
 
 // File icon helpers
 const FILE_ICONS = {
@@ -319,11 +320,7 @@ function CopilotPanelExpanded({
                 <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" className="w-4 h-4" />
               </div>
               <div className="flex flex-col gap-1.5 px-3 py-2 bg-white/[0.04] border border-white/5 rounded-[10px] rounded-bl-[2px]">
-                <div className="flex gap-1">
-                  {[0, 1, 2].map(idx => (
-                    <span key={idx} className="w-[5px] h-[5px] rounded-full bg-[#a1a1aa] animate-bounce" style={{ animationDelay: `${idx * 0.2}s` }} />
-                  ))}
-                </div>
+                <ThinkingDots size={15} dotSize={2} />
                 {loadingHint && (
                   <p className="text-[11px] text-[#a1a1aa] m-0 animate-pulse">
                     {loadingHint}

@@ -24,7 +24,9 @@ export const APP_CATALOG: AivoryApp[] = [
   {
     id: 'slack',
     name: 'Slack',
-    description: 'Send messages and notifications to Slack channels.',
+    // Distinct from deploying an agent INTO Slack as a bot (Agents page):
+    // this connects the operator's own account so agent tools can post there.
+    description: 'Let your agents post updates and notifications to your Slack workspace.',
     icon: '',
     iconPath: '/integrations/slack.svg',
     authType: 'oauth',
@@ -175,7 +177,9 @@ export const APP_CATALOG: AivoryApp[] = [
     fields: [],
   },
   {
-    id: 'google-drive',
+    // id must equal the real Composio toolkit slug — this appId is sent
+    // straight to Composio on connect with no translation layer.
+    id: 'googledrive',
     name: 'Google Drive',
     description: 'Read and write files in Google Drive.',
     icon: '',
@@ -189,7 +193,7 @@ export const APP_CATALOG: AivoryApp[] = [
     fields: [],
   },
   {
-    id: 'google-sheets',
+    id: 'googlesheets',
     name: 'Google Sheets',
     description: 'Read and write data in Google Sheets.',
     icon: '',
@@ -203,7 +207,7 @@ export const APP_CATALOG: AivoryApp[] = [
     fields: [],
   },
   {
-    id: 'google-calendar',
+    id: 'googlecalendar',
     name: 'Google Calendar',
     description: 'Create and manage calendar events.',
     icon: '',
@@ -216,32 +220,10 @@ export const APP_CATALOG: AivoryApp[] = [
     oauthScopes: ['openid', 'email', 'https://www.googleapis.com/auth/calendar'],
     fields: [],
   },
-  {
-    id: 'telegram',
-    name: 'Telegram',
-    description: 'Send messages and notifications via Telegram bot.',
-    icon: '',
-    iconPath: '/integrations/telegram.svg',
-    authType: 'apiKey',
-    categories: ['Communication'],
-    defaultAction: 'Send Message',
-    fields: [
-      { key: 'apiKey', label: 'Bot Token', type: 'password', placeholder: '123456:ABC-DEF...', required: true },
-    ],
-  },
-  {
-    id: 'whatsapp',
-    name: 'WhatsApp',
-    description: 'Send WhatsApp messages via Twilio or Meta API.',
-    icon: '',
-    iconPath: '/integrations/whatsapp.svg',
-    authType: 'apiKey',
-    categories: ['Communication'],
-    defaultAction: 'Send Message',
-    fields: [
-      { key: 'apiKey', label: 'API Key', type: 'password', placeholder: 'Bearer ...', required: true },
-    ],
-  },
+  // Telegram and WhatsApp are deliberately NOT in this catalog: both are
+  // deployment channels on the Agents page (bot tokens are server-configured
+  // per agent type), not something a user connects their own credentials for
+  // here. No agent tool or workflow ever read the old manual entries.
   {
     id: 'discord',
     name: 'Discord',
@@ -257,7 +239,8 @@ export const APP_CATALOG: AivoryApp[] = [
     fields: [],
   },
   {
-    id: 'microsoft-teams',
+    // Composio's slug uses an underscore, not a hyphen.
+    id: 'microsoft_teams',
     name: 'Microsoft Teams',
     description: 'Send messages to Microsoft Teams channels.',
     icon: '',

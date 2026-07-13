@@ -1,18 +1,33 @@
 /**
  * Composio SDK client — server-side only.
  *
+ * Migrated from composio-core (v1 API — retired 2026-07-03, returns HTTP 410
+ * on every call) to @composio/core (v3). Key API shape changes:
+ *   - composio.getEntity(userId).getConnections()
+ *       -> composio.connectedAccounts.list({ userIds: [userId] })  (returns { items }, not a bare array)
+ *   - entity.initiateConnection({ appName, redirectUri })
+ *       -> composio.connectedAccounts.link(userId, authConfigId, { callbackUrl })
+ *          (`initiate()` still exists but throws for Composio-managed OAuth
+ *          post-2026-07-03; `link()` is the documented replacement)
+ *   - composio.connectedAccounts.delete({ connectedAccountId })
+ *       -> composio.connectedAccounts.delete(connectedAccountId)  (positional string, not an object)
+ *   - "appName" is now "toolkit.slug" on every response object
+ *   - v3 requires an authConfigId to open a connection — see
+ *     {@link getOrCreateAuthConfigId}, which auto-provisions a
+ *     Composio-managed auth config per toolkit so no manual dashboard
+ *     setup or bring-your-own OAuth app credentials are needed.
+ *
  * Usage:
- *   import { getComposioClient } from '@/lib/composio'
+ *   import { getComposioClient, getOrCreateAuthConfigId } from '@/lib/composio'
  *   const composio = getComposioClient()
- *   const entity   = composio.getEntity(userId)
- *   const conns    = await entity.getConnections()
+ *   const { items } = await composio.connectedAccounts.list({ userIds: [userId] })
  *
  * Environment variables required:
  *   COMPOSIO_API_KEY          — Composio API key
  *   COMPOSIO_REDIRECT_URL     — OAuth redirect URL (optional override)
  */
 
-import { Composio } from 'composio-core'
+import { Composio } from '@composio/core'
 
 /**
  * Stable sentinel token that prefixes the "Composio is not configured" error
@@ -58,4 +73,39 @@ export function getComposioRedirectUrl(): string {
     process.env.COMPOSIO_REDIRECT_URL ||
     `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/integrations/callback`
   )
+}
+
+// In-process cache of toolkit slug -> auth config id, so we don't call
+// authConfigs.list/create on every connect click. Fine to lose on restart —
+// worst case is one extra list+maybe-create round trip.
+const _authConfigCache = new Map<string, string>()
+
+/**
+ * Resolve the Composio auth config id for a toolkit (e.g. 'slack', 'gmail'),
+ * creating a Composio-managed one on first use if none exists yet.
+ *
+ * v3 requires every connectedAccounts.link()/initiate() call to reference an
+ * auth config id — there is no more "just pass the app name" shortcut. Rather
+ * than requiring auth configs to be pre-created in the Composio dashboard (or
+ * bringing our own per-app OAuth credentials), authConfigs.create(toolkit)
+ * defaults to `{ type: 'use_composio_managed_auth' }`, which provisions a
+ * Composio-hosted OAuth app for that toolkit automatically.
+ */
+export async function getOrCreateAuthConfigId(
+  composio: Composio,
+  toolkitSlug: string
+): Promise<string> {
+  const cached = _authConfigCache.get(toolkitSlug)
+  if (cached) return cached
+
+  const existing = await composio.authConfigs.list({ toolkit: toolkitSlug })
+  const existingId = existing.items[0]?.id
+  if (existingId) {
+    _authConfigCache.set(toolkitSlug, existingId)
+    return existingId
+  }
+
+  const created = await composio.authConfigs.create(toolkitSlug)
+  _authConfigCache.set(toolkitSlug, created.id)
+  return created.id
 }

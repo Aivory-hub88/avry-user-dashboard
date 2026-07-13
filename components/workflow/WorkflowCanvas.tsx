@@ -752,7 +752,13 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       {/* ── Body ── */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* Canvas */}
-        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+        <div style={{
+          flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative',
+          background: [
+            'radial-gradient(ellipse 70% 60% at 20% 10%, rgba(183,203,166,0.035) 0%, transparent 55%)',
+            'radial-gradient(ellipse 60% 50% at 90% 90%, rgba(221,218,197,0.03) 0%, transparent 55%)',
+          ].join(', '),
+        }}>
           {/* ── Inspector toggle button — right edge ── */}
           <button
             type="button"
@@ -801,8 +807,12 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                 </div>
               ) : syncState === 'error' ? (
                 <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: 13, color: '#f87171', marginBottom: 8 }}>
+                  <div style={{
+                    textAlign: 'center', padding: '28px 32px', borderRadius: 16, maxWidth: 360,
+                    background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(248,113,113,0.15)',
+                    boxShadow: '0 16px 40px rgba(0,0,0,0.3)',
+                  }}>
+                    <p style={{ fontSize: 13, color: '#f2a2a2', marginBottom: 8, lineHeight: 1.5 }}>
                       {errorMsg?.includes('502') || errorMsg?.includes('404')
                         ? 'Workflow graph not available in preview mode'
                         : errorMsg}
@@ -816,9 +826,13 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                 </div>
               ) : isEmpty ? (
                 <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: 13, color: '#a8a6a2', marginBottom: 4 }}>This workflow has no steps yet</p>
-                    <p style={{ fontSize: 11, color: '#5a5a58' }}>Drag nodes from the side panel onto the canvas to get started.</p>
+                  <div style={{
+                    textAlign: 'center', padding: '32px 40px', borderRadius: 16,
+                    background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
+                    boxShadow: '0 16px 40px rgba(0,0,0,0.25)',
+                  }}>
+                    <p style={{ fontSize: 13, color: '#c8c6c2', marginBottom: 4, fontWeight: 500 }}>This workflow has no steps yet</p>
+                    <p style={{ fontSize: 11.5, color: '#8b8985' }}>Drag nodes from the side panel onto the canvas to get started.</p>
                   </div>
                 </div>
               ) : (
@@ -850,7 +864,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                   fitView
                   fitViewOptions={{ maxZoom: 1, padding: 0.2 }}
                 >
-                  <Background color="rgba(255,255,255,0.06)" gap={24} size={1} />
+                  <Background color="rgba(255,255,255,0.08)" gap={24} size={1} />
                   <Controls />
                   <MiniMap
                     pannable
