@@ -588,7 +588,7 @@ export default function ConsolePage() {
 
             <h2 className="mb-2 text-2xl font-semibold text-white/95">Connectors</h2>
             <p className="mb-6 text-sm text-white/50">
-              Connect your tools and services to Aivory
+              Connect your tools and services to Aivory Agent
             </p>
 
             <div className="grid grid-cols-3 gap-3 max-h-[420px] overflow-y-auto pr-2">
