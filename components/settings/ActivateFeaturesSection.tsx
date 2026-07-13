@@ -185,7 +185,6 @@ export function ActivateFeaturesSection() {
       )}
 
       <div className="mb-6 lg:mb-8">
-        <h3 className="text-[20px] lg:text-[22px] font-medium text-white mb-2">Activate Features</h3>
         <p className="text-[14px] text-gray-400 max-w-2xl leading-relaxed">
           Unlock premium features and enable specific tabs. Choose a single product or get the bundle for the complete experience.
         </p>
