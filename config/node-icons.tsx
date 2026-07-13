@@ -1,5 +1,6 @@
 // src/config/node-icons.tsx
 import React from 'react';
+import { asset } from '@/lib/asset';
 
 export const NODE_ICONS: Record<string, React.ReactNode> = {
   "n8n-nodes-base.webhook": (
@@ -291,3 +292,44 @@ export const DefaultIcon = () => (
     <path d="m9 9 6 6" />
   </svg>
 );
+// ── Brand icons ──────────────────────────────────────────────
+// Integration nodes use the same brand SVG set as the canvas
+// (components/workflow/WorkflowNode.tsx APP_ICON_MAP) so the side panel and
+// canvas stay visually consistent. Core/logic/utility nodes keep the line
+// icons above; only types with a real brand asset appear here.
+const BRAND_NODE_ICONS: Record<string, string> = {
+  'n8n-nodes-base.gmailTrigger': '/icons/integrations/gmail.svg',
+  'n8n-nodes-base.gmail': '/icons/integrations/gmail.svg',
+  'n8n-nodes-base.microsoftOutlook': '/icons/integrations/outlook.svg',
+  'n8n-nodes-base.slack': '/icons/integrations/slack.svg',
+  'n8n-nodes-base.telegram': '/icons/integrations/telegram.svg',
+  'n8n-nodes-base.whatsApp': '/icons/integrations/whatsapp.svg',
+  'n8n-nodes-base.discord': '/icons/integrations/discord.svg',
+  'n8n-nodes-base.microsoftTeams': '/icons/integrations/microsoft-teams.svg',
+  'n8n-nodes-base.googleSheets': '/icons/integrations/google-sheets.svg',
+  'n8n-nodes-base.airtable': '/icons/integrations/airtable.svg',
+  'n8n-nodes-base.notion': '/icons/integrations/notion.svg',
+  'n8n-nodes-base.hubspot': '/icons/integrations/hubspot.svg',
+  'n8n-nodes-base.salesforce': '/icons/integrations/salesforce.svg',
+  'n8n-nodes-base.httpRequest': '/icons/integrations/http.svg',
+  '@n8n/n8n-nodes-langchain.lmChatOpenAi': '/icons/integrations/openai.svg',
+};
+
+/** Palette icon: brand SVG when available, line icon otherwise. */
+export function getPaletteNodeIcon(type: string): React.ReactNode {
+  const brand = BRAND_NODE_ICONS[type];
+  if (brand) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={asset(brand)}
+        alt=""
+        width={20}
+        height={20}
+        style={{ objectFit: 'contain' }}
+        draggable={false}
+      />
+    );
+  }
+  return NODE_ICONS[type] || <DefaultIcon />;
+}

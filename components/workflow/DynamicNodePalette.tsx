@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { NODE_PALETTE, QUICK_ACCESS, type NodeDefinition } from '../../config/workflow-nodes';
-import { NODE_ICONS, DefaultIcon } from '../../config/node-icons';
+import { getPaletteNodeIcon } from '../../config/node-icons';
 import styles from './StandardNodePalette.module.css'; // Reuse existing styles
 
 interface Props {
@@ -37,9 +37,7 @@ export function DynamicNodePalette({ onDragStart }: Props) {
     onDragStart?.(e, node);
   };
 
-  const getIcon = (type: string) => {
-    return NODE_ICONS[type] || <DefaultIcon />;
-  };
+  const getIcon = (type: string) => getPaletteNodeIcon(type);
 
   const categoryColors: Record<string, string> = {
     'Triggers': '#F59E0B',
