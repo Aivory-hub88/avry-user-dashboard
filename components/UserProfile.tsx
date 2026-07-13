@@ -8,12 +8,13 @@
 import { useEffect, useState } from 'react'
 import { logout, getUser } from '@/lib/auth'
 import { SettingsModal, User } from '@/components/settings/SettingsModal'
+import { useSettingsModal } from '@/contexts/SettingsModalContext'
 
 // User interface moved to SettingsModal
 export function UserProfile() {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const { openSettingsModal } = useSettingsModal()
 
   useEffect(() => {
     const loadUser = () => {
@@ -75,8 +76,8 @@ export function UserProfile() {
 
   return (
     <>
-      <button 
-        onClick={() => setIsModalOpen(true)}
+      <button
+        onClick={() => openSettingsModal()}
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-t border-white/5 text-left group"
       >
         <div className="w-8 h-8 rounded-full bg-[#b7cba6] flex items-center justify-center text-[#1a0b2e] font-bold text-sm shrink-0">
@@ -95,11 +96,7 @@ export function UserProfile() {
         </div>
       </button>
 
-      <SettingsModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        user={user} 
-      />
+      <SettingsModal user={user} />
     </>
   )
 }

@@ -16,6 +16,8 @@ import { useRouterContext } from '@/contexts/RouterContext'
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole'
 import { AuthManager } from '@/lib/authManager'
 import { SERVICES } from '@/config/services'
+import { usePayment } from '@/hooks/usePayment'
+import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
@@ -23,8 +25,7 @@ export default function DashboardPage() {
   const [authLoading, setAuthLoading] = useState(true)
   const [deepDiagnosticCompleted, setDeepDiagnosticCompleted] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
-  const [paymentLoading, setPaymentLoading] = useState(false)
-  const [paymentError, setPaymentError] = useState<string | null>(null)
+  const { handlePayment, paymentLoading, paymentError } = usePayment()
   const t = useTranslations("dashboard")
 
   const { pendingContext, clearPendingContext } = useRouterContext()
@@ -108,258 +109,6 @@ export default function DashboardPage() {
     }
   }
 
-  const loadMidtransScript = async () => {
-    return new Promise<boolean>((resolve) => {
-      if ((window as any).snap) {
-        resolve(true)
-        return
-      }
-
-      const script = document.createElement("script")
-      script.src = "https://app.sandbox.midtrans.com/snap/snap.js"
-      script.setAttribute(
-        "data-client-key",
-        process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || ""
-      )
-      script.onload = () => resolve(true)
-      script.onerror = () => resolve(false)
-      document.body.appendChild(script)
-    })
-  }
-
-  const handlePayment = async (
-    product: string,
-    amount: number,
-    productName: string
-  ) => {
-    try {
-      setPaymentLoading(true)
-      setPaymentError(null)
-
-      const user = AuthManager.getUser()
-      if (!user?.email) {
-        throw new Error("User not authenticated")
-      }
-
-      const userId = AuthManager.getUserId()
-      if (!userId) {
-        throw new Error("User not authenticated")
-      }
-
-      // For subscriptions and one-time purchases, check wallet balance
-      // Only wallet topups go through Midtrans
-      const isSubscription = ['foundation', 'acceleration', 'intelligence'].includes(product)
-      const isOneTimePurchase = product.startsWith('ai_')
-
-      if (isSubscription || isOneTimePurchase) {
-        // These now process through payment gateway (Midtrans or mock)
-        // Create transaction on backend
-        const response = await fetch(
-          `${SERVICES.PAYMENTS}/api/v1/payments/midtrans/create`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              user_id: userId,
-              amount: amount,
-              product: product,
-              customer_email: user.email,
-              customer_first_name: user.company_name || "Customer",
-              custom_field1: `Purchase: ${productName}`,
-              custom_field2: `User: ${user.email}`,
-            }),
-          }
-        )
-
-        if (!response.ok) {
-          throw new Error(`Backend error: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        if (!data.success) {
-          throw new Error(data.error || "Failed to create payment transaction")
-        }
-
-        if (!data.token) {
-          throw new Error("Payment gateway returned no token")
-        }
-
-        // Check if using mock token (for development)
-        if (data.token && data.token.startsWith("mock_token_")) {
-          // Simulate immediate payment success for mock mode
-          await simulatePaymentSuccess(data.order_id, userId, product, amount, productName)
-          return
-        }
-
-        // Load Midtrans snap script for real payments
-        const scriptLoaded = await loadMidtransScript()
-        if (!scriptLoaded || !(window as any).snap) {
-          throw new Error("Failed to load payment gateway")
-        }
-
-        // Open Midtrans payment modal
-        ;(window as any).snap.pay(data.token, {
-          onSuccess: async () => {
-            await confirmPaymentSuccess(data.order_id, userId, product, amount, productName)
-          },
-          onPending: () => {
-            setPaymentError("Payment pending. Please complete the process.")
-          },
-          onError: () => {
-            setPaymentError("Payment failed. Please try again.")
-          },
-          onClose: () => {
-            setPaymentError("Payment cancelled.")
-          },
-        })
-      } else if (product.startsWith('credits_')) {
-        // Credit purchases go through Midtrans
-        const response = await fetch(
-          `${SERVICES.PAYMENTS}/api/v1/payments/midtrans/create`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              user_id: userId,
-              amount: amount,
-              product: product,
-              customer_email: user.email,
-              customer_first_name: user.company_name || "Customer",
-              custom_field1: `Purchase: ${productName}`,
-              custom_field2: `User: ${user.email}`,
-            }),
-          }
-        )
-
-        if (!response.ok) {
-          throw new Error(`Backend error: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        if (!data.success) {
-          throw new Error(data.error || "Failed to create payment transaction")
-        }
-
-        // Check for mock token
-        if (data.token && data.token.startsWith("mock_token_")) {
-          await simulatePaymentSuccess(data.order_id, userId, product, amount, productName)
-          return
-        }
-
-        const scriptLoaded = await loadMidtransScript()
-        if (!scriptLoaded || !(window as any).snap) {
-          throw new Error("Failed to load payment gateway")
-        }
-
-        ;(window as any).snap.pay(data.token, {
-          onSuccess: async () => {
-            await confirmPaymentSuccess(data.order_id, userId, product, amount, productName)
-          },
-          onPending: () => {
-            setPaymentError("Payment pending.")
-          },
-          onError: () => {
-            setPaymentError("Payment failed. Please try again.")
-          },
-          onClose: () => {
-            setPaymentError("Payment cancelled.")
-          },
-        })
-      } else {
-        throw new Error("Unknown product type")
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "An error occurred"
-      setPaymentError(message)
-      console.error("Payment error:", err)
-    } finally {
-      setPaymentLoading(false)
-    }
-  }
-
-  const simulatePaymentSuccess = async (
-    orderId: string,
-    userId: string,
-    product: string,
-    amount: number,
-    productName: string
-  ) => {
-    try {
-      // Call confirm endpoint to process purchase with mock flag
-      const confirmResponse = await fetch(
-        `${SERVICES.PAYMENTS}/api/v1/payments/confirm`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            order_id: orderId,
-            user_id: userId,
-            product: product,
-            amount: amount,
-            is_mock: true,  // Flag as mock payment
-          }),
-        }
-      )
-
-      if (confirmResponse.ok) {
-        setPaymentError(null)
-        alert(`✓ MOCK PAYMENT - Successfully purchased ${productName}!\n\n(This is a development simulation)`)
-        // Reload to get updated user data
-        window.location.reload()
-      } else {
-        setPaymentError("Payment confirmed but failed to process purchase")
-      }
-    } catch (err) {
-      console.error("Error simulating payment success:", err)
-      setPaymentError("Payment succeeded but couldn't update account")
-    }
-  }
-
-  const confirmPaymentSuccess = async (
-    orderId: string,
-    userId: string,
-    product: string,
-    amount: number,
-    productName: string
-  ) => {
-    try {
-      const confirmResponse = await fetch(
-        `${SERVICES.PAYMENTS}/api/v1/payments/confirm`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            order_id: orderId,
-            user_id: userId,
-            product: product,
-            amount: amount,
-            is_mock: false,  // Real payment
-          }),
-        }
-      )
-
-      if (confirmResponse.ok) {
-        setPaymentError(null)
-        alert(`Successfully purchased ${productName}!`)
-        window.location.reload()
-      } else {
-        setPaymentError("Payment confirmed but failed to process purchase")
-      }
-    } catch (err) {
-      console.error("Error confirming payment:", err)
-      setPaymentError("Payment succeeded but couldn't update account")
-    }
-  }
 
   if (loading || authLoading) {
     return <LoadingState />
@@ -528,88 +277,16 @@ export default function DashboardPage() {
           <div className="rounded-xl border border-white/[0.07] bg-[#2a2a27] p-8">
             <h2 className="text-xl font-medium text-white mb-8">Subscriptions</h2>
             
-            {/* Error Message */}
+            <div className="mb-12">
+              <ActivateFeaturesSection />
+            </div>
+
+            {/* Error Message (subscription tier purchases below) */}
             {paymentError && (
               <div className="mb-6 rounded-lg bg-red-500/[0.1] border border-red-500/[0.3] p-4">
                 <p className="text-sm text-red-300">{paymentError}</p>
               </div>
             )}
-            
-            {/* One-Time Feature Purchases Section */}
-            <div className="mb-12">
-              <h3 className="text-lg font-medium text-white mb-2">Activate Features</h3>
-              <p className="text-sm text-gray-400 mb-6">One-time purchases to unlock premium features and enable specific tabs</p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* AI Readiness Deep Diagnostic */}
-                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.has_diagnostic ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-medium text-white">AI Readiness Deep Diagnostic</h3>
-                    {AuthManager.getUser()?.has_diagnostic && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
-                  </div>
-                  <p className="text-sm text-gray-400 mb-4">Know exactly where your business stands on AI before you build anything.</p>
-                  <div className="mb-6">
-                    <span className="text-3xl font-bold text-white">$29</span>
-                    <span className="text-sm text-gray-400">/one time</span>
-                  </div>
-                  <ul className="space-y-2 text-sm text-gray-300 mb-6 flex-grow">
-                    <li>✓ AI readiness score</li>
-                    <li>✓ Business objective mapping</li>
-                    <li>✓ Gap & constraint analysis</li>
-                    <li>✓ AI opportunity identification</li>
-                    <li>✓ Data & process readiness</li>
-                  </ul>
-                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.has_diagnostic ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`} onClick={() => !AuthManager.getUser()?.has_diagnostic && handlePayment('ai_diagnostic', 29, 'AI Readiness Deep Diagnostic')} disabled={paymentLoading || AuthManager.getUser()?.has_diagnostic}>
-                    {paymentLoading ? 'Processing...' : AuthManager.getUser()?.has_diagnostic ? 'Tab Unlocked' : 'Activate'}
-                  </button>
-                </div>
-
-                {/* AI System Blueprint + Roadmap */}
-                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.has_blueprint ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-medium text-white">AI System Blueprint + Roadmap</h3>
-                    {AuthManager.getUser()?.has_blueprint && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
-                  </div>
-                  <p className="text-sm text-gray-400 mb-4">Your full AI architecture and execution plan, built around your business, not a template.</p>
-                  <div className="mb-6">
-                    <span className="text-3xl font-bold text-white">$85</span>
-                    <span className="text-sm text-gray-400">/one time</span>
-                  </div>
-                  <ul className="space-y-2 text-sm text-gray-300 mb-6 flex-grow">
-                    <li>✓ Full AI system blueprint</li>
-                    <li>✓ Workflow architecture</li>
-                    <li>✓ Agent structure design</li>
-                    <li>✓ Deployment-ready plan</li>
-                    <li>✓ Phased implementation roadmap</li>
-                    <li>✓ KPI targets per phase</li>
-                  </ul>
-                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.has_blueprint ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`} onClick={() => !AuthManager.getUser()?.has_blueprint && handlePayment('ai_blueprint', 85, 'AI System Blueprint + Roadmap')} disabled={paymentLoading || AuthManager.getUser()?.has_blueprint}>
-                    {paymentLoading ? 'Processing...' : AuthManager.getUser()?.has_blueprint ? 'Tab Unlocked' : 'Activate'}
-                  </button>
-                </div>
-
-                {/* Full Stack Bundle */}
-                <div className={`rounded-lg border p-6 transition-all flex flex-col ${(AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-medium text-white">Full Stack Bundle</h3>
-                    {(AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
-                  </div>
-                  <p className="text-sm text-gray-400 mb-4">Everything in one. Know, plan, execute in order.</p>
-                  <div className="mb-6">
-                    <span className="text-3xl font-bold text-white">$99</span>
-                    <span className="text-sm text-gray-400">/one time</span>
-                  </div>
-                  <ul className="space-y-2 text-sm text-gray-300 mb-6 flex-grow">
-                    <li>✓ Deep Diagnostic</li>
-                    <li>✓ Blueprint</li>
-                    <li>✓ Roadmap</li>
-                    <li className="text-[#b7cba6] font-medium">✓ Save $15 vs buying separately</li>
-                  </ul>
-                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${(AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`} onClick={() => !(AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) && handlePayment('ai_fullstack', 99, 'Full Stack Bundle')} disabled={paymentLoading || (AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint)}>
-                    {paymentLoading ? 'Processing...' : (AuthManager.getUser()?.has_diagnostic && AuthManager.getUser()?.has_blueprint) ? 'All Tabs Unlocked' : 'Activate Bundle'}
-                  </button>
-                </div>
-              </div>
-            </div>
 
             {/* Recurring Subscription Plans Section */}
             <div className="border-t border-white/[0.07] pt-8">

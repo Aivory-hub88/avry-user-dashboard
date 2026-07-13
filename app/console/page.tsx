@@ -18,6 +18,8 @@ import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
 import UploadMenu from "@/components/UploadMenu"
 import type { Attachment } from "@/components/UploadMenu"
 import { AttachmentCard } from "@/components/AttachmentCard"
+import { getUser } from "@/lib/auth"
+import { useSettingsModal } from "@/contexts/SettingsModalContext"
 
 interface Toast { id: string; type: "success" | "error"; message: string }
 
@@ -35,29 +37,23 @@ interface ChipData {
 
 const CHIPS: ChipData[] = [
   {
+    // Redirect-only (see "Agents" below for why): the gate in openChip()
+    // sends users with no diagnostic/blueprint purchase to Activate Features
+    // instead of an empty deep-diagnostic page.
     id: "deep-diagnostic",
     label: "Deep Diagnostic",
     options: [
-      { text: "Assist me with AI readiness deep diagnostic within the console", action: "assist" },
       { text: "Direct me to deep diagnostic tab", action: "redirect", tab: "/diagnostics/deep" },
     ],
   },
-  // No "Blueprint" chip: the "Blueprint Mode" button right above the input
-  // already gets you there in one click — a chip here would just be a
-  // second, slower path to the same place.
-  {
-    id: "integration",
-    label: "Integration",
-    options: [
-      { text: "Guide me through connecting a new integration", action: "assist" },
-      { text: "Direct me to integrations tab", action: "redirect", tab: "/integrations" },
-    ],
-  },
+  // No "Blueprint" chip and no "Blueprint Mode" button: neither had anywhere
+  // real to send you faster than the sidebar's Blueprint link already does.
+  // No "Integration" chip either: the "connect your tools to..." icon row
+  // right below the input already opens the same Connectors popup.
   {
     id: "workflow",
     label: "Workflow",
     options: [
-      { text: "Help me design or optimise a workflow here", action: "assist" },
       { text: "Direct me to workflow tab", action: "redirect", tab: "/workflows" },
     ],
   },
@@ -79,6 +75,7 @@ const MAX_VISIBLE_INTEGRATIONS = 4
 
 export default function ConsolePage() {
   const router = useRouter()
+  const { openSettingsModal } = useSettingsModal()
 
   // UI-only state
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -160,6 +157,17 @@ export default function ConsolePage() {
     // A chip with exactly one redirect option has nothing to choose between —
     // skip the submenu and navigate straight there.
     if (chip.options.length === 1 && chip.options[0].action === "redirect" && chip.options[0].tab) {
+      // Deep Diagnostic is a one-time paid unlock ($29, or bundled into the
+      // $85 Blueprint+Roadmap purchase — see Activate Features in Settings).
+      // A user with neither has nothing to see on the diagnostic page yet,
+      // so open the purchase modal instead of an empty diagnostic screen.
+      if (chip.id === "deep-diagnostic") {
+        const user = getUser()
+        if (!user?.has_diagnostic && !user?.has_blueprint) {
+          openSettingsModal("purchases")
+          return
+        }
+      }
       router.push(chip.options[0].tab)
       return
     }
@@ -251,13 +259,6 @@ export default function ConsolePage() {
                   Attach Context
                 </button>
 
-                <button className="console-pill inline-flex items-center gap-1.5">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="3"/>
-                    <path d="M9 9h6M9 12h6M9 15h4"/>
-                  </svg>
-                  Blueprint Mode
-                </button>
                 <button
                   className="console-pill inline-flex items-center gap-1.5"
                   onClick={() => setUploadMenuOpen(o => !o)}
