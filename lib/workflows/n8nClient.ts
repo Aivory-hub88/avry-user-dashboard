@@ -21,8 +21,11 @@ function getConfig() {
     process.env.N8N_BASE_URL ||
     process.env.N8N_API_URL ||
     process.env.N8N_URL ||
-    'http://43.156.108.96:5678'  // ← was 3003 (Zeroclaw webhook port, WRONG)
+    ''
   ).replace(/\/$/, '')
+  // Fail hard when unset — never fall back to a hardcoded host (the old
+  // fallback pointed at the retired, compromised VPS).
+  if (!raw) throw new Error('N8N_BASE_URL is not configured')
   const key = process.env.N8N_API_KEY
   if (!key) throw new Error('N8N_API_KEY is not configured')
   return {

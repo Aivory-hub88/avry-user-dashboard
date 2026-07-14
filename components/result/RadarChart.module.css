@@ -8,26 +8,33 @@
   overflow: visible;
 }
 
-  .guide {
-    fill: none;
-    stroke: #ffffff;
-    stroke-width: 0.5;
-  }
-
-.dataPolygon {
-  fill: rgba(178, 204, 162, 0.15);
-  stroke: #b7cba6;
-  stroke-width: 2;
+.guide {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.10);
+  stroke-width: 0.75;
 }
 
-  .axisLine {
-    stroke: #ffffff;
-    stroke-width: 0.5;
-  }
+.dataPolygon {
+  stroke: #b7cba6;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.vertexDot {
+  fill: #eef6e6;
+  stroke: #7fae6f;
+  stroke-width: 1;
+}
+
+.axisLine {
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 0.75;
+}
 
 .axisLabel {
   font-size: 11px;
-  fill: #a1a1aa;
-  text-anchor: middle;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  fill: #a3a39c;
   dominant-baseline: middle;
 }

@@ -5,6 +5,7 @@ import React, { useMemo } from 'react'
 import Image from 'next/image'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { ThinkingDots } from '@/components/ui/ThinkingDots'
 
 interface ChatMessageCompactProps {
   role: 'user' | 'assistant'
@@ -111,15 +112,7 @@ export default function ChatMessageCompact({
           <div className="flex-1 min-w-0 pt-0.5">
             {isStreaming && !content && (
               <div className="flex items-center gap-1.5">
-                <span className="flex gap-1">
-                  {[0, 150, 300].map((delay) => (
-                    <span
-                      key={delay}
-                      className="w-1 h-1 rounded-full bg-[#a1a1aa] animate-bounce"
-                      style={{ animationDelay: `${delay}ms`, animationDuration: '1s' }}
-                    />
-                  ))}
-                </span>
+                <ThinkingDots size={13} dotSize={1.8} />
                 <span className="text-[12px] text-[#a1a1aa]">thinking...</span>
               </div>
             )}

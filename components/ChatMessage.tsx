@@ -12,6 +12,7 @@ import { RoutingSuggestBanner } from './chat/RoutingSuggestBanner'
 import { AttachmentCard } from '@/components/AttachmentCard'
 import type { Attachment } from '@/components/UploadMenu'
 import type { ClassifiedIntent } from '@/lib/intentClassifier'
+import { ThinkingDots } from '@/components/ui/ThinkingDots'
 
 interface ChatMessageProps {
   role: 'user' | 'assistant'
@@ -304,15 +305,8 @@ export default function ChatMessage({ role, content, isStreaming = false, agenti
           <div className="flex-1 px-1 py-1 text-base text-[#f7f7f7] leading-[1.6] min-w-0 max-w-[800px] text-left">
             {/* Thinking indicator */}
             {isStreaming && !content && !hasAgenticPhases && (
-              <div className="flex items-center gap-2">
-                <span className="flex gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#a1a1aa] animate-bounce"
-                        style={{ animationDelay: '0ms', animationDuration: '1s' }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#a1a1aa] animate-bounce"
-                        style={{ animationDelay: '150ms', animationDuration: '1s' }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#a1a1aa] animate-bounce"
-                        style={{ animationDelay: '300ms', animationDuration: '1s' }} />
-                </span>
+              <div className="flex items-center gap-2.5">
+                <ThinkingDots size={16} dotSize={2.5} />
                 <span className="text-sm text-[#a1a1aa]">Aivory is thinking...</span>
               </div>
             )}

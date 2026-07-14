@@ -12,6 +12,9 @@
  * Lihat: /app/api/copilot/[...path]/route.ts
  */
 
+import { callCopilotOperation } from './bridgeCopilot'
+import { analyzeRequest, matchTemplate, sanitizeWorkflow } from './deterministicPlanner'
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -46,6 +49,14 @@ export interface GeneratedWorkflowStep {
   testable: boolean
   /** Resolved by n8n MCP inspection, written back after each sandbox test */
   nodeType?: string
+  /**
+   * Integration/service name (lowercase, e.g. "slack", "gmail") and its
+   * operation. The bridge's draft service uses `app` as the definitive
+   * signal when resolving steps to concrete n8n nodes — without it, node
+   * matching falls back to fuzzy title-text search.
+   */
+  app?: string
+  action?: string
 }
 
 export interface NodeConfig {
@@ -161,6 +172,13 @@ export interface CopilotConversationState {
   lastMessage: string
   createdAt: string
   updatedAt: string
+  /**
+   * Number of clarify rounds already spent in this conversation. Optional for
+   * backward compatibility with states persisted before this field existed.
+   * The machine hard-caps clarification so a chatty LLM can never trap the
+   * user in an endless question loop.
+   */
+  clarifyRounds?: number
 }
 
 // ============================================================
@@ -267,85 +285,37 @@ function workflowStepToBridgeStep(step: GeneratedWorkflowStep) {
     title: step.title,
     description: step.description || '',
     config: step.config || {},
+    // app/action are the draft service's primary node-resolution signal —
+    // dropping them (as this mapper used to) forces fuzzy title matching.
+    ...(step.app ? { app: step.app } : {}),
+    ...(step.action ? { action: step.action } : {}),
     ...(step.nodeType ? { nodeType: step.nodeType } : {}),
   }
 }
 
 // ============================================================
 // VPS BRIDGE CLIENT
-// ✅ FIXED: Menggunakan URL relatif /api/copilot/* → tidak ada CORS
-// Server-side proxy di /app/api/copilot/[...path]/route.ts
+// In-process calls into lib/workflows/bridgeCopilot.ts. The state machine
+// only ever runs inside a Next.js API route (server-side), so there is no
+// reason to loop back through the app's own PUBLIC URL to reach the bridge —
+// the old self-fetch went container → Cloudflare → Traefik → same container,
+// adding seconds of latency and an external dependency per message.
 // ============================================================
 
 class BridgeClient {
-  /**
-   * Semua request ke VPS Bridge diproxy melalui Next.js API route.
-   * Browser: fetch('/api/copilot/workflows/clarify') → server → VPS Bridge
-   */
-  private async post<T>(path: string, body: unknown): Promise<T> {
-    const isServer = typeof window === 'undefined'
-    // Server-side: use internal URL to self-fetch through the copilot proxy route.
-    // The proxy route handles body transformation + VPS Bridge routing.
-    // Client-side: use relative URL (browser → same origin).
-    const serverBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || '3000'}`).replace(/\/$/, '')
-    const url = isServer
-      ? `${serverBaseUrl}/api/copilot${path}`
-      : `/api/copilot${path}`
-
-    const bodyRecord = body && typeof body === 'object' ? body as Record<string, unknown> : {}
-    console.log('[BridgeClient] →', path, {
-      url,
-      session_id:      bodyRecord.session_id ?? null,
-      organization_id: bodyRecord.organization_id ?? null,
-    })
-
+  private async call<T>(op: 'clarify' | 'generate' | 'repair' | 'edit' | 'draft-test', body: Record<string, unknown>): Promise<T> {
     const t0 = Date.now()
-
-    // Explicit 120s timeout with AbortController for proper cancellation.
-    // This matches the maxDuration on the copilot route and the VPS Bridge
-    // timeout, preventing silent hangs at any hop in the chain.
-    const controller = new AbortController()
-    const timeoutId  = setTimeout(() => controller.abort(), 120_000)
-
-    let response: Response
     try {
-      response = await fetch(url, {
-        method:  'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body:    JSON.stringify(body),
-        signal:  controller.signal,
+      const result = await callCopilotOperation(op, body)
+      console.log('[BridgeClient]', op, { elapsedMs: Date.now() - t0 })
+      return result as T
+    } catch (error: unknown) {
+      console.error('[BridgeClient] error', op, {
+        elapsedMs: Date.now() - t0,
+        cause: error instanceof Error ? error.message : String(error),
       })
-    } finally {
-      clearTimeout(timeoutId)
+      throw error instanceof Error ? error : new Error(String(error))
     }
-
-    const elapsed = Date.now() - t0
-    console.log('[BridgeClient] ←', path, {
-      status:    response.status,
-      ok:        response.ok,
-      elapsedMs: elapsed,
-    })
-
-    const rawBody = await response.text()
-    let parsed: unknown = null
-    try {
-      parsed = rawBody ? JSON.parse(rawBody) : null
-    } catch {
-      parsed = null
-    }
-
-    if (!response.ok) {
-      const msg =
-        parsed && typeof (parsed as Record<string, unknown>).message === 'string'
-          ? (parsed as Record<string, unknown>).message as string
-          : rawBody || `Error ${response.status}`
-      console.error('[BridgeClient] error', path, { status: response.status, msg, elapsedMs: elapsed })
-      throw new Error(msg)
-    }
-
-    return parsed as T
   }
 
   async clarify(params: {
@@ -354,7 +324,7 @@ class BridgeClient {
     user_request: string
     conversation_history: Message[]
   }): Promise<BridgeClarifyResponse> {
-    return this.post('/workflows/clarify', params)
+    return this.call('clarify', params as unknown as Record<string, unknown>)
   }
 
   async generate(params: {
@@ -363,7 +333,7 @@ class BridgeClient {
     user_request: string
     conversation_history: Message[]
   }): Promise<BridgeGenerateResponse> {
-    return this.post('/workflows/generate', params)
+    return this.call('generate', params as unknown as Record<string, unknown>)
   }
 
   async repair(params: {
@@ -373,7 +343,7 @@ class BridgeClient {
     current_workflow: GeneratedWorkflow
     failed_steps: { stepId: string; error: string; inputData?: Record<string, unknown> }[]
   }): Promise<BridgeRepairResponse> {
-    return this.post('/workflows/repair', params)
+    return this.call('repair', params as unknown as Record<string, unknown>)
   }
 
   async edit(params: {
@@ -383,8 +353,9 @@ class BridgeClient {
     current_workflow: GeneratedWorkflow
     edit_request: string
   }): Promise<BridgeEditResponse> {
-    return this.post('/workflows/edit', params)
+    return this.call('edit', params as unknown as Record<string, unknown>)
   }
+
   async draftTest(params: {
     organization_id: string
     workflowId?: string
@@ -398,16 +369,15 @@ class BridgeClient {
       nodeType?: string
     }[]
   }): Promise<BridgeDraftTestResponse> {
-    const result = await this.post<BridgeDraftTestResponse>(
-      '/workflows/draft-test',
-      params,
+    const result = await this.call<BridgeDraftTestResponse>(
+      'draft-test',
+      params as unknown as Record<string, unknown>,
     )
     if (!result.dummyTest) {
       throw new Error('VPS Bridge did not return sandbox test results.')
     }
     return result
   }
-
 }
 
 
@@ -498,9 +468,50 @@ export class CopilotStateMachine {
 
   private async handleIdle(userMessage: string): Promise<CopilotConversationState> {
     this.state.userRequest = userMessage
-    this.state.stage = 'CLARIFYING'
+    this.state.clarifyRounds = 0
     this.updateTimestamp()
 
+    // ── Deterministic fast-paths — decide locally before spending any LLM
+    // round trip. Both paths still land in AWAITING_CONFIRMATION, so the
+    // user always reviews the result before anything is tested or applied.
+    const analysis = analyzeRequest(userMessage)
+
+    // 1) Template fast-path: a recognized pattern with both pipeline
+    //    endpoints explicitly named builds instantly — zero LLM calls.
+    const template = matchTemplate(userMessage, analysis)
+    if (template) {
+      console.log('[CopilotStateMachine] template fast-path', {
+        session_id: this.state.sessionId,
+        templateId: template.templateId,
+      })
+      this.state.generatedWorkflow = {
+        workflowName: template.workflowName,
+        steps: template.steps,
+        estimate_hours: template.estimate_hours,
+        automation_score: template.automation_score,
+        summary: template.summary,
+        nodeConfigs: [],
+      }
+      this.state.stage = 'AWAITING_CONFIRMATION'
+      return this.setAssistantMessage(
+        this.buildWorkflowSummaryMessage(template.steps, template.workflowName),
+      )
+    }
+
+    // 2) Specific-request fast-path: trigger + source + target already named
+    //    → generation has everything it needs; a clarify round would only
+    //    ask for information the user already gave.
+    if (analysis.isSpecific) {
+      console.log('[CopilotStateMachine] skip-clarify fast-path', {
+        session_id: this.state.sessionId,
+        source: analysis.sourceApp?.id ?? null,
+        target: analysis.targetApp?.id ?? null,
+      })
+      return this.generateWorkflow()
+    }
+
+    // ── Ambiguous request — one clarify round via LLM ──────────────────────
+    this.state.stage = 'CLARIFYING'
     console.log('[CopilotStateMachine] entering CLARIFYING', {
       session_id:          this.state.sessionId,
       user_request_length: userMessage.length,
@@ -514,12 +525,12 @@ export class CopilotStateMachine {
         conversation_history: this.state.conversationHistory,
       })
 
-      console.log('[CopilotStateMachine] CLARIFYING done', {
-        session_id:      this.state.sessionId,
-        message_length:  result.message?.length ?? 0,
-      })
-
-      return this.setAssistantMessage(result.message)
+      this.state.clarifyRounds = 1
+      // If the model skipped straight to emitting workflow JSON, don't show
+      // it — generate properly instead.
+      const clarifyMsg = chatSafeMessage(result.message)
+      if (!clarifyMsg) return this.generateWorkflow()
+      return this.setAssistantMessage(clarifyMsg)
     } catch (error: unknown) {
       console.error('[CopilotStateMachine] CLARIFYING error', {
         session_id: this.state.sessionId,
@@ -539,9 +550,24 @@ export class CopilotStateMachine {
       return this.setAssistantMessage('Okay, canceled. Is there anything else I can help you with?')
     }
 
-    // Multi-turn clarification: call clarify again with updated history.
-    // If Zeroclaw still has a question → stay in CLARIFYING.
-    // If the response looks ready → proceed to generate.
+    const rounds = this.state.clarifyRounds ?? 1
+
+    // ── Deterministic exits before any LLM call ─────────────────────────────
+    // 1) Hard cap: after 2 clarify rounds we generate with whatever we have.
+    //    A chatty LLM must never be able to trap the user in a question loop.
+    // 2) Combined-context specificity: if the original request PLUS this
+    //    answer now name the full pipeline, generation has what it needs.
+    const combinedContext = `${this.state.userRequest}\n${userMessage}`
+    if (rounds >= 2 || analyzeRequest(combinedContext).isSpecific) {
+      console.log('[CopilotStateMachine] clarify exit', {
+        session_id: this.state.sessionId,
+        reason: rounds >= 2 ? 'round-cap' : 'now-specific',
+        rounds,
+      })
+      return this.generateWorkflow()
+    }
+
+    // ── One more clarify round via LLM ──────────────────────────────────────
     try {
       const result = await this.bridge.clarify({
         session_id: this.state.sessionId,
@@ -550,28 +576,19 @@ export class CopilotStateMachine {
         conversation_history: this.state.conversationHistory,
       })
 
-      const msg = result.message ?? ''
-      const isStillClarifying =
-        msg.trim().endsWith('?') ||
-        msg.toLowerCase().includes('please') ||
-        msg.toLowerCase().includes('can you tell') ||
-        msg.toLowerCase().includes('confirm') ||
-        msg.toLowerCase().includes('how much') ||
-        msg.toLowerCase().includes('when') ||
-        msg.toLowerCase().includes('what') ||
-        msg.toLowerCase().includes('tolong') ||
-        msg.toLowerCase().includes('bisa ceritakan') ||
-        msg.toLowerCase().includes('konfirmasi') ||
-        msg.toLowerCase().includes('berapa') ||
-        msg.toLowerCase().includes('kapan') ||
-        msg.toLowerCase().includes('apa')
+      const msg = chatSafeMessage(result.message) ?? ''
+      // A response is "still clarifying" only if it actually asks something —
+      // a question mark in the last two lines. The old keyword heuristic
+      // ("what", "when", "please", "apa"...) matched nearly every sentence
+      // and kept conversations stuck in CLARIFYING.
+      const lastLines = msg.split('\n').filter(Boolean).slice(-2).join('\n')
+      const isStillClarifying = lastLines.includes('?')
 
       if (isStillClarifying) {
-        // Stay in CLARIFYING — Zeroclaw still needs more info
+        this.state.clarifyRounds = rounds + 1
         return this.setAssistantMessage(msg)
       }
 
-      // Zeroclaw is satisfied — proceed to generate
       return this.generateWorkflow()
     } catch {
       // Fallback: just generate if clarify fails
@@ -629,20 +646,30 @@ export class CopilotStateMachine {
 
       if (!hasValidWorkflow) {
         const fallbackMessage =
-          typeof result?.message === 'string' && result.message.trim()
-            ? result.message
-            : (workflow && typeof workflow.summary === 'string' && workflow.summary.trim())
-              ? workflow.summary
-              : 'Sorry, I cannot build a workflow from this request yet. Please explain more specifically — for example, the trigger, apps to use, and expected outcome.'
+          chatSafeMessage(result?.message) ??
+          ((workflow && typeof workflow.summary === 'string' && workflow.summary.trim())
+            ? workflow.summary
+            : 'Sorry, I cannot build a workflow from this request yet. Please explain more specifically — for example, the trigger, apps to use, and expected outcome.')
 
         this.state.stage = 'IDLE'
         this.state.generatedWorkflow = null
         return this.setAssistantMessage(fallbackMessage)
       }
 
+      // Deterministic sanitation — normalize structural defects locally
+      // (missing ids, wrong first-step type, unknown types) so they never
+      // reach the sandbox, where each would cost a full repair round.
+      const sanitized = sanitizeWorkflow(workflow.steps)
+      if (sanitized.fixes.length > 0) {
+        console.log('[CopilotStateMachine] sanitized LLM output', {
+          session_id: this.state.sessionId,
+          fixes: sanitized.fixes,
+        })
+      }
+
       this.state.generatedWorkflow = {
         workflowName: workflow.workflowName,
-        steps: workflow.steps,
+        steps: sanitized.steps,
         estimate_hours: workflow.estimate_hours ?? 2,
         automation_score: workflow.automation_score ?? 0.8,
         summary: workflow.summary ?? '',
@@ -651,9 +678,13 @@ export class CopilotStateMachine {
 
       this.state.stage = 'AWAITING_CONFIRMATION'
 
-      const displayMessage =
-        result.message ??
-        this.buildWorkflowSummaryMessage(workflow.steps, workflow.workflowName)
+      // Always show the structured step-list summary. result.message is the
+      // model's raw output on this path (often the workflow JSON itself) and
+      // must never be surfaced verbatim in chat.
+      const displayMessage = this.buildWorkflowSummaryMessage(
+        this.state.generatedWorkflow.steps,
+        this.state.generatedWorkflow.workflowName,
+      )
 
       return this.setAssistantMessage(displayMessage)
     } catch (error: unknown) {
@@ -771,12 +802,37 @@ export class CopilotStateMachine {
 
       if (attempt < 3) {
         this.state.stage = 'FIXING'
+        const failureList = failedSteps
+          .map((f) => `• **${f.stepId}**: ${f.errorDetail || f.message}`)
+          .join('\n')
+
+        // First failure: try a deterministic local repair before spending an
+        // LLM round. Sanitation + the MCP-resolved nodeTypes (already written
+        // back above) fix the common structural failures. Only when the local
+        // pass has nothing to change do we escalate to the LLM immediately.
+        if (attempt === 1 && this.state.generatedWorkflow) {
+          const local = sanitizeWorkflow(this.state.generatedWorkflow.steps)
+          const gainedNodeTypes = this.state.generatedWorkflow.steps.some(
+            (s, i) => s.nodeType && !local.steps[i]?.nodeType,
+          )
+          if (local.fixes.length > 0 || gainedNodeTypes) {
+            console.log('[CopilotStateMachine] local repair', {
+              session_id: this.state.sessionId,
+              fixes: local.fixes,
+            })
+            this.state.generatedWorkflow.steps = local.steps.map((s, i) => {
+              const prev = this.state.generatedWorkflow!.steps[i]
+              return prev?.nodeType && !s.nodeType ? { ...s, nodeType: prev.nodeType } : s
+            })
+            this.setAssistantMessage(
+              `⚠️ ${failedSteps.length} steps failed during testing (attempt ${attempt}/3):\n${failureList}\n\n🔧 Applying automatic structural fixes and retesting...`,
+            )
+            return this.runTests(attempt + 1)
+          }
+        }
+
         this.setAssistantMessage(
-          `⚠️ ${failedSteps.length} steps failed during testing (attempt ${attempt}/3):\n` +
-            failedSteps
-              .map((f) => `• **${f.stepId}**: ${f.errorDetail || f.message}`)
-              .join('\n') +
-            `\n\n🔧 ZeroClaw is automatically repairing...`,
+          `⚠️ ${failedSteps.length} steps failed during testing (attempt ${attempt}/3):\n${failureList}\n\n🔧 Automatically repairing...`,
         )
         await this.repairWorkflow(failedSteps)
         return this.runTests(attempt + 1)
@@ -835,7 +891,7 @@ export class CopilotStateMachine {
         return
       }
 
-      this.state.generatedWorkflow.steps = repairedWorkflow.steps.map((step) => {
+      this.state.generatedWorkflow.steps = sanitizeWorkflow(repairedWorkflow.steps).steps.map((step) => {
         const known = existingNodeTypes.get(step.id)
         return known && !step.nodeType ? { ...step, nodeType: known } : step
       })
@@ -873,13 +929,13 @@ export class CopilotStateMachine {
 
       if (!editedStepsValid) {
         console.warn('[Copilot] handleEditing: ZeroClaw returned invalid workflow, keeping current state')
-        const message = typeof result?.message === 'string' && result.message.trim()
-          ? result.message
-          : 'I cannot process that change yet. Please explain the step you want to change in more detail.'
+        const message =
+          chatSafeMessage(result?.message) ??
+          'I cannot process that change yet. Please explain the step you want to change in more detail.'
         return this.setAssistantMessage(message)
       }
 
-      this.state.generatedWorkflow.steps = editedWorkflow.steps
+      this.state.generatedWorkflow.steps = sanitizeWorkflow(editedWorkflow.steps).steps
       if (typeof editedWorkflow.workflowName === 'string' && editedWorkflow.workflowName.trim()) {
         this.state.generatedWorkflow.workflowName = editedWorkflow.workflowName
       }
@@ -892,13 +948,13 @@ export class CopilotStateMachine {
       this.state.testAttempts = 0
       this.state.stage = 'AWAITING_CONFIRMATION'
 
-      const displayMessage =
-        result.message ??
-        this.buildWorkflowSummaryMessage(
-          this.state.generatedWorkflow.steps,
-          this.state.generatedWorkflow.workflowName,
-          true,
-        )
+      // Same as generate: never surface result.message (raw model JSON) —
+      // show the structured "workflow updated" step list instead.
+      const displayMessage = this.buildWorkflowSummaryMessage(
+        this.state.generatedWorkflow.steps,
+        this.state.generatedWorkflow.workflowName,
+        true,
+      )
 
       return this.setAssistantMessage(displayMessage)
     } catch (error: unknown) {
@@ -1044,6 +1100,24 @@ export class CopilotStateMachine {
 }
 
 // ============================================================
+// MESSAGE SAFETY
+// ============================================================
+
+/**
+ * Bridge/Zeroclaw responses on workflow_* entrypoints are often the raw
+ * workflow JSON (the bridge instructs "output ONLY a single JSON object").
+ * A chat bubble must never show that payload — accept a bridge message only
+ * when it reads like prose.
+ */
+export function chatSafeMessage(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('```')) return null
+  return trimmed
+}
+
+// ============================================================
 // INTENT DETECTION
 // ============================================================
 
@@ -1058,6 +1132,11 @@ export function detectUserIntent(
     )
   )
     return 'confirm'
+
+  // "Publish it", "publikasikan", "go live" — treat as confirmation so the
+  // flow proceeds to sandbox testing instead of falling through to EDIT
+  // (which echoes the whole workflow back through the LLM).
+  if (/\b(publish|publikasikan|terbitkan|go.?live)\b/i.test(lower)) return 'confirm'
 
   if (
     /^(tidak|no|nope|gak|engga|batal|cancel|ndak|nggak|jangan|stop)$/i.test(lower)

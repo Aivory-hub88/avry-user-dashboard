@@ -54,8 +54,15 @@ export default function SummaryPage() {
         return acc
       }, {} as Record<PhaseId, Record<string, any>>)
 
-      const result = await DeepDiagnosticService.submitDiagnostic(companyName, phases)
-      DeepDiagnosticService.saveResult(result)
+      // AI analysis is best-effort: if the LLM path fails, the user still gets
+      // the full deterministic report (scores/ROI are computed locally anyway).
+      try {
+        const result = await DeepDiagnosticService.submitDiagnostic(companyName, phases)
+        DeepDiagnosticService.saveResult(result)
+      } catch (llmErr) {
+        console.warn('[DeepDiagnostic] AI analysis failed — continuing with local report:', llmErr)
+        DeepDiagnosticService.clearResult()
+      }
 
       // Build rich DiagnosticContext and write to localStorage for the final-result page
       const flattenedAnswers: DiagnosticAnswers = {}

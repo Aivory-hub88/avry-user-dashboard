@@ -3,23 +3,30 @@
  *
  * Premium consultancy-grade design (McKinsey / BCG / Deloitte tier).
  * Cover/back: dark background images preserved. Inner pages: white editorial.
- * Font: Helvetica (approximating Manrope 300/400/500 + Doto for score numbers).
+ * Font: real Manrope (Regular/Bold) + Doto embedded from /public/fonts as TTF,
+ * with a Helvetica fallback if the embed fails for any reason.
  * Inner palette: #ffffff bg · #3a7a3a accent · #0a1a0f text.
  */
 
 import jsPDF from 'jspdf'
 import type { DiagnosticContext, ImprovementItem } from '@/types/diagnostic'
+import { asset } from '@/lib/asset'
+import { COVER_FRONT_BG, COVER_BACK_BG, COVER_WORDMARK, COVER_MICROGRAPHIC, COVER_FOOTER_BADGE, SIGNATURE_WHITE, SIGNATURE_DARK } from '@/lib/pdfAssets'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
 export const INK       = '#0a1a0f'   // primary text, display values
 export const ACCENT    = '#3a7a3a'   // section labels, bars, badges, ring arc
-export const MUTED     = '#888888'   // body text, descriptions
-export const LABEL     = '#bbbbbb'   // small labels, sub notes
-export const LABEL_A   = '#aaaaaa'   // metric labels
-export const UNIT_C    = '#999999'   // unit text
+// NOTE: greys below are tuned to clear WCAG AA (>=4.5:1) against #ffffff.
+// The previous values (#888/#bbb/#aaa/#999/#ccc) fell as low as ~1.3:1 and
+// were effectively unreadable in print/PDF — this was a real defect, not a
+// stylistic choice, so it's fixed here rather than left as-is.
+export const MUTED     = '#5c5c5c'   // body text, descriptions (~7.0:1)
+export const LABEL     = '#6e6e6e'   // small labels, sub notes (~5.1:1)
+export const LABEL_A   = '#6e6e6e'   // metric labels (~5.1:1)
+export const UNIT_C    = '#6e6e6e'   // unit text (~5.1:1)
 export const TRACK     = '#e8e8e4'   // bar tracks, grid borders, cell dividers
 export const RULE      = '#e0e0d8'   // section-label rule, card borders
-export const FOOTER_C  = '#cccccc'   // footer text
+export const FOOTER_C  = '#767676'   // footer text (~4.5:1, deliberately the dimmest passing grey)
 export const SEC_LBL   = '#6a9a6a'   // section label text
 export const VAL_MID   = '#444444'   // diagnostic context values
 export const CONTENT_C = '#666666'   // improvement content
@@ -46,9 +53,10 @@ export const CW = PAGE_W - ML - MR // 174 mm
 // Manrope / Doto are design-intent fonts; helvetica is the jsPDF fallback.
 // To embed true Manrope/Doto, bundle base64-encoded TTF files (follow-up).
 let FONT_LOADED = false
+let DOTO_LOADED = false
 export const F  = () => FONT_LOADED ? 'Manrope' : 'helvetica'
 export const FB = () => FONT_LOADED ? 'Manrope' : 'helvetica'
-export const FD = () => 'helvetica' // Doto fallback (for score ring numbers)
+export const FD = () => DOTO_LOADED ? 'Doto' : 'helvetica' // score ring numbers
 
 // ── Utility functions ──────────────────────────────────────────────────────────
 export function hexToRgb(hex: string): [number, number, number] {
@@ -98,9 +106,59 @@ export function spacedText(
   return totalW
 }
 
-// ── Font loader (Manrope — future TTF bundle) ─────────────────────────────────
-export async function loadManrope(_pdf: jsPDF): Promise<void> {
-  FONT_LOADED = false
+// ── Font loader — embeds the real Manrope + Doto TTFs (public/fonts) into the
+// jsPDF document so rendered text is actually Manrope/Doto, not Helvetica.
+// Falls back to Helvetica (FONT_LOADED stays false) if any fetch fails —
+// asset() is required here because these are plain fetch() calls, which,
+// unlike next/image or next/link, do NOT get the Next.js basePath ("/dashboard")
+// auto-prepended. Without it these 404 in production (see cover image bug).
+async function fetchAsBase64(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url)
+    if (!r.ok) return null
+    const buf = await r.arrayBuffer()
+    const bytes = new Uint8Array(buf)
+    let binary = ''
+    const chunk = 0x8000
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+    }
+    return btoa(binary)
+  } catch {
+    return null
+  }
+}
+
+export async function loadManrope(pdf: jsPDF): Promise<void> {
+  try {
+    const [regular, bold] = await Promise.all([
+      fetchAsBase64(asset('/fonts/Manrope-Regular.ttf')),
+      fetchAsBase64(asset('/fonts/Manrope-Bold.ttf')),
+    ])
+
+    if (regular) {
+      pdf.addFileToVFS('Manrope-Regular.ttf', regular)
+      pdf.addFont('Manrope-Regular.ttf', 'Manrope', 'normal')
+    }
+    if (bold) {
+      pdf.addFileToVFS('Manrope-Bold.ttf', bold)
+      pdf.addFont('Manrope-Bold.ttf', 'Manrope', 'bold')
+    }
+    FONT_LOADED = !!(regular && bold)
+  } catch {
+    FONT_LOADED = false
+  }
+
+  try {
+    const doto = await fetchAsBase64(asset('/fonts/Doto-Regular.ttf'))
+    if (doto) {
+      pdf.addFileToVFS('Doto-Regular.ttf', doto)
+      pdf.addFont('Doto-Regular.ttf', 'Doto', 'normal')
+      DOTO_LOADED = true
+    }
+  } catch {
+    DOTO_LOADED = false
+  }
 }
 
 // ── Image loaders ──────────────────────────────────────────────────────────────
@@ -187,9 +245,45 @@ async function renderTextToPngDataUrl(
 // ══════════════════════════════════════════════════════════════════════════════
 
 /** White background fill for every inner page. */
+// Soft warm-white radial gradient shared with the free-diagnostic card
+// (radial-gradient(120% 90% at 28% 0%, #fff, #fbfaf7 45%, #f2f0ea)). Rendered
+// once to a canvas and cached, so every inner page carries the same subtle
+// paper texture instead of flat white. Falls back to flat white if the canvas
+// is unavailable (SSR / no DOM) — the page still prints.
+let _contentBgCache: string | null = null
+function getContentBg(): string | null {
+  if (_contentBgCache) return _contentBgCache
+  try {
+    if (typeof document === 'undefined') return null
+    const canvas = document.createElement('canvas')
+    const scale = 3
+    canvas.width = PAGE_W * scale
+    canvas.height = PAGE_H * scale
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    const cx = canvas.width * 0.28
+    const r = Math.max(canvas.width, canvas.height) * 1.05
+    const grad = ctx.createRadialGradient(cx, 0, 0, cx, 0, r)
+    grad.addColorStop(0, '#ffffff')
+    grad.addColorStop(0.45, '#fbfaf7')
+    grad.addColorStop(1, '#f2f0ea')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    _contentBgCache = canvas.toDataURL('image/png')
+    return _contentBgCache
+  } catch {
+    return null
+  }
+}
+
 export function pageBg(pdf: jsPDF) {
-  setC(pdf, '#ffffff', 'fill')
-  pdf.rect(0, 0, PAGE_W, PAGE_H, 'F')
+  const bg = getContentBg()
+  if (bg) {
+    pdf.addImage(bg, 'PNG', 0, 0, PAGE_W, PAGE_H, undefined, 'FAST')
+  } else {
+    setC(pdf, '#ffffff', 'fill')
+    pdf.rect(0, 0, PAGE_W, PAGE_H, 'F')
+  }
 }
 
 /** Footer: AIVORY™ · CONFIDENTIAL left, aivory.uk right, divider above. */
@@ -242,16 +336,80 @@ export function thinDiv(pdf: jsPDF, y: number, x1 = ML, x2 = ML + CW): number {
   return y + 4
 }
 
+/**
+ * Only starts a new page when the next block genuinely won't fit — replaces
+ * the old pattern of an unconditional pdf.addPage() before every named
+ * section, which forced short sections (e.g. a single opportunity card, or
+ * 3 next-step rows) onto their own near-empty page and broke reading flow.
+ * `needed` is a conservative estimate of the space the upcoming block's
+ * header + opening content requires.
+ */
+export function ensureSpace(pdf: jsPDF, y: number, needed: number): number {
+  if (y + needed > PAGE_H - 16) {
+    pdf.addPage()
+    pageBg(pdf)
+    pageFooter(pdf)
+    return 16
+  }
+  return y
+}
+
+/**
+ * A short connective sentence bridging two sections — gives the report a
+ * narrated, editorial flow instead of reading as disconnected data blocks.
+ * Styled as a left-accent-bar callout so it reads distinctly from both the
+ * section narrative above it and the section label below it.
+ */
+export function renderTransition(pdf: jsPDF, y: number, text: string): number {
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(9.5)
+  pdf.setLineHeightFactor(1.55)
+  const lines = pdf.splitTextToSize(text, CW - 8)
+  const textH = lines.length * 4.9
+  const blockH = textH + 8
+
+  setC(pdf, ACCENT, 'fill')
+  pdf.rect(ML, y, 0.7, textH + 1, 'F')
+
+  setC(pdf, '#3f5c3f', 'text')
+  pdf.text(lines, ML + 6, y + 4.2)
+  pdf.setLineHeightFactor(1.15)
+
+  return y + blockH + 6
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 //  COMPONENTS
 // ══════════════════════════════════════════════════════════════════════════════
 
-/** Score arc — ring with accent progress, Doto number, maturity label. */
+/** Linearly interpolate between two hex colours (0-1). */
+function lerpHex(a: string, b: string, t: number): [number, number, number] {
+  const [ar, ag, ab] = hexToRgb(a)
+  const [br, bg, bb] = hexToRgb(b)
+  return [ar + (br - ar) * t, ag + (bg - ag) * t, ab + (bb - ab) * t]
+}
+
+/**
+ * Score arc — ring with a gradient progress sweep (deep forest → bright
+ * mint, matching the on-screen ScoreRing), a soft outer halo, and gauge
+ * tick marks at 0/25/50/75/100. jsPDF has no native SVG-style gradient
+ * stroke, so the gradient is faked by interpolating the stroke colour
+ * segment-by-segment along the arc.
+ */
 async function scoreArc(
   pdf: jsPDF, cx: number, cy: number, r: number, score: number, label: string,
 ) {
   const pct = score / 100
   const start = -Math.PI / 2
+
+  // Soft ambient halo behind the ring — low-opacity accent disc
+  const gs = (pdf as unknown as { GState: new (p: Record<string, number>) => unknown; setGState: (g: unknown) => void })
+  if (gs.GState) {
+    gs.setGState(new gs.GState({ opacity: 0.07 }))
+    setC(pdf, ACCENT, 'fill')
+    pdf.circle(cx, cy, r + 5, 'F')
+    gs.setGState(new gs.GState({ opacity: 1 }))
+  }
 
   // Round linecaps for the arc strokes
   pdf.setLineCap(1) // round
@@ -266,15 +424,34 @@ async function scoreArc(
     pdf.line(cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a2), cy + r * Math.sin(a2))
   }
 
-  // Progress arc — #3a7a3a, 7px ≈ 2.5mm
-  setC(pdf, ACCENT, 'draw')
+  // Tick marks at 0/25/50/75/100 — instrument-panel detail
+  setC(pdf, '#b8b8b0', 'draw')
+  pdf.setLineWidth(0.5)
+  ;[0, 25, 50, 75, 100].forEach((tick) => {
+    const a = start + 2 * Math.PI * (tick / 100)
+    const inner = r - 5
+    const outer = r - 2.2
+    pdf.line(cx + inner * Math.cos(a), cy + inner * Math.sin(a), cx + outer * Math.cos(a), cy + outer * Math.sin(a))
+  })
+
+  // Progress arc — gradient sweep from deep forest (#7fae6f) to bright
+  // mint (#d9ecc9), 7px ≈ 2.5mm, interpolated per segment.
   pdf.setLineWidth(2.5)
   const end = start + 2 * Math.PI * pct
   const segs = Math.max(1, Math.round(80 * pct))
   for (let i = 0; i < segs; i++) {
+    const t = segs > 1 ? i / (segs - 1) : 0
+    const [rr, gg, bb] = lerpHex('#7fae6f', '#d9ecc9', t)
+    pdf.setDrawColor(rr, gg, bb)
     const a1 = start + (end - start) * (i / segs)
     const a2 = start + (end - start) * ((i + 1) / segs)
     pdf.line(cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a2), cy + r * Math.sin(a2))
+  }
+
+  // Bright tip dot — reinforces the "gauge needle" read
+  if (pct > 0) {
+    setC(pdf, '#eef6e6', 'fill')
+    pdf.circle(cx + r * Math.cos(end), cy + r * Math.sin(end), 1.6, 'F')
   }
 
   pdf.setLineCap(0) // reset to butt
@@ -322,12 +499,27 @@ function dimBar(
   pdf.setFontSize(10) // 13px
   pdf.text(String(score), x + w, y + 3, { align: 'right' })
 
-  // 1.5px track ≈ 0.53mm
+  // Track + fill — 1.5px, rounded ends and a gradient fill (matching the
+  // on-screen dimension bars) instead of a flat rectangle.
   const barY = y + 6
+  const barH = 0.9
   setC(pdf, TRACK, 'fill')
-  pdf.rect(x, barY, w, 0.53, 'F')
-  setC(pdf, ACCENT, 'fill')
-  pdf.rect(x, barY, w * (score / 100), 0.53, 'F')
+  pdf.roundedRect(x, barY - barH / 2, w, barH, barH / 2, barH / 2, 'F')
+  const fillW = w * (score / 100)
+  if (fillW > 0) {
+    const segN = Math.max(1, Math.round(fillW / 3))
+    for (let i = 0; i < segN; i++) {
+      const t0 = i / segN
+      const t1 = (i + 1) / segN
+      const [rr, gg, bb] = lerpHex('#5f8f52', '#a9c99a', (t0 + t1) / 2)
+      pdf.setFillColor(rr, gg, bb)
+      pdf.rect(x + fillW * t0, barY - barH / 2, fillW * (t1 - t0) + 0.1, barH, 'F')
+    }
+    setC(pdf, '#a9c99a', 'fill')
+    pdf.circle(x + fillW - barH / 2, barY, barH / 2, 'F')
+    setC(pdf, '#5f8f52', 'fill')
+    pdf.circle(x + barH / 2, barY, barH / 2, 'F')
+  }
 
   return y + 14
 }
@@ -431,6 +623,15 @@ function oppCard(
 function nextStepRow(
   pdf: jsPDF, y: number, stepNum: string, title: string, body: string,
 ): number {
+  // Guarantee the whole row fits on the current page before drawing — a long
+  // body used to run straight through the page footer (no per-row page break).
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(8.5)
+  pdf.setLineHeightFactor(1.65)
+  const measured = pdf.splitTextToSize(body, CW - 13)
+  pdf.setLineHeightFactor(1.15)
+  y = ensureSpace(pdf, y, 7 + 10 + measured.length * 5.2 + 7)
+
   thinDiv(pdf, y)
   y += 7 // ~20px padding-top
 
@@ -457,6 +658,35 @@ function nextStepRow(
   pdf.setLineHeightFactor(1.15)
 
   return y + 10 + bl.length * 5.2 + 7 // ~20px padding-bottom
+}
+
+/**
+ * Pre-measures the height an improvementBlock will actually need, mirroring
+ * its own line-splitting exactly. The previous code checked a flat 60mm
+ * threshold before drawing, but a block with 3 long paragraphs plus a
+ * before/after card easily exceeds 100mm — the block would start near the
+ * bottom of the page and run straight through the footer.
+ */
+function measureImprovementBlockHeight(pdf: jsPDF, item: ImprovementItem): number {
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(8.5)
+  const cLines = pdf.splitTextToSize(item.currentState, CW - 4)
+  const aLines = pdf.splitTextToSize(item.recommendedAction, CW - 4)
+  const iLines = pdf.splitTextToSize(item.operationalImpact, CW - 4)
+
+  let h = 14 // title + badge
+  h += cLines.length * 5 + 5 + 4 // label + lines + gap
+  h += aLines.length * 5 + 5 + 4
+  h += iLines.length * 5 + 4 + 4
+
+  if (item.before && item.after) {
+    const bLines = pdf.splitTextToSize(item.before, (CW - 14) / 2 - 4)
+    const afLines = pdf.splitTextToSize(item.after, (CW - 14) / 2 - 4)
+    const bHeight = Math.max(bLines.length, afLines.length) * 4 + 10
+    h += bHeight + 6
+  }
+
+  return h + 9 // bottom divider + margin
 }
 
 /** Improvement block: title + priority badge + 3 labeled content rows. */
@@ -602,119 +832,243 @@ export async function applyPremiumCovers(
   title: string = '',
   meta?: { company?: string; date?: string; reportId?: string },
 ) {
-  const [bg, logo] = await Promise.all([
-    loadImage(type === 'front' ? '/cover-front-bg.jpg' : '/cover-back-gradient.jpg'),
-    loadSvgAsPngDataUrl('/aivory-logo-cover.svg', 251, 80),
-  ])
+  // Tighter cover margin (matches the mockups' ~12mm).
+  const CML = 12
 
-  // Background — image or solid fallback
-  if (bg) {
-    pdf.addImage(bg, 'JPEG', 0, 0, PAGE_W, PAGE_H, undefined, 'FAST')
-  } else {
-    setC(pdf, COVER_BG, 'fill')
-    pdf.rect(0, 0, PAGE_W, PAGE_H, 'F')
-  }
+  // Every graphic on the covers is an INLINE base64 image (see lib/pdfAssets.ts):
+  // pdf.addImage() gets the bytes directly, so a logo/background can never go
+  // missing from a fetch/canvas/basePath failure. All cover TEXT is drawn with
+  // pdf.text() using the Manrope font embedded into the PDF (loadManrope), so it
+  // is vector-crisp and does not depend on the browser having the web font.
+
+  // Full-bleed background
+  pdf.addImage(type === 'front' ? COVER_FRONT_BG : COVER_BACK_BG, 'JPEG', 0, 0, PAGE_W, PAGE_H, undefined, 'FAST')
 
   if (type === 'front') {
-    // ── Top row: Report ID left · CONFIDENTIAL right ──
-    // ── Headline ──
-    const titleText = title || `AI Readiness\nAssessment Report`
-    const titleImg = await renderTextToPngDataUrl(
-      titleText, '300 48px "Manrope", sans-serif', '#ffffff',
-    )
-    if (titleImg) {
-      const wMm = titleImg.width * 0.264583
-      const hMm = titleImg.height * 0.264583
-      pdf.addImage(titleImg.dataUrl, 'PNG', ML, 35, wMm, hMm, undefined, 'FAST')
-    } else {
+    // Top-right: slim all-white AIVORY wordmark (900x187 → 4.813:1)
+    const wmW = 42
+    const wmH = wmW * (187 / 900)
+    pdf.addImage(COVER_WORDMARK, 'PNG', PAGE_W - CML - wmW, 13, wmW, wmH, undefined, 'FAST')
+
+    // Headline — uppercase, 2 lines, tight leading, lower-left. Width-fitted so
+    // the longest line lands at ~122mm regardless of font metrics.
+    const titleLines = (title || 'AI Readiness\nAssessment Report').toUpperCase().split('\n')
+    setC(pdf, '#ffffff', 'text')
+    pdf.setFont(F(), 'normal')
+    let tfs = 40
+    pdf.setFontSize(tfs)
+    const widest = Math.max(...titleLines.map((l) => pdf.getTextWidth(l)))
+    if (widest > 0) tfs = tfs * (122 / widest)
+    pdf.setFontSize(tfs)
+    const lineGap = tfs * 0.3528 * 1.04 // pt→mm, tight leading
+    const titleTopBaseline = 165 // baseline of first line (mm)
+    titleLines.forEach((l, i) => pdf.text(l, CML, titleTopBaseline + i * lineGap))
+    const titleWmm = Math.max(...titleLines.map((l) => pdf.getTextWidth(l)))
+
+    // Ring glyph, right of the second title line (vector — nothing to load)
+    setC(pdf, '#ffffff', 'draw')
+    pdf.setLineWidth(0.7)
+    pdf.circle(CML + titleWmm + 12, titleTopBaseline + lineGap - tfs * 0.3528 * 0.36, 6.3, 'S')
+
+    // Company Name — large, shrink-to-fit so long names never overflow
+    if (meta?.company) {
       setC(pdf, '#ffffff', 'text')
       pdf.setFont(F(), 'normal')
-      pdf.setFontSize(27)
-      titleText.split('\n').forEach((line, i) => {
-        pdf.text(line, ML, 45 + i * 14)
-      })
+      let cfs = 26
+      pdf.setFontSize(cfs)
+      const cw = pdf.getTextWidth(meta.company)
+      const maxW = PAGE_W - 2 * CML
+      if (cw > maxW) { cfs = cfs * (maxW / cw); pdf.setFontSize(cfs) }
+      pdf.text(meta.company, CML, 210)
     }
 
-    // ── Company Name ──
-    if (meta?.company) {
-      const companyImg = await renderTextToPngDataUrl(
-        meta.company, '300 22px "Manrope", sans-serif', '#ffffff',
-      )
-      if (companyImg) {
-        const cwMm = companyImg.width * 0.264583
-        const chMm = companyImg.height * 0.264583
-        pdf.addImage(companyImg.dataUrl, 'PNG', ML, 70, cwMm, chMm, undefined, 'FAST')
-      } else {
-        setC(pdf, '#ffffff', 'text')
-        pdf.setFont(F(), 'normal')
-        pdf.setFontSize(12)
-        pdf.text(meta.company, ML, 75)
-      }
-    }
-
-    // ── Date (Right aligned, above gradient) ──
+    // Date — DD MM YY, muted, wide-spaced
     if (meta?.date) {
-      let formattedDate = meta.date;
-      const d = new Date(meta.date);
+      let fd = meta.date
+      const d = new Date(meta.date)
       if (!isNaN(d.getTime())) {
-        formattedDate = `${String(d.getDate()).padStart(2, '0')} ${String(d.getMonth() + 1).padStart(2, '0')} ${d.getFullYear()}`;
+        fd = `${String(d.getDate()).padStart(2, '0')}  ${String(d.getMonth() + 1).padStart(2, '0')}  ${String(d.getFullYear()).slice(-2)}`
       }
-      const dateImg = await renderTextToPngDataUrl(
-        formattedDate, '300 32px "Manrope", sans-serif', '#ffffff',
-      )
-      if (dateImg) {
-        const wMm = dateImg.width * 0.264583
-        const hMm = dateImg.height * 0.264583
-        pdf.addImage(dateImg.dataUrl, 'PNG', PAGE_W - MR - wMm, 185, wMm, hMm, undefined, 'FAST')
-      }
+      setC(pdf, '#a9bfa4', 'text')
+      pdf.setFont(F(), 'normal')
+      pdf.setFontSize(15)
+      spacedText(pdf, fd, CML, 223, 0.4)
     }
 
-    // ── Logo and Tagline at Bottom (per Image 4) ──
-    const baseY = PAGE_H - 20
-
-    if (logo) {
-      const lw = 55
-      const lh = lw * (80 / 251)
-      // Logo on the LEFT
-      pdf.addImage(logo, 'PNG', ML, baseY - lh / 2, lw, lh, undefined, 'FAST')
-      
-      // Tagline on the RIGHT
-      const subImg = await renderTextToPngDataUrl(
-        'Make AI make sense\u00AE', '300 16px "Manrope", sans-serif', '#ffffff',
-      )
-      if (subImg) {
-        const wMm = subImg.width * 0.264583
-        const hMm = subImg.height * 0.264583
-        pdf.addImage(subImg.dataUrl, 'PNG', PAGE_W - MR - wMm, baseY - hMm / 2, wMm, hMm, undefined, 'FAST')
-      }
-    }
-
-  } else {
-    // ── Back cover (per Image 3) ──
-    const cx = PAGE_W / 2
-    const cy = PAGE_H / 2
-
-    if (logo) {
-      const lw = 60
-      const lh = lw * (80 / 251)
-      pdf.addImage(logo, 'PNG', cx - lw / 2, cy - lh / 2 - 2, lw, lh, undefined, 'FAST')
-
-      const tagImg = await renderTextToPngDataUrl(
-        'Make AI make sense\u00AE', '300 18px "Manrope", sans-serif', '#ffffff',
-      )
-      if (tagImg) {
-        const twMm = tagImg.width * 0.264583
-        const thMm = tagImg.height * 0.264583
-        pdf.addImage(tagImg.dataUrl, 'PNG', cx - twMm / 2, cy + lh / 2 - 0.5, twMm, thMm, undefined, 'FAST')
-      }
-    }
-    
-    // URL and copyright at the very bottom
+    // Tagline bottom-left
+    setC(pdf, '#ffffff', 'text')
     pdf.setFont(F(), 'normal')
-    pdf.setTextColor('#ffffff')
-    pdf.setFontSize(8)
-    pdf.text('www.aivory.uk', ML, PAGE_H - 12)
-    pdf.text('\u00A9 2026 Aivory\u2122', PAGE_W - MR, PAGE_H - 12, { align: 'right' })
+    pdf.setFontSize(11)
+    pdf.text('Make AI make sense®', CML, PAGE_H - 14)
+
+    // Footer credential strip, bottom-right (1700x165 → 10.30:1)
+    const fW = 76
+    const fH = fW * (165 / 1700)
+    pdf.addImage(COVER_FOOTER_BADGE, 'PNG', PAGE_W - CML - fW, PAGE_H - 12 - fH, fW, fH, undefined, 'FAST')
+  } else {
+    // Back cover — single centred all-white AIVORY lockup (1900x545 → 3.486:1)
+    const mW = 99
+    const mH = mW * (545 / 1900)
+    pdf.addImage(COVER_MICROGRAPHIC, 'PNG', PAGE_W / 2 - mW / 2, 154 - mH / 2, mW, mH, undefined, 'FAST')
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  EDITORIAL SPREAD — a full-bleed "thesis" page between the cover and the
+//  data pages, in the style of a consulting-firm opening provocation. Gives
+//  the report a premium editorial rhythm (cover → thesis → data → close)
+//  instead of jumping straight from cover into charts.
+// ══════════════════════════════════════════════════════════════════════════════
+function editorialSpread(pdf: jsPDF, context: DiagnosticContext) {
+  pdf.addPage()
+  setC(pdf, COVER_BG, 'fill')
+  pdf.rect(0, 0, PAGE_W, PAGE_H, 'F')
+
+  const cx = ML
+  const companyLabel = context.company || 'your team'
+  const topOppTitle = context.opportunities?.[0]?.title
+
+  // Eyebrow
+  setC(pdf, '#8fb87f', 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(7.5)
+  spacedText(pdf, 'A NOTE FROM AIVORY', cx, 58, 0.5)
+
+  // Salutation
+  setC(pdf, '#ffffff', 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(17)
+  pdf.text(`Dear ${companyLabel},`, cx, 78)
+
+  // Letter body — a short, warm framing of what the report contains,
+  // in place of the earlier pull-quote treatment (which read as an
+  // out-of-context KPI statement rather than an actual thesis).
+  setC(pdf, '#dce8d6', 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(11.5)
+  pdf.setLineHeightFactor(1.7)
+
+  const p1 = `Thank you for completing the AI Readiness Assessment. What follows is a diagnostic of where ${companyLabel} stands today: not a generic scorecard, but a reading of your own answers, your goals, your constraints, and the gap between where you are and where you're aiming to be.`
+  const p1Lines = pdf.splitTextToSize(p1, CW - 10)
+  pdf.text(p1Lines, cx, 94)
+  let ny = 94 + p1Lines.length * 6.3 + 8
+
+  const p2 = topOppTitle
+    ? `The findings point to a clear starting point: ${topOppTitle.toLowerCase()}, alongside the financial case and a sequenced plan to act on it. Every number that follows traces back to what you told us.`
+    : `The pages ahead lay out your composite readiness score, the opportunities with the fastest path to ROI, and a sequenced plan to act on them. Every number that follows traces back to what you told us.`
+  const p2Lines = pdf.splitTextToSize(p2, CW - 10)
+  pdf.text(p2Lines, cx, ny)
+  ny += p2Lines.length * 6.3 + 14
+  pdf.setLineHeightFactor(1.15)
+
+  setC(pdf, '#8fb87f', 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(11)
+  pdf.text('Warmly, The Aivory Team', cx, ny)
+
+  // Aivory signature (white) beneath the sign-off — inline asset, cannot fail.
+  {
+    const sigW = 46
+    const sigH = sigW * (62.9 / 498.7)
+    pdf.addImage(SIGNATURE_WHITE, 'PNG', cx, ny + 8, sigW, sigH, undefined, 'FAST')
+  }
+
+  // Bottom supporting data strip — composite score as a grounding stat
+  const stripY = PAGE_H - 46
+  setC(pdf, '#3f5c46', 'draw')
+  pdf.setLineWidth(0.18)
+  pdf.line(ML, stripY, ML + CW, stripY)
+
+  setC(pdf, '#8fb87f', 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(6.4)
+  spacedText(pdf, 'COMPOSITE READINESS SCORE', ML, stripY + 9, 0.3)
+
+  setC(pdf, '#ffffff', 'text')
+  pdf.setFont(FD(), 'normal')
+  pdf.setFontSize(15)
+  pdf.text(`${Math.round(context.scores.composite)}`, ML, stripY + 20)
+
+  setC(pdf, '#a9c4a0', 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(6.4)
+  const mLabel = context.scores.maturityLevel.toUpperCase()
+  spacedText(pdf, mLabel, ML + CW, stripY + 20, 0.3, { align: 'right' })
+  setC(pdf, '#a9c4a0', 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(6.4)
+  spacedText(pdf, 'MATURITY LEVEL', ML + CW, stripY + 9, 0.3, { align: 'right' })
+}
+
+/**
+ * Reusable dark "A NOTE FROM AIVORY" letter page — the same treatment as the
+ * diagnostic's editorialSpread, exported so the Blueprint and Roadmap exports
+ * can open with the identical premium note (with the white Aivory signature).
+ * Adds its own page. footerStats renders the grounding data strip.
+ */
+export function renderAivoryNote(
+  doc: jsPDF,
+  opts: {
+    greeting: string
+    paragraphs: string[]
+    footerStats?: Array<{ label: string; value: string; align?: 'left' | 'right' }>
+  },
+) {
+  doc.addPage()
+  setC(doc, COVER_BG, 'fill')
+  doc.rect(0, 0, PAGE_W, PAGE_H, 'F')
+
+  const cx = ML
+
+  setC(doc, '#8fb87f', 'text')
+  doc.setFont(FB(), 'bold')
+  doc.setFontSize(7.5)
+  spacedText(doc, 'A NOTE FROM AIVORY', cx, 58, 0.5)
+
+  setC(doc, '#ffffff', 'text')
+  doc.setFont(F(), 'normal')
+  doc.setFontSize(17)
+  doc.text(opts.greeting, cx, 78)
+
+  setC(doc, '#dce8d6', 'text')
+  doc.setFont(F(), 'normal')
+  doc.setFontSize(11.5)
+  doc.setLineHeightFactor(1.7)
+  let ny = 94
+  opts.paragraphs.forEach((p) => {
+    const lines = doc.splitTextToSize(p, CW - 10)
+    doc.text(lines, cx, ny)
+    ny += lines.length * 6.3 + 8
+  })
+  doc.setLineHeightFactor(1.15)
+
+  ny += 6
+  setC(doc, '#8fb87f', 'text')
+  doc.setFont(F(), 'normal')
+  doc.setFontSize(11)
+  doc.text('Warmly, The Aivory Team', cx, ny)
+
+  const sigW = 46
+  const sigH = sigW * (62.9 / 498.7)
+  doc.addImage(SIGNATURE_WHITE, 'PNG', cx, ny + 8, sigW, sigH, undefined, 'FAST')
+
+  if (opts.footerStats?.length) {
+    const stripY = PAGE_H - 46
+    setC(doc, '#3f5c46', 'draw')
+    doc.setLineWidth(0.18)
+    doc.line(ML, stripY, ML + CW, stripY)
+    opts.footerStats.forEach((st) => {
+      const align = st.align ?? 'left'
+      const x = align === 'right' ? ML + CW : ML
+      setC(doc, '#8fb87f', 'text')
+      doc.setFont(FB(), 'bold')
+      doc.setFontSize(6.4)
+      spacedText(doc, st.label.toUpperCase(), x, stripY + 9, 0.3, { align })
+      setC(doc, '#ffffff', 'text')
+      doc.setFont(F(), 'normal')
+      doc.setFontSize(13)
+      spacedText(doc, st.value, x, stripY + 20, 0.2, { align })
+    })
   }
 }
 
@@ -757,7 +1111,12 @@ export async function exportReportToPdf(
   })
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 2 — EXECUTIVE SCORECARD
+  // PAGE 2 — EDITORIAL SPREAD (thesis / pull-quote page)
+  // ════════════════════════════════════════════════════════════════════════════
+  editorialSpread(pdf, context)
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // PAGE 3 — EXECUTIVE SCORECARD
   // ════════════════════════════════════════════════════════════════════════════
   pdf.addPage()
   pageBg(pdf)
@@ -790,7 +1149,7 @@ export async function exportReportToPdf(
   const gap = 0.4
   const bdr = 0.2
   const cellW = (CW - gap - 2 * bdr) / 2
-  const cellH = 33
+  const cellH = 40 // was 33 — too tight, crowded the divider against the unit text
   const gridH = cellH * 2 + gap + 2 * bdr
   const gridY = y
 
@@ -814,13 +1173,15 @@ export async function exportReportToPdf(
   pdf.setLineWidth(0.18)
   pdf.roundedRect(ML, gridY, CW, gridH, 2, 2, 'S')
 
-  // Tile content rendering helper
+  // Tile content rendering helper — vertical rhythm reworked so the divider
+  // sits clear of the unit text above it (was 1mm, nearly touching) and the
+  // sub-label has even breathing room on both sides of that divider.
   function tileContent(
     tx: number, ty: number, tw: number,
     label: string, value: string, unit: string, sub: string,
   ) {
-    const padX = 7.5 // ~22px
-    const padY = 7   // ~20px
+    const padX = 8
+    const padY = 9
     const ix = tx + padX
     const iy = ty + padY
 
@@ -834,23 +1195,23 @@ export async function exportReportToPdf(
     setC(pdf, INK, 'text')
     pdf.setFont(F(), 'normal') // weight 300 → normal
     pdf.setFontSize(19) // 26px
-    pdf.text(value, ix, iy + 10)
+    pdf.text(value, ix, iy + 11)
 
     // Unit — 11px #999
     setC(pdf, UNIT_C, 'text')
     pdf.setFont(FB(), 'bold')
     pdf.setFontSize(8.5) // 11px
-    pdf.text(unit, ix, iy + 15.5)
+    pdf.text(unit, ix, iy + 17)
 
     // Sub — divider + 9px #bbb uppercase, letter-spacing 0.06em
-    const subDivY = ty + cellH - 9.5
+    const subDivY = iy + 21
     setC(pdf, TRACK, 'draw')
     pdf.setLineWidth(0.18)
     pdf.line(ix, subDivY, tx + tw - padX, subDivY)
     setC(pdf, LABEL, 'text')
     pdf.setFont(F(), 'normal')
     pdf.setFontSize(7) // 9px
-    spacedText(pdf, sub.toUpperCase(), ix, subDivY + 4.5, 0.15) // 0.06em
+    spacedText(pdf, sub.toUpperCase(), ix, subDivY + 5.5, 0.15) // 0.06em
   }
 
   // Tile 1 — Total Annual Savings
@@ -890,14 +1251,14 @@ export async function exportReportToPdf(
 
   y = gridY + gridH + 4
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 3 — OPPORTUNITY ANALYSIS
-  // ════════════════════════════════════════════════════════════════════════════
-  pdf.addPage()
-  pageBg(pdf)
-  pageFooter(pdf)
-  y = 16
+  // ── Transition into Opportunity Analysis ──
+  y = ensureSpace(pdf, y, 26)
+  y = renderTransition(pdf, y, `These scores translate into a concrete set of opportunities, starting with the fastest path to measurable ROI.`)
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // OPPORTUNITY ANALYSIS
+  // ════════════════════════════════════════════════════════════════════════════
+  y = ensureSpace(pdf, y, 55)
   y = sectionLabel(pdf, y, 'Opportunity Analysis')
 
   y = renderNarrative(pdf, y, `Targeted automation offers immediate relief for your company/organization's core pain points in slow customer onboarding and repetitive content generation. Deploying quick wins can deliver tangible results in as little as 5 to 8 weeks. These initial initiatives directly address manual bottlenecks while requiring relatively low implementation effort. Securing these early operational victories will establish momentum for more complex, multi-step agent deployments in the future.`)
@@ -919,14 +1280,14 @@ export async function exportReportToPdf(
     }
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 4 — NEXT STEPS
-  // ════════════════════════════════════════════════════════════════════════════
-  pdf.addPage()
-  pageBg(pdf)
-  pageFooter(pdf)
-  y = 16
+  // ── Transition into Next Steps ──
+  y = ensureSpace(pdf, y, 26)
+  y = renderTransition(pdf, y, `Turning this analysis into results starts with a clear, sequenced set of actions.`)
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // NEXT STEPS
+  // ════════════════════════════════════════════════════════════════════════════
+  y = ensureSpace(pdf, y, 45)
   y = sectionLabel(pdf, y, 'Next Steps')
 
   // Dynamic content
@@ -953,20 +1314,24 @@ export async function exportReportToPdf(
 
 
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 5 — ROI PROJECTION
-  // ════════════════════════════════════════════════════════════════════════════
-  pdf.addPage()
-  pageBg(pdf)
-  pageFooter(pdf)
-  y = 16
+  // ── Transition into ROI Projection ──
+  y = ensureSpace(pdf, y, 26)
+  y = renderTransition(pdf, y, `Here is the financial case underpinning that sequence.`)
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // ROI PROJECTION
+  // ════════════════════════════════════════════════════════════════════════════
+  y = ensureSpace(pdf, y, 70)
   y = sectionLabel(pdf, y, 'ROI Projection')
 
   y = renderNarrative(pdf, y, `An initial AI infrastructure investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} is projected to generate a strong ${fmtPct(calculations.threeYearROIPercent)} three-year ROI and reclaim ${Math.round(calculations.hoursReclaimedPerYear || 0).toLocaleString()} hours of team capacity annually. The financial model indicates full payback in ${((calculations.paybackMonths || 0) / 12).toFixed(1)} years, driven by ${fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD)} in continuous annual savings. Crucially, delaying this deployment incurs a direct "cost of inaction" totaling ${fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR)} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`)
 
   // ── 3 primary metrics across top ──
-  const roiW = (CW - 1) / 3 // 0.5mm divider between
+  // gap gives each column breathing room on both sides of its divider —
+  // the previous 0.5mm gap let the divider run straight through the "3" of
+  // "3-YEAR ROI", a cramped/cheap-looking collision.
+  const roiGap = 6
+  const roiW = (CW - roiGap * 2) / 3
   const roiMetrics = [
     {
       l: 'Total Annual Savings',
@@ -988,7 +1353,7 @@ export async function exportReportToPdf(
 
   const roiTop = y
   roiMetrics.forEach((m, i) => {
-    const rx = ML + i * (roiW + 0.5)
+    const rx = ML + i * (roiW + roiGap)
 
     // Label — 8.5px #aaa
     setC(pdf, LABEL_A, 'text')
@@ -1008,11 +1373,12 @@ export async function exportReportToPdf(
     pdf.setFontSize(7)
     pdf.text(m.n, rx, roiTop + 18)
 
-    // Vertical divider between metrics
+    // Vertical divider between metrics — centred in the gap, clear of text
     if (i < roiMetrics.length - 1) {
       setC(pdf, TRACK, 'draw')
       pdf.setLineWidth(0.18)
-      pdf.line(rx + roiW + 0.25, roiTop - 2, rx + roiW + 0.25, roiTop + 20)
+      const dividerX = rx + roiW + roiGap / 2
+      pdf.line(dividerX, roiTop - 2, dividerX, roiTop + 20)
     }
   })
 
@@ -1141,14 +1507,14 @@ export async function exportReportToPdf(
     )
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 6 — DIAGNOSTIC CONTEXT
-  // ════════════════════════════════════════════════════════════════════════════
-  pdf.addPage()
-  pageBg(pdf)
-  pageFooter(pdf)
-  y = 16
+  // ── Transition into Diagnostic Context ──
+  y = ensureSpace(pdf, y, 26)
+  y = renderTransition(pdf, y, `These projections are grounded in the specific context your team described in this assessment.`)
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // DIAGNOSTIC CONTEXT
+  // ════════════════════════════════════════════════════════════════════════════
+  y = ensureSpace(pdf, y, 45)
   y = sectionLabel(pdf, y, 'Diagnostic Context')
 
   const ctxRows: [string, string][] = [
@@ -1192,21 +1558,21 @@ export async function exportReportToPdf(
   })
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 7 — ROOM FOR IMPROVEMENT + RISK REGISTER
+  // ROOM FOR IMPROVEMENT + RISK REGISTER
   // ════════════════════════════════════════════════════════════════════════════
   if (Array.isArray(roomForImprovement) && roomForImprovement.length > 0) {
-    pdf.addPage()
-    pageBg(pdf)
-    pageFooter(pdf)
-    y = 16
+    // ── Transition into Room for Improvement ──
+    y = ensureSpace(pdf, y, 26)
+    y = renderTransition(pdf, y, `Against that context, this is where the greatest friction and opportunity lie.`)
 
+    y = ensureSpace(pdf, y, 55)
     y = sectionLabel(pdf, y, 'Room for Improvement')
 
     const gap = (context.quantitative.targetAutomationPct ?? 0) - (context.quantitative.currentAutomationPct ?? 0)
     y = renderNarrative(pdf, y, `Your company/organization currently maintains ${context.quantitative.currentAutomationPct ?? 0}% automation coverage against a strategic target of ${context.quantitative.targetAutomationPct ?? 0}%. This ${gap}% gap represents the manual effort continuously wasted on routine data entry and unoptimized tasks. Closing this deficit requires standardizing undocumented core workflows, which is the root cause of the lower Process score. Bridging this gap will ensure consistent, reliable inputs for AI agents and drastically reduce ongoing operational friction.`)
 
     roomForImprovement.forEach((item) => {
-      if (y > PAGE_H - 60) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
+      y = ensureSpace(pdf, y, measureImprovementBlockHeight(pdf, item))
       y = improvementBlock(pdf, item, y)
     })
 
@@ -1303,6 +1669,44 @@ export async function exportReportToPdf(
       }
       y += Math.max(rl.length * 4.5 + 6, 8) + (risk.source ? 5 : 0)
     })
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // CLOSING NOTE — synthesizes the report into a single closing statement
+  // before the back cover, so the document ends on a narrated conclusion
+  // rather than stopping mid-data on the last risk row.
+  // ════════════════════════════════════════════════════════════════════════════
+  pdf.addPage()
+  pageBg(pdf)
+  pageFooter(pdf)
+  y = 16
+
+  y = sectionLabel(pdf, y, 'Closing Note')
+
+  const companyLabel = context.company || 'Your organization'
+  const gapPct = (context.quantitative.targetAutomationPct ?? 0) - (context.quantitative.currentAutomationPct ?? 0)
+  const closingTopOpp = opportunities[0]
+  const closingSavings = fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD)
+
+  y = renderNarrative(pdf, y, `${companyLabel} enters this next phase with a composite readiness score of ${Math.round(scores.composite)}, a "${scores.maturityLevel}" foundation strong enough to move from isolated wins to systemic execution. The path forward is not abstract: it starts with ${closingTopOpp ? closingTopOpp.title.toLowerCase() : 'the highest-impact opportunity identified in this assessment'}${gapPct > 0 ? `, and closes the ${gapPct}% automation gap` : ''} one phase at a time. Every figure in this report traces back to the answers your team provided, and every recommendation is sized to what is realistically achievable within the next planning cycle.`)
+
+  y += 2
+  y = renderNarrative(pdf, y, `None of this requires a leap of faith. The next step is simply to turn this diagnostic into a deployment plan, and begin compounding the ${closingSavings} in annual savings this analysis identified.`)
+
+  y += 6
+  thinDiv(pdf, y)
+  y += 8
+  setC(pdf, SEC_LBL, 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(9.5)
+  pdf.text('Warmly, The Aivory Team', ML, y)
+
+  // Aivory signature (grey, colour-adjusted for the light page) closing the
+  // document — inline asset, cannot fail.
+  {
+    const sigW = 46
+    const sigH = sigW * (62.9 / 498.7)
+    pdf.addImage(SIGNATURE_DARK, 'PNG', ML, y + 6, sigW, sigH, undefined, 'FAST')
   }
 
   // ════════════════════════════════════════════════════════════════════════════
