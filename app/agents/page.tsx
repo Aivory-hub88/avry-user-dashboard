@@ -18,6 +18,8 @@ import {
 } from '@/lib/slackDeploy';
 import { listAgentActions, AgentAction } from '@/lib/agentActions';
 import { listDeployments, deleteDeployment, AgentDeployment } from '@/lib/agentChat';
+import { getCredits, CreditStatus } from '@/lib/agentProfiles';
+import CustomizeAgentModal from '@/components/agents/CustomizeAgentModal';
 
 const NoiseOverlay = () => (
   <>
@@ -611,7 +613,7 @@ function DeploymentRow({ deployment, onDisconnect }: { deployment: AgentDeployme
   );
 }
 
-function AgentCard({ agent, deployments, onDeploy, onDisconnect }: { agent: typeof AGENTS[0], deployments: AgentDeployment[], onDeploy: () => void, onDisconnect: (d: AgentDeployment) => void }) {
+function AgentCard({ agent, deployments, onDeploy, onCustomize, onDisconnect }: { agent: typeof AGENTS[0], deployments: AgentDeployment[], onDeploy: () => void, onCustomize?: () => void, onDisconnect: (d: AgentDeployment) => void }) {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -706,16 +708,28 @@ function AgentCard({ agent, deployments, onDeploy, onDisconnect }: { agent: type
           </div>
         )}
 
-        <div className="mt-auto pt-5">
+        <div className="mt-auto pt-5 flex items-center gap-2">
           <button
             onClick={onDeploy}
-            className="w-full py-2 rounded-lg bg-gradient-to-b from-white/[0.09] to-white/[0.03] hover:from-[#b7cba6]/25 hover:to-[#b7cba6]/10 text-white/95 hover:text-white text-[12.5px] font-medium transition-all border border-white/10 hover:border-[#b7cba6]/30 shadow-[0_1px_0_rgba(255,255,255,0.08)_inset,0_4px_12px_rgba(0,0,0,0.25)] flex items-center justify-center gap-2 group/btn"
+            className="flex-1 py-2 rounded-lg bg-gradient-to-b from-white/[0.09] to-white/[0.03] hover:from-[#b7cba6]/25 hover:to-[#b7cba6]/10 text-white/95 hover:text-white text-[12.5px] font-medium transition-all border border-white/10 hover:border-[#b7cba6]/30 shadow-[0_1px_0_rgba(255,255,255,0.08)_inset,0_4px_12px_rgba(0,0,0,0.25)] flex items-center justify-center gap-2 group/btn"
           >
             Deploy
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover/btn:opacity-100 group-hover/btn:translate-x-0 transition-all duration-200">
               <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
             </svg>
           </button>
+          {onCustomize && (
+            <button
+              onClick={onCustomize}
+              title="Customize this agent's identity"
+              className="shrink-0 px-3 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.09] text-white/55 hover:text-white/90 text-[12.5px] font-medium transition-all border border-white/10 hover:border-white/20 flex items-center justify-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -846,8 +860,37 @@ function AgentActivity() {
   );
 }
 
+function CreditsPill() {
+  const [credits, setCredits] = useState<CreditStatus | null>(null);
+  useEffect(() => {
+    getCredits().then(setCredits).catch(() => {});
+  }, []);
+  if (!credits) return null;
+  const low = !credits.unlimited && credits.balance !== null && credits.allowance
+    ? credits.balance / credits.allowance < 0.15
+    : false;
+  return (
+    <span
+      title="AI message credits for your deployed agents this month"
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium ${
+        low
+          ? 'bg-[#e8b96a]/[0.08] border-[#e8b96a]/25 text-[#e8b96a]/90'
+          : 'bg-white/[0.04] border-white/[0.08] text-white/60'
+      }`}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-3 h-3 text-[#b7cba6]/90">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+      </svg>
+      {credits.unlimited
+        ? 'Credits: unlimited'
+        : `Credits: ${credits.balance ?? 0} / ${credits.allowance ?? 0}`}
+    </span>
+  );
+}
+
 export default function AgentsPage() {
   const [deployingAgent, setDeployingAgent] = useState<{ title: string, agentType: TelegramAgentType | null } | null>(null);
+  const [customizingAgent, setCustomizingAgent] = useState<{ title: string, agentType: TelegramAgentType } | null>(null);
   const [dynamicAgents, setDynamicAgents] = useState<any[]>([]);
   const [deployments, setDeployments] = useState<AgentDeployment[]>([]);
 
@@ -893,6 +936,7 @@ export default function AgentsPage() {
           <div className="text-[13px] font-light text-[#a1a1aa] flex items-center gap-2">
             <span className="text-white">Agent</span>
           </div>
+          <CreditsPill />
         </div>
 
         {/* Hero Banner */}
@@ -909,6 +953,7 @@ export default function AgentsPage() {
               agent={agent}
               deployments={deployments.filter((d) => d.agentType === (agent as any).agentType)}
               onDeploy={() => setDeployingAgent({ title: agent.title, agentType: (agent as any).agentType ?? null })}
+              onCustomize={(agent as any).agentType ? () => setCustomizingAgent({ title: agent.title, agentType: (agent as any).agentType }) : undefined}
               onDisconnect={handleDisconnect}
             />
           ))}
@@ -925,6 +970,14 @@ export default function AgentsPage() {
         onClose={() => { setDeployingAgent(null); refreshDeployments(); }}
         agentName={deployingAgent?.title ?? null}
         agentType={deployingAgent?.agentType ?? null}
+      />
+
+      {/* Customize identity modal */}
+      <CustomizeAgentModal
+        isOpen={!!customizingAgent}
+        onClose={() => setCustomizingAgent(null)}
+        agentName={customizingAgent?.title ?? null}
+        agentType={customizingAgent?.agentType ?? null}
       />
     </div>
   );
