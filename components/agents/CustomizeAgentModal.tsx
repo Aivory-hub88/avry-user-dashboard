@@ -25,8 +25,10 @@ const FIELD_LIMITS = {
   greeting: 300,
 } as const;
 
+type Option = { value: string; label: string };
+
 // Stored in language_pref as a comma-separated string, e.g. "Indonesian, English"
-const LANGUAGES = [
+const LANGUAGES: Option[] = [
   { value: 'English', label: 'English' },
   { value: 'Indonesian', label: 'Indonesian' },
   { value: 'Arabic', label: 'Arabic' },
@@ -40,8 +42,25 @@ const LANGUAGES = [
   { value: 'Italian', label: 'Italian' },
 ];
 
-function parseLanguages(saved: string): string[] {
-  const known = new Map(LANGUAGES.map((l) => [l.value.toLowerCase(), l.value]));
+// Stored in tone as a comma-separated string; values read naturally in the
+// agent's prompt ("Tone of voice: Friendly, Direct & concise").
+const TONES: Option[] = [
+  { value: 'Friendly', label: 'Friendly' },
+  { value: 'Professional', label: 'Professional' },
+  { value: 'Casual', label: 'Casual' },
+  { value: 'Formal', label: 'Formal' },
+  { value: 'Warm', label: 'Warm' },
+  { value: 'Empathetic', label: 'Empathetic' },
+  { value: 'Playful', label: 'Playful' },
+  { value: 'Direct & concise', label: 'Direct & concise' },
+  { value: 'Enthusiastic', label: 'Enthusiastic' },
+  { value: 'Calm & patient', label: 'Calm & patient' },
+  { value: 'Persuasive', label: 'Persuasive' },
+  { value: 'Premium & polished', label: 'Premium & polished' },
+];
+
+function parseSelection(saved: string, options: Option[]): string[] {
+  const known = new Map(options.map((o) => [o.value.toLowerCase(), o.value]));
   return saved
     .split(',')
     .map((s) => known.get(s.trim().toLowerCase()))
@@ -106,11 +125,15 @@ function Field({
   );
 }
 
-function LanguageMultiSelect({
-  selected, onChange,
+function MultiSelect({
+  label, placeholder, options, selected, onChange, max,
 }: {
+  label: string;
+  placeholder: string;
+  options: Option[];
   selected: string[];
-  onChange: (langs: string[]) => void;
+  onChange: (values: string[]) => void;
+  max?: number;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -124,15 +147,23 @@ function LanguageMultiSelect({
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
+  const atMax = max !== undefined && selected.length >= max;
+
   const toggle = (value: string) => {
-    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
+    if (selected.includes(value)) {
+      onChange(selected.filter((v) => v !== value));
+    } else if (!atMax) {
+      onChange([...selected, value]);
+    }
   };
 
   return (
     <div ref={wrapRef} className="relative">
       <div className="flex items-baseline justify-between mb-1.5">
-        <label className="text-white/70 text-[12px] font-medium">Preferred languages</label>
-        {selected.length > 0 && <span className="text-[10px] text-white/25">{selected.length} selected</span>}
+        <label className="text-white/70 text-[12px] font-medium">{label}</label>
+        <span className={`text-[10px] ${atMax ? 'text-[#e8b96a]/80' : 'text-white/25'}`}>
+          {selected.length > 0 ? `${selected.length}${max ? `/${max}` : ''} selected` : max ? `up to ${max}` : ''}
+        </span>
       </div>
       <button
         type="button"
@@ -140,7 +171,7 @@ function LanguageMultiSelect({
         className={`${inputClass} flex items-center justify-between gap-2 text-left cursor-pointer`}
       >
         {selected.length === 0 ? (
-          <span className="text-white/25">Any language (auto-detect)</span>
+          <span className="text-white/25">{placeholder}</span>
         ) : (
           <span className="flex flex-wrap gap-1.5 min-w-0">
             {selected.map((v) => (
@@ -169,23 +200,25 @@ function LanguageMultiSelect({
       </button>
       {open && (
         <div className="absolute z-20 mt-1.5 w-full max-h-52 overflow-y-auto rounded-lg bg-[#2e2e2e] border border-white/12 shadow-xl py-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-          {LANGUAGES.map((lang) => {
-            const checked = selected.includes(lang.value);
+          {options.map((option) => {
+            const checked = selected.includes(option.value);
+            const disabled = !checked && atMax;
             return (
               <button
-                key={lang.value}
+                key={option.value}
                 type="button"
-                onClick={() => toggle(lang.value)}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-[13px] text-white/80 hover:bg-white/[0.06] transition-colors"
+                onClick={() => toggle(option.value)}
+                disabled={disabled}
+                className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-[13px] transition-colors ${disabled ? 'text-white/25 cursor-not-allowed' : 'text-white/80 hover:bg-white/[0.06]'}`}
               >
-                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${checked ? 'bg-[#b7cba6]/80 border-[#b7cba6]' : 'border-white/25'}`}>
+                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${checked ? 'bg-[#b7cba6]/80 border-[#b7cba6]' : disabled ? 'border-white/10' : 'border-white/25'}`}>
                   {checked && (
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="#242424" className="w-3 h-3">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                     </svg>
                   )}
                 </span>
-                {lang.label}
+                {option.label}
               </button>
             );
           })}
@@ -302,9 +335,19 @@ export default function CustomizeAgentModal({
                 <Field label="Agent name" value={fields.agent_name} limit={FIELD_LIMITS.agent_name} onChange={set('agent_name')} placeholder="e.g. Sari" />
                 <Field label="Business name" value={fields.business_name} limit={FIELD_LIMITS.business_name} onChange={set('business_name')} placeholder="e.g. Toko Baju Melati" />
               </div>
-              <Field label="Tone of voice" value={fields.tone} limit={FIELD_LIMITS.tone} onChange={set('tone')} placeholder="e.g. warm, casual, uses everyday language" />
-              <LanguageMultiSelect
-                selected={parseLanguages(fields.language_pref)}
+              <MultiSelect
+                label="Tone of voice"
+                placeholder="Default tone (warm & helpful)"
+                options={TONES}
+                max={3}
+                selected={parseSelection(fields.tone, TONES)}
+                onChange={(tones) => set('tone')(tones.join(', '))}
+              />
+              <MultiSelect
+                label="Preferred languages"
+                placeholder="Any language (auto-detect)"
+                options={LANGUAGES}
+                selected={parseSelection(fields.language_pref, LANGUAGES)}
                 onChange={(langs) => set('language_pref')(langs.join(', '))}
               />
               <Field
