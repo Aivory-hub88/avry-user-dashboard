@@ -15,11 +15,14 @@ import { WorkflowGenerationModal } from '@/components/workflow/WorkflowGeneratio
 import { retrieveWorkflowSpec, clearWorkflowSpec, convertHandoffToNodes } from '@/lib/workflowHandoff'
 import { StandardNodePalette } from '@/components/workflow/StandardNodePalette'
 import { DynamicNodePalette } from '@/components/workflow/DynamicNodePalette'
-import { clearCanvasState } from '@/hooks/useCanvasPersistence'
+import { clearCanvasState, loadCanvasState } from '@/hooks/useCanvasPersistence'
+import { reactFlowToN8n } from '@/lib/n8nMapper'
 import { ActivationModal } from '@/components/workflow/ActivationModal'
 import { saveCredentials, N8nCredentials } from '@/lib/workflows/credentialStore'
 import { detectNodeIntent } from '@/lib/workflows/nodeMapper'
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
+import { fetchTemplateById } from '@/lib/templates/resolveTemplate'
+import { templateToCanvas } from '@/lib/templates/templateToCanvas'
 import type { AivoryWorkflowSpec } from '@/types/workflow'
 import { useRouterContext } from '@/contexts/RouterContext'
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole'
@@ -344,7 +347,7 @@ function RightPanel({
       JSON.parse(value)
       setJsonError('')
     } catch {
-      setJsonError('Format JSON tidak valid')
+      setJsonError('Invalid JSON format')
     }
   }
 
@@ -397,7 +400,7 @@ function RightPanel({
           )}
         </div>
         <span className={styles.fieldHelperText}>
-          Ceritakan apa yang terjadi di langkah ini dengan kalimat biasa. Contoh: 'Ambil data klien dari Salesforce ketika ada onboarding baru masuk.'
+          Describe what happens in this step in plain language. Example: 'Fetch client data from Salesforce when a new onboarding comes in.'
         </span>
         <textarea className={styles.fieldTextarea} value={action} onChange={e => setAction(e.target.value)} rows={3} />
         
@@ -405,13 +408,13 @@ function RightPanel({
           <>
             <label className={styles.fieldLabel}>{t('toolService')}</label>
             <span className={styles.fieldHelperText}>
-              Tulis nama tool atau API yang dipakai. Contoh: 'Salesforce REST API', 'SendGrid v3', 'SharePoint Graph API', atau 'HTTP Custom API'.
+              Enter the tool or API used. Example: 'Salesforce REST API', 'SendGrid v3', 'SharePoint Graph API', or 'HTTP Custom API'.
             </span>
             <input className={styles.fieldInput} value={tool} onChange={e => setTool(e.target.value)} placeholder="e.g. Google Sheets, OpenAI, Slack" />
             
             <label className={styles.fieldLabel}>{t('whatProduces')}</label>
             <span className={styles.fieldHelperText}>
-              Tulis output yang dihasilkan langkah ini. Contoh: 'Data klien lengkap dalam format JSON, siap diproses ke langkah berikutnya.'
+              Describe the output this step produces. Example: 'Complete client data in JSON format, ready for the next step.'
             </span>
             <input className={styles.fieldInput} value={output} onChange={e => setOutput(e.target.value)} placeholder="e.g. Enriched lead record" />
 
@@ -450,7 +453,7 @@ function RightPanel({
                 <div className={styles.credField}>
                   <label className={styles.credFieldLabel}>{t('integration')}</label>
                   <span className={styles.credFieldHelper}>
-                    Pilih sistem yang digunakan. Kalau tidak ada di list, pilih 'Custom'.
+                    Select the system being used. If it's not in the list, choose 'Custom'.
                   </span>
                   <select 
                     className={styles.credSelect}
@@ -476,7 +479,7 @@ function RightPanel({
                 <div className={styles.credField}>
                   <label className={styles.credFieldLabel}>{t('apiUrl')}</label>
                   <span className={styles.credFieldHelper}>
-                    Masukkan URL lengkap endpoint API yang akan dipanggil. Contoh: https://api.salesforce.com/v54/sobjects/Contact
+                    Enter the full URL of the API endpoint to call. Example: https://api.salesforce.com/v54/sobjects/Contact
                   </span>
                   <input 
                     className={styles.credInput}
@@ -492,7 +495,7 @@ function RightPanel({
                   <div className={styles.credField}>
                     <label className={styles.credFieldLabel}>{t('httpMethod')}</label>
                     <span className={styles.credFieldHelper}>
-                      Pilih metode request yang dipakai API ini.
+                      Select the request method this API uses.
                     </span>
                     <select 
                       className={styles.credSelect}
@@ -512,7 +515,7 @@ function RightPanel({
                 <div className={styles.credField}>
                   <label className={styles.credFieldLabel}>{t('apiKeyOrToken')}</label>
                   <span className={styles.credFieldHelper}>
-                    Masukkan API key atau Bearer token. Credential ini hanya disimpan di browser kamu — tidak dikirim ke server Aivory.
+                    Enter an API key or Bearer token. This credential is only stored in your browser — it is never sent to Aivory servers.
                   </span>
                   <div className={styles.apiKeyRow}>
                     <input 
@@ -520,13 +523,13 @@ function RightPanel({
                       type={showApiKeyPassword ? 'text' : 'password'}
                       value={apiKey}
                       onChange={e => setApiKey(e.target.value)}
-                      placeholder="sk-xxxx atau Bearer eyJhbGc..."
+                      placeholder="sk-xxxx or Bearer eyJhbGc..."
                     />
                     <button 
                       className={styles.toggleVisBtn}
                       onClick={() => setShowApiKeyPassword(!showApiKeyPassword)}
                     >
-                      {showApiKeyPassword ? 'Sembunyikan' : 'Tampilkan'}
+                      {showApiKeyPassword ? 'Hide' : 'Show'}
                     </button>
                   </div>
                 </div>
@@ -535,14 +538,14 @@ function RightPanel({
                 <div className={styles.credField}>
                   <label className={styles.credFieldLabel}>{t('credentialName')}</label>
                   <span className={styles.credFieldHelper}>
-                    Beri nama supaya Aivory bisa mereferensikannya saat membangun workflow. Contoh: 'Salesforce Production'.
+                    Give it a name so Aivory can reference it when building workflows. Example: 'Salesforce Production'.
                   </span>
                   <input 
                     className={styles.credInput}
                     type="text"
                     value={credName}
                     onChange={e => setCredName(e.target.value)}
-                    placeholder="contoh: Salesforce Production"
+                    placeholder="e.g. Salesforce Production"
                   />
                 </div>
 
@@ -552,12 +555,12 @@ function RightPanel({
                     className={styles.subSectionHeader}
                     onClick={() => setShowParamSection(!showParamSection)}
                   >
-                    PARAMETER TAMBAHAN (OPSIONAL) {showParamSection ? '›' : '›'}
+                    ADDITIONAL PARAMETERS (OPTIONAL) {showParamSection ? '›' : '›'}
                   </div>
                   {showParamSection && (
                     <>
                       <span className={styles.credFieldHelper}>
-                        Tambahkan parameter custom dalam format JSON. Contoh: {'{'}  "timeout": 30, "version": "v2" {'}'}
+                        Add custom parameters in JSON format. Example: {'{'}  "timeout": 30, "version": "v2" {'}'}
                       </span>
                       <textarea 
                         className={styles.credTextarea}
@@ -773,6 +776,27 @@ function WorkflowsPageInner() {
     }
   }, [])
 
+  // Apply a marketplace template to a brand-new workflow canvas
+  // (?applyTemplate=<id>, set by the "Try it" button on /templates/[id]).
+  useEffect(() => {
+    const templateId = searchParams?.get('applyTemplate')
+    if (!templateId) return
+
+    const url = new URL(window.location.href)
+    url.searchParams.delete('applyTemplate')
+    window.history.replaceState({}, '', url.toString())
+
+    ;(async () => {
+      const template = await fetchTemplateById(templateId)
+      if (!template) {
+        showToast('Template not found', 'error')
+        return
+      }
+      const { nodes, edges } = templateToCanvas(template)
+      await handleGenerationApply(nodes, edges)
+    })()
+  }, [])
+
   // Auto-select first API workflow once loaded (if nothing selected yet)
   useEffect(() => {
     if (!selectedId && apiWorkflows.length > 0) {
@@ -961,13 +985,27 @@ function WorkflowsPageInner() {
       // Persist credentials to chosen storage
       saveCredentials(credentials)
 
+      // Build the n8n workflow JSON from the current canvas so the deployed
+      // workflow carries the node configs (inspector / setup copilot edits).
+      // Without this, the activate route falls back to a bare placeholder.
+      const canvas = loadCanvasState(selected.workflow_id)
+      const workflow_json = canvas && canvas.nodes.length > 0
+        ? {
+            ...reactFlowToN8n(canvas.nodes as any, canvas.edges as any, {
+              name: selected.title, nodes: [], connections: {}, settings: {},
+            } as any),
+            name: selected.title,
+          }
+        : undefined
+
       // POST to activate route with user-provided n8n credentials
-      const res = await fetch('/api/workflows/activate', {
+      // (asset() prefixes the /dashboard basePath — Next serves API routes there)
+      const res = await fetch(asset('/api/workflows/activate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workflow_id: selected.workflow_id,
-          workflow_data: selected,
+          workflow_data: { ...selected, ...(workflow_json ? { workflow_json } : {}) },
           n8n_instance_url: credentials.instanceUrl,
           n8n_api_key: credentials.apiKey,
         }),
