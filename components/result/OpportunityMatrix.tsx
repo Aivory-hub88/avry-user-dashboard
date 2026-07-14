@@ -54,9 +54,26 @@ export default function OpportunityMatrix({ opportunities, highlightedId, onDotC
         aria-label="Opportunity priority matrix"
         role="img"
       >
+        <defs>
+          <filter id="oppDotGlow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="2.2" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* Quadrant tint washes — reads the matrix at a glance before any
+            data point is even considered: green=best, red=worst. */}
+        <rect className={styles.quadQuickWin} x={PLOT_LEFT} y={PLOT_TOP} width={MID_X - PLOT_LEFT} height={MID_Y - PLOT_TOP} />
+        <rect className={styles.quadMajorProject} x={MID_X} y={PLOT_TOP} width={PLOT_RIGHT - MID_X} height={MID_Y - PLOT_TOP} />
+        <rect className={styles.quadFillIn} x={PLOT_LEFT} y={MID_Y} width={MID_X - PLOT_LEFT} height={PLOT_BOTTOM - MID_Y} />
+        <rect className={styles.quadThankless} x={MID_X} y={MID_Y} width={PLOT_RIGHT - MID_X} height={PLOT_BOTTOM - MID_Y} />
+
         {/* Axes */}
-        <line x1={PLOT_LEFT} y1={PLOT_BOTTOM} x2={PLOT_RIGHT} y2={PLOT_BOTTOM} stroke="#ffffff" strokeWidth="0.5" />
-        <line x1={PLOT_LEFT} y1={PLOT_TOP} x2={PLOT_LEFT} y2={PLOT_BOTTOM} stroke="#ffffff" strokeWidth="0.5" />
+        <line x1={PLOT_LEFT} y1={PLOT_BOTTOM} x2={PLOT_RIGHT} y2={PLOT_BOTTOM} className={styles.axis} />
+        <line x1={PLOT_LEFT} y1={PLOT_TOP} x2={PLOT_LEFT} y2={PLOT_BOTTOM} className={styles.axis} />
 
         {/* Axis labels */}
         <text className={styles.axisLabel} x={(PLOT_LEFT + PLOT_RIGHT) / 2} y={310}>
@@ -76,10 +93,10 @@ export default function OpportunityMatrix({ opportunities, highlightedId, onDotC
         <line className={styles.divider} x1={PLOT_LEFT} y1={MID_Y} x2={PLOT_RIGHT} y2={MID_Y} />
 
         {/* Quadrant labels */}
-        <text className={styles.quadrantLabel} x={PLOT_LEFT + 6} y={PLOT_TOP + 14}>Quick Win</text>
-        <text className={styles.quadrantLabel} x={MID_X + 6} y={PLOT_TOP + 14}>Major Project</text>
-        <text className={styles.quadrantLabel} x={PLOT_LEFT + 6} y={MID_Y + 14}>Fill In</text>
-        <text className={styles.quadrantLabel} x={MID_X + 6} y={MID_Y + 14}>Thankless Task</text>
+        <text className={`${styles.quadrantLabel} ${styles.labelQuickWin}`} x={PLOT_LEFT + 8} y={PLOT_TOP + 16}>Quick Win</text>
+        <text className={`${styles.quadrantLabel} ${styles.labelNeutral}`} x={MID_X + 8} y={PLOT_TOP + 16}>Major Project</text>
+        <text className={`${styles.quadrantLabel} ${styles.labelNeutral}`} x={PLOT_LEFT + 8} y={MID_Y + 16}>Fill In</text>
+        <text className={`${styles.quadrantLabel} ${styles.labelThankless}`} x={MID_X + 8} y={MID_Y + 16}>Thankless Task</text>
 
         {/* Dots — each opportunity gets a distinct color */}
         {opportunities.map((opp, idx) => {
@@ -109,6 +126,7 @@ export default function OpportunityMatrix({ opportunities, highlightedId, onDotC
               stroke={isHighlighted ? '#fff' : '#262623'}
               strokeWidth={isHighlighted ? 2 : 1.5}
               opacity={isHighlighted ? 1 : 0.85}
+              filter="url(#oppDotGlow)"
               style={{ cursor: 'pointer' }}
             />
           )

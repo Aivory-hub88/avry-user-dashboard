@@ -1,7 +1,7 @@
 // @ts-nocheck
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { BlueprintV1, BlueprintV1WorkflowModule } from '@/types/blueprint'
@@ -9,6 +9,7 @@ import { saveWorkflow } from '@/hooks/useWorkflows'
 import { useRouterContext } from '@/contexts/RouterContext'
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole'
 import BlueprintHeader from '@/components/blueprint/BlueprintHeader'
+import ScoreRing from '@/components/result/ScoreRing'
 import styles from './blueprint.module.css'
 import { exportBlueprintPDF, exportBlueprintDOCX } from '@/lib/blueprintExport'
 import { useTranslations } from 'next-intl'
@@ -283,6 +284,24 @@ function coerceList(value: any): string[] {
   return (single && !isCorruptedString(single)) ? [single] : []
 }
 
+// Product/tool names bolded inline wherever architecture text mentions them,
+// so the reader can pick out WHAT builds/runs each stage at a glance.
+const PRODUCT_TERMS = [
+  'Aivory Workflow Builder', 'Aivory Console', 'AI Console', 'Aivory Agents',
+  'Deep Diagnostic', 'AI System Blueprint', 'Implementation Roadmap', 'n8n',
+]
+const PRODUCT_TERMS_RE = new RegExp(`(${PRODUCT_TERMS.join('|')})`, 'g')
+
+function boldProducts(text: string): React.ReactNode {
+  const parts = text.split(PRODUCT_TERMS_RE)
+  if (parts.length === 1) return text
+  return parts.map((part, i) =>
+    PRODUCT_TERMS.includes(part)
+      ? <strong key={i} style={{ color: '#e8e8e2', fontWeight: 600 }}>{part}</strong>
+      : part
+  )
+}
+
 // Pull a numeric readiness score out of whatever shape the backend returns.
 // Handles: number, numeric string ("80"), "80/100", or text containing "Score: 80".
 function coerceScore(value: any, fallback = 0): number {
@@ -430,7 +449,9 @@ function mapBlueprintToInsights(bp: any) {
       metric: coerceToString(k?.metric, 'Metric'),
       current: coerceToString(k?.current, 'Baseline'),
       target: coerceToString(k?.target, '—'),
-      impact: coerceToString(k?.impact ?? k?.target, '—'),
+      // Never mirror the target into the impact column — older blueprints
+      // without expected_impact show an em dash instead of a duplicate.
+      impact: coerceToString(k?.expected_impact ?? k?.impact, '—'),
     })).concat(BLUEPRINT_INSIGHTS.metrics.slice((Array.isArray(strategic.kpi_targets) ? strategic.kpi_targets : []).length)),
     currentState: {
       summary: `Your company is at ${maturity} maturity with an AI readiness score of ${score}/100.`,
@@ -453,7 +474,11 @@ function mapBlueprintToInsights(bp: any) {
       name: coerceToString(w?.name, `Wave ${i + 1}`),
       timeline: i === 0 ? '0–3 months' : '3–12 months',
       impact: coerceToString(w?.notes, ''),
-      deliverables: coerceList(w?.included_workflows),
+      // Resolve workflow ids (e.g. "wfm-001") to human-readable names.
+      deliverables: coerceList(w?.included_workflows).map((wf: string) => {
+        const byId = (Array.isArray(bp.workflow_modules) ? bp.workflow_modules : []).find((m: any) => m?.workflow_id === wf)
+        return byId?.name || wf
+      }),
       owner: 'Led by AI Champion team',
     })).concat(BLUEPRINT_INSIGHTS.roadmap.slice((Array.isArray(bp.deployment_plan?.waves) ? bp.deployment_plan.waves : []).length)),
     risks: [
@@ -468,7 +493,35 @@ function mapBlueprintToInsights(bp: any) {
         actions: coerceList(risk.mitigation_strategies).slice(0, 2),
       })),
     ].slice(0, 3),
-    actions: BLUEPRINT_INSIGHTS.actions,
+    // Derive the 30–90 day checklist from the blueprint itself (wave 1
+    // workflows + top mitigation) instead of static sample actions that
+    // referenced systems the client may not even use (SAP, etc.).
+    actions: (() => {
+      const wfModules = Array.isArray(bp.workflow_modules) ? bp.workflow_modules : []
+      const wave1 = Array.isArray(bp.deployment_plan?.waves) ? bp.deployment_plan.waves[0] : null
+      const wave1Names = coerceList(wave1?.included_workflows).map((wf: string) => {
+        const byId = wfModules.find((m: any) => m?.workflow_id === wf)
+        return byId?.name || wf
+      })
+      const derived: { label: string; owner: string; deadline: string }[] = [
+        {
+          label: 'Review this Blueprint with leadership and confirm Wave 1 scope',
+          owner: 'Leadership + AI Champion',
+          deadline: 'Within 2 weeks',
+        },
+        ...wave1Names.slice(0, 3).map((name: string, i: number) => ({
+          label: `Build & deploy: ${name}`,
+          owner: 'AI Champion + Operations',
+          deadline: i === 0 ? 'Within 30 days' : 'Within 60 days',
+        })),
+      ]
+      const mitigation = coerceList(risk.mitigation_strategies)[0]
+      if (mitigation) {
+        derived.push({ label: mitigation, owner: 'Operations Lead', deadline: 'Within 90 days' })
+      }
+      // Static sample checklist only when the blueprint gave us nothing to derive from.
+      return wave1Names.length > 0 ? derived : BLUEPRINT_INSIGHTS.actions
+    })(),
   }
 }
 
@@ -496,9 +549,6 @@ function BlueprintInsightsSection({
   onViewWorkflows,
 }: InsightsSectionProps & { blueprint?: any }) {
   const s = mapBlueprintToInsights(blueprint)
-  // stroke-dashoffset for 55/100: circumference=251.2, offset = 251.2*(1-0.55) = 113.04
-  const circumference = 251.2
-  const offset = circumference * (1 - s.score / 100)
 
   function ArchIcon({ type }: { type: string }) {
     if (type === 'database') return <IconDatabase />
@@ -511,22 +561,14 @@ function BlueprintInsightsSection({
     <section className={styles.insightsSection}>
       <h2 className={styles.insightsSectionTitle}>AI Blueprint Insights</h2>
 
-      {/* Card 1 — Readiness Score */}
+      {/* Card 1 — Readiness Score. Reuses the same ScoreRing component as
+          the Deep Diagnostic report (gradient arc, halo, tick marks, Doto
+          Bold center number) so the score reads identically across both
+          surfaces instead of a separately hand-rolled ring/font. */}
       <div className={styles.heroCard}>
         <div className={styles.heroScoreRow}>
-          <div className={styles.heroRing} aria-label={`AI Readiness Score: ${s.score} out of 100`}>
-            <svg className={styles.heroRingSvg} viewBox="0 0 96 96">
-              <circle className={styles.heroRingBg} cx="48" cy="48" r="40" />
-              <circle
-                className={styles.heroRingFill}
-                cx="48" cy="48" r="40"
-                style={{ strokeDashoffset: offset }}
-              />
-            </svg>
-            <div className={styles.heroRingLabel}>
-              <span className={styles.heroRingScore}>{s.score}</span>
-              <span className={styles.heroRingMax}>/100</span>
-            </div>
+          <div className={styles.heroRingWrap}>
+            <ScoreRing score={s.score} maturityLevel={s.maturity} />
           </div>
           <div className={styles.heroScoreInfo}>
             <h3 className={styles.heroScoreTitle}>AI Blueprint Readiness Score</h3>
@@ -591,7 +633,7 @@ function BlueprintInsightsSection({
           <span className={styles.insightSubheading}>Highlights</span>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {s.currentState.highlights.map((h, i) => (
-              <li key={i} style={{ fontSize: '0.875rem', color: '#888', paddingLeft: 14, position: 'relative', lineHeight: 1.5 }}>
+              <li key={i} style={{ fontSize: '0.875rem', color: '#c6c6bf', paddingLeft: 14, position: 'relative', lineHeight: 1.5 }}>
                 <span style={{ position: 'absolute', left: 0, color: '#b7cba6' }}>•</span>
                 {typeof h === 'string' ? h : coerceToString(h, 'Highlight')}
               </li>
@@ -613,7 +655,9 @@ function BlueprintInsightsSection({
                   </div>
                   <span className={styles.archPipelineLabel}>{stage.label}</span>
                   <ul className={styles.archPipelineItems}>
-                    {stage.items.map((item: any, j: number) => <li key={j}>{item}</li>)}
+                    {stage.items.map((item: any, j: number) => (
+                      <li key={j}>{typeof item === 'string' ? boldProducts(item) : item}</li>
+                    ))}
                   </ul>
                 </div>
                 {i < s.architecture.stages.length - 1 && (
@@ -634,7 +678,11 @@ function BlueprintInsightsSection({
         <div className={styles.insightCardBody}>
           <div className={styles.workflowModulesGrid}>
             {(workflowModules.length > 0 ? workflowModules : BLUEPRINT_INSIGHTS.workflowModules).map((wf, i) => {
-              // Dynamic blueprint module — enrich with static insight data by index
+              // Dynamic blueprint module — rendered entirely from the
+              // AI-generated blueprint. (Previously these cards were
+              // "enriched" with static placeholder text by array index —
+              // fake statuses and SAP/SharePoint copy unrelated to the
+              // client's actual diagnostic.)
               if ('workflow_id' in wf) {
                 const dynWf = wf as BlueprintV1WorkflowModule
                 const id = dynWf.workflow_id
@@ -642,8 +690,8 @@ function BlueprintInsightsSection({
                 const generated = generatedWorkflows[id]
                 const saved = savedWorkflowIds[id]
                 const err = workflowErrors[id]
-                // Pull enrichment from static data by position (best-effort)
-                const enrichment = BLUEPRINT_INSIGHTS.workflowModules[i]
+                const steps = Array.isArray(dynWf.steps) ? dynWf.steps : []
+                const integrations = coerceList(dynWf.integrations_required)
                 return (
                   <div key={id} className={styles.workflowModuleCard}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
@@ -659,22 +707,24 @@ function BlueprintInsightsSection({
                         ) : generated ? 'Regenerate' : 'Generate'}
                       </button>
                     </div>
-                    {enrichment && (
-                      <span className={styles.workflowModuleStatus}>
-                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} aria-hidden="true" />
-                        {enrichment.status}
-                      </span>
-                    )}
-                    {enrichment && <p className={styles.workflowModuleText}>{enrichment.value}</p>}
-                    {enrichment && <p className={styles.workflowModuleText} style={{ color: '#666' }}>{enrichment.maturity}</p>}
-                    <p className={styles.workflowModuleNext}>
+                    <p className={styles.workflowModuleNext} style={{ borderTop: 'none', paddingTop: 0 }}>
                       <span className={styles.workflowModuleNextLabel}>Trigger: </span>
                       {dynWf.trigger}
                     </p>
-                    {enrichment && (
+                    {steps.length > 0 && (
+                      <div className={styles.workflowModuleNext}>
+                        <span className={styles.workflowModuleNextLabel}>Steps ({steps.length}): </span>
+                        <ol style={{ margin: '4px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {steps.map((st, j) => (
+                            <li key={j} style={{ lineHeight: 1.45 }}>{coerceToString((st as any)?.action, '')}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                    {integrations.length > 0 && (
                       <p className={styles.workflowModuleNext}>
-                        <span className={styles.workflowModuleNextLabel}>Next step: </span>
-                        {enrichment.next}
+                        <span className={styles.workflowModuleNextLabel}>Integrations: </span>
+                        {integrations.join(', ')}
                       </p>
                     )}
                     {err && <p className={styles.workflowError}>{err}</p>}
@@ -792,9 +842,15 @@ function BlueprintInsightsSection({
                     </div>
                     {wave.included_workflows && wave.included_workflows.length > 0 && (
                       <div className={styles.deployWaveTags}>
-                        {wave.included_workflows.map((wf, j) => (
-                          <span key={j} className={styles.deployWaveTag}>{wf}</span>
-                        ))}
+                        {wave.included_workflows.map((wf, j) => {
+                          // Older blueprints reference workflows by id (e.g.
+                          // "wfm-001") — meaningless to the reader, so resolve
+                          // to the workflow's human-readable name.
+                          const byId = workflowModules.find(m => m.workflow_id === wf)
+                          return (
+                            <span key={j} className={styles.deployWaveTag}>{byId?.name || wf}</span>
+                          )
+                        })}
                       </div>
                     )}
                     {wave.notes && <p className={styles.deployWaveNotes}>{wave.notes}</p>}
@@ -1270,6 +1326,23 @@ export default function BlueprintPage() {
               cursor: 'pointer', fontSize: '1rem', padding: '0 4px', lineHeight: 1,
             }}
           >✕</button>
+        </div>
+      )}
+      {/* Fallback-generation notice: the AI didn't return a complete
+          blueprint, so this one was assembled from a simplified template.
+          The user should know it's not a full AI result and can regenerate. */}
+      {(blueprint as any).fallback_generated && (
+        <div
+          role="alert"
+          style={{
+            position: 'sticky', top: 0, zIndex: 50,
+            background: '#78350f', color: '#fef3c7',
+            padding: '10px 16px', display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between', gap: 12, fontSize: '0.875rem',
+            borderBottom: '1px solid #92400e',
+          }}
+        >
+          <span>⚠️ This blueprint was built from a simplified template because AI generation didn&apos;t return a complete result. Use &quot;Regenerate Blueprint&quot; to try again.</span>
         </div>
       )}
       <div className={styles.content} ref={contentRef}>

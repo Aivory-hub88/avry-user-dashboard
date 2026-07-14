@@ -1093,12 +1093,27 @@ function WorkflowsPageInner() {
       email: 'channel', messaging: 'channel', http: 'action', respond: 'channel',
       filter: 'condition', transform: 'action', schedule: 'trigger', ai: 'action',
     }
+    // step.app ("gmail", "slack", "openai", …) is the definitive signal for
+    // brand icons and category colors — step.type/intent guessing is only the
+    // fallback. Without it every node collapsed to generic icons and two
+    // body colors.
+    const AI_APPS = new Set(['openai', 'anthropic', 'claude', 'ai', 'llm', 'gemini'])
+    const DB_APPS = new Set(['postgres', 'postgresql', 'mysql', 'mongodb', 'redis', 'airtable', 'google sheets', 'notion', 'supabase'])
+    const categoryForStep = (app: string, type: string, intent: string): string => {
+      if (type === 'trigger') return 'trigger'
+      if (type === 'condition') return 'condition'
+      if (AI_APPS.has(app)) return 'ai'
+      if (DB_APPS.has(app)) return 'database'
+      if (type === 'channel') return 'channel'
+      return intentToCategory[intent] ?? 'action'
+    }
     const allSteps = workflow.steps.map((step, index) => ({
       step: index + 1,
       action: step.title,
       tool: step.type,
       output: step.description || '',
       type: step.type,
+      app: (step.app || '').toLowerCase().trim(),
       config: step.config || {},
     }))
     const rfNodes = allSteps.map((s, i) => {
@@ -1110,7 +1125,8 @@ function WorkflowsPageInner() {
         data: {
           label: s.action || `Step ${i + 1}`,
           icon: i === 0 ? 'webhook' : (intentToIcon[intent] ?? 'http'),
-          category: i === 0 ? 'trigger' : (intentToCategory[intent] ?? 'action'),
+          category: i === 0 ? 'trigger' : categoryForStep(s.app, s.type, intent),
+          app: s.app || undefined,
           title: s.action || `Step ${i + 1}`,
           description: s.output || s.tool || '',
           config: s.config || {},
@@ -1147,7 +1163,11 @@ function WorkflowsPageInner() {
       })),
       integrations: [],
       estimated_time: workflow.estimate_hours ? `~${workflow.estimate_hours}h estimated` : '0',
-      automation_percentage: workflow.automation_score ? `${Math.round((workflow.automation_score ?? 0) * 100)}% automated` : '0',
+      // automation_score arrives on a 0–1 OR 0–10 scale depending on the
+      // model's mood — normalize so 8 renders as 80%, not 800%.
+      automation_percentage: workflow.automation_score
+        ? `${Math.min(100, Math.round(workflow.automation_score <= 1 ? workflow.automation_score * 100 : workflow.automation_score * 10))}% automated`
+        : '0',
       error_handling: '',
       notes: workflow.summary || '',
       created_at: new Date().toISOString(),

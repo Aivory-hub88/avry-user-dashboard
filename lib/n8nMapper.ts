@@ -7,7 +7,7 @@
 
 import { type Node, type Edge } from '@xyflow/react'
 import { N8nWorkflow, N8nNode, N8nConnections } from './n8n'
-import type { WorkflowNodeData, WorkflowNodeCategory } from '@/types/workflow-node'
+import type { WorkflowNodeData, WorkflowNodeCategory, NodeConfig } from '@/types/workflow-node'
 import { WORKFLOW_TEMPLATES } from '@/config/workflow-templates'
 
 // Extended ReactFlow node with n8n-specific data
@@ -140,6 +140,108 @@ export function n8nToReactFlow(
   return { nodes, edges }
 }
 
+// ── NodeConfig → n8n parameters ─────────────────────────────
+// Inverse of inspector/nodeConfigUtils.extractConfigFromNode: turns the typed
+// canvas config (edited via the inspector or the setup copilot) into concrete
+// n8n node parameters so "Deploy to n8n" ships what the user configured.
+
+/** The n8n node type implied by a typed config (used when the node has no rawN8n type). */
+export function configToN8nType(config: NodeConfig): string | null {
+  switch (config.type) {
+    case 'httpRequest':   return 'n8n-nodes-base.httpRequest'
+    case 'webhook':       return 'n8n-nodes-base.webhook'
+    case 'schedule':      return 'n8n-nodes-base.scheduleTrigger'
+    case 'manualTrigger': return 'n8n-nodes-base.manualTrigger'
+    case 'ifCondition':   return 'n8n-nodes-base.if'
+    case 'editFields':    return 'n8n-nodes-base.set'
+    case 'httpResponse':  return 'n8n-nodes-base.respondToWebhook'
+    default:              return null
+  }
+}
+
+/** typeVersion matching the parameter shapes written by configToN8nParameters. */
+export function configToN8nTypeVersion(config: NodeConfig): number | null {
+  switch (config.type) {
+    case 'httpRequest':   return 4.2
+    case 'webhook':       return 2
+    case 'schedule':      return 1.2
+    case 'ifCondition':   return 1
+    case 'editFields':    return 1
+    default:              return 1
+  }
+}
+
+/** Serialize a typed canvas config into n8n node parameters. Returns null for configs with no mapping. */
+export function configToN8nParameters(config: NodeConfig): Record<string, any> | null {
+  switch (config.type) {
+    case 'httpRequest': {
+      const headers = [...(config.headers ?? [])]
+      // Auth is expressed as headers so the deployed workflow works without
+      // pre-provisioned n8n credentials (values may be n8n expressions like ={{ $env.TOKEN }}).
+      const af = config.authFields ?? {}
+      if (config.authentication === 'bearerToken' && af.token) {
+        headers.push({ key: 'Authorization', value: af.token.startsWith('Bearer') || af.token.startsWith('=') ? af.token : `Bearer ${af.token}` })
+      } else if (config.authentication === 'apiKey' && af.keyValue) {
+        headers.push({ key: af.keyName || 'X-API-Key', value: af.keyValue })
+      } else if (config.authentication === 'basicAuth' && af.username) {
+        headers.push({ key: 'Authorization', value: `={{ 'Basic ' + Buffer.from('${af.username}:${af.password ?? ''}').toString('base64') }}` })
+      }
+      const sendHeaders = config.sendHeaders || headers.length > 0
+      return {
+        method: config.method,
+        url: config.url,
+        sendHeaders,
+        ...(sendHeaders ? { headerParameters: { parameters: headers.map(h => ({ name: h.key, value: h.value })) } } : {}),
+        sendQuery: config.sendQuery,
+        ...(config.sendQuery ? { queryParameters: { parameters: (config.queryParams ?? []).map(q => ({ name: q.key, value: q.value })) } } : {}),
+        sendBody: config.sendBody,
+        ...(config.sendBody ? {
+          contentType: config.bodyType === 'form' ? 'form-urlencoded' : config.bodyType,
+          ...(config.bodyType === 'json' ? { specifyBody: 'json', jsonBody: config.body } : { body: config.body }),
+        } : {}),
+      }
+    }
+    case 'webhook':
+      return {
+        httpMethod: config.httpMethod,
+        path: (config.path || '/').replace(/^\//, ''),
+        responseMode: config.respondWith === 'immediately' ? 'onReceived'
+          : config.respondWith === 'lastNode' ? 'lastNode' : 'responseNode',
+      }
+    case 'schedule': {
+      const n = Math.max(1, Number(config.interval) || 1)
+      const intervalField: Record<string, any> = {
+        minutes: { field: 'minutes', minutesInterval: n },
+        hours:   { field: 'hours',   hoursInterval: n },
+        days:    { field: 'days',    daysInterval: n },
+        weeks:   { field: 'weeks',   weeksInterval: n },
+      }[config.unit] ?? { field: 'hours', hoursInterval: n }
+      return { rule: { interval: [intervalField] }, ...(config.timezone ? { timezone: config.timezone } : {}) }
+    }
+    case 'ifCondition':
+      return {
+        conditions: {
+          boolean: config.conditions.map(c => ({ value1: c.field, operation: c.operator, value2: c.value })),
+        },
+        combineOperation: config.combinator,
+      }
+    case 'editFields':
+      return { values: { string: config.fields.map(f => ({ name: f.key, value: f.value })) } }
+    case 'httpResponse':
+      return {
+        respondWith: 'text',
+        responseBody: config.responseBody,
+        statusCode: config.statusCode,
+        options: { responseCode: config.statusCode },
+      }
+    case 'manualTrigger':
+      return {}
+    default:
+      // aiStep / agent / generic — no direct n8n parameter mapping; keep rawN8n params.
+      return null
+  }
+}
+
 /**
  * Convert ReactFlow nodes and edges back to n8n workflow format
  * @param nodes ReactFlow nodes
@@ -172,14 +274,20 @@ export function reactFlowToN8n(
     const rawN8n = node.data.rawN8n
     const originalN8nNode = baseWorkflow.nodes?.find((n) => n.id === node.id)
     const name = idToName.get(node.id) || 'Unnamed Node'
-    
+
+    // Typed canvas config (inspector / setup copilot) wins over stale raw params —
+    // this is what makes "Deploy to n8n" ship the user's configuration.
+    const config = node.data.config
+    const configParams = config ? configToN8nParameters(config) : null
+    const baseParams = rawN8n?.parameters || originalN8nNode?.parameters || {}
+
     const n8nNode: N8nNode = {
       id: node.id,
       name,
-      type: rawN8n?.type || originalN8nNode?.type || 'n8n-nodes-base.set',
-      typeVersion: rawN8n?.typeVersion || originalN8nNode?.typeVersion || 1,
+      type: rawN8n?.type || originalN8nNode?.type || (config ? configToN8nType(config) : null) || 'n8n-nodes-base.set',
+      typeVersion: rawN8n?.typeVersion || originalN8nNode?.typeVersion || (config ? configToN8nTypeVersion(config) : null) || 1,
       position: [node.position.x, node.position.y] as [number, number],
-      parameters: rawN8n?.parameters || originalN8nNode?.parameters || {},
+      parameters: configParams ? { ...baseParams, ...configParams } : baseParams,
     }
 
     workflow.nodes.push(n8nNode)

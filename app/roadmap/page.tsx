@@ -660,12 +660,13 @@ function BtnPrimary({ onClick, disabled, loading, children }: {
     <button onClick={onClick} disabled={disabled}
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{
-        background: h && !disabled ? '#555553' : T.green,
-        color: '#000', border: 'none', borderRadius: 10,
-        padding: '13px 32px', fontSize: '0.9375rem', fontWeight: 700,
+        background: disabled ? T.green : `linear-gradient(to bottom, ${h ? '#d3e2c4' : '#c9dab8'}, ${h ? '#c2d5af' : '#b7cba6'})`,
+        color: '#1c2318', border: 'none', borderRadius: 9,
+        padding: '9px 22px', fontSize: '0.8125rem', fontWeight: 600,
         fontFamily: 'inherit', cursor: disabled ? 'not-allowed' : 'pointer',
-        display: 'flex', alignItems: 'center', gap: 10,
-        transition: 'background 0.15s', opacity: disabled ? 0.6 : 1,
+        display: 'flex', alignItems: 'center', gap: 8,
+        transition: 'all 0.15s', opacity: disabled ? 0.6 : 1,
+        boxShadow: disabled ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.4), 0 4px 14px rgba(183,203,166,0.25)',
       }}>
       {loading && (
         <span style={{
@@ -679,6 +680,22 @@ function BtnPrimary({ onClick, disabled, loading, children }: {
   );
 }
 
+function BtnSecondary({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  const [h, setH] = useState(false);
+  return (
+    <button onClick={onClick}
+      onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{
+        fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8,
+        border: `1px solid ${h ? 'rgba(183,203,166,0.35)' : 'rgba(255,255,255,0.08)'}`,
+        background: h ? 'rgba(183,203,166,0.08)' : 'rgba(255,255,255,0.02)',
+        color: h ? T.green : T.textSub,
+        cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
+      }}
+    >{children}</button>
+  );
+}
+
 // ─── Export PDF (Feature 6) ───────────────────────────────────
 async function exportRoadmapPdf(
   roadmap: AiryRoadmap,
@@ -687,7 +704,7 @@ async function exportRoadmapPdf(
   phaseCompletes: Record<string, boolean>,
 ) {
   const { default: jsPDF } = await import('jspdf');
-  const { applyPremiumCovers, loadManrope, pageBg, pageFooter, sectionLabel, renderNarrative, thinDiv } = await import('@/lib/pdfExport');
+  const { applyPremiumCovers, renderAivoryNote, loadManrope, pageBg, pageFooter, sectionLabel, renderNarrative, thinDiv } = await import('@/lib/pdfExport');
 
   const doc = new jsPDF('p', 'mm', 'a4');
   await loadManrope(doc);
@@ -714,14 +731,18 @@ Roadmap`, {
     reportId: `RM-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-001`
   });
 
-  // Progress summary on front cover (dark green area, below client info)
-  doc.setGState(new (doc as any).GState({ opacity: 0.7 }));
-  doc.setFontSize(10);
-  doc.setTextColor(255, 255, 255);
-  doc.text(`Overall Progress: ${overallPct}%  ·  ${checkedMilestones}/${totalMilestones} milestones`, ML, 125);
-  doc.setFontSize(8);
-  doc.text(`Exported: ${now.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })} · ${now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`, ML, 132);
-  doc.setGState(new (doc as any).GState({ opacity: 1 }));
+  // ── A note from Aivory ───────────────────────────────────
+  renderAivoryNote(doc, {
+    greeting: `Dear ${roadmap.title},`,
+    paragraphs: [
+      `This is your AI Implementation Roadmap: the phased, milestone-by-milestone plan that turns your blueprint into deployed, working systems. It sequences what to build, in what order, and how to measure that each phase is landing.`,
+      `Use it as a living document. As your team checks off milestones and records KPI actuals, the roadmap tracks how far you have progressed toward a fully operational AI capability.`,
+    ],
+    footerStats: [
+      { label: 'Overall Progress', value: `${overallPct}%` },
+      { label: 'Milestones', value: `${checkedMilestones}/${totalMilestones}`, align: 'right' },
+    ],
+  });
 
   // Cover page intro (first inner page)
   doc.addPage();
@@ -846,37 +867,41 @@ function EmptyState({ generating, error, onGenerate, router }: {
   const t = useTranslations("roadmap");
   return (
     <div style={{
-      background: T.card, border: `1px solid ${T.border}`, borderRadius: 20,
-      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-      padding: '64px 40px', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', textAlign: 'center', gap: 20,
-      boxShadow: '0 4px 32px rgba(0,0,0,0.4)',
+      background: [
+        'radial-gradient(ellipse 80% 100% at 15% 0%, rgba(183,203,166,0.06) 0%, transparent 55%)',
+        'radial-gradient(ellipse 70% 90% at 90% 100%, rgba(221,218,197,0.04) 0%, transparent 55%)',
+        `linear-gradient(160deg, ${T.cardSolid} 0%, #1e1d1a 100%)`,
+      ].join(', '),
+      border: '1px solid rgba(255,255,255,0.06)', borderRadius: 18,
+      padding: '40px 32px', display: 'flex', flexDirection: 'column',
+      alignItems: 'center', textAlign: 'center', gap: 16,
+      boxShadow: '0 8px 28px rgba(0,0,0,0.3)',
     }}>
       {/* illustration */}
-      <svg width="220" height="72" viewBox="0 0 220 72" fill="none" aria-hidden style={{ opacity: 0.7 }}>
-        <line x1="20" y1="36" x2="200" y2="36" stroke="#2a2a28" strokeWidth="2" strokeDasharray="6 4"/>
-        {([20, 110, 200] as const).map((cx, i) => (
+      <svg width="200" height="66" viewBox="0 0 200 66" fill="none" aria-hidden>
+        <line x1="25" y1="28" x2="175" y2="28" stroke="rgba(255,255,255,0.1)" strokeWidth="2" strokeDasharray="1 7" strokeLinecap="round"/>
+        {([25, 100, 175] as const).map((cx, i) => (
           <g key={cx}>
-            <circle cx={cx} cy="36" r="14" fill="#161614" stroke={i === 0 ? T.green : '#2e2e2c'} strokeWidth="1.5"/>
-            <text x={cx} y="41" textAnchor="middle" fontSize="11" fontWeight="700"
-              fill={i === 0 ? T.green : '#444'} fontFamily="var(--font-manrope), Manrope, sans-serif">{i + 1}</text>
-            <text x={cx} y="60" textAnchor="middle" fontSize="9" fill="#444" fontFamily="var(--font-manrope), Manrope, sans-serif">
+            <circle cx={cx} cy="28" r="13" fill={i === 0 ? 'rgba(183,203,166,0.14)' : 'rgba(255,255,255,0.04)'} stroke={i === 0 ? T.green : 'rgba(255,255,255,0.14)'} strokeWidth="1.5"/>
+            <text x={cx} y="32.5" textAnchor="middle" fontSize="10" fontWeight="700"
+              fill={i === 0 ? T.green : 'rgba(255,255,255,0.5)'} fontFamily="var(--font-manrope), Manrope, sans-serif">{i + 1}</text>
+            <text x={cx} y="52" textAnchor="middle" fontSize="9" fontWeight="500" fill="rgba(255,255,255,0.4)" fontFamily="var(--font-manrope), Manrope, sans-serif">
               {['Build','Scale','Optimize'][i]}
             </text>
           </g>
         ))}
       </svg>
 
-      <h2 style={{ fontSize: '1.375rem', fontWeight: 300, color: T.text, margin: 0, letterSpacing: '-0.2px', lineHeight: 1.3 }}>
+      <h2 style={{ fontSize: '1.25rem', fontWeight: 300, color: T.text, margin: 0, letterSpacing: '-0.2px', lineHeight: 1.3 }}>
         {t("noRoadmap")}
       </h2>
-      <p style={{ fontSize: '0.9375rem', color: T.textSub, lineHeight: 1.7, maxWidth: 480, margin: 0 }}>
+      <p style={{ fontSize: '0.8125rem', color: T.textSub, lineHeight: 1.6, maxWidth: 420, margin: 0 }}>
         {t("noRoadmapDesc")}
       </p>
 
       {error && (
         <p role="alert" style={{
-          fontSize: '0.875rem', color: T.red, padding: '10px 14px',
+          fontSize: '0.8125rem', color: T.red, padding: '8px 12px',
           background: T.redDim, border: '1px solid rgba(248,113,113,0.18)',
           borderRadius: 8, margin: 0,
         }}>{error}</p>
@@ -887,26 +912,17 @@ function EmptyState({ generating, error, onGenerate, router }: {
       </BtnPrimary>
 
       <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9,
         padding: '14px 18px', background: 'rgba(255,255,255,0.02)',
-        border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10,
-        maxWidth: 480, width: '100%',
+        border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12,
+        maxWidth: 420, width: '100%',
       }}>
-        <span style={{ fontSize: '0.8125rem', color: T.textMuted, lineHeight: 1.5 }}>
+        <span style={{ fontSize: '0.75rem', color: T.textMuted, lineHeight: 1.5 }}>
           {t("proTip")}
         </span>
         <div style={{ display: 'flex', gap: 8 }}>
-          {[[t("startDiagnostic"), '/diagnostics'], [t("viewBlueprints"), '/blueprint']].map(([label, path]) => (
-            <button key={path} onClick={() => router.push(path)}
-              style={{
-                fontSize: 12, fontWeight: 500, padding: '6px 14px', borderRadius: 7,
-                border: `1px solid ${T.border}`, background: 'transparent', color: T.textSub,
-                cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { (e.target as HTMLButtonElement).style.borderColor = T.borderGreen; (e.target as HTMLButtonElement).style.color = T.green; }}
-              onMouseLeave={e => { (e.target as HTMLButtonElement).style.borderColor = T.border; (e.target as HTMLButtonElement).style.color = T.textSub; }}
-            >{label}</button>
-          ))}
+          <BtnSecondary onClick={() => router.push('/diagnostics')}>{t("startDiagnostic")}</BtnSecondary>
+          <BtnSecondary onClick={() => router.push('/blueprint')}>{t("viewBlueprints")}</BtnSecondary>
         </div>
       </div>
     </div>

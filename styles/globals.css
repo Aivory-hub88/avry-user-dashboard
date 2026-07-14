@@ -1071,3 +1071,57 @@ h1, h2, h3, h4, h5, h6,
 .spotlight-card:hover::before {
   opacity: 1;
 }
+/* ── Copilot chat typography ─────────────────────────────────
+   The broad `main p / main h1..h4 / main li` rules above force 1rem+ sizes
+   onto everything, including chat messages. Scope-normalize the copilot
+   thread so every message renders at consistent 13px chat sizing.
+   (!important is required to beat those unlayered element selectors.) */
+.copilot-chat p,
+.copilot-chat li {
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+  margin-bottom: 0 !important;
+}
+.copilot-chat p + p { margin-top: 6px !important; }
+.copilot-chat h1,
+.copilot-chat h2,
+.copilot-chat h3,
+.copilot-chat h4 {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.5 !important;
+  margin: 8px 0 4px !important;
+}
+.copilot-chat ul,
+.copilot-chat ol {
+  margin: 4px 0 !important;
+  padding-left: 18px !important;
+}
+.copilot-chat li { margin-bottom: 2px !important; }
+.copilot-chat code { font-size: 12px !important; }
+.copilot-chat pre {
+  font-size: 12px !important;
+  margin: 6px 0 !important;
+}
+.copilot-chat blockquote { margin: 4px 0 !important; }
+.copilot-chat table { font-size: 12px !important; }
+
+/* ── Thinking dots — shared AI-loading indicator ──────────────
+   Same 7-dot circular pulse as the landing page's loader-wave demo
+   (frontend-nextjs), recolored from olive/sage to near-white for the
+   dashboard's dark chat surfaces. See components/ui/ThinkingDots.tsx. */
+.thinking-dots {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.thinking-dots__dot {
+  position: absolute;
+  border-radius: 9999px;
+  animation: thinkingDotsWave 1.2s infinite ease-in-out;
+}
+@keyframes thinkingDotsWave {
+  0%   { transform: scale(0.5); opacity: 0.3;  background-color: rgba(247, 247, 247, 0.55); }
+  50%  { transform: scale(1.2); opacity: 1;    background-color: #f7f7f7; }
+  100% { transform: scale(0.5); opacity: 0.3;  background-color: rgba(247, 247, 247, 0.55); }
+}

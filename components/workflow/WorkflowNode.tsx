@@ -4,7 +4,7 @@ import { asset } from "@/lib/asset";
 import React, { memo, useState } from 'react';
 import { Handle, Position, useReactFlow, useNodeId } from '@xyflow/react';
 import {
-  Zap, GitFork, Waypoints, Share2, Send, Play, Workflow, BotMessageSquare,
+  Zap, GitFork, Waypoints, Share2, Send, Play, Workflow, BotMessageSquare, Database,
 } from 'lucide-react';
 import styles from './WorkflowNode.module.css';
 
@@ -88,10 +88,33 @@ const APP_ICON_MAP: Record<string, string> = {
   stripe: '/icons/integrations/stripe.svg',
   twilio: '/icons/integrations/twilio.svg',
   zendesk: '/icons/integrations/zendesk.svg',
+  telegram: '/icons/integrations/telegram.svg',
+  whatsapp: '/icons/integrations/whatsapp.svg',
+  discord: '/icons/integrations/discord.svg',
+  postgres: '/icons/integrations/postgresql.svg',
+  postgresql: '/icons/integrations/postgresql.svg',
+  mysql: '/icons/integrations/mysql.svg',
+  mongodb: '/icons/integrations/mongodb.svg',
+  redis: '/icons/integrations/redis.svg',
+  graphql: '/icons/integrations/graphql.svg',
+  anthropic: '/icons/integrations/claude.svg',
+  claude: '/icons/integrations/claude.svg',
+  ollama: '/icons/integrations/ollama.svg',
+  odoo: '/icons/integrations/odoo.svg',
+  erpnext: '/icons/integrations/erpnext.svg',
+  // Common aliases the workflow generator emits
+  'google-sheets': '/icons/integrations/google-sheets.svg',
+  googlesheets: '/icons/integrations/google-sheets.svg',
+  sheets: '/icons/integrations/google-sheets.svg',
+  'microsoft-teams': '/icons/integrations/microsoft-teams.svg',
+  teams: '/icons/integrations/microsoft-teams.svg',
+  email: '/icons/integrations/gmail.svg',
+  s3: '/icons/integrations/amazon-s3.svg',
 };
 
 function getAppSvgIcon(label: string): string | null {
   const key = label.toLowerCase().trim();
+  if (!key) return null; // '' would fuzzy-match every entry below
   if (APP_ICON_MAP[key]) return APP_ICON_MAP[key];
   for (const [k, v] of Object.entries(APP_ICON_MAP)) {
     if (key.includes(k) || k.includes(key)) return v;
@@ -110,6 +133,7 @@ function DefaultIcon({ category }: { category?: string }) {
   if (cat === 'channel' || cat === 'email' || cat === 'notification') return <Send {...p} />;
   if (cat === 'app' || cat === 'action' || cat === 'utility') return <Play {...p} />;
   if (cat === 'http' || cat === 'api') return <Workflow {...p} />;
+  if (cat === 'database' || cat === 'db') return <Database {...p} />;
   return <Workflow {...p} />;
 }
 
@@ -142,6 +166,8 @@ export interface WorkflowNodeData {
   hideTarget?: boolean; onAddStep?: () => void;
   title?: string; appName?: string; agentName?: string;
   appId?: string; appIcon?: string; iconPath?: string;
+  /** Integration id from the generated workflow step (e.g. "gmail", "slack") — primary brand-icon signal */
+  app?: string;
   [key: string]: unknown;
 }
 
@@ -150,7 +176,7 @@ interface WorkflowNodeProps { data: WorkflowNodeData; selected: boolean; }
 export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
   const [expanded, setExpanded] = useState(false);
   const label = data.label || data.title || data.appName || data.agentName || 'Step';
-  const { description, category, icon, hideTarget = false, onAddStep, appIcon, iconPath } = data;
+  const { description, category, icon, hideTarget = false, onAddStep, appIcon, iconPath, app } = data;
   const { setNodes, setEdges } = useReactFlow();
   const nodeId = useNodeId();
 
@@ -180,24 +206,24 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
         />
       );
     }
-    if (appIcon) {
-      if (appIcon.startsWith('/') || appIcon.startsWith('http')) {
-        return (
-          <img src={appIcon} alt={label}
-            style={{ width: 36, height: 36, objectFit: 'contain' }}
-            onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.removeAttribute('style'); }}
-          />
-        );
-      }
-      const svgPath = getAppSvgIcon(label);
-      if (svgPath) {
-        return (
-          <img src={svgPath} alt={label}
-            style={{ width: 36, height: 36, objectFit: 'contain' }}
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-          />
-        );
-      }
+    if (appIcon && (appIcon.startsWith('/') || appIcon.startsWith('http'))) {
+      return (
+        <img src={appIcon.startsWith('http') ? appIcon : asset(appIcon)} alt={label}
+          style={{ width: 36, height: 36, objectFit: 'contain' }}
+          onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.removeAttribute('style'); }}
+        />
+      );
+    }
+    // Brand icon: the step's `app` id is the definitive signal; the node
+    // label is a last resort (titles rarely contain the app name).
+    const svgPath = getAppSvgIcon(app || '') ?? getAppSvgIcon(typeof appIcon === 'string' ? appIcon : '') ?? (appIcon ? getAppSvgIcon(label) : null);
+    if (svgPath) {
+      return (
+        <img src={asset(svgPath)} alt={label}
+          style={{ width: 36, height: 36, objectFit: 'contain' }}
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        />
+      );
     }
     if (icon && typeof icon !== 'string') return icon;
     return <DefaultIcon category={category} />;

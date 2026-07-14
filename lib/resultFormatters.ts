@@ -346,6 +346,7 @@ export function humanizeDimensionKey(key: string): string {
     process: 'Process',
     people: 'People',
     governance: 'Governance',
+    security: 'Security & Governance',
   }
   if (key in map) return map[key]
   if (!key) return '—'

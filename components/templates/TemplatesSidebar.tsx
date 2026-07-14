@@ -26,10 +26,10 @@ export default function TemplatesSidebar({
             <button
               key={category}
               onClick={() => setActiveCategory(category)}
-              className={`text-left px-3 py-2.5 rounded-lg text-[14px] font-light transition-all ${
-                isActive 
-                  ? "bg-white/10 text-white font-medium shadow-sm" 
-                  : "text-[#a1a1aa] hover:bg-white/5 hover:text-white"
+              className={`text-left px-3.5 py-2.5 rounded-lg text-[13.5px] transition-all border ${
+                isActive
+                  ? "bg-[#b7cba6]/[0.12] border-[#b7cba6]/25 text-[#c9dab8] font-medium"
+                  : "border-transparent text-[#a1a1aa] font-light hover:bg-white/[0.04] hover:text-white"
               }`}
             >
               {category}

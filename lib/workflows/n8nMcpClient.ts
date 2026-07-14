@@ -10,7 +10,10 @@
  */
 
 // n8n-MCP server runs on the VPS. Set N8N_MCP_URL in .env.local to override.
-const MCP_URL = process.env.N8N_MCP_URL || 'http://43.156.108.96:3020'
+// Fail hard when unset. The old fallback pointed at the retired, compromised
+// VPS; a missing env var must be a visible config error, never a silent
+// redirect of traffic to a hostile host.
+const MCP_URL = process.env.N8N_MCP_URL || ''
 const MCP_AUTH = process.env.N8N_MCP_AUTH_TOKEN || ''
 const CACHE_TTL_MS = 10 * 60 * 1000
 
@@ -106,6 +109,7 @@ async function mcpRequest(method: string, params: Record<string, unknown>, retry
   if (MCP_AUTH) headers['Authorization'] = `Bearer ${MCP_AUTH}`
   if (sessionId) headers['mcp-session-id'] = sessionId
 
+  if (!MCP_URL) throw new Error('N8N_MCP_URL is not configured')
   const res = await fetch(`${MCP_URL}/mcp`, {
     method: 'POST',
     headers,

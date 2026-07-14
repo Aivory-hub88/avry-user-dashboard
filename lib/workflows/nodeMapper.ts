@@ -21,7 +21,13 @@ export type NodeIntent =
   | 'schedule'
   | 'ai'
 
-export const ZEROCLAW_WEBHOOK_URL = process.env.ZEROCLAW_WEBHOOK_URL || 'http://43.156.108.96:3003/webhook'
+// AI-step webhook target embedded into exported n8n workflows. This module is
+// bundled client-side, where process.env.ZEROCLAW_WEBHOOK_URL is undefined:
+// the old fallback baked a retired (and compromised) VPS IP into every
+// deployed workflow's AI node. No hardcoded host; an empty URL makes the n8n
+// node fail visibly at configuration time instead of silently calling a dead
+// or hostile endpoint.
+export const ZEROCLAW_WEBHOOK_URL = process.env.ZEROCLAW_WEBHOOK_URL || ''
 
 // Intent detection patterns (priority order matters)
 // NOTE: Use \b word boundaries for short words like "if", "ai" to avoid substring matches

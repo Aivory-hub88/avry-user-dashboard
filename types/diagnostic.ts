@@ -265,7 +265,7 @@ export interface DiagnosticResponse {
 // Deep Diagnostic Result Page — DiagnosticContext types (v2)
 // ============================================================================
 
-export type DimensionKey = 'strategy' | 'data' | 'process' | 'people' | 'governance'
+export type DimensionKey = 'strategy' | 'data' | 'process' | 'people' | 'governance' | 'security'
 export type MaturityLevel = 'Nascent' | 'Initiating' | 'Developing' | 'Defined' | 'Optimizing'
 export type OpportunityQuadrant = 'quick_win' | 'major_project' | 'fill_in' | 'thankless_task'
 
@@ -299,6 +299,25 @@ export interface ROIProjection {
   efficiencyFactor: number
   /** Whether the small-team opportunity-cost rate adjustment was applied. */
   smallTeamRateApplied: boolean
+  /** Assumed annual ongoing cost as a fraction of the initial investment. */
+  ongoingCostRate?: number
+  /** Annual ongoing run cost (licenses/maintenance/support), USD and local. */
+  annualOngoingCostUSD?: number | null
+  annualOngoingCostLocal?: number | null
+  /** Net annual savings after ongoing cost, USD and local. */
+  netAnnualSavingsUSD?: number | null
+  netAnnualSavingsLocal?: number | null
+  /** Payback on net savings (months). */
+  netPaybackMonths?: number | null
+  /** 3-year ROI computed on net savings (%). */
+  netThreeYearROIPercent?: number | null
+  /** Conservative / base / optimistic 3-year ROI range (%). */
+  scenarioThreeYearROI?: { low: number | null; base: number | null; high: number | null }
+  /** Annual discount rate used for NPV. */
+  discountRate?: number
+  /** Net present value of 3-year net cash flows minus investment (USD, local). */
+  npv3YearUSD?: number | null
+  npv3YearLocal?: number | null
   /** @deprecated Use annualLaborSavingsLocal — kept for backward compat with stored contexts */
   annualLaborSavingsIDR?: number | null
   /** @deprecated Use annualProcessSavingsLocal — kept for backward compat with stored contexts */
@@ -315,6 +334,7 @@ export interface DimensionScores {
   process: number
   people: number
   governance: number
+  security: number
   composite: number
   maturityLevel: MaturityLevel
   weakestDimension: DimensionKey

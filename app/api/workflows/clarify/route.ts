@@ -23,10 +23,12 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
+// Fail hard when unset — no hardcoded fallback host (the old one was the
+// retired, compromised VPS).
 const VPS_BRIDGE_URL = (
   process.env.VPS_BRIDGE_URL ||
   process.env.NEXT_PUBLIC_VPS_BRIDGE_URL ||
-  'http://43.156.108.96:3003'
+  ''
 ).replace(/\/$/, '')
 
 const UPSTREAM_PATH = '/console/stream'

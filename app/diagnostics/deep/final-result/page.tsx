@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { DiagnosticContext } from '@/types/diagnostic'
-import { upgradeDiagnosticContext, DeepDiagnosticService } from '@/services/deepDiagnostic'
+import { upgradeDiagnosticContext, DeepDiagnosticService, maturityFromScore } from '@/services/deepDiagnostic'
 import HeaderBar from '@/components/result/HeaderBar'
 import ScoreRing from '@/components/result/ScoreRing'
 import RadarChart from '@/components/result/RadarChart'
@@ -51,10 +51,15 @@ type PageState =
   | { status: 'error'; message: string }
   | { status: 'loaded'; context: DiagnosticContext }
 
+const FX_AS_OF_LABEL = 'Jun 2026'
+const fmtRoi = (v: number | null | undefined): string =>
+  v == null ? 'N/A' : v >= 999 ? '>999%' : `${Math.round(v)}%`
+
 export default function FinalResultPage() {
   const router = useRouter()
   const [state, setState] = useState<PageState>({ status: 'loading' })
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
+  const [llmResult, setLlmResult] = useState<Record<string, any> | null>(null)
 
   const [isExportingPdf, setIsExportingPdf] = useState(false)
   const [isGeneratingBlueprint, setIsGeneratingBlueprint] = useState(false)
@@ -66,9 +71,37 @@ export default function FinalResultPage() {
     }
     try {
       setIsGeneratingBlueprint(true)
-      const diagnosticData = state.context
+      // Send the same blended composite the user sees on this page (70%
+      // deterministic + 30% AI assessment) so the blueprint's
+      // ai_readiness_score matches the on-screen report instead of the raw
+      // deterministic composite. Also attach the AI analysis narrative so
+      // blueprint generation can build on it.
+      const llmScore =
+        typeof (llmResult as any)?.score === 'number' ? (llmResult as any).score
+        : typeof (llmResult as any)?.ai_readiness_score === 'number' ? (llmResult as any).ai_readiness_score
+        : null
+      const blendedComposite = llmScore != null
+        ? Math.round(state.context.scores.composite * 0.7 + llmScore * 0.3)
+        : state.context.scores.composite
+      const diagnosticData = {
+        ...state.context,
+        scores: {
+          ...state.context.scores,
+          composite: blendedComposite,
+          maturityLevel: llmScore != null ? maturityFromScore(blendedComposite) : state.context.scores.maturityLevel,
+        },
+        ...(llmResult ? {
+          ai_analysis: {
+            summary: (llmResult as any).summary ?? null,
+            strengths: (llmResult as any).strengths ?? null,
+            constraints: (llmResult as any).constraints ?? null,
+            automation_opportunities: (llmResult as any).automation_opportunities ?? null,
+            recommended_next_step: (llmResult as any).recommended_next_step ?? null,
+          },
+        } : {}),
+      }
       const diagnosticId = (diagnosticData as any).id || 'current'
-      
+
       await DeepDiagnosticService.generateBlueprint(
         diagnosticId,
         'demo_org',
@@ -84,6 +117,12 @@ export default function FinalResultPage() {
       setIsGeneratingBlueprint(false)
     }
   }
+
+  useEffect(() => {
+    try {
+      setLlmResult(DeepDiagnosticService.loadResult() as unknown as Record<string, any> | null)
+    } catch { /* AI analysis is optional — never block the report */ }
+  }, [])
 
   useEffect(() => {
     const loadContext = async () => {
@@ -177,8 +216,17 @@ export default function FinalResultPage() {
   const quickWinCount = opportunities.filter(o => o.quadrant === 'quick_win').length
 
   // Assessment broken into individual bullet lines matching the screenshot
+  const _llmScore =
+    typeof (llmResult as any)?.score === 'number' ? (llmResult as any).score
+    : typeof (llmResult as any)?.ai_readiness_score === 'number' ? (llmResult as any).ai_readiness_score
+    : null
+  const _blended = _llmScore != null ? Math.round(scores.composite * 0.7 + _llmScore * 0.3) : scores.composite
+  const displayScores = _llmScore != null
+    ? { ...scores, composite: _blended, maturityLevel: maturityFromScore(_blended) }
+    : scores
+
   const assessmentBullets: { icon: string; color: string; text: string }[] = [
-    { icon: '▲', color: '#afd199', text: `Your company / organization scores ${scores.composite}/100, placing it at ${scores.maturityLevel} maturity.` },
+    { icon: '▲', color: '#afd199', text: `Your company / organization scores ${displayScores.composite}/100, placing it at ${displayScores.maturityLevel} maturity.${_llmScore != null ? ' (composite blended 70% deterministic + 30% AI assessment)' : ''}` },
     { icon: '▲', color: '#afd199', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension)}.` },
     { icon: '▽', color: '#fbbf24', text: `Greatest gap: ${humanizeDimensionKey(scores.weakestDimension)}.` },
     { icon: '▽', color: '#fbbf24', text: `${highRiskCount} high-severity risk${highRiskCount !== 1 ? 's' : ''} identified.` },
@@ -208,12 +256,12 @@ export default function FinalResultPage() {
 
         {/* ── Executive Scorecard ── */}
         <div className={styles.card}>
-          <h2 className={styles.sectionTitle}>Executive Scorecard</h2>
+          <h2 className={styles.sectionLabel}>Executive Scorecard</h2>
 
           {/* Top row: ScoreRing | RadarChart */}
           <div className={styles.scorecardTopRow}>
             <div className={styles.scorecardRingCol}>
-              <ScoreRing score={scores.composite} maturityLevel={scores.maturityLevel} />
+              <ScoreRing score={displayScores.composite} maturityLevel={displayScores.maturityLevel} />
             </div>
             <div className={styles.scorecardChartCol}>
               <RadarChart scores={scores} />
@@ -248,9 +296,71 @@ export default function FinalResultPage() {
           </div>
         </div>
 
+        {/* ── AI Analysis (model-generated; numbers stay deterministic) ── */}
+        <div className={styles.card}>
+          <h2 className={styles.sectionLabel}>AI Analysis</h2>
+          {llmResult ? (
+            <>
+              {(llmResult.narrative_summary || llmResult.narrative) && (
+                <p className={styles.aiNarrative}>
+                  {llmResult.narrative_summary || llmResult.narrative}
+                </p>
+              )}
+              <div className={styles.aiGrid}>
+                {Array.isArray(llmResult.strengths) && llmResult.strengths.length > 0 && (
+                  <div>
+                    <h3 className={styles.aiColLabel}>Strengths</h3>
+                    <ul className={styles.aiList}>
+                      {llmResult.strengths.slice(0, 5).map((s: string, i: number) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {(() => {
+                  const constraints = llmResult.primary_constraints ?? llmResult.blockers
+                  return Array.isArray(constraints) && constraints.length > 0 ? (
+                    <div>
+                      <h3 className={styles.aiColLabel}>Primary constraints</h3>
+                      <ul className={styles.aiList}>
+                        {constraints.slice(0, 5).map((s: string, i: number) => (
+                          <li key={i}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null
+                })()}
+                {(() => {
+                  const opps = llmResult.automation_opportunities ?? llmResult.opportunities
+                  return Array.isArray(opps) && opps.length > 0 ? (
+                    <div>
+                      <h3 className={styles.aiColLabel}>Automation opportunities</h3>
+                      <ul className={styles.aiList}>
+                        {opps.slice(0, 5).map((s: string, i: number) => (
+                          <li key={i}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null
+                })()}
+              </div>
+              {llmResult.recommended_next_step && (
+                <p className={styles.aiNextStep}>
+                  <strong>Recommended next step:</strong> {llmResult.recommended_next_step}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className={styles.aiUnavailable}>
+              AI analysis was unavailable for this submission. The scores and projections
+              in this report are calculated directly from your answers.
+            </p>
+          )}
+        </div>
+
         {/* ── ROI Projection ── */}
         <div className={styles.card}>
-          <h2 className={styles.sectionTitle}>ROI Projection</h2>
+          <h2 className={styles.sectionLabel}>ROI Projection</h2>
 
           {!calculations.hasEnoughDataForProjection && (
             <div className={styles.confidenceBanner}>
@@ -281,6 +391,10 @@ export default function FinalResultPage() {
               value={calculations.threeYearROIPercent}
               formatter={(v) => v >= 999 ? '>999%' : formatPercent(v)}
             />
+            <ROIMetricTile label="3-Year NPV" value={(calculations as any).npv3YearLocal ?? null} formatter={fmtCurrency} subtitle="Net present value @ 10% discount" />
+            <ROIMetricTile label="Annual Ongoing Cost" value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtCurrency} subtitle="Est. licenses, maintenance & support" />
+            <ROIMetricTile label="Net Annual Savings" value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtCurrency} subtitle="After ongoing cost" />
+            <ROIMetricTile label="Net Payback Period" value={(calculations as any).netPaybackMonths ?? null} formatter={formatMonths} subtitle="On net savings" />
             <ROIMetricTile
               label="Cost of Inaction (90 days)"
               value={costOfInaction90DaysLocal}
@@ -293,45 +407,90 @@ export default function FinalResultPage() {
             />
           </div>
 
+          {(calculations as any).scenarioThreeYearROI && (
+            <div className={styles.scenarioRow}>
+              <span className={styles.scenarioLabel}>3-Year ROI range</span>
+              <div className={styles.scenarioGrid}>
+                <div className={`${styles.scenarioCell} ${styles.scenarioCellLow}`}>
+                  <span className={styles.scenarioCellLabel}>Conservative</span>
+                  <span className={styles.scenarioCellValue}>{fmtRoi((calculations as any).scenarioThreeYearROI.low)}</span>
+                </div>
+                <div className={`${styles.scenarioCell} ${styles.scenarioCellBase}`}>
+                  <span className={styles.scenarioCellLabel}>Base</span>
+                  <span className={styles.scenarioCellValue}>{fmtRoi((calculations as any).scenarioThreeYearROI.base)}</span>
+                </div>
+                <div className={`${styles.scenarioCell} ${styles.scenarioCellHigh}`}>
+                  <span className={styles.scenarioCellLabel}>Optimistic</span>
+                  <span className={styles.scenarioCellValue}>{fmtRoi((calculations as any).scenarioThreeYearROI.high)}</span>
+                </div>
+              </div>
+              <span className={styles.scenarioNote}>Range reflects 50%–90% automation efficiency; base case uses {Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%.</span>
+            </div>
+          )}
+
           {calculations.hasEnoughDataForProjection && (
             <div className={styles.assumptionsNote}>
               <p className={styles.assumptionsTitle}>How these figures were calculated</p>
               <ul className={styles.assumptionsList}>
-                <li>
-                  <strong>Step 1 — Hours reclaimed/year:</strong>{' '}
-                  {calculations.hoursReclaimedPerYear} hrs
-                  {' = '}manual hours/week × 52 weeks × automation gap × {Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}% efficiency factor
+                <li className={styles.stepRow}>
+                  <span className={styles.stepLabel}>Step 1 — Hours reclaimed/year</span>
+                  <span className={styles.stepValue}>
+                    {calculations.hoursReclaimedPerYear} hrs
+                    {' = '}manual hours/week × 52 weeks × automation gap × {Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}% efficiency factor
+                  </span>
                 </li>
-                <li>
-                  <strong>Step 2 — Labor savings:</strong>{' '}
-                  {fmtCurrency(calculations.annualLaborSavingsLocal)} = {calculations.hoursReclaimedPerYear} hrs × <strong>{fmtCurrency(calculations.assumedHourlyRateLocal)}/hr</strong>
-                  {calculations.smallTeamRateApplied
-                    ? ' (opportunity-cost rate for teams of 1–5 FTEs — 50% of industry blended rate)'
-                    : ' (industry blended rate)'}
+                <li className={styles.stepRow}>
+                  <span className={styles.stepLabel}>Step 2 — Labor savings</span>
+                  <span className={styles.stepValue}>
+                    {fmtCurrency(calculations.annualLaborSavingsLocal)} = {calculations.hoursReclaimedPerYear} hrs × <strong>{fmtCurrency(calculations.assumedHourlyRateLocal)}/hr</strong>
+                    {calculations.smallTeamRateApplied
+                      ? ' (opportunity-cost rate for teams of 1–5 FTEs — 50% of industry blended rate)'
+                      : ' (industry blended rate)'}
+                  </span>
                 </li>
-                <li>
-                  <strong>Step 3 — Process savings:</strong>{' '}
-                  {fmtCurrency(calculations.annualProcessSavingsLocal)} = 20% of labor savings (operational overhead reduction)
+                <li className={styles.stepRow}>
+                  <span className={styles.stepLabel}>Step 3 — Process savings</span>
+                  <span className={styles.stepValue}>
+                    {fmtCurrency(calculations.annualProcessSavingsLocal)} = 20% of labor savings (operational overhead reduction — internal benchmark estimate)
+                  </span>
                 </li>
-                <li>
-                  <strong>Step 4 — Total annual savings:</strong>{' '}
-                  <strong>{fmtCurrency(calculations.totalAnnualSavingsLocal)}</strong> = labor + process savings
+                <li className={styles.stepRow}>
+                  <span className={styles.stepLabel}>Ongoing run cost</span>
+                  <span className={styles.stepValue}>
+                    {fmtCurrency((calculations as any).annualOngoingCostLocal)} / year = {Math.round(((calculations as any).ongoingCostRate ?? 0.2) * 100)}% of the initial investment (licenses, maintenance, support). Net figures and payback are computed after this cost.
+                  </span>
+                </li>
+                <li className={styles.stepRow}>
+                  <span className={styles.stepLabel}>Currency &amp; sources</span>
+                  <span className={styles.stepValue}>
+                    FX rates as of {FX_AS_OF_LABEL}; the 75% efficiency factor and 20% process-overhead figure are internal benchmark estimates, not client-specific guarantees.
+                  </span>
+                </li>
+                <li className={styles.stepRow}>
+                  <span className={styles.stepLabel}>Step 4 — Total annual savings</span>
+                  <span className={styles.stepValue}>
+                    <strong>{fmtCurrency(calculations.totalAnnualSavingsLocal)}</strong> = labor + process savings
+                  </span>
                 </li>
                 {calculations.assumedBudgetMidpointLocal != null && (
-                  <li>
-                    <strong>Step 5 — Payback period:</strong>{' '}
-                    {calculations.paybackMonths != null ? `${Math.round(calculations.paybackMonths)} months` : '—'}{' '}
-                    = <strong>{fmtCurrency(calculations.assumedBudgetMidpointLocal)}</strong> investment ÷ {fmtCurrency(calculations.totalAnnualSavingsLocal)}/yr × 12
-                    {' '}(midpoint of your selected budget range)
+                  <li className={styles.stepRow}>
+                    <span className={styles.stepLabel}>Step 5 — Payback period</span>
+                    <span className={styles.stepValue}>
+                      {calculations.paybackMonths != null ? `${Math.round(calculations.paybackMonths)} months` : '—'}{' '}
+                      = <strong>{fmtCurrency(calculations.assumedBudgetMidpointLocal)}</strong> investment ÷ {fmtCurrency(calculations.totalAnnualSavingsLocal)}/yr × 12
+                      {' '}(midpoint of your selected budget range)
+                    </span>
                   </li>
                 )}
                 {calculations.assumedBudgetMidpointLocal != null && (
-                  <li>
-                    <strong>Step 6 — 3-Year ROI:</strong>{' '}
+                  <li className={styles.stepRow}>
+                    <span className={styles.stepLabel}>Step 6 — 3-Year ROI</span>
+                    <span className={styles.stepValue}>
                     <strong style={{ color: calculations.threeYearROIPercent != null && calculations.threeYearROIPercent < 0 ? '#f87171' : '#4ade80' }}>
                       {calculations.threeYearROIPercent != null ? `${calculations.threeYearROIPercent.toFixed(1)}%` : '—'}
                     </strong>
                     {' = '}({fmtCurrency(calculations.totalAnnualSavingsLocal)}/yr × 3 − {fmtCurrency(calculations.assumedBudgetMidpointLocal)}) ÷ {fmtCurrency(calculations.assumedBudgetMidpointLocal)} × 100
+                    </span>
 
                     {calculations.threeYearROIPercent != null && calculations.threeYearROIPercent < 0 && calculations.totalAnnualSavingsLocal != null && calculations.assumedBudgetMidpointLocal != null && (() => {
                       const savings3yr = calculations.totalAnnualSavingsLocal! * 3
@@ -348,12 +507,12 @@ export default function FinalResultPage() {
                             of the full investment ({fmtCurrency(budget)}). Break-even is at{' '}
                             <strong>~{breakEvenYears.toFixed(1)} years</strong>, not 3.
                           </li>
-                          <li>
+                          <li className={styles.roiFixItem}>
                             <span className={styles.roiFixLabel}>Fix A — Reduce initial budget scope</span>
                             Start with a budget of <strong>{fmtCurrency(savings3yr)}</strong> or less.
                             That amount is fully recovered by year 3 at your current saving rate.
                           </li>
-                          <li>
+                          <li className={styles.roiFixItem}>
                             <span className={styles.roiFixLabel}>Fix B — Increase automation depth</span>
                             Automate more hours or close a larger automation gap to push annual savings to at least{' '}
                             <strong>{fmtCurrency(savingsNeededPerYear)}/yr</strong> (currently {fmtCurrency(calculations.totalAnnualSavingsLocal)}/yr).
@@ -363,7 +522,7 @@ export default function FinalResultPage() {
                     })()}
 
                     {calculations.threeYearROIPercent != null && calculations.threeYearROIPercent >= 0 &&
-                      <span style={{ color: '#86efac', marginLeft: 6 }}>✓ Fully recovered within 3 years.</span>
+                      <span style={{ color: '#86efac', gridColumn: '2' }}>✓ Fully recovered within 3 years.</span>
                     }
                   </li>
                 )}
@@ -374,7 +533,7 @@ export default function FinalResultPage() {
 
         {/* ── Opportunity Priority Matrix ── */}
         <div className={styles.card}>
-          <h2 className={styles.sectionTitle}>Opportunity Priority Matrix</h2>
+          <h2 className={styles.sectionLabel}>Opportunity Priority Matrix</h2>
           {opportunities.length === 0 ? (
             <p className={styles.emptyMessage}>No opportunities identified.</p>
           ) : (
@@ -401,7 +560,7 @@ export default function FinalResultPage() {
 
         {/* ── Risk Register ── */}
         <div className={styles.card}>
-          <h2 className={styles.sectionTitle}>Risk Register</h2>
+          <h2 className={styles.sectionLabel}>Risk Register</h2>
           {sortedRisks.length === 0 ? (
             <p className={styles.emptyMessage}>No risks detected.</p>
           ) : (
@@ -415,7 +574,7 @@ export default function FinalResultPage() {
 
         {/* ── Diagnostic Context — 2-column free-flow ── */}
         <div className={styles.card}>
-          <h2 className={styles.sectionTitle}>Diagnostic Context</h2>
+          <h2 className={styles.sectionLabel}>Diagnostic Context</h2>
           <div className={styles.contextColumns}>
 
             {/* Left column */}
@@ -515,7 +674,7 @@ export default function FinalResultPage() {
         {/* ── Room for Improvement ── */}
         {Array.isArray(context.roomForImprovement) && context.roomForImprovement.length > 0 && (
           <div className={styles.card}>
-            <h2 className={styles.sectionTitle}>Room for Improvement</h2>
+            <h2 className={styles.sectionLabel}>Room for Improvement</h2>
             <p className={styles.improvementIntro}>
               Prioritized areas to strengthen before and during AI adoption. These feed directly
               into your AI System Blueprint.
@@ -584,7 +743,7 @@ export default function FinalResultPage() {
 
       {/* Hidden printable layout for PDF generation */}
       <div id="pdf-print-layout" style={{ display: 'none' }}>
-        <PrintableReport context={context} />
+        <PrintableReport context={context} llmResult={llmResult ?? undefined} />
       </div>
     </div>
   )

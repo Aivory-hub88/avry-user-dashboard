@@ -20,6 +20,7 @@ import { useCopilotPanel } from '@/hooks/useCopilotPanel'
 import { useWorkflowCopilot } from '@/hooks/useWorkflowCopilot'
 import type { CopilotMessage } from '@/hooks/useWorkflowCopilot'
 import type { GeneratedWorkflow } from '@/lib/workflows/copilotClient'
+import { ThinkingDots } from '@/components/ui/ThinkingDots'
 
 // File icon helpers
 const FILE_ICONS = {
@@ -66,6 +67,8 @@ export function CopilotTogglePanel({ onApplyWorkflow, onApplySuggestion }: Copil
     isCompleted,
     isTesting,
     sendMessage,
+    editMessage,
+    deleteMessage,
     reset,
   } = useWorkflowCopilot()
 
@@ -92,6 +95,8 @@ export function CopilotTogglePanel({ onApplyWorkflow, onApplySuggestion }: Copil
           canApply={canApply}
           isCompleted={isCompleted}
           onSendMessage={sendMessage}
+          onEditMessage={editMessage}
+          onDeleteMessage={deleteMessage}
           onApplyWorkflow={applyHandler}
           onClear={reset}
         />
@@ -135,6 +140,8 @@ interface CopilotPanelExpandedProps {
   canApply: boolean
   isCompleted: boolean
   onSendMessage: (text: string) => Promise<void>
+  onEditMessage: (index: number, newText: string) => Promise<void>
+  onDeleteMessage: (index: number) => void
   onApplyWorkflow?: (workflow: GeneratedWorkflow) => void
   onClear?: () => void
 }
@@ -142,7 +149,7 @@ interface CopilotPanelExpandedProps {
 function CopilotPanelExpanded({
   onClose, messages, loading, loadingHint, error,
   stage, isTesting, workflow, canApply, isCompleted,
-  onSendMessage, onApplyWorkflow, onClear,
+  onSendMessage, onEditMessage, onDeleteMessage, onApplyWorkflow, onClear,
 }: CopilotPanelExpandedProps) {
   const [input, setInput] = useState('')
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
@@ -229,11 +236,11 @@ function CopilotPanelExpanded({
 
   // Stage label shown during active processing
   const stageLabel: Record<string, string> = {
-    CLARIFYING: 'Memahami kebutuhan...',
-    GENERATING: 'Membuat workflow...',
+    CLARIFYING: 'Understanding your request...',
+    GENERATING: 'Building workflow...',
     TESTING: 'Testing workflow...',
-    FIXING: 'Memperbaiki otomatis...',
-    APPLYING: 'Menerapkan ke canvas...',
+    FIXING: 'Fixing automatically...',
+    APPLYING: 'Applying to canvas...',
   }
 
   return (
@@ -295,28 +302,16 @@ function CopilotPanelExpanded({
           </p>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2.5" style={{ height: `${panelHeight}px` }}>
+        <div className="copilot-chat flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3" style={{ height: `${panelHeight}px` }}>
           {messages.map((msg, i) => (
-            <div key={i} className={`flex items-start gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-              {msg.role === 'assistant' && (
-                <div className="shrink-0 mt-0.5">
-                  <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" className="w-4 h-4" />
-                </div>
-              )}
-              <div className={`flex flex-col gap-1 max-w-[85%] ${msg.role === 'user' ? 'items-end' : ''}`}>
-                {msg.role === 'assistant' ? (
-                  <div className="text-[13px] leading-[1.55] px-3 py-2 rounded-[10px] bg-white/[0.04] border border-white/5 text-[#f7f7f7] rounded-bl-[2px] break-words text-left [&_strong]:font-semibold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_p]:m-0 [&_p+p]:mt-1.5 [&_code]:bg-white/10 [&_code]:px-1 [&_code]:rounded [&_code]:text-[12px]">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {msg.content}
-                    </ReactMarkdown>
-                  </div>
-                ) : (
-                  <p className="text-[13px] leading-[1.55] m-0 px-3 py-2 rounded-[10px] whitespace-pre-wrap break-words text-left bg-[#282825] border border-white/5 text-[#f7f7f7] rounded-br-[2px]">
-                    {msg.content}
-                  </p>
-                )}
-              </div>
-            </div>
+            <MessageRow
+              key={i}
+              index={i}
+              msg={msg}
+              busy={loading}
+              onEdit={onEditMessage}
+              onDelete={onDeleteMessage}
+            />
           ))}
 
           {loading && (
@@ -325,11 +320,7 @@ function CopilotPanelExpanded({
                 <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" className="w-4 h-4" />
               </div>
               <div className="flex flex-col gap-1.5 px-3 py-2 bg-white/[0.04] border border-white/5 rounded-[10px] rounded-bl-[2px]">
-                <div className="flex gap-1">
-                  {[0, 1, 2].map(idx => (
-                    <span key={idx} className="w-[5px] h-[5px] rounded-full bg-[#a1a1aa] animate-bounce" style={{ animationDelay: `${idx * 0.2}s` }} />
-                  ))}
-                </div>
+                <ThinkingDots size={15} dotSize={2} />
                 {loadingHint && (
                   <p className="text-[11px] text-[#a1a1aa] m-0 animate-pulse">
                     {loadingHint}
@@ -349,7 +340,7 @@ function CopilotPanelExpanded({
         <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-[#353532]/60 border-t border-[#666864]/40 shrink-0 rounded-xl mx-3 mb-2">
           <div className="flex flex-col text-left">
             <span className="text-[13px] text-[#f7f7f7] font-medium">
-              Workflow siap -- {workflow.steps.length} langkah
+              Workflow ready — {workflow.steps.length} steps
             </span>
             <span className="text-[11px] text-[#a1a1aa]">
               Validated. Setup items: {workflow.setupReport?.nodeRequirements?.length ?? 0}
@@ -371,7 +362,7 @@ function CopilotPanelExpanded({
       {(isCompleted || appliedToCanvas) && (
         <div className="flex items-center px-4 py-2 bg-emerald-900/20 border-t border-emerald-700/30 shrink-0">
           <span className="text-[13px] text-emerald-400 font-medium text-left">
-            Workflow berhasil diterapkan ke canvas
+            Workflow successfully applied to canvas
           </span>
         </div>
       )}
@@ -451,6 +442,175 @@ function CopilotPanelExpanded({
         onMouseDown={startResize}
       >
         <div className="w-8 h-1 rounded-full bg-white/20 group-hover:bg-white/40 transition-colors" />
+      </div>
+    </div>
+  )
+}
+
+/* ── Chat message row ─────────────────────────────────────
+ * AI-chat-style rendering with hover actions: copy (all), edit (user,
+ * regenerates from that turn), delete (all). Markdown output is normalized
+ * so headings/lists/code never break the 13px chat typography.
+ */
+
+// Single source of truth for message typography — keeps sizes consistent
+// no matter what markdown the model returns.
+const MD_CLASSES = [
+  'text-[13px] leading-[1.6] break-words text-left',
+  '[&_h1]:text-[13px] [&_h2]:text-[13px] [&_h3]:text-[13px] [&_h4]:text-[13px]',
+  '[&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_h4]:font-semibold',
+  '[&_h1]:mt-2 [&_h1]:mb-1 [&_h2]:mt-2 [&_h2]:mb-1 [&_h3]:mt-1.5 [&_h3]:mb-0.5 [&_h4]:mt-1.5 [&_h4]:mb-0.5',
+  '[&_p]:m-0 [&_p+p]:mt-1.5 [&_strong]:font-semibold [&_em]:italic',
+  '[&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:my-1 [&_li]:my-0.5',
+  '[&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-px [&_code]:rounded [&_code]:text-[12px] [&_code]:font-mono',
+  '[&_pre]:bg-black/30 [&_pre]:border [&_pre]:border-white/5 [&_pre]:rounded-lg [&_pre]:p-2.5 [&_pre]:my-1.5 [&_pre]:overflow-x-auto [&_pre]:text-[12px] [&_pre_code]:bg-transparent [&_pre_code]:p-0',
+  '[&_a]:underline [&_a]:text-[#b7cba6]',
+  '[&_blockquote]:border-l-2 [&_blockquote]:border-white/15 [&_blockquote]:pl-3 [&_blockquote]:my-1 [&_blockquote]:text-white/70',
+  '[&_hr]:border-white/10 [&_hr]:my-2 [&_table]:text-[12px] [&_th]:text-left [&_th]:font-semibold [&_th]:pr-3 [&_td]:pr-3',
+].join(' ')
+
+function ActionBtn({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="flex items-center justify-center w-6 h-6 rounded-md text-white/35 hover:text-white/85 hover:bg-white/[0.07] transition-colors"
+    >
+      {children}
+    </button>
+  )
+}
+
+const ICONS = {
+  copy: <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
+  check: <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="#b7cba6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>,
+  edit: <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>,
+  trash: <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>,
+}
+
+function MessageRow({
+  index, msg, busy, onEdit, onDelete,
+}: {
+  index: number
+  msg: CopilotMessage
+  busy: boolean
+  onEdit: (index: number, newText: string) => Promise<void>
+  onDelete: (index: number) => void
+}) {
+  const [copied, setCopied] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(msg.content)
+  const editRef = useRef<HTMLTextAreaElement>(null)
+  const isUser = msg.role === 'user'
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(msg.content)
+    } catch {
+      // Fallback for contexts where the async clipboard API is unavailable
+      const ta = document.createElement('textarea')
+      ta.value = msg.content
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      try { document.execCommand('copy') } catch { /* give up silently */ }
+      ta.remove()
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }, [msg.content])
+
+  const startEdit = useCallback(() => {
+    setDraft(msg.content)
+    setEditing(true)
+    setTimeout(() => {
+      editRef.current?.focus()
+      editRef.current?.setSelectionRange(msg.content.length, msg.content.length)
+    }, 40)
+  }, [msg.content])
+
+  const submitEdit = useCallback(() => {
+    const trimmed = draft.trim()
+    if (!trimmed || busy) return
+    setEditing(false)
+    if (trimmed !== msg.content.trim()) onEdit(index, trimmed)
+  }, [draft, busy, msg.content, onEdit, index])
+
+  // ── Inline edit mode (user messages) ──
+  if (editing) {
+    return (
+      <div className="flex justify-end">
+        <div className="w-[85%] flex flex-col gap-1.5">
+          <textarea
+            ref={editRef}
+            className="w-full bg-black/25 border border-white/15 rounded-xl px-3 py-2 text-[13px] leading-[1.6] text-[#f7f7f7] resize-none outline-none focus:border-[#b7cba6]/50 min-h-[60px]"
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitEdit() }
+              if (e.key === 'Escape') setEditing(false)
+            }}
+            rows={2}
+            aria-label="Edit message"
+          />
+          <div className="flex items-center justify-end gap-2">
+            <span className="text-[10px] text-white/30 mr-auto">Regenerates the conversation from this turn</span>
+            <button
+              type="button"
+              className="text-[11px] font-medium px-3 py-1 rounded-lg text-white/60 hover:text-white/90 border border-white/10 hover:border-white/25 transition-colors"
+              onClick={() => setEditing(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="text-[11px] font-semibold px-3 py-1 rounded-lg bg-[#dddac5] text-[#23231f] hover:bg-[#eae7d4] transition-colors disabled:opacity-45"
+              onClick={submitEdit}
+              disabled={!draft.trim() || busy}
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Assistant message: avatar + open content, actions on hover ──
+  if (!isUser) {
+    return (
+      <div className="group flex items-start gap-2.5">
+        <div className="shrink-0 mt-1">
+          <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" className="w-[18px] h-[18px]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className={`${MD_CLASSES} text-[#ecebe7]`}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+          </div>
+          <div className="flex items-center gap-0.5 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <ActionBtn label={copied ? 'Copied' : 'Copy'} onClick={handleCopy}>{copied ? ICONS.check : ICONS.copy}</ActionBtn>
+            <ActionBtn label="Delete message" onClick={() => onDelete(index)}>{ICONS.trash}</ActionBtn>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── User message: right-aligned bubble, actions on hover ──
+  return (
+    <div className="group flex flex-col items-end">
+      <div className="max-w-[85%] bg-[#282825] border border-white/[0.06] rounded-2xl rounded-br-md px-3.5 py-2">
+        <p className="m-0 text-[13px] leading-[1.6] text-[#f7f7f7] whitespace-pre-wrap break-words text-left">
+          {msg.content}
+        </p>
+      </div>
+      <div className="flex items-center gap-0.5 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <ActionBtn label={copied ? 'Copied' : 'Copy'} onClick={handleCopy}>{copied ? ICONS.check : ICONS.copy}</ActionBtn>
+        {!busy && <ActionBtn label="Edit and resend" onClick={startEdit}>{ICONS.edit}</ActionBtn>}
+        <ActionBtn label="Delete message" onClick={() => onDelete(index)}>{ICONS.trash}</ActionBtn>
       </div>
     </div>
   )

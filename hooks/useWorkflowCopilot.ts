@@ -37,6 +37,10 @@ export interface UseWorkflowCopilotReturn {
   isCompleted: boolean
   isTesting: boolean
   sendMessage: (text: string) => Promise<void>
+  /** Replace a user message and regenerate the conversation from that point. */
+  editMessage: (index: number, newText: string) => Promise<void>
+  /** Remove a single message from the thread. */
+  deleteMessage: (index: number) => void
   reset: () => void
 }
 
@@ -92,12 +96,16 @@ export function useWorkflowCopilot(): UseWorkflowCopilotReturn {
     initial.current?.sessionId ?? null
   )
 
-  // Derived convenience fields surfaced from server state
-  const [workflow, setWorkflow] = useState<GeneratedWorkflow | null>(null)
-  const [testResults, setTestResults] = useState<TestResult[] | null>(null)
-  const [canApply, setCanApply] = useState(false)
-  const [isCompleted, setIsCompleted] = useState(false)
-  const [isTesting, setIsTesting] = useState(false)
+  // Derived convenience fields surfaced from server state.
+  // Rehydrated from the persisted serverState using the same rules as the
+  // copilot API route — otherwise a reload would drop workflow/canApply and
+  // the "Apply to canvas" button would vanish for a ready workflow.
+  const persisted = initial.current?.serverState ?? null
+  const [workflow, setWorkflow] = useState<GeneratedWorkflow | null>(persisted?.generatedWorkflow ?? null)
+  const [testResults, setTestResults] = useState<TestResult[] | null>(persisted?.testResults ?? null)
+  const [canApply, setCanApply] = useState(persisted?.stage === 'AWAITING_APPLY_APPROVAL')
+  const [isCompleted, setIsCompleted] = useState(persisted?.stage === 'COMPLETED')
+  const [isTesting, setIsTesting] = useState(persisted?.stage === 'SANDBOX_TESTING' || persisted?.stage === 'FIXING')
 
   const stage = serverState?.stage ?? 'IDLE'
 
@@ -159,6 +167,19 @@ export function useWorkflowCopilot(): UseWorkflowCopilotReturn {
     }
   }, [loading, sessionId, serverState])
 
+  const editMessage = useCallback(async (index: number, newText: string) => {
+    const trimmed = newText.trim()
+    if (!trimmed || loading) return
+    // Drop the edited message and everything after it, then resend — the
+    // conversation regenerates from that point (sendMessage re-appends the user turn).
+    setMessages(prev => prev.slice(0, index))
+    await sendMessage(trimmed)
+  }, [loading, sendMessage])
+
+  const deleteMessage = useCallback((index: number) => {
+    setMessages(prev => prev.filter((_, i) => i !== index))
+  }, [])
+
   const reset = useCallback(() => {
     setMessages([])
     setLoading(false)
@@ -186,6 +207,8 @@ export function useWorkflowCopilot(): UseWorkflowCopilotReturn {
     isCompleted,
     isTesting,
     sendMessage,
+    editMessage,
+    deleteMessage,
     reset,
   }
 }

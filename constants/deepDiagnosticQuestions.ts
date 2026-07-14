@@ -247,6 +247,19 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
         ],
         helperText: 'Used to calibrate ROI and savings estimates',
         required: false
+      },
+      {
+        id: 'data_infrastructure',
+        question: 'What best describes your current data infrastructure?',
+        type: 'radio',
+        options: [
+          'Spreadsheets / manual files',
+          'Databases (SQL / NoSQL)',
+          'Data warehouse or data lake',
+          'Modern data platform (streaming, catalog, governance)'
+        ],
+        helperText: 'Higher-maturity data platforms shorten AI time-to-value',
+        required: false
       }
     ]
   },
@@ -358,6 +371,30 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
           'Not sure'
         ],
         helperText: 'Affects which AI infrastructure options are available',
+        required: false
+      },
+      {
+        id: 'ai_governance',
+        question: 'Do you have AI governance or an oversight process?',
+        type: 'radio',
+        options: [
+          'No AI governance',
+          'Informal / ad-hoc oversight',
+          'Formal AI governance & oversight'
+        ],
+        helperText: 'Governance is a gating factor for enterprise AI adoption',
+        required: false
+      },
+      {
+        id: 'ai_data_privacy',
+        question: 'How do you handle data privacy & security for AI systems?',
+        type: 'radio',
+        options: [
+          'No formal data privacy policy',
+          'Basic privacy policy',
+          'Formal privacy policy with controls (DPIA, access controls, audit)'
+        ],
+        helperText: 'Privacy controls determine which data can be used for AI',
         required: false
       }
     ]

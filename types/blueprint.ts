@@ -75,6 +75,10 @@ export interface BlueprintV1DiagnosticSummary {
 export interface BlueprintV1KpiTarget {
   metric: string
   target: string
+  /** Baseline value from the diagnostic (e.g. "$4.20 per ticket"). */
+  current?: string
+  /** Business outcome of hitting the target — distinct from the target itself. */
+  expected_impact?: string
 }
 
 export interface BlueprintV1StrategicObjective {
@@ -133,6 +137,12 @@ export interface BlueprintV1 {
   workflow_modules: BlueprintV1WorkflowModule[]
   risk_assessment: BlueprintV1RiskAssessment
   deployment_plan: BlueprintV1DeploymentPlan
+  /**
+   * Set by the generate API when the AI returned prose instead of valid
+   * JSON and the blueprint was assembled from a simplified template. The
+   * UI uses this to suggest regenerating.
+   */
+  fallback_generated?: boolean
 }
 
 /**
