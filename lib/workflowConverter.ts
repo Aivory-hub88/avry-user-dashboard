@@ -9,8 +9,14 @@
  * Trigger node always uses Webhook with auto-generated path.
  */
 
-import { detectNodeIntent, mapIntentToN8nNode } from '@/lib/workflows/nodeMapper'
+import { detectNodeIntent, mapIntentToN8nNodes } from '@/lib/workflows/nodeMapper'
 import type { NodeIntent, MapContext } from '@/lib/workflows/nodeMapper'
+
+// Intents whose n8n node can return multiple items — when immediately
+// followed by an AI step, a Limit node is inserted between them so the
+// agent doesn't get called once per item (matches the reference workflow:
+// RSS Read -> Limit -> AI Agent).
+const MULTI_ITEM_INTENTS: NodeIntent[] = ['rss', 'http', 'database']
 
 interface WorkflowStep {
   step: number
@@ -103,10 +109,19 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
   }
   nodes.push(triggerNode)
 
+  // Merge a connection into `connections` without clobbering other
+  // connection types (or branches) already registered for the same source.
+  const addConnection = (from: string, to: string, type: 'main' | 'ai_languageModel' | 'ai_memory' | 'ai_tool') => {
+    if (!connections[from]) connections[from] = {}
+    if (!connections[from][type]) connections[from][type] = [[]]
+    connections[from][type][0].push({ node: to, type, index: 0 })
+  }
+
   // 2. Step nodes — classified via nodeMapper engine
   let aiNodeCount = 0
   const nodeNames: string[] = []
   const stepCount = workflow.steps.length
+  let prevIntent: NodeIntent | null = null
 
   workflow.steps.forEach((step, i) => {
     const isLast = i === stepCount - 1
@@ -122,20 +137,41 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
     }
 
     const ctx: MapContext = { stepIndex: i, aiNodeCount, isLast }
-    const stepNode = mapIntentToN8nNode(intent, step, ctx)
-    console.log(`[workflowConverter] Step ${i}: mapped to n8n type="${stepNode.type}" typeVersion=${stepNode.typeVersion}`)
+    const { primary, extraNodes, extraConnections } = mapIntentToN8nNodes(intent, step, ctx)
+    console.log(`[workflowConverter] Step ${i}: mapped to n8n type="${primary.type}" typeVersion=${primary.typeVersion}`)
 
     // Track AI nodes for input expression selection
     if (intent === 'ai') aiNodeCount++
 
-    nodes.push(stepNode)
+    let prevNodeName = i === 0 ? triggerNode.name : nodeNames[i - 1]
 
-    // Connect previous node → this node using tracked names
-    const prevNodeName = i === 0 ? triggerNode.name : nodeNames[i - 1]
-    connections[prevNodeName] = {
-      main: [[{ node: stepNode.name, type: 'main', index: 0 }]],
+    // A multi-item producer feeding straight into an AI step gets a Limit
+    // node in between, so the agent runs once per batch instead of once
+    // per item (matches n8n's own recommended RSS -> Limit -> AI Agent shape).
+    if (intent === 'ai' && prevIntent && MULTI_ITEM_INTENTS.includes(prevIntent)) {
+      const limitNode: N8nNode = {
+        id: generateNodeId(),
+        name: `Limit ${i}`,
+        type: 'n8n-nodes-base.limit',
+        typeVersion: 1,
+        position: [primary.position[0] - 110, primary.position[1]],
+        parameters: { maxItems: 1 },
+      }
+      nodes.push(limitNode)
+      addConnection(prevNodeName, limitNode.name, 'main')
+      prevNodeName = limitNode.name
     }
-    nodeNames.push(stepNode.name)
+
+    nodes.push(primary)
+    if (extraNodes) nodes.push(...extraNodes)
+
+    addConnection(prevNodeName, primary.name, 'main')
+    for (const conn of extraConnections ?? []) {
+      addConnection(conn.from, conn.to, conn.type)
+    }
+
+    nodeNames.push(primary.name)
+    prevIntent = intent
   })
 
   return {

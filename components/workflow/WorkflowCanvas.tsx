@@ -33,7 +33,7 @@ import AppNode from './AppNode';
 import TriggerNode from './TriggerNode';
 import StandardNode from './StandardNode';
 import AgentNode from './AgentNode';
-import { N8NAdaptiveEdge } from './WorkflowEdges';
+import { N8NAdaptiveEdge, AiSubConnectionEdge } from './WorkflowEdges';
 import NodeInspectorPanel from './inspector/NodeInspectorPanel';
 import { n8nToReactFlow, reactFlowToN8n } from '@/lib/n8nMapper';
 import { loadCanvasState, fetchCanvasState, useCanvasAutosave } from '@/hooks/useCanvasPersistence';
@@ -82,14 +82,19 @@ const pillStyle = (active: boolean): React.CSSProperties => ({
   whiteSpace: 'nowrap' as const,
 });
 
-/** Normalize edges loaded from any external source to use canonical n8nAdaptive type + marker. */
+/** Normalize edges loaded from any external source to use canonical n8nAdaptive type + marker.
+ * `aiSubConnection` edges (LangChain Chat Model/Memory/Tool -> Agent) are left
+ * alone — they're not part of the main flow and use their own styling. */
 function normalizeEdges(edges: Edge[], nodes?: Node[]): Edge[] {
-  return edges.map((e) => ({
-    ...e,
-    type: 'n8nAdaptive',
-    animated: false,
-    markerEnd: (e.markerEnd as any) || { type: MarkerType.ArrowClosed, width: 12, height: 12, color: '#9ca3af' },
-  }));
+  return edges.map((e) => {
+    if (e.type === 'aiSubConnection') return e;
+    return {
+      ...e,
+      type: 'n8nAdaptive',
+      animated: false,
+      markerEnd: (e.markerEnd as any) || { type: MarkerType.ArrowClosed, width: 12, height: 12, color: '#9ca3af' },
+    };
+  });
 }
 
 /**
@@ -642,6 +647,9 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     straight: N8NAdaptiveEdge,
     step: N8NAdaptiveEdge,
     simplebezier: N8NAdaptiveEdge,
+    // LangChain sub-node connections (Chat Model/Memory/Tool -> Agent) —
+    // dashed, arrowless, not part of the main step flow.
+    aiSubConnection: AiSubConnectionEdge,
   }), []);
   const selectedNode = useMemo(() => nodes.find((n) => n.id === selectedNodeId) ?? null, [nodes, selectedNodeId]);
 

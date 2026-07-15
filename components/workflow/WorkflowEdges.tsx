@@ -106,5 +106,51 @@ const N8NAdaptiveEdge = memo((props: EdgeProps) => {
 
 N8NAdaptiveEdge.displayName = 'N8NAdaptiveEdge';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// AiSubConnectionEdge — dashed, arrowless connector for LangChain sub-nodes
+// (Chat Model / Memory / Tool feeding an AI Agent via ai_languageModel /
+// ai_memory / ai_tool). Visually distinct from the main step-to-step flow.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AiSubConnectionEdge = memo((props: EdgeProps) => {
+  const {
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition = Position.Right,
+    targetPosition = Position.Left,
+    selected,
+  } = props;
+
+  const [edgePath] = useMemo(
+    () =>
+      getSmoothStepPath({
+        sourceX,
+        sourceY,
+        sourcePosition,
+        targetX,
+        targetY,
+        targetPosition,
+        borderRadius: 12,
+      }),
+    [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition]
+  );
+
+  return (
+    <BaseEdge
+      path={edgePath}
+      style={{
+        stroke: selected ? '#a8a6a2' : '#6b6b68',
+        strokeWidth: 1.5,
+        strokeDasharray: '4 4',
+      }}
+      interactionWidth={16}
+    />
+  );
+});
+
+AiSubConnectionEdge.displayName = 'AiSubConnectionEdge';
+
 export default N8NAdaptiveEdge;
-export { N8NAdaptiveEdge };
+export { N8NAdaptiveEdge, AiSubConnectionEdge };

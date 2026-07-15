@@ -49,6 +49,9 @@ export type NodeConfig =
   | EditFieldsConfig
   | HttpResponseConfig
   | AgentConfig
+  | RssFeedConfig
+  | SlackConfig
+  | GmailConfig
   | GenericConfig;
 
 export interface HttpRequestConfig {
@@ -88,11 +91,35 @@ export interface ManualTriggerConfig {
 export interface AiStepConfig {
   type: 'aiStep';
   whatHappens: string;
+  /** Chat Model provider — determines which n8n LangChain sub-node gets deployed. */
+  provider: 'openai' | 'anthropic';
   model: string;
   systemPrompt: string;
   temperature: number;
   toolService: string;
   expectedOutput: string;
+}
+
+export interface RssFeedConfig {
+  type: 'rssFeed';
+  feedUrl: string;
+}
+
+export interface SlackConfig {
+  type: 'slack';
+  resource: 'message';
+  operation: 'send';
+  channel: string;
+  text: string;
+  /** Bot token entered in Aivory — used to create a Slack credential in n8n at deploy time. Never persisted server-side by Aivory. */
+  botToken: string;
+}
+
+export interface GmailConfig {
+  type: 'gmail';
+  to: string;
+  subject: string;
+  message: string;
 }
 
 export interface IfConditionConfig {

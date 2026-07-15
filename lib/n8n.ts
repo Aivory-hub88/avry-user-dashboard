@@ -23,18 +23,27 @@ export interface N8nNode {
 
 // ── Connections ───────────────────────────────────────────────────────────────
 // Keyed by SOURCE node NAME (not ID).
-// Each key maps to an object with a "main" array of output branches.
-// Each branch is an array of connection targets.
+// Each key maps to an object keyed by connection type, each holding an array
+// of output branches (each branch an array of connection targets).
+// 'main' is the regular data-flow connection. The `ai_*` types are how
+// LangChain sub-nodes (Chat Model, Memory, Tool) feed into an AI Agent node —
+// the sub-node is the connection SOURCE even though it renders below/behind
+// the Agent it feeds.
+
+export type N8nConnectionType = 'main' | 'ai_languageModel' | 'ai_memory' | 'ai_tool'
 
 export interface N8nConnectionTarget {
   node: string   // target node NAME
-  type: 'main'
+  type: N8nConnectionType
   index: number
 }
 
 export interface N8nConnections {
   [sourceNodeName: string]: {
-    main: Array<Array<N8nConnectionTarget>>
+    main?: Array<Array<N8nConnectionTarget>>
+    ai_languageModel?: Array<Array<N8nConnectionTarget>>
+    ai_memory?: Array<Array<N8nConnectionTarget>>
+    ai_tool?: Array<Array<N8nConnectionTarget>>
   }
 }
 

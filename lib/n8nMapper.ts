@@ -29,6 +29,8 @@ export interface AivoryNode extends Node {
  * @param workflow n8n workflow object
  * @returns Object with nodes and edges arrays
  */
+const AI_SUB_CONNECTION_TYPES = ['ai_languageModel', 'ai_memory', 'ai_tool'] as const
+
 export function n8nToReactFlow(
   workflow: N8nWorkflow
 ): { nodes: Node<WorkflowNodeData>[]; edges: Edge[] } {
@@ -44,8 +46,13 @@ export function n8nToReactFlow(
   const nameToId = new Map<string, string>()
   workflow.nodes.forEach((n) => nameToId.set(n.name, n.id))
 
-  // Build adjacency map (by ID) for layout calculation
+  // Build adjacency map (by ID) for layout calculation — main-flow only.
+  // LangChain sub-nodes (Chat Model/Memory/Tool) connect via ai_* types and
+  // are NOT part of the main flow column layout; they're positioned below
+  // whatever node they feed once that node's column is known (see below).
   const adjacency = new Map<string, string[]>()
+  const subNodeParent = new Map<string, string>() // sub-node id -> node id it feeds
+  const modelForAgent = new Map<string, string>() // agent/parent id -> ai_languageModel sub-node id
   workflow.nodes.forEach((n) => adjacency.set(n.id, []))
 
   if (workflow.connections) {
@@ -62,10 +69,20 @@ export function n8nToReactFlow(
           adjacency.set(sourceId, targets)
         })
       })
+      AI_SUB_CONNECTION_TYPES.forEach((subType) => {
+        const subBranches = outputs[subType] ?? []
+        subBranches.forEach((branch) => {
+          branch.forEach((conn) => {
+            const targetId = nameToId.get(conn.node) ?? conn.node
+            subNodeParent.set(sourceId, targetId)
+            if (subType === 'ai_languageModel') modelForAgent.set(targetId, sourceId)
+          })
+        })
+      })
     })
   }
 
-  // Assign layout levels via BFS from trigger nodes
+  // Assign layout levels via BFS from trigger nodes (main-flow only)
   const levels = new Map<string, number>()
   const visited = new Set<string>()
 
@@ -81,23 +98,49 @@ export function n8nToReactFlow(
     if (mapN8nNodeType(n.type) === 'trigger') assignLevel(n.id, 0)
   })
   workflow.nodes.forEach((n) => {
-    if (!visited.has(n.id)) assignLevel(n.id, 0)
+    if (!visited.has(n.id) && !subNodeParent.has(n.id)) assignLevel(n.id, 0)
   })
 
   // Count nodes per level for vertical stacking within a column
   const indexPerLevel = new Map<number, number>()
+  const positionById = new Map<string, { x: number; y: number }>()
 
   workflow.nodes.forEach((n8nNode) => {
+    if (subNodeParent.has(n8nNode.id)) return // positioned in the pass below
+
     const level = levels.get(n8nNode.id) ?? 0
     const indexInLevel = indexPerLevel.get(level) ?? 0
     indexPerLevel.set(level, indexInLevel + 1)
 
-    const workflowData = mapN8nNodeToWorkflowData(n8nNode, workflow.id)
+    const linkedModelId = modelForAgent.get(n8nNode.id)
+    const linkedModelNode = linkedModelId ? workflow.nodes.find((n) => n.id === linkedModelId) : undefined
+    const workflowData = mapN8nNodeToWorkflowData(n8nNode, workflow.id, linkedModelNode)
+    const position = { x: level * 320, y: indexInLevel * 180 }
+    positionById.set(n8nNode.id, position)
 
     nodes.push({
       id: n8nNode.id,
       data: workflowData,
-      position: { x: level * 320, y: indexInLevel * 180 },
+      position,
+      type: 'standardNode',
+    })
+  })
+
+  // Position sub-nodes directly below the node they feed (staggered if more
+  // than one sub-node feeds the same parent, e.g. Chat Model + Memory + Tool).
+  const subIndexByParent = new Map<string, number>()
+  workflow.nodes.forEach((n8nNode) => {
+    const parentId = subNodeParent.get(n8nNode.id)
+    if (!parentId) return
+    const parentPos = positionById.get(parentId) ?? { x: 0, y: 0 }
+    const subIndex = subIndexByParent.get(parentId) ?? 0
+    subIndexByParent.set(parentId, subIndex + 1)
+
+    const workflowData = mapN8nNodeToWorkflowData(n8nNode, workflow.id)
+    nodes.push({
+      id: n8nNode.id,
+      data: workflowData,
+      position: { x: parentPos.x + subIndex * 180, y: parentPos.y + 200 },
       type: 'standardNode',
     })
   })
@@ -134,6 +177,27 @@ export function n8nToReactFlow(
           })
         })
       })
+
+      // LangChain sub-node connections (ai_languageModel/ai_memory/ai_tool) —
+      // tagged distinctly so reactFlowToN8n() writes them back into the right
+      // connection bucket instead of 'main', and so the canvas can style them
+      // as sub-connections rather than regular flow steps.
+      AI_SUB_CONNECTION_TYPES.forEach((subType) => {
+        const subBranches = outputs[subType] ?? []
+        subBranches.forEach((branch) => {
+          branch.forEach((conn) => {
+            const targetId = nameToId.get(conn.node) ?? conn.node
+            edges.push({
+              id: `${sourceId}-${targetId}-${subType}`,
+              source: sourceId,
+              target: targetId,
+              animated: false,
+              type: 'aiSubConnection',
+              data: { connectionType: subType },
+            })
+          })
+        })
+      })
     })
   }
 
@@ -155,6 +219,13 @@ export function configToN8nType(config: NodeConfig): string | null {
     case 'ifCondition':   return 'n8n-nodes-base.if'
     case 'editFields':    return 'n8n-nodes-base.set'
     case 'httpResponse':  return 'n8n-nodes-base.respondToWebhook'
+    case 'rssFeed':       return 'n8n-nodes-base.rssFeedRead'
+    case 'slack':         return 'n8n-nodes-base.slack'
+    case 'gmail':         return 'n8n-nodes-base.gmail'
+    // No rawN8n type to preserve means this AI step was never bound to a
+    // concrete node (e.g. built purely from the inspector). Default to a
+    // real, deployable OpenAI node rather than silently downgrading to Set.
+    case 'aiStep':         return 'n8n-nodes-base.openAi'
     default:              return null
   }
 }
@@ -167,12 +238,22 @@ export function configToN8nTypeVersion(config: NodeConfig): number | null {
     case 'schedule':      return 1.2
     case 'ifCondition':   return 1
     case 'editFields':    return 1
+    case 'rssFeed':       return 1.1
+    case 'slack':         return 2.2
+    case 'gmail':         return 2.1
+    case 'aiStep':        return 1.3
     default:              return 1
   }
 }
 
-/** Serialize a typed canvas config into n8n node parameters. Returns null for configs with no mapping. */
-export function configToN8nParameters(config: NodeConfig): Record<string, any> | null {
+/**
+ * Serialize a typed canvas config into n8n node parameters. Returns null for
+ * configs with no mapping (baseParams are kept as-is in that case).
+ * `rawType` is the node's existing n8n type (if any) — aiStep needs it to
+ * know whether it's writing a real OpenAI node's parameters or the JSON body
+ * of an httpRequest node that calls Aivory's Zeroclaw backend.
+ */
+export function configToN8nParameters(config: NodeConfig, rawType?: string | null): Record<string, any> | null {
   switch (config.type) {
     case 'httpRequest': {
       const headers = [...(config.headers ?? [])]
@@ -236,8 +317,62 @@ export function configToN8nParameters(config: NodeConfig): Record<string, any> |
       }
     case 'manualTrigger':
       return {}
+    case 'rssFeed':
+      return { url: config.feedUrl }
+    case 'slack':
+      return {
+        resource: config.resource,
+        operation: config.operation,
+        channel: config.channel,
+        text: config.text,
+        otherOptions: {},
+      }
+    case 'gmail':
+      return {
+        resource: 'message',
+        operation: 'send',
+        sendTo: config.to,
+        subject: config.subject,
+        message: config.message,
+      }
+    case 'aiStep': {
+      // Zeroclaw ignores a separate system_prompt field — it must be embedded
+      // in the message text (see workflow-builder-architecture memory).
+      if (!rawType || rawType === 'n8n-nodes-base.httpRequest') {
+        const instruction = [config.systemPrompt, config.whatHappens].filter(Boolean).join('\n\n')
+        return {
+          method: 'POST',
+          sendBody: true,
+          specifyBody: 'json',
+          jsonBody: JSON.stringify({ message: instruction || config.whatHappens }, null, 2),
+        }
+      }
+      if (rawType === '@n8n/n8n-nodes-langchain.lmChatOpenAi' || rawType === '@n8n/n8n-nodes-langchain.lmChatAnthropic') {
+        return { model: { value: config.model }, options: { temperature: config.temperature } }
+      }
+      if (rawType === '@n8n/n8n-nodes-langchain.agent') {
+        // The Agent node itself has no model/temperature — those live on its
+        // linked Chat Model sub-node (updated separately, see reactFlowToN8n's
+        // sub-node sync pass). `text` is usually an n8n expression referencing
+        // upstream JSON — leave it untouched (comes through via baseParams merge).
+        return { promptType: 'define', options: { systemMessage: config.systemPrompt || config.whatHappens || '' } }
+      }
+      // Real n8n-nodes-base.openAi node.
+      return {
+        resource: 'text',
+        operation: 'message',
+        modelId: { value: config.model, mode: 'list' },
+        messages: {
+          values: [
+            ...(config.systemPrompt ? [{ content: config.systemPrompt, role: 'system' }] : []),
+            { content: config.whatHappens, role: 'user' },
+          ],
+        },
+        options: { temperature: config.temperature },
+      }
+    }
     default:
-      // aiStep / agent / generic — no direct n8n parameter mapping; keep rawN8n params.
+      // agent / generic — no direct n8n parameter mapping; keep rawN8n params.
       return null
   }
 }
@@ -278,7 +413,8 @@ export function reactFlowToN8n(
     // Typed canvas config (inspector / setup copilot) wins over stale raw params —
     // this is what makes "Deploy to n8n" ship the user's configuration.
     const config = node.data.config
-    const configParams = config ? configToN8nParameters(config) : null
+    const resolvedType = rawN8n?.type || originalN8nNode?.type || null
+    const configParams = config ? configToN8nParameters(config, resolvedType) : null
     const baseParams = rawN8n?.parameters || originalN8nNode?.parameters || {}
 
     const n8nNode: N8nNode = {
@@ -295,28 +431,59 @@ export function reactFlowToN8n(
 
   // Map ReactFlow edges back to n8n connections format
   // n8n connections are keyed by source node NAME, target is also node NAME
-  // Format: { [sourceName]: { main: Array<Array<N8nConnectionTarget>> } }
+  // Format: { [sourceName]: { main: Array<Array<N8nConnectionTarget>>, ai_languageModel?: ... } }
   edges.forEach((edge) => {
     const sourceName = idToName.get(edge.source) || edge.source
     const targetName = idToName.get(edge.target) || edge.target
 
+    // 'aiSubConnection' edges (Chat Model/Memory/Tool -> Agent) use their own
+    // n8n connection type instead of 'main' — see n8nToReactFlow() above.
+    const subType = edge.type === 'aiSubConnection' ? (edge.data as any)?.connectionType : undefined
+    const connType: 'main' | 'ai_languageModel' | 'ai_memory' | 'ai_tool' = subType || 'main'
+
     if (!workflow.connections[sourceName]) {
-      workflow.connections[sourceName] = { main: [] }
+      workflow.connections[sourceName] = {}
+    }
+    if (!workflow.connections[sourceName][connType]) {
+      workflow.connections[sourceName][connType] = []
+    }
+    const branchArray = workflow.connections[sourceName][connType]!
+
+    // Determine branch index: 0 = true/main, 1 = false/no (only meaningful for 'main')
+    const branchIndex = connType === 'main' && edge.sourceHandle === 'out-no' ? 1 : 0
+
+    while (branchArray.length <= branchIndex) {
+      branchArray.push([])
     }
 
-    // Determine branch index: 0 = true/main, 1 = false/no
-    const branchIndex = edge.sourceHandle === 'out-no' ? 1 : 0
-
-    // Ensure the branch array exists
-    while (workflow.connections[sourceName].main.length <= branchIndex) {
-      workflow.connections[sourceName].main.push([])
-    }
-
-    workflow.connections[sourceName].main[branchIndex].push({
+    branchArray[branchIndex].push({
       node: targetName,
-      type: 'main',
+      type: connType,
       index: 0,
     })
+  })
+
+  // Sync the AI Agent's linked Chat Model sub-node when the user edits the
+  // Agent's model in the inspector — the model lives on the sub-node's
+  // parameters, not the Agent's own parameters.
+  const aiLanguageModelEdges = edges.filter(
+    (e) => e.type === 'aiSubConnection' && (e.data as any)?.connectionType === 'ai_languageModel'
+  )
+  aiLanguageModelEdges.forEach((edge) => {
+    const agentReactNode = nodes.find((n) => n.id === edge.target)
+    const config = agentReactNode?.data.config
+    if (!config || config.type !== 'aiStep' || !config.model) return
+    const modelNode = workflow.nodes.find((n) => n.id === edge.source)
+    if (!modelNode) return
+    if (modelNode.type === '@n8n/n8n-nodes-langchain.lmChatAnthropic' || modelNode.type === '@n8n/n8n-nodes-langchain.lmChatOpenAi') {
+      // Provider changed in the inspector — swap the sub-node's n8n type too,
+      // not just the model value, so the deployed workflow uses the right
+      // LangChain Chat Model node.
+      modelNode.type = config.provider === 'anthropic'
+        ? '@n8n/n8n-nodes-langchain.lmChatAnthropic'
+        : '@n8n/n8n-nodes-langchain.lmChatOpenAi'
+      modelNode.parameters = { ...modelNode.parameters, model: { value: config.model } }
+    }
   })
 
   return workflow
@@ -345,7 +512,8 @@ function humanizeN8nType(type: string): string {
 
 function mapN8nNodeToWorkflowData(
   n8nNode: N8nNode,
-  workflowId?: string
+  workflowId?: string,
+  linkedModelNode?: N8nNode
 ): WorkflowNodeData {
   // Check if there's a template for this workflow
   const template = workflowId
@@ -368,7 +536,12 @@ function mapN8nNodeToWorkflowData(
     description: stepMeta?.description,
     category,
     // Don't pass icon — WorkflowNode derives its own Lucide icon from category
-    rawN8n: n8nNode,
+    // linkedModel is not part of the real n8n schema — it's how we carry the
+    // AI Agent's connected Chat Model sub-node params through to the inspector
+    // (extractConfigFromNode) without threading the whole graph everywhere.
+    rawN8n: linkedModelNode
+      ? { ...n8nNode, linkedModel: { type: linkedModelNode.type, parameters: linkedModelNode.parameters } }
+      : n8nNode,
   };
 
   // For condition nodes, add YES/NO outputs

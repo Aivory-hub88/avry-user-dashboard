@@ -19,6 +19,7 @@ export type NodeIntent =
   | 'filter'
   | 'transform'
   | 'schedule'
+  | 'rss'
   | 'ai'
 
 // AI-step webhook target embedded into exported n8n workflows. This module is
@@ -38,6 +39,7 @@ const INTENT_PATTERNS: Record<NodeIntent, RegExp> = {
   email: /email|mail\b|smtp|inbox/i,
   messaging: /slack|discord|telegram|whatsapp|\bsms\b|\bteams\b/i,
   schedule: /schedule|cron|daily|hourly|weekly|timer|interval/i,
+  rss: /\brss\b|\bfeed\b/i,
   http: /\bhttp\b|\bapi\b|request\b|fetch\b|call.*endpoint|webhook.*call|post.*to|get.*from/i,
   transform: /transform|convert|format\b|parse\b|extract\b|set.*value/i,
   database: /mysql|postgres|postgresql|sql\b|database|db\b|query|insert|select.*from/i,
@@ -62,6 +64,7 @@ export function detectNodeIntent(action: string, tool?: string): NodeIntent {
   if (INTENT_PATTERNS.respond.test(text)) return 'respond'
   if (INTENT_PATTERNS.filter.test(text)) return 'filter'
   if (INTENT_PATTERNS.schedule.test(text)) return 'schedule'
+  if (INTENT_PATTERNS.rss.test(text)) return 'rss'
   if (INTENT_PATTERNS.http.test(text)) return 'http'
   if (INTENT_PATTERNS.database.test(text)) return 'database'
   if (INTENT_PATTERNS.ftp.test(text)) return 'ftp'
@@ -107,6 +110,22 @@ export interface MapContext {
   stepIndex: number
   aiNodeCount: number
   isLast: boolean
+}
+
+export type N8nStepConnectionType = 'main' | 'ai_languageModel' | 'ai_memory' | 'ai_tool'
+
+export interface StepConnection {
+  from: string
+  to: string
+  type: N8nStepConnectionType
+}
+
+/** Result of mapping one Aivory step — usually one node, but AI steps expand
+ * into an Agent node + a linked Chat Model sub-node. */
+export interface MappedStepResult {
+  primary: N8nNode
+  extraNodes?: N8nNode[]
+  extraConnections?: StepConnection[]
 }
 
 /**
@@ -157,10 +176,26 @@ export function mapIntentToN8nNode(
         },
       }
 
-    case 'email':
+    case 'email': {
+      // Gmail specifically gets the native Gmail node; everything else falls
+      // back to generic SMTP. Credentials intentionally omitted either way —
+      // user attaches the Gmail OAuth2 / SMTP credential in n8n after activation.
+      const isGmail = /gmail/i.test(`${step.tool || ''} ${step.action || ''}`)
+      if (isGmail) {
+        return {
+          ...baseNode,
+          type: 'n8n-nodes-base.gmail',
+          typeVersion: 2.1,
+          parameters: {
+            resource: 'message',
+            operation: 'send',
+            sendTo: step.inputs?.to_email || '={{ $json.to || $json.user_email || $json.email }}',
+            subject: step.inputs?.subject_template || "={{ 'Re: ' + ($json.subject || 'Aivory notification') }}",
+            message: step.inputs?.body_template || '={{ $json.reply_text || $json.aiResponse || $json.message }}',
+          },
+        }
+      }
       // n8n Send Email node — schema from n8n-MCP (typeVersion 2.1).
-      // Credentials intentionally omitted — user assigns SMTP credential
-      // manually in n8n side panel after activation.
       return {
         ...baseNode,
         type: 'n8n-nodes-base.emailSend',
@@ -175,6 +210,7 @@ export function mapIntentToN8nNode(
         },
         // No credentials — user assigns SMTP credential in n8n side panel
       }
+    }
 
     case 'messaging': {
       // Detect Slack specifically for native node
@@ -237,6 +273,16 @@ export function mapIntentToN8nNode(
         typeVersion: 1,
         parameters: {
           rule: { interval: [{ field: 'hours', triggerAtHour: 9 }] },
+        },
+      }
+
+    case 'rss':
+      return {
+        ...baseNode,
+        type: 'n8n-nodes-base.rssFeedRead',
+        typeVersion: 1.1,
+        parameters: {
+          url: step.inputs?.url || '',
         },
       }
 
@@ -310,11 +356,30 @@ export function mapIntentToN8nNode(
 
     case 'ai':
     default: {
-      // AI intent: POST to Zeroclaw with proper input expression
       const inputExpr = aiNodeCount === 0
         ? '={{ $("Webhook Trigger").item.json.body }}'
         : '={{ $json.response }}'
 
+      // Explicit "OpenAI" / "GPT" mentions get a real, deployable OpenAI
+      // node so the user can attach their own OpenAI credential — otherwise
+      // AI steps default to Aivory's Zeroclaw backend (no credential needed).
+      const wantsOpenAi = /openai|open\s*ai|\bgpt-?\d/i.test(`${step.tool || ''} ${step.action || ''}`)
+      if (wantsOpenAi) {
+        return {
+          ...baseNode,
+          type: 'n8n-nodes-base.openAi',
+          typeVersion: 1.3,
+          parameters: {
+            resource: 'text',
+            operation: 'message',
+            modelId: { value: 'gpt-4o', mode: 'list' },
+            messages: { values: [{ content: `${step.action}: ${inputExpr}`, role: 'user' }] },
+            options: {},
+          },
+        }
+      }
+
+      // AI intent: POST to Zeroclaw with proper input expression
       return {
         ...baseNode,
         type: 'n8n-nodes-base.httpRequest',
@@ -331,4 +396,71 @@ export function mapIntentToN8nNode(
       }
     }
   }
+}
+
+/**
+ * Build a native n8n AI Agent node + its linked Chat Model sub-node.
+ * The sub-node connects to the Agent via the special `ai_languageModel`
+ * connection type (not `main`) — that's how n8n wires LangChain sub-nodes.
+ * Provider defaults to OpenAI; explicit "claude"/"anthropic" mentions switch
+ * to Anthropic. The user can change the provider later from the inspector.
+ */
+function buildAiAgentStep(step: WorkflowStep, ctx: MapContext): MappedStepResult {
+  const { stepIndex, aiNodeCount } = ctx
+  const nodeName = `Step ${stepIndex + 1}: ${step.action.substring(0, 40)}`
+  const position: [number, number] = [250 + ((stepIndex + 1) * 220), 300]
+
+  const inputExpr = aiNodeCount === 0
+    ? '={{ $("Webhook Trigger").item.json.body }}'
+    : '={{ $json.response }}'
+
+  const isAnthropic = /claude|anthropic/i.test(`${step.tool || ''} ${step.action || ''}`)
+  const modelNodeName = `${isAnthropic ? 'Anthropic' : 'OpenAI'} Chat Model${stepIndex > 0 ? ` ${stepIndex}` : ''}`
+
+  const agentNode: N8nNode = {
+    id: generateNodeId(),
+    name: nodeName,
+    type: '@n8n/n8n-nodes-langchain.agent',
+    typeVersion: 1.7,
+    position,
+    parameters: {
+      promptType: 'define',
+      text: inputExpr,
+      options: {
+        systemMessage: step.action || '',
+      },
+    },
+  }
+
+  const modelNode: N8nNode = {
+    id: generateNodeId(),
+    name: modelNodeName,
+    type: isAnthropic ? '@n8n/n8n-nodes-langchain.lmChatAnthropic' : '@n8n/n8n-nodes-langchain.lmChatOpenAi',
+    typeVersion: 1,
+    position: [position[0], position[1] + 200],
+    parameters: {
+      model: { value: isAnthropic ? 'claude-3-5-sonnet-20241022' : 'gpt-4o', mode: 'list' },
+      options: {},
+    },
+  }
+
+  return {
+    primary: agentNode,
+    extraNodes: [modelNode],
+    extraConnections: [{ from: modelNodeName, to: nodeName, type: 'ai_languageModel' }],
+  }
+}
+
+/**
+ * Map detected intent to one or more n8n nodes + any extra (non-`main`)
+ * connections they need. This is the entry point workflow assembly should
+ * use — `mapIntentToN8nNode()` above stays as the single-node primitive.
+ */
+export function mapIntentToN8nNodes(
+  intent: NodeIntent,
+  step: WorkflowStep,
+  ctx: MapContext
+): MappedStepResult {
+  if (intent === 'ai') return buildAiAgentStep(step, ctx)
+  return { primary: mapIntentToN8nNode(intent, step, ctx) }
 }

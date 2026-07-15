@@ -14,6 +14,9 @@ import EditFieldsForm from './forms/EditFieldsForm';
 import HttpResponseForm from './forms/HttpResponseForm';
 import AgentForm from './forms/AgentForm';
 import GenericNodeForm from './forms/GenericNodeForm';
+import RssFeedForm from './forms/RssFeedForm';
+import SlackForm from './forms/SlackForm';
+import GmailForm from './forms/GmailForm';
 
 type Tab = 'configure' | 'advanced' | 'output';
 interface Props {
@@ -137,6 +140,9 @@ function ConfigureTab({ config, onChange, errors }: { config: NodeConfig; onChan
     case 'editFields':    return <EditFieldsForm config={config} onChange={onChange} errors={errors} />;
     case 'httpResponse':  return <HttpResponseForm config={config} onChange={onChange} errors={errors} />;
     case 'agent':         return <AgentForm config={config} onChange={onChange} errors={errors} />;
+    case 'rssFeed':       return <RssFeedForm config={config} onChange={onChange} errors={errors} />;
+    case 'slack':         return <SlackForm config={config} onChange={onChange} errors={errors} />;
+    case 'gmail':         return <GmailForm config={config} onChange={onChange} errors={errors} />;
     case 'generic':       return <GenericNodeForm config={config} onChange={onChange} errors={errors} />;
     default:              return <p style={{ color: '#5a5a58', fontSize: 12 }}>No configuration available.</p>;
   }

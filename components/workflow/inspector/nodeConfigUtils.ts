@@ -46,9 +46,77 @@ export function extractConfigFromNode(data: WorkflowNodeData): NodeConfig {
       return { type: 'editFields', fields: (p.values?.string ?? []).map((v: any) => ({ key: v.name ?? '', value: v.value ?? '' })) };
     case 'n8n-nodes-base.respondToWebhook':
       return { type: 'httpResponse', statusCode: p.statusCode ?? 200, responseBody: p.responseBody ?? '' };
+    case 'n8n-nodes-base.rssFeedRead':
+      return { type: 'rssFeed', feedUrl: p.url ?? p.feedUrl ?? '' };
+    case 'n8n-nodes-base.slack':
+      return {
+        type: 'slack',
+        resource: 'message',
+        operation: 'send',
+        channel: p.channel ?? p.channelId?.value ?? '',
+        text: p.text ?? '',
+        botToken: '',
+      };
+    case 'n8n-nodes-base.gmail':
+      return {
+        type: 'gmail',
+        to: p.sendTo ?? p.toList?.[0] ?? p.to ?? '',
+        subject: p.subject ?? '',
+        message: p.message ?? '',
+      };
+    case 'n8n-nodes-base.openAi':
+    case '@n8n/n8n-nodes-langchain.lmChatOpenAi':
+      return {
+        type: 'aiStep',
+        whatHappens: data.title ?? '',
+        provider: 'openai',
+        model: p.modelId?.value ?? p.model?.value ?? p.model ?? 'gpt-4o',
+        systemPrompt: p.messages?.values?.find((m: any) => m.role === 'system')?.content ?? p.options?.systemMessage ?? '',
+        temperature: p.options?.temperature ?? 0.7,
+        toolService: data.subtitle ?? '',
+        expectedOutput: data.description ?? '',
+      };
+    case '@n8n/n8n-nodes-langchain.lmChatAnthropic':
+      return {
+        type: 'aiStep',
+        whatHappens: data.title ?? '',
+        provider: 'anthropic',
+        model: p.model?.value ?? 'claude-3-5-sonnet-20241022',
+        systemPrompt: p.options?.systemMessage ?? '',
+        temperature: p.options?.temperature ?? 0.7,
+        toolService: data.subtitle ?? '',
+        expectedOutput: data.description ?? '',
+      };
+    case '@n8n/n8n-nodes-langchain.agent': {
+      // Model/provider live on the linked Chat Model sub-node, not the Agent
+      // node itself — n8nMapper.ts's n8nToReactFlow() carries it through as
+      // rawN8n.linkedModel so the inspector can show/edit it in one place.
+      const linkedModel = (data.rawN8n as any)?.linkedModel;
+      const lp = linkedModel?.parameters ?? {};
+      const isAnthropic = linkedModel?.type === '@n8n/n8n-nodes-langchain.lmChatAnthropic';
+      return {
+        type: 'aiStep',
+        whatHappens: data.title ?? '',
+        provider: isAnthropic ? 'anthropic' : 'openai',
+        model: lp.model?.value ?? (isAnthropic ? 'claude-3-5-sonnet-20241022' : 'gpt-4o'),
+        systemPrompt: p.options?.systemMessage ?? '',
+        temperature: lp.options?.temperature ?? 0.7,
+        toolService: data.subtitle ?? '',
+        expectedOutput: data.description ?? '',
+      };
+    }
     default:
       if (data.category === 'ai') {
-        return { type: 'aiStep', whatHappens: data.title ?? '', model: 'gpt-4o', systemPrompt: '', temperature: 0.7, toolService: data.subtitle ?? '', expectedOutput: data.description ?? '' };
+        return {
+          type: 'aiStep',
+          whatHappens: data.title ?? '',
+          provider: 'openai',
+          model: p.modelId?.value ?? p.model?.value ?? p.model ?? 'gpt-4o',
+          systemPrompt: p.messages?.values?.find?.((m: any) => m.role === 'system')?.content ?? p.systemPrompt ?? '',
+          temperature: p.options?.temperature ?? p.temperature ?? 0.7,
+          toolService: data.subtitle ?? '',
+          expectedOutput: data.description ?? '',
+        };
       }
       if (data.category === 'condition') {
         return { type: 'ifCondition', conditions: [{ field: '', operator: 'equals', value: '' }], combinator: 'AND' };
@@ -73,6 +141,15 @@ export function validateConfig(config: NodeConfig): Record<string, string> {
       break;
     case 'ifCondition':
       if (config.conditions.length === 0) errors.conditions = 'At least one condition required';
+      break;
+    case 'rssFeed':
+      if (!config.feedUrl) errors.feedUrl = 'Feed URL is required';
+      break;
+    case 'slack':
+      if (!config.channel) errors.channel = 'Channel is required';
+      break;
+    case 'gmail':
+      if (!config.to) errors.to = 'Recipient is required';
       break;
     case 'aiStep':
       if (!config.whatHappens) errors.whatHappens = 'Description is required';
@@ -145,6 +222,17 @@ export function getDeployChecklist(config: NodeConfig, data: WorkflowNodeData): 
     case 'agent':
       items.push({ label: 'Agent linked', ok: Boolean((config as any).agentId || data.agentId), severity: 'error', hint: 'Pick which agent runs this step' });
       break;
+    case 'rssFeed':
+      items.push({ label: 'Feed URL is set', ok: Boolean(config.feedUrl), severity: 'error', hint: 'n8n rejects RSS Feed Read nodes without a URL' });
+      break;
+    case 'slack':
+      items.push({ label: 'Channel is set', ok: Boolean(config.channel), severity: 'error', hint: 'e.g. #general or a channel ID' });
+      items.push({ label: 'Bot token provided', ok: Boolean(config.botToken), severity: 'warn', hint: 'Or attach a Slack credential in n8n after deploy' });
+      break;
+    case 'gmail':
+      items.push({ label: 'Recipient is set', ok: Boolean(config.to), severity: 'error' });
+      items.push({ label: 'Gmail account connected', ok: false, severity: 'warn', hint: 'Attach the Gmail OAuth2 credential in n8n after deploy — Aivory cannot complete Google OAuth for you' });
+      break;
     default: {
       // generic / app nodes
       if (data.category === 'app') {
@@ -187,6 +275,12 @@ export function summarizeConfig(config: NodeConfig): { key: string; value: strin
       return [{ key: 'Status', value: String(config.statusCode) }];
     case 'manualTrigger':
       return [{ key: 'Trigger', value: 'Manual' }];
+    case 'rssFeed':
+      return [{ key: 'Feed URL', value: config.feedUrl || '—' }];
+    case 'slack':
+      return [{ key: 'Channel', value: config.channel || '—' }, { key: 'Token', value: config.botToken ? '••••••' : '—' }];
+    case 'gmail':
+      return [{ key: 'To', value: config.to || '—' }, { key: 'Subject', value: config.subject || '—' }];
     default:
       return [];
   }
@@ -204,6 +298,11 @@ export function getNodeTypeLabel(data: WorkflowNodeData): string {
       'n8n-nodes-base.if': 'If / Switch',
       'n8n-nodes-base.set': 'Edit Fields',
       'n8n-nodes-base.respondToWebhook': 'HTTP Response',
+      'n8n-nodes-base.rssFeedRead': 'RSS Feed Read',
+      'n8n-nodes-base.slack': 'Slack',
+      'n8n-nodes-base.gmail': 'Gmail',
+      'n8n-nodes-base.openAi': 'OpenAI',
+      '@n8n/n8n-nodes-langchain.lmChatOpenAi': 'OpenAI Chat Model',
     };
     if (map[n8nType]) return map[n8nType];
   }
