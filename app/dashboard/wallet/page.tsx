@@ -138,22 +138,27 @@ export default function WalletPage() {
         },
       }
 
-      // Fetch payment history
-      const userId = user?.user_id || "GrandMasterRCH"
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8081'}/api/v1/payments/history/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${AuthManager.getAccessToken()}`
-        }
-      })
+      // Fetch payment history — only when a real user is signed in. The
+      // legacy "GrandMasterRCH" fallback userId is retired; without a
+      // user_id there is no history to fetch.
+      const userId = user?.user_id
 
       let payments: Payment[] = []
       let totalSpent = 0
 
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && Array.isArray(data.payments)) {
-          payments = data.payments
-          totalSpent = payments.reduce((sum, p) => sum + (p.amount || 0), 0)
+      if (userId) {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8081'}/api/v1/payments/history/${userId}`, {
+          headers: {
+            'Authorization': `Bearer ${AuthManager.getAccessToken()}`
+          }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && Array.isArray(data.payments)) {
+            payments = data.payments
+            totalSpent = payments.reduce((sum, p) => sum + (p.amount || 0), 0)
+          }
         }
       }
 
