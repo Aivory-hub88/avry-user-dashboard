@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { PhaseId, PhaseData } from '@/types/deepDiagnostic'
 import { DEEP_DIAGNOSTIC_PHASES } from '@/constants/deepDiagnosticQuestions'
-import { DeepDiagnosticService, buildDiagnosticContext } from '@/services/deepDiagnostic'
+import { DeepDiagnosticService, buildDiagnosticContext, ensureLiveRates } from '@/services/deepDiagnostic'
 import type { DiagnosticAnswers } from '@/types/diagnostic'
 import styles from './summary.module.css'
 
@@ -47,6 +47,10 @@ export default function SummaryPage() {
     if (!phaseData) return
     setIsSubmitting(true)
     setError(null)
+
+    // Fetch live FX rates before the ROI computation below — best-effort;
+    // buildDiagnosticContext falls back to the static snapshot if this fails.
+    await ensureLiveRates()
 
     try {
       const phases = PHASE_ORDER.reduce((acc, id) => {

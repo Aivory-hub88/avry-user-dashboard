@@ -11,8 +11,13 @@ import {
   loadDeepDiagnosticResult as _supabaseLoadResult,
 } from '@/lib/supabaseStorage'
 import { isMisconfigured as _supabaseMisconfigured } from '@/lib/supabaseClient'
-import { CURRENCY_RATES, FX_AS_OF } from '@/lib/currencyConfig'
+import { FX_AS_OF } from '@/lib/currencyConfig'
+import { getRate, getFxAsOfLabel, ensureLiveRates } from '@/lib/liveRates'
 import { asset } from '@/lib/asset'
+
+// Re-export so callers (summary/final-result pages) can prefetch live FX
+// before running the deterministic ROI computation.
+export { ensureLiveRates }
 
 // In-memory fallback when localStorage is unavailable
 let _memoryProgress: DeepDiagnosticProgress | null = null
@@ -427,7 +432,9 @@ function calculateROI(
   currencyCode: CurrencyCode = 'USD',
   industry: string | undefined = undefined
 ): ROIProjectionInternal {
-  const rate = CURRENCY_RATES[currencyCode] ?? 1
+  // Live FX when available (2h auto-refresh via /api/exchange-rates),
+  // static snapshot otherwise.
+  const rate = getRate(currencyCode)
   const missing: string[] = []
 
   if (q.totalManualHoursWeekly === null) missing.push('manual hours/week')
@@ -555,7 +562,9 @@ function calculateROI(
   if (process.env.NODE_ENV !== 'test') {
     console.log('[ROI Audit]', {
       industry: industry ?? 'unknown',
-      fxAsOf: FX_AS_OF,
+      fxAsOf: getFxAsOfLabel(),
+      fxRate: rate,
+      fxStaticFallback: FX_AS_OF,
       baseHourlyRateUSD,
       hourlyRateUSD,
       smallTeamRateApplied,
@@ -591,6 +600,9 @@ function calculateROI(
     assumedBudgetMidpointLocal: budgetUSD !== null ? budgetUSD * rate : null,
     efficiencyFactor: EFFICIENCY_FACTOR,
     smallTeamRateApplied,
+    // FX transparency: the exact rate used for the *Local conversions above
+    fxRateUsed: rate,
+    fxAsOf: getFxAsOfLabel(),
     // Ongoing cost + net economics + scenario range
     ongoingCostRate: ONGOING_COST_RATE,
     annualOngoingCostUSD,
@@ -830,7 +842,7 @@ function rankOpportunities(
 
   // Use proportional weighting based on actual impact scores
   const totalImpact = triggered.reduce((sum, c) => sum + c.impact, 0)
-  const rate = CURRENCY_RATES[currencyCode] ?? 1
+  const rate = getRate(currencyCode)
 
   const opps: RankedOpportunity[] = triggered.map(c => {
     let projectedROINote: string

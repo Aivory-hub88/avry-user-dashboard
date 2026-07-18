@@ -299,6 +299,10 @@ export interface ROIProjection {
   efficiencyFactor: number
   /** Whether the small-team opportunity-cost rate adjustment was applied. */
   smallTeamRateApplied: boolean
+  /** USD→local FX rate applied to the *Local fields (live quote when available). */
+  fxRateUsed?: number
+  /** Human label for when the FX rate was sourced (e.g. "18 Jul 2026 (live)"). */
+  fxAsOf?: string
   /** Assumed annual ongoing cost as a fraction of the initial investment. */
   ongoingCostRate?: number
   /** Annual ongoing run cost (licenses/maintenance/support), USD and local. */

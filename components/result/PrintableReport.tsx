@@ -2,7 +2,7 @@ import type { DiagnosticContext } from '@/types/diagnostic'
 import ScoreRing from '@/components/result/ScoreRing'
 import RadarChart from '@/components/result/RadarChart'
 import {
-  formatCurrency,
+  formatLocalAmount,
   formatPercent,
   formatMonths,
   humanizeDimensionKey,
@@ -20,7 +20,9 @@ interface PrintableReportProps {
 export default function PrintableReport({ context, llmResult }: PrintableReportProps) {
   const { scores, calculations, opportunities, risks, company } = context
   const currencyCode = parseCurrencyCode(context.currency)
-  const fmtCurrency = (v: number | null | undefined) => formatCurrency(v, currencyCode)
+  // Values below are already in the local display currency — format only,
+  // never convert again (formatCurrency would re-multiply by the FX rate).
+  const fmtCurrency = (v: number | null | undefined) => formatLocalAmount(v, currencyCode)
   
   const totalAnnualSavings = calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsIDR ?? null
   const annualLaborSavings = calculations.annualLaborSavingsLocal ?? calculations.annualLaborSavingsIDR ?? null

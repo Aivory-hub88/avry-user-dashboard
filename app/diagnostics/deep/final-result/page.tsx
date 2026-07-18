@@ -17,13 +17,14 @@ import ErrorCard from '@/components/result/ErrorCard'
 import PrintableReport from '@/components/result/PrintableReport'
 import { exportReportToPdf } from '@/lib/pdfExport'
 import {
-  formatCurrency,
+  formatLocalAmount,
   formatPercent,
   formatMonths,
   humanizeDimensionKey,
   parseCurrencyCode,
   type CurrencyCode,
 } from '@/lib/resultFormatters'
+import { ensureLiveRates, getFxAsOfLabel } from '@/lib/liveRates'
 import styles from './final-result.module.css'
 
 // TODO: add schema version field to DiagnosticContext for forward compatibility
@@ -51,7 +52,6 @@ type PageState =
   | { status: 'error'; message: string }
   | { status: 'loaded'; context: DiagnosticContext }
 
-const FX_AS_OF_LABEL = 'Jun 2026'
 const fmtRoi = (v: number | null | undefined): string =>
   v == null ? 'N/A' : v >= 999 ? '>999%' : `${Math.round(v)}%`
 
@@ -139,6 +139,9 @@ export default function FinalResultPage() {
         } catch { /* ignore */ }
         return undefined
       }
+      // Fetch live FX before upgradeDiagnosticContext may recompute ROI —
+      // best-effort; the static snapshot is the fallback.
+      await ensureLiveRates()
       // Try Supabase first (Req 6.5–6.8), fall back to localStorage
       let raw: string | null = null
       try {
@@ -189,7 +192,10 @@ export default function FinalResultPage() {
   const handleDownloadPdf = async () => {
     setIsExportingPdf(true)
     try {
-      await exportReportToPdf('pdf-print-layout', context.company, context)
+      // Pass the same blended scores shown on this page (70% deterministic +
+      // 30% AI assessment) so the PDF's composite matches the on-screen one
+      // instead of silently reverting to the raw deterministic score.
+      await exportReportToPdf('pdf-print-layout', context.company, { ...context, scores: displayScores })
     } catch (error) {
       console.error('Failed to generate PDF', error)
     } finally {
@@ -197,9 +203,13 @@ export default function FinalResultPage() {
     }
   }
 
-  // Bug 1 fix: derive currency from context, never hardcode IDR
+  // Bug 1 fix: derive currency from context, never hardcode IDR.
+  // The *Local calculation fields are ALREADY converted to the display
+  // currency at compute time, so they must be formatted without a second
+  // conversion — formatLocalAmount, not formatCurrency. (The old fmtCurrency
+  // here multiplied by the FX rate again, inflating IDR figures 15,600×.)
   const currencyCode: CurrencyCode = parseCurrencyCode(context.currency)
-  const fmtCurrency = (v: number | null | undefined) => formatCurrency(v, currencyCode)
+  const fmtLocal = (v: number | null | undefined) => formatLocalAmount(v, currencyCode)
 
   // Bug 1 fix: support both new *Local field names and legacy *IDR names from
   // stored DiagnosticContext objects that were saved before this fix was deployed.
@@ -377,9 +387,9 @@ export default function FinalResultPage() {
           )}
 
           <div className={styles.roiGrid}>
-            <ROIMetricTile label="Total Annual Savings" value={totalAnnualSavingsLocal} formatter={fmtCurrency} />
-            <ROIMetricTile label="Annual Labor Savings" value={annualLaborSavingsLocal} formatter={fmtCurrency} />
-            <ROIMetricTile label="Annual Process Savings" value={annualProcessSavingsLocal} formatter={fmtCurrency} />
+            <ROIMetricTile label="Total Annual Savings" value={totalAnnualSavingsLocal} formatter={fmtLocal} />
+            <ROIMetricTile label="Annual Labor Savings" value={annualLaborSavingsLocal} formatter={fmtLocal} />
+            <ROIMetricTile label="Annual Process Savings" value={annualProcessSavingsLocal} formatter={fmtLocal} />
             <ROIMetricTile
               label="Hours Reclaimed / Year"
               value={calculations.hoursReclaimedPerYear}
@@ -391,14 +401,14 @@ export default function FinalResultPage() {
               value={calculations.threeYearROIPercent}
               formatter={(v) => v >= 999 ? '>999%' : formatPercent(v)}
             />
-            <ROIMetricTile label="3-Year NPV" value={(calculations as any).npv3YearLocal ?? null} formatter={fmtCurrency} subtitle="Net present value @ 10% discount" />
-            <ROIMetricTile label="Annual Ongoing Cost" value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtCurrency} subtitle="Est. licenses, maintenance & support" />
-            <ROIMetricTile label="Net Annual Savings" value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtCurrency} subtitle="After ongoing cost" />
+            <ROIMetricTile label="3-Year NPV" value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle="Net present value @ 10% discount" />
+            <ROIMetricTile label="Annual Ongoing Cost" value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle="Est. licenses, maintenance & support" />
+            <ROIMetricTile label="Net Annual Savings" value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtLocal} subtitle="After ongoing cost" />
             <ROIMetricTile label="Net Payback Period" value={(calculations as any).netPaybackMonths ?? null} formatter={formatMonths} subtitle="On net savings" />
             <ROIMetricTile
               label="Cost of Inaction (90 days)"
               value={costOfInaction90DaysLocal}
-              formatter={fmtCurrency}
+              formatter={fmtLocal}
               subtitle={
                 qualitative.annualRevenue?.toLowerCase().includes('pre-revenue')
                   ? 'Estimated opportunity cost if delayed'
@@ -442,7 +452,7 @@ export default function FinalResultPage() {
                 <li className={styles.stepRow}>
                   <span className={styles.stepLabel}>Step 2 — Labor savings</span>
                   <span className={styles.stepValue}>
-                    {fmtCurrency(calculations.annualLaborSavingsLocal)} = {calculations.hoursReclaimedPerYear} hrs × <strong>{fmtCurrency(calculations.assumedHourlyRateLocal)}/hr</strong>
+                    {fmtLocal(calculations.annualLaborSavingsLocal)} = {calculations.hoursReclaimedPerYear} hrs × <strong>{fmtLocal(calculations.assumedHourlyRateLocal)}/hr</strong>
                     {calculations.smallTeamRateApplied
                       ? ' (opportunity-cost rate for teams of 1–5 FTEs — 50% of industry blended rate)'
                       : ' (industry blended rate)'}
@@ -451,25 +461,25 @@ export default function FinalResultPage() {
                 <li className={styles.stepRow}>
                   <span className={styles.stepLabel}>Step 3 — Process savings</span>
                   <span className={styles.stepValue}>
-                    {fmtCurrency(calculations.annualProcessSavingsLocal)} = 20% of labor savings (operational overhead reduction — internal benchmark estimate)
+                    {fmtLocal(calculations.annualProcessSavingsLocal)} = 20% of labor savings (operational overhead reduction — internal benchmark estimate)
                   </span>
                 </li>
                 <li className={styles.stepRow}>
                   <span className={styles.stepLabel}>Ongoing run cost</span>
                   <span className={styles.stepValue}>
-                    {fmtCurrency((calculations as any).annualOngoingCostLocal)} / year = {Math.round(((calculations as any).ongoingCostRate ?? 0.2) * 100)}% of the initial investment (licenses, maintenance, support). Net figures and payback are computed after this cost.
+                    {fmtLocal((calculations as any).annualOngoingCostLocal)} / year = {Math.round(((calculations as any).ongoingCostRate ?? 0.2) * 100)}% of the initial investment (licenses, maintenance, support). Net figures and payback are computed after this cost.
                   </span>
                 </li>
                 <li className={styles.stepRow}>
                   <span className={styles.stepLabel}>Currency &amp; sources</span>
                   <span className={styles.stepValue}>
-                    FX rates as of {FX_AS_OF_LABEL}; the 75% efficiency factor and 20% process-overhead figure are internal benchmark estimates, not client-specific guarantees.
+                    FX rates as of {(calculations as any).fxAsOf ?? getFxAsOfLabel()} (auto-refreshed every 2 hours from live market data); the 75% efficiency factor and 20% process-overhead figure are internal benchmark estimates, not client-specific guarantees.
                   </span>
                 </li>
                 <li className={styles.stepRow}>
                   <span className={styles.stepLabel}>Step 4 — Total annual savings</span>
                   <span className={styles.stepValue}>
-                    <strong>{fmtCurrency(calculations.totalAnnualSavingsLocal)}</strong> = labor + process savings
+                    <strong>{fmtLocal(calculations.totalAnnualSavingsLocal)}</strong> = labor + process savings
                   </span>
                 </li>
                 {calculations.assumedBudgetMidpointLocal != null && (
@@ -477,7 +487,7 @@ export default function FinalResultPage() {
                     <span className={styles.stepLabel}>Step 5 — Payback period</span>
                     <span className={styles.stepValue}>
                       {calculations.paybackMonths != null ? `${Math.round(calculations.paybackMonths)} months` : '—'}{' '}
-                      = <strong>{fmtCurrency(calculations.assumedBudgetMidpointLocal)}</strong> investment ÷ {fmtCurrency(calculations.totalAnnualSavingsLocal)}/yr × 12
+                      = <strong>{fmtLocal(calculations.assumedBudgetMidpointLocal)}</strong> investment ÷ {fmtLocal(calculations.totalAnnualSavingsLocal)}/yr × 12
                       {' '}(midpoint of your selected budget range)
                     </span>
                   </li>
@@ -489,7 +499,7 @@ export default function FinalResultPage() {
                     <strong style={{ color: calculations.threeYearROIPercent != null && calculations.threeYearROIPercent < 0 ? '#f87171' : '#4ade80' }}>
                       {calculations.threeYearROIPercent != null ? `${calculations.threeYearROIPercent.toFixed(1)}%` : '—'}
                     </strong>
-                    {' = '}({fmtCurrency(calculations.totalAnnualSavingsLocal)}/yr × 3 − {fmtCurrency(calculations.assumedBudgetMidpointLocal)}) ÷ {fmtCurrency(calculations.assumedBudgetMidpointLocal)} × 100
+                    {' = '}({fmtLocal(calculations.totalAnnualSavingsLocal)}/yr × 3 − {fmtLocal(calculations.assumedBudgetMidpointLocal)}) ÷ {fmtLocal(calculations.assumedBudgetMidpointLocal)} × 100
                     </span>
 
                     {calculations.threeYearROIPercent != null && calculations.threeYearROIPercent < 0 && calculations.totalAnnualSavingsLocal != null && calculations.assumedBudgetMidpointLocal != null && (() => {
@@ -502,20 +512,20 @@ export default function FinalResultPage() {
                         <ul className={styles.roiNegativeList}>
                           <li className={styles.roiNegativeReason}>
                             <span className={styles.roiNegativeLabel}>⚠ Why negative?</span>
-                            Your 3-year cumulative savings (<strong>{fmtCurrency(savings3yr)}</strong>) fall{' '}
-                            <strong style={{ color: '#f87171' }}>{fmtCurrency(shortfall)} short</strong>{' '}
-                            of the full investment ({fmtCurrency(budget)}). Break-even is at{' '}
+                            Your 3-year cumulative savings (<strong>{fmtLocal(savings3yr)}</strong>) fall{' '}
+                            <strong style={{ color: '#f87171' }}>{fmtLocal(shortfall)} short</strong>{' '}
+                            of the full investment ({fmtLocal(budget)}). Break-even is at{' '}
                             <strong>~{breakEvenYears.toFixed(1)} years</strong>, not 3.
                           </li>
                           <li className={styles.roiFixItem}>
                             <span className={styles.roiFixLabel}>Fix A — Reduce initial budget scope</span>
-                            Start with a budget of <strong>{fmtCurrency(savings3yr)}</strong> or less.
+                            Start with a budget of <strong>{fmtLocal(savings3yr)}</strong> or less.
                             That amount is fully recovered by year 3 at your current saving rate.
                           </li>
                           <li className={styles.roiFixItem}>
                             <span className={styles.roiFixLabel}>Fix B — Increase automation depth</span>
                             Automate more hours or close a larger automation gap to push annual savings to at least{' '}
-                            <strong>{fmtCurrency(savingsNeededPerYear)}/yr</strong> (currently {fmtCurrency(calculations.totalAnnualSavingsLocal)}/yr).
+                            <strong>{fmtLocal(savingsNeededPerYear)}/yr</strong> (currently {fmtLocal(calculations.totalAnnualSavingsLocal)}/yr).
                           </li>
                         </ul>
                       )

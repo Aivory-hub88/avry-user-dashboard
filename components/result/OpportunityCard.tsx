@@ -1,5 +1,5 @@
 import type { RankedOpportunity } from '@/types/diagnostic'
-import { formatCurrency, humanizeQuadrant, type CurrencyCode } from '@/lib/resultFormatters'
+import { formatLocalAmount, humanizeQuadrant, type CurrencyCode } from '@/lib/resultFormatters'
 import styles from './OpportunityCard.module.css'
 
 interface OpportunityCardProps {
@@ -50,7 +50,7 @@ export default function OpportunityCard({
     opportunity.estimatedSavingsLocal ?? opportunity.estimatedSavingsIDR ?? null
   const savingsLine =
     typeof estimatedSavings === 'number'
-      ? `Est. ${formatCurrency(estimatedSavings, currencyCode)}/yr savings`
+      ? `Est. ${formatLocalAmount(estimatedSavings, currencyCode)}/yr savings`
       : null
 
   return (

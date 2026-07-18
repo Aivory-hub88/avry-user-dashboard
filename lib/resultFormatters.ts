@@ -4,6 +4,7 @@
  */
 
 import type { OpportunityQuadrant } from '@/types/diagnostic'
+import { getRate } from '@/lib/liveRates'
 
 // ────────────────────────────────────────────
 //  CURRENCY CONFIG
@@ -45,6 +46,14 @@ export function parseCurrencyCode(answer: string | undefined): CurrencyCode {
 /**
  * Format a USD value into the target currency.
  * e.g. formatCurrency(1000, 'IDR') → "Rp 15.600.000"
+ *
+ * Uses the live FX rate when one has been fetched (see lib/liveRates.ts);
+ * falls back to the static snapshot in CURRENCY_MAP otherwise.
+ *
+ * IMPORTANT: the input must be in USD — this function CONVERTS. For values
+ * that are already in the user's local currency (the *Local fields on
+ * ROIProjection), use formatLocalAmount() instead, or the amount gets
+ * multiplied by the FX rate a second time.
  */
 export function formatCurrency(
   valueUSD: number | null | undefined,
@@ -53,10 +62,26 @@ export function formatCurrency(
   if (valueUSD === null || valueUSD === undefined || !isFinite(valueUSD) || isNaN(valueUSD)) {
     return '—'
   }
+  const converted = Math.round(valueUSD * getRate(currency))
+  return formatLocalAmount(converted, currency)
+}
+
+/**
+ * Format a value that is ALREADY in the target currency — no conversion.
+ * e.g. formatLocalAmount(131_695_200, 'IDR') → "Rp 131.695.200"
+ */
+export function formatLocalAmount(
+  value: number | null | undefined,
+  currency: CurrencyCode = 'USD',
+): string {
+  if (value === null || value === undefined || !isFinite(value) || isNaN(value)) {
+    return '—'
+  }
   const cfg = CURRENCY_MAP[currency] ?? CURRENCY_MAP.USD
-  const converted = Math.round(valueUSD * cfg.rateFromUSD)
-  const formatted = converted.toString().replace(/\B(?=(\d{3})+(?!\d))/g, cfg.thousands)
-  return `${cfg.symbol}${formatted}`
+  const rounded = Math.round(value)
+  const sign = rounded < 0 ? '-' : ''
+  const formatted = Math.abs(rounded).toString().replace(/\B(?=(\d{3})+(?!\d))/g, cfg.thousands)
+  return `${sign}${cfg.symbol}${formatted}`
 }
 
 /**

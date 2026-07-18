@@ -1125,7 +1125,31 @@ export async function exportReportToPdf(
 
   y = sectionLabel(pdf, y, 'Executive Scorecard')
 
-  y = renderNarrative(pdf, y, `Your company/organization operates at an advanced "${scores.maturityLevel}" maturity level with a composite score of ${Math.round(scores.composite)}, driven by strong scores in People and Governance. Fully aligned leadership and previous AI successes indicate a culture primed for scaled deployment. However, a lagging Process score (${Math.round(scores.process)}) highlights significant friction stemming from manual data entry and repetitive workflows. Standardizing these operations is critical to unlocking the team's full potential and transitioning from localized successes to systemic efficiency.`)
+  // Data-driven narrative — previously a hardcoded template that claimed
+  // "fully aligned leadership and previous AI successes" regardless of the
+  // user's actual answers.
+  const DIM_LABELS: Record<string, string> = {
+    strategy: 'Strategy', data: 'Data', process: 'Process',
+    people: 'People', governance: 'Governance', security: 'Security & Governance',
+  }
+  const scoreOf = (k: string) => Math.round((scores as unknown as Record<string, number>)[k] ?? 0)
+  const strongestKey = scores.strongestDimension
+  const weakestKey = scores.weakestDimension
+  const leadershipRaw = qualitative.leadershipAlignment || ''
+  const leadershipClause = leadershipRaw.includes('Fully aligned')
+    ? 'Fully aligned leadership provides a strong mandate for scaled deployment.'
+    : leadershipRaw.includes('Supportive')
+      ? 'Leadership is supportive but cautious, so early initiatives should be low-risk and quickly measurable to build confidence.'
+      : leadershipRaw.includes('Some interest')
+        ? 'Leadership interest is still forming, so early wins need to make the business case visible.'
+        : 'Securing explicit leadership sponsorship should accompany the first initiatives.'
+  const priorRaw = qualitative.priorAIAttempts || ''
+  const priorClause = priorRaw.startsWith('No')
+    ? 'As this is the organization’s first AI initiative, the sequencing below prioritises proven, low-complexity automations first.'
+    : priorRaw
+      ? 'Previous AI attempts give the team practical deployment experience to build on.'
+      : ''
+  y = renderNarrative(pdf, y, `Your company/organization operates at a "${scores.maturityLevel}" maturity level with a composite score of ${Math.round(scores.composite)}. The strongest dimension is ${DIM_LABELS[strongestKey] ?? cap(strongestKey)} (${scoreOf(strongestKey)}), while ${DIM_LABELS[weakestKey] ?? cap(weakestKey)} (${scoreOf(weakestKey)}) represents the clearest gap and the first constraint to address. ${leadershipClause}${priorClause ? ' ' + priorClause : ''}`)
 
   // ── Two-column: score ring left · dimension bars right ──
   const arcCx = ML + 35
@@ -1136,11 +1160,16 @@ export async function exportReportToPdf(
   const barX = ML + 82
   const barW = CW - 82
   let by = y + 2
-  const dims: Array<'strategy' | 'data' | 'process' | 'people' | 'governance'> = [
-    'strategy', 'data', 'process', 'people', 'governance',
+  // All six dimensions — matches the on-screen radar (security was missing).
+  // Old stored contexts may predate the security dimension; skip keys that
+  // have no score rather than rendering a bogus 0 bar.
+  const dims: Array<'strategy' | 'data' | 'process' | 'people' | 'governance' | 'security'> = [
+    'strategy', 'data', 'process', 'people', 'governance', 'security',
   ]
   dims.forEach((d) => {
-    by = dimBar(pdf, barX, by, barW, d, (scores as unknown as Record<string, number>)[d] ?? 0)
+    const s = (scores as unknown as Record<string, number | undefined>)[d]
+    if (typeof s !== 'number') return
+    by = dimBar(pdf, barX, by, barW, DIM_LABELS[d] ?? d, s)
   })
 
   y = Math.max(arcCy + arcR + 12, by) + 6
@@ -1231,22 +1260,30 @@ export async function exportReportToPdf(
     `${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}% efficiency factor`,
   )
 
-  // Tile 3 — Payback Period
+  // Tile 3 — Payback Period. When payback is unknown (no budget provided),
+  // say so — the old code rendered "on — investment · Investment recovered
+  // yr 3" against a "—" value, which read as a broken claim.
+  const hasPayback = calculations.paybackMonths != null
   tileContent(cx0, cy1, cellW,
     'Payback Period',
     fmtMonths(calculations.paybackMonths),
-    `on ${fmt(calculations.assumedBudgetMidpointLocal)} investment`,
-    (calculations.paybackMonths ?? 0) <= 36
-      ? 'Investment recovered yr 3'
-      : `Break-even ~${((calculations.paybackMonths ?? 0) / 12).toFixed(1)} yrs`,
+    hasPayback ? `on ${fmt(calculations.assumedBudgetMidpointLocal)} investment` : 'insufficient data',
+    !hasPayback
+      ? 'Requires budget input'
+      : (calculations.paybackMonths as number) <= 36
+        ? 'Investment recovered yr 3'
+        : `Break-even ~${((calculations.paybackMonths as number) / 12).toFixed(1)} yrs`,
   )
 
   // Tile 4 — 3-Year ROI
+  const hasRoi3 = calculations.threeYearROIPercent != null
   tileContent(cx1, cy1, cellW,
     '3-Year ROI',
     fmtPct(calculations.threeYearROIPercent),
-    'net of investment',
-    `Cost of inaction: ${fmt(calculations.costOfInaction90DaysLocal)}/90d`,
+    hasRoi3 ? 'net of investment' : 'insufficient data',
+    calculations.costOfInaction90DaysLocal != null
+      ? `Cost of inaction: ${fmt(calculations.costOfInaction90DaysLocal)}/90d`
+      : 'Requires budget input',
   )
 
   y = gridY + gridH + 4
@@ -1261,13 +1298,27 @@ export async function exportReportToPdf(
   y = ensureSpace(pdf, y, 55)
   y = sectionLabel(pdf, y, 'Opportunity Analysis')
 
-  y = renderNarrative(pdf, y, `Targeted automation offers immediate relief for your company/organization's core pain points in slow customer onboarding and repetitive content generation. Deploying quick wins can deliver tangible results in as little as 5 to 8 weeks. These initial initiatives directly address manual bottlenecks while requiring relatively low implementation effort. Securing these early operational victories will establish momentum for more complex, multi-step agent deployments in the future.`)
+  // Data-driven narrative — was a hardcoded template claiming pain points in
+  // "slow customer onboarding and repetitive content generation" regardless
+  // of what the user actually reported.
+  const painPoints = (qualitative.topPainPoints || '').trim()
+  const oppQuickWins = opportunities.filter(o => o.quadrant === 'quick_win')
+  const oppIntroPain = painPoints
+    ? `your company/organization's reported pain points (${painPoints})`
+    : `your company/organization's core operational bottlenecks`
+  const oppTtvWeeks = oppQuickWins.length > 0
+    ? Math.min(...oppQuickWins.map(o => o.timeToValueWeeks))
+    : opportunities.length > 0
+      ? Math.min(...opportunities.map(o => o.timeToValueWeeks))
+      : null
+  y = renderNarrative(pdf, y, `Targeted automation offers immediate relief for ${oppIntroPain}.${oppTtvWeeks != null ? ` Deploying ${oppQuickWins.length > 0 ? 'quick wins' : 'the first initiatives'} can deliver tangible results in as little as ${oppTtvWeeks} weeks.` : ''} These initial initiatives directly address manual bottlenecks while requiring relatively low implementation effort. Securing these early operational victories will establish momentum for more complex, multi-step agent deployments in the future.`)
 
   if (opportunities.length === 0) {
     setC(pdf, MUTED, 'text')
     pdf.setFont(F(), 'normal')
     pdf.setFontSize(8.5)
     pdf.text('No opportunities identified.', ML, y + 6)
+    y += 12 // advance past the line — it previously overlapped the next block
   } else {
     for (const opp of opportunities) {
       if (y > PAGE_H - 65) {
@@ -1324,7 +1375,20 @@ export async function exportReportToPdf(
   y = ensureSpace(pdf, y, 70)
   y = sectionLabel(pdf, y, 'ROI Projection')
 
-  y = renderNarrative(pdf, y, `An initial AI infrastructure investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} is projected to generate a strong ${fmtPct(calculations.threeYearROIPercent)} three-year ROI and reclaim ${Math.round(calculations.hoursReclaimedPerYear || 0).toLocaleString()} hours of team capacity annually. The financial model indicates full payback in ${((calculations.paybackMonths || 0) / 12).toFixed(1)} years, driven by ${fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD)} in continuous annual savings. Crucially, delaying this deployment incurs a direct "cost of inaction" totaling ${fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR)} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`)
+  // Null-guarded narrative — the old single-template version rendered
+  // "investment of —", "a strong — three-year ROI" and "full payback in
+  // 0.0 years" whenever budget was not provided.
+  const roiHoursStr = Math.round(calculations.hoursReclaimedPerYear || 0).toLocaleString()
+  const roiSavingsStr = fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD)
+  const roiInactionStr = fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR)
+  const roiComplete =
+    calculations.paybackMonths != null &&
+    calculations.threeYearROIPercent != null &&
+    (calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD) != null
+  const roiNarrative = roiComplete
+    ? `An initial AI infrastructure investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} is projected to generate a ${fmtPct(calculations.threeYearROIPercent)} three-year ROI and reclaim ${roiHoursStr} hours of team capacity annually. The financial model indicates full payback in ${((calculations.paybackMonths as number) / 12).toFixed(1)} years, driven by ${roiSavingsStr} in continuous annual savings. Crucially, delaying this deployment incurs a direct "cost of inaction" totaling ${roiInactionStr} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`
+    : `Based on the manual workload your team reported, automation is projected to reclaim ${roiHoursStr} hours of team capacity annually${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, worth an estimated ${roiSavingsStr} in continuous annual savings` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Delaying this deployment carries an estimated "cost of inaction" of ${roiInactionStr} every 90 days.` : ''} Because no implementation budget was provided in the assessment, payback period and three-year ROI are not projected — supplying a budget range completes the financial model. These estimates carry ${calculations.confidenceLevel ?? 'low'} confidence and are based on internal benchmark assumptions rather than client-specific figures.`
+  y = renderNarrative(pdf, y, roiNarrative)
 
   // ── 3 primary metrics across top ──
   // gap gives each column breathing room on both sides of its divider —
@@ -1602,12 +1666,16 @@ export async function exportReportToPdf(
       )
 
       sorted.forEach((risk) => {
-        if (y > PAGE_H - 22) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
-
         const c = sevC[risk.severity] ?? MUTED
         pdf.setFont(F(), 'normal')
         pdf.setFontSize(8.5)
         const rl = pdf.splitTextToSize(risk.risk, CW - 30)
+
+        // Break on the item's MEASURED height (risk lines + source line), not
+        // a fixed threshold — a fixed 22mm let multi-line items and their
+        // "Source:" caption spill into the footer.
+        const itemH = 3 + 3.5 + rl.length * 4.5 + (risk.source ? 7 : 0) + 4
+        if (y + itemH > PAGE_H - 16) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
 
         thinDiv(pdf, y)
         y += 3
@@ -1648,11 +1716,13 @@ export async function exportReportToPdf(
       ({ HIGH: 0, MEDIUM: 1, LOW: 2 } as Record<string, number>)[b.severity]!,
     )
     sorted.forEach((risk) => {
-      if (y > PAGE_H - 22) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
       const c = sevC[risk.severity] ?? MUTED
       pdf.setFont(F(), 'normal')
       pdf.setFontSize(8.5)
       const rl = pdf.splitTextToSize(risk.risk, CW - 30)
+      // Measured-height page break — see the twin loop above.
+      const itemH = 3 + 3.5 + rl.length * 4.5 + (risk.source ? 7 : 0) + 4
+      if (y + itemH > PAGE_H - 16) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
       thinDiv(pdf, y)
       y += 3
       setC(pdf, c, 'text')
@@ -1691,7 +1761,10 @@ export async function exportReportToPdf(
   y = renderNarrative(pdf, y, `${companyLabel} enters this next phase with a composite readiness score of ${Math.round(scores.composite)}, a "${scores.maturityLevel}" foundation strong enough to move from isolated wins to systemic execution. The path forward is not abstract: it starts with ${closingTopOpp ? closingTopOpp.title.toLowerCase() : 'the highest-impact opportunity identified in this assessment'}${gapPct > 0 ? `, and closes the ${gapPct}% automation gap` : ''} one phase at a time. Every figure in this report traces back to the answers your team provided, and every recommendation is sized to what is realistically achievable within the next planning cycle.`)
 
   y += 2
-  y = renderNarrative(pdf, y, `None of this requires a leap of faith. The next step is simply to turn this diagnostic into a deployment plan, and begin compounding the ${closingSavings} in annual savings this analysis identified.`)
+  y = renderNarrative(pdf, y,
+    (calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD) != null
+      ? `None of this requires a leap of faith. The next step is simply to turn this diagnostic into a deployment plan, and begin compounding the ${closingSavings} in annual savings this analysis identified.`
+      : `None of this requires a leap of faith. The next step is simply to turn this diagnostic into a deployment plan and begin reclaiming the manual hours this analysis identified.`)
 
   y += 6
   thinDiv(pdf, y)
