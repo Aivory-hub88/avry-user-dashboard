@@ -190,7 +190,7 @@ export function ActivateFeaturesSection() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 lg:gap-6 items-stretch">
+      <div style={{ zoom: 0.85 }} className="grid grid-cols-1 xl:grid-cols-3 gap-5 lg:gap-6 items-stretch">
         <PricingCard
           title="AI Readiness Deep Diagnostic"
           price={29}
