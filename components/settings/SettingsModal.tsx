@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { logout } from '@/lib/auth'
+import { getMarketingUrl } from '@/lib/config'
 import { useSettingsModal, SettingsTab } from '@/contexts/SettingsModalContext'
 import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
 
@@ -60,7 +61,7 @@ export function SettingsModal({ user }: SettingsModalProps) {
     try {
       await logout()
       if (typeof window !== 'undefined') {
-        window.location.href = 'http://localhost:9000'
+        window.location.href = getMarketingUrl()
       }
     } catch (error) {
       console.error('[SettingsModal] Logout failed:', error)

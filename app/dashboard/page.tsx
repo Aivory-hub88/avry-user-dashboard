@@ -16,6 +16,7 @@ import { useRouterContext } from '@/contexts/RouterContext'
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole'
 import { AuthManager } from '@/lib/authManager'
 import { SERVICES } from '@/config/services'
+import { getMarketingUrl } from '@/lib/config'
 import { usePayment } from '@/hooks/usePayment'
 import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
 
@@ -375,7 +376,7 @@ export default function DashboardPage() {
               <div className="mt-8 pt-8 border-t border-white/[0.07]">
                 <h3 className="text-lg font-medium text-white mb-4">Need Something Different?</h3>
                 <p className="text-sm text-gray-400 mb-6">Create a custom plan tailored to your specific business needs. Our team will work with you to design the perfect solution.</p>
-                <a href="http://localhost:9000/contact" target="_blank" rel="noopener noreferrer" className="inline-block px-6 py-3 bg-white/[0.05] text-white font-medium rounded-lg hover:bg-white/[0.1] transition-colors">
+                <a href={`${getMarketingUrl()}/contact`} target="_blank" rel="noopener noreferrer" className="inline-block px-6 py-3 bg-white/[0.05] text-white font-medium rounded-lg hover:bg-white/[0.1] transition-colors">
                   Contact Us
                 </a>
               </div>

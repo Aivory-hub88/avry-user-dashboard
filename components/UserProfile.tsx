@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { logout, getUser } from '@/lib/auth'
+import { getMarketingUrl } from '@/lib/config'
 import { SettingsModal, User } from '@/components/settings/SettingsModal'
 import { useSettingsModal } from '@/contexts/SettingsModalContext'
 
@@ -55,9 +56,10 @@ export function UserProfile() {
     try {
       await logout()
       setUser(null)
-      // Redirect to homepage
+      // Redirect to homepage — resolved per environment; the old hardcoded
+      // http://localhost:9000 sent production users to a dead page.
       if (typeof window !== 'undefined') {
-        window.location.href = 'http://localhost:9000'
+        window.location.href = getMarketingUrl()
       }
     } catch (error) {
       console.error('[UserProfile] Logout failed:', error)
