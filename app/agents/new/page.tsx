@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CreateAgentRequest, AgentProvider, AgentRuntime } from '@/types/agents';
+import { asset } from '@/lib/asset'
 
 const PROVIDERS: AgentProvider[] = ['openrouter', 'openai', 'anthropic', 'other'];
 const RUNTIMES: AgentRuntime[] = ['zeroclaw', 'direct', 'n8n'];
@@ -51,7 +52,7 @@ export default function NewAgentPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/agents', {
+      const res = await fetch(asset('/api/agents'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

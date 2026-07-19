@@ -69,7 +69,7 @@ export class DeepDiagnosticService {
     // 1) Enqueue the deep diagnostic — the bridge returns a job_id immediately.
     let submitRes: Response
     try {
-      submitRes = await fetch('/api/diagnostics/run', {
+      submitRes = await fetch(asset('/api/diagnostics/run'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ organization_id: organizationId, mode: 'deep', phases }),
@@ -93,7 +93,7 @@ export class DeepDiagnosticService {
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
       let pollRes: Response
       try {
-        pollRes = await fetch(`/api/diagnostics/result/${jobId}`)
+        pollRes = await fetch(asset(`/api/diagnostics/result/${jobId}`))
       } catch {
         continue // transient network blip — keep polling
       }

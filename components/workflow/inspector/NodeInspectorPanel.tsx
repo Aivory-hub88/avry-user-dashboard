@@ -17,6 +17,7 @@ import GenericNodeForm from './forms/GenericNodeForm';
 import RssFeedForm from './forms/RssFeedForm';
 import SlackForm from './forms/SlackForm';
 import GmailForm from './forms/GmailForm';
+import { asset } from '@/lib/asset'
 
 type Tab = 'configure' | 'advanced' | 'output';
 interface Props {
@@ -47,7 +48,7 @@ export default function NodeInspectorPanel({ selectedNode, onChange, onDelete, o
     if (!config) return;
     setTesting(true);
     try {
-      const res = await fetch('/api/workflows/test-step', {
+      const res = await fetch(asset('/api/workflows/test-step'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodeId, config }),
       });

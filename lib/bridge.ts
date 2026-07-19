@@ -1,3 +1,4 @@
+import { asset } from '@/lib/asset'
 export type BridgeResponse<T = unknown> = {
   error: boolean
   code?: string
@@ -23,7 +24,7 @@ export async function callBridge<T = unknown>(
   path: string,
   payload: unknown,
 ): Promise<T> {
-  const res = await fetch(`/api/bridge/${path}`, {
+  const res = await fetch(asset(`/api/bridge/${path}`), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

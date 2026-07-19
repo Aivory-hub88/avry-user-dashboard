@@ -108,6 +108,7 @@ export function getWorkflowCount(): number {
 
 import { useEffect, useState, useCallback } from 'react'
 import type { AivoryWorkflowSpec } from '@/types/workflow'
+import { asset } from '@/lib/asset'
 
 /** Fetch all workflows from the API. */
 export function useWorkflowList() {
@@ -119,7 +120,7 @@ export function useWorkflowList() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/workflows')
+      const res = await fetch(asset('/api/workflows'))
       if (!res.ok) throw new Error(`Failed to load workflows: ${res.status}`)
       const data = await res.json()
       setWorkflows(data)
@@ -139,7 +140,7 @@ export function useWorkflowList() {
 export async function createWorkflow(
   data: Partial<AivoryWorkflowSpec>
 ): Promise<AivoryWorkflowSpec> {
-  const res = await fetch('/api/workflows', {
+  const res = await fetch(asset('/api/workflows'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -156,7 +157,7 @@ export async function patchWorkflow(
   id: string,
   patch: Partial<AivoryWorkflowSpec>
 ): Promise<AivoryWorkflowSpec> {
-  const res = await fetch(`/api/workflows/${id}`, {
+  const res = await fetch(asset(`/api/workflows/${id}`), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
@@ -170,7 +171,7 @@ export async function patchWorkflow(
 
 /** Delete a workflow via DELETE /api/workflows/:id. */
 export async function removeWorkflow(id: string): Promise<void> {
-  const res = await fetch(`/api/workflows/${id}`, { method: 'DELETE' })
+  const res = await fetch(asset(`/api/workflows/${id}`), { method: 'DELETE' })
   if (!res.ok && res.status !== 404) {
     throw new Error(`Delete failed: ${res.status}`)
   }
@@ -178,7 +179,7 @@ export async function removeWorkflow(id: string): Promise<void> {
 
 /** Activate a workflow via POST /api/workflows/:id/activate. Returns updated spec. */
 export async function activateWorkflow(id: string, spec?: AivoryWorkflowSpec): Promise<AivoryWorkflowSpec> {
-  const res = await fetch(`/api/workflows/${id}/activate`, {
+  const res = await fetch(asset(`/api/workflows/${id}/activate`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     // Send the full spec so the server can recover if the in-memory store was reset
@@ -196,7 +197,7 @@ export async function activateWorkflow(id: string, spec?: AivoryWorkflowSpec): P
 
 /** Deactivate a workflow via POST /api/workflows/:id/deactivate. Returns updated spec. */
 export async function deactivateWorkflow(id: string): Promise<AivoryWorkflowSpec> {
-  const res = await fetch(`/api/workflows/${id}/deactivate`, { method: 'POST' })
+  const res = await fetch(asset(`/api/workflows/${id}/deactivate`), { method: 'POST' })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.error ?? `Deactivation failed: ${res.status}`)

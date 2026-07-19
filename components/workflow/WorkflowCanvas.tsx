@@ -41,6 +41,7 @@ import type { WorkflowNodeData } from '@/types/workflow-node';
 import type { SavedWorkflow } from '@/hooks/useWorkflows';
 import type { WorkflowStep, AivoryWorkflowSpec } from '@/types/workflows';
 import { detectNodeIntent } from '@/lib/workflows/nodeMapper';
+import { asset } from '@/lib/asset'
 
 type Props = {
   workflowId: string;
@@ -544,7 +545,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       setSyncState('loading');
       setErrorMsg(null);
       try {
-        const res = await fetch(`/api/n8n/workflow/${fetchId}`);
+        const res = await fetch(asset(`/api/n8n/workflow/${fetchId}`));
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const wf = await res.json();
         if (cancelled) return;
@@ -570,7 +571,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     setSyncState('saving'); setErrorMsg(null);
     try {
       const payload = reactFlowToN8n(nodes, edges, rawWorkflow);
-      const res = await fetch(`/api/n8n/workflow/${saveId}`, {
+      const res = await fetch(asset(`/api/n8n/workflow/${saveId}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -610,7 +611,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     const fetchId = n8nWorkflowId || workflowId;
     setExecLoading(true); setExecError(null);
     try {
-      const res = await fetch(`/api/n8n/workflow/${fetchId}/executions?limit=20`);
+      const res = await fetch(asset(`/api/n8n/workflow/${fetchId}/executions?limit=20`));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setExecutions(data.data || []);

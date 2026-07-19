@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Agent } from '@/types/agents';
+import { asset } from '@/lib/asset'
 
 interface AgentConfigPanelProps {
   nodeId: string;
@@ -30,7 +31,7 @@ export function AgentConfigPanel({
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch('/api/agents?status=active');
+        const res = await fetch(asset('/api/agents?status=active'));
         if (!res.ok) throw new Error('Failed to fetch agents');
         const data = await res.json();
         setAgents(data.agents || []);

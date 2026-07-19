@@ -1,4 +1,5 @@
 import { IntentRoute, INTENT_BOUNDARIES } from './intentBoundaries'
+import { asset } from '@/lib/asset'
 
 export type { IntentRoute }
 
@@ -54,7 +55,7 @@ export async function classifyIntent(userMessage: string, aiReply: string): Prom
     const prompt = buildClassifierPrompt(userMessage, aiReply)
     console.log('[IntentClassifier] LOG #1 — prompt built, length:', prompt.length)
     
-    const response = await fetch(`/api/intent`, {
+    const response = await fetch(asset(`/api/intent`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

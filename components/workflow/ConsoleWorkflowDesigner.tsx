@@ -8,6 +8,7 @@
 import React, { useState, useCallback } from 'react'
 import styles from './ConsoleWorkflowDesigner.module.css'
 import { AivoryWorkflowSpec, AivoryWorkflowEdge } from '@/types/workflows'
+import { asset } from '@/lib/asset'
 
 export interface ConsoleWorkflowDesignerProps {
   onWorkflowCreated?: (spec: AivoryWorkflowSpec, edges: AivoryWorkflowEdge[]) => void
@@ -52,7 +53,7 @@ export const ConsoleWorkflowDesigner: React.FC<ConsoleWorkflowDesignerProps> = (
 
     try {
       // Call ai-suggest endpoint
-      const response = await fetch('/api/workflows/ai-suggest', {
+      const response = await fetch(asset('/api/workflows/ai-suggest'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -71,7 +72,7 @@ export const ConsoleWorkflowDesigner: React.FC<ConsoleWorkflowDesignerProps> = (
       setGeneratedEdges(result.edges)
 
       // Now call copilot to get explanation
-      const explainResponse = await fetch('/api/workflows/copilot', {
+      const explainResponse = await fetch(asset('/api/workflows/copilot'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

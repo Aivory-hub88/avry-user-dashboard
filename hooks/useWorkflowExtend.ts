@@ -7,6 +7,7 @@
 
 import { useCallback, useState } from 'react'
 import { AivoryWorkflowSpec, AivoryWorkflowEdge, WorkflowStep } from '@/types/workflows'
+import { asset } from '@/lib/asset'
 
 export interface WorkflowExtensionResult {
   newSteps: WorkflowStep[]
@@ -47,7 +48,7 @@ export function useWorkflowExtend(): UseWorkflowExtendState & UseWorkflowExtendA
       setResult(null)
 
       try {
-        const response = await fetch('/api/workflows/aivory-extend', {
+        const response = await fetch(asset('/api/workflows/aivory-extend'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

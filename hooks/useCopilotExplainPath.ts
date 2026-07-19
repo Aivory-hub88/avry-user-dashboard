@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { AivoryWorkflowSpec } from '@/types/workflows'
+import { asset } from '@/lib/asset'
 
 export interface ExplainPathResult {
   summary: string
@@ -32,7 +33,7 @@ export function useCopilotExplainPath(): UseAivoryExplainPathState & UseAivoryEx
       setResult(null)
 
       try {
-        const response = await fetch('/api/workflows/aivory-explain-path', {
+        const response = await fetch(asset('/api/workflows/aivory-explain-path'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ workflow, targetStepId }),

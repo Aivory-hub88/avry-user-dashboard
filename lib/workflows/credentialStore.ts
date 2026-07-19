@@ -7,6 +7,7 @@
  *
  * This module runs client-side only.
  */
+import { asset } from '@/lib/asset'
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ export function clearCredentials(): void {
  * Calls PATCH /api/user/credentials — endpoint does not exist yet.
  */
 async function saveToDatabaseStub(creds: PersistedCredentials): Promise<void> {
-  const res = await fetch('/api/user/credentials', {
+  const res = await fetch(asset('/api/user/credentials'), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

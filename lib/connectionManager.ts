@@ -1,4 +1,5 @@
 import { Connection } from '@/types/workflow';
+import { asset } from '@/lib/asset'
 
 // Simple in-memory cache for connections
 const connectionCache: Record<string, { data: Connection[]; timestamp: number }> = {};
@@ -20,7 +21,7 @@ export const fetchConnectionsForApp = async (appId: string): Promise<Connection[
     }
 
     // Fetch from API
-    const response = await fetch(`/api/integrations/connections?appId=${appId}`);
+    const response = await fetch(asset(`/api/integrations/connections?appId=${appId}`));
     if (!response.ok) {
       console.error(`[connectionManager] Failed to fetch connections for app ${appId}:`, response.statusText);
       return [];

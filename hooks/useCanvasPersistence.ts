@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import type { Node, Edge } from '@xyflow/react';
+import { asset } from '@/lib/asset'
 
 const PREFIX = 'canvas_state_';
 
@@ -81,7 +82,7 @@ export function clearCanvasState(workflowId: string) {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(canvasStorageKey(workflowId));
   // Also clear from backend
-  fetch(`/api/workflows/${workflowId}/canvas`, { method: 'DELETE' }).catch(() => {});
+  fetch(asset(`/api/workflows/${workflowId}/canvas`), { method: 'DELETE' }).catch(() => {});
 }
 
 // ── Backend helpers ──────────────────────────────────────
@@ -89,7 +90,7 @@ export function clearCanvasState(workflowId: string) {
 /** Fetch canvas state from the backend. Returns null on any error. */
 export async function fetchCanvasState(workflowId: string): Promise<CanvasState | null> {
   try {
-    const res = await fetch(`/api/workflows/${workflowId}/canvas`);
+    const res = await fetch(asset(`/api/workflows/${workflowId}/canvas`));
     if (!res.ok) return null;
     const data = await res.json() as CanvasState | null;
     if (!data) return null;
@@ -103,7 +104,7 @@ export async function fetchCanvasState(workflowId: string): Promise<CanvasState 
 /** Persist canvas state to the backend. Fire-and-forget. */
 async function pushCanvasState(workflowId: string, nodes: Node[], edges: Edge[]) {
   try {
-    await fetch(`/api/workflows/${workflowId}/canvas`, {
+    await fetch(asset(`/api/workflows/${workflowId}/canvas`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nodes, edges }),

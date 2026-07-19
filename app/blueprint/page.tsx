@@ -14,6 +14,7 @@ import styles from './blueprint.module.css'
 import { exportBlueprintPDF, exportBlueprintDOCX } from '@/lib/blueprintExport'
 import { useTranslations } from 'next-intl'
 import { saveRoadmap } from '@/hooks/useRoadmap'
+import { asset } from '@/lib/asset'
 
 // ── Lucide-style inline SVG icons ────────────────────────────────────────────
 function IconDatabase() {
@@ -1120,7 +1121,7 @@ export default function BlueprintPage() {
       const diagnosticContext = (() => {
         try { return JSON.parse(localStorage.getItem('aivory_deep_result') || '{}') } catch { return {} }
       })()
-      const res = await fetch('/api/roadmap/generate', {
+      const res = await fetch(asset('/api/roadmap/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1150,7 +1151,7 @@ export default function BlueprintPage() {
         try { return JSON.parse(localStorage.getItem('aivory_deep_result') || '{}') } catch { return {} }
       })()
 
-      const res = await fetch('/api/console/workflows/from-blueprint', {
+      const res = await fetch(asset('/api/console/workflows/from-blueprint'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

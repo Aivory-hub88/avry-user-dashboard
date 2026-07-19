@@ -1,11 +1,12 @@
 import type { ConsoleWorkflow } from '@/types/workflow';
+import { asset } from '@/lib/asset'
 
 export async function createWorkflowFromBlueprint(params: {
   blueprintId: string;
   name?: string;
   context?: Record<string, any>;
 }): Promise<ConsoleWorkflow> {
-  const res = await fetch('/api/console/workflows/from-blueprint', {
+  const res = await fetch(asset('/api/console/workflows/from-blueprint'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),

@@ -36,12 +36,12 @@ function ProviderButton({ app, onPopupOpened }: ProviderButtonProps) {
     setLoading(true)
     try {
       // 1. Get the Composio session — surfaces auth/gating errors server-side
-      const sessionRes = await fetch('/api/integrations/oauth?action=session')
+      const sessionRes = await fetch(asset('/api/integrations/oauth?action=session'))
       if (!sessionRes.ok) throw new Error('Failed to create session')
 
       // 2. Initiate Composio OAuth — opens the provider's auth page.
       // The entity is derived from the session server-side; never send a client userId.
-      const connectRes = await fetch('/api/integrations/oauth/connect', {
+      const connectRes = await fetch(asset('/api/integrations/oauth/connect'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ appId: app.id }),
@@ -110,7 +110,7 @@ function ConnectModal({ app, existingId, onClose, onSaved }: ConnectModalProps) 
     try {
       let res: Response
       if (isReconnect) {
-        res = await fetch(`/api/integrations/connections/${existingId}`, {
+        res = await fetch(asset(`/api/integrations/connections/${existingId}`), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ credentials: fieldValues }),
@@ -121,7 +121,7 @@ function ConnectModal({ app, existingId, onClose, onSaved }: ConnectModalProps) 
           displayName: displayName.trim(),
           credentials: fieldValues,
         }
-        res = await fetch('/api/integrations/connections', {
+        res = await fetch(asset('/api/integrations/connections'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -271,7 +271,7 @@ function IntegrationsContent() {
 
   const fetchApps = useCallback(async () => {
     try {
-      const res = await fetch('/api/integrations/apps')
+      const res = await fetch(asset('/api/integrations/apps'))
       if (res.ok) setApps(await res.json())
     } finally {
       setLoadingApps(false)
@@ -281,11 +281,11 @@ function IntegrationsContent() {
   const fetchConnections = useCallback(async () => {
     try {
       // Fetch OAuth connections from Next.js API (Composio)
-      const oauthRes = await fetch(`/api/integrations/oauth?action=status`)
+      const oauthRes = await fetch(asset(`/api/integrations/oauth?action=status`))
       const oauthConns = oauthRes.ok ? await oauthRes.json() : []
 
       // Fetch manual (API key/basic) connections from Next.js API
-      const manualRes = await fetch('/api/integrations/connections')
+      const manualRes = await fetch(asset('/api/integrations/connections'))
       const manualConns = manualRes.ok ? await manualRes.json() : []
 
       // Merge: manual connections + OAuth connections
@@ -322,7 +322,7 @@ function IntegrationsContent() {
       }
 
       try {
-        const res = await fetch(`/api/integrations/oauth?action=status`)
+        const res = await fetch(asset(`/api/integrations/oauth?action=status`))
         if (res.ok) {
           const conns: AivoryConnection[] = await res.json()
           const found = conns.find(c => c.appId === targetAppId && c.status === 'connected')
@@ -350,14 +350,14 @@ function IntegrationsContent() {
 
     try {
       if (conn.authType === 'oauth' && conn.oauthProvider) {
-        const res = await fetch('/api/integrations/oauth', {
+        const res = await fetch(asset('/api/integrations/oauth'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'revoke', connectedAccountId: conn.id }),
         })
         if (!res.ok) throw new Error('Failed to revoke OAuth connection')
       } else {
-        const res = await fetch(`/api/integrations/connections/${conn.id}`, { method: 'DELETE' })
+        const res = await fetch(asset(`/api/integrations/connections/${conn.id}`), { method: 'DELETE' })
         if (!res.ok) throw new Error('Failed to delete connection')
       }
       setFeedback({ type: 'success', message: `Successfully revoked ${conn.displayName}` })
@@ -376,11 +376,11 @@ function IntegrationsContent() {
 
     if (conn.authType === 'oauth' && app.oauthProvider) {
       try {
-        const sessionRes = await fetch('/api/integrations/oauth?action=session')
+        const sessionRes = await fetch(asset('/api/integrations/oauth?action=session'))
         if (!sessionRes.ok) throw new Error('Failed to create session')
 
         // The entity is derived from the session server-side; never send a client userId.
-        const connectRes = await fetch('/api/integrations/oauth/connect', {
+        const connectRes = await fetch(asset('/api/integrations/oauth/connect'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ appId: app.id }),

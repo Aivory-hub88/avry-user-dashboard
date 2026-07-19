@@ -6,6 +6,7 @@ import { AuthManager } from "@/lib/authManager"
 import LoadingState from "@/components/dashboard/LoadingState"
 import ErrorState from "@/components/dashboard/ErrorState"
 import styles from "@/app/dashboard/dashboard.module.css"
+import { asset } from '@/lib/asset'
 
 interface Payment {
   paymentId: string
@@ -81,7 +82,7 @@ export default function PaymentsPage() {
         headers['Authorization'] = `Bearer ${token}`
       }
 
-      const response = await fetch(`/api/payments/history/${userId}`, {
+      const response = await fetch(asset(`/api/payments/history/${userId}`), {
         method: 'GET',
         headers,
       })

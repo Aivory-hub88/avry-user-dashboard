@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Agent, UpdateAgentRequest, AgentProvider, AgentRuntime, AgentStatus } from '@/types/agents';
+import { asset } from '@/lib/asset'
 
 const PROVIDERS: AgentProvider[] = ['openrouter', 'openai', 'anthropic', 'other'];
 const RUNTIMES: AgentRuntime[] = ['zeroclaw', 'direct', 'n8n'];
@@ -42,7 +43,7 @@ export default function AgentDetailPage() {
     const fetchAgent = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/agents/${id}`);
+        const res = await fetch(asset(`/api/agents/${id}`));
         if (!res.ok) throw new Error('Failed to fetch agent');
         const data = await res.json();
         setAgent(data);
@@ -70,7 +71,7 @@ export default function AgentDetailPage() {
     setError(null);
 
     try {
-      const res = await fetch(`/api/agents/${id}`, {
+      const res = await fetch(asset(`/api/agents/${id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -100,7 +101,7 @@ export default function AgentDetailPage() {
     setError(null);
 
     try {
-      const res = await fetch(`/api/agents/${id}`, {
+      const res = await fetch(asset(`/api/agents/${id}`), {
         method: 'DELETE',
       });
 

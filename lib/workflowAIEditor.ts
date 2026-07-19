@@ -5,6 +5,7 @@
  */
 
 import { SavedWorkflow } from '@/hooks/useWorkflows'
+import { asset } from '@/lib/asset'
 
 export interface WorkflowChange {
   type: 'ADD_STEP' | 'REMOVE_STEP' | 'UPDATE_STEP' | 'REORDER_STEPS' | 'UPDATE_TRIGGER'
@@ -35,7 +36,7 @@ export async function requestWorkflowEdit(
   userInstruction: string
 ): Promise<AIEditResponse> {
   try {
-    const res = await fetch('/api/workflows/aivory-edit', {
+    const res = await fetch(asset('/api/workflows/aivory-edit'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -85,7 +86,7 @@ export async function requestStepEdit(
       integrations: [],
     }
 
-    const res = await fetch('/api/workflows/aivory-edit', {
+    const res = await fetch(asset('/api/workflows/aivory-edit'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

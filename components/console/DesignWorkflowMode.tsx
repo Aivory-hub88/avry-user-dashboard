@@ -4,6 +4,7 @@ import React, { useState, useCallback } from 'react'
 import { WorkflowGenerationResult } from '@/types/workflows'
 import { storeWorkflowSpec } from '@/lib/workflowHandoff'
 import styles from './DesignWorkflowMode.module.css'
+import { asset } from '@/lib/asset'
 
 export interface DesignWorkflowModeProps {
   onClose: () => void
@@ -23,7 +24,7 @@ export const DesignWorkflowMode: React.FC<DesignWorkflowModeProps> = ({ onClose 
     setResult(null)
 
     try {
-      const response = await fetch('/api/workflows/ai-suggest', {
+      const response = await fetch(asset('/api/workflows/ai-suggest'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

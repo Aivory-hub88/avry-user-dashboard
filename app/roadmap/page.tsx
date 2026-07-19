@@ -7,6 +7,7 @@ import { loadRoadmap, saveRoadmap } from '@/hooks/useRoadmap';
 import type { AiryRoadmap, AiryRoadmapPhase, AiryRoadmapKpi, AiryRoadmapMilestone } from '@/types/roadmap';
 import { useRouterContext } from '@/contexts/RouterContext';
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole';
+import { asset } from '@/lib/asset'
 
 // ─── colour tokens ────────────────────────────────────────────
 const T = {
@@ -1034,7 +1035,7 @@ export default function RoadmapPage() {
     try {
       const diagCtx = (() => { try { return JSON.parse(localStorage.getItem('aivory_deep_result') || '{}'); } catch { return {}; } })();
       const bpCtx   = (() => { try { return JSON.parse(localStorage.getItem('aivory_blueprint') || '{}'); } catch { return {}; } })();
-      const res = await fetch('/api/roadmap/generate', {
+      const res = await fetch(asset('/api/roadmap/generate'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source: 'direct', diagnosticContext: diagCtx, blueprintContext: bpCtx }),
       });

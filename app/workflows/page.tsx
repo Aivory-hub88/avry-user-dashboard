@@ -261,7 +261,7 @@ function RightPanel({
   const [connections, setConnections] = useState<Array<{ id: string; displayName: string; appId: string; appName: string; status: string }>>([])
   const [selectedConnectionId, setSelectedConnectionId] = useState(step?.connectionId ?? '')
   useEffect(() => {
-    fetch('/api/integrations/connections')
+    fetch(asset('/api/integrations/connections'))
       .then(r => r.ok ? r.json() : [])
       .then((all: Array<{ id: string; displayName: string; appId: string; appName: string; status: string }>) =>
         setConnections(all.filter(c => c.status === 'connected'))
@@ -680,7 +680,7 @@ function WorkflowsPageInner() {
   const [appsCategory, setAppsCategory] = useState<string>('All')
 
   useEffect(() => {
-    fetch('/api/integrations/apps')
+    fetch(asset('/api/integrations/apps'))
       .then(r => r.ok ? r.json() : [])
       .then(setApps)
       .catch(() => {})
@@ -1188,7 +1188,7 @@ function WorkflowsPageInner() {
     // Store pending nodes for injection once the NEW canvas mounts
     pendingHandoffRef.current = { nodes: rfNodes, edges: rfEdges }
     // Persist to backend canvas for the new workflow
-    fetch(`/api/workflows/${workflowId}/canvas`, {
+    fetch(asset(`/api/workflows/${workflowId}/canvas`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nodes: rfNodes, edges: rfEdges }),
@@ -1248,7 +1248,7 @@ function WorkflowsPageInner() {
     // Store pending nodes for injection once the NEW canvas mounts
     pendingHandoffRef.current = { nodes, edges }
     // Persist to backend canvas for the new workflow
-    fetch(`/api/workflows/${workflowId}/canvas`, {
+    fetch(asset(`/api/workflows/${workflowId}/canvas`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nodes, edges }),

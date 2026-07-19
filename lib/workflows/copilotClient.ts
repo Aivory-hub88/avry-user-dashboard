@@ -16,6 +16,7 @@ import type {
   TestResult,
   Message,
 } from '@/lib/workflows/copilotStateMachine'
+import { asset } from '@/lib/asset'
 
 // Re-export types so consumers don't need to import from the server file
 export type { CopilotConversationState, CopilotStage, GeneratedWorkflow, TestResult, Message }
@@ -42,7 +43,7 @@ export async function sendCopilotMessage(params: {
   sessionId?: string | null
   currentState?: CopilotConversationState | null
 }): Promise<CopilotApiResponse> {
-  const res = await fetch('/api/workflows/copilot', {
+  const res = await fetch(asset('/api/workflows/copilot'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
