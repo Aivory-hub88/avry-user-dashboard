@@ -710,6 +710,16 @@ export function maturityFromScore(composite: number): MaturityLevel {
   return 'Nascent'
 }
 
+/**
+ * Single source of truth for rendering automation-gap percentages. Keeps a
+ * fractional gap like 32.5% exact instead of letting each caller round it
+ * differently (the report previously showed 32.5%, 33% and 38% for the same
+ * underlying numbers depending on the section).
+ */
+export function formatGapPct(value: number): string {
+  return Number.isInteger(value) ? `${value}%` : `${value.toFixed(1)}%`
+}
+
 function calculateDimensionScores(a: DiagnosticAnswers): DimensionScores {
   const strategy = scoreStrategy(a)
   const data = scoreData(a)
@@ -1085,21 +1095,29 @@ function buildRoomForImprovement(
 
   // --- Automation gap (operational) ---
   if (currentAuto !== null && targetAuto !== null && targetAuto - currentAuto >= 15) {
-    const gap = Math.round(targetAuto - currentAuto)
+    // Keep the gap exact (e.g. 32.5%) — rounding here made this card disagree
+    // with the Next Steps / Room for Improvement narratives built elsewhere.
+    const gap = targetAuto - currentAuto
+    const gapStr = formatGapPct(gap)
+    // Weekly hours actually recoverable by closing the gap — same formula as
+    // calculateROI (manual hrs × gap × 75% efficiency), so this narrative can
+    // never disagree with the report's "Hours Reclaimed/yr" figure.
+    const weeklyReclaimable =
+      manualHrs != null ? Math.round(manualHrs * (gap / 100) * 0.75) : null
     items.push({
       id: 'rfi-automation-gap',
       area: 'Automation Coverage',
-      title: `Close the Automation Gap (${gap}%)`,
+      title: `Close the Automation Gap (${gapStr})`,
       priority: gap >= 40 ? 'high' : 'medium',
-      currentState: `An automation gap of ${gap}% means that roughly ${gap}% of your repetitive operational tasks are still handled manually despite your automation goals. Closing this gap represents your most immediate opportunity for untapped efficiency.`,
+      currentState: `Your team currently automates ${formatGapPct(currentAuto)} of in-scope work against a stated target of ${formatGapPct(targetAuto)}. The ${gapStr} between them is repetitive work still handled manually — your most immediate opportunity for untapped efficiency.`,
       recommendedAction:
         'Sequence automation in phases — start with the highest-volume, lowest-complexity tasks (quick wins) to build momentum, then expand to multi-step workflows.',
       operationalImpact:
-        manualHrs
-          ? `Closing this gap targets the ~${manualHrs} manual hours/week currently spent on repetitive work, freeing the team for higher-value tasks.`
+        weeklyReclaimable != null
+          ? `Closing this gap converts roughly ${weeklyReclaimable} of the ~${manualHrs} manual hours/week into automated capacity (after a 75% efficiency factor), freeing the team for higher-value tasks.`
           : 'Closing this gap redirects repetitive manual effort toward higher-value work.',
-      before: `Roughly ${100 - Math.round(currentAuto)}% of in-scope work is still manual and repetitive.`,
-      after: `Up to ${Math.round(targetAuto)}% of in-scope work runs automatically with human oversight only on exceptions.`,
+      before: `Roughly ${formatGapPct(100 - currentAuto)} of in-scope work is still manual and repetitive.`,
+      after: `Up to ${formatGapPct(targetAuto)} of in-scope work runs automatically with human oversight only on exceptions.`,
     })
   }
 
@@ -1271,7 +1289,9 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
  *  - `roomForImprovement` from the stored scores + quantitative inputs
  *    (only when missing).
  *
- * Everything else (scores, opportunities, risks, qualitative) is preserved.
+ * It also regenerates `opportunities` when the stored list is empty (legacy
+ * contexts persisted by older builds) — see the healing block below.
+ * Everything else (scores, risks, qualitative) is preserved.
  * The upgraded context is re-persisted to localStorage so the blueprint
  * generator and subsequent loads also benefit, and we avoid recomputing on
  * every render. The function is idempotent and pure for already-upgraded input.
@@ -1344,9 +1364,30 @@ export function upgradeDiagnosticContext(
     changed = true
   }
 
+  // Heal legacy contexts whose stored opportunity list is empty. The current
+  // rankOpportunities always returns at least one candidate (the always-on
+  // cross-system reporting fallback), so an empty array can only mean the
+  // context was persisted by an older build — regenerate from what the
+  // context still carries instead of preserving a hole in the report forever.
+  let opportunities = context.opportunities
+  if ((!Array.isArray(opportunities) || opportunities.length === 0) && context.scores) {
+    const currencyCode = parseCurrencyCode(context.currency)
+    const approxAnswers: DiagnosticAnswers = {}
+    if (typeof context.qualitative?.topPainPoints === 'string') {
+      approxAnswers.pain_points = context.qualitative.topPainPoints
+    }
+    opportunities = rankOpportunities(
+      approxAnswers,
+      context.scores,
+      currencyCode,
+      (calculations as Partial<ROIProjection> | undefined)?.totalAnnualSavingsUSD ?? null,
+    )
+    changed = true
+  }
+
   if (!changed) return context
 
-  const upgraded: DiagnosticContext = { ...context, calculations, roomForImprovement }
+  const upgraded: DiagnosticContext = { ...context, calculations, roomForImprovement, opportunities }
 
   try {
     localStorage.setItem('aivory_diagnostic_context', JSON.stringify(upgraded))

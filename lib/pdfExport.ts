@@ -1073,6 +1073,272 @@ export function renderAivoryNote(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+//  REPORT NARRATIVE HELPERS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** Safe string coercion for qualitative values that may be strings or arrays. */
+function qstr(v: unknown): string {
+  if (Array.isArray(v)) return v.map((x) => String(x)).join(', ')
+  return typeof v === 'string' ? v : ''
+}
+
+/**
+ * Gap/percentage formatter — keeps fractional values exact (32.5%) instead of
+ * letting each section round differently (the report previously showed 32.5%,
+ * 33% and 38% for the same underlying numbers).
+ */
+function fmtGap(v: number): string {
+  return Number.isInteger(v) ? `${v}%` : `${v.toFixed(1)}%`
+}
+
+/** Client-facing labels for the internal answer keys used as risk sources. */
+const RISK_SOURCE_LABELS: Record<string, string> = {
+  compliance_requirements: 'Compliance requirements',
+  data_quality: 'Data quality',
+  leadership_alignment: 'Leadership alignment',
+  change_readiness: 'Change readiness',
+  budget_allocated: 'Budget allocation',
+  process_documentation: 'Process documentation',
+  budget_range: 'Budget range',
+  fte_count: 'Team size',
+  annual_revenue: 'Annual revenue',
+  automation_current: 'Current automation level',
+}
+
+function humanizeRiskSource(src: string): string {
+  return RISK_SOURCE_LABELS[src] ?? cap(src.replace(/_/g, ' '))
+}
+
+/** Five-band readiness scale — thresholds mirror services maturityFromScore. */
+const MATURITY_BANDS: Array<{ level: string; range: string; meaning: string }> = [
+  { level: 'Nascent', range: '0–34', meaning: 'the foundational building blocks — reliable data, documented processes, and clear ownership — are not yet in place, so readiness groundwork should come before any AI deployment' },
+  { level: 'Initiating', range: '35–49', meaning: 'the organization is ready for closely supervised pilots in narrow, low-risk workflows while the underlying data and process foundations are built up' },
+  { level: 'Developing', range: '50–64', meaning: 'the organization is ready to deploy its first production automations in well-bounded, low-risk workflows — but not yet ready for a broad, multi-department AI rollout' },
+  { level: 'Defined', range: '65–79', meaning: 'the organization is ready for systematic AI adoption across several functions, with governance mature enough to manage risk at scale' },
+  { level: 'Optimizing', range: '80–100', meaning: 'AI-ready foundations are in place across the organization, and the focus shifts from readiness to compounding advantage' },
+]
+
+/** What a low score in each dimension concretely blocks. */
+const DIM_CONSTRAINT_NOTES: Record<string, string> = {
+  strategy: 'without quantified KPIs it is hard to prove value and prioritise the next automation',
+  data: 'AI output quality stays capped until core data is centralized and cleaned',
+  process: 'automations stay fragile until core workflows are documented and standardized',
+  people: 'adoption stalls without skills enablement and clear internal ownership',
+  governance: 'scaling automation without oversight structures compounds operational risk',
+  security: 'security and compliance guardrails need defining before sensitive data reaches AI systems',
+}
+
+/** Labeled bullet list used by the AI Analysis section. Handles page breaks. */
+function renderAiList(pdf: jsPDF, y: number, heading: string, items: string[]): number {
+  y = ensureSpace(pdf, y, 18)
+  setC(pdf, SEC_LBL, 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(6.6)
+  spacedText(pdf, heading.toUpperCase(), ML, y, 0.3)
+  y += 5
+  for (const item of items) {
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(8.8)
+    const lines = pdf.splitTextToSize(String(item), CW - 7)
+    y = ensureSpace(pdf, y, lines.length * 4.6 + 3)
+    setC(pdf, ACCENT, 'text')
+    pdf.text('•', ML + 1, y)
+    setC(pdf, MUTED, 'text')
+    pdf.setLineHeightFactor(1.45)
+    pdf.text(lines, ML + 6, y)
+    pdf.setLineHeightFactor(1.15)
+    y += lines.length * 4.6 + 2.2
+  }
+  return y + 4
+}
+
+/** Accent callout box for the AI-recommended next step. */
+function renderNextStepCallout(pdf: jsPDF, y: number, text: string): number {
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(9)
+  pdf.setLineHeightFactor(1.5)
+  const lines = pdf.splitTextToSize(text, CW - 16)
+  const boxH = lines.length * 4.8 + 13
+  y = ensureSpace(pdf, y, boxH + 4)
+  setC(pdf, '#eaf5e4', 'fill')
+  pdf.roundedRect(ML, y, CW, boxH, 2, 2, 'F')
+  setC(pdf, '#c0ddb0', 'draw')
+  pdf.setLineWidth(0.18)
+  pdf.roundedRect(ML, y, CW, boxH, 2, 2, 'S')
+  setC(pdf, ACCENT, 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(6.2)
+  spacedText(pdf, 'RECOMMENDED NEXT STEP', ML + 7, y + 6, 0.35)
+  setC(pdf, '#2f4f2f', 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(9)
+  pdf.setLineHeightFactor(1.5)
+  pdf.text(lines, ML + 7, y + 11.5)
+  pdf.setLineHeightFactor(1.15)
+  return y + boxH + 6
+}
+
+/** Amber banner mirroring the on-screen low-confidence warning + missing inputs. */
+function renderConfidenceBanner(pdf: jsPDF, y: number, confidence: string, missing: string[]): number {
+  const msg =
+    `${cap(confidence)} confidence projection — these figures are based on limited input data and internal benchmarks, and may not reflect actual outcomes.` +
+    (missing.length ? ` Missing inputs: ${missing.join(', ')}.` : '')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(8.2)
+  pdf.setLineHeightFactor(1.45)
+  const lines = pdf.splitTextToSize(msg, CW - 14)
+  const boxH = lines.length * 4.3 + 8
+  y = ensureSpace(pdf, y, boxH + 4)
+  setC(pdf, BADGE_A_BG, 'fill')
+  pdf.roundedRect(ML, y, CW, boxH, 2, 2, 'F')
+  setC(pdf, BADGE_A_BD, 'draw')
+  pdf.setLineWidth(0.18)
+  pdf.roundedRect(ML, y, CW, boxH, 2, 2, 'S')
+  setC(pdf, WARN_AMB, 'text')
+  pdf.text(lines, ML + 7, y + 5.5)
+  pdf.setLineHeightFactor(1.15)
+  return y + boxH + 6
+}
+
+/** Compact metric grid (4 columns per row) for the secondary ROI figures. */
+function renderMetricGrid(
+  pdf: jsPDF, y: number,
+  metrics: Array<{ l: string; v: string; n?: string }>,
+): number {
+  const cols = 4
+  const gapX = 5
+  const w = (CW - gapX * (cols - 1)) / cols
+  const rowH = 17
+  for (let i = 0; i < metrics.length; i += cols) {
+    y = ensureSpace(pdf, y, rowH + 2)
+    metrics.slice(i, i + cols).forEach((m, j) => {
+      const x = ML + j * (w + gapX)
+      setC(pdf, LABEL_A, 'text')
+      pdf.setFont(FB(), 'bold')
+      pdf.setFontSize(5.6)
+      spacedText(pdf, m.l.toUpperCase(), x, y, 0.18)
+      setC(pdf, INK, 'text')
+      pdf.setFont(F(), 'normal')
+      pdf.setFontSize(11.5)
+      pdf.text(m.v, x, y + 7)
+      if (m.n) {
+        setC(pdf, LABEL, 'text')
+        pdf.setFont(F(), 'normal')
+        pdf.setFontSize(6)
+        pdf.text(m.n, x, y + 11.5)
+      }
+    })
+    y += rowH
+  }
+  return y
+}
+
+/** Conservative / Base / Optimistic 3-Year ROI range row. */
+function renderScenarioRange(
+  pdf: jsPDF, y: number,
+  sc: { low?: number | null; base?: number | null; high?: number | null },
+  effPct: number,
+): number {
+  const roiFmt = (v: number | null | undefined): string =>
+    v == null || !isFinite(v) ? '—' : v >= 999 ? '>999%' : `${Math.round(v)}%`
+  const cells: Array<{ l: string; v: string; bg: string; tx: string }> = [
+    { l: 'CONSERVATIVE', v: roiFmt(sc.low), bg: '#f4f4f0', tx: MUTED },
+    { l: 'BASE', v: roiFmt(sc.base), bg: '#eaf5e4', tx: ACCENT },
+    { l: 'OPTIMISTIC', v: roiFmt(sc.high), bg: '#f4f4f0', tx: MUTED },
+  ]
+  y = ensureSpace(pdf, y, 30)
+  setC(pdf, LABEL_A, 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(6.4)
+  spacedText(pdf, '3-YEAR ROI RANGE', ML, y, 0.32)
+  y += 4
+  const gapX = 4
+  const w = (CW - gapX * 2) / 3
+  cells.forEach((c, i) => {
+    const x = ML + i * (w + gapX)
+    setC(pdf, c.bg, 'fill')
+    pdf.roundedRect(x, y, w, 14, 1.5, 1.5, 'F')
+    setC(pdf, LABEL, 'text')
+    pdf.setFont(FB(), 'bold')
+    pdf.setFontSize(5.6)
+    spacedText(pdf, c.l, x + 4, y + 5, 0.25)
+    setC(pdf, c.tx, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(11)
+    pdf.text(c.v, x + 4, y + 11)
+  })
+  y += 18
+  setC(pdf, LABEL, 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(6.4)
+  pdf.text(`Range reflects 50%–90% automation efficiency; base case uses ${effPct}%.`, ML, y)
+  return y + 6
+}
+
+/**
+ * Risk Register renderer — shared by both layout branches (with and without a
+ * Room for Improvement section), replacing two previously duplicated loops.
+ */
+function renderRiskRegister(pdf: jsPDF, y: number, risks: DiagnosticContext['risks']): number {
+  if (y > PAGE_H - 30) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 } else { y += 6 }
+
+  if (risks.length === 0) {
+    setC(pdf, SEC_LBL, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(7)
+    const rLblW = spacedText(pdf, 'RISK REGISTER', ML, y, 0.5)
+    setC(pdf, ACCENT, 'text')
+    pdf.setFontSize(7)
+    pdf.text('✓', ML + rLblW + 6, y)
+    setC(pdf, LABEL, 'text')
+    pdf.text('No risks detected.', ML + rLblW + 10, y)
+    return y + 8
+  }
+
+  y = sectionLabel(pdf, y, 'Risk Register')
+  const sevC: Record<string, string> = { HIGH: '#c04040', MEDIUM: WARN_AMB, LOW: ACCENT }
+  const sorted = [...risks].sort((a, b) =>
+    ({ HIGH: 0, MEDIUM: 1, LOW: 2 } as Record<string, number>)[a.severity]! -
+    ({ HIGH: 0, MEDIUM: 1, LOW: 2 } as Record<string, number>)[b.severity]!,
+  )
+
+  sorted.forEach((risk) => {
+    const c = sevC[risk.severity] ?? MUTED
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(8.5)
+    const rl = pdf.splitTextToSize(risk.risk, CW - 30)
+
+    // Break on the item's MEASURED height (risk lines + source line) — a fixed
+    // threshold let multi-line items spill into the footer.
+    const itemH = 3 + 3.5 + rl.length * 4.5 + (risk.source ? 7 : 0) + 4
+    if (y + itemH > PAGE_H - 16) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
+
+    thinDiv(pdf, y)
+    y += 3
+
+    setC(pdf, c, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(6.4)
+    const stw = pdf.getTextWidth(risk.severity)
+    spacedText(pdf, risk.severity, ML, y + 3.5, 0.2)
+
+    setC(pdf, INK, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(8.5)
+    pdf.text(rl, ML + stw + 8, y + 3.5)
+
+    if (risk.source) {
+      setC(pdf, LABEL, 'text')
+      pdf.setFontSize(6)
+      pdf.text(`Signal: ${humanizeRiskSource(risk.source)}`, ML + stw + 8, y + 3.5 + rl.length * 4.5 + 2)
+    }
+
+    y += Math.max(rl.length * 4.5 + 6, 8) + (risk.source ? 5 : 0)
+  })
+  return y
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 //  MAIN EXPORT
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -1080,6 +1346,7 @@ export async function exportReportToPdf(
   _elementId: string,
   companyName: string,
   context?: DiagnosticContext,
+  aiAnalysis?: Record<string, any> | null,
 ) {
   if (!context) {
     try {
@@ -1092,6 +1359,8 @@ export async function exportReportToPdf(
   const { scores, calculations, opportunities, risks, qualitative, roomForImprovement } = context
   const currency = (context.currency || 'USD') as 'USD' | 'EUR' | 'GBP' | 'IDR'
   const fmt = (v: number | null | undefined) => fmtCurrency(v, currency)
+  const cAny = calculations as any
+  const company = context.company || 'Your organization'
 
   const pdf = new jsPDF('p', 'mm', 'a4')
   await loadManrope(pdf)
@@ -1111,12 +1380,12 @@ export async function exportReportToPdf(
   })
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 2 — EDITORIAL SPREAD (thesis / pull-quote page)
+  // PAGE 2 — EDITORIAL SPREAD (letter page)
   // ════════════════════════════════════════════════════════════════════════════
   editorialSpread(pdf, context)
 
   // ════════════════════════════════════════════════════════════════════════════
-  // PAGE 3 — EXECUTIVE SCORECARD
+  // EXECUTIVE SCORECARD
   // ════════════════════════════════════════════════════════════════════════════
   pdf.addPage()
   pageBg(pdf)
@@ -1130,7 +1399,7 @@ export async function exportReportToPdf(
   // user's actual answers.
   const DIM_LABELS: Record<string, string> = {
     strategy: 'Strategy', data: 'Data', process: 'Process',
-    people: 'People', governance: 'Governance', security: 'Security & Governance',
+    people: 'People', governance: 'Governance', security: 'Security',
   }
   const scoreOf = (k: string) => Math.round((scores as unknown as Record<string, number>)[k] ?? 0)
   const strongestKey = scores.strongestDimension
@@ -1144,12 +1413,13 @@ export async function exportReportToPdf(
         ? 'Leadership interest is still forming, so early wins need to make the business case visible.'
         : 'Securing explicit leadership sponsorship should accompany the first initiatives.'
   const priorRaw = qualitative.priorAIAttempts || ''
-  const priorClause = priorRaw.startsWith('No')
+  const isFirstAttempt = priorRaw.startsWith('No')
+  const priorClause = isFirstAttempt
     ? 'As this is the organization’s first AI initiative, the sequencing below prioritises proven, low-complexity automations first.'
     : priorRaw
       ? 'Previous AI attempts give the team practical deployment experience to build on.'
       : ''
-  y = renderNarrative(pdf, y, `Your company/organization operates at a "${scores.maturityLevel}" maturity level with a composite score of ${Math.round(scores.composite)}. The strongest dimension is ${DIM_LABELS[strongestKey] ?? cap(strongestKey)} (${scoreOf(strongestKey)}), while ${DIM_LABELS[weakestKey] ?? cap(weakestKey)} (${scoreOf(weakestKey)}) represents the clearest gap and the first constraint to address. ${leadershipClause}${priorClause ? ' ' + priorClause : ''}`)
+  y = renderNarrative(pdf, y, `${company} operates at a "${scores.maturityLevel}" maturity level with a composite score of ${Math.round(scores.composite)}. The strongest dimension is ${DIM_LABELS[strongestKey] ?? cap(strongestKey)} (${scoreOf(strongestKey)}), while ${DIM_LABELS[weakestKey] ?? cap(weakestKey)} (${scoreOf(weakestKey)}) represents the clearest gap and the first constraint to address. ${leadershipClause}${priorClause ? ' ' + priorClause : ''}`)
 
   // ── Two-column: score ring left · dimension bars right ──
   const arcCx = ML + 35
@@ -1160,9 +1430,9 @@ export async function exportReportToPdf(
   const barX = ML + 82
   const barW = CW - 82
   let by = y + 2
-  // All six dimensions — matches the on-screen radar (security was missing).
-  // Old stored contexts may predate the security dimension; skip keys that
-  // have no score rather than rendering a bogus 0 bar.
+  // All six dimensions — matches the on-screen radar. Old stored contexts may
+  // predate the security dimension; skip keys that have no score rather than
+  // rendering a bogus 0 bar.
   const dims: Array<'strategy' | 'data' | 'process' | 'people' | 'governance' | 'security'> = [
     'strategy', 'data', 'process', 'people', 'governance', 'security',
   ]
@@ -1178,7 +1448,7 @@ export async function exportReportToPdf(
   const gap = 0.4
   const bdr = 0.2
   const cellW = (CW - gap - 2 * bdr) / 2
-  const cellH = 40 // was 33 — too tight, crowded the divider against the unit text
+  const cellH = 40
   const gridH = cellH * 2 + gap + 2 * bdr
   const gridY = y
 
@@ -1202,9 +1472,6 @@ export async function exportReportToPdf(
   pdf.setLineWidth(0.18)
   pdf.roundedRect(ML, gridY, CW, gridH, 2, 2, 'S')
 
-  // Tile content rendering helper — vertical rhythm reworked so the divider
-  // sits clear of the unit text above it (was 1mm, nearly touching) and the
-  // sub-label has even breathing room on both sides of that divider.
   function tileContent(
     tx: number, ty: number, tw: number,
     label: string, value: string, unit: string, sub: string,
@@ -1214,33 +1481,29 @@ export async function exportReportToPdf(
     const ix = tx + padX
     const iy = ty + padY
 
-    // Label — 8.5px uppercase #aaa, letter-spacing 0.14em
     setC(pdf, LABEL_A, 'text')
     pdf.setFont(FB(), 'bold')
-    pdf.setFontSize(6.4) // 8.5px
-    spacedText(pdf, label.toUpperCase(), ix, iy, 0.32) // 0.14em
+    pdf.setFontSize(6.4)
+    spacedText(pdf, label.toUpperCase(), ix, iy, 0.32)
 
-    // Value — 26px weight 300 #0a1a0f
     setC(pdf, INK, 'text')
-    pdf.setFont(F(), 'normal') // weight 300 → normal
-    pdf.setFontSize(19) // 26px
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(19)
     pdf.text(value, ix, iy + 11)
 
-    // Unit — 11px #999
     setC(pdf, UNIT_C, 'text')
     pdf.setFont(FB(), 'bold')
-    pdf.setFontSize(8.5) // 11px
+    pdf.setFontSize(8.5)
     pdf.text(unit, ix, iy + 17)
 
-    // Sub — divider + 9px #bbb uppercase, letter-spacing 0.06em
     const subDivY = iy + 21
     setC(pdf, TRACK, 'draw')
     pdf.setLineWidth(0.18)
     pdf.line(ix, subDivY, tx + tw - padX, subDivY)
     setC(pdf, LABEL, 'text')
     pdf.setFont(F(), 'normal')
-    pdf.setFontSize(7) // 9px
-    spacedText(pdf, sub.toUpperCase(), ix, subDivY + 5.5, 0.15) // 0.06em
+    pdf.setFontSize(7)
+    spacedText(pdf, sub.toUpperCase(), ix, subDivY + 5.5, 0.15)
   }
 
   // Tile 1 — Total Annual Savings
@@ -1255,14 +1518,13 @@ export async function exportReportToPdf(
   tileContent(cx1, cy0, cellW,
     'Hours Reclaimed/yr',
     calculations.hoursReclaimedPerYear != null
-      ? String(calculations.hoursReclaimedPerYear.toLocaleString()) : '\u2014',
+      ? String(calculations.hoursReclaimedPerYear.toLocaleString()) : '—',
     'efficiency adjusted',
     `${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}% efficiency factor`,
   )
 
   // Tile 3 — Payback Period. When payback is unknown (no budget provided),
-  // say so — the old code rendered "on — investment · Investment recovered
-  // yr 3" against a "—" value, which read as a broken claim.
+  // say so instead of rendering a broken claim.
   const hasPayback = calculations.paybackMonths != null
   tileContent(cx0, cy1, cellW,
     'Payback Period',
@@ -1288,38 +1550,164 @@ export async function exportReportToPdf(
 
   y = gridY + gridH + 4
 
-  // ── Transition into Opportunity Analysis ──
+  // ════════════════════════════════════════════════════════════════════════════
+  // READINESS VERDICT — answers "how ready are we, and what do we do first?"
+  // directly from the score band, before any further data.
+  // ════════════════════════════════════════════════════════════════════════════
   y = ensureSpace(pdf, y, 26)
-  y = renderTransition(pdf, y, `These scores translate into a concrete set of opportunities, starting with the fastest path to measurable ROI.`)
+  y = renderTransition(pdf, y, `What this score means for ${company} — and what to do first — is summarised below.`)
+
+  y = ensureSpace(pdf, y, 60)
+  y = sectionLabel(pdf, y, 'Readiness Verdict')
+
+  const band = MATURITY_BANDS.find((b) => b.level === scores.maturityLevel) ?? MATURITY_BANDS[2]
+  const weakestNote = DIM_CONSTRAINT_NOTES[weakestKey] ?? 'this dimension needs strengthening before automation can scale'
+  y = renderNarrative(pdf, y,
+    `With a composite score of ${Math.round(scores.composite)}/100, ${company} sits in the "${scores.maturityLevel}" band (${band.range}) of the five-level Aivory readiness scale (Nascent, Initiating, Developing, Defined, Optimizing). In practical terms, ${band.meaning}. The immediate constraint is ${DIM_LABELS[weakestKey] ?? cap(weakestKey)} (${scoreOf(weakestKey)}): ${weakestNote}. ${DIM_LABELS[strongestKey] ?? cap(strongestKey)} (${scoreOf(strongestKey)}) is the strongest foundation to build on.`)
+
+  // The first moves — numbered rows, ordered foundation → proof → mandate.
+  const firstImprovement = Array.isArray(roomForImprovement) && roomForImprovement.length > 0
+    ? roomForImprovement[0] : null
+  const verdictTopOpp = opportunities[0] ?? null
+  const hasBudgetInput = (calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD) != null
+  let moveNum = 1
+  const mv = () => String(moveNum++).padStart(2, '0')
+  if (firstImprovement) {
+    y = nextStepRow(pdf, y, mv(),
+      `Fix the foundation: ${firstImprovement.title}`,
+      firstImprovement.recommendedAction)
+  }
+  if (verdictTopOpp) {
+    y = nextStepRow(pdf, y, mv(),
+      `Prove value fast: ${verdictTopOpp.title}`,
+      `Highest-impact starting opportunity — ${verdictTopOpp.timeToValueWeeks}-week time to value${verdictTopOpp.dataReadiness === 'ready' ? ', data ready today' : ''}.`)
+  }
+  if (!hasBudgetInput) {
+    y = nextStepRow(pdf, y, mv(),
+      'Size the budget',
+      'No implementation budget was provided in the assessment. Supplying a budget range completes the payback and ROI model and turns these estimates into a decision-ready business case.')
+  } else {
+    y = nextStepRow(pdf, y, mv(), 'Secure the mandate', leadershipClause)
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // AI ANALYSIS — the model-generated narrative the user sees on screen.
+  // Numbers elsewhere stay deterministic; this section is clearly labelled.
+  // ════════════════════════════════════════════════════════════════════════════
+  if (aiAnalysis && typeof aiAnalysis === 'object') {
+    y = ensureSpace(pdf, y, 55)
+    y = sectionLabel(pdf, y, 'AI Analysis')
+
+    setC(pdf, LABEL, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(7)
+    const aiNote = 'Generated by the Aivory analysis model from your answers. All scores and financial figures elsewhere in this report remain deterministic.'
+    const aiNoteLines = pdf.splitTextToSize(aiNote, CW)
+    pdf.text(aiNoteLines, ML, y)
+    y += aiNoteLines.length * 3.6 + 4
+
+    const aiSummary = [aiAnalysis.narrative_summary, aiAnalysis.narrative, aiAnalysis.summary]
+      .find((v) => typeof v === 'string' && v.trim())
+    if (aiSummary) y = renderNarrative(pdf, y, String(aiSummary).trim())
+
+    const aiStrengths = Array.isArray(aiAnalysis.strengths)
+      ? aiAnalysis.strengths.slice(0, 5).map(String) : []
+    const aiConstraintsRaw = aiAnalysis.primary_constraints ?? aiAnalysis.blockers
+    const aiConstraints = Array.isArray(aiConstraintsRaw)
+      ? aiConstraintsRaw.slice(0, 5).map(String) : []
+    const aiOppsRaw = aiAnalysis.automation_opportunities ?? aiAnalysis.opportunities
+    const aiOpps = Array.isArray(aiOppsRaw) ? aiOppsRaw.slice(0, 5).map(String) : []
+
+    if (aiStrengths.length) y = renderAiList(pdf, y, 'Strengths', aiStrengths)
+    if (aiConstraints.length) y = renderAiList(pdf, y, 'Primary Constraints', aiConstraints)
+    if (aiOpps.length) y = renderAiList(pdf, y, 'Automation Opportunities', aiOpps)
+
+    if (typeof aiAnalysis.recommended_next_step === 'string' && aiAnalysis.recommended_next_step.trim()) {
+      y = renderNextStepCallout(pdf, y, aiAnalysis.recommended_next_step.trim())
+    }
+  } else {
+    y = ensureSpace(pdf, y, 14)
+    setC(pdf, LABEL, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(7.5)
+    const unavail = pdf.splitTextToSize(
+      'AI analysis was unavailable for this submission. The verdict above and all figures in this report are derived deterministically from your answers.', CW)
+    pdf.text(unavail, ML, y)
+    y += unavail.length * 4 + 6
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // DIAGNOSTIC CONTEXT — the inputs, placed BEFORE the analysis they ground.
+  // ════════════════════════════════════════════════════════════════════════════
+  y = ensureSpace(pdf, y, 26)
+  y = renderTransition(pdf, y, 'That verdict rests on the specific context your team described in this assessment.')
+
+  y = ensureSpace(pdf, y, 45)
+  y = sectionLabel(pdf, y, 'Diagnostic Context')
+
+  const ctxRows: [string, string][] = [
+    ['Primary Business Objective', qstr(qualitative.primaryObjective) || 'Not provided'],
+    ['Top Pain Points', qstr(qualitative.topPainPoints) || 'Not provided'],
+    ['AI / Technical Capability', qstr(qualitative.aiCapability) || 'Not provided'],
+    ['Implementation Approach', qstr(qualitative.implementApproach) || 'Not provided'],
+    ['Leadership Alignment', qstr(qualitative.leadershipAlignment) || 'Not provided'],
+    ['Prior AI Attempts', qstr(qualitative.priorAIAttempts) || 'Not provided'],
+    ['Consequence of Delay', qstr(qualitative.delayConsequence) || 'Not provided'],
+    ['Risk / Error Tolerance', qstr(qualitative.errorTolerance) || 'Not provided'],
+    ['Sources of Resistance', qstr(qualitative.resistanceSources) || 'None reported'],
+    ['Data Residency', qstr(qualitative.dataResidency) || 'Not provided'],
+    ['Compliance Requirements', qstr(qualitative.compliance) || 'None'],
+  ]
+
+  const labelColW = 50
+
+  ctxRows.forEach(([lbl, val]) => {
+    if (y > PAGE_H - 22) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
+
+    thinDiv(pdf, y)
+    y += 3
+
+    setC(pdf, SEC_LBL, 'text')
+    pdf.setFont(FB(), 'bold')
+    pdf.setFontSize(6.4)
+    spacedText(pdf, lbl.toUpperCase(), ML, y + 4, 0.3)
+
+    setC(pdf, VAL_MID, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(9)
+    pdf.setLineHeightFactor(1.6)
+    const vl = pdf.splitTextToSize(val, CW - labelColW - 4)
+    pdf.text(vl, ML + labelColW, y + 4)
+    pdf.setLineHeightFactor(1.15)
+
+    y += Math.max(vl.length * 5 + 4, 10)
+  })
 
   // ════════════════════════════════════════════════════════════════════════════
   // OPPORTUNITY ANALYSIS
   // ════════════════════════════════════════════════════════════════════════════
+  y = ensureSpace(pdf, y, 26)
+  y = renderTransition(pdf, y, 'Against that context, these are the highest-leverage opportunities to pursue first.')
+
   y = ensureSpace(pdf, y, 55)
   y = sectionLabel(pdf, y, 'Opportunity Analysis')
 
-  // Data-driven narrative — was a hardcoded template claiming pain points in
-  // "slow customer onboarding and repetitive content generation" regardless
-  // of what the user actually reported.
-  const painPoints = (qualitative.topPainPoints || '').trim()
-  const oppQuickWins = opportunities.filter(o => o.quadrant === 'quick_win')
-  const oppIntroPain = painPoints
-    ? `your company/organization's reported pain points (${painPoints})`
-    : `your company/organization's core operational bottlenecks`
-  const oppTtvWeeks = oppQuickWins.length > 0
-    ? Math.min(...oppQuickWins.map(o => o.timeToValueWeeks))
-    : opportunities.length > 0
-      ? Math.min(...opportunities.map(o => o.timeToValueWeeks))
-      : null
-  y = renderNarrative(pdf, y, `Targeted automation offers immediate relief for ${oppIntroPain}.${oppTtvWeeks != null ? ` Deploying ${oppQuickWins.length > 0 ? 'quick wins' : 'the first initiatives'} can deliver tangible results in as little as ${oppTtvWeeks} weeks.` : ''} These initial initiatives directly address manual bottlenecks while requiring relatively low implementation effort. Securing these early operational victories will establish momentum for more complex, multi-step agent deployments in the future.`)
-
   if (opportunities.length === 0) {
-    setC(pdf, MUTED, 'text')
-    pdf.setFont(F(), 'normal')
-    pdf.setFontSize(8.5)
-    pdf.text('No opportunities identified.', ML, y + 6)
-    y += 12 // advance past the line — it previously overlapped the next block
+    // Coherent empty state — the previous build rendered the "immediate
+    // relief" narrative and then contradicted it with "No opportunities
+    // identified." on the next line.
+    y = renderNarrative(pdf, y, `No automation opportunities could be derived from the stored assessment data. This usually means the assessment was completed on an earlier version of the analysis engine — re-running the Deep Diagnostic will generate a prioritised, ranked opportunity set for ${company}.`)
   } else {
+    const painPoints = qstr(qualitative.topPainPoints).trim()
+    const oppQuickWins = opportunities.filter((o) => o.quadrant === 'quick_win')
+    const oppIntroPain = painPoints
+      ? `the pain points ${company} reported (${painPoints})`
+      : `${company}'s core operational bottlenecks`
+    const oppTtvWeeks = oppQuickWins.length > 0
+      ? Math.min(...oppQuickWins.map((o) => o.timeToValueWeeks))
+      : Math.min(...opportunities.map((o) => o.timeToValueWeeks))
+    y = renderNarrative(pdf, y, `Targeted automation offers immediate relief for ${oppIntroPain}. Deploying ${oppQuickWins.length > 0 ? 'quick wins' : 'the first initiatives'} can deliver tangible results in as little as ${oppTtvWeeks} weeks. These initial initiatives directly address manual bottlenecks while requiring relatively low implementation effort, and early operational victories will establish momentum for more complex, multi-step agent deployments.`)
+
     for (const opp of opportunities) {
       if (y > PAGE_H - 65) {
         pdf.addPage()
@@ -1331,53 +1719,29 @@ export async function exportReportToPdf(
     }
   }
 
-  // ── Transition into Next Steps ──
-  y = ensureSpace(pdf, y, 26)
-  y = renderTransition(pdf, y, `Turning this analysis into results starts with a clear, sequenced set of actions.`)
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // NEXT STEPS
-  // ════════════════════════════════════════════════════════════════════════════
-  y = ensureSpace(pdf, y, 45)
-  y = sectionLabel(pdf, y, 'Next Steps')
-
-  // Dynamic content
-  const topOpp = opportunities[0]
-  const autoGap = (context.quantitative.targetAutomationPct ?? 0) - (context.quantitative.currentAutomationPct ?? 0)
-  const autoGapStr = autoGap > 0 ? `${autoGap}%` : ''
-
-  y = nextStepRow(pdf, y, '01',
-    'Review your opportunities',
-    topOpp
-      ? `Start with ${topOpp.title} \u2014 highest impact${topOpp.dataReadiness === 'ready' ? ', data ready' : ''}, ${topOpp.timeToValueWeeks}-week time to value. This is your fastest path to measurable ROI.`
-      : 'Review the opportunities identified in this assessment and prioritise based on impact, data readiness, and time to value.',
-  )
-
-  y = nextStepRow(pdf, y, '02',
-    'Generate your AI System Blueprint',
-    'Turn these findings into a deployment-ready architecture. Your Blueprint maps data sources, agent structure, and workflow sequencing.',
-  )
-
-  y = nextStepRow(pdf, y, '03',
-    'Deploy on Aivory\u2122',
-    `Launch your first agent, connect your channels, and start closing the ${autoGapStr ? autoGapStr + ' ' : ''}automation gap (the difference between your current automation level of ${context.quantitative.currentAutomationPct ?? 0}% and your target of ${context.quantitative.targetAutomationPct ?? 0}%).`,
-  )
-
-
-
-  // ── Transition into ROI Projection ──
-  y = ensureSpace(pdf, y, 26)
-  y = renderTransition(pdf, y, `Here is the financial case underpinning that sequence.`)
-
   // ════════════════════════════════════════════════════════════════════════════
   // ROI PROJECTION
   // ════════════════════════════════════════════════════════════════════════════
+  y = ensureSpace(pdf, y, 26)
+  y = renderTransition(pdf, y, opportunities.length > 0
+    ? 'Here is the financial case underpinning those opportunities.'
+    : 'Here is the financial case built from the workload your team reported.')
+
   y = ensureSpace(pdf, y, 70)
   y = sectionLabel(pdf, y, 'ROI Projection')
 
-  // Null-guarded narrative — the old single-template version rendered
-  // "investment of —", "a strong — three-year ROI" and "full payback in
-  // 0.0 years" whenever budget was not provided.
+  // Mirror the on-screen low-confidence banner (incl. the missing inputs the
+  // page shows) instead of burying confidence in a tile caption.
+  if (!calculations.hasEnoughDataForProjection) {
+    y = renderConfidenceBanner(
+      pdf, y,
+      calculations.confidenceLevel ?? 'low',
+      Array.isArray(calculations.missingInputs) ? calculations.missingInputs : [],
+    )
+  }
+
+  // Null-guarded narrative — never renders "investment of —" / "payback in
+  // 0.0 years" when budget is missing.
   const roiHoursStr = Math.round(calculations.hoursReclaimedPerYear || 0).toLocaleString()
   const roiSavingsStr = fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD)
   const roiInactionStr = fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR)
@@ -1391,9 +1755,6 @@ export async function exportReportToPdf(
   y = renderNarrative(pdf, y, roiNarrative)
 
   // ── 3 primary metrics across top ──
-  // gap gives each column breathing room on both sides of its divider —
-  // the previous 0.5mm gap let the divider run straight through the "3" of
-  // "3-YEAR ROI", a cramped/cheap-looking collision.
   const roiGap = 6
   const roiW = (CW - roiGap * 2) / 3
   const roiMetrics = [
@@ -1405,7 +1766,7 @@ export async function exportReportToPdf(
     {
       l: 'Hours Reclaimed',
       v: calculations.hoursReclaimedPerYear != null
-        ? `${calculations.hoursReclaimedPerYear.toLocaleString()} hrs` : '\u2014',
+        ? `${calculations.hoursReclaimedPerYear.toLocaleString()} hrs` : '—',
       n: 'per year, efficiency adjusted',
     },
     {
@@ -1415,29 +1776,26 @@ export async function exportReportToPdf(
     },
   ]
 
+  y = ensureSpace(pdf, y, 30)
   const roiTop = y
   roiMetrics.forEach((m, i) => {
     const rx = ML + i * (roiW + roiGap)
 
-    // Label — 8.5px #aaa
     setC(pdf, LABEL_A, 'text')
     pdf.setFont(FB(), 'bold')
     pdf.setFontSize(6.4)
     spacedText(pdf, m.l.toUpperCase(), rx, roiTop, 0.32)
 
-    // Value — large
     setC(pdf, INK, 'text')
     pdf.setFont(F(), 'normal')
-    pdf.setFontSize(19) // 26px
+    pdf.setFontSize(19)
     pdf.text(m.v, rx, roiTop + 12)
 
-    // Note — 9px #bbb
     setC(pdf, LABEL, 'text')
     pdf.setFont(F(), 'normal')
     pdf.setFontSize(7)
     pdf.text(m.n, rx, roiTop + 18)
 
-    // Vertical divider between metrics — centred in the gap, clear of text
     if (i < roiMetrics.length - 1) {
       setC(pdf, TRACK, 'draw')
       pdf.setLineWidth(0.18)
@@ -1448,32 +1806,66 @@ export async function exportReportToPdf(
 
   y = roiTop + 26
   thinDiv(pdf, y)
+  y += 6
+
+  // ── Secondary metrics — full parity with the on-screen ROI grid ──
+  y = renderMetricGrid(pdf, y, [
+    { l: 'Annual Labor Savings', v: fmt(calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD) },
+    { l: 'Annual Process Savings', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
+    { l: 'Payback Period', v: fmtMonths(calculations.paybackMonths) },
+    { l: 'Cost of Inaction (90d)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR) },
+    { l: '3-Year NPV', v: fmt(cAny.npv3YearLocal), n: 'net present value @ 10% discount' },
+    { l: 'Annual Ongoing Cost', v: fmt(cAny.annualOngoingCostLocal), n: 'licenses, maintenance & support' },
+    { l: 'Net Annual Savings', v: fmt(cAny.netAnnualSavingsLocal), n: 'after ongoing cost' },
+    { l: 'Net Payback', v: fmtMonths(cAny.netPaybackMonths), n: 'on net savings' },
+  ])
+
+  // ── Scenario range (Conservative / Base / Optimistic) — only when at least
+  // one scenario value exists; an all-"—" row is noise, not information. ──
+  const effPct = Math.round((calculations.efficiencyFactor ?? 0.75) * 100)
+  const scenario = cAny.scenarioThreeYearROI
+  if (scenario && [scenario.low, scenario.base, scenario.high].some((v: unknown) => v != null)) {
+    y += 2
+    y = renderScenarioRange(pdf, y, scenario, effPct)
+  }
+
+  y = ensureSpace(pdf, y, 10)
+  thinDiv(pdf, y)
   y += 4
 
-  // ── Methodology section ──
-  if (calculations.hasEnoughDataForProjection && calculations.assumedHourlyRateLocal != null) {
+  // ── Methodology — always rendered when the underlying figures exist, even
+  // for low-confidence projections (those are exactly the reports that need
+  // the working shown; the confidence banner above carries the caveat). ──
+  if (calculations.assumedHourlyRateLocal != null) {
+    y = ensureSpace(pdf, y, 40)
     y = sectionLabel(pdf, y, 'Methodology')
 
-    const effPct = Math.round((calculations.efficiencyFactor ?? 0.75) * 100)
     const hrs = calculations.hoursReclaimedPerYear ?? 0
     const rateNote = calculations.smallTeamRateApplied ? ' (opp-cost)' : ' (industry)'
 
-    const steps: [string, string, string][] = [
-      ['01', 'Hours reclaimed per year',
-        `${hrs} hrs = manual hrs/wk \u00d7 52 \u00d7 gap \u00d7 ${effPct}%`],
-      ['02', 'Annual labor savings',
-        `${fmt(calculations.annualLaborSavingsLocal)} = ${hrs} hrs \u00d7 ${fmt(calculations.assumedHourlyRateLocal)}/hr${rateNote}`],
-      ['03', 'Annual process savings',
+    const stepsRaw: [string, string][] = [
+      ['Hours reclaimed per year',
+        `${hrs} hrs = manual hrs/wk × 52 × gap × ${effPct}%`],
+      ['Annual labor savings',
+        `${fmt(calculations.annualLaborSavingsLocal)} = ${hrs} hrs × ${fmt(calculations.assumedHourlyRateLocal)}/hr${rateNote}`],
+      ['Annual process savings',
         `${fmt(calculations.annualProcessSavingsLocal)} = 20% of labor savings`],
-      ['04', 'Total annual savings',
+      ['Total annual savings',
         `${fmt(calculations.totalAnnualSavingsLocal)} = labor + process`],
     ]
     if (calculations.assumedBudgetMidpointLocal != null) {
-      steps.push(['05', 'Payback period',
-        `${fmtMonths(calculations.paybackMonths)} = investment \u00f7 savings/yr \u00d7 12`])
-      steps.push(['06', '3-Year ROI',
-        `${fmtPct(calculations.threeYearROIPercent)} = (savings\u00d73 \u2212 investment) \u00f7 investment \u00d7 100`])
+      stepsRaw.push(['Payback period',
+        `${fmtMonths(calculations.paybackMonths)} = investment ÷ savings/yr × 12`])
+      stepsRaw.push(['3-Year ROI',
+        `${fmtPct(calculations.threeYearROIPercent)} = (savings×3 − investment) ÷ investment × 100`])
     }
+    if (cAny.annualOngoingCostLocal != null) {
+      stepsRaw.push(['Ongoing run cost',
+        `${fmt(cAny.annualOngoingCostLocal)}/yr = ${Math.round((cAny.ongoingCostRate ?? 0.2) * 100)}% of initial investment`])
+    }
+    const steps: [string, string, string][] = stepsRaw.map(
+      ([desc, result], i) => [String(i + 1).padStart(2, '0'), desc, result],
+    )
 
     steps.forEach(([num, desc, result]) => {
       if (y > PAGE_H - 18) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
@@ -1481,18 +1873,15 @@ export async function exportReportToPdf(
       thinDiv(pdf, y)
       y += 3
 
-      // Step number — 9px #bbb
       setC(pdf, LABEL, 'text')
       pdf.setFont(F(), 'normal')
       pdf.setFontSize(7)
       pdf.text(num, ML, y + 3.5)
 
-      // Description — 11px #888
       setC(pdf, MUTED, 'text')
       pdf.setFontSize(8.5)
       pdf.text(desc, ML + 12, y + 3.5)
 
-      // Result — 11px weight 500 #0a1a0f
       setC(pdf, INK, 'text')
       pdf.setFont(FB(), 'bold')
       pdf.setFontSize(8.5)
@@ -1556,195 +1945,86 @@ export async function exportReportToPdf(
       setC(pdf, ACCENT, 'text')
       pdf.setFont(FB(), 'bold')
       pdf.setFontSize(7.5)
-      pdf.text('\u2713  Investment fully recovered within 3 years.', ML + 7, y + 5.5)
+      pdf.text('✓  Investment fully recovered within 3 years.', ML + 7, y + 5.5)
       y += 13
     }
 
-    // Confidence line — centred, 9px #bbb
+    // Assumptions line — centred
     y += 4
+    y = ensureSpace(pdf, y, 8)
     setC(pdf, LABEL, 'text')
     pdf.setFont(F(), 'normal')
     pdf.setFontSize(7)
     pdf.text(
-      `Labor rate: ${fmt(calculations.assumedHourlyRateLocal)}/hr  \u00b7  Efficiency factor: ${effPct}%  \u00b7  Confidence: ${calculations.confidenceLevel ?? 'medium'}`,
+      `Labor rate: ${fmt(calculations.assumedHourlyRateLocal)}/hr  ·  Efficiency factor: ${effPct}%  ·  Confidence: ${calculations.confidenceLevel ?? 'medium'}  ·  FX as of ${cAny.fxAsOf ?? 'latest snapshot'}`,
       PAGE_W / 2, y, { align: 'center' },
     )
+    y += 4
   }
-
-  // ── Transition into Diagnostic Context ──
-  y = ensureSpace(pdf, y, 26)
-  y = renderTransition(pdf, y, `These projections are grounded in the specific context your team described in this assessment.`)
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // DIAGNOSTIC CONTEXT
-  // ════════════════════════════════════════════════════════════════════════════
-  y = ensureSpace(pdf, y, 45)
-  y = sectionLabel(pdf, y, 'Diagnostic Context')
-
-  const ctxRows: [string, string][] = [
-    ['Primary Business Objective', qualitative.primaryObjective || 'Not provided'],
-    ['Top Pain Points', qualitative.topPainPoints || 'Not provided'],
-    ['AI / Technical Capability', qualitative.aiCapability || 'Not provided'],
-    ['Implementation Approach', qualitative.implementApproach || 'Not provided'],
-    ['Leadership Alignment', qualitative.leadershipAlignment || 'Not provided'],
-    ['Prior AI Attempts', qualitative.priorAIAttempts || 'Not provided'],
-    ['Consequence of Delay', qualitative.delayConsequence || 'Not provided'],
-    ['Risk / Error Tolerance', qualitative.errorTolerance || 'Not provided'],
-    ['Data Residency', qualitative.dataResidency || 'Not provided'],
-    ['Compliance Requirements', qualitative.compliance?.length ? qualitative.compliance.join(', ') : 'None'],
-  ]
-
-  const labelColW = 44
-
-  ctxRows.forEach(([lbl, val]) => {
-    if (y > PAGE_H - 22) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
-
-    // Row divider
-    thinDiv(pdf, y)
-    y += 3
-
-    // Label — 8.5px uppercase #6a9a6a, bold, letter-spacing 0.12em
-    setC(pdf, SEC_LBL, 'text')
-    pdf.setFont(FB(), 'bold')
-    pdf.setFontSize(6.4) // 8.5px
-    spacedText(pdf, lbl.toUpperCase(), ML, y + 4, 0.3) // 0.12em
-
-    // Value — 12px #444, line-height 1.6
-    setC(pdf, VAL_MID, 'text')
-    pdf.setFont(F(), 'normal')
-    pdf.setFontSize(9) // 12px
-    pdf.setLineHeightFactor(1.6)
-    const vl = pdf.splitTextToSize(val, CW - labelColW - 4)
-    pdf.text(vl, ML + labelColW, y + 4)
-    pdf.setLineHeightFactor(1.15)
-
-    y += Math.max(vl.length * 5 + 4, 10)
-  })
 
   // ════════════════════════════════════════════════════════════════════════════
   // ROOM FOR IMPROVEMENT + RISK REGISTER
   // ════════════════════════════════════════════════════════════════════════════
   if (Array.isArray(roomForImprovement) && roomForImprovement.length > 0) {
-    // ── Transition into Room for Improvement ──
     y = ensureSpace(pdf, y, 26)
-    y = renderTransition(pdf, y, `Against that context, this is where the greatest friction and opportunity lie.`)
+    y = renderTransition(pdf, y, 'This is where the greatest friction — and the fastest payoff — lies before and during adoption.')
 
     y = ensureSpace(pdf, y, 55)
     y = sectionLabel(pdf, y, 'Room for Improvement')
 
-    const gap = (context.quantitative.targetAutomationPct ?? 0) - (context.quantitative.currentAutomationPct ?? 0)
-    y = renderNarrative(pdf, y, `Your company/organization currently maintains ${context.quantitative.currentAutomationPct ?? 0}% automation coverage against a strategic target of ${context.quantitative.targetAutomationPct ?? 0}%. This ${gap}% gap represents the manual effort continuously wasted on routine data entry and unoptimized tasks. Closing this deficit requires standardizing undocumented core workflows, which is the root cause of the lower Process score. Bridging this gap will ensure consistent, reliable inputs for AI agents and drastically reduce ongoing operational friction.`)
+    const rfiCurrent = context.quantitative.currentAutomationPct ?? 0
+    const rfiTarget = context.quantitative.targetAutomationPct ?? 0
+    const rfiGap = rfiTarget - rfiCurrent
+    const rootCauseClause = weakestKey === 'process'
+      ? 'Closing this deficit starts with standardizing undocumented core workflows — the root cause of the lower Process score.'
+      : `Closing this deficit starts with the ${DIM_LABELS[weakestKey] ?? cap(weakestKey)} improvements below.`
+    y = renderNarrative(pdf, y, `${company} currently maintains ${fmtGap(rfiCurrent)} automation coverage against a strategic target of ${fmtGap(rfiTarget)}.${rfiGap > 0 ? ` This ${fmtGap(rfiGap)} gap is manual effort spent on routine, unautomated tasks.` : ''} ${rootCauseClause} Bridging this gap gives AI agents consistent, reliable inputs and steadily reduces operational friction.`)
 
     roomForImprovement.forEach((item) => {
       y = ensureSpace(pdf, y, measureImprovementBlockHeight(pdf, item))
       y = improvementBlock(pdf, item, y)
     })
 
-    // ── Risk Register — inline callout at bottom ──
-    if (y > PAGE_H - 30) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
-    y += 6
-
-    if (risks.length === 0) {
-      // Section label inline
-      setC(pdf, SEC_LBL, 'text')
-      pdf.setFont(F(), 'normal')
-      pdf.setFontSize(7)
-      const rLblW = spacedText(pdf, 'RISK REGISTER', ML, y, 0.5)
-
-      // Green checkmark + no risks text
-      setC(pdf, ACCENT, 'text')
-      pdf.setFontSize(7)
-      pdf.text('\u2713', ML + rLblW + 6, y)
-      setC(pdf, LABEL, 'text')
-      pdf.text('No risks detected.', ML + rLblW + 10, y)
-    } else {
-      y = sectionLabel(pdf, y, 'Risk Register')
-      const sevC: Record<string, string> = { HIGH: '#c04040', MEDIUM: WARN_AMB, LOW: ACCENT }
-      const sorted = [...risks].sort((a, b) =>
-        ({ HIGH: 0, MEDIUM: 1, LOW: 2 } as Record<string, number>)[a.severity]! -
-        ({ HIGH: 0, MEDIUM: 1, LOW: 2 } as Record<string, number>)[b.severity]!,
-      )
-
-      sorted.forEach((risk) => {
-        const c = sevC[risk.severity] ?? MUTED
-        pdf.setFont(F(), 'normal')
-        pdf.setFontSize(8.5)
-        const rl = pdf.splitTextToSize(risk.risk, CW - 30)
-
-        // Break on the item's MEASURED height (risk lines + source line), not
-        // a fixed threshold — a fixed 22mm let multi-line items and their
-        // "Source:" caption spill into the footer.
-        const itemH = 3 + 3.5 + rl.length * 4.5 + (risk.source ? 7 : 0) + 4
-        if (y + itemH > PAGE_H - 16) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
-
-        thinDiv(pdf, y)
-        y += 3
-
-        // Severity tag
-        setC(pdf, c, 'text')
-        pdf.setFont(F(), 'normal')
-        pdf.setFontSize(6.4)
-        const stw = pdf.getTextWidth(risk.severity)
-        spacedText(pdf, risk.severity, ML, y + 3.5, 0.2)
-
-        // Risk text
-        setC(pdf, INK, 'text')
-        pdf.setFont(F(), 'normal')
-        pdf.setFontSize(8.5)
-        pdf.text(rl, ML + stw + 8, y + 3.5)
-
-        // Source
-        if (risk.source) {
-          setC(pdf, LABEL, 'text')
-          pdf.setFontSize(6)
-          pdf.text(`Source: ${risk.source}`, ML + stw + 8, y + 3.5 + rl.length * 4.5 + 2)
-        }
-
-        y += Math.max(rl.length * 4.5 + 6, 8) + (risk.source ? 5 : 0)
-      })
-    }
+    y = renderRiskRegister(pdf, y, risks)
   } else if (risks.length > 0) {
-    // No improvements but risks exist
-    pdf.addPage()
-    pageBg(pdf)
-    pageFooter(pdf)
-    y = 16
-    y = sectionLabel(pdf, y, 'Risk Register')
-    const sevC: Record<string, string> = { HIGH: '#c04040', MEDIUM: WARN_AMB, LOW: ACCENT }
-    const sorted = [...risks].sort((a, b) =>
-      ({ HIGH: 0, MEDIUM: 1, LOW: 2 } as Record<string, number>)[a.severity]! -
-      ({ HIGH: 0, MEDIUM: 1, LOW: 2 } as Record<string, number>)[b.severity]!,
-    )
-    sorted.forEach((risk) => {
-      const c = sevC[risk.severity] ?? MUTED
-      pdf.setFont(F(), 'normal')
-      pdf.setFontSize(8.5)
-      const rl = pdf.splitTextToSize(risk.risk, CW - 30)
-      // Measured-height page break — see the twin loop above.
-      const itemH = 3 + 3.5 + rl.length * 4.5 + (risk.source ? 7 : 0) + 4
-      if (y + itemH > PAGE_H - 16) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
-      thinDiv(pdf, y)
-      y += 3
-      setC(pdf, c, 'text')
-      pdf.setFontSize(6.4)
-      const stw = pdf.getTextWidth(risk.severity)
-      spacedText(pdf, risk.severity, ML, y + 3.5, 0.2)
-      setC(pdf, INK, 'text')
-      pdf.setFontSize(8.5)
-      pdf.text(rl, ML + stw + 8, y + 3.5)
-      if (risk.source) {
-        setC(pdf, LABEL, 'text')
-        pdf.setFontSize(6)
-        pdf.text(`Source: ${risk.source}`, ML + stw + 8, y + 3.5 + rl.length * 4.5 + 2)
-      }
-      y += Math.max(rl.length * 4.5 + 6, 8) + (risk.source ? 5 : 0)
-    })
+    y = ensureSpace(pdf, y, 45)
+    y = renderRiskRegister(pdf, y, risks)
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // CLOSING NOTE — synthesizes the report into a single closing statement
-  // before the back cover, so the document ends on a narrated conclusion
-  // rather than stopping mid-data on the last risk row.
+  // NEXT STEPS — the product CTA sequence, placed AFTER the full analysis so
+  // the reader has seen the financial case before being asked to act on it.
+  // ════════════════════════════════════════════════════════════════════════════
+  y = ensureSpace(pdf, y, 26)
+  y = renderTransition(pdf, y, 'Turning this analysis into results starts with a clear, sequenced set of actions.')
+
+  y = ensureSpace(pdf, y, 45)
+  y = sectionLabel(pdf, y, 'Next Steps')
+
+  const topOpp = opportunities[0]
+  const nsCurrent = context.quantitative.currentAutomationPct ?? 0
+  const nsTarget = context.quantitative.targetAutomationPct ?? 0
+  const nsGap = nsTarget - nsCurrent
+
+  y = nextStepRow(pdf, y, '01',
+    'Review your opportunities',
+    topOpp
+      ? `Start with ${topOpp.title} — highest impact${topOpp.dataReadiness === 'ready' ? ', data ready' : ''}, ${topOpp.timeToValueWeeks}-week time to value. This is your fastest path to measurable ROI.`
+      : 'Re-run the Deep Diagnostic to generate a prioritised opportunity list, then prioritise based on impact, data readiness, and time to value.',
+  )
+
+  y = nextStepRow(pdf, y, '02',
+    'Generate your AI System Blueprint',
+    'Turn these findings into a deployment-ready architecture. Your Blueprint maps data sources, agent structure, and workflow sequencing.',
+  )
+
+  y = nextStepRow(pdf, y, '03',
+    'Deploy on Aivory™',
+    `Launch your first agent, connect your channels, and start closing the${nsGap > 0 ? ` ${fmtGap(nsGap)}` : ''} automation gap (from ${fmtGap(nsCurrent)} automated today to your ${fmtGap(nsTarget)} target).`,
+  )
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // CLOSING NOTE
   // ════════════════════════════════════════════════════════════════════════════
   pdf.addPage()
   pageBg(pdf)
@@ -1753,17 +2033,25 @@ export async function exportReportToPdf(
 
   y = sectionLabel(pdf, y, 'Closing Note')
 
-  const companyLabel = context.company || 'Your organization'
-  const gapPct = (context.quantitative.targetAutomationPct ?? 0) - (context.quantitative.currentAutomationPct ?? 0)
   const closingTopOpp = opportunities[0]
   const closingSavings = fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD)
+  const lowConfidence =
+    !calculations.hasEnoughDataForProjection ||
+    (calculations.confidenceLevel ?? '').toLowerCase() === 'low'
+  // "Isolated wins" only makes sense for teams with prior AI attempts — for
+  // first-timers the honest framing is a first structured deployment.
+  const foundationClause = isFirstAttempt
+    ? `a "${scores.maturityLevel}" foundation ready for its first structured, low-risk AI deployments`
+    : `a "${scores.maturityLevel}" foundation strong enough to move from isolated wins to systemic execution`
 
-  y = renderNarrative(pdf, y, `${companyLabel} enters this next phase with a composite readiness score of ${Math.round(scores.composite)}, a "${scores.maturityLevel}" foundation strong enough to move from isolated wins to systemic execution. The path forward is not abstract: it starts with ${closingTopOpp ? closingTopOpp.title.toLowerCase() : 'the highest-impact opportunity identified in this assessment'}${gapPct > 0 ? `, and closes the ${gapPct}% automation gap` : ''} one phase at a time. Every figure in this report traces back to the answers your team provided, and every recommendation is sized to what is realistically achievable within the next planning cycle.`)
+  y = renderNarrative(pdf, y, `${company} enters this next phase with a composite readiness score of ${Math.round(scores.composite)} — ${foundationClause}. The path forward is not abstract: it starts with ${closingTopOpp ? closingTopOpp.title.toLowerCase() : 'the highest-impact opportunity identified in this assessment'}${nsGap > 0 ? `, and closes the ${fmtGap(nsGap)} automation gap` : ''} one phase at a time. Every figure in this report traces back to the answers your team provided, and every recommendation is sized to what is realistically achievable within the next planning cycle.`)
 
   y += 2
   y = renderNarrative(pdf, y,
     (calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD) != null
-      ? `None of this requires a leap of faith. The next step is simply to turn this diagnostic into a deployment plan, and begin compounding the ${closingSavings} in annual savings this analysis identified.`
+      ? (lowConfidence
+          ? `None of this requires a leap of faith. The next step is simply to turn this diagnostic into a deployment plan and begin validating the ${closingSavings} in estimated annual savings this analysis identified — an estimate that will sharpen as budget and workload inputs are confirmed.`
+          : `None of this requires a leap of faith. The next step is simply to turn this diagnostic into a deployment plan, and begin compounding the ${closingSavings} in annual savings this analysis identified.`)
       : `None of this requires a leap of faith. The next step is simply to turn this diagnostic into a deployment plan and begin reclaiming the manual hours this analysis identified.`)
 
   y += 6

@@ -195,7 +195,9 @@ export default function FinalResultPage() {
       // Pass the same blended scores shown on this page (70% deterministic +
       // 30% AI assessment) so the PDF's composite matches the on-screen one
       // instead of silently reverting to the raw deterministic score.
-      await exportReportToPdf('pdf-print-layout', context.company, { ...context, scores: displayScores })
+      // llmResult must be forwarded too — without it the PDF silently drops
+      // the entire AI Analysis section the user sees on this page.
+      await exportReportToPdf('pdf-print-layout', context.company, { ...context, scores: displayScores }, llmResult)
     } catch (error) {
       console.error('Failed to generate PDF', error)
     } finally {
