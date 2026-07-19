@@ -1024,11 +1024,11 @@ export default function BlueprintPage() {
   const [generatingRoadmap, setGeneratingRoadmap] = useState(false)
 
   useEffect(() => {
-    // Load blueprint: try Supabase first (with 10s timeout), fall back to localStorage (Req 4.5–4.7)
+    // Load blueprint: try the per-user Postgres row first, fall back to localStorage
     const loadBlueprintData = async () => {
       try {
-        const { loadBlueprint: _loadBlueprint } = await import('@/lib/supabaseStorage')
-        const result = await _loadBlueprint('demo_org')
+        const { loadBlueprint: _loadBlueprint } = await import('@/lib/reportStorage')
+        const result = await _loadBlueprint()
         if (result) {
           setBlueprint(sanitizeBlueprint(result))
         } else {

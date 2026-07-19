@@ -103,9 +103,10 @@ export default function FinalResultPage() {
       }
       const diagnosticId = (diagnosticData as any).id || 'current'
 
+      // organizationId omitted → the service derives the signed-in user's id
       await DeepDiagnosticService.generateBlueprint(
         diagnosticId,
-        'demo_org',
+        undefined,
         diagnosticData.qualitative?.primaryObjective || 'AI readiness improvement',
         diagnosticData
       )
@@ -143,23 +144,24 @@ export default function FinalResultPage() {
       // Fetch live FX before upgradeDiagnosticContext may recompute ROI —
       // best-effort; the static snapshot is the fallback.
       await ensureLiveRates()
-      // Try Supabase first (Req 6.5–6.8), fall back to localStorage
+      // Try the per-user Postgres row first (keyed by the signed-in user's
+      // JWT inside reportStorage), fall back to localStorage
       let raw: string | null = null
       try {
-        const { loadDiagnosticContext } = await import('@/lib/supabaseStorage')
-        const supabaseCtx = await loadDiagnosticContext('demo_org')
-        if (supabaseCtx) {
-          const context = validateContext(supabaseCtx)
+        const { loadDiagnosticContext } = await import('@/lib/reportStorage')
+        const remoteCtx = await loadDiagnosticContext()
+        if (remoteCtx) {
+          const context = validateContext(remoteCtx)
           if (context) {
             setState({ status: 'loaded', context: upgradeDiagnosticContext(context, findIndustryHint()) })
             return
           }
         }
       } catch {
-        // Supabase unavailable — fall through to localStorage
+        // Server storage unavailable — fall through to localStorage
       }
 
-      // localStorage fallback (Req 6.7)
+      // localStorage fallback
       raw = localStorage.getItem('aivory_diagnostic_context')
       if (!raw) {
         router.push('/diagnostics/deep')

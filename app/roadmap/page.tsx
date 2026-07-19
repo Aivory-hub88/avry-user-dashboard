@@ -974,12 +974,12 @@ export default function RoadmapPage() {
   }, []);
 
   useEffect(() => {
-    // Load roadmap: try Supabase first, fall back to localStorage (Req 5.4–5.6)
+    // Load roadmap: try the per-user Postgres row first, fall back to localStorage
     const loadRoadmapData = async () => {
       let rm: AiryRoadmap | null = null;
       try {
-        const { loadRoadmapFromSupabase } = await import('@/lib/supabaseStorage')
-        const result = await loadRoadmapFromSupabase('demo_org')
+        const { loadRoadmapRemote } = await import('@/lib/reportStorage')
+        const result = await loadRoadmapRemote()
         rm = result || loadRoadmap();
       } catch {
         rm = loadRoadmap();

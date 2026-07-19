@@ -7,10 +7,10 @@ import {
 } from '@/types/deepDiagnostic'
 import type { BlueprintV1 } from '@/types/blueprint'
 import {
-  saveDeepDiagnosticResult as _supabaseSaveResult,
-  loadDeepDiagnosticResult as _supabaseLoadResult,
-} from '@/lib/supabaseStorage'
-import { isMisconfigured as _supabaseMisconfigured } from '@/lib/supabaseClient'
+  saveDeepDiagnosticResult as _remoteSaveResult,
+  loadDeepDiagnosticResult as _remoteLoadResult,
+} from '@/lib/reportStorage'
+import { getUser } from '@/lib/auth'
 import { FX_AS_OF } from '@/lib/currencyConfig'
 import { getRate, getFxAsOfLabel, ensureLiveRates } from '@/lib/liveRates'
 import { asset } from '@/lib/asset'
@@ -120,41 +120,28 @@ export class DeepDiagnosticService {
 
   /**
    * Saves a diagnostic result.
-   * Dual-writes to Supabase + localStorage (Req 3.1).
-   * Falls back to localStorage-only if Supabase is not configured.
-   * organizationId defaults to 'demo_org' when not provided.
+   * localStorage write-through + per-user server sync (keyed by the signed-in
+   * user's JWT inside lib/reportStorage — no org/user id is passed).
    */
-  static saveResult(result: DeepDiagnosticResult, organizationId: string = 'demo_org'): void {
-    if (_supabaseMisconfigured) {
-      // Supabase not configured — write to localStorage only
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(this.RESULT_KEY, JSON.stringify(result))
-        } catch (error) {
-          console.error('[DeepDiagnostic] Failed to save result to localStorage:', error)
-        }
-      }
-      return
-    }
-
-    // Fire-and-forget Supabase + localStorage dual-write (Req 3.1)
-    _supabaseSaveResult(result, organizationId).catch((err) => {
+  static saveResult(result: DeepDiagnosticResult): void {
+    // reportStorage writes localStorage synchronously before the server POST,
+    // so synchronous readers see the value immediately.
+    _remoteSaveResult(result).catch((err) => {
       // Both stores failed — log but don't crash the caller
-      console.error('[DeepDiagnostic] saveResult dual-write failed:', err)
+      console.error('[DeepDiagnostic] saveResult failed:', err)
     })
   }
 
   /**
    * Loads a diagnostic result.
-   * Tries Supabase first; falls back to localStorage (Req 3.4 – 3.6).
-   * Returns a Promise — callers that need the value must await it.
-   * For backward-compat, a synchronous localStorage-only path is used when
-   * Supabase is not configured.
+   * Returns the localStorage value synchronously (callers depend on the sync
+   * shape) and refreshes the cache from the per-user server row in the
+   * background for the next load.
    */
-  static loadResult(organizationId: string = 'demo_org'): DeepDiagnosticResult | null {
-    // Synchronous localStorage-only path when Supabase is not configured
-    if (_supabaseMisconfigured) {
-      if (typeof window === 'undefined') return null
+  static loadResult(): DeepDiagnosticResult | null {
+    if (typeof window === 'undefined') return null
+
+    const localResult = (() => {
       try {
         const stored = localStorage.getItem(this.RESULT_KEY)
         if (!stored) return null
@@ -175,30 +162,10 @@ export class DeepDiagnosticService {
         console.error('[DeepDiagnostic] Failed to load result:', error)
         return null
       }
-    }
-
-    // When Supabase is configured, return localStorage value immediately for
-    // synchronous callers, and kick off an async Supabase fetch in the background
-    // to keep localStorage in sync for the next load.
-    const localResult = (() => {
-      if (typeof window === 'undefined') return null
-      try {
-        const stored = localStorage.getItem(this.RESULT_KEY)
-        if (!stored) return null
-        const result = JSON.parse(stored) as DeepDiagnosticResult
-        const hasScore =
-          typeof result.score === 'number' ||
-          typeof (result as any).ai_readiness_score === 'number'
-        if (!result.diagnostic_id || !hasScore) return null
-        if (typeof result.score !== 'number' && typeof (result as any).ai_readiness_score === 'number') {
-          (result as any).score = (result as any).ai_readiness_score
-        }
-        return result
-      } catch { return null }
     })()
 
-    // Background sync: fetch from Supabase and update localStorage cache
-    _supabaseLoadResult(organizationId).catch(() => { /* silent — localStorage already returned */ })
+    // Background sync: refresh the localStorage cache from Postgres
+    _remoteLoadResult().catch(() => { /* silent — localStorage already returned */ })
 
     return localResult
   }
@@ -213,10 +180,13 @@ export class DeepDiagnosticService {
 
   static async generateBlueprint(
     diagnosticId: string,
-    organizationId: string = 'demo_org',
+    organizationId?: string,
     objective: string = 'AI readiness improvement',
     diagnosticData?: Record<string, any>
   ): Promise<BlueprintV1> {
+    // Blueprint runs are attributed to the signed-in user, not a shared demo
+    // key or a collision-prone company name.
+    const orgId = organizationId?.trim() || getUser()?.user_id || 'current'
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 120_000)
 
@@ -229,7 +199,7 @@ export class DeepDiagnosticService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           diagnostic_id: diagnosticId,
-          organization_id: organizationId,
+          organization_id: orgId,
           objective,
           ...(diagnosticData ? { diagnostic_data: diagnosticData } : {}),
         }),
@@ -250,18 +220,11 @@ export class DeepDiagnosticService {
 
     const blueprint: BlueprintV1 = await response.json()
 
-    // Dual-write blueprint to Supabase + localStorage (Req 4.1)
-    if (!_supabaseMisconfigured) {
-      const { saveBlueprint: _supabaseSaveBlueprint } = await import('@/lib/supabaseStorage')
-      _supabaseSaveBlueprint(blueprint, organizationId).catch((err) => {
-        console.error('[DeepDiagnostic] generateBlueprint Supabase save failed:', err)
-      })
-    } else {
-      // Supabase not configured — write to localStorage only
-      if (typeof window !== 'undefined') {
-        try { localStorage.setItem('aivory_blueprint', JSON.stringify(blueprint)) } catch { /* ignore */ }
-      }
-    }
+    // Dual-write blueprint to Postgres (per signed-in user) + localStorage
+    const { saveBlueprint: _remoteSaveBlueprint } = await import('@/lib/reportStorage')
+    _remoteSaveBlueprint(blueprint).catch((err) => {
+      console.error('[DeepDiagnostic] generateBlueprint server save failed:', err)
+    })
 
     return blueprint
   }
@@ -1263,13 +1226,13 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     // localStorage unavailable (SSR or quota exceeded) — silently continue
   }
 
-  // Async Supabase dual-write for DiagnosticContext (Req 6.1) — fire-and-forget
+  // Async per-user Postgres write for DiagnosticContext — fire-and-forget
   if (typeof window !== 'undefined') {
-    import('@/lib/supabaseStorage').then(({ saveDiagnosticContext }) => {
-      saveDiagnosticContext(context, answers.companyName || answers.company_name || 'demo_org').catch((err) => {
-        console.error('[buildDiagnosticContext] Supabase save failed:', err)
+    import('@/lib/reportStorage').then(({ saveDiagnosticContext }) => {
+      saveDiagnosticContext(context).catch((err) => {
+        console.error('[buildDiagnosticContext] server save failed:', err)
       })
-    }).catch(() => { /* supabaseStorage unavailable */ })
+    }).catch(() => { /* reportStorage unavailable */ })
   }
 
   return context
