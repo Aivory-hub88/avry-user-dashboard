@@ -371,7 +371,9 @@ export function humanizeDimensionKey(key: string): string {
     process: 'Process',
     people: 'People',
     governance: 'Governance',
-    security: 'Security & Governance',
+    // 'Security' only — the old 'Security & Governance' label collided with
+    // the separate Governance dimension and read as two governance scores.
+    security: 'Security',
   }
   if (key in map) return map[key]
   if (!key) return '—'
