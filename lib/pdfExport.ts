@@ -12,6 +12,14 @@ import jsPDF from 'jspdf'
 import type { DiagnosticContext, ImprovementItem } from '@/types/diagnostic'
 import { asset } from '@/lib/asset'
 import { COVER_FRONT_BG, COVER_BACK_BG, COVER_WORDMARK, COVER_MICROGRAPHIC, COVER_FOOTER_BADGE, SIGNATURE_WHITE, SIGNATURE_DARK } from '@/lib/pdfAssets'
+import {
+  DIM_LABELS,
+  fmtGap,
+  humanizeRiskSource,
+  buildLeadershipClause,
+  buildVerdictNarrative,
+  buildFirstMoves,
+} from '@/lib/readinessNarrative'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
 export const INK       = '#0a1a0f'   // primary text, display values
@@ -1082,51 +1090,9 @@ function qstr(v: unknown): string {
   return typeof v === 'string' ? v : ''
 }
 
-/**
- * Gap/percentage formatter — keeps fractional values exact (32.5%) instead of
- * letting each section round differently (the report previously showed 32.5%,
- * 33% and 38% for the same underlying numbers).
- */
-function fmtGap(v: number): string {
-  return Number.isInteger(v) ? `${v}%` : `${v.toFixed(1)}%`
-}
-
-/** Client-facing labels for the internal answer keys used as risk sources. */
-const RISK_SOURCE_LABELS: Record<string, string> = {
-  compliance_requirements: 'Compliance requirements',
-  data_quality: 'Data quality',
-  leadership_alignment: 'Leadership alignment',
-  change_readiness: 'Change readiness',
-  budget_allocated: 'Budget allocation',
-  process_documentation: 'Process documentation',
-  budget_range: 'Budget range',
-  fte_count: 'Team size',
-  annual_revenue: 'Annual revenue',
-  automation_current: 'Current automation level',
-}
-
-function humanizeRiskSource(src: string): string {
-  return RISK_SOURCE_LABELS[src] ?? cap(src.replace(/_/g, ' '))
-}
-
-/** Five-band readiness scale — thresholds mirror services maturityFromScore. */
-const MATURITY_BANDS: Array<{ level: string; range: string; meaning: string }> = [
-  { level: 'Nascent', range: '0–34', meaning: 'the foundational building blocks — reliable data, documented processes, and clear ownership — are not yet in place, so readiness groundwork should come before any AI deployment' },
-  { level: 'Initiating', range: '35–49', meaning: 'the organization is ready for closely supervised pilots in narrow, low-risk workflows while the underlying data and process foundations are built up' },
-  { level: 'Developing', range: '50–64', meaning: 'the organization is ready to deploy its first production automations in well-bounded, low-risk workflows — but not yet ready for a broad, multi-department AI rollout' },
-  { level: 'Defined', range: '65–79', meaning: 'the organization is ready for systematic AI adoption across several functions, with governance mature enough to manage risk at scale' },
-  { level: 'Optimizing', range: '80–100', meaning: 'AI-ready foundations are in place across the organization, and the focus shifts from readiness to compounding advantage' },
-]
-
-/** What a low score in each dimension concretely blocks. */
-const DIM_CONSTRAINT_NOTES: Record<string, string> = {
-  strategy: 'without quantified KPIs it is hard to prove value and prioritise the next automation',
-  data: 'AI output quality stays capped until core data is centralized and cleaned',
-  process: 'automations stay fragile until core workflows are documented and standardized',
-  people: 'adoption stalls without skills enablement and clear internal ownership',
-  governance: 'scaling automation without oversight structures compounds operational risk',
-  security: 'security and compliance guardrails need defining before sensitive data reaches AI systems',
-}
+// fmtGap, RISK_SOURCE_LABELS/humanizeRiskSource, MATURITY_BANDS and
+// DIM_CONSTRAINT_NOTES live in lib/readinessNarrative.ts — shared verbatim
+// with the on-screen result page.
 
 /** Labeled bullet list used by the AI Analysis section. Handles page breaks. */
 function renderAiList(pdf: jsPDF, y: number, heading: string, items: string[]): number {
@@ -1397,21 +1363,11 @@ export async function exportReportToPdf(
   // Data-driven narrative — previously a hardcoded template that claimed
   // "fully aligned leadership and previous AI successes" regardless of the
   // user's actual answers.
-  const DIM_LABELS: Record<string, string> = {
-    strategy: 'Strategy', data: 'Data', process: 'Process',
-    people: 'People', governance: 'Governance', security: 'Security',
-  }
   const scoreOf = (k: string) => Math.round((scores as unknown as Record<string, number>)[k] ?? 0)
   const strongestKey = scores.strongestDimension
   const weakestKey = scores.weakestDimension
   const leadershipRaw = qualitative.leadershipAlignment || ''
-  const leadershipClause = leadershipRaw.includes('Fully aligned')
-    ? 'Fully aligned leadership provides a strong mandate for scaled deployment.'
-    : leadershipRaw.includes('Supportive')
-      ? 'Leadership is supportive but cautious, so early initiatives should be low-risk and quickly measurable to build confidence.'
-      : leadershipRaw.includes('Some interest')
-        ? 'Leadership interest is still forming, so early wins need to make the business case visible.'
-        : 'Securing explicit leadership sponsorship should accompany the first initiatives.'
+  const leadershipClause = buildLeadershipClause(leadershipRaw)
   const priorRaw = qualitative.priorAIAttempts || ''
   const isFirstAttempt = priorRaw.startsWith('No')
   const priorClause = isFirstAttempt
@@ -1560,35 +1516,30 @@ export async function exportReportToPdf(
   y = ensureSpace(pdf, y, 60)
   y = sectionLabel(pdf, y, 'Readiness Verdict')
 
-  const band = MATURITY_BANDS.find((b) => b.level === scores.maturityLevel) ?? MATURITY_BANDS[2]
-  const weakestNote = DIM_CONSTRAINT_NOTES[weakestKey] ?? 'this dimension needs strengthening before automation can scale'
-  y = renderNarrative(pdf, y,
-    `With a composite score of ${Math.round(scores.composite)}/100, ${company} sits in the "${scores.maturityLevel}" band (${band.range}) of the five-level Aivory readiness scale (Nascent, Initiating, Developing, Defined, Optimizing). In practical terms, ${band.meaning}. The immediate constraint is ${DIM_LABELS[weakestKey] ?? cap(weakestKey)} (${scoreOf(weakestKey)}): ${weakestNote}. ${DIM_LABELS[strongestKey] ?? cap(strongestKey)} (${scoreOf(strongestKey)}) is the strongest foundation to build on.`)
+  y = renderNarrative(pdf, y, buildVerdictNarrative({
+    company,
+    composite: scores.composite,
+    maturityLevel: scores.maturityLevel,
+    weakestKey,
+    weakestScore: scoreOf(weakestKey),
+    strongestKey,
+    strongestScore: scoreOf(strongestKey),
+  }))
 
   // The first moves — numbered rows, ordered foundation → proof → mandate.
   const firstImprovement = Array.isArray(roomForImprovement) && roomForImprovement.length > 0
     ? roomForImprovement[0] : null
   const verdictTopOpp = opportunities[0] ?? null
   const hasBudgetInput = (calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD) != null
-  let moveNum = 1
-  const mv = () => String(moveNum++).padStart(2, '0')
-  if (firstImprovement) {
-    y = nextStepRow(pdf, y, mv(),
-      `Fix the foundation: ${firstImprovement.title}`,
-      firstImprovement.recommendedAction)
-  }
-  if (verdictTopOpp) {
-    y = nextStepRow(pdf, y, mv(),
-      `Prove value fast: ${verdictTopOpp.title}`,
-      `Highest-impact starting opportunity — ${verdictTopOpp.timeToValueWeeks}-week time to value${verdictTopOpp.dataReadiness === 'ready' ? ', data ready today' : ''}.`)
-  }
-  if (!hasBudgetInput) {
-    y = nextStepRow(pdf, y, mv(),
-      'Size the budget',
-      'No implementation budget was provided in the assessment. Supplying a budget range completes the payback and ROI model and turns these estimates into a decision-ready business case.')
-  } else {
-    y = nextStepRow(pdf, y, mv(), 'Secure the mandate', leadershipClause)
-  }
+  const firstMoves = buildFirstMoves({
+    firstImprovement,
+    topOpportunity: verdictTopOpp,
+    hasBudgetInput,
+    leadershipClause,
+  })
+  firstMoves.forEach((move, i) => {
+    y = nextStepRow(pdf, y, String(i + 1).padStart(2, '0'), move.title, move.body)
+  })
 
   // ════════════════════════════════════════════════════════════════════════════
   // AI ANALYSIS — the model-generated narrative the user sees on screen.

@@ -466,6 +466,38 @@
 .roiFixLabel { display: block; font-size: 12px; font-weight: 700; color: #afd199; margin-bottom: 3px; }
 
 
+/* ── Readiness Verdict section ── */
+.verdictNarrative {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--dd-text, #e5e7eb);
+  margin: 0 0 1.25rem;
+}
+.verdictMoves {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.verdictMoveRow {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  background: rgba(175, 209, 153, 0.05);
+  border: 1px solid rgba(175, 209, 153, 0.18);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.verdictMoveNum {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #afd199;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+.verdictMoveBody { display: flex; flex-direction: column; gap: 4px; }
+.verdictMoveTitle { font-size: 15px; font-weight: 700; color: #e5e5e3; }
+.verdictMoveText { font-size: 14px; line-height: 1.6; color: #c8c8c4; margin: 0; }
+
 /* ── AI Analysis section ── */
 .aiNarrative {
   font-size: 0.95rem;

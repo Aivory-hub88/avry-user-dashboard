@@ -25,6 +25,7 @@ import {
   type CurrencyCode,
 } from '@/lib/resultFormatters'
 import { ensureLiveRates, getFxAsOfLabel } from '@/lib/liveRates'
+import { buildVerdictNarrative, buildFirstMoves, buildLeadershipClause } from '@/lib/readinessNarrative'
 import styles from './final-result.module.css'
 
 // TODO: add schema version field to DiagnosticContext for forward compatibility
@@ -237,6 +238,26 @@ export default function FinalResultPage() {
     ? { ...scores, composite: _blended, maturityLevel: maturityFromScore(_blended) }
     : scores
 
+  // Readiness Verdict — identical strings to the PDF (shared builders in
+  // lib/readinessNarrative.ts), fed the same blended displayScores the PDF gets.
+  const dimScoreOf = (k: string) => Math.round((scores as unknown as Record<string, number>)[k] ?? 0)
+  const verdictNarrative = buildVerdictNarrative({
+    company: context.company || 'Your organization',
+    composite: displayScores.composite,
+    maturityLevel: displayScores.maturityLevel,
+    weakestKey: scores.weakestDimension,
+    weakestScore: dimScoreOf(scores.weakestDimension),
+    strongestKey: scores.strongestDimension,
+    strongestScore: dimScoreOf(scores.strongestDimension),
+  })
+  const firstMoves = buildFirstMoves({
+    firstImprovement: Array.isArray(context.roomForImprovement) && context.roomForImprovement.length > 0
+      ? context.roomForImprovement[0] : null,
+    topOpportunity: opportunities[0] ?? null,
+    hasBudgetInput: (calculations.assumedBudgetMidpointLocal ?? (calculations as any).assumedBudgetMidpointUSD) != null,
+    leadershipClause: buildLeadershipClause(qualitative.leadershipAlignment || ''),
+  })
+
   const assessmentBullets: { icon: string; color: string; text: string }[] = [
     { icon: '▲', color: '#afd199', text: `Your company / organization scores ${displayScores.composite}/100, placing it at ${displayScores.maturityLevel} maturity.${_llmScore != null ? ' (composite blended 70% deterministic + 30% AI assessment)' : ''}` },
     { icon: '▲', color: '#afd199', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension)}.` },
@@ -305,6 +326,23 @@ export default function FinalResultPage() {
                 </li>
               ))}
             </ul>
+          </div>
+        </div>
+
+        {/* ── Readiness Verdict — same narrative the PDF renders ── */}
+        <div className={styles.card}>
+          <h2 className={styles.sectionLabel}>Readiness Verdict</h2>
+          <p className={styles.verdictNarrative}>{verdictNarrative}</p>
+          <div className={styles.verdictMoves}>
+            {firstMoves.map((move, i) => (
+              <div key={i} className={styles.verdictMoveRow}>
+                <span className={styles.verdictMoveNum}>{String(i + 1).padStart(2, '0')}</span>
+                <div className={styles.verdictMoveBody}>
+                  <span className={styles.verdictMoveTitle}>{move.title}</span>
+                  <p className={styles.verdictMoveText}>{move.body}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -640,8 +678,12 @@ export default function FinalResultPage() {
                 <span className={styles.contextLabel}>Top Pain Points</span>
                 {qualitative.topPainPoints ? (
                   <ul className={styles.contextBulletList}>
-                    {qualVal(qualitative.topPainPoints)
-                      .split(/\d+\.\s+/)
+                    {(() => {
+                      // Numbered lists split on "1. "; free-text answers fall
+                      // back to comma separation so they still render as bullets.
+                      const text = qualVal(qualitative.topPainPoints)
+                      return /\d+\.\s+/.test(text) ? text.split(/\d+\.\s+/) : text.split(/,\s*/)
+                    })()
                       .filter(s => s.trim())
                       .map((point, i) => (
                         <li key={i} className={styles.contextBulletItem}>

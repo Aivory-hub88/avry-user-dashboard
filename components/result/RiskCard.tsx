@@ -1,4 +1,5 @@
 import type { RiskFlag } from '@/types/diagnostic'
+import { humanizeRiskSource } from '@/lib/readinessNarrative'
 import styles from './RiskCard.module.css'
 
 interface RiskCardProps {
@@ -23,7 +24,7 @@ export default function RiskCard({ risk }: RiskCardProps) {
         )}
       </div>
       <p className={styles.description}>{risk.risk}</p>
-      <span className={styles.source}>Source: {risk.source}</span>
+      <span className={styles.source}>Signal: {humanizeRiskSource(risk.source)}</span>
     </div>
   )
 }
