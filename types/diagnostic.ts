@@ -487,6 +487,10 @@ export interface DiagnosticContext {
     kpiBaseline?: string
     processOwnership?: string
     painPointHours?: string
+    /** D2 (2026-07-20) — raw estimate_basis answer; used to re-apply the ROI
+     *  confidence damper when upgrading stored results. Absent on pre-D2
+     *  contexts → treated as neutral (no confidence change). Never scored. */
+    estimateBasis?: string
   }
 }
 

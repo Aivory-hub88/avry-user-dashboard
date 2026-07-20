@@ -16,7 +16,7 @@
  * and reconciles exactly — that is what this test locks in.
  */
 import { describe, it, expect } from 'vitest'
-import { calculateROI } from './deepDiagnostic'
+import { calculateROI, dampConfidenceByEstimateBasis } from './deepDiagnostic'
 import type { DiagnosticContext } from '@/types/diagnostic'
 
 type Q = DiagnosticContext['quantitative']
@@ -89,4 +89,43 @@ describe('calculateROI — methodology reconciles in the displayed (local) curre
       expect(Math.min(localFormula, 999)).toBeCloseTo(r.threeYearROIPercent!, 4)
     })
   }
+})
+
+describe('D2 — dampConfidenceByEstimateBasis (confidence-source signal)', () => {
+  it('formal time-tracking is neutral — never changes the base confidence', () => {
+    expect(dampConfidenceByEstimateBasis('high', 'Formal time-tracking system')).toBe('high')
+    expect(dampConfidenceByEstimateBasis('medium', 'Formal time-tracking system')).toBe('medium')
+    expect(dampConfidenceByEstimateBasis('low', 'Formal time-tracking system')).toBe('low')
+  })
+
+  it('informal tracking caps at medium (only lowers, never raises)', () => {
+    expect(dampConfidenceByEstimateBasis('high', 'Informal tracking (notes, spreadsheets)')).toBe('medium')
+    expect(dampConfidenceByEstimateBasis('medium', 'Informal tracking (notes, spreadsheets)')).toBe('medium')
+    expect(dampConfidenceByEstimateBasis('low', 'Informal tracking (notes, spreadsheets)')).toBe('low')
+  })
+
+  it('gut-feel caps at low', () => {
+    expect(dampConfidenceByEstimateBasis('high', 'Rough estimate / gut feel')).toBe('low')
+    expect(dampConfidenceByEstimateBasis('medium', 'Rough estimate / gut feel')).toBe('low')
+    expect(dampConfidenceByEstimateBasis('low', 'Rough estimate / gut feel')).toBe('low')
+  })
+
+  it('absent / empty / unrecognized answers are a no-op (back-compat invariant)', () => {
+    for (const base of ['low', 'medium', 'high'] as const) {
+      expect(dampConfidenceByEstimateBasis(base, undefined)).toBe(base)
+      expect(dampConfidenceByEstimateBasis(base, null)).toBe(base)
+      expect(dampConfidenceByEstimateBasis(base, '')).toBe(base)
+      expect(dampConfidenceByEstimateBasis(base, 'something else entirely')).toBe(base)
+    }
+  })
+
+  it('does not alter any figure — full ROI object is unchanged apart from the label', () => {
+    const base = calculateROI(CASES[1].q, 'USD')
+    const damped = { ...base, confidenceLevel: dampConfidenceByEstimateBasis(base.confidenceLevel, 'Rough estimate / gut feel') }
+    expect(damped.totalAnnualSavingsUSD).toBe(base.totalAnnualSavingsUSD)
+    expect(damped.hoursReclaimedPerYear).toBe(base.hoursReclaimedPerYear)
+    expect(damped.paybackMonths).toBe(base.paybackMonths)
+    expect(damped.threeYearROIPercent).toBe(base.threeYearROIPercent)
+    expect(damped.confidenceLevel).toBe('low')
+  })
 })

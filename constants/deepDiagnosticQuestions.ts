@@ -281,6 +281,26 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
         required: false
       },
       {
+        // D2 — confidence-source signal. Qualifies the manual-hours / FTE
+        // estimates above: it feeds ONLY the confidence label on the ROI
+        // projection (dampConfidenceByEstimateBasis in
+        // services/deepDiagnostic.ts), never any figure. Both the `id` and the
+        // option strings are load-bearing per the header rule — the damping
+        // logic matches on the literal option text, so they are frozen once
+        // shipped. Optional, like the other quantitative-qualifier questions;
+        // an absent answer is treated as neutral (no confidence change).
+        id: 'estimate_basis',
+        question: 'How were the time and workload estimates above arrived at?',
+        type: 'radio',
+        options: [
+          'Rough estimate / gut feel',
+          'Informal tracking (notes, spreadsheets)',
+          'Formal time-tracking system'
+        ],
+        helperText: 'More rigorous tracking raises the confidence rating on your financial projections.',
+        required: false
+      },
+      {
         id: 'data_infrastructure',
         question: 'What best describes your current data infrastructure?',
         type: 'radio',

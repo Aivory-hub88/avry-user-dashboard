@@ -597,6 +597,57 @@ export function calculateROI(
 }
 
 // ============================================================================
+// D2 — confidence-source signal
+// ============================================================================
+//
+// `calculateROI` derives `confidenceLevel` purely from input COMPLETENESS
+// (how many of the three required financial inputs are missing). That says
+// nothing about how trustworthy the numbers themselves are: a report where
+// every field is filled from gut-feel guesses should not read as 'high'
+// confidence. D2 adds the `estimate_basis` intake question and folds its
+// answer in here as a CEILING on the completeness-based confidence — it can
+// only lower the rating, never raise it.
+//
+// These option strings are LOAD-BEARING (see the header of
+// constants/deepDiagnosticQuestions.ts): they match the literal intake option
+// text and are frozen once shipped.
+export type EstimateBasis =
+  | 'Rough estimate / gut feel'
+  | 'Informal tracking (notes, spreadsheets)'
+  | 'Formal time-tracking system'
+
+const CONFIDENCE_ORDER: ROIProjection['confidenceLevel'][] = ['low', 'medium', 'high']
+const CONFIDENCE_RANK: Record<ROIProjection['confidenceLevel'], number> = { low: 0, medium: 1, high: 2 }
+
+/**
+ * D2 blending rule (deterministic): the `estimate_basis` answer acts as a
+ * CEILING/damper on `baseConfidence` (the existing inputs-completeness
+ * confidence), never an amplifier:
+ *   - 'Formal time-tracking system'         → neutral (keep baseConfidence)
+ *   - 'Informal tracking (notes, spreadsheets)' → cap at 'medium'
+ *   - 'Rough estimate / gut feel'           → cap at 'low'
+ *   - absent / unknown / any other value    → neutral (keep baseConfidence)
+ *
+ * BACK-COMPAT INVARIANT: an absent (undefined/null/'') or unrecognized answer
+ * MUST be a pure no-op, returning `baseConfidence` unchanged. Old stored
+ * contexts and users who skipped this optional question therefore behave
+ * EXACTLY as before D2 — no regression. This changes only the qualitative
+ * confidence LABEL; no savings/ROI/payback/hours figure is touched.
+ */
+export function dampConfidenceByEstimateBasis(
+  baseConfidence: ROIProjection['confidenceLevel'],
+  estimateBasis: string | null | undefined,
+): ROIProjection['confidenceLevel'] {
+  const norm = normalizeStr(estimateBasis ?? undefined)
+  let ceilingRank = CONFIDENCE_RANK[baseConfidence] // neutral default: no cap
+  if (norm === 'Rough estimate / gut feel') ceilingRank = CONFIDENCE_RANK.low
+  else if (norm === 'Informal tracking (notes, spreadsheets)') ceilingRank = CONFIDENCE_RANK.medium
+  // 'Formal time-tracking system' and every unrecognized/absent value fall
+  // through to the neutral default above.
+  return CONFIDENCE_ORDER[Math.min(CONFIDENCE_RANK[baseConfidence], ceilingRank)]
+}
+
+// ============================================================================
 // Phase E1.4/E2.4 — ROI sensitivity surface + what-if efficiency slider
 // ============================================================================
 //
@@ -1557,6 +1608,15 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
   // FIX #3: Pass industry to calculateROI for correct labor rate
   const calculations = calculateROI(quantitative, currencyCode, answers.industry)
 
+  // D2 — damp the completeness-based confidence by how the manual-hours / FTE
+  // estimates were sourced. Absent answer → neutral, so pre-D2 behaviour is
+  // preserved exactly. Only the qualitative label changes; every figure above
+  // is already computed and untouched.
+  calculations.confidenceLevel = dampConfidenceByEstimateBasis(
+    calculations.confidenceLevel,
+    answers.estimate_basis,
+  )
+
   const { totalAnnualSavingsUSD } = calculations
 
   const opportunities = rankOpportunities(answers, scores, currencyCode, totalAnnualSavingsUSD)
@@ -1589,6 +1649,9 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     kpiBaseline: answers.kpi_baseline || '',
     processOwnership: answers.process_ownership || '',
     painPointHours: answers.pain_point_hours || '',
+    // D2 — persisted so upgradeDiagnosticContext can re-apply the confidence
+    // damper after any ROI recompute. Narrative/context only; never scored.
+    estimateBasis: answers.estimate_basis || '',
   }
 
   const context: DiagnosticContext = {
@@ -1693,6 +1756,17 @@ export function upgradeDiagnosticContext(
     }
 
     calculations = calculateROI(context.quantitative, currencyCode, industry)
+    // D2 — the recompute above resets confidence to the raw completeness-based
+    // value, so re-apply the estimate-basis damper from the stored answer.
+    // Pre-D2 contexts have no `estimateBasis` → neutral no-op → identical to
+    // today (no regression on legacy reports).
+    calculations = {
+      ...calculations,
+      confidenceLevel: dampConfidenceByEstimateBasis(
+        calculations.confidenceLevel,
+        context.qualitative?.estimateBasis,
+      ),
+    }
     changed = true
   }
 
