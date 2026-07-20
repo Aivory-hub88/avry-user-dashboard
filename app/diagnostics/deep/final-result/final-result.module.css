@@ -6,9 +6,20 @@
   font-family: var(--font-manrope), sans-serif;
 }
 
+/* Phase E2.5 — row that holds the report content column plus the sticky
+   section nav rail. A single flex child (rail hidden on mobile) still
+   centers correctly via justify-content. */
+.reportRow {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 20px;
+}
+
 .content {
+  flex: 1 1 auto;
+  min-width: 0;
   max-width: 1100px;
-  margin: 0 auto;
   padding: 24px 20px 80px;
   display: flex;
   flex-direction: column;

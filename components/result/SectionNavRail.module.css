@@ -1,0 +1,85 @@
+/* ─── Sticky section nav rail (Phase E2.5) ───────────────────────────────
+   Desktop-only companion column to the report card stack. Hidden below the
+   same 767px breakpoint the rest of final-result.module.css uses for its
+   mobile layout switches. */
+
+.rail {
+  flex: 0 0 168px;
+  width: 168px;
+  align-self: flex-start;
+  position: sticky;
+  top: 32px;
+  /* Keep the rail's own scrollbar-free height sane on short viewports —
+     it simply stops being sticky and scrolls with the page past this. */
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .rail {
+    display: none;
+  }
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 4px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 1px solid #4a4a46;
+}
+
+.item {
+  margin: 0;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 6px 8px 6px 0;
+  margin-left: -15px;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.link:hover {
+  background: rgba(229, 229, 227, 0.05);
+}
+
+.dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3a3a36;
+  border: 1.5px solid #6a6a62;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.label {
+  font-family: var(--font-manrope), sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #a3a39c;
+  line-height: 1.3;
+  transition: color 0.15s ease;
+}
+
+.linkActive .dot {
+  background: #afd199;
+  border-color: #afd199;
+  transform: scale(1.15);
+}
+
+.linkActive .label {
+  color: #e5e5e3;
+  font-weight: 600;
+}

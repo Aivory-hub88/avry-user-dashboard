@@ -20,6 +20,7 @@ import RiskCard from '@/components/result/RiskCard'
 import LoadingState from '@/components/result/LoadingState'
 import ErrorCard from '@/components/result/ErrorCard'
 import PrintableReport from '@/components/result/PrintableReport'
+import SectionNavRail from '@/components/result/SectionNavRail'
 import { exportReportToPdf } from '@/lib/pdfExport'
 import {
   formatLocalAmount,
@@ -372,8 +373,27 @@ export default function FinalResultPage() {
     return v.trim() || 'Not provided'
   }
 
+  // Phase E2.5 — sticky section nav rail. Mirrors the section order below;
+  // the "Improvement Priorities" entry is only included when that card
+  // actually renders, so the rail never points at a missing anchor.
+  const hasImprovementPriorities =
+    Array.isArray(context.roomForImprovement) && context.roomForImprovement.length > 0
+  const navSections = [
+    { id: 'section-executive-summary', label: 'Executive Summary' },
+    { id: 'section-operational-health', label: 'Operational Health' },
+    { id: 'section-executive-diagnosis', label: 'Diagnosis' },
+    { id: 'section-operations-analysis', label: 'Operations Analysis' },
+    { id: 'section-operational-constraints', label: 'Constraints' },
+    { id: 'section-transformation-opportunities', label: 'Opportunities' },
+    { id: 'section-financial-case', label: 'Financial Case' },
+    ...(hasImprovementPriorities ? [{ id: 'section-improvement-priorities', label: 'Priorities' }] : []),
+    { id: 'section-business-context', label: 'Business Context' },
+    { id: 'section-ai-enablement', label: 'AI Enablement' },
+  ]
+
   return (
     <div className={styles.page}>
+      <div className={styles.reportRow}>
       <div className={styles.content} id="diagnostic-report">
         <HeaderBar
           company={context.company}
@@ -384,13 +404,13 @@ export default function FinalResultPage() {
         />
 
         {/* ── Executive Summary ── */}
-        <div className={`${styles.card} ${styles.executiveSummaryCard}`}>
+        <div id="section-executive-summary" className={`${styles.card} ${styles.executiveSummaryCard}`}>
           <h2 className={styles.sectionLabel}>Executive Summary</h2>
           <p className={styles.executiveSummaryText}>{executiveSummary}</p>
         </div>
 
         {/* ── Operational Health ── */}
-        <div className={styles.card}>
+        <div id="section-operational-health" className={styles.card}>
           <h2 className={styles.sectionLabel}>Operational Health</h2>
 
           {/* Top row: ScoreRing | RadarChart */}
@@ -443,7 +463,7 @@ export default function FinalResultPage() {
         </div>
 
         {/* ── Executive Operational Diagnosis — same narrative the PDF renders ── */}
-        <div className={styles.card}>
+        <div id="section-executive-diagnosis" className={styles.card}>
           <h2 className={styles.sectionLabel}>Executive Operational Diagnosis</h2>
           <p className={styles.verdictNarrative}>{verdictNarrative}</p>
           {weakestConsequenceChain && (
@@ -474,7 +494,7 @@ export default function FinalResultPage() {
         </div>
 
         {/* ── Business Operations Analysis (model-generated; numbers stay deterministic) ── */}
-        <div className={styles.card}>
+        <div id="section-operations-analysis" className={styles.card}>
           <h2 className={styles.sectionLabel}>Business Operations Analysis</h2>
           {llmResult ? (
             <>
@@ -536,7 +556,7 @@ export default function FinalResultPage() {
         </div>
 
         {/* ── Operational Constraints (was Risk Register) ── */}
-        <div className={styles.card}>
+        <div id="section-operational-constraints" className={styles.card}>
           <h2 className={styles.sectionLabel}>Operational Constraints</h2>
           {sortedRisks.length === 0 ? (
             <p className={styles.emptyMessage}>No risks detected.</p>
@@ -550,7 +570,7 @@ export default function FinalResultPage() {
         </div>
 
         {/* ── Transformation Opportunities ── */}
-        <div className={styles.card}>
+        <div id="section-transformation-opportunities" className={styles.card}>
           <h2 className={styles.sectionLabel}>Transformation Opportunities</h2>
           {opportunities.length === 0 ? (
             <p className={styles.emptyMessage}>No opportunities identified.</p>
@@ -581,7 +601,7 @@ export default function FinalResultPage() {
         </div>
 
         {/* ── Financial Case ── */}
-        <div className={styles.card}>
+        <div id="section-financial-case" className={styles.card}>
           <h2 className={styles.sectionLabel}>Financial Case</h2>
 
           {!calculations.hasEnoughDataForProjection && (
@@ -781,7 +801,7 @@ export default function FinalResultPage() {
 
         {/* ── Operational Improvement Priorities ── */}
         {Array.isArray(context.roomForImprovement) && context.roomForImprovement.length > 0 && (
-          <div className={styles.card}>
+          <div id="section-improvement-priorities" className={styles.card}>
             <h2 className={styles.sectionLabel}>Operational Improvement Priorities</h2>
             <p className={styles.improvementIntro}>
               Prioritized areas to strengthen before and during AI adoption. These feed directly
@@ -831,7 +851,7 @@ export default function FinalResultPage() {
         )}
 
         {/* ── Business Context — 2-column free-flow ── */}
-        <div className={styles.card}>
+        <div id="section-business-context" className={styles.card}>
           <h2 className={styles.sectionLabel}>Business Context</h2>
           <div className={styles.contextColumns}>
 
@@ -959,7 +979,7 @@ export default function FinalResultPage() {
         </div>
 
         {/* ── AI Enablement (closing section) ── */}
-        <div className={styles.card}>
+        <div id="section-ai-enablement" className={styles.card}>
           <h2 className={styles.sectionLabel}>AI Enablement</h2>
           <p className={styles.aiEnablementText}>{aiEnablement}</p>
         </div>
@@ -985,6 +1005,9 @@ export default function FinalResultPage() {
           </div>
         </div>
 
+      </div>
+
+      <SectionNavRail sections={navSections} />
       </div>
 
       {/* Hidden printable layout for PDF generation */}
