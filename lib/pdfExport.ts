@@ -114,7 +114,7 @@ export const SP = { hair: 2, xs: 4, sm: 6, md: 8, lg: 14, transitionGuard: 26 } 
 // Not every call site has been migrated to reference TS — see the file-level
 // design-QA notes — but new/edited sections should pick a rung from this
 // scale rather than adding another one-off size.
-export const TS = { micro: 6, caption: 6.4, label: 7, small: 7.5, body: 8.5, value: 10, title: 10.5, subhead: 11.5, metric: 11.5, display: 19, hero: 30 } as const
+export const TS = { micro: 6, caption: 6.4, label: 7, small: 7.5, body: 8.5, value: 10, title: 10.5, subhead: 11.5, metric: 11.5, sectionHeadline: 13, display: 19, hero: 30 } as const
 
 // ── Font helpers ───────────────────────────────────────────────────────────────
 // Manrope / Doto are design-intent fonts; helvetica is the jsPDF fallback.
@@ -372,15 +372,25 @@ export function pageFooter(pdf: jsPDF) {
 export function sectionLabel(pdf: jsPDF, y: number, title: string): number {
   setC(pdf, SEC_LBL, 'text')
   pdf.setFont(FB(), 'bold')
-  pdf.setFontSize(7) // 9px
-  const tw = spacedText(pdf, title.toUpperCase(), ML, y, 0.5) // 0.2em
+  // Section headline must read as a HEADLINE — clearly larger than body copy.
+  // It previously rendered at 7pt against 10pt body (renderNarrative), i.e.
+  // 30% SMALLER than the text it introduced, which collapsed the hierarchy on
+  // the printed page. TS.sectionHeadline (13pt) is ~1.3x body so the level is
+  // unmistakable at a glance.
+  pdf.setFontSize(TS.sectionHeadline)
+  // Tracking eased from 0.5 → 0.35: letter-spacing that reads as deliberate at
+  // 7pt becomes gappy once the glyphs are nearly twice the size.
+  const tw = spacedText(pdf, title.toUpperCase(), ML, y, 0.35)
 
-  // Extending rule
+  // Extending rule — centred on the cap height of the (now taller) headline
+  // rather than the old fixed −1.2mm, which would have crossed through the
+  // glyphs. Cap height ≈ fontSize(pt) × 0.3528 mm/pt × ~0.7.
+  const capHeight = TS.sectionHeadline * 0.3528 * 0.7
   setC(pdf, RULE, 'draw')
   pdf.setLineWidth(0.18) // 0.5px
-  pdf.line(ML + tw + 4, y - 1.2, ML + CW, y - 1.2)
+  pdf.line(ML + tw + 4, y - capHeight / 2, ML + CW, y - capHeight / 2)
 
-  return y + 10 // ~28px margin-bottom
+  return y + 12 // headline is taller — a little more breathing room beneath
 }
 
 /** Renders a narrative block and returns the new Y position. */
@@ -1905,7 +1915,7 @@ export async function exportReportToPdf(
   tileContent(cx0, cy1, cellW,
     'Payback Period',
     fmtMonths(calculations.paybackMonths),
-    hasPayback ? `on ${fmt(calculations.assumedBudgetMidpointLocal)} investment` : 'insufficient data',
+    hasPayback ? `on ${fmt(calculations.assumedBudgetMidpointLocal)} investment` : 'not provided',
     !hasPayback
       ? 'Requires budget input'
       : (calculations.paybackMonths as number) <= 36
@@ -1918,7 +1928,7 @@ export async function exportReportToPdf(
   tileContent(cx1, cy1, cellW,
     '3-Year ROI',
     fmtPct(calculations.threeYearROIPercent),
-    hasRoi3 ? 'net of investment' : 'insufficient data',
+    hasRoi3 ? 'net of investment' : 'not provided',
     calculations.costOfInaction90DaysLocal != null
       ? `Cost of delay: ${fmt(calculations.costOfInaction90DaysLocal)}/90d`
       : 'Requires budget input',

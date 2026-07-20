@@ -29,7 +29,7 @@ export default function ROIMetricTile({ label, value, formatter, subtitle, confi
       <span className={`${styles.label} ${isHero ? styles.labelHero : ''}`}>{label}</span>
       {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
       {value === null ? (
-        <span className={styles.insufficient}>Insufficient data</span>
+        <span className={styles.insufficient}>Not provided</span>
       ) : (
         <span className={`${styles.value} ${isHero ? styles.valueHero : ''}`} style={value < 0 ? { color: '#f87171' } : undefined}>
           {formatter(value)}
