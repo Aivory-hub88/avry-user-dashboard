@@ -1,80 +1,95 @@
+/* Borderless typographic metric cell — mirrors the PDF's Financial Case grid
+   (lib/pdfExport.ts, "3 primary metrics across top"): no fill, no card border,
+   no shadow. Structure comes from hairline rules drawn in the grid gutters by
+   .roiGrid in final-result.module.css, so whitespace does the work and long
+   currency strings (e.g. "IDR 151,483,266") are never boxed in.
+
+   Sizing note: every figure below is ~30–40% smaller than the previous
+   card-based treatment (hero 34–44px → 22–28px, supporting value 20px → 14px,
+   padding 20px → 12/16px). The old sizes cramped long IDR values against the
+   card edge; the smaller type plus the removed 20px of box chrome gives each
+   value its full column width back. */
 .tile {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.028) 0%, rgba(255, 255, 255, 0) 60%), #262623;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 20px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 4px 14px rgba(0, 0, 0, 0.22);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 5px;
+  padding: 12px 16px;
+  min-width: 0;
 }
 
 .label {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 10px;
+  font-weight: 600;
   color: #a1a1aa;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
 }
 
+/* Supporting figure — 20px → 14px (30% smaller). overflow-wrap keeps an
+   unusually long value inside its column instead of pushing the grid wider. */
 .value {
-  font-size: 20px;
+  font-size: 14px;
   font-weight: 700;
   color: #b7cba6;
-  line-height: 1.2;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
-/* C2 — hero tile: spans the full ROI grid width and leads the block. */
+/* C2 — hero cell: still spans the full ROI grid width and still leads the
+   block, but as type alone (no tint, no border, no shadow). */
 .tileHero {
   grid-column: 1 / -1;
-  background: linear-gradient(180deg, rgba(175, 209, 153, 0.10) 0%, rgba(175, 209, 153, 0.02) 100%), #262623;
-  border-color: rgba(175, 209, 153, 0.30);
+  padding-top: 4px;
 }
 
-/* Hero value: ~2× the 20px supporting tiles, so one figure dominates the
-   Financial Case block. clamp keeps it from overflowing on narrow viewports
-   (C6) while staying dominant on desktop. */
+/* Hero value: 2× the 14px supporting figures, so one figure still clearly
+   dominates the Financial Case — just 36% smaller than the previous
+   clamp(34px, 6vw, 44px), which oversized long IDR strings. clamp keeps it
+   from overflowing on narrow viewports (C6). */
 .valueHero {
-  font-size: clamp(34px, 6vw, 44px);
-  line-height: 1.1;
+  font-size: clamp(22px, 3.6vw, 28px);
+  line-height: 1.15;
   color: #d0e0af;
 }
 
 .labelHero {
   color: #b7cba6;
+  font-size: 11px;
 }
 
 .insufficient {
-  font-size: 14px;
+  font-size: 13px;
   font-style: italic;
   color: #a3a39c;
 }
 
 .subtitle {
-  font-size: 11px;
+  font-size: 10.5px;
   color: #a3a39c;
   font-style: italic;
-  margin-top: -4px;
+  line-height: 1.35;
+  margin-top: -2px;
+  /* Pins the sub-caption to the bottom of its cell so a two-line caption
+     doesn't drag the row's hairline away from the shorter cells beside it. */
+  margin-bottom: auto;
 }
 
-/* E1.7 — per-tile evidence-strength tag, mirrors the Financial Case banner's
-   amber accent so the two indicators read as one visual language. */
+/* E1.7 — per-tile evidence-strength tag. Now a bare typographic marker rather
+   than a filled pill, so it doesn't reintroduce a box into a borderless grid. */
 .confidenceTag {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   width: fit-content;
-  padding: 2px 7px;
-  border-radius: 4px;
+  margin-top: 1px;
 }
 
 .confidenceTagLow {
   color: #fbbf24;
-  background: rgba(251, 191, 36, 0.12);
 }
 
 .confidenceTagMedium {
   color: #d4d4a8;
-  background: rgba(212, 212, 168, 0.1);
 }

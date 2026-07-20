@@ -198,20 +198,54 @@ export function buildFirstMoves(m: FirstMovesInputs): FirstMove[] {
  * the top opportunity, and the Business Value Created figure. Deterministic
  * string composition only — no new intelligence is generated here.
  */
+/**
+ * Short, plain-business characterisation of each band — deliberately WORDED
+ * DIFFERENTLY from `MATURITY_BANDS[].meaning` (which frames the band in terms
+ * of pilot/rollout readiness and is used by the Executive Operational
+ * Diagnosis). The Executive Summary opens the report and must not read as a
+ * verbatim preview of the section that follows it.
+ */
+const MATURITY_BAND_POSTURE: Record<string, string> = {
+  Nascent: 'the basics — clean data, written-down processes, clear owners — are not yet in place',
+  Initiating: 'results still depend more on individual effort than on repeatable systems',
+  Developing: 'core workflows exist but are applied unevenly across the business',
+  Defined: 'processes are documented and followed consistently enough to scale on',
+  Optimizing: 'operations are measured and instrumented, and improvement compounds',
+}
+
+/**
+ * Opening section of the report.
+ *
+ * This used to be literally `buildVerdictNarrative(v)`'s first sentence, which
+ * meant the Executive Summary and the Executive Operational Diagnosis opened
+ * with the SAME sentence word-for-word ("With a composite score of X/100, …
+ * five-level Aivory operational maturity scale (Nascent, Initiating, …)") —
+ * two pages apart. It now leads on position → value at stake → the one
+ * constraint, and hands off to the diagnosis rather than pre-empting it. The
+ * band range and the five-level enumeration deliberately appear ONLY in the
+ * diagnosis.
+ */
 export function buildExecutiveSummary(
   v: VerdictInputs & { businessValueLabel: string | null; topOpportunityTitle: string | null },
 ): string {
-  const fullVerdict = buildVerdictNarrative(v)
-  // First sentence only — the score/band clause, not the full constraint
-  // breakdown (that lives in the Executive Operational Diagnosis section).
-  const firstClause = fullVerdict.split(/(?<=\.)\s+/)[0]
-  const oppClause = v.topOpportunityTitle
-    ? ` The fastest path forward is ${v.topOpportunityTitle.toLowerCase()}.`
-    : ''
-  const valueClause = v.businessValueLabel
-    ? ` Acting on these findings is projected to unlock ${v.businessValueLabel} in Business Value Created.`
-    : ''
-  return `${firstClause}${oppClause}${valueClause}`
+  const posture = MATURITY_BAND_POSTURE[v.maturityLevel] ?? MATURITY_BAND_POSTURE.Developing
+  const article = /^[AEIOU]/i.test(v.maturityLevel) ? 'an' : 'a'
+  const weakLabel = DIM_LABELS[v.weakestKey] ?? cap(v.weakestKey)
+
+  const opening = `${v.company} operates at ${Math.round(v.composite)} out of 100 on the Aivory operational maturity scale — ${article} "${v.maturityLevel}" posture, where ${posture}.`
+
+  let valueSentence = ''
+  if (v.businessValueLabel && v.topOpportunityTitle) {
+    valueSentence = ` Acting on the findings in this report is projected to unlock ${v.businessValueLabel} in annual business value, with ${v.topOpportunityTitle.toLowerCase()} the fastest first move.`
+  } else if (v.businessValueLabel) {
+    valueSentence = ` Acting on the findings in this report is projected to unlock ${v.businessValueLabel} in annual business value.`
+  } else if (v.topOpportunityTitle) {
+    valueSentence = ` The fastest first move is ${v.topOpportunityTitle.toLowerCase()}.`
+  }
+
+  const constraint = ` The single constraint standing in the way is ${weakLabel} (${v.weakestScore}) — examined in the diagnosis that follows.`
+
+  return `${opening}${valueSentence}${constraint}`
 }
 
 /** Lowercase, consequence-first phrase describing what a weak dimension concretely is. */

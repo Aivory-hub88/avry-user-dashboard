@@ -233,21 +233,68 @@
   margin: 0;
 }
 
+/* Borderless typographic metric grid — the PDF's Financial Case treatment
+   (lib/pdfExport.ts) ported to the screen: the cells themselves carry no fill
+   or border (see ROIMetricTile.module.css); structure comes from hairline
+   rules drawn here, in the gutters between columns and rows. Replaces the
+   previous grid of filled white/dark cards, whose 20px padding + border left
+   long currency values ("IDR 151,483,266") visibly cramped against the edge.
+
+   gap:0 is deliberate — the rules ARE the separation, and the tiles' own
+   12/16px padding provides the breathing room, so a divider never floats in
+   dead space. */
 .roiGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 0;
+}
+
+/* Horizontal rule above every cell except the hero — this draws the rule
+   UNDER the full-width hero (matching the PDF's thinDiv beneath the hero row)
+   and between each subsequent row. */
+.roiGrid > *:not(:first-child) {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Vertical rules between columns. The hero (child 1) spans the full width, so
+   the supporting cells start at child 2: in the 3-column layout the
+   first-in-row cells are 2, 5, 8, 11 → 3n+2, which are the ones that must NOT
+   carry a left rule. */
+.roiGrid > * + * {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.roiGrid > *:nth-child(3n + 2) {
+  border-left: none;
 }
 
 @media (max-width: 1023px) {
   .roiGrid {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  /* 2 columns → first-in-row cells are 2, 4, 6, … (even). */
+  .roiGrid > *:nth-child(3n + 2) {
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .roiGrid > *:nth-child(even) {
+    border-left: none;
+  }
 }
 
 @media (max-width: 639px) {
   .roiGrid {
     grid-template-columns: 1fr;
+  }
+
+  /* Single column → no vertical rules at all; the row rules carry it.
+     `:nth-child(n)` matches every child but raises specificity to match the
+     3-column `:nth-child(3n + 2)` rule above — a plain `.roiGrid > *` (one
+     class, no pseudo-class) loses to it and left children 5 and 11 with a
+     stray vertical rule hanging in a single-column layout. */
+  .roiGrid > *:nth-child(n) {
+    border-left: none;
   }
 }
 

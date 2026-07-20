@@ -15,8 +15,10 @@ interface ROIMetricTileProps {
   /**
    * C2 — hero treatment for the ONE dominant metric of the Financial Case
    * (Business Value Created). Spans the grid full-width and renders the value
-   * far larger than the supporting tiles, so the block reads as one hero
-   * figure with supporting metrics rather than a flat grid of equals.
+   * ~2x the supporting cells, so the block reads as one hero figure with
+   * supporting metrics rather than a flat grid of equals. Note the cell is
+   * borderless in both variants — the hero is distinguished by type size and
+   * colour alone, matching the PDF's Financial Case grid.
    */
   variant?: 'default' | 'hero'
 }
@@ -27,7 +29,12 @@ export default function ROIMetricTile({ label, value, formatter, subtitle, confi
   return (
     <div className={`${styles.tile} ${isHero ? styles.tileHero : ''}`}>
       <span className={`${styles.label} ${isHero ? styles.labelHero : ''}`}>{label}</span>
-      {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
+      {/* Order is eyebrow → value → sub-caption, matching the PDF's Financial
+          Case grid. It also keeps every value on the same baseline across a
+          row: with the sub-caption above the value (the previous order), a
+          cell that had one pushed its figure a line lower than its
+          neighbours', which was invisible inside the old bordered cards but
+          obvious once the boxes came off and the rows share a hairline. */}
       {value === null ? (
         <span className={styles.insufficient}>Not provided</span>
       ) : (
@@ -35,6 +42,7 @@ export default function ROIMetricTile({ label, value, formatter, subtitle, confi
           {formatter(value)}
         </span>
       )}
+      {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
       {confidenceTag && (
         <span
           className={`${styles.confidenceTag} ${confidenceLevel === 'low' ? styles.confidenceTagLow : styles.confidenceTagMedium}`}

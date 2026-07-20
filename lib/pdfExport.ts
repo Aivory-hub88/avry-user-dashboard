@@ -393,6 +393,67 @@ export function sectionLabel(pdf: jsPDF, y: number, title: string): number {
   return y + 12 // headline is taller — a little more breathing room beneath
 }
 
+/**
+ * TABLE OF CONTENTS
+ *
+ * A single entry in the report's contents page. `page` is the 1-based jsPDF
+ * page number the section's heading actually landed on — recorded at render
+ * time, never predicted (see `tocMark` in exportReportToPdf).
+ */
+export interface TocEntry {
+  title: string
+  page: number
+  /** Sub-sections (currently only Methodology, nested inside Financial Case). */
+  sub?: boolean
+}
+
+/**
+ * Draws the contents list onto an ALREADY-RESERVED page.
+ *
+ * jsPDF renders linearly, so a section's page number is unknowable until the
+ * section is drawn. The two-pass approach used here:
+ *   1. Immediately after the editorial letter, reserve a page (addPage + the
+ *      standard pageBg/pageFooter treatment) and remember its page number.
+ *   2. Render the whole report as normal, pushing a TocEntry with
+ *      pdf.getCurrentPageInfo().pageNumber each time a section heading is
+ *      actually emitted — so conditionally-skipped sections simply never get
+ *      an entry, and a section pushed onto a fresh page by ensureSpace records
+ *      the page it landed on, not the one it was measured from.
+ *   3. At the end, pdf.setPage(reserved) and call this to fill it in.
+ *
+ * Deliberately draws NO background/footer of its own: those were applied when
+ * the page was reserved, and re-running pageBg here would paint the gradient
+ * image over the footer that is already on the page.
+ */
+export function renderContents(pdf: jsPDF, entries: TocEntry[]): void {
+  let y = 16
+  y = sectionLabel(pdf, y, 'Contents')
+
+  entries.forEach((e) => {
+    if (y > PAGE_H - 20) return // defensive: the list comfortably fits one page
+    const indent = e.sub ? 8 : 0
+
+    // Row rule above each entry — the same 0.18mm TRACK hairline the report
+    // uses everywhere else, so the list reads as one editorial system.
+    thinDiv(pdf, y - 4, ML + indent, ML + CW)
+
+    setC(pdf, e.sub ? LABEL : INK, 'text')
+    pdf.setFont(e.sub ? F() : FB(), e.sub ? 'normal' : 'bold')
+    pdf.setFontSize(e.sub ? TS.body : TS.value)
+    pdf.text(e.title, ML + indent, y + 2)
+
+    setC(pdf, e.sub ? LABEL : MUTED, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(TS.body)
+    pdf.text(String(e.page), ML + CW, y + 2, { align: 'right' })
+
+    // Uniform row pitch, sub-entries included — an indent + lighter weight
+    // already reads as "nested", and varying the pitch as well made the rules
+    // around Methodology sit visibly off the rhythm of the rest of the list.
+    y += SP.lg
+  })
+}
+
 /** Renders a narrative block and returns the new Y position. */
 export function renderNarrative(pdf: jsPDF, y: number, text: string): number {
   setC(pdf, CONTENT_C, 'text')
@@ -1056,12 +1117,9 @@ export async function applyPremiumCovers(
     const lineGap = tfs * 0.3528 * 1.04 // pt→mm, tight leading
     const titleTopBaseline = 165 // baseline of first line (mm)
     titleLines.forEach((l, i) => pdf.text(l, CML, titleTopBaseline + i * lineGap))
-    const titleWmm = Math.max(...titleLines.map((l) => pdf.getTextWidth(l)))
-
-    // Ring glyph, right of the second title line (vector — nothing to load)
-    setC(pdf, '#ffffff', 'draw')
-    pdf.setLineWidth(0.7)
-    pdf.circle(CML + titleWmm + 12, titleTopBaseline + lineGap - tfs * 0.3528 * 0.36, 6.3, 'S')
+    // (The decorative ring glyph that used to sit right of the second title
+    // line was removed — it read as an unexplained artefact next to the
+    // cover title rather than as brand furniture.)
 
     // Company Name — large, shrink-to-fit so long names never overflow
     if (meta?.company) {
@@ -1442,7 +1500,21 @@ function renderConfidenceBanner(pdf: jsPDF, y: number, confidence: string, missi
   return y + boxH + 6
 }
 
-/** Compact metric grid (4 columns per row) for the secondary ROI figures. */
+/**
+ * Compact metric grid (4 columns per row) for the secondary ROI figures.
+ *
+ * Sizing: values 11.5pt (TS.metric) → 8pt and row height 17mm → 13mm, the same
+ * ~30% reduction applied to the primary Financial Case row above. Labels stay
+ * at 5.6pt — they are already at the legibility floor for print, and the
+ * product owner's note was about the metric BOXES and the number text, not the
+ * eyebrows.
+ *
+ * The auto-shrink loop mirrors the primary row's: at 4 columns each cell is
+ * only ~39.75mm wide, which a long currency string ("IDR 151,483,266") can
+ * still exceed even at 8pt, and jsPDF will happily overrun into the
+ * neighbouring column rather than wrap. Shrinking to a 6pt floor guarantees
+ * the value stays inside its own cell for every currency.
+ */
 function renderMetricGrid(
   pdf: jsPDF, y: number,
   metrics: Array<{ l: string; v: string; n?: string }>,
@@ -1450,7 +1522,7 @@ function renderMetricGrid(
   const cols = 4
   const gapX = 5
   const w = (CW - gapX * (cols - 1)) / cols
-  const rowH = 17
+  const rowH = 13
   for (let i = 0; i < metrics.length; i += cols) {
     y = ensureSpace(pdf, y, rowH + 2)
     metrics.slice(i, i + cols).forEach((m, j) => {
@@ -1461,13 +1533,18 @@ function renderMetricGrid(
       spacedText(pdf, m.l.toUpperCase(), x, y, 0.18)
       setC(pdf, INK, 'text')
       pdf.setFont(F(), 'normal')
-      pdf.setFontSize(11.5)
-      pdf.text(m.v, x, y + 7)
+      let vSize = 8
+      pdf.setFontSize(vSize)
+      while (vSize > 6 && pdf.getTextWidth(m.v) > w - 1.5) {
+        vSize -= 0.25
+        pdf.setFontSize(vSize)
+      }
+      pdf.text(m.v, x, y + 5.5)
       if (m.n) {
         setC(pdf, LABEL, 'text')
         pdf.setFont(F(), 'normal')
-        pdf.setFontSize(6)
-        pdf.text(m.n, x, y + 11.5)
+        pdf.setFontSize(5.6)
+        pdf.text(m.n, x, y + 9.5)
       }
     })
     y += rowH
@@ -1522,7 +1599,14 @@ function renderScenarioRange(
  * (with and without an Operational Improvement Priorities section), replacing two
  * previously duplicated loops.
  */
-function renderRiskRegister(pdf: jsPDF, y: number, risks: DiagnosticContext['risks']): number {
+function renderRiskRegister(
+  pdf: jsPDF, y: number, risks: DiagnosticContext['risks'],
+  // Contents tracking: pushed to only on the branch that actually emits an
+  // "Operational Constraints" section heading. The zero-risk branch renders a
+  // one-line "No risks detected" note rather than a section, so it must NOT
+  // appear in the contents list.
+  tocMark?: (title: string) => void,
+): number {
   if (y > PAGE_H - 30) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 } else { y += 6 }
 
   if (risks.length === 0) {
@@ -1538,6 +1622,7 @@ function renderRiskRegister(pdf: jsPDF, y: number, risks: DiagnosticContext['ris
     return y + 8
   }
 
+  tocMark?.('Operational Constraints')
   y = sectionLabel(pdf, y, 'Operational Constraints')
 
   // Phase E2.6 — same builder as the on-screen RiskCard list caption, so
@@ -1641,6 +1726,37 @@ export async function exportReportToPdf(
   editorialSpread(pdf, context)
 
   // ════════════════════════════════════════════════════════════════════════════
+  // PAGE 3 — CONTENTS (reserved now, filled in at the very end)
+  //
+  // Two-pass: jsPDF renders linearly, so no section's page number is known
+  // until it is drawn. Reserve the page here so it sits between the editorial
+  // letter and the Executive Summary, collect real page numbers via tocMark()
+  // as each section renders, then setPage() back and draw the list before
+  // save(). Same pageBg + pageFooter treatment as every other content page.
+  // ════════════════════════════════════════════════════════════════════════════
+  pdf.addPage()
+  pageBg(pdf)
+  pageFooter(pdf)
+  const contentsPageNumber = pdf.getCurrentPageInfo().pageNumber
+
+  const toc: TocEntry[] = []
+  /**
+   * Records the page a section heading ACTUALLY landed on. Must be called at
+   * the heading itself — i.e. after any ensureSpace()/addPage() that precedes
+   * it — otherwise a section pushed onto the next page would be indexed to the
+   * page it was measured from. Sections that are conditionally skipped never
+   * call this, so the contents list always reflects what was rendered.
+   */
+  const tocMark = (title: string, sub = false) => {
+    toc.push({ title, page: pdf.getCurrentPageInfo().pageNumber, sub })
+  }
+  /** tocMark + sectionLabel in one call, for the linear sections below. */
+  const tocSection = (yy: number, title: string): number => {
+    tocMark(title)
+    return sectionLabel(pdf, yy, title)
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
   // EXECUTIVE SUMMARY — same builder as the on-screen page (readinessNarrative.ts)
   // ════════════════════════════════════════════════════════════════════════════
   pdf.addPage()
@@ -1648,7 +1764,7 @@ export async function exportReportToPdf(
   pageFooter(pdf)
   let y = 16
 
-  y = sectionLabel(pdf, y, 'Executive Summary')
+  y = tocSection(y, 'Executive Summary')
 
   const execScoreOf = (k: string) => Math.round((scores as unknown as Record<string, number>)[k] ?? 0)
   const execTopOpportunityTitle = opportunities[0]?.title ?? null
@@ -1669,8 +1785,10 @@ export async function exportReportToPdf(
   // Bold the figures an executive scans for first: composite score, maturity
   // band, top opportunity, and the headline dollar figure — same shared
   // sentence as the on-screen page, PDF-only emphasis layered on top.
+  // Bold targets track buildExecutiveSummary's wording — it says "N out of
+  // 100", not "N/100" (the "/100" form belongs to the diagnosis narrative).
   y = renderNarrativeSegments(pdf, y, boldSubstrings(execSummaryText, [
-    `${Math.round(scores.composite)}/100`,
+    `${Math.round(scores.composite)} out of 100`,
     `"${scores.maturityLevel}"`,
     execTopOpportunityTitle?.toLowerCase() ?? null,
     execBusinessValueLabel,
@@ -1688,7 +1806,7 @@ export async function exportReportToPdf(
     y = thinDiv(pdf, y) + 4
   }
 
-  y = sectionLabel(pdf, y, 'Operational Health')
+  y = tocSection(y, 'Operational Health')
 
   // Data-driven narrative — previously a hardcoded template that claimed
   // "fully aligned leadership and previous AI successes" regardless of the
@@ -1944,7 +2062,7 @@ export async function exportReportToPdf(
   y = renderTransition(pdf, y, `What this score means for ${company} — and what to do first — is summarised below.`)
 
   y = ensureSpace(pdf, y, 60)
-  y = sectionLabel(pdf, y, 'Executive Operational Diagnosis')
+  y = tocSection(y, 'Executive Operational Diagnosis')
 
   const verdictText = buildVerdictNarrative({
     company,
@@ -2014,7 +2132,7 @@ export async function exportReportToPdf(
   // ════════════════════════════════════════════════════════════════════════════
   if (aiAnalysis && typeof aiAnalysis === 'object') {
     y = ensureSpace(pdf, y, 55)
-    y = sectionLabel(pdf, y, 'Business Operations Analysis')
+    y = tocSection(y, 'Business Operations Analysis')
 
     setC(pdf, LABEL, 'text')
     pdf.setFont(F(), 'normal')
@@ -2061,7 +2179,7 @@ export async function exportReportToPdf(
   y = renderTransition(pdf, y, 'That diagnosis rests on the specific context your team described in this assessment.')
 
   y = ensureSpace(pdf, y, 45)
-  y = sectionLabel(pdf, y, 'Business Context')
+  y = tocSection(y, 'Business Context')
 
   // E1.5 — enhance each pain point with its estimated hours/cost (real data
   // from `painPointHours` when present, otherwise an equal-weight allocation
@@ -2136,7 +2254,7 @@ export async function exportReportToPdf(
   y = renderTransition(pdf, y, 'Against that context, these are the highest-leverage opportunities to pursue first.')
 
   y = ensureSpace(pdf, y, 55)
-  y = sectionLabel(pdf, y, 'Transformation Opportunities')
+  y = tocSection(y, 'Transformation Opportunities')
 
   if (opportunities.length === 0) {
     // Coherent empty state — the previous build rendered the "immediate
@@ -2183,7 +2301,7 @@ export async function exportReportToPdf(
     : 'Here is the financial case built from the workload your team reported.')
 
   y = ensureSpace(pdf, y, 70)
-  y = sectionLabel(pdf, y, 'Financial Case')
+  y = tocSection(y, 'Financial Case')
 
   // Mirror the on-screen low-confidence banner (incl. the missing inputs the
   // page shows) instead of burying confidence in a tile caption.
@@ -2247,14 +2365,23 @@ export async function exportReportToPdf(
     },
   ]
 
-  y = ensureSpace(pdf, y, 34)
+  y = ensureSpace(pdf, y, 26)
   const roiTop = y
   roiMetrics.forEach((m, i) => {
     const rx = ML + i * (roiW + roiGap)
-    // C2 — Business Value Created (i === 0) is the hero of the Financial Case:
-    // rendered at TS.hero (30pt) and accented, the two supporting figures at
-    // 15pt, so the block reads "this is THE number, these two support it"
-    // instead of three equally-weighted metrics.
+    // C2 — Business Value Created (i === 0) is the hero of the Financial Case,
+    // accented and rendered at TS.display (19pt) against the two supporting
+    // figures at TS.value (10pt), so the block reads "this is THE number,
+    // these two support it" instead of three equally-weighted metrics.
+    //
+    // Sizing: hero 30pt (TS.hero) → 19pt (TS.display) and supporting 15pt →
+    // 10pt (TS.value) — a ~35% reduction on both, per the product owner's
+    // "30–40% smaller" note. The old 30pt hero forced long currency strings
+    // ("IDR 151,483,266") straight into the auto-shrink loop below, so the
+    // rendered size was unpredictable and the block sat cramped in its
+    // column; at 19pt the same string fits its 54mm column outright. The
+    // hero:supporting ratio stays ~1.9x, so dominance is unchanged — only the
+    // absolute scale drops. Row height follows: 27mm → 21mm.
     const isHero = i === 0
 
     setC(pdf, isHero ? ACCENT : LABEL_A, 'text')
@@ -2264,28 +2391,28 @@ export async function exportReportToPdf(
 
     setC(pdf, INK, 'text')
     pdf.setFont(F(), 'normal')
-    let vSize = isHero ? TS.hero : 15
+    let vSize = isHero ? TS.display : TS.value
     pdf.setFontSize(vSize)
-    while (vSize > 10 && pdf.getTextWidth(m.v) > roiW - 2) {
-      vSize -= 1
+    while (vSize > 7 && pdf.getTextWidth(m.v) > roiW - 2) {
+      vSize -= 0.5
       pdf.setFontSize(vSize)
     }
-    pdf.text(m.v, rx, roiTop + (isHero ? 13 : 11))
+    pdf.text(m.v, rx, roiTop + (isHero ? 9 : 8))
 
     setC(pdf, LABEL, 'text')
     pdf.setFont(F(), 'normal')
-    pdf.setFontSize(7)
-    pdf.text(m.n, rx, roiTop + 19)
+    pdf.setFontSize(6.4)
+    pdf.text(m.n, rx, roiTop + 14)
 
     if (i < roiMetrics.length - 1) {
       setC(pdf, TRACK, 'draw')
       pdf.setLineWidth(0.18)
       const dividerX = rx + roiW + roiGap / 2
-      pdf.line(dividerX, roiTop - 2, dividerX, roiTop + 21)
+      pdf.line(dividerX, roiTop - 2, dividerX, roiTop + 16)
     }
   })
 
-  y = roiTop + 27
+  y = roiTop + 21
   thinDiv(pdf, y)
   y += 6
 
@@ -2362,6 +2489,7 @@ export async function exportReportToPdf(
   // the working shown; the confidence banner above carries the caveat). ──
   if (calculations.assumedHourlyRateLocal != null) {
     y = ensureSpace(pdf, y, 40)
+    tocMark('Methodology', true)
     y = sectionLabel(pdf, y, 'Methodology')
 
     const hrs = calculations.hoursReclaimedPerYear ?? 0
@@ -2500,7 +2628,7 @@ export async function exportReportToPdf(
     y = renderTransition(pdf, y, 'This is where the greatest friction — and the fastest payoff — lies before and during adoption.')
 
     y = ensureSpace(pdf, y, 55)
-    y = sectionLabel(pdf, y, 'Operational Improvement Priorities')
+    y = tocSection(y, 'Operational Improvement Priorities')
 
     const rfiCurrent = context.quantitative.currentAutomationPct ?? 0
     const rfiTarget = context.quantitative.targetAutomationPct ?? 0
@@ -2524,10 +2652,10 @@ export async function exportReportToPdf(
     // C5 — Operational Constraints stands alone only with ≥2 risks. A single
     // risk was folded into the Executive Operational Diagnosis above; 0 risks
     // render nothing at all.
-    if (risks.length >= 2) y = renderRiskRegister(pdf, y, risks)
+    if (risks.length >= 2) y = renderRiskRegister(pdf, y, risks, tocMark)
   } else if (risks.length >= 2) {
     y = ensureSpace(pdf, y, 45)
-    y = renderRiskRegister(pdf, y, risks)
+    y = renderRiskRegister(pdf, y, risks, tocMark)
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -2540,7 +2668,7 @@ export async function exportReportToPdf(
   y = renderTransition(pdf, y, 'Turning this analysis into results starts with where AI fits into the sequence above.')
 
   y = ensureSpace(pdf, y, 45)
-  y = sectionLabel(pdf, y, 'AI Enablement')
+  y = tocSection(y, 'AI Enablement')
 
   const topOpp = opportunities[0]
   const nsCurrent = context.quantitative.currentAutomationPct ?? 0
@@ -2589,7 +2717,7 @@ export async function exportReportToPdf(
     y = thinDiv(pdf, y) + 4
   }
 
-  y = sectionLabel(pdf, y, 'Closing Note')
+  y = tocSection(y, 'Closing Note')
 
   const closingTopOpp = opportunities[0]
   const closingSavings = fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD)
@@ -2633,6 +2761,15 @@ export async function exportReportToPdf(
   // ════════════════════════════════════════════════════════════════════════════
   pdf.addPage()
   await applyPremiumCovers(pdf, 'back')
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // CONTENTS — pass 2. Every section has now rendered, so `toc` holds real page
+  // numbers for exactly the sections that were emitted. Jump back to the page
+  // reserved after the editorial letter and fill it in.
+  // ════════════════════════════════════════════════════════════════════════════
+  pdf.setPage(contentsPageNumber)
+  renderContents(pdf, toc)
+  pdf.setPage(pdf.getNumberOfPages())
 
   pdf.save(`Business_Operations_Assessment_${companyName.replace(/\s+/g, '_')}.pdf`)
 }
