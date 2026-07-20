@@ -427,6 +427,25 @@ export function buildRiskRegisterCaption(
 }
 
 /**
+ * C5 — single-constraint fold line. When the Operational Constraints section
+ * would carry FEWER THAN 2 risks it is not worth a standalone section (it
+ * reads empty/templated), so the lone risk is folded into the Executive
+ * Operational Diagnosis as one "Key constraint: …" line instead. Shared by
+ * page and PDF so the folded sentence is identical on both surfaces. Returns
+ * null unless there is exactly one risk (0 risks → nothing to fold; ≥2 → the
+ * section stands on its own).
+ */
+export function buildFoldedConstraintNote(
+  risks: Array<{ risk: string; severity: 'HIGH' | 'MEDIUM' | 'LOW'; source: string }>,
+): string | null {
+  if (!Array.isArray(risks) || risks.length !== 1) return null
+  const r = risks[0]
+  const sourceClause = r.source ? ` (signal: ${humanizeRiskSource(r.source).toLowerCase()})` : ''
+  const body = r.risk.trim().replace(/\.*$/, '')
+  return `Key constraint: ${body}${sourceClause}.`
+}
+
+/**
  * AI Enablement — the closing paragraph on both surfaces. Positions AI as
  * the execution layer of the transformation (Business → Operations →
  * Processes → Data → Automation → AI), never the headline.

@@ -45,6 +45,7 @@ import {
   buildOpportunityMatrixCaption,
   buildRoiTilesCaption,
   buildRiskRegisterCaption,
+  buildFoldedConstraintNote,
   DIM_CONSEQUENCE_CHAINS,
   DIM_LABELS,
 } from '@/lib/readinessNarrative'
@@ -379,6 +380,14 @@ export default function FinalResultPage() {
     return order[a.severity] - order[b.severity]
   })
 
+  // C5 — Operational Constraints is a standalone section ONLY with ≥2 risks.
+  // A single risk is folded into the Executive Operational Diagnosis as one
+  // "Key constraint: …" line (shared builder → identical to the PDF); 0 risks
+  // render nothing. Keeps a lone risk from reading as an empty, templated
+  // section.
+  const hasStandaloneConstraints = risks.length >= 2
+  const foldedConstraint = buildFoldedConstraintNote(risks)
+
   function qualVal(v: string | string[] | undefined): string {
     if (!v) return 'Not provided'
     if (Array.isArray(v)) return v.length > 0 ? v.join(', ') : 'Not provided'
@@ -395,7 +404,9 @@ export default function FinalResultPage() {
     { id: 'section-operational-health', label: 'Operational Health' },
     { id: 'section-executive-diagnosis', label: 'Diagnosis' },
     { id: 'section-operations-analysis', label: 'Operations Analysis' },
-    { id: 'section-operational-constraints', label: 'Constraints' },
+    // C5 — only list Constraints when it actually renders as its own section
+    // (≥2 risks); otherwise the rail would point at a merged-away anchor.
+    ...(hasStandaloneConstraints ? [{ id: 'section-operational-constraints', label: 'Constraints' }] : []),
     { id: 'section-transformation-opportunities', label: 'Opportunities' },
     { id: 'section-financial-case', label: 'Financial Case' },
     ...(hasImprovementPriorities ? [{ id: 'section-improvement-priorities', label: 'Priorities' }] : []),
@@ -502,6 +513,10 @@ export default function FinalResultPage() {
               </div>
             ))}
           </div>
+          {/* C5 — single folded constraint (only when exactly 1 risk). */}
+          {foldedConstraint && (
+            <p className={styles.foldedConstraint}>{foldedConstraint}</p>
+          )}
           <div className={styles.executiveInsight}>
             <span className={styles.executiveInsightLabel}>Executive Insight</span>
             {diagnosisInsight}
@@ -570,22 +585,20 @@ export default function FinalResultPage() {
           )}
         </div>
 
-        {/* ── Operational Constraints (was Risk Register) ── */}
-        <div id="section-operational-constraints" className={styles.card}>
-          <h2 className={styles.sectionLabel}>Operational Constraints</h2>
-          {sortedRisks.length === 0 ? (
-            <p className={styles.emptyMessage}>No risks detected.</p>
-          ) : (
-            <>
-              {riskRegisterCaption && <p className={styles.vizCaption}>{riskRegisterCaption}</p>}
-              <div className={styles.riskList}>
-                {sortedRisks.map(risk => (
-                  <RiskCard key={risk.id} risk={risk} />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+        {/* ── Operational Constraints (was Risk Register) — C5: standalone
+              only with ≥2 risks; a single risk is folded into the diagnosis
+              above, 0 risks render nothing. ── */}
+        {hasStandaloneConstraints && (
+          <div id="section-operational-constraints" className={styles.card}>
+            <h2 className={styles.sectionLabel}>Operational Constraints</h2>
+            {riskRegisterCaption && <p className={styles.vizCaption}>{riskRegisterCaption}</p>}
+            <div className={styles.riskList}>
+              {sortedRisks.map(risk => (
+                <RiskCard key={risk.id} risk={risk} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Transformation Opportunities ── */}
         <div id="section-transformation-opportunities" className={styles.card}>
@@ -640,7 +653,7 @@ export default function FinalResultPage() {
           )}
 
           <div className={styles.roiGrid}>
-            <ROIMetricTile label="Business Value Created" value={totalAnnualSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} />
+            <ROIMetricTile label="Business Value Created" value={totalAnnualSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} variant="hero" />
             <ROIMetricTile label="Recovered Labor Value" value={annualLaborSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} />
             <ROIMetricTile label="Process Efficiency Value" value={annualProcessSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} />
             <ROIMetricTile

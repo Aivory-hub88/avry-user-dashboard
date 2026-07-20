@@ -53,13 +53,23 @@
   background: linear-gradient(90deg, #5f8f52, #afd199);
 }
 
+/* C3 — median marker is a DIAMOND, not a thin coloured line. Your-score
+   (solid gradient fill) vs industry-median previously differed only by hue
+   (green fill vs amber line) — indistinguishable in grayscale/low-contrast.
+   A rotated square is differentiated by SHAPE alone, so the comparison
+   survives a B/W print or a colour-blind reader. A dark keyline keeps it
+   legible whether it sits on the bright fill or the dark track. */
 .medianTick {
   position: absolute;
-  top: -3px;
-  width: 2px;
-  height: 12px;
-  background: #d9c98a;
-  transform: translateX(-1px);
+  top: 50%;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  background: #e2d18f;
+  border: 1px solid rgba(30, 26, 8, 0.75);
+  border-radius: 1px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
 }
 
 .rowValue {

@@ -18,10 +18,30 @@
 }
 
 .value {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   color: #b7cba6;
   line-height: 1.2;
+}
+
+/* C2 — hero tile: spans the full ROI grid width and leads the block. */
+.tileHero {
+  grid-column: 1 / -1;
+  background: linear-gradient(180deg, rgba(175, 209, 153, 0.10) 0%, rgba(175, 209, 153, 0.02) 100%), #262623;
+  border-color: rgba(175, 209, 153, 0.30);
+}
+
+/* Hero value: ~2× the 20px supporting tiles, so one figure dominates the
+   Financial Case block. clamp keeps it from overflowing on narrow viewports
+   (C6) while staying dominant on desktop. */
+.valueHero {
+  font-size: clamp(34px, 6vw, 44px);
+  line-height: 1.1;
+  color: #d0e0af;
+}
+
+.labelHero {
+  color: #b7cba6;
 }
 
 .insufficient {

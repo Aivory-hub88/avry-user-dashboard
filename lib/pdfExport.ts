@@ -28,6 +28,7 @@ import {
   buildDimensionBenchmarkCaption,
   buildRoiTilesCaption,
   buildRiskRegisterCaption,
+  buildFoldedConstraintNote,
 } from '@/lib/readinessNarrative'
 import { getIndustryBenchmark, formatVsMedian, BENCHMARK_DISCLAIMER } from '@/lib/industryBenchmarks'
 import { quantifyPainPoints, formatPainPointHours } from '@/lib/bottleneckQuantification'
@@ -99,13 +100,21 @@ export const SP = { hair: 2, xs: 4, sm: 6, md: 8, lg: 14, transitionGuard: 26 } 
 //   TS.small    = 7.5    step numbers ("01"), small headings, SCORE DRIVERS heading
 //   TS.body     = 8.5    paragraph/list body copy (dimBar names, risk text, next-step bodies)
 //   TS.value    = 10     narrative body copy, title-weight small headings
-//   TS.title    = 10.5   card/opportunity titles
+//   TS.subhead  = 11.5   card/opportunity/improvement titles (C1: bumped from
+//                        10.5 so a bold subhead sits a clear SIZE step — not
+//                        just a weight step — above the 10pt normal body it
+//                        captions; the old 10.5-vs-10 gap read as "same size,
+//                        slightly bolder", i.e. the muddy hierarchy C1 fixes)
 //   TS.metric   = 11.5   metric-grid values
-//   TS.display  = 19     large tile figures (financial metric tiles)
+//   TS.display  = 19     supporting tile figures (financial metric tiles)
+//   TS.hero     = 30     the ONE dominant metric per section (C2) — ~3× the
+//                        supporting figures around it (score ring uses ~30pt
+//                        Doto to the dimension numbers' 10pt; the Financial
+//                        Case hero mirrors that ratio)
 // Not every call site has been migrated to reference TS — see the file-level
 // design-QA notes — but new/edited sections should pick a rung from this
 // scale rather than adding another one-off size.
-export const TS = { micro: 6, caption: 6.4, label: 7, small: 7.5, body: 8.5, value: 10, title: 10.5, metric: 11.5, display: 19 } as const
+export const TS = { micro: 6, caption: 6.4, label: 7, small: 7.5, body: 8.5, value: 10, title: 10.5, subhead: 11.5, metric: 11.5, display: 19, hero: 30 } as const
 
 // ── Font helpers ───────────────────────────────────────────────────────────────
 // Manrope / Doto are design-intent fonts; helvetica is the jsPDF fallback.
@@ -588,31 +597,34 @@ async function scoreArc(
 
   pdf.setLineCap(0) // reset to butt
 
-  // Score number — Doto 36px ≈ 27pt, #0a1a0f
+  // Score number — C6: 28px Doto (was 36px). With the smaller ring radius the
+  // old glyph nearly touched the ring stroke; 28px keeps the number the
+  // section hero (still ~3× the dimension-bar numbers, C2) while leaving a
+  // balanced margin of clear space inside the ring.
   const scoreImg = await renderTextToPngDataUrl(
-    String(score), '400 36px "Doto", monospace', INK,
+    String(score), '400 28px "Doto", monospace', INK,
   )
   if (scoreImg) {
     const swMm = scoreImg.width * 0.264583
     const shMm = scoreImg.height * 0.264583
-    pdf.addImage(scoreImg.dataUrl, 'PNG', cx - swMm / 2, cy - shMm / 2 + 1.5, swMm, shMm, undefined, 'FAST')
+    pdf.addImage(scoreImg.dataUrl, 'PNG', cx - swMm / 2, cy - shMm / 2 + 1, swMm, shMm, undefined, 'FAST')
   } else {
     setC(pdf, INK, 'text')
     pdf.setFont(FD(), 'normal')
-    pdf.setFontSize(27)
-    pdf.text(String(score), cx, cy + 3, { align: 'center' })
+    pdf.setFontSize(21)
+    pdf.text(String(score), cx, cy + 2.5, { align: 'center' })
   }
 
   // Status label below number — 9px #6a9a6a uppercase
   setC(pdf, SEC_LBL, 'text')
   pdf.setFont(FB(), 'bold')
-  pdf.setFontSize(7)
-  spacedText(pdf, label.toUpperCase(), cx, cy + 10, 0.3, { align: 'center' })
+  pdf.setFontSize(6.6)
+  spacedText(pdf, label.toUpperCase(), cx, cy + 8.5, 0.3, { align: 'center' })
 
   // COMPOSITE SCORE below ring — 9px #bbb
   setC(pdf, LABEL, 'text')
-  pdf.setFontSize(7)
-  spacedText(pdf, 'COMPOSITE SCORE', cx, cy + r + 8, 0.25, { align: 'center' })
+  pdf.setFontSize(6.6)
+  spacedText(pdf, 'COMPOSITE SCORE', cx, cy + r + 7, 0.25, { align: 'center' })
 }
 
 /** Dimension bar: name (11px #888) · 1.5px track · green fill · value right (Doto 13px #0a1a0f). */
@@ -665,12 +677,29 @@ function dimBar(
     pdf.circle(x + barH / 2, barY, barH / 2, 'F')
   }
 
-  // Median tick — thin vertical mark at the industry-median position.
+  // Median marker — C3: a small filled DIAMOND (rotated square), not a thin
+  // coloured tick. The solid-green bar fill and the median marker previously
+  // differed only by hue (two greens → a faint amber line), which collapses
+  // to near-identical greys in a B/W print. A diamond is distinguishable by
+  // SHAPE alone, so the "your score vs industry median" read survives
+  // grayscale. Drawn as two triangles sharing the top/bottom vertices, with a
+  // thin white keyline so it stays legible even when it lands on the fill.
   if (typeof median === 'number') {
     const tickX = x + w * (Math.max(0, Math.min(100, median)) / 100)
-    setC(pdf, '#c9b872', 'draw')
-    pdf.setLineWidth(0.35)
-    pdf.line(tickX, barY - 1.6, tickX, barY + 1.6)
+    const hw = 1.15 // half-width (mm)
+    const hh = 1.7  // half-height (mm)
+    // White halo so the diamond reads on top of the green fill.
+    setC(pdf, '#ffffff', 'draw')
+    pdf.setLineWidth(0.9)
+    pdf.line(tickX, barY - hh, tickX + hw, barY)
+    pdf.line(tickX + hw, barY, tickX, barY + hh)
+    pdf.line(tickX, barY + hh, tickX - hw, barY)
+    pdf.line(tickX - hw, barY, tickX, barY - hh)
+    // Filled diamond in a dark ink so it contrasts against both the fill and
+    // the track in grayscale.
+    setC(pdf, '#5a4a10', 'fill')
+    pdf.triangle(tickX, barY - hh, tickX + hw, barY, tickX, barY + hh, 'F')
+    pdf.triangle(tickX, barY - hh, tickX - hw, barY, tickX, barY + hh, 'F')
   }
 
   return y + (medianVsLabel ? 16.5 : 14)
@@ -704,7 +733,9 @@ function oppCard(
   // ── Header: title + badge ──
   setC(pdf, INK, 'text')
   pdf.setFont(FB(), 'bold') // weight 500
-  pdf.setFontSize(10.5) // 14px
+  // C1 — subhead rung: 11.5pt bold sits a clear size+weight step above the
+  // 10pt normal body copy (was 10.5pt, only ~0.5pt above body → muddy).
+  pdf.setFontSize(11.5)
   const titleLines = pdf.splitTextToSize(opp.title, CW - 55)
   pdf.text(titleLines[0] || opp.title, ML + pad, y + padT + 5)
 
@@ -793,11 +824,11 @@ function nextStepRow(
   pdf.setFontSize(7.5) // 10px
   spacedText(pdf, stepNum, ML, y + 4, 0.3) // 0.12em
 
-  // Title — 13px weight 500, #0a1a0f
+  // Title — C1 subhead rung: 11pt bold, a clear step above 8.5pt body.
   const contentX = ML + 13 // ~36px gap
   setC(pdf, INK, 'text')
   pdf.setFont(FB(), 'bold')
-  pdf.setFontSize(10) // 13px
+  pdf.setFontSize(11)
   pdf.text(title, contentX, y + 4)
 
   // Body — 11px #888, line-height 1.65
@@ -854,10 +885,10 @@ function improvementBlock(pdf: jsPDF, item: ImprovementItem, y: number): number 
   const aLines = pdf.splitTextToSize(item.recommendedAction, CW - 4)
   const iLines = pdf.splitTextToSize(item.operationalImpact, CW - 4)
 
-  // Title — 13px weight 500
+  // Title — C1 subhead rung: 11.5pt bold, clear step above 10pt body.
   setC(pdf, INK, 'text')
   pdf.setFont(FB(), 'bold')
-  pdf.setFontSize(10) // 13px
+  pdf.setFontSize(11.5)
   const tLines = pdf.splitTextToSize(item.title, CW - 55)
   pdf.text(tLines[0] || item.title, ML, y + 5)
 
@@ -1293,6 +1324,92 @@ function renderNextStepCallout(pdf: jsPDF, y: number, text: string, label = 'REC
   return y + boxH + 6
 }
 
+/**
+ * C4 — the closing call-to-action steps (AI Enablement) rendered as a single
+ * filled, tinted CTA panel — deliberately DISTINCT from the Methodology's
+ * plain numbered rows (grey numbers on hairline dividers). The most
+ * business-important moment of the report must not read like documentation:
+ * this block gets an accent-tinted card, a left accent spine, an eyebrow
+ * header, and accent-filled step chips, so a reader instantly recognises it
+ * as "what to do next" rather than more reference material. The whole panel
+ * is measured up front and kept on one page (ensureSpace) so the CTA never
+ * splits across a page break.
+ */
+function renderCtaSteps(
+  pdf: jsPDF, y: number, heading: string,
+  steps: Array<{ num: string; title: string; body: string }>,
+): number {
+  const padX = 8
+  const numCol = 12
+  const bodyX = ML + padX + numCol
+  const bodyW = CW - padX * 2 - numCol
+  const headerH = 9
+
+  // Measure every row's body so the panel height is exact.
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(TS.body)
+  const rows = steps.map((s) => {
+    pdf.setLineHeightFactor(1.5)
+    const lines = pdf.splitTextToSize(s.body, bodyW)
+    pdf.setLineHeightFactor(1.15)
+    const h = 5.5 /*title*/ + lines.length * 4.4 + 7 /*row padding*/
+    return { ...s, lines, h }
+  })
+  const totalH = headerH + rows.reduce((a, r) => a + r.h, 0) + 6
+
+  y = ensureSpace(pdf, y, totalH + 4)
+
+  // Panel: accent-tinted fill + left accent spine (the distinct "this is the
+  // CTA" signal; Methodology has neither).
+  setC(pdf, '#eaf5e4', 'fill')
+  pdf.roundedRect(ML, y, CW, totalH, 2.5, 2.5, 'F')
+  setC(pdf, '#c0ddb0', 'draw')
+  pdf.setLineWidth(0.18)
+  pdf.roundedRect(ML, y, CW, totalH, 2.5, 2.5, 'S')
+  setC(pdf, ACCENT, 'fill')
+  pdf.rect(ML, y + 2.5, 1.4, totalH - 5, 'F')
+
+  // Eyebrow header.
+  setC(pdf, ACCENT, 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(6.4)
+  spacedText(pdf, heading.toUpperCase(), ML + padX, y + 6.5, 0.4)
+
+  let ry = y + headerH + 3
+  rows.forEach((r, i) => {
+    if (i > 0) {
+      setC(pdf, '#cfe4c2', 'draw')
+      pdf.setLineWidth(0.15)
+      pdf.line(ML + padX, ry - 2, ML + CW - padX, ry - 2)
+    }
+    // Accent-filled step chip (numbered) — a filled marker, not a bare grey
+    // number, so the steps read as actionable.
+    setC(pdf, ACCENT, 'fill')
+    pdf.circle(ML + padX + 2.4, ry + 1.6, 2.6, 'F')
+    setC(pdf, '#ffffff', 'text')
+    pdf.setFont(FB(), 'bold')
+    pdf.setFontSize(6)
+    pdf.text(r.num, ML + padX + 2.4, ry + 2.5, { align: 'center' })
+
+    // Title (subhead rung) + body.
+    setC(pdf, '#25401f', 'text')
+    pdf.setFont(FB(), 'bold')
+    pdf.setFontSize(TS.subhead)
+    pdf.text(r.title, bodyX, ry + 3)
+
+    setC(pdf, '#3f5c3f', 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(TS.body)
+    pdf.setLineHeightFactor(1.5)
+    pdf.text(r.lines, bodyX, ry + 8)
+    pdf.setLineHeightFactor(1.15)
+
+    ry += r.h
+  })
+
+  return y + totalH + 6
+}
+
 /** Amber banner mirroring the on-screen low-confidence warning + missing inputs. */
 function renderConfidenceBanner(pdf: jsPDF, y: number, confidence: string, missing: string[]): number {
   const msg =
@@ -1581,9 +1698,12 @@ export async function exportReportToPdf(
   y = renderNarrative(pdf, y, `${company} operates at a "${scores.maturityLevel}" maturity level with a composite score of ${Math.round(scores.composite)}. The strongest dimension is ${DIM_LABELS[strongestKey] ?? cap(strongestKey)} (${scoreOf(strongestKey)}), while ${DIM_LABELS[weakestKey] ?? cap(weakestKey)} (${scoreOf(weakestKey)}) represents the clearest gap and the first constraint to address. ${leadershipClause}${priorClause ? ' ' + priorClause : ''}`)
 
   // ── Two-column: score ring left · dimension bars right ──
+  // C6: arcR 20 → 17 (the addendum flagged the ring + caption as oversized /
+  // needing rebalance). Ring right edge = arcCx + arcR = 53+17 = 70mm, still
+  // well clear of the dimension-bar column at barX = ML+82 = 100mm.
   const arcCx = ML + 35
-  const arcCy = y + 30
-  const arcR = 20
+  const arcCy = y + 28
+  const arcR = 17
   await scoreArc(pdf, arcCx, arcCy, arcR, scores.composite, scores.maturityLevel)
 
   // Phase E1.1/E2.1 — industry benchmark overlay (pure display, no score
@@ -1709,47 +1829,65 @@ export async function exportReportToPdf(
   pdf.setLineWidth(0.18)
   pdf.roundedRect(ML, gridY, CW, gridH, 2, 2, 'S')
 
+  // C2 — one hero metric per section. `hero` renders the value at TS.hero
+  // (30pt) instead of TS.display (19pt) — ~2× the supporting tiles — so a
+  // single figure (Business Value Created) is unmistakably the dominant read
+  // and the other three tiles clearly recede to supporting weight. The value
+  // shrinks to fit its cell so a long currency string (e.g. IDR) can never
+  // overflow the tile box (C6).
   function tileContent(
     tx: number, ty: number, tw: number,
     label: string, value: string, unit: string, sub: string,
+    hero = false,
   ) {
     const padX = 8
     const padY = 9
     const ix = tx + padX
     const iy = ty + padY
+    const availW = tw - padX * 2
 
-    setC(pdf, LABEL_A, 'text')
+    // Hero label gets the accent colour to reinforce which tile leads.
+    setC(pdf, hero ? ACCENT : LABEL_A, 'text')
     pdf.setFont(FB(), 'bold')
     pdf.setFontSize(6.4)
     spacedText(pdf, label.toUpperCase(), ix, iy, 0.32)
 
     setC(pdf, INK, 'text')
     pdf.setFont(F(), 'normal')
-    pdf.setFontSize(19)
-    pdf.text(value, ix, iy + 11)
+    // Supporting tiles: 15pt (was 19). Hero: 30pt, shrunk to fit the cell.
+    let vSize = hero ? TS.hero : 15
+    pdf.setFontSize(vSize)
+    while (vSize > 9 && pdf.getTextWidth(value) > availW) {
+      vSize -= 1
+      pdf.setFontSize(vSize)
+    }
+    const valueBaseline = iy + (hero ? 13 : 10)
+    pdf.text(value, ix, valueBaseline)
 
     setC(pdf, UNIT_C, 'text')
     pdf.setFont(FB(), 'bold')
-    pdf.setFontSize(8.5)
-    pdf.text(unit, ix, iy + 17)
+    pdf.setFontSize(8)
+    const unitY = hero ? iy + 19 : iy + 16
+    pdf.text(unit, ix, unitY)
 
-    const subDivY = iy + 21
+    const subDivY = hero ? iy + 23 : iy + 20
     setC(pdf, TRACK, 'draw')
     pdf.setLineWidth(0.18)
     pdf.line(ix, subDivY, tx + tw - padX, subDivY)
     setC(pdf, LABEL, 'text')
     pdf.setFont(F(), 'normal')
     pdf.setFontSize(7)
-    spacedText(pdf, sub.toUpperCase(), ix, subDivY + 5.5, 0.15)
+    spacedText(pdf, sub.toUpperCase(), ix, subDivY + 5, 0.15)
   }
 
-  // Tile 1 — Business Value Created
+  // Tile 1 — Business Value Created (HERO: the dominant figure of the block)
   tileContent(cx0, cy0, cellW,
     'Business Value Created',
     fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD),
     'labor + process',
     // E1.7 — same label text/threshold as the on-screen ROI tiles (lib/readinessNarrative.ts).
     confidenceTileLabel(calculations.confidenceLevel) ?? 'High confidence',
+    true,
   )
 
   // Tile 2 — Recovered Team Capacity
@@ -1837,6 +1975,24 @@ export async function exportReportToPdf(
   if (diagnosisChain) {
     y = ensureSpace(pdf, y, 14)
     y = renderNarrative(pdf, y, formatConsequenceChain(diagnosisChain))
+  }
+
+  // C5 — when there is exactly ONE operational constraint it does not earn a
+  // standalone section (that reads empty/templated); it is folded here as a
+  // single "Key constraint: …" line instead. Shared builder → identical
+  // wording on the page. 0 risks → nothing; ≥2 → the standalone Operational
+  // Constraints section still renders below.
+  const foldedConstraint = buildFoldedConstraintNote(risks)
+  if (foldedConstraint) {
+    y = ensureSpace(pdf, y, 12)
+    setC(pdf, INK, 'text')
+    pdf.setFont(FB(), 'bold')
+    pdf.setFontSize(TS.body)
+    const fcLines = pdf.splitTextToSize(foldedConstraint, CW)
+    pdf.setLineHeightFactor(1.5)
+    pdf.text(fcLines, ML, y)
+    pdf.setLineHeightFactor(1.15)
+    y += fcLines.length * 4.6 + 4
   }
 
   y = renderNextStepCallout(pdf, y, buildExecutiveInsight('diagnosis', { weakestKey }), 'EXECUTIVE INSIGHT')
@@ -2081,35 +2237,45 @@ export async function exportReportToPdf(
     },
   ]
 
-  y = ensureSpace(pdf, y, 30)
+  y = ensureSpace(pdf, y, 34)
   const roiTop = y
   roiMetrics.forEach((m, i) => {
     const rx = ML + i * (roiW + roiGap)
+    // C2 — Business Value Created (i === 0) is the hero of the Financial Case:
+    // rendered at TS.hero (30pt) and accented, the two supporting figures at
+    // 15pt, so the block reads "this is THE number, these two support it"
+    // instead of three equally-weighted metrics.
+    const isHero = i === 0
 
-    setC(pdf, LABEL_A, 'text')
+    setC(pdf, isHero ? ACCENT : LABEL_A, 'text')
     pdf.setFont(FB(), 'bold')
     pdf.setFontSize(6.4)
     spacedText(pdf, m.l.toUpperCase(), rx, roiTop, 0.32)
 
     setC(pdf, INK, 'text')
     pdf.setFont(F(), 'normal')
-    pdf.setFontSize(19)
-    pdf.text(m.v, rx, roiTop + 12)
+    let vSize = isHero ? TS.hero : 15
+    pdf.setFontSize(vSize)
+    while (vSize > 10 && pdf.getTextWidth(m.v) > roiW - 2) {
+      vSize -= 1
+      pdf.setFontSize(vSize)
+    }
+    pdf.text(m.v, rx, roiTop + (isHero ? 13 : 11))
 
     setC(pdf, LABEL, 'text')
     pdf.setFont(F(), 'normal')
     pdf.setFontSize(7)
-    pdf.text(m.n, rx, roiTop + 18)
+    pdf.text(m.n, rx, roiTop + 19)
 
     if (i < roiMetrics.length - 1) {
       setC(pdf, TRACK, 'draw')
       pdf.setLineWidth(0.18)
       const dividerX = rx + roiW + roiGap / 2
-      pdf.line(dividerX, roiTop - 2, dividerX, roiTop + 20)
+      pdf.line(dividerX, roiTop - 2, dividerX, roiTop + 21)
     }
   })
 
-  y = roiTop + 26
+  y = roiTop + 27
   thinDiv(pdf, y)
   y += 6
 
@@ -2345,8 +2511,11 @@ export async function exportReportToPdf(
       topImprovementAction: topImprovement?.recommendedAction ?? null,
     }), 'EXECUTIVE INSIGHT')
 
-    y = renderRiskRegister(pdf, y, risks)
-  } else if (risks.length > 0) {
+    // C5 — Operational Constraints stands alone only with ≥2 risks. A single
+    // risk was folded into the Executive Operational Diagnosis above; 0 risks
+    // render nothing at all.
+    if (risks.length >= 2) y = renderRiskRegister(pdf, y, risks)
+  } else if (risks.length >= 2) {
     y = ensureSpace(pdf, y, 45)
     y = renderRiskRegister(pdf, y, risks)
   }
@@ -2373,22 +2542,27 @@ export async function exportReportToPdf(
     weakestLabel: DIM_LABELS[weakestKey] ?? cap(weakestKey),
   }))
 
-  y = nextStepRow(pdf, y, '01',
-    'Review your opportunities',
-    topOpp
-      ? `Start with ${topOpp.title} — highest impact${topOpp.dataReadiness === 'ready' ? ', data ready' : ''}, ${topOpp.timeToValueWeeks}-week time to value. This is your fastest path to measurable ROI.`
-      : 'Re-run the Deep Diagnostic to generate a prioritised opportunity list, then prioritise based on impact, data readiness, and time to value.',
-  )
-
-  y = nextStepRow(pdf, y, '02',
-    'Generate your Transformation Blueprint',
-    'Turn these findings into a deployment-ready architecture. Your Blueprint maps data sources, agent structure, and workflow sequencing.',
-  )
-
-  y = nextStepRow(pdf, y, '03',
-    'Deploy on Aivory™',
-    `Launch your first agent, connect your channels, and start closing the${nsGap > 0 ? ` ${fmtGap(nsGap)}` : ''} automation gap (from ${fmtGap(nsCurrent)} automated today to your ${fmtGap(nsTarget)} target).`,
-  )
+  // C4 — rendered as a distinct tinted CTA panel (renderCtaSteps), NOT as the
+  // same plain numbered rows the Methodology section uses.
+  y = renderCtaSteps(pdf, y, 'Your Next Steps', [
+    {
+      num: '1',
+      title: 'Review your opportunities',
+      body: topOpp
+        ? `Start with ${topOpp.title} — highest impact${topOpp.dataReadiness === 'ready' ? ', data ready' : ''}, ${topOpp.timeToValueWeeks}-week time to value. This is your fastest path to measurable ROI.`
+        : 'Re-run the Deep Diagnostic to generate a prioritised opportunity list, then prioritise based on impact, data readiness, and time to value.',
+    },
+    {
+      num: '2',
+      title: 'Generate your Transformation Blueprint',
+      body: 'Turn these findings into a deployment-ready architecture. Your Blueprint maps data sources, agent structure, and workflow sequencing.',
+    },
+    {
+      num: '3',
+      title: 'Deploy on Aivory™',
+      body: `Launch your first agent, connect your channels, and start closing the${nsGap > 0 ? ` ${fmtGap(nsGap)}` : ''} automation gap (from ${fmtGap(nsCurrent)} automated today to your ${fmtGap(nsTarget)} target).`,
+    },
+  ])
 
   // ════════════════════════════════════════════════════════════════════════════
   // CLOSING NOTE — was an unconditional pdf.addPage() regardless of how much
