@@ -25,7 +25,16 @@ import {
   type CurrencyCode,
 } from '@/lib/resultFormatters'
 import { ensureLiveRates, getFxAsOfLabel } from '@/lib/liveRates'
-import { buildVerdictNarrative, buildFirstMoves, buildLeadershipClause } from '@/lib/readinessNarrative'
+import {
+  buildVerdictNarrative,
+  buildFirstMoves,
+  buildLeadershipClause,
+  buildExecutiveSummary,
+  buildExecutiveInsight,
+  buildAiEnablement,
+  DIM_CONSEQUENCE_CHAINS,
+  DIM_LABELS,
+} from '@/lib/readinessNarrative'
 import styles from './final-result.module.css'
 
 // TODO: add schema version field to DiagnosticContext for forward compatibility
@@ -260,6 +269,45 @@ export default function FinalResultPage() {
     leadershipClause: buildLeadershipClause(qualitative.leadershipAlignment || ''),
   })
 
+  // Executive Summary (section 1) + Executive Insights (per-section closers)
+  // + AI Enablement (section 10) — identical builders/strings to the PDF.
+  const topOpportunityTitle = opportunities[0]?.title ?? null
+  const businessValueLabel = totalAnnualSavingsLocal != null ? fmtLocal(totalAnnualSavingsLocal) : null
+  const executiveSummary = buildExecutiveSummary({
+    company: context.company || 'Your organization',
+    composite: displayScores.composite,
+    maturityLevel: displayScores.maturityLevel,
+    weakestKey: scores.weakestDimension,
+    weakestScore: dimScoreOf(scores.weakestDimension),
+    strongestKey: scores.strongestDimension,
+    strongestScore: dimScoreOf(scores.strongestDimension),
+    businessValueLabel,
+    topOpportunityTitle,
+  })
+  const weakestConsequenceChain = DIM_CONSEQUENCE_CHAINS[scores.weakestDimension] ?? null
+  const diagnosisInsight = buildExecutiveInsight('diagnosis', { weakestKey: scores.weakestDimension })
+  const topOpportunity = opportunities[0] ?? null
+  const opportunitiesInsight = buildExecutiveInsight('opportunities', {
+    topOpportunityTitle: topOpportunity?.title ?? null,
+    topOpportunityTimeToValueWeeks: topOpportunity?.timeToValueWeeks ?? null,
+    topOpportunityDataReadiness: topOpportunity?.dataReadiness ?? null,
+  })
+  const financialInsight = buildExecutiveInsight('financial', {
+    hasBudgetInput: (calculations.assumedBudgetMidpointLocal ?? (calculations as any).assumedBudgetMidpointUSD) != null,
+    paybackMonths: calculations.paybackMonths,
+    threeYearROIPercent: calculations.threeYearROIPercent,
+  })
+  const topImprovement = Array.isArray(context.roomForImprovement) && context.roomForImprovement.length > 0
+    ? context.roomForImprovement[0] : null
+  const improvementsInsight = buildExecutiveInsight('improvements', {
+    topImprovementTitle: topImprovement?.title ?? null,
+    topImprovementAction: topImprovement?.recommendedAction ?? null,
+  })
+  const aiEnablement = buildAiEnablement({
+    topOpportunityTitle,
+    weakestLabel: DIM_LABELS[scores.weakestDimension] ?? scores.weakestDimension,
+  })
+
   const assessmentBullets: { icon: string; color: string; text: string }[] = [
     { icon: '▲', color: '#afd199', text: `Your company / organization scores ${displayScores.composite}/100, placing it at ${displayScores.maturityLevel} maturity.${_llmScore != null ? ' (composite blended 70% deterministic + 30% AI assessment)' : ''}` },
     { icon: '▲', color: '#afd199', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension)}.` },
@@ -288,6 +336,12 @@ export default function FinalResultPage() {
           onDownloadPdf={handleDownloadPdf}
           isExportingPdf={isExportingPdf}
         />
+
+        {/* ── Executive Summary ── */}
+        <div className={`${styles.card} ${styles.executiveSummaryCard}`}>
+          <h2 className={styles.sectionLabel}>Executive Summary</h2>
+          <p className={styles.executiveSummaryText}>{executiveSummary}</p>
+        </div>
 
         {/* ── Operational Health ── */}
         <div className={styles.card}>
@@ -335,6 +389,16 @@ export default function FinalResultPage() {
         <div className={styles.card}>
           <h2 className={styles.sectionLabel}>Executive Operational Diagnosis</h2>
           <p className={styles.verdictNarrative}>{verdictNarrative}</p>
+          {weakestConsequenceChain && (
+            <div className={styles.consequenceChain}>
+              {weakestConsequenceChain.map((step, i) => (
+                <span key={i} style={{ display: 'contents' }}>
+                  {i > 0 && <span className={styles.consequenceChainArrow}>→</span>}
+                  <span className={styles.consequenceChainStep}>{step}</span>
+                </span>
+              ))}
+            </div>
+          )}
           <div className={styles.verdictMoves}>
             {firstMoves.map((move, i) => (
               <div key={i} className={styles.verdictMoveRow}>
@@ -345,6 +409,10 @@ export default function FinalResultPage() {
                 </div>
               </div>
             ))}
+          </div>
+          <div className={styles.executiveInsight}>
+            <span className={styles.executiveInsightLabel}>Executive Insight</span>
+            {diagnosisInsight}
           </div>
         </div>
 
@@ -449,6 +517,10 @@ export default function FinalResultPage() {
               </div>
             </div>
           )}
+          <div className={styles.executiveInsight}>
+            <span className={styles.executiveInsightLabel}>Executive Insight</span>
+            {opportunitiesInsight}
+          </div>
         </div>
 
         {/* ── Financial Case ── */}
@@ -622,6 +694,10 @@ export default function FinalResultPage() {
               </ul>
             </div>
           )}
+          <div className={styles.executiveInsight}>
+            <span className={styles.executiveInsightLabel}>Executive Insight</span>
+            {financialInsight}
+          </div>
         </div>
 
         {/* ── Operational Improvement Priorities ── */}
@@ -667,6 +743,10 @@ export default function FinalResultPage() {
                   </div>
                 </div>
               ))}
+            </div>
+            <div className={styles.executiveInsight}>
+              <span className={styles.executiveInsightLabel}>Executive Insight</span>
+              {improvementsInsight}
             </div>
           </div>
         )}
@@ -772,6 +852,12 @@ export default function FinalResultPage() {
             </div>
 
           </div>
+        </div>
+
+        {/* ── AI Enablement (closing section) ── */}
+        <div className={styles.card}>
+          <h2 className={styles.sectionLabel}>AI Enablement</h2>
+          <p className={styles.aiEnablementText}>{aiEnablement}</p>
         </div>
 
         {/* ── Generate Blueprint CTA ── */}

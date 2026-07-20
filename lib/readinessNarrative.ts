@@ -61,6 +61,25 @@ export const DIM_CONSTRAINT_NOTES: Record<string, string> = {
   security: 'security and compliance guardrails need defining before sensitive data reaches AI systems',
 }
 
+/**
+ * Per-dimension consequence chain, weakest dimension only (keep it focused).
+ * Rendered as a compact "A → B → C → D" line on both surfaces via
+ * `formatConsequenceChain`.
+ */
+export const DIM_CONSEQUENCE_CHAINS: Record<string, string[]> = {
+  data: ['Low data maturity', 'Inconsistent operational decisions', 'Lower automation potential', 'Higher operating costs'],
+  process: ['Undocumented core processes', 'Fragile, person-dependent operations', 'Automation breaks on exceptions', 'Slower, riskier scaling'],
+  strategy: ['No quantified operational KPIs', 'Improvement value is invisible', 'Investment decisions stall', 'Efficiency gains go unfunded'],
+  people: ['Missing skills and ownership', 'Change adoption stalls', 'Tools go unused', 'Manual work persists'],
+  governance: ['No oversight structures', 'Inconsistent execution quality', 'Compounding operational risk', 'Scaling multiplies errors'],
+  security: ['Undefined data guardrails', 'Sensitive data exposure risk', 'Compliance blockers surface late', 'Transformation initiatives stall'],
+}
+
+/** Joins a consequence chain into one narrative line: "A → B → C → D". */
+export function formatConsequenceChain(chain: string[]): string {
+  return chain.join(' → ')
+}
+
 /** Mandate sentence derived from the leadership-alignment answer. */
 export function buildLeadershipClause(leadershipRaw: string): string {
   return leadershipRaw.includes('Fully aligned')
@@ -125,4 +144,117 @@ export function buildFirstMoves(m: FirstMovesInputs): FirstMove[] {
     moves.push({ title: 'Secure the mandate', body: m.leadershipClause })
   }
   return moves
+}
+
+/**
+ * Executive Summary — the new opening section on both surfaces. 2–3
+ * sentences: the first clause of buildVerdictNarrative (score + band),
+ * the top opportunity, and the Business Value Created figure. Deterministic
+ * string composition only — no new intelligence is generated here.
+ */
+export function buildExecutiveSummary(
+  v: VerdictInputs & { businessValueLabel: string | null; topOpportunityTitle: string | null },
+): string {
+  const fullVerdict = buildVerdictNarrative(v)
+  // First sentence only — the score/band clause, not the full constraint
+  // breakdown (that lives in the Executive Operational Diagnosis section).
+  const firstClause = fullVerdict.split(/(?<=\.)\s+/)[0]
+  const oppClause = v.topOpportunityTitle
+    ? ` The fastest path forward is ${v.topOpportunityTitle.toLowerCase()}.`
+    : ''
+  const valueClause = v.businessValueLabel
+    ? ` Acting on these findings is projected to unlock ${v.businessValueLabel} in Business Value Created.`
+    : ''
+  return `${firstClause}${oppClause}${valueClause}`
+}
+
+/** Lowercase, consequence-first phrase describing what a weak dimension concretely is. */
+const DIM_INSIGHT_LABEL: Record<string, string> = {
+  data: 'unreliable and fragmented operational data',
+  process: 'inconsistent operational processes',
+  strategy: 'the absence of quantified operational KPIs',
+  people: 'gaps in skills and clear ownership',
+  governance: 'the absence of oversight structures',
+  security: 'undefined data security guardrails',
+}
+
+/** The one recommendation to fix a weak dimension, phrased as an imperative clause. */
+const DIM_INSIGHT_ACTION: Record<string, string> = {
+  data: 'Centralizing and cleaning core data before scaling automation',
+  process: 'Standardising workflows before automation',
+  strategy: 'Defining quantified KPIs before funding new initiatives',
+  people: 'Investing in skills enablement and clear ownership',
+  governance: 'Establishing oversight structures before scaling automation',
+  security: 'Defining data security guardrails before sensitive data reaches AI systems',
+}
+
+export interface ExecutiveInsightInputs {
+  /** diagnosis */
+  weakestKey?: string
+  /** financial */
+  paybackMonths?: number | null
+  threeYearROIPercent?: number | null
+  hasBudgetInput?: boolean
+  /** opportunities */
+  topOpportunityTitle?: string | null
+  topOpportunityTimeToValueWeeks?: number | null
+  topOpportunityDataReadiness?: string | null
+  /** improvements */
+  topImprovementTitle?: string | null
+  topImprovementAction?: string | null
+}
+
+/**
+ * Deterministic, consequence-first Executive Insight for a section — string
+ * templates only, never an LLM call. Bar for quality (CMO reference):
+ * "Your greatest constraint is not AI capability. It is inconsistent
+ * operational processes. Standardising workflows before automation will
+ * reduce implementation risk, improve adoption, and accelerate ROI."
+ */
+export function buildExecutiveInsight(
+  section: 'diagnosis' | 'opportunities' | 'financial' | 'improvements',
+  inputs: ExecutiveInsightInputs,
+): string {
+  switch (section) {
+    case 'diagnosis': {
+      const key = inputs.weakestKey ?? ''
+      const label = DIM_INSIGHT_LABEL[key] ?? 'operational inconsistency across the organization'
+      const action = DIM_INSIGHT_ACTION[key] ?? 'Strengthening this dimension before automation'
+      return `Your greatest constraint is not AI capability. It is ${label}. ${action} will reduce implementation risk, improve adoption, and accelerate ROI.`
+    }
+    case 'opportunities': {
+      if (!inputs.topOpportunityTitle) {
+        return 'No automation opportunities have been derived yet. Re-running the Deep Diagnostic will generate a prioritised, ranked opportunity set to sequence first.'
+      }
+      const ttv = inputs.topOpportunityTimeToValueWeeks
+      const readyClause = inputs.topOpportunityDataReadiness === 'ready' ? ', with data ready today' : ''
+      return `The fastest path to proof is ${inputs.topOpportunityTitle.toLowerCase()}${ttv ? `, deliverable in as little as ${ttv} weeks` : ''}${readyClause}. Sequencing execution to start here builds momentum and de-risks the rest of the transformation roadmap.`
+    }
+    case 'financial': {
+      if (inputs.hasBudgetInput && inputs.paybackMonths != null && inputs.threeYearROIPercent != null) {
+        return `The financial case is decision-ready: payback in ${Math.round(inputs.paybackMonths)} months and a ${Math.round(inputs.threeYearROIPercent)}% three-year ROI. Approving budget now converts this analysis into compounding savings — every quarter of delay is a quarter of avoidable cost.`
+      }
+      return 'The financial case cannot be finalized without a budget input. Supplying a budget range this week turns these projections into a board-ready business case with an accurate payback period and three-year ROI.'
+    }
+    case 'improvements': {
+      if (!inputs.topImprovementTitle) {
+        return 'No improvement priorities have been identified yet. Re-running the Deep Diagnostic will surface the specific operational gaps to close first.'
+      }
+      const actionClause = inputs.topImprovementAction ? ` ${inputs.topImprovementAction}` : ''
+      return `The highest-priority fix is ${inputs.topImprovementTitle}.${actionClause} Closing this gap first removes the single largest blocker to reliable automation and protects the financial case above.`
+    }
+  }
+}
+
+/**
+ * AI Enablement — the closing paragraph on both surfaces. Positions AI as
+ * the execution layer of the transformation (Business → Operations →
+ * Processes → Data → Automation → AI), never the headline.
+ */
+export function buildAiEnablement(inputs: { topOpportunityTitle: string | null; weakestLabel: string }): string {
+  const oppClause = inputs.topOpportunityTitle
+    ? `starting with ${inputs.topOpportunityTitle.toLowerCase()}`
+    : 'starting with the highest-priority opportunity identified in this report'
+  const weakestClause = inputs.weakestLabel ? inputs.weakestLabel.toLowerCase() : 'the constraints identified above'
+  return `AI is the execution layer of this transformation, not its headline. The sequence that delivers results is Business → Operations → Processes → Data → Automation → AI: clarify the business objective, fix the operating model, standardise the process, get the data right, automate what is now reliable, and only then deploy AI to accelerate it. With ${weakestClause} as the current constraint, closing that foundation comes first — from there, ${oppClause} is where AI-accelerated execution delivers the fastest, most defensible return. The Transformation Blueprint below turns this sequence into a deployment-ready plan.`
 }

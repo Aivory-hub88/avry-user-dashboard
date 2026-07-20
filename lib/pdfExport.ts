@@ -19,6 +19,11 @@ import {
   buildLeadershipClause,
   buildVerdictNarrative,
   buildFirstMoves,
+  buildExecutiveSummary,
+  buildExecutiveInsight,
+  buildAiEnablement,
+  DIM_CONSEQUENCE_CHAINS,
+  formatConsequenceChain,
 } from '@/lib/readinessNarrative'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
@@ -1118,8 +1123,13 @@ function renderAiList(pdf: jsPDF, y: number, heading: string, items: string[]): 
   return y + 4
 }
 
-/** Accent callout box for the AI-recommended next step. */
-function renderNextStepCallout(pdf: jsPDF, y: number, text: string): number {
+/**
+ * Accent callout box — shared treatment for the AI-recommended next step
+ * (Business Operations Analysis) and the Executive Insight blocks that close
+ * every major section (§6 of the narrative brief). `label` defaults to the
+ * original "RECOMMENDED NEXT STEP" so existing call sites are unaffected.
+ */
+function renderNextStepCallout(pdf: jsPDF, y: number, text: string, label = 'RECOMMENDED NEXT STEP'): number {
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(9)
   pdf.setLineHeightFactor(1.5)
@@ -1134,7 +1144,7 @@ function renderNextStepCallout(pdf: jsPDF, y: number, text: string): number {
   setC(pdf, ACCENT, 'text')
   pdf.setFont(FB(), 'bold')
   pdf.setFontSize(6.2)
-  spacedText(pdf, 'RECOMMENDED NEXT STEP', ML + 7, y + 6, 0.35)
+  spacedText(pdf, label, ML + 7, y + 6, 0.35)
   setC(pdf, '#2f4f2f', 'text')
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(9)
@@ -1352,12 +1362,39 @@ export async function exportReportToPdf(
   editorialSpread(pdf, context)
 
   // ════════════════════════════════════════════════════════════════════════════
-  // OPERATIONAL HEALTH
+  // EXECUTIVE SUMMARY — same builder as the on-screen page (readinessNarrative.ts)
   // ════════════════════════════════════════════════════════════════════════════
   pdf.addPage()
   pageBg(pdf)
   pageFooter(pdf)
   let y = 16
+
+  y = sectionLabel(pdf, y, 'Executive Summary')
+
+  const execScoreOf = (k: string) => Math.round((scores as unknown as Record<string, number>)[k] ?? 0)
+  const execTopOpportunityTitle = opportunities[0]?.title ?? null
+  const execBusinessValueLabel = (calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD) != null
+    ? fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD)
+    : null
+  y = renderNarrative(pdf, y, buildExecutiveSummary({
+    company,
+    composite: scores.composite,
+    maturityLevel: scores.maturityLevel,
+    weakestKey: scores.weakestDimension,
+    weakestScore: execScoreOf(scores.weakestDimension),
+    strongestKey: scores.strongestDimension,
+    strongestScore: execScoreOf(scores.strongestDimension),
+    businessValueLabel: execBusinessValueLabel,
+    topOpportunityTitle: execTopOpportunityTitle,
+  }))
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // OPERATIONAL HEALTH
+  // ════════════════════════════════════════════════════════════════════════════
+  pdf.addPage()
+  pageBg(pdf)
+  pageFooter(pdf)
+  y = 16
 
   y = sectionLabel(pdf, y, 'Operational Health')
 
@@ -1542,6 +1579,16 @@ export async function exportReportToPdf(
     y = nextStepRow(pdf, y, String(i + 1).padStart(2, '0'), move.title, move.body)
   })
 
+  // Cause → effect chain for the weakest dimension — one narrative line via
+  // the existing renderNarrative helper (same chain data the page renders as chips).
+  const diagnosisChain = DIM_CONSEQUENCE_CHAINS[weakestKey]
+  if (diagnosisChain) {
+    y = ensureSpace(pdf, y, 14)
+    y = renderNarrative(pdf, y, formatConsequenceChain(diagnosisChain))
+  }
+
+  y = renderNextStepCallout(pdf, y, buildExecutiveInsight('diagnosis', { weakestKey }), 'EXECUTIVE INSIGHT')
+
   // ════════════════════════════════════════════════════════════════════════════
   // BUSINESS OPERATIONS ANALYSIS — the model-generated narrative the user
   // sees on screen. Numbers elsewhere stay deterministic; this section is
@@ -1670,6 +1717,15 @@ export async function exportReportToPdf(
       }
       y = oppCard(pdf, opp, y, fmt)
     }
+  }
+
+  {
+    const oppTop = opportunities[0] ?? null
+    y = renderNextStepCallout(pdf, y, buildExecutiveInsight('opportunities', {
+      topOpportunityTitle: oppTop?.title ?? null,
+      topOpportunityTimeToValueWeeks: oppTop?.timeToValueWeeks ?? null,
+      topOpportunityDataReadiness: oppTop?.dataReadiness ?? null,
+    }), 'EXECUTIVE INSIGHT')
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -1915,6 +1971,12 @@ export async function exportReportToPdf(
     y += 4
   }
 
+  y = renderNextStepCallout(pdf, y, buildExecutiveInsight('financial', {
+    hasBudgetInput: (calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD) != null,
+    paybackMonths: calculations.paybackMonths,
+    threeYearROIPercent: calculations.threeYearROIPercent,
+  }), 'EXECUTIVE INSIGHT')
+
   // ════════════════════════════════════════════════════════════════════════════
   // OPERATIONAL IMPROVEMENT PRIORITIES + OPERATIONAL CONSTRAINTS (RISK REGISTER)
   // ════════════════════════════════════════════════════════════════════════════
@@ -1938,6 +2000,12 @@ export async function exportReportToPdf(
       y = improvementBlock(pdf, item, y)
     })
 
+    const topImprovement = roomForImprovement[0]
+    y = renderNextStepCallout(pdf, y, buildExecutiveInsight('improvements', {
+      topImprovementTitle: topImprovement?.title ?? null,
+      topImprovementAction: topImprovement?.recommendedAction ?? null,
+    }), 'EXECUTIVE INSIGHT')
+
     y = renderRiskRegister(pdf, y, risks)
   } else if (risks.length > 0) {
     y = ensureSpace(pdf, y, 45)
@@ -1945,19 +2013,26 @@ export async function exportReportToPdf(
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // NEXT STEPS — the product CTA sequence, placed AFTER the full analysis so
-  // the reader has seen the financial case before being asked to act on it.
+  // AI ENABLEMENT + NEXT STEPS — closes the report by positioning AI as the
+  // execution layer (buildAiEnablement, shared with the on-screen page),
+  // then the product CTA sequence, placed AFTER the full analysis so the
+  // reader has seen the financial case before being asked to act on it.
   // ════════════════════════════════════════════════════════════════════════════
   y = ensureSpace(pdf, y, 26)
-  y = renderTransition(pdf, y, 'Turning this analysis into results starts with a clear, sequenced set of actions.')
+  y = renderTransition(pdf, y, 'Turning this analysis into results starts with where AI fits into the sequence above.')
 
   y = ensureSpace(pdf, y, 45)
-  y = sectionLabel(pdf, y, 'Next Steps')
+  y = sectionLabel(pdf, y, 'AI Enablement')
 
   const topOpp = opportunities[0]
   const nsCurrent = context.quantitative.currentAutomationPct ?? 0
   const nsTarget = context.quantitative.targetAutomationPct ?? 0
   const nsGap = nsTarget - nsCurrent
+
+  y = renderNarrative(pdf, y, buildAiEnablement({
+    topOpportunityTitle: topOpp?.title ?? null,
+    weakestLabel: DIM_LABELS[weakestKey] ?? cap(weakestKey),
+  }))
 
   y = nextStepRow(pdf, y, '01',
     'Review your opportunities',
