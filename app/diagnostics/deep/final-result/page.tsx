@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { DiagnosticContext } from '@/types/diagnostic'
-import { upgradeDiagnosticContext, DeepDiagnosticService, maturityFromScore } from '@/services/deepDiagnostic'
+import { upgradeDiagnosticContext, DeepDiagnosticService, maturityFromScore, getROISensitivity } from '@/services/deepDiagnostic'
 import HeaderBar from '@/components/result/HeaderBar'
 import ScoreRing from '@/components/result/ScoreRing'
 import RadarChart from '@/components/result/RadarChart'
@@ -12,6 +12,8 @@ import DimensionBenchmarkBars from '@/components/result/DimensionBenchmarkBars'
 import DimensionDrivers from '@/components/result/DimensionDrivers'
 import HistorySparkline from '@/components/result/HistorySparkline'
 import ROIMetricTile from '@/components/result/ROIMetricTile'
+import ROISensitivityTornado from '@/components/result/ROISensitivityTornado'
+import EfficiencyWhatIfSlider from '@/components/result/EfficiencyWhatIfSlider'
 import OpportunityMatrix from '@/components/result/OpportunityMatrix'
 import OpportunityCard from '@/components/result/OpportunityCard'
 import RiskCard from '@/components/result/RiskCard'
@@ -247,6 +249,11 @@ export default function FinalResultPage() {
   // here multiplied by the FX rate again, inflating IDR figures 15,600×.)
   const currencyCode: CurrencyCode = parseCurrencyCode(context.currency)
   const fmtLocal = (v: number | null | undefined) => formatLocalAmount(v, currencyCode)
+
+  // Phase E1.4 — tornado-chart sensitivity data. Pure, display-only
+  // re-evaluation of calculateROI at the efficiency factor's scenario
+  // bounds; never touches `context.calculations`.
+  const roiSensitivity = getROISensitivity(context)
 
   // Bug 1 fix: support both new *Local field names and legacy *IDR names from
   // stored DiagnosticContext objects that were saved before this fix was deployed.
@@ -644,6 +651,25 @@ export default function FinalResultPage() {
               </div>
               <span className={styles.scenarioNote}>Range reflects 50%–90% automation efficiency; base case uses {Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%.</span>
             </div>
+          )}
+
+          {calculations.hasEnoughDataForProjection && (
+            <ROISensitivityTornado
+              sensitivity={roiSensitivity}
+              baseValueLocal={totalAnnualSavingsLocal}
+              baseBoundLabel={`${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%`}
+              formatter={fmtLocal}
+            />
+          )}
+
+          {calculations.hasEnoughDataForProjection && (
+            <EfficiencyWhatIfSlider
+              context={context}
+              calculations={calculations}
+              fmtLocal={fmtLocal}
+              formatMonths={formatMonths}
+              formatPercent={formatPercent}
+            />
           )}
 
           {calculations.hasEnoughDataForProjection && (

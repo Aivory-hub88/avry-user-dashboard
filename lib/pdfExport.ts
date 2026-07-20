@@ -28,6 +28,7 @@ import {
 } from '@/lib/readinessNarrative'
 import { getIndustryBenchmark, formatVsMedian, BENCHMARK_DISCLAIMER } from '@/lib/industryBenchmarks'
 import { quantifyPainPoints, formatPainPointHours } from '@/lib/bottleneckQuantification'
+import { getROISensitivity } from '@/services/deepDiagnostic'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
 export const INK       = '#0a1a0f'   // primary text, display values
@@ -2092,6 +2093,31 @@ export async function exportReportToPdf(
   if (scenario && [scenario.low, scenario.base, scenario.high].some((v: unknown) => v != null)) {
     y += 2
     y = renderScenarioRange(pdf, y, scenario, effPct)
+  }
+
+  // ── ROI sensitivity summary (Phase E1.4) — static equivalent of the
+  // on-screen tornado chart. No interactive slider in a static PDF (E2.4 is
+  // screen-only), but the sensitivity pass itself is genuinely derivable and
+  // adds value to the printed report. Uses the same shared, pure
+  // getROISensitivity()/calculateROI() as the page and the slider — no
+  // duplicated math. Only rendered when the underlying figures exist. ──
+  if (calculations.hasEnoughDataForProjection) {
+    const sensitivity = getROISensitivity(context)
+    const lever = sensitivity[0]
+    if (lever && lever.lowValueLocal != null && lever.highValueLocal != null) {
+      y = ensureSpace(pdf, y, 12)
+      y += 2
+      setC(pdf, LABEL, 'text')
+      pdf.setFont(F(), 'normal')
+      pdf.setFontSize(7.2)
+      const sensitivityText =
+        `Sensitivity — Business Value Created ranges from ${fmt(lever.lowValueLocal)} at ${lever.lowBoundLabel} efficiency to ` +
+        `${fmt(lever.highValueLocal)} at ${lever.highBoundLabel} efficiency (base case ${effPct}%: ${fmt(calculations.totalAnnualSavingsLocal ?? cAny.totalAnnualSavingsUSD)}). ` +
+        `Hourly rate and automation gap are fixed inputs for this assessment, not swept.`
+      const sensitivityLines = pdf.splitTextToSize(sensitivityText, CW)
+      pdf.text(sensitivityLines, ML, y)
+      y += sensitivityLines.length * 3.6 + 4
+    }
   }
 
   y = ensureSpace(pdf, y, 10)

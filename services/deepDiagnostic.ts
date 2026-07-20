@@ -386,14 +386,24 @@ function getHourlyRateUSD(industry: string | undefined): number {
 
 // ---- ROI calculation ----
 
-interface ROIProjectionInternal extends ROIProjection {
+export interface ROIProjectionInternal extends ROIProjection {
   // totalAnnualSavingsUSD is already on ROIProjection (Bug 3 fix)
 }
 
-function calculateROI(
+export function calculateROI(
   q: DiagnosticContext['quantitative'],
   currencyCode: CurrencyCode = 'USD',
-  industry: string | undefined = undefined
+  industry: string | undefined = undefined,
+  /**
+   * Phase E1.4/E2.4 — optional override for the efficiency factor, used by
+   * the ROI sensitivity tornado (E1.4) and the what-if slider (E2.4) to
+   * re-evaluate this exact formula at a different assumption WITHOUT
+   * touching the real save-time computation. Both real call sites in this
+   * file omit this argument, so they keep computing at the standard 0.75
+   * exactly as before this change — zero numeric change to stored figures
+   * (E-invariant 1/3 in docs/OPS-TRANSFORMATION-NARRATIVE-BRIEF.md §8).
+   */
+  efficiencyFactorOverride?: number
 ): ROIProjectionInternal {
   // Live FX when available (2h auto-refresh via /api/exchange-rates),
   // static snapshot otherwise.
@@ -439,7 +449,7 @@ function calculateROI(
   // Formula: weeklyHours × 52 weeks × automation gap × 0.75 efficiency factor.
   // The 0.75 factor accounts for ramp-up time, partial automation coverage,
   // edge-case handling, and human oversight still required in automated flows.
-  const EFFICIENCY_FACTOR = 0.75
+  const EFFICIENCY_FACTOR = efficiencyFactorOverride ?? 0.75
   const hoursReclaimedPerYear = q.totalManualHoursWeekly
     ? Math.round(hoursPerYear * incrementalAutoPct * EFFICIENCY_FACTOR)
     : null
@@ -584,6 +594,122 @@ function calculateROI(
     totalAnnualSavingsIDR: totalAnnualSavingsUSD ? totalAnnualSavingsUSD * rate : null,
     costOfInaction90DaysIDR: costOfInaction90DaysUSD ? costOfInaction90DaysUSD * rate : null,
   }
+}
+
+// ============================================================================
+// Phase E1.4/E2.4 — ROI sensitivity surface + what-if efficiency slider
+// ============================================================================
+//
+// Both features need to re-run the EXACT `calculateROI` formula at a
+// different efficiency assumption without ever mutating a stored
+// `DiagnosticContext.calculations`. Rather than duplicating the math (the
+// approach used for E1.2's `computeScoreDrivers`, which is a read-only
+// derived pass that never touches the scorer), this slice refactors
+// `calculateROI` itself to accept an optional efficiency override (see
+// above) — the formula is a single pure function with no side effects
+// beyond a dev-only audit `console.log`, so it was cleanly separable and
+// refactoring is safer than a parallel copy (a past copy-paste split of
+// shared math produced three different numbers for the same figure — see
+// docs/OPS-TRANSFORMATION-NARRATIVE-BRIEF.md §2). Both real call sites
+// (buildDiagnosticContext, upgradeDiagnosticContext) omit the new
+// parameter, so stored figures are byte-for-byte unchanged.
+//
+// The two thin wrappers below are the only client-facing surface: they
+// take a full DiagnosticContext (what the browser already has in memory)
+// and hand back a freshly-computed ROIProjection — a NEW object, never
+// written back onto `context.calculations`.
+
+/** The only efficiency-factor bounds the product has actually defined for
+ *  this formula (see `scenarioNetRoi`/`scenarioThreeYearROI` above, which
+ *  already ship the 3-Year ROI scenario range at these same bounds). */
+export const EFFICIENCY_SCENARIO_BOUNDS = { low: 0.5, high: 0.9 } as const
+
+/**
+ * Re-run `calculateROI` for a given DiagnosticContext at an arbitrary
+ * efficiency factor. Pure/display-only: returns a brand-new ROIProjection
+ * object and never mutates `context` or `context.calculations`. Used by:
+ *  - the E2.4 what-if slider (client-side, per-keystroke re-render)
+ *  - the E1.4 tornado chart (called at the low/high bounds)
+ *  - the PDF's static sensitivity summary (lib/pdfExport.ts, server-safe
+ *    since this function has no server-only dependencies)
+ */
+export function recomputeROIAtEfficiency(
+  context: Pick<DiagnosticContext, 'quantitative' | 'currency' | 'qualitative'>,
+  efficiencyFactor: number
+): ROIProjectionInternal | null {
+  // Defensive guard matching `upgradeDiagnosticContext`'s own
+  // `!!context.quantitative` checks above: very old stored contexts can
+  // predate the `quantitative` field entirely. calculateROI's inputs are
+  // all `q.xxx === null` checks, which would throw on `q` itself being
+  // undefined — never call it without quantitative present.
+  if (!context.quantitative) return null
+  const currencyCode = parseCurrencyCode(context.currency)
+  const industry = context.qualitative?.industry
+  return calculateROI(context.quantitative, currencyCode, industry, efficiencyFactor)
+}
+
+export interface ROISensitivityLever {
+  key: 'efficiencyFactor'
+  label: string
+  /** Business Value Created (local currency) at the lever's low bound. */
+  lowValueLocal: number | null
+  /** Business Value Created (local currency) at the lever's high bound. */
+  highValueLocal: number | null
+  /** |high − low|, used to rank/size tornado bars. */
+  swingLocal: number
+  lowBoundLabel: string
+  highBoundLabel: string
+}
+
+/**
+ * Phase E1.4 — tornado-chart data: for each lever that is ACTUALLY a
+ * configurable range inside `calculateROI` (checked against the formula
+ * above), compute Business Value Created at the low and high bound and
+ * report the swing.
+ *
+ * Judgment call: `calculateROI` only defines a real low/high range for the
+ * efficiency factor (0.5–0.9, the same bounds already used by
+ * `scenarioThreeYearROI`). The hourly rate (`getHourlyRateUSD` — a fixed
+ * per-industry lookup, only varied by the binary small-team-factor branch,
+ * not a range) and the automation gap (`incrementalAutoPct` — a point value
+ * derived once from the user's current/target automation answers, no
+ * alternate bound defined anywhere) are NOT configurable ranges in this
+ * formula today. Per the brief's explicit instruction not to invent
+ * sensitivity on a dimension that is actually a fixed constant, this
+ * function returns a single, honestly-grounded lever rather than fabricated
+ * multi-bar comparisons. The return type is an array so a future change
+ * that genuinely parameterizes hourly rate or automation gap can add a
+ * lever here without changing callers.
+ */
+export function getROISensitivity(
+  context: Pick<DiagnosticContext, 'quantitative' | 'currency' | 'qualitative'>
+): ROISensitivityLever[] {
+  // Contexts missing `quantitative` (very old stored reports, or contexts
+  // that predate this field) have nothing to sweep — render nothing rather
+  // than crash. Same rule `upgradeDiagnosticContext` already applies before
+  // calling calculateROI.
+  if (!context.quantitative) return []
+  const low = recomputeROIAtEfficiency(context, EFFICIENCY_SCENARIO_BOUNDS.low)
+  const high = recomputeROIAtEfficiency(context, EFFICIENCY_SCENARIO_BOUNDS.high)
+  if (!low || !high) return []
+  const lowValueLocal = low.totalAnnualSavingsLocal
+  const highValueLocal = high.totalAnnualSavingsLocal
+  const swingLocal =
+    lowValueLocal !== null && highValueLocal !== null
+      ? Math.abs(highValueLocal - lowValueLocal)
+      : 0
+
+  return [
+    {
+      key: 'efficiencyFactor',
+      label: 'Automation efficiency factor',
+      lowValueLocal,
+      highValueLocal,
+      swingLocal,
+      lowBoundLabel: `${Math.round(EFFICIENCY_SCENARIO_BOUNDS.low * 100)}%`,
+      highBoundLabel: `${Math.round(EFFICIENCY_SCENARIO_BOUNDS.high * 100)}%`,
+    },
+  ]
 }
 
 // ---- Dimension scoring ----
