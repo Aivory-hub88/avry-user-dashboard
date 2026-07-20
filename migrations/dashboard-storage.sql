@@ -7,6 +7,14 @@
 --   D3: applied once at deploy time, NOT from application code:
 --       docker exec -i avry-postgres psql -U aivory -d aivory < migrations/dashboard-storage.sql
 -- Idempotent: safe to re-run.
+--
+-- Phase E1.3 (docs/OPS-TRANSFORMATION-NARRATIVE-BRIEF.md §8): assessment
+-- history / delta. Adds dashboard.diagnostic_history, the append table D1
+-- anticipated — INSERT-only, no unique constraint on user_id, one row per
+-- successful save to dashboard.diagnostic_contexts (see
+-- app/api/storage/[entity]/route.ts POST). Powers the delta chip + sparkline
+-- on the result page (E2.3) once a user has ≥2 rows. Pure new read surface —
+-- no methodologyVersion bump per E-invariant 1.
 
 CREATE SCHEMA IF NOT EXISTS dashboard;
 
@@ -37,3 +45,17 @@ CREATE TABLE IF NOT EXISTS dashboard.roadmaps (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Phase E1.3 — append-only history for the delta chip + sparkline. No
+-- upsert, no unique constraint on user_id: every successful context save
+-- gets its own row. `data` holds a minimal snapshot (composite,
+-- maturityLevel, per-dimension scores) extracted at write time, NOT the
+-- full DiagnosticContext — see app/api/storage/[entity]/route.ts.
+CREATE TABLE IF NOT EXISTS dashboard.diagnostic_history (
+  id         bigserial PRIMARY KEY,
+  user_id    text NOT NULL,
+  data       jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS diagnostic_history_user_id_created_at_idx
+  ON dashboard.diagnostic_history (user_id, created_at DESC);

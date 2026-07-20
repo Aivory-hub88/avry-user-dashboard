@@ -1,0 +1,28 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  width: fit-content;
+}
+
+.arrow {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.up {
+  color: #afd199;
+  background: rgba(175, 209, 153, 0.12);
+  border: 1px solid rgba(175, 209, 153, 0.3);
+}
+
+.down {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}

@@ -10,6 +10,7 @@ import ScoreRing from '@/components/result/ScoreRing'
 import RadarChart from '@/components/result/RadarChart'
 import DimensionBenchmarkBars from '@/components/result/DimensionBenchmarkBars'
 import DimensionDrivers from '@/components/result/DimensionDrivers'
+import HistorySparkline from '@/components/result/HistorySparkline'
 import ROIMetricTile from '@/components/result/ROIMetricTile'
 import OpportunityMatrix from '@/components/result/OpportunityMatrix'
 import OpportunityCard from '@/components/result/OpportunityCard'
@@ -28,6 +29,8 @@ import {
 } from '@/lib/resultFormatters'
 import { ensureLiveRates, getFxAsOfLabel } from '@/lib/liveRates'
 import { getIndustryBenchmark, formatVsMedian } from '@/lib/industryBenchmarks'
+import { computeDelta, compositeSeries } from '@/lib/diagnosticHistory'
+import type { DiagnosticHistoryEntry } from '@/types/diagnostic'
 import {
   buildVerdictNarrative,
   buildFirstMoves,
@@ -74,6 +77,10 @@ export default function FinalResultPage() {
   const [state, setState] = useState<PageState>({ status: 'loading' })
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [llmResult, setLlmResult] = useState<Record<string, any> | null>(null)
+  // Phase E1.3/E2.3 — assessment history for the delta chip + sparkline.
+  // Defaults to [] so signed-out/no-history/fetch-failure all render
+  // identically to "nothing to show" without any extra loading state.
+  const [history, setHistory] = useState<DiagnosticHistoryEntry[]>([])
 
   const [isExportingPdf, setIsExportingPdf] = useState(false)
   const [isGeneratingBlueprint, setIsGeneratingBlueprint] = useState(false)
@@ -137,6 +144,18 @@ export default function FinalResultPage() {
     try {
       setLlmResult(DeepDiagnosticService.loadResult() as unknown as Record<string, any> | null)
     } catch { /* AI analysis is optional — never block the report */ }
+  }, [])
+
+  // Phase E1.3 — fetch history independently of the main context load; it's
+  // a secondary signal (delta chip + sparkline), so it must never block or
+  // gate rendering of the primary report. Signed-out/error → stays [].
+  useEffect(() => {
+    let cancelled = false
+    import('@/lib/reportStorage')
+      .then(({ loadDiagnosticHistory }) => loadDiagnosticHistory())
+      .then((entries) => { if (!cancelled) setHistory(entries) })
+      .catch(() => { /* already degrades to [] inside loadDiagnosticHistory */ })
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -257,6 +276,13 @@ export default function FinalResultPage() {
   // null when qualitative.industry is missing/unrecognized — every consumer
   // below must degrade gracefully to the pre-Phase-E layout in that case.
   const industryBenchmark = getIndustryBenchmark(qualitative.industry)
+
+  // Phase E1.3/E2.3 — history-derived delta chip + sparkline. Both are null/
+  // empty (and therefore invisible) for signed-out users, users with fewer
+  // than 2 saved assessments, or a flat composite score — see
+  // lib/diagnosticHistory.ts for the exact gating.
+  const historyDelta = computeDelta(history)
+  const historySeries = compositeSeries(history)
   const compositeVsMedian = industryBenchmark
     ? formatVsMedian(displayScores.composite, industryBenchmark.composite)
     : null
@@ -342,11 +368,12 @@ export default function FinalResultPage() {
   return (
     <div className={styles.page}>
       <div className={styles.content} id="diagnostic-report">
-        <HeaderBar 
-          company={context.company} 
-          submittedAt={context.submittedAt} 
+        <HeaderBar
+          company={context.company}
+          submittedAt={context.submittedAt}
           onDownloadPdf={handleDownloadPdf}
           isExportingPdf={isExportingPdf}
+          delta={historyDelta}
         />
 
         {/* ── Executive Summary ── */}
@@ -370,6 +397,7 @@ export default function FinalResultPage() {
                   <span className={styles.compositeBenchmarkDisclaimer}>Directional benchmark, not a measured statistic.</span>
                 </p>
               )}
+              <HistorySparkline series={historySeries} />
             </div>
             <div className={styles.scorecardChartCol}>
               <RadarChart scores={scores} benchmark={industryBenchmark} />

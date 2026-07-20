@@ -1,4 +1,6 @@
 import { formatDate } from '@/lib/resultFormatters'
+import type { DiagnosticDelta } from '@/lib/diagnosticHistory'
+import DeltaChip from './DeltaChip'
 import styles from './HeaderBar.module.css'
 
 interface HeaderBarProps {
@@ -6,9 +8,11 @@ interface HeaderBarProps {
   submittedAt: string
   onDownloadPdf?: () => void
   isExportingPdf?: boolean
+  /** Phase E2.3 — null/undefined renders no chip (signed out, <2 history rows, or flat score). */
+  delta?: DiagnosticDelta | null
 }
 
-export default function HeaderBar({ company, submittedAt, onDownloadPdf, isExportingPdf }: HeaderBarProps) {
+export default function HeaderBar({ company, submittedAt, onDownloadPdf, isExportingPdf, delta }: HeaderBarProps) {
   return (
     <div className="relative w-full rounded-[18px] overflow-hidden bg-[#3a3a37] p-8 md:p-12 mb-8 border border-white/5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
       {/* Background Gradient Mesh */}
@@ -24,6 +28,7 @@ export default function HeaderBar({ company, submittedAt, onDownloadPdf, isExpor
           {company}
         </h1>
         <span className="text-[#a1a1aa] text-base font-light">{formatDate(submittedAt)}</span>
+        <DeltaChip delta={delta ?? null} />
       </div>
 
       <div className="relative z-10">

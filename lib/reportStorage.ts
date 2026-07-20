@@ -22,7 +22,7 @@ import { asset } from '@/lib/asset'
 import type { DeepDiagnosticResult } from '@/types/deepDiagnostic'
 import type { BlueprintV1 } from '@/types/blueprint'
 import type { AiryRoadmap } from '@/types/roadmap'
-import type { DiagnosticContext } from '@/types/diagnostic'
+import type { DiagnosticContext, DiagnosticHistoryEntry } from '@/types/diagnostic'
 
 export type SaveOutcome = { local: boolean; remote: boolean }
 
@@ -157,3 +157,37 @@ export const saveRoadmapRemote = (data: AiryRoadmap): Promise<SaveOutcome> =>
   saveEntity('roadmap', data)
 export const loadRoadmapRemote = (): Promise<AiryRoadmap | null> =>
   loadEntity<AiryRoadmap>('roadmap')
+
+// ── Assessment history (Phase E1.3) ────────────────────────────────────────────
+// Genuinely server-only — there is no localStorage fallback and no save*
+// counterpart here. History rows are written server-side as a side effect of
+// saveDiagnosticContext's POST to /api/storage/context (see
+// app/api/storage/[entity]/route.ts), never by the client directly. Signed
+// out or a server error both degrade to an empty array so callers never need
+// a try/catch of their own — "no history yet" and "can't reach history" look
+// identical to the UI, which is the correct degrade per E2.3's ≥2-rows gate.
+export async function loadDiagnosticHistory(): Promise<DiagnosticHistoryEntry[]> {
+  const token = isBrowser() ? getToken() : null
+  if (!token) return []
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+    try {
+      const res = await fetch(asset('/api/storage/history'), {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      })
+      if (!res.ok) {
+        if (res.status !== 401) console.warn(`[ReportStorage] load history: HTTP ${res.status}`)
+        return []
+      }
+      const value = (await res.json()) as DiagnosticHistoryEntry[]
+      return Array.isArray(value) ? value : []
+    } finally {
+      clearTimeout(timer)
+    }
+  } catch (err) {
+    console.warn('[ReportStorage] load history failed:', err instanceof Error ? err.message : err)
+    return []
+  }
+}

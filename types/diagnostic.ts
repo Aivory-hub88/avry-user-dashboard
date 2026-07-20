@@ -367,6 +367,24 @@ export interface DimensionScores {
   strongestDimension: DimensionKey
 }
 
+/**
+ * Phase E1.3 — assessment history / delta. The minimal snapshot stored per
+ * save into the append-only dashboard.diagnostic_history table (NOT the full
+ * DiagnosticContext — see migrations/dashboard-storage.sql). Just enough for
+ * the result page's delta chip + sparkline.
+ */
+export interface DiagnosticHistorySnapshot {
+  composite: number
+  maturityLevel: MaturityLevel
+  dimensions: Record<DimensionKey, number>
+}
+
+/** One row as returned by GET /api/storage/history, newest first. */
+export interface DiagnosticHistoryEntry {
+  data: DiagnosticHistorySnapshot
+  createdAt: string
+}
+
 export interface RiskFlag {
   id: string
   risk: string
