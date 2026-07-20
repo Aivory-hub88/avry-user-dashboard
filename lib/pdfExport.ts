@@ -2596,6 +2596,11 @@ export async function exportReportToPdf(
       title: 'Deploy on Aivory™',
       body: `Launch your first agent, connect your channels, and start closing the${nsGap > 0 ? ` ${fmtGap(nsGap)}` : ''} automation gap (from ${fmtGap(nsCurrent)} automated today to your ${fmtGap(nsTarget)} target).`,
     },
+    {
+      num: '4',
+      title: 'Speak with our advisory team',
+      body: 'Prefer a guided walkthrough? Our advisory team offers a complimentary face-to-face session to debrief this report and align it with your roadmap — reach us at advisory@aivory.uk.',
+    },
   ])
 
   // ════════════════════════════════════════════════════════════════════════════
