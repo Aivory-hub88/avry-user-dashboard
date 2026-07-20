@@ -593,7 +593,7 @@ function PhaseSection({ phase, index, open, phaseRef, onToggle, onWorkflow, chec
               {phaseComplete ? t("markedComplete") : t("markComplete")}
             </BtnComplete>
             <BtnAivory onClick={() => openAivoryAssistant(
-              `Help me work on "${phase.name}" of my AI Roadmap.\nMilestones:\n${phase.milestones.map(m => `- ${m.title}`).join('\n')}`,
+              `Help me work on "${phase.name}" of my Transformation Roadmap.\nMilestones:\n${phase.milestones.map(m => `- ${m.title}`).join('\n')}`,
               {
                 roadmapTitle: phase.name,
                 currentPhase: phase.name,
@@ -1189,9 +1189,9 @@ export default function RoadmapPage() {
                   </span>
                 </BtnGhost>
                 <BtnAivory onClick={() => openAivoryAssistant(
-                  `Review and refine my AI Roadmap based on these phases and KPIs.\n${roadmap.phases.map((p, i) => `Phase ${i + 1}: ${p.name} (${p.timeframe})`).join('\n')}`,
+                  `Review and refine my Transformation Roadmap based on these phases and KPIs.\n${roadmap.phases.map((p, i) => `Phase ${i + 1}: ${p.name} (${p.timeframe})`).join('\n')}`,
                   {
-                    roadmapTitle: roadmap.title ?? 'AI Roadmap',
+                    roadmapTitle: roadmap.title ?? 'Transformation Roadmap',
                     currentPhase: roadmap.phases[activeIdx]?.name ?? '',
                     milestones: roadmap.phases.flatMap(p => p.milestones.map(m => m.title)),
                   }

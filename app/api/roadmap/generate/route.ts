@@ -22,10 +22,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (contextParts.length === 0) {
-      contextParts.push('No diagnostic or blueprint data provided. Generate a generic AI adoption roadmap for an SME.');
+      contextParts.push('No diagnostic or blueprint data provided. Generate a generic business operations transformation roadmap for an SME.');
     }
 
-    const prompt = `You are an AI strategy consultant. Based on the following context, generate a phased AI implementation roadmap.
+    const prompt = `You are a business operations transformation consultant. Based on the following context, generate a phased transformation roadmap, with AI positioned as the execution layer where it accelerates the plan.
 
 ${contextParts.join('\n\n')}
 

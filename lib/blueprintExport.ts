@@ -109,7 +109,7 @@ export async function exportBlueprintPDF(
 
   // ── 1. Strategic Objective ──────────────────────────────
   y = sectionLabel(doc, y, '1. Strategic Objective')
-  y = renderNarrative(doc, y, "Our primary objective is to aggressively reduce operational costs by deploying targeted AI-powered process automation. By aiming for a 25% reduction in cost per ticket and a 20% decrease in average handle time, we directly alleviate the burden of manual data entry and slow support routing. Achieving the target 62.5% automation coverage translates directly into $14,296 in annual labor savings and reclaims 361 hours of high-value team capacity.")
+  y = renderNarrative(doc, y, "Our primary objective is to aggressively reduce operational costs by deploying targeted AI-powered process automation. By aiming for a 25% reduction in cost per ticket and a 20% decrease in average handle time, we directly alleviate the burden of manual data entry and slow support routing. Achieving the target 62.5% automation coverage translates directly into $14,296 in recovered labor value and reclaims 361 hours of high-value team capacity.")
   if (Array.isArray(strategic_objective?.kpi_targets) && strategic_objective.kpi_targets.length > 0) {
     h2('KPI Targets')
     strategic_objective.kpi_targets.forEach(kpi => {

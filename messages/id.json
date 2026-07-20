@@ -120,7 +120,7 @@
     "name": "Aivory",
     "fullName": "Aivory Intelligence & Reasoning Agent",
     "meetAivory": "Kenalkan Aivory",
-    "tagline": "Tanyakan Aivory tentang tujuan bisnis, diagnostik, atau Cetak Biru Sistem AI Anda, lalu ubah menjadi alur kerja dan otomasi.",
+    "tagline": "Tanyakan Aivory tentang tujuan bisnis, diagnostik, atau Cetak Biru Transformasi Anda, lalu ubah menjadi alur kerja dan otomasi.",
     "isThinking": "Aivory sedang berpikir",
     "emptyResponse": "Aivory mengembalikan respons kosong. Silakan coba lagi.",
     "sessionError": "Kesalahan sesi. Silakan muat ulang.",
@@ -131,7 +131,7 @@
       "checkCompliance": "Periksa celah kepatuhan",
       "summarizeDiagnostics": "Ringkas diagnostik saya",
       "suggestAutomation": "Sarankan peluang otomasi",
-      "reviewReadiness": "Tinjau kesiapan AI saya"
+      "reviewReadiness": "Tinjau kesehatan operasional saya"
     }
   },
   "console": {
@@ -159,7 +159,7 @@
     "overview": "Ringkasan",
     "diagnosticsCard": {
       "title": "Diagnostik",
-      "descriptionNotStarted": "Jalankan Diagnostik Kesiapan AI untuk memahami bisnis dan potensi otomasi Anda.",
+      "descriptionNotStarted": "Jalankan Diagnostik Mendalam Operasi Bisnis untuk memahami bisnis dan potensi otomasi Anda.",
       "descriptionCompleted": "Diagnostik Gratis selesai dengan skor {score}/100. Lanjutkan dengan Diagnostik Mendalam untuk analisis komprehensif.",
       "startDiagnostic": "Mulai Diagnostik",
       "continueDiagnostic": "Lanjutkan Diagnostik",
@@ -167,7 +167,7 @@
     },
     "blueprintCard": {
       "title": "Cetak Biru",
-      "description": "Rancang Cetak Biru Sistem AI Anda: arsitektur, alur kerja, dan rencana penerapan.",
+      "description": "Rancang Cetak Biru Transformasi Anda: arsitektur, alur kerja, dan rencana penerapan.",
       "generateBlueprint": "Buat Cetak Biru",
       "viewBlueprint": "Lihat Cetak Biru"
     },
@@ -179,8 +179,8 @@
     "recentActivity": "Aktivitas Terbaru"
   },
   "blueprint": {
-    "title": "Cetak Biru Sistem AI",
-    "description": "Rancang Cetak Biru Sistem AI Anda: arsitektur, alur kerja, dan rencana penerapan.",
+    "title": "Cetak Biru Transformasi",
+    "description": "Rancang Cetak Biru Transformasi Anda: arsitektur, alur kerja, dan rencana penerapan.",
     "generate": "Buat Cetak Biru",
     "view": "Lihat Cetak Biru",
     "export": "Ekspor Cetak Biru",
@@ -214,7 +214,7 @@
     "saveBlueprintVersion": "Simpan Versi Cetak Biru",
     "saveVersionDesc": "Beri nama versi ini. Akan disimpan secara lokal.",
     "saveVersionPlaceholder": "contoh: V1, Penilaian Awal",
-    "emptyText": "Jalankan diagnostik mendalam terlebih dahulu dan kami akan membuat cetak biru sistem AI yang dipersonalisasi untuk organisasi Anda.",
+    "emptyText": "Jalankan diagnostik mendalam terlebih dahulu dan kami akan membuat Cetak Biru Transformasi yang dipersonalisasi untuk organisasi Anda.",
     "corruptedTitle": "Data cetak biru rusak",
     "corruptedText": "Buat ulang dari diagnostik terbaru Anda.",
     "regenerateBlueprint": "Buat Ulang Cetak Biru",
@@ -224,7 +224,7 @@
   },
   "diagnostics": {
     "title": "Diagnostik",
-    "description": "Jalankan Diagnostik Kesiapan AI untuk memahami bisnis dan potensi otomasi Anda.",
+    "description": "Jalankan Diagnostik Mendalam Operasi Bisnis untuk memahami bisnis dan potensi otomasi Anda.",
     "freeDiagnostic": "Diagnostik Gratis",
     "deepDiagnostic": "Diagnostik Mendalam",
     "startFree": "Mulai Diagnostik Gratis",
@@ -293,8 +293,8 @@
   },
   "roadmap": {
     "title": "Peta Jalan",
-    "pageTitle": "Peta Jalan AI",
-    "description": "Lacak perjalanan implementasi AI Anda dan pencapaian yang akan datang.",
+    "pageTitle": "Peta Jalan Transformasi",
+    "description": "Lacak perjalanan transformasi operasional Anda dan pencapaian yang akan datang.",
     "subtitle": "Rencana bertahap berdasarkan Diagnostik dan Cetak Biru Anda",
     "phases": "Fase",
     "currentPhase": "Fase Saat Ini",
@@ -302,8 +302,8 @@
     "upcoming": "Akan Datang",
     "inProgress": "Sedang Berjalan",
     "noRoadmap": "Belum ada peta jalan",
-    "noRoadmapDesc": "Buat peta jalan implementasi AI yang dipersonalisasi — lihat apa yang harus dibangun, kapan, dan bagaimana mengukur keberhasilan.",
-    "generateRoadmap": "Buat Peta Jalan AI",
+    "noRoadmapDesc": "Buat Peta Jalan Transformasi yang dipersonalisasi — lihat apa yang harus dibangun, kapan, dan bagaimana mengukur keberhasilan.",
+    "generateRoadmap": "Buat Peta Jalan Transformasi",
     "generatingRoadmap": "Membuat Peta Jalan…",
     "regenerateRoadmap": "Buat Ulang Peta Jalan",
     "regenerating": "Membuat ulang…",

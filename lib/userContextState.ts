@@ -162,7 +162,7 @@ export function formatUserContextForAI(state: UserContextState): string {
   }
 
   if (state.has_roadmap) {
-    parts.push(` Has AI Roadmap.`)
+    parts.push(` Has Transformation Roadmap.`)
   }
 
   if (state.tier) {

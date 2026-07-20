@@ -63,7 +63,7 @@ export function getPlaceholderData(): DashboardData {
       {
         id: '1',
         type: 'diagnostic',
-        message: 'Welcome to Aivory! Start by running a diagnostic to assess your AI readiness.',
+        message: 'Welcome to Aivory! Start by running a diagnostic to assess your operational health.',
         timestamp: '2 minutes ago'
       }
     ]

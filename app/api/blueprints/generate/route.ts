@@ -109,7 +109,7 @@ function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
       primary_goal: primaryGoal,
       kpi_targets: [
         {
-          metric: 'AI readiness score',
+          metric: 'Operational Health Score',
           current: `${extractedScore}/100`,
           target: 'Improve through prioritized automation initiatives',
           expected_impact: 'Higher automation coverage and reduced manual workload'
@@ -117,7 +117,7 @@ function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
       ]
     },
     system_architecture: {
-      data_sources: ['Diagnostic context'],
+      data_sources: ['Business context'],
       processing_layers: ['Aivory Workflow Builder'],
       decision_engine: 'Rule-based routing with AI-assisted decisions',
       memory_layer: 'Centralized operational data store',
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
           messages: [
             {
               role: 'user',
-              content: `Generate an AI system blueprint from this diagnostic data. Return a complete blueprint in strict JSON format. Do not include markdown formatting or wrappers like \`\`\`json. The JSON MUST match this TypeScript interface exactly:
+              content: `Generate a transformation blueprint from this diagnostic data. Return a complete blueprint in strict JSON format. Do not include markdown formatting or wrappers like \`\`\`json. The JSON MUST match this TypeScript interface exactly:
 interface BlueprintV1 {
   blueprint_id: string;
   version: string;
@@ -208,7 +208,7 @@ IMPORTANT: The diagnostic includes a "roomForImprovement" array — each item ha
 
 KPI TARGETS: For each kpi_targets entry, "current" is the baseline value taken from the diagnostic data (e.g. "$4.20 per ticket", "22% automation coverage"), "target" is the goal value (e.g. "$1.80 per ticket"), and "expected_impact" is the BUSINESS OUTCOME of reaching that target (e.g. "~57% lower support cost, ≈$22,500/yr saved") — expected_impact must NEVER be a copy of the target value.
 
-ARCHITECTURE GROUNDING: Aivory's actual product suite is: Deep Diagnostic (AI readiness scoring), AI System Blueprint, Implementation Roadmap, AI Console (assistant), Workflow Builder (designs automation workflows from natural language and DEPLOYS THEM TO n8n — automations execute on n8n, not on Aivory), Agents, Automation Templates, and Connectors (Slack, WhatsApp, Telegram, Gmail, HubSpot, Notion, Salesforce, and similar). The system_architecture must be honest and grounded in this reality: "processing_layers" should name the client's real processing needs (e.g. intent classification, data validation) plus "Aivory Workflow Builder" where workflow design fits; "decision_engine" describes the client's decision logic (rules, LLM-assisted routing); "execution_layer" must lead with exactly "Built with Aivory Workflow Builder, deployed to n8n for execution" as its first item, followed by the specific Connectors/integrations needed (each as a short, plain phrase). Recommend third-party tools by name where they genuinely fit (n8n, a CRM API, a helpdesk platform). Do NOT invent Aivory products that do not exist (there is no "Aivory Workflow Engine" runtime and no "Aivory High Intelligence Deterministic Engine" in the client's architecture), and do not mention VPS Bridge or Zeroclaw.
+ARCHITECTURE GROUNDING: Aivory's actual product suite is: Deep Diagnostic (business operations scoring), Transformation Blueprint, Transformation Roadmap, AI Console (assistant), Workflow Builder (designs automation workflows from natural language and DEPLOYS THEM TO n8n — automations execute on n8n, not on Aivory), Agents, Automation Templates, and Connectors (Slack, WhatsApp, Telegram, Gmail, HubSpot, Notion, Salesforce, and similar). The system_architecture must be honest and grounded in this reality: "processing_layers" should name the client's real processing needs (e.g. intent classification, data validation) plus "Aivory Workflow Builder" where workflow design fits; "decision_engine" describes the client's decision logic (rules, LLM-assisted routing); "execution_layer" must lead with exactly "Built with Aivory Workflow Builder, deployed to n8n for execution" as its first item, followed by the specific Connectors/integrations needed (each as a short, plain phrase). Recommend third-party tools by name where they genuinely fit (n8n, a CRM API, a helpdesk platform). Do NOT invent Aivory products that do not exist (there is no "Aivory Workflow Engine" runtime and no "Aivory High Intelligence Deterministic Engine" in the client's architecture), and do not mention VPS Bridge or Zeroclaw.
 
 DEPLOYMENT WAVES: In deployment_plan.waves, "included_workflows" must contain the exact "name" values of workflows from workflow_modules (human-readable names, never workflow_id codes).
 

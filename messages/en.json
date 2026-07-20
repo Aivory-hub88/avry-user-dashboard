@@ -120,7 +120,7 @@
     "name": "Aivory",
     "fullName": "Aivory Intelligence & Reasoning Agent",
     "meetAivory": "Meet Aivory",
-    "tagline": "Ask Aivory about your business goals, diagnostics, or AI System Blueprint, then turn them into workflows and automation.",
+    "tagline": "Ask Aivory about your business goals, diagnostics, or Transformation Blueprint, then turn them into workflows and automation.",
     "isThinking": "Aivory is thinking",
     "emptyResponse": "Aivory returned an empty response. Please try again.",
     "sessionError": "Session error. Please refresh.",
@@ -131,7 +131,7 @@
       "checkCompliance": "Check compliance gap",
       "summarizeDiagnostics": "Summarize my diagnostics",
       "suggestAutomation": "Suggest automation opportunities",
-      "reviewReadiness": "Review my AI readiness"
+      "reviewReadiness": "Review my operational health"
     }
   },
   "console": {
@@ -159,7 +159,7 @@
     "overview": "Overview",
     "diagnosticsCard": {
       "title": "Diagnostics",
-      "descriptionNotStarted": "Run AI Readiness Diagnostic to understand your business and automation potential.",
+      "descriptionNotStarted": "Run the Business Operations Deep Diagnostic to understand your business and automation potential.",
       "descriptionCompleted": "Free Diagnostic completed with score {score}/100. Continue with Deep Diagnostic for comprehensive analysis.",
       "startDiagnostic": "Start Diagnostic",
       "continueDiagnostic": "Continue Diagnostic",
@@ -167,7 +167,7 @@
     },
     "blueprintCard": {
       "title": "Blueprint",
-      "description": "Design your AI System Blueprint: architecture, workflows, and deployment plan.",
+      "description": "Design your Transformation Blueprint: architecture, workflows, and deployment plan.",
       "generateBlueprint": "Generate Blueprint",
       "viewBlueprint": "View Blueprint"
     },
@@ -179,8 +179,8 @@
     "recentActivity": "Recent Activity"
   },
   "blueprint": {
-    "title": "AI System Blueprint",
-    "description": "Design your AI System Blueprint: architecture, workflows, and deployment plan.",
+    "title": "Transformation Blueprint",
+    "description": "Design your Transformation Blueprint: architecture, workflows, and deployment plan.",
     "generate": "Generate Blueprint",
     "view": "View Blueprint",
     "export": "Export Blueprint",
@@ -214,7 +214,7 @@
     "saveBlueprintVersion": "Save Blueprint Version",
     "saveVersionDesc": "Give this version a name. It will be saved locally.",
     "saveVersionPlaceholder": "e.g. V1, Initial Assessment",
-    "emptyText": "Run a deep diagnostic first and we'll generate a personalized AI system blueprint for your organization.",
+    "emptyText": "Run a deep diagnostic first and we'll generate a personalized Transformation Blueprint for your organization.",
     "corruptedTitle": "Blueprint data is corrupted",
     "corruptedText": "Regenerate it from your latest diagnostic.",
     "regenerateBlueprint": "Regenerate Blueprint",
@@ -224,7 +224,7 @@
   },
   "diagnostics": {
     "title": "Diagnostics",
-    "description": "Run AI Readiness Diagnostic to understand your business and automation potential.",
+    "description": "Run the Business Operations Deep Diagnostic to understand your business and automation potential.",
     "freeDiagnostic": "Free Diagnostic",
     "deepDiagnostic": "Deep Diagnostic",
     "startFree": "Start Free Diagnostic",
@@ -293,8 +293,8 @@
   },
   "roadmap": {
     "title": "Roadmap",
-    "pageTitle": "AI Roadmap",
-    "description": "Track your AI implementation journey and upcoming milestones.",
+    "pageTitle": "Transformation Roadmap",
+    "description": "Track your operations transformation journey and upcoming milestones.",
     "subtitle": "Phased plan based on your Diagnostic and Blueprints",
     "phases": "Phases",
     "currentPhase": "Current Phase",
@@ -302,8 +302,8 @@
     "upcoming": "Upcoming",
     "inProgress": "In Progress",
     "noRoadmap": "No roadmap yet",
-    "noRoadmapDesc": "Generate your personalized AI implementation roadmap — see exactly what to build, when, and how to measure success.",
-    "generateRoadmap": "Generate AI Roadmap",
+    "noRoadmapDesc": "Generate your personalized Transformation Roadmap — see exactly what to build, when, and how to measure success.",
+    "generateRoadmap": "Generate Transformation Roadmap",
     "generatingRoadmap": "Generating Roadmap…",
     "regenerateRoadmap": "Regenerate Roadmap",
     "regenerating": "Regenerating…",

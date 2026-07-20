@@ -181,7 +181,7 @@ export class DeepDiagnosticService {
   static async generateBlueprint(
     diagnosticId: string,
     organizationId?: string,
-    objective: string = 'AI readiness improvement',
+    objective: string = 'Operational health improvement',
     diagnosticData?: Record<string, any>
   ): Promise<BlueprintV1> {
     // Blueprint runs are attributed to the signed-in user, not a shared demo
