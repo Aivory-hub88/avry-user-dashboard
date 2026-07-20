@@ -859,11 +859,17 @@ function oppCard(
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(6.4) // 8.5px
   pdf.text('IMPACT', ML + pad, barY - 1.5)
-  // Track + fill
+  // Track + fill. impact is a 0-10 scale (classifyQuadrant's 5.5 threshold in
+  // services/deepDiagnostic.ts confirms it), but this renderer is the only
+  // thing standing between a malformed/out-of-range value (a stale stored
+  // context, bad manual data, a future scale change) and a bar that spills
+  // past the card — clamp the fraction defensively rather than trust the
+  // input is always in range.
+  const impactFraction = Math.max(0, Math.min((opp.impact ?? 0) / 10, 1))
   setC(pdf, TRACK, 'fill')
   pdf.rect(ML + pad, barY, barW, 0.53, 'F')
   setC(pdf, ACCENT, 'fill')
-  pdf.rect(ML + pad, barY, barW * (opp.impact / 10), 0.53, 'F')
+  pdf.rect(ML + pad, barY, barW * impactFraction, 0.53, 'F')
   // Data readiness + complexity right-aligned
   const drText = `${drL[opp.dataReadiness] ?? opp.dataReadiness} \u00b7 ${cap(opp.complexity ?? 'medium')}`
   setC(pdf, UNIT_C, 'text')
