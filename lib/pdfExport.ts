@@ -63,6 +63,44 @@ export const ML = 18
 export const MR = 18
 export const CW = PAGE_W - ML - MR // 174 mm
 
+// ── Design tokens ──────────────────────────────────────────────────────────────
+// Named spacing/type scales, values chosen from what this file already uses
+// most (grep-verified against every setFontSize()/`y + N` call below), not
+// invented from scratch. The point isn't to migrate every literal in a
+// 2000-line file in one pass — it's a lookup table so the NEXT tweak reaches
+// for an existing rung instead of adding one more bespoke magic number, which
+// is exactly how both bugs fixed in this pass happened: dimBar's "vs industry
+// median" caption landing on top of the bar track, and Executive Summary's
+// unconditional addPage() leaving a near-empty page. New sections and any
+// future edits to existing sections should prefer these constants; a handful
+// of the most mechanical, lowest-risk call sites (the pre-section
+// `ensureSpace` transition guard) have been migrated below as the pattern.
+//
+// SPACING SCALE (mm):
+//   SP.hair       = 2    tightest gaps — icon/bullet-to-label, caption nudges
+//   SP.xs         = 4    divider-to-content gap (thinDiv, sectionLabel rule)
+//   SP.sm         = 6    inter-block trailing margin (renderNarrative/renderTransition)
+//   SP.md         = 8    section-intro spacing, callout vertical padding
+//   SP.lg         = 14   row/card vertical rhythm (nextStepRow top pad, dimBar row height)
+//   SP.transitionGuard = 26   headroom reserved via ensureSpace() before a renderTransition
+//                              bridge line, so the bridge sentence never opens a page alone
+export const SP = { hair: 2, xs: 4, sm: 6, md: 8, lg: 14, transitionGuard: 26 } as const
+
+// TYPE SCALE (pt) — font sizes already in use in this file, named by role:
+//   TS.micro    = 6      unit text, badge micro-labels, footnote disclaimers
+//   TS.caption  = 6.4    metric captions, "vs median" notes, footer stat labels
+//   TS.label    = 7      section labels (sectionLabel), status labels
+//   TS.small    = 7.5    step numbers ("01"), small headings, SCORE DRIVERS heading
+//   TS.body     = 8.5    paragraph/list body copy (dimBar names, risk text, next-step bodies)
+//   TS.value    = 10     narrative body copy, title-weight small headings
+//   TS.title    = 10.5   card/opportunity titles
+//   TS.metric   = 11.5   metric-grid values
+//   TS.display  = 19     large tile figures (financial metric tiles)
+// Not every call site has been migrated to reference TS — see the file-level
+// design-QA notes — but new/edited sections should pick a rung from this
+// scale rather than adding another one-off size.
+export const TS = { micro: 6, caption: 6.4, label: 7, small: 7.5, body: 8.5, value: 10, title: 10.5, metric: 11.5, display: 19 } as const
+
 // ── Font helpers ───────────────────────────────────────────────────────────────
 // Manrope / Doto are design-intent fonts; helvetica is the jsPDF fallback.
 // To embed true Manrope/Doto, bundle base64-encoded TTF files (follow-up).
@@ -342,6 +380,80 @@ export function renderNarrative(pdf: jsPDF, y: number, text: string): number {
   return y + lines.length * 5.2 + 8
 }
 
+/**
+ * Segment-aware sibling of renderNarrative — renders a paragraph as mixed
+ * normal/bold runs so key figures and consequential phrases (composite
+ * score, band name, weakest dimension, key dollar amounts) read as visually
+ * weighted, enterprise-deliverable style, instead of uniform paragraph text.
+ * Same font size/colour/line-height as renderNarrative; only the per-word
+ * weight differs. Deliberately additive: renderNarrative's signature and
+ * every existing plain-string call site are untouched, so nothing that
+ * already works can regress. jsPDF's splitTextToSize has no concept of
+ * mixed styling, so wrapping is done manually, word by word.
+ */
+function renderNarrativeSegments(
+  pdf: jsPDF, y: number, segments: Array<{ text: string; bold?: boolean }>,
+): number {
+  pdf.setFontSize(10)
+  pdf.setLineHeightFactor(1.5)
+
+  const words: Array<{ text: string; bold: boolean }> = []
+  segments.forEach((seg) => {
+    seg.text.split(/(\s+)/).forEach((w) => {
+      if (w.length === 0) return
+      words.push({ text: w, bold: !!seg.bold })
+    })
+  })
+
+  const lineHeight = 5.2
+  const maxX = ML + CW
+  let cx = ML
+  let cy = y + 4
+
+  words.forEach((w) => {
+    const isSpace = w.text.trim().length === 0
+    pdf.setFont(w.bold ? FB() : F(), w.bold ? 'bold' : 'normal')
+    const ww = pdf.getTextWidth(w.text)
+    if (!isSpace && cx + ww > maxX) {
+      cx = ML
+      cy += lineHeight
+    }
+    if (isSpace && cx === ML) return // don't indent a wrapped line with a leading space
+    setC(pdf, w.bold ? INK : CONTENT_C, 'text')
+    pdf.text(w.text, cx, cy)
+    cx += ww
+  })
+
+  pdf.setLineHeightFactor(1.15)
+  // Matches renderNarrative's `y + lines.length * 5.2 + 8` for the same
+  // rendered line count (verified: for a single unwrapped line, cy stays
+  // y+4, so this reduces to y + 1*5.2 + 8 exactly).
+  return cy + 9.2
+}
+
+/**
+ * Splits `text` into {text, bold} segments by marking each phrase in
+ * `phrases` as bold (in the order it's found), leaving everything else at
+ * normal weight. Lets 2-3 high-visibility call sites add inline emphasis to
+ * strings built in lib/readinessNarrative.ts WITHOUT changing that file's
+ * exported string-returning signatures — the on-screen result page calls
+ * those same builders and renders plain text, so the shared sentence itself
+ * must stay markup-free. The bolding here is a PDF-only presentation layer
+ * on top of the identical shared sentence.
+ */
+function boldSubstrings(text: string, phrases: Array<string | null | undefined>): Array<{ text: string; bold: boolean }> {
+  const unique = [...new Set(phrases.filter((p): p is string => !!p && p.length > 0))]
+  if (unique.length === 0) return [{ text, bold: false }]
+  // Longest first so a phrase that contains a shorter one (e.g. a full
+  // opportunity title vs. a dimension label it happens to include) matches
+  // as the more specific run.
+  const sorted = unique.sort((a, b) => b.length - a.length)
+  const escaped = sorted.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const re = new RegExp(`(${escaped.join('|')})`, 'g')
+  const boldSet = new Set(sorted)
+  return text.split(re).filter((p) => p.length > 0).map((p) => ({ text: p, bold: boldSet.has(p) }))
+}
+
 /** 0.5px horizontal divider in TRACK colour. */
 export function thinDiv(pdf: jsPDF, y: number, x1 = ML, x2 = ML + CW): number {
   setC(pdf, TRACK, 'draw')
@@ -520,7 +632,9 @@ function dimBar(
     setC(pdf, LABEL, 'text')
     pdf.setFont(F(), 'italic')
     pdf.setFontSize(6.2)
-    pdf.text(medianVsLabel, x + w, y + 7.5, { align: 'right' })
+    // Sits below the track (barY ± barH/2 ≈ y+5.55..y+6.45) — was previously
+    // y+7.5, which overlapped the bar for this font size/leading.
+    pdf.text(medianVsLabel, x + w, y + 9.5, { align: 'right' })
   }
 
   // Track + fill — 1.5px, rounded ends and a gradient fill (matching the
@@ -553,7 +667,7 @@ function dimBar(
     pdf.line(tickX, barY - 1.6, tickX, barY + 1.6)
   }
 
-  return y + (medianVsLabel ? 15.5 : 14)
+  return y + (medianVsLabel ? 16.5 : 14)
 }
 
 /** Opportunity card — bordered, with header badge, 4-col metrics, impact bar. */
@@ -1395,7 +1509,7 @@ export async function exportReportToPdf(
   const execBusinessValueLabel = (calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD) != null
     ? fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD)
     : null
-  y = renderNarrative(pdf, y, buildExecutiveSummary({
+  const execSummaryText = buildExecutiveSummary({
     company,
     composite: scores.composite,
     maturityLevel: scores.maturityLevel,
@@ -1405,15 +1519,28 @@ export async function exportReportToPdf(
     strongestScore: execScoreOf(scores.strongestDimension),
     businessValueLabel: execBusinessValueLabel,
     topOpportunityTitle: execTopOpportunityTitle,
-  }))
+  })
+  // Bold the figures an executive scans for first: composite score, maturity
+  // band, top opportunity, and the headline dollar figure — same shared
+  // sentence as the on-screen page, PDF-only emphasis layered on top.
+  y = renderNarrativeSegments(pdf, y, boldSubstrings(execSummaryText, [
+    `${Math.round(scores.composite)}/100`,
+    `"${scores.maturityLevel}"`,
+    execTopOpportunityTitle?.toLowerCase() ?? null,
+    execBusinessValueLabel,
+  ]))
 
   // ════════════════════════════════════════════════════════════════════════════
-  // OPERATIONAL HEALTH
+  // OPERATIONAL HEALTH — continues directly beneath Executive Summary when
+  // there's room instead of always forcing a fresh page, which previously
+  // left Executive Summary looking like a near-empty page (a 3-4 sentence
+  // block followed by ~80% blank space before the footer).
   // ════════════════════════════════════════════════════════════════════════════
-  pdf.addPage()
-  pageBg(pdf)
-  pageFooter(pdf)
-  y = 16
+  const opHealthTop = y + 4
+  y = ensureSpace(pdf, opHealthTop, 150)
+  if (y === opHealthTop) {
+    y = thinDiv(pdf, y) + 4
+  }
 
   y = sectionLabel(pdf, y, 'Operational Health')
 
@@ -1631,13 +1758,13 @@ export async function exportReportToPdf(
   // EXECUTIVE OPERATIONAL DIAGNOSIS — answers "what's slowing the business
   // down, and what do we do first?" directly from the score band.
   // ════════════════════════════════════════════════════════════════════════════
-  y = ensureSpace(pdf, y, 26)
+  y = ensureSpace(pdf, y, SP.transitionGuard)
   y = renderTransition(pdf, y, `What this score means for ${company} — and what to do first — is summarised below.`)
 
   y = ensureSpace(pdf, y, 60)
   y = sectionLabel(pdf, y, 'Executive Operational Diagnosis')
 
-  y = renderNarrative(pdf, y, buildVerdictNarrative({
+  const verdictText = buildVerdictNarrative({
     company,
     composite: scores.composite,
     maturityLevel: scores.maturityLevel,
@@ -1645,7 +1772,15 @@ export async function exportReportToPdf(
     weakestScore: scoreOf(weakestKey),
     strongestKey,
     strongestScore: scoreOf(strongestKey),
-  }))
+  })
+  // Bold the score, band, and the weakest/strongest dimension clauses — the
+  // read-in-ten-seconds version of "what's the verdict and why."
+  y = renderNarrativeSegments(pdf, y, boldSubstrings(verdictText, [
+    `${Math.round(scores.composite)}/100`,
+    `"${scores.maturityLevel}"`,
+    `${DIM_LABELS[weakestKey] ?? cap(weakestKey)} (${scoreOf(weakestKey)})`,
+    `${DIM_LABELS[strongestKey] ?? cap(strongestKey)} (${scoreOf(strongestKey)})`,
+  ]))
 
   // The first moves — numbered rows, ordered foundation → proof → mandate.
   const firstImprovement = Array.isArray(roomForImprovement) && roomForImprovement.length > 0
@@ -1722,7 +1857,7 @@ export async function exportReportToPdf(
   // ════════════════════════════════════════════════════════════════════════════
   // BUSINESS CONTEXT — the inputs, placed BEFORE the analysis they ground.
   // ════════════════════════════════════════════════════════════════════════════
-  y = ensureSpace(pdf, y, 26)
+  y = ensureSpace(pdf, y, SP.transitionGuard)
   y = renderTransition(pdf, y, 'That diagnosis rests on the specific context your team described in this assessment.')
 
   y = ensureSpace(pdf, y, 45)
@@ -1769,7 +1904,7 @@ export async function exportReportToPdf(
   // ════════════════════════════════════════════════════════════════════════════
   // TRANSFORMATION OPPORTUNITIES
   // ════════════════════════════════════════════════════════════════════════════
-  y = ensureSpace(pdf, y, 26)
+  y = ensureSpace(pdf, y, SP.transitionGuard)
   y = renderTransition(pdf, y, 'Against that context, these are the highest-leverage opportunities to pursue first.')
 
   y = ensureSpace(pdf, y, 55)
@@ -1814,7 +1949,7 @@ export async function exportReportToPdf(
   // ════════════════════════════════════════════════════════════════════════════
   // FINANCIAL CASE
   // ════════════════════════════════════════════════════════════════════════════
-  y = ensureSpace(pdf, y, 26)
+  y = ensureSpace(pdf, y, SP.transitionGuard)
   y = renderTransition(pdf, y, opportunities.length > 0
     ? 'Here is the financial case underpinning those opportunities.'
     : 'Here is the financial case built from the workload your team reported.')
@@ -1844,7 +1979,14 @@ export async function exportReportToPdf(
   const roiNarrative = roiComplete
     ? `An initial transformation investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} is projected to generate a ${fmtPct(calculations.threeYearROIPercent)} three-year ROI and reclaim ${roiHoursStr} hours of team capacity annually. The financial model indicates full payback in ${((calculations.paybackMonths as number) / 12).toFixed(1)} years, driven by ${roiSavingsStr} in continuous annual savings. Crucially, delaying this transformation incurs a direct "operational cost of delay" totaling ${roiInactionStr} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`
     : `Based on the manual workload your team reported, automation is projected to reclaim ${roiHoursStr} hours of team capacity annually${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, worth an estimated ${roiSavingsStr} in continuous annual savings` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Delaying this transformation carries an estimated "operational cost of delay" of ${roiInactionStr} every 90 days.` : ''} Because no implementation budget was provided in the assessment, payback period and three-year ROI are not projected — supplying a budget range completes the financial model. These estimates carry ${calculations.confidenceLevel ?? 'low'} confidence and are based on internal benchmark assumptions rather than client-specific figures.`
-  y = renderNarrative(pdf, y, roiNarrative)
+  // Bold the figures the financial case hinges on: investment, 3-year ROI,
+  // payback, savings, and cost-of-delay — the "so what" of the paragraph.
+  const roiInvestmentStr = fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)
+  const roiPaybackYearsStr = calculations.paybackMonths != null
+    ? `${((calculations.paybackMonths as number) / 12).toFixed(1)} years` : null
+  y = renderNarrativeSegments(pdf, y, boldSubstrings(roiNarrative, roiComplete
+    ? [roiInvestmentStr, fmtPct(calculations.threeYearROIPercent), roiPaybackYearsStr, roiSavingsStr, roiInactionStr]
+    : [roiSavingsStr, roiInactionStr]))
 
   // ── 3 primary metrics across top ──
   const roiGap = 6
@@ -2064,7 +2206,7 @@ export async function exportReportToPdf(
   // OPERATIONAL IMPROVEMENT PRIORITIES + OPERATIONAL CONSTRAINTS (RISK REGISTER)
   // ════════════════════════════════════════════════════════════════════════════
   if (Array.isArray(roomForImprovement) && roomForImprovement.length > 0) {
-    y = ensureSpace(pdf, y, 26)
+    y = ensureSpace(pdf, y, SP.transitionGuard)
     y = renderTransition(pdf, y, 'This is where the greatest friction — and the fastest payoff — lies before and during adoption.')
 
     y = ensureSpace(pdf, y, 55)
@@ -2101,7 +2243,7 @@ export async function exportReportToPdf(
   // then the product CTA sequence, placed AFTER the full analysis so the
   // reader has seen the financial case before being asked to act on it.
   // ════════════════════════════════════════════════════════════════════════════
-  y = ensureSpace(pdf, y, 26)
+  y = ensureSpace(pdf, y, SP.transitionGuard)
   y = renderTransition(pdf, y, 'Turning this analysis into results starts with where AI fits into the sequence above.')
 
   y = ensureSpace(pdf, y, 45)
@@ -2135,12 +2277,19 @@ export async function exportReportToPdf(
   )
 
   // ════════════════════════════════════════════════════════════════════════════
-  // CLOSING NOTE
+  // CLOSING NOTE — was an unconditional pdf.addPage() regardless of how much
+  // room remained after AI Enablement's next-step rows, so a short closing
+  // (two narrative paragraphs + signature, ~110mm) routinely landed on a page
+  // that was otherwise ~70% blank. Closing Note has no internal per-line page
+  // -break guard (it's a single monolithic block, unlike the risk register or
+  // improvement blocks), so `needed` here covers the WHOLE section rather
+  // than just its opening line, per the ensureSpace doc comment.
   // ════════════════════════════════════════════════════════════════════════════
-  pdf.addPage()
-  pageBg(pdf)
-  pageFooter(pdf)
-  y = 16
+  const closingTop = y + 4
+  y = ensureSpace(pdf, closingTop, 130)
+  if (y === closingTop) {
+    y = thinDiv(pdf, y) + 4
+  }
 
   y = sectionLabel(pdf, y, 'Closing Note')
 
