@@ -564,24 +564,26 @@ export default function FinalResultPage() {
           )}
 
           <div className={styles.roiGrid}>
-            <ROIMetricTile label="Business Value Created" value={totalAnnualSavingsLocal} formatter={fmtLocal} />
-            <ROIMetricTile label="Recovered Labor Value" value={annualLaborSavingsLocal} formatter={fmtLocal} />
-            <ROIMetricTile label="Process Efficiency Value" value={annualProcessSavingsLocal} formatter={fmtLocal} />
+            <ROIMetricTile label="Business Value Created" value={totalAnnualSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} />
+            <ROIMetricTile label="Recovered Labor Value" value={annualLaborSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} />
+            <ROIMetricTile label="Process Efficiency Value" value={annualProcessSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} />
             <ROIMetricTile
               label="Recovered Team Capacity"
               value={calculations.hoursReclaimedPerYear}
               formatter={(v) => `${Math.round(v).toLocaleString('en-US')} hours`}
+              confidenceLevel={calculations.confidenceLevel}
             />
-            <ROIMetricTile label="Payback Period" value={calculations.paybackMonths} formatter={formatMonths} />
+            <ROIMetricTile label="Payback Period" value={calculations.paybackMonths} formatter={formatMonths} confidenceLevel={calculations.confidenceLevel} />
             <ROIMetricTile
               label="3-Year ROI"
               value={calculations.threeYearROIPercent}
               formatter={(v) => v >= 999 ? '>999%' : formatPercent(v)}
+              confidenceLevel={calculations.confidenceLevel}
             />
-            <ROIMetricTile label="3-Year NPV" value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle="Net present value @ 10% discount" />
-            <ROIMetricTile label="Annual Ongoing Cost" value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle="Est. licenses, maintenance & support" />
-            <ROIMetricTile label="Net Annual Savings" value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtLocal} subtitle="After ongoing cost" />
-            <ROIMetricTile label="Net Payback Period" value={(calculations as any).netPaybackMonths ?? null} formatter={formatMonths} subtitle="On net savings" />
+            <ROIMetricTile label="3-Year NPV" value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle="Net present value @ 10% discount" confidenceLevel={calculations.confidenceLevel} />
+            <ROIMetricTile label="Annual Ongoing Cost" value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle="Est. licenses, maintenance & support" confidenceLevel={calculations.confidenceLevel} />
+            <ROIMetricTile label="Net Annual Savings" value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtLocal} subtitle="After ongoing cost" confidenceLevel={calculations.confidenceLevel} />
+            <ROIMetricTile label="Net Payback Period" value={(calculations as any).netPaybackMonths ?? null} formatter={formatMonths} subtitle="On net savings" confidenceLevel={calculations.confidenceLevel} />
             <ROIMetricTile
               label="Operational Cost of Delay (90 days)"
               value={costOfInaction90DaysLocal}
@@ -591,6 +593,7 @@ export default function FinalResultPage() {
                   ? 'Estimated opportunity cost if delayed'
                   : 'Revenue at risk if delayed'
               }
+              confidenceLevel={calculations.confidenceLevel}
             />
           </div>
 

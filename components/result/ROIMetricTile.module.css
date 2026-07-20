@@ -36,3 +36,25 @@
   font-style: italic;
   margin-top: -4px;
 }
+
+/* E1.7 — per-tile evidence-strength tag, mirrors the Financial Case banner's
+   amber accent so the two indicators read as one visual language. */
+.confidenceTag {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  width: fit-content;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.confidenceTagLow {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+}
+
+.confidenceTagMedium {
+  color: #d4d4a8;
+  background: rgba(212, 212, 168, 0.1);
+}

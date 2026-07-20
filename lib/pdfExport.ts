@@ -24,6 +24,7 @@ import {
   buildAiEnablement,
   DIM_CONSEQUENCE_CHAINS,
   formatConsequenceChain,
+  confidenceTileLabel,
 } from '@/lib/readinessNarrative'
 import { getIndustryBenchmark, formatVsMedian, BENCHMARK_DISCLAIMER } from '@/lib/industryBenchmarks'
 import { quantifyPainPoints, formatPainPointHours } from '@/lib/bottleneckQuantification'
@@ -1716,7 +1717,8 @@ export async function exportReportToPdf(
     'Business Value Created',
     fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD),
     'labor + process',
-    `${cap(calculations.confidenceLevel ?? 'medium')} confidence`,
+    // E1.7 — same label text/threshold as the on-screen ROI tiles (lib/readinessNarrative.ts).
+    confidenceTileLabel(calculations.confidenceLevel) ?? 'High confidence',
   )
 
   // Tile 2 — Recovered Team Capacity

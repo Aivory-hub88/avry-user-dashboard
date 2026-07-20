@@ -10,6 +10,20 @@ function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+/**
+ * E1.7 — Confidence surfacing. Shared "evidence strength" label for the
+ * Financial Case tiles, identical on the result page and the PDF. Returns
+ * null for 'high' confidence (full data) so the indicator only appears where
+ * a figure is actually resting on incomplete inputs — no badge clutter when
+ * there's nothing to caveat.
+ */
+export function confidenceTileLabel(
+  level: 'low' | 'medium' | 'high' | null | undefined
+): string | null {
+  if (!level || level === 'high') return null
+  return `${cap(level)} confidence`
+}
+
 /** Client-facing labels for the six scoring dimensions. */
 export const DIM_LABELS: Record<string, string> = {
   strategy: 'Strategy', data: 'Data', process: 'Process',
