@@ -42,6 +42,38 @@ export function humanizeRiskSource(src: string): string {
   return RISK_SOURCE_LABELS[src] ?? cap(src.replace(/_/g, ' '))
 }
 
+/**
+ * Phase E1.2 — client-facing factor names for the raw answer keys used as
+ * score drivers (see ScoreDriverItem.answerKey / computeScoreDrivers in
+ * services/deepDiagnostic.ts). Same pattern as RISK_SOURCE_LABELS above.
+ */
+export const DRIVER_ANSWER_LABELS: Record<string, string> = {
+  quantified_goal: 'Quantified objective',
+  kpi_tracking: 'KPI tracking',
+  success_timeline: 'Success timeline',
+  data_centralization: 'Data centralization',
+  data_quality: 'Data quality',
+  system_integration: 'System integration',
+  data_infrastructure: 'Data infrastructure',
+  process_documentation: 'Process documentation',
+  workflow_standardization: 'Workflow standardization',
+  automation_current: 'Current automation level',
+  internal_capability: 'Internal AI capability',
+  change_readiness: 'Change readiness',
+  decision_speed: 'Decision speed',
+  leadership_alignment: 'Leadership alignment',
+  risk_tolerance: 'Risk tolerance',
+  budget_allocated: 'Budget allocation',
+  ai_governance: 'AI governance',
+  ai_data_privacy: 'AI data privacy',
+  compliance_requirements: 'Compliance requirements',
+  data_residency: 'Data residency',
+}
+
+export function humanizeDriverAnswerKey(key: string): string {
+  return DRIVER_ANSWER_LABELS[key] ?? cap(key.replace(/_/g, ' '))
+}
+
 /** Five-band operational maturity scale — thresholds mirror services maturityFromScore. */
 export const MATURITY_BANDS: Array<{ level: string; range: string; meaning: string }> = [
   { level: 'Nascent', range: '0–34', meaning: 'the foundational building blocks — reliable data, documented processes, and clear ownership — are not yet in place, so operational groundwork should come before any automation investment' },

@@ -1352,7 +1352,7 @@ export async function exportReportToPdf(
   }
   if (!context) throw new Error('No diagnostic context')
 
-  const { scores, calculations, opportunities, risks, qualitative, roomForImprovement } = context
+  const { scores, calculations, opportunities, risks, qualitative, roomForImprovement, scoreDrivers } = context
   const currency = (context.currency || 'USD') as 'USD' | 'EUR' | 'GBP' | 'IDR'
   const fmt = (v: number | null | undefined) => fmtCurrency(v, currency)
   const cAny = calculations as any
@@ -1478,6 +1478,48 @@ export async function exportReportToPdf(
   }
 
   y = Math.max(arcCy + arcR + (industryBenchmark ? 20 : 12), by) + 6
+
+  // Phase E1.2/E2.2 — compact "Score drivers" sub-list per dimension. Pulls
+  // from the same context.scoreDrivers computed in
+  // services/deepDiagnostic.ts as the on-screen DimensionDrivers accordion
+  // — shared data, no PDF-only copy of the labels. Renders nothing when
+  // scoreDrivers is absent (contexts stored before this feature shipped).
+  if (scoreDrivers) {
+    y = ensureSpace(pdf, y, 30)
+    setC(pdf, ACCENT, 'text')
+    pdf.setFont(FB(), 'bold')
+    pdf.setFontSize(7.5)
+    pdf.text('SCORE DRIVERS', ML, y)
+    y += 5
+
+    dims.forEach((d) => {
+      const items = scoreDrivers[d]
+      if (!items || items.length === 0) return
+      y = ensureSpace(pdf, y, 14)
+
+      setC(pdf, INK, 'text')
+      pdf.setFont(FB(), 'bold')
+      pdf.setFontSize(7.5)
+      pdf.text(DIM_LABELS[d] ?? d, ML, y)
+      y += 4
+
+      pdf.setFont(F(), 'normal')
+      pdf.setFontSize(7.2)
+      pdf.setLineHeightFactor(1.35)
+      items.slice(0, 3).forEach((item) => {
+        const arrow = item.direction === 'raised' ? '+' : '-'
+        setC(pdf, item.direction === 'raised' ? ACCENT : '#b8873a', 'text')
+        pdf.text(arrow, ML + 2, y)
+        setC(pdf, MUTED, 'text')
+        const lines = pdf.splitTextToSize(item.label, CW - 8)
+        pdf.text(lines, ML + 6, y)
+        y += lines.length * 3.6 + 1
+      })
+      pdf.setLineHeightFactor(1.15)
+      y += 2
+    })
+    y += 4
+  }
 
   // ── Financial metrics — 2×2 grid ──
   const gap = 0.4

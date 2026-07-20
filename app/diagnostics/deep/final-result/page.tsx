@@ -9,6 +9,7 @@ import HeaderBar from '@/components/result/HeaderBar'
 import ScoreRing from '@/components/result/ScoreRing'
 import RadarChart from '@/components/result/RadarChart'
 import DimensionBenchmarkBars from '@/components/result/DimensionBenchmarkBars'
+import DimensionDrivers from '@/components/result/DimensionDrivers'
 import ROIMetricTile from '@/components/result/ROIMetricTile'
 import OpportunityMatrix from '@/components/result/OpportunityMatrix'
 import OpportunityCard from '@/components/result/OpportunityCard'
@@ -402,6 +403,7 @@ export default function FinalResultPage() {
           </div>
 
           <DimensionBenchmarkBars scores={scores} benchmark={industryBenchmark} />
+          <DimensionDrivers scoreDrivers={context.scoreDrivers} />
         </div>
 
         {/* ── Executive Operational Diagnosis — same narrative the PDF renders ── */}

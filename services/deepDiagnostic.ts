@@ -711,6 +711,256 @@ function calculateDimensionScores(a: DiagnosticAnswers): DimensionScores {
   }
 }
 
+// ---- Score drivers (Phase E1.2 — traceability) ----
+//
+// Read-only, derived view: mirrors the branch conditions in scoreStrategy/
+// scoreData/scoreProcess/scorePeople/scoreGovernance/scoreSecurity above so
+// the reported points-per-answer are faithful to what those functions
+// actually compute, WITHOUT calling into or altering them in any way. This
+// is a deliberate duplication of the branch conditions (not a refactor of
+// the scorers) so there is zero risk of this feature changing a score —
+// see brief §8 E-invariant 1. If the scorer branches above ever change,
+// this table must be updated in lockstep (values only, not logic style).
+import type { ScoreDriverItem, ScoreDrivers } from '@/types/diagnostic'
+
+interface DriverFactor {
+  answerKey: string
+  maxPoints: number
+  /** Returns the points this answer actually earned + a human label, given the raw answer. */
+  evaluate: (a: DiagnosticAnswers) => { points: number; label: string }
+}
+
+function driverItem(f: DriverFactor, a: DiagnosticAnswers): ScoreDriverItem {
+  const { points, label } = f.evaluate(a)
+  const direction: ScoreDriverItem['direction'] = points >= f.maxPoints / 2 ? 'raised' : 'lowered'
+  return { answerKey: f.answerKey, label, direction, points, maxPoints: f.maxPoints }
+}
+
+/** Picks the top N items by how far their contribution is from the factor's midpoint (most decisive first). */
+function topDrivers(items: ScoreDriverItem[], n = 3): ScoreDriverItem[] {
+  return [...items]
+    .sort((x, y) => Math.abs(y.points - y.maxPoints / 2) - Math.abs(x.points - x.maxPoints / 2))
+    .slice(0, n)
+}
+
+const STRATEGY_FACTORS: DriverFactor[] = [
+  {
+    answerKey: 'quantified_goal', maxPoints: 20,
+    evaluate: (a) => a.quantified_goal?.includes('specific metrics')
+      ? { points: 20, label: 'Objectives are tied to specific, tracked metrics' }
+      : a.quantified_goal?.includes('not quantified')
+        ? { points: 5, label: 'Objectives are set but not quantified' }
+        : { points: 0, label: 'No quantified objective defined yet' },
+  },
+  {
+    answerKey: 'kpi_tracking', maxPoints: 15,
+    evaluate: (a) => a.kpi_tracking === 'Automated dashboards'
+      ? { points: 15, label: 'KPIs are tracked via automated dashboards' }
+      : a.kpi_tracking === 'Manual reports'
+        ? { points: 5, label: 'KPIs are tracked via manual reports' }
+        : { points: 0, label: 'KPIs are not tracked systematically' },
+  },
+  {
+    answerKey: 'success_timeline', maxPoints: 10,
+    evaluate: (a) => (a.success_timeline === '1-3 months' || a.success_timeline === '3-6 months')
+      ? { points: 10, label: 'A realistic 1–6 month success timeline is set' }
+      : { points: 0, label: 'Success timeline is long or open-ended' },
+  },
+]
+
+const DATA_FACTORS: DriverFactor[] = [
+  {
+    answerKey: 'data_centralization', maxPoints: 30,
+    evaluate: (a) => a.data_centralization?.includes('Fully centralized')
+      ? { points: 30, label: 'Data is fully centralized in a warehouse/lake' }
+      : a.data_centralization?.includes('Partially')
+        ? { points: 15, label: 'Data is only partially centralized' }
+        : { points: 0, label: 'Data is siloed or not centralized' },
+  },
+  {
+    answerKey: 'data_quality', maxPoints: 25,
+    evaluate: (a) => a.data_quality?.includes('High quality')
+      ? { points: 25, label: 'Data quality is high, clean, and consistent' }
+      : a.data_quality?.includes('Good quality')
+        ? { points: 15, label: 'Data quality is good with minor issues' }
+        : a.data_quality?.includes('Moderate')
+          ? { points: 5, label: 'Data quality is moderate and needs cleanup' }
+          : { points: 0, label: 'Data quality has significant issues' },
+  },
+  {
+    answerKey: 'system_integration', maxPoints: 15,
+    evaluate: (a) => a.system_integration?.includes('Fully integrated')
+      ? { points: 15, label: 'Systems are fully integrated with APIs and automation' }
+      : a.system_integration?.includes('Some integration')
+        ? { points: 7, label: 'Some integration exists between key systems' }
+        : { points: 0, label: 'Systems are disconnected or not integrated' },
+  },
+  {
+    answerKey: 'data_infrastructure', maxPoints: 15,
+    evaluate: (a) => a.data_infrastructure?.includes('Modern data platform')
+      ? { points: 15, label: 'A modern data platform (streaming, catalog, governance) is in place' }
+      : (a.data_infrastructure?.includes('warehouse') || a.data_infrastructure?.includes('lake'))
+        ? { points: 10, label: 'A data warehouse or data lake is in place' }
+        : a.data_infrastructure?.includes('Databases')
+          ? { points: 5, label: 'Data lives in databases without a warehouse/lake' }
+          : { points: 0, label: 'Data infrastructure is spreadsheets/manual files' },
+  },
+]
+
+const PROCESS_FACTORS: DriverFactor[] = [
+  {
+    answerKey: 'process_documentation', maxPoints: 25,
+    evaluate: (a) => a.process_documentation === '75-100%'
+      ? { points: 25, label: '75–100% of key processes are documented' }
+      : a.process_documentation === '50-75%'
+        ? { points: 15, label: '50–75% of key processes are documented' }
+        : a.process_documentation === '25-50%'
+          ? { points: 7, label: '25–50% of key processes are documented' }
+          : { points: 0, label: 'Under 25% of key processes are documented' },
+  },
+  {
+    answerKey: 'workflow_standardization', maxPoints: 25,
+    evaluate: (a) => a.workflow_standardization?.includes('Fully standardized')
+      ? { points: 25, label: 'Workflows are fully standardized with clear procedures' }
+      : a.workflow_standardization?.includes('Mostly standardized')
+        ? { points: 15, label: 'Workflows are mostly standardized with some variation' }
+        : { points: 0, label: 'Workflows are largely ad-hoc' },
+  },
+  {
+    answerKey: 'automation_current', maxPoints: 20,
+    evaluate: (a) => {
+      const pct = parsePct(a.automation_current)
+      const points = pct !== null ? Math.round(pct * 0.2) : 0
+      return {
+        points,
+        label: pct !== null
+          ? `Automation currently covers ${formatGapPct(pct)} of processes`
+          : 'Current automation coverage was not reported',
+      }
+    },
+  },
+]
+
+const PEOPLE_FACTORS: DriverFactor[] = [
+  {
+    answerKey: 'internal_capability', maxPoints: 35,
+    evaluate: (a) => a.internal_capability?.includes('Strong AI team')
+      ? { points: 35, label: 'A strong, experienced AI team is in place' }
+      : a.internal_capability?.includes('Some AI knowledge')
+        ? { points: 20, label: 'Some AI knowledge exists but needs guidance' }
+        : a.internal_capability?.includes('Limited')
+          ? { points: 8, label: 'Technical skills for AI are limited' }
+          : { points: 0, label: 'There is no internal technical team' },
+  },
+  {
+    answerKey: 'change_readiness', maxPoints: 20,
+    evaluate: (a) => a.change_readiness?.includes('Embracing')
+      ? { points: 20, label: 'The organization is actively embracing change' }
+      : a.change_readiness?.includes('Open')
+        ? { points: 12, label: 'The organization is open to change with proper planning' }
+        : a.change_readiness?.includes('Cautious')
+          ? { points: 5, label: 'The organization is cautious about change' }
+          : { points: 0, label: 'The organization is resistant to change' },
+  },
+  {
+    answerKey: 'decision_speed', maxPoints: 15,
+    evaluate: (a) => a.decision_speed?.includes('Hours to days')
+      ? { points: 15, label: 'Decisions on new initiatives happen in hours to days' }
+      : a.decision_speed?.includes('Days to weeks')
+        ? { points: 8, label: 'Decisions on new initiatives take days to weeks' }
+        : { points: 0, label: 'Decisions on new initiatives take weeks or longer' },
+  },
+]
+
+const GOVERNANCE_FACTORS: DriverFactor[] = [
+  {
+    answerKey: 'leadership_alignment', maxPoints: 30,
+    evaluate: (a) => a.leadership_alignment?.includes('Fully aligned')
+      ? { points: 30, label: 'Leadership is fully aligned and championing this' }
+      : a.leadership_alignment?.includes('Supportive')
+        ? { points: 18, label: 'Leadership is supportive but cautious' }
+        : a.leadership_alignment?.includes('Some interest')
+          ? { points: 8, label: 'Leadership has some interest but needs convincing' }
+          : { points: 0, label: 'Leadership shows no alignment or interest' },
+  },
+  {
+    answerKey: 'risk_tolerance', maxPoints: 15,
+    evaluate: (a) => a.risk_tolerance?.includes('High')
+      ? { points: 15, label: 'The organization has high risk tolerance for AI projects' }
+      : a.risk_tolerance?.includes('Moderate')
+        ? { points: 10, label: 'The organization has a moderate, balanced risk tolerance' }
+        : a.risk_tolerance?.includes('Low') && !a.risk_tolerance?.includes('Very low')
+          ? { points: 5, label: 'The organization prefers proven, low-risk solutions' }
+          : { points: 0, label: 'The organization is extremely risk-averse' },
+  },
+  {
+    answerKey: 'budget_allocated', maxPoints: 15,
+    evaluate: (a) => a.budget_allocated?.includes('specific allocation')
+      ? { points: 15, label: 'A dedicated budget with specific allocation exists' }
+      : a.budget_allocated?.includes('flexible')
+        ? { points: 8, label: 'A flexible/exploratory budget exists' }
+        : { points: 0, label: 'No dedicated budget has been allocated' },
+  },
+]
+
+const SECURITY_FACTORS: DriverFactor[] = [
+  {
+    answerKey: 'ai_governance', maxPoints: 22,
+    evaluate: (a) => a.ai_governance?.includes('Formal AI governance')
+      ? { points: 22, label: 'Formal AI governance and oversight is in place' }
+      : a.ai_governance?.includes('Informal')
+        ? { points: 11, label: 'AI oversight exists but is informal/ad-hoc' }
+        : { points: 0, label: 'No AI governance process exists' },
+  },
+  {
+    answerKey: 'ai_data_privacy', maxPoints: 22,
+    evaluate: (a) => a.ai_data_privacy?.includes('Formal privacy')
+      ? { points: 22, label: 'A formal AI data privacy policy with controls is in place' }
+      : a.ai_data_privacy?.includes('Basic')
+        ? { points: 11, label: 'A basic AI data privacy policy exists' }
+        : { points: 0, label: 'No formal AI data privacy policy exists' },
+  },
+  {
+    answerKey: 'compliance_requirements', maxPoints: 10,
+    evaluate: (a) => Array.isArray(a.compliance_requirements) &&
+      a.compliance_requirements.length > 0 &&
+      !a.compliance_requirements.includes('None')
+      ? { points: 10, label: `Compliance requirements are tracked (${a.compliance_requirements.join(', ')})` }
+      : { points: 0, label: 'No compliance requirements were captured' },
+  },
+  {
+    answerKey: 'data_residency', maxPoints: 6,
+    evaluate: (a) => a.data_residency && !a.data_residency.includes('Not sure')
+      ? { points: 6, label: 'Data residency requirements are defined' }
+      : { points: 0, label: 'Data residency requirements are undefined' },
+  },
+]
+
+const DIMENSION_DRIVER_FACTORS: Record<DimensionKey, DriverFactor[]> = {
+  strategy: STRATEGY_FACTORS,
+  data: DATA_FACTORS,
+  process: PROCESS_FACTORS,
+  people: PEOPLE_FACTORS,
+  governance: GOVERNANCE_FACTORS,
+  security: SECURITY_FACTORS,
+}
+
+/**
+ * Computes the 2–3 answers that most raised/lowered each dimension. Pure,
+ * read-only derived pass over the same raw answers the scorer functions
+ * consume above — never calls scoreStrategy/scoreData/etc. and never
+ * touches `scores`, weights, or thresholds. Safe to call from
+ * buildDiagnosticContext as an additive field only (E-invariant 1/4).
+ */
+export function computeScoreDrivers(a: DiagnosticAnswers): ScoreDrivers {
+  const result = {} as ScoreDrivers
+  for (const [dim, factors] of Object.entries(DIMENSION_DRIVER_FACTORS) as [DimensionKey, DriverFactor[]][]) {
+    const items = factors.map((f) => driverItem(f, a))
+    result[dim] = topDrivers(items, 3)
+  }
+  return result
+}
+
 // ---- Opportunity ranking ----
 
 function classifyQuadrant(impact: number, effort: number): OpportunityQuadrant {
@@ -1186,6 +1436,9 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
   const opportunities = rankOpportunities(answers, scores, currencyCode, totalAnnualSavingsUSD)
   const risks = classifyRisks(answers, scores)
   const roomForImprovement = buildRoomForImprovement(scores, quantitative, answers)
+  // Phase E1.2 — pure read-only derived pass over the same raw answers;
+  // never touches scores/calculations. See computeScoreDrivers above.
+  const scoreDrivers = computeScoreDrivers(answers)
 
   const compliance: string[] = Array.isArray(answers.compliance_requirements)
     ? answers.compliance_requirements.filter((c: string) => c !== 'None')
@@ -1217,6 +1470,7 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     opportunities,
     risks,
     roomForImprovement,
+    scoreDrivers,
     qualitative,
   }
 

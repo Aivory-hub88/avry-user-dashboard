@@ -332,6 +332,28 @@ export interface ROIProjection {
   costOfInaction90DaysIDR?: number | null
 }
 
+/**
+ * Phase E1.2 — score traceability. A single answer's contribution to a
+ * dimension score, expressed as a direction (did this answer push the
+ * dimension up or down relative to the midpoint of what that question could
+ * contribute) rather than a raw delta, so the UI/PDF can render "↑ raised" /
+ * "↓ lowered" without re-deriving scoring internals.
+ */
+export interface ScoreDriverItem {
+  /** Raw diagnostic answer key this driver was derived from, e.g. 'data_quality'. */
+  answerKey: string
+  /** Human-readable sentence describing the answer's effect on this dimension. */
+  label: string
+  direction: 'raised' | 'lowered'
+  /** Points this answer actually contributed toward the dimension (read-only, derived). */
+  points: number
+  /** Max points this question could have contributed to the dimension. */
+  maxPoints: number
+}
+
+/** Top 2-3 answers that most moved each dimension, keyed by dimension. */
+export type ScoreDrivers = Record<DimensionKey, ScoreDriverItem[]>
+
 export interface DimensionScores {
   strategy: number
   data: number
@@ -418,6 +440,14 @@ export interface DiagnosticContext {
   risks: RiskFlag[]
   /** Prioritized improvement areas with operational before/after — feeds the AI System Blueprint. */
   roomForImprovement?: ImprovementItem[]
+  /**
+   * Phase E1.2 — score traceability/drivers. Computed at build time as a
+   * read-only derived view over the same answers the scorer used; never
+   * affects `scores` or any figure. Optional/absent on contexts stored
+   * before this feature shipped — consumers MUST treat missing as "no
+   * drill-down available", not an error (graceful degradation).
+   */
+  scoreDrivers?: ScoreDrivers
   qualitative: {
     primaryObjective: string
     topPainPoints: string
