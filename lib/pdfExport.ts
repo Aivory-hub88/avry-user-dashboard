@@ -25,6 +25,9 @@ import {
   DIM_CONSEQUENCE_CHAINS,
   formatConsequenceChain,
   confidenceTileLabel,
+  buildDimensionBenchmarkCaption,
+  buildRoiTilesCaption,
+  buildRiskRegisterCaption,
 } from '@/lib/readinessNarrative'
 import { getIndustryBenchmark, formatVsMedian, BENCHMARK_DISCLAIMER } from '@/lib/industryBenchmarks'
 import { quantifyPainPoints, formatPainPointHours } from '@/lib/bottleneckQuantification'
@@ -1409,6 +1412,19 @@ function renderRiskRegister(pdf: jsPDF, y: number, risks: DiagnosticContext['ris
   }
 
   y = sectionLabel(pdf, y, 'Operational Constraints')
+
+  // Phase E2.6 — same builder as the on-screen RiskCard list caption, so
+  // the high-severity concentration line reads identically on both surfaces.
+  const riskCaption = buildRiskRegisterCaption(risks)
+  if (riskCaption) {
+    setC(pdf, LABEL, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(6.8)
+    const capLines = pdf.splitTextToSize(riskCaption, CW)
+    pdf.text(capLines, ML, y)
+    y += capLines.length * 3.2 + 3
+  }
+
   const sevC: Record<string, string> = { HIGH: '#c04040', MEDIUM: WARN_AMB, LOW: ACCENT }
   const sorted = [...risks].sort((a, b) =>
     ({ HIGH: 0, MEDIUM: 1, LOW: 2 } as Record<string, number>)[a.severity]! -
@@ -1600,6 +1616,20 @@ export async function exportReportToPdf(
     by = dimBar(pdf, barX, by, barW, DIM_LABELS[d] ?? d, s, point ? formatVsMedian(s, point) : null, point?.median ?? null)
   })
   if (industryBenchmark) {
+    // Phase E2.6 — same builder as the on-screen DimensionBenchmarkBars
+    // caption, so the "so what" line can never independently drift between
+    // the two surfaces.
+    const dimCaption = buildDimensionBenchmarkCaption(
+      scores as unknown as Record<string, number>, industryBenchmark,
+    )
+    if (dimCaption) {
+      setC(pdf, MUTED, 'text')
+      pdf.setFont(F(), 'normal')
+      pdf.setFontSize(6.4)
+      const capLines = pdf.splitTextToSize(dimCaption, barW)
+      pdf.text(capLines, barX, by + 2)
+      by += capLines.length * 3 + 2
+    }
     setC(pdf, LABEL, 'text')
     pdf.setFont(F(), 'italic')
     pdf.setFontSize(6)
@@ -2085,6 +2115,24 @@ export async function exportReportToPdf(
     { l: 'Net Annual Savings', v: fmt(cAny.netAnnualSavingsLocal), n: 'after ongoing cost' },
     { l: 'Net Payback', v: fmtMonths(cAny.netPaybackMonths), n: 'on net savings' },
   ])
+
+  // Phase E2.6 — same builder as the on-screen ROI tile grid caption, so
+  // the labor-vs-process split reads identically on both surfaces.
+  {
+    const roiCaption = buildRoiTilesCaption(
+      calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD,
+      calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD,
+    )
+    if (roiCaption) {
+      y = ensureSpace(pdf, y, 8)
+      setC(pdf, LABEL, 'text')
+      pdf.setFont(F(), 'normal')
+      pdf.setFontSize(6.8)
+      const capLines = pdf.splitTextToSize(roiCaption, CW)
+      pdf.text(capLines, ML, y)
+      y += capLines.length * 3.2 + 3
+    }
+  }
 
   // ── Scenario range (Conservative / Base / Optimistic) — only when at least
   // one scenario value exists; an all-"—" row is noise, not information. ──

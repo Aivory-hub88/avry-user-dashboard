@@ -2,6 +2,7 @@ import type { DimensionKey, DimensionScores } from '@/types/diagnostic'
 import { humanizeDimensionKey } from '@/lib/resultFormatters'
 import type { IndustryBenchmark } from '@/lib/industryBenchmarks'
 import { BENCHMARK_DISCLAIMER, formatVsMedian } from '@/lib/industryBenchmarks'
+import { buildDimensionBenchmarkCaption } from '@/lib/readinessNarrative'
 import styles from './DimensionBenchmarkBars.module.css'
 
 const DIMENSION_ORDER: DimensionKey[] = ['strategy', 'data', 'process', 'people', 'governance', 'security']
@@ -20,9 +21,15 @@ interface DimensionBenchmarkBarsProps {
 export default function DimensionBenchmarkBars({ scores, benchmark }: DimensionBenchmarkBarsProps) {
   if (!benchmark) return null
 
+  // Phase E2.6 — shared with the PDF's dimension-bar block via the same
+  // builder (lib/readinessNarrative.ts) so the "so what" line can never
+  // independently drift between the two surfaces.
+  const caption = buildDimensionBenchmarkCaption(scores, benchmark)
+
   return (
     <div className={styles.container}>
       <span className={styles.heading}>Dimensions vs industry median</span>
+      {caption && <p className={styles.caption}>{caption}</p>}
       <div className={styles.rows}>
         {DIMENSION_ORDER.map((key) => {
           const score = Math.round(scores[key] ?? 0)

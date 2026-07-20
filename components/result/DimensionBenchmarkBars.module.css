@@ -76,3 +76,13 @@
   color: #7a7a72;
   line-height: 1.5;
 }
+
+/* Phase E2.6 — one-line "so what" takeaway, separate from the methodology
+   disclaimer below it (that one explains what the numbers ARE; this one
+   states what they MEAN). */
+.caption {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: #c9c9c1;
+  line-height: 1.4;
+}

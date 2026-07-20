@@ -292,6 +292,140 @@ export function buildExecutiveInsight(
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Phase E2.6 — section-level "so what" density pass. Short (5-15 word),
+// one-line captions for the report's charts/tables, distinct from the
+// section-level Executive Insight above: the Executive Insight covers the
+// whole section's recommendation, these state the specific takeaway visible
+// in ONE visual, derived only from fields already on DiagnosticContext.
+// Deterministic string templates only, no LLM. Shared here so any caption
+// that appears on both the result page and the PDF (dimension bars, ROI
+// tiles, risk register) can never independently drift — see file header.
+// ─────────────────────────────────────────────────────────────────────────
+
+type DimensionKey = 'strategy' | 'data' | 'process' | 'people' | 'governance' | 'security'
+const DIM_ORDER: DimensionKey[] = ['strategy', 'data', 'process', 'people', 'governance', 'security']
+
+/**
+ * Radar chart caption (page-only — the PDF renders a static score arc, not
+ * a radar). States how far the weakest dimension trails the average of the
+ * other five, the thing a reader can't get from the axis labels alone.
+ */
+export function buildDimensionSpreadCaption(
+  scores: Record<string, number>,
+): string {
+  const vals = DIM_ORDER.map((k) => Math.round(scores[k] ?? 0))
+  const weakestIdx = vals.indexOf(Math.min(...vals))
+  const weakestKey = DIM_ORDER[weakestIdx]
+  const others = vals.filter((_, i) => i !== weakestIdx)
+  const avgOthers = others.reduce((a, b) => a + b, 0) / others.length
+  const gap = Math.round(avgOthers - vals[weakestIdx])
+  const label = DIM_LABELS[weakestKey] ?? cap(weakestKey)
+  if (gap <= 3) {
+    return 'Your six dimensions are evenly matched — no single area is dragging the profile down.'
+  }
+  return `${label} is your weakest link — it trails the average of your other five dimensions by ${gap} points.`
+}
+
+/**
+ * Dimension bars caption — shared by the result page (DimensionBenchmarkBars)
+ * and the PDF's dimension-bar block. Only meaningful once an industry
+ * benchmark exists (the bars themselves show "vs median" ticks); returns
+ * null so callers can omit the caption line entirely when there's no
+ * benchmark to summarize, matching the bars' own graceful degradation.
+ */
+export function buildDimensionBenchmarkCaption(
+  scores: Record<string, number>,
+  benchmark: Partial<Record<DimensionKey, { median: number }>> | null | undefined,
+): string | null {
+  if (!benchmark) return null
+  let below = 0
+  let worstGap = -Infinity
+  let worstKey: DimensionKey | null = null
+  for (const key of DIM_ORDER) {
+    const point = benchmark[key]
+    if (!point) continue
+    const score = Math.round(scores[key] ?? 0)
+    if (score < point.median) below += 1
+    const gap = point.median - score
+    if (gap > worstGap) {
+      worstGap = gap
+      worstKey = key
+    }
+  }
+  if (worstKey === null) return null
+  if (below === 0) return 'You are at or above the industry median in every dimension measured.'
+  const label = DIM_LABELS[worstKey] ?? cap(worstKey)
+  return `Below industry median in ${below} of 6 dimensions — ${label} trails furthest, by ${Math.round(worstGap)} points.`
+}
+
+/**
+ * Opportunity matrix caption (page-only — the PDF lists opportunity cards
+ * linearly rather than plotting the impact/effort scatter). States the
+ * quadrant distribution, the thing the scatter shape communicates that the
+ * per-card list below it does not.
+ */
+export function buildOpportunityMatrixCaption(
+  opportunities: Array<{ quadrant: string }>,
+): string | null {
+  if (!Array.isArray(opportunities) || opportunities.length === 0) return null
+  const quickWins = opportunities.filter((o) => o.quadrant === 'quick_win').length
+  if (quickWins === 0) {
+    return 'No quick wins in this set — every opportunity here requires meaningful effort before payoff.'
+  }
+  const pct = Math.round((quickWins / opportunities.length) * 100)
+  return `${quickWins} of ${opportunities.length} opportunities (${pct}%) are quick wins — high impact, low effort.`
+}
+
+/**
+ * ROI metric tile grid caption — shared by the result page (roiGrid) and
+ * the PDF's 2x2 financial tile block. States the labor-vs-process split
+ * behind "Business Value Created", a relationship no single tile shows on
+ * its own. Percentage-only (no currency) so page and PDF never need to pass
+ * a formatter through — avoids re-opening the *Local-vs-*IDR formatting
+ * bug class documented in app/diagnostics/deep/final-result/page.tsx.
+ */
+export function buildRoiTilesCaption(
+  annualLaborSavingsLocal: number | null | undefined,
+  annualProcessSavingsLocal: number | null | undefined,
+): string | null {
+  const labor = annualLaborSavingsLocal ?? 0
+  const process = annualProcessSavingsLocal ?? 0
+  const total = labor + process
+  if (total <= 0) return null
+  const laborPct = Math.round((labor / total) * 100)
+  if (laborPct >= 55) {
+    return `${laborPct}% of this value is recovered labor — process-efficiency gains are secondary.`
+  }
+  if (laborPct <= 45) {
+    return `${100 - laborPct}% of this value comes from process-efficiency gains, not labor alone.`
+  }
+  return 'Value is split evenly between recovered labor and process-efficiency gains.'
+}
+
+/**
+ * Operational Constraints (risk register) caption — shared by the result
+ * page's RiskCard list and the PDF's renderRiskRegister. States whether
+ * high-severity risks cluster around one signal, the pattern a reader would
+ * otherwise have to scan every card to notice.
+ */
+export function buildRiskRegisterCaption(
+  risks: Array<{ severity: 'HIGH' | 'MEDIUM' | 'LOW'; source: string }>,
+): string | null {
+  if (!Array.isArray(risks) || risks.length === 0) return null
+  const highRisks = risks.filter((r) => r.severity === 'HIGH')
+  if (highRisks.length === 0) {
+    return `No high-severity risks — the ${risks.length} flagged item${risks.length === 1 ? '' : 's'} are lower-urgency watch items.`
+  }
+  const counts: Record<string, number> = {}
+  for (const r of highRisks) counts[r.source] = (counts[r.source] ?? 0) + 1
+  const [topSource, topCount] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]
+  if (topCount > 1) {
+    return `${highRisks.length} high-severity risks, concentrated in ${humanizeRiskSource(topSource).toLowerCase()}.`
+  }
+  return `${highRisks.length} high-severity risk${highRisks.length === 1 ? '' : 's'} ${highRisks.length === 1 ? 'requires' : 'require'} attention before scaling automation.`
+}
+
 /**
  * AI Enablement — the closing paragraph on both surfaces. Positions AI as
  * the execution layer of the transformation (Business → Operations →

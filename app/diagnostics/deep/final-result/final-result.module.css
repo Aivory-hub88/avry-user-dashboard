@@ -85,6 +85,17 @@
   color: #7a7a72;
 }
 
+/* Phase E2.6 — one-line "so what" caption under a chart/table, distinct
+   from the section-level Executive Insight (which covers the whole
+   section). Reused across Operational Health, Opportunities, Financial
+   Case and Operational Constraints. */
+.vizCaption {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #a3a39c;
+  line-height: 1.4;
+}
+
 .scorecardChartCol {
   display: flex;
   justify-content: center;

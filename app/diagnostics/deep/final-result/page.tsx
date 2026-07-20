@@ -41,6 +41,10 @@ import {
   buildExecutiveSummary,
   buildExecutiveInsight,
   buildAiEnablement,
+  buildDimensionSpreadCaption,
+  buildOpportunityMatrixCaption,
+  buildRoiTilesCaption,
+  buildRiskRegisterCaption,
   DIM_CONSEQUENCE_CHAINS,
   DIM_LABELS,
 } from '@/lib/readinessNarrative'
@@ -354,6 +358,14 @@ export default function FinalResultPage() {
     weakestLabel: DIM_LABELS[scores.weakestDimension] ?? scores.weakestDimension,
   })
 
+  // Phase E2.6 — section-level "so what" captions. Dimension bars' caption
+  // lives inside DimensionBenchmarkBars itself (shared with the PDF via the
+  // same builder); these four are page-only or need page-local data.
+  const radarCaption = buildDimensionSpreadCaption(scores as unknown as Record<string, number>)
+  const opportunityMatrixCaption = buildOpportunityMatrixCaption(opportunities)
+  const roiTilesCaption = buildRoiTilesCaption(annualLaborSavingsLocal, annualProcessSavingsLocal)
+  const riskRegisterCaption = buildRiskRegisterCaption(risks)
+
   const assessmentBullets: { icon: string; color: string; text: string }[] = [
     { icon: '▲', color: '#afd199', text: `Your company / organization scores ${displayScores.composite}/100, placing it at ${displayScores.maturityLevel} maturity.${_llmScore != null ? ' (composite blended 70% deterministic + 30% AI assessment)' : ''}` },
     { icon: '▲', color: '#afd199', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension)}.` },
@@ -427,7 +439,10 @@ export default function FinalResultPage() {
               <HistorySparkline series={historySeries} />
             </div>
             <div className={styles.scorecardChartCol}>
-              <RadarChart scores={scores} benchmark={industryBenchmark} />
+              <div>
+                <RadarChart scores={scores} benchmark={industryBenchmark} />
+                <p className={styles.vizCaption}>{radarCaption}</p>
+              </div>
             </div>
           </div>
 
@@ -561,11 +576,14 @@ export default function FinalResultPage() {
           {sortedRisks.length === 0 ? (
             <p className={styles.emptyMessage}>No risks detected.</p>
           ) : (
-            <div className={styles.riskList}>
-              {sortedRisks.map(risk => (
-                <RiskCard key={risk.id} risk={risk} />
-              ))}
-            </div>
+            <>
+              {riskRegisterCaption && <p className={styles.vizCaption}>{riskRegisterCaption}</p>}
+              <div className={styles.riskList}>
+                {sortedRisks.map(risk => (
+                  <RiskCard key={risk.id} risk={risk} />
+                ))}
+              </div>
+            </>
           )}
         </div>
 
@@ -576,11 +594,14 @@ export default function FinalResultPage() {
             <p className={styles.emptyMessage}>No opportunities identified.</p>
           ) : (
             <div className={styles.matrixLayout}>
-              <OpportunityMatrix
-                opportunities={opportunities}
-                highlightedId={highlightedId}
-                onDotClick={(id) => setHighlightedId(prev => prev === id ? null : id)}
-              />
+              <div>
+                <OpportunityMatrix
+                  opportunities={opportunities}
+                  highlightedId={highlightedId}
+                  onDotClick={(id) => setHighlightedId(prev => prev === id ? null : id)}
+                />
+                {opportunityMatrixCaption && <p className={styles.vizCaption}>{opportunityMatrixCaption}</p>}
+              </div>
               <div className={styles.opportunityList}>
                 {opportunities.map((opp, idx) => (
                   <OpportunityCard
@@ -651,6 +672,7 @@ export default function FinalResultPage() {
               confidenceLevel={calculations.confidenceLevel}
             />
           </div>
+          {roiTilesCaption && <p className={styles.vizCaption}>{roiTilesCaption}</p>}
 
           {(calculations as any).scenarioThreeYearROI && (
             <div className={styles.scenarioRow}>
