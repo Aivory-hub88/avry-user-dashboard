@@ -38,6 +38,7 @@ import {
   DIM_CONSEQUENCE_CHAINS,
   DIM_LABELS,
 } from '@/lib/readinessNarrative'
+import { quantifyPainPoints, formatPainPointHours } from '@/lib/bottleneckQuantification'
 import styles from './final-result.module.css'
 
 // TODO: add schema version field to DiagnosticContext for forward compatibility
@@ -842,30 +843,35 @@ export default function FinalResultPage() {
                 <span className={styles.contextLabel}>Top Pain Points</span>
                 {qualitative.topPainPoints ? (
                   <ul className={styles.contextBulletList}>
-                    {(() => {
-                      // Numbered lists split on "1. "; free-text answers fall
-                      // back to comma separation so they still render as bullets.
-                      const text = qualVal(qualitative.topPainPoints)
-                      return /\d+\.\s+/.test(text) ? text.split(/\d+\.\s+/) : text.split(/,\s*/)
-                    })()
-                      .filter(s => s.trim())
-                      .map((point, i) => (
+                    {quantifyPainPoints({
+                      topPainPoints: qualitative.topPainPoints,
+                      painPointHours: qualitative.painPointHours,
+                      hoursReclaimedPerYear: calculations.hoursReclaimedPerYear,
+                      assumedHourlyRateLocal: calculations.assumedHourlyRateLocal,
+                    }).map((item, i) => {
+                      const hoursLabel = formatPainPointHours(item)
+                      const costLabel = item.annualCostLocal != null ? fmtLocal(item.annualCostLocal) : null
+                      return (
                         <li key={i} className={styles.contextBulletItem}>
                           <span className={styles.contextBulletIcon}>▶</span>
-                          <span className={styles.contextValue}>{point.trim()}</span>
+                          <span className={styles.contextValue}>
+                            {item.label}
+                            {hoursLabel ? (
+                              <>
+                                {' — '}
+                                <span className={styles.contextBulletFigure}>{hoursLabel}</span>
+                                {costLabel ? ` (~${costLabel}/yr)` : ''}
+                              </>
+                            ) : null}
+                          </span>
                         </li>
-                      ))}
+                      )
+                    })}
                   </ul>
                 ) : (
                   <span className={`${styles.contextValue} ${styles.notProvided}`}>Not provided</span>
                 )}
               </div>
-              {qualitative.painPointHours ? (
-                <div className={styles.contextItem}>
-                  <span className={styles.contextLabel}>Hours per Pain Point</span>
-                  <span className={styles.contextValue}>{qualVal(qualitative.painPointHours)}</span>
-                </div>
-              ) : null}
               <div className={styles.contextItem}>
                 <span className={styles.contextLabel}>Implementation Approach</span>
                 <span className={`${styles.contextValue} ${!qualitative.implementApproach ? styles.notProvided : ''}`}>

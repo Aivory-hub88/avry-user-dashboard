@@ -325,6 +325,13 @@
   flex-shrink: 0;
 }
 
+/* Hours/cost figure appended to a pain-point bullet (E1.5 bottleneck quantification) */
+.contextBulletFigure {
+  color: #fbbf24;
+  font-weight: 600;
+  font-size: 13px;
+}
+
 /* ─── Generate Blueprint CTA ─────────────────────────────────────────────────── */
 .blueprintCta {
   background: #073d34;

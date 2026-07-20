@@ -26,6 +26,7 @@ import {
   formatConsequenceChain,
 } from '@/lib/readinessNarrative'
 import { getIndustryBenchmark, formatVsMedian, BENCHMARK_DISCLAIMER } from '@/lib/industryBenchmarks'
+import { quantifyPainPoints, formatPainPointHours } from '@/lib/bottleneckQuantification'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
 export const INK       = '#0a1a0f'   // primary text, display values
@@ -1863,9 +1864,30 @@ export async function exportReportToPdf(
   y = ensureSpace(pdf, y, 45)
   y = sectionLabel(pdf, y, 'Business Context')
 
+  // E1.5 — enhance each pain point with its estimated hours/cost (real data
+  // from `painPointHours` when present, otherwise an equal-weight allocation
+  // of `hoursReclaimedPerYear` labeled "estimated allocation"). Shared
+  // parsing/formatting with the on-screen result page via bottleneckQuantification.ts.
+  const quantifiedPainPoints = quantifyPainPoints({
+    topPainPoints: qualitative.topPainPoints,
+    painPointHours: qualitative.painPointHours,
+    hoursReclaimedPerYear: calculations.hoursReclaimedPerYear,
+    assumedHourlyRateLocal: calculations.assumedHourlyRateLocal,
+  })
+  const topPainPointsDisplay = quantifiedPainPoints.length > 0
+    ? quantifiedPainPoints
+      .map((item) => {
+        const hoursLabel = formatPainPointHours(item)
+        if (!hoursLabel) return item.label
+        const costLabel = item.annualCostLocal != null ? ` (~${fmt(item.annualCostLocal)}/yr)` : ''
+        return `${item.label} — ${hoursLabel}${costLabel}`
+      })
+      .join('; ')
+    : qstr(qualitative.topPainPoints) || 'Not provided'
+
   const ctxRows: [string, string][] = [
     ['Primary Business Objective', qstr(qualitative.primaryObjective) || 'Not provided'],
-    ['Top Pain Points', qstr(qualitative.topPainPoints) || 'Not provided'],
+    ['Top Pain Points', topPainPointsDisplay],
     ['AI / Technical Capability', qstr(qualitative.aiCapability) || 'Not provided'],
     ['Implementation Approach', qstr(qualitative.implementApproach) || 'Not provided'],
     ['Leadership Alignment', qstr(qualitative.leadershipAlignment) || 'Not provided'],
@@ -1881,7 +1903,8 @@ export async function exportReportToPdf(
   // provided them, so contexts predating the questions render identically.
   if (qstr(qualitative.kpiBaseline)) ctxRows.push(['Operational KPI Baselines', qstr(qualitative.kpiBaseline)])
   if (qstr(qualitative.processOwnership)) ctxRows.push(['Process Ownership', qstr(qualitative.processOwnership)])
-  if (qstr(qualitative.painPointHours)) ctxRows.push(['Hours per Pain Point', qstr(qualitative.painPointHours)])
+  // Note: raw painPointHours text is no longer shown as its own row — it is
+  // now folded into the "Top Pain Points" row above via quantifyPainPoints().
 
   const labelColW = 50
 
