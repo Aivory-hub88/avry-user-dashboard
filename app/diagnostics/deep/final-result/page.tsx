@@ -410,6 +410,47 @@ export default function FinalResultPage() {
           )}
         </div>
 
+        {/* ── Operational Constraints (was Risk Register) ── */}
+        <div className={styles.card}>
+          <h2 className={styles.sectionLabel}>Operational Constraints</h2>
+          {sortedRisks.length === 0 ? (
+            <p className={styles.emptyMessage}>No risks detected.</p>
+          ) : (
+            <div className={styles.riskList}>
+              {sortedRisks.map(risk => (
+                <RiskCard key={risk.id} risk={risk} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Transformation Opportunities ── */}
+        <div className={styles.card}>
+          <h2 className={styles.sectionLabel}>Transformation Opportunities</h2>
+          {opportunities.length === 0 ? (
+            <p className={styles.emptyMessage}>No opportunities identified.</p>
+          ) : (
+            <div className={styles.matrixLayout}>
+              <OpportunityMatrix
+                opportunities={opportunities}
+                highlightedId={highlightedId}
+                onDotClick={(id) => setHighlightedId(prev => prev === id ? null : id)}
+              />
+              <div className={styles.opportunityList}>
+                {opportunities.map((opp, idx) => (
+                  <OpportunityCard
+                    key={opp.id}
+                    opportunity={opp}
+                    isHighlighted={opp.id === highlightedId}
+                    colorIndex={idx}
+                    currencyCode={currencyCode}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* ── Financial Case ── */}
         <div className={styles.card}>
           <h2 className={styles.sectionLabel}>Financial Case</h2>
@@ -583,46 +624,52 @@ export default function FinalResultPage() {
           )}
         </div>
 
-        {/* ── Transformation Opportunities ── */}
-        <div className={styles.card}>
-          <h2 className={styles.sectionLabel}>Transformation Opportunities</h2>
-          {opportunities.length === 0 ? (
-            <p className={styles.emptyMessage}>No opportunities identified.</p>
-          ) : (
-            <div className={styles.matrixLayout}>
-              <OpportunityMatrix
-                opportunities={opportunities}
-                highlightedId={highlightedId}
-                onDotClick={(id) => setHighlightedId(prev => prev === id ? null : id)}
-              />
-              <div className={styles.opportunityList}>
-                {opportunities.map((opp, idx) => (
-                  <OpportunityCard
-                    key={opp.id}
-                    opportunity={opp}
-                    isHighlighted={opp.id === highlightedId}
-                    colorIndex={idx}
-                    currencyCode={currencyCode}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── Risk Register ── */}
-        <div className={styles.card}>
-          <h2 className={styles.sectionLabel}>Risk Register</h2>
-          {sortedRisks.length === 0 ? (
-            <p className={styles.emptyMessage}>No risks detected.</p>
-          ) : (
-            <div className={styles.riskList}>
-              {sortedRisks.map(risk => (
-                <RiskCard key={risk.id} risk={risk} />
+        {/* ── Operational Improvement Priorities ── */}
+        {Array.isArray(context.roomForImprovement) && context.roomForImprovement.length > 0 && (
+          <div className={styles.card}>
+            <h2 className={styles.sectionLabel}>Operational Improvement Priorities</h2>
+            <p className={styles.improvementIntro}>
+              Prioritized areas to strengthen before and during AI adoption. These feed directly
+              into your Transformation Blueprint.
+            </p>
+            <div className={styles.improvementList}>
+              {context.roomForImprovement.map((item) => (
+                <div key={item.id} className={styles.improvementItem}>
+                  <div className={styles.improvementHeader}>
+                    <span className={styles.improvementTitle}>{item.title}</span>
+                    <span className={`${styles.improvementBadge} ${styles[`priority_${item.priority}`]}`}>
+                      {item.priority} priority
+                    </span>
+                    <span className={styles.improvementArea}>{item.area}</span>
+                  </div>
+                  <div className={styles.improvementBody}>
+                    <p className={styles.improvementField}>
+                      <span className={styles.improvementFieldLabel}>What to improve</span>
+                      {item.recommendedAction}
+                    </p>
+                    <p className={styles.improvementField}>
+                      <span className={styles.improvementFieldLabel}>Operational impact</span>
+                      {item.operationalImpact}
+                    </p>
+                  </div>
+                  <div className={styles.beforeAfter}>
+                    <div className={`${styles.baCell} ${styles.baBefore}`}>
+                      <span className={styles.baLabel}>Before</span>
+                      <span className={styles.baText}>{item.before}</span>
+                    </div>
+                    <div className={styles.baArrow} aria-hidden="true">
+                      <ArrowRight size={20} strokeWidth={2} />
+                    </div>
+                    <div className={`${styles.baCell} ${styles.baAfter}`}>
+                      <span className={styles.baLabel}>After</span>
+                      <span className={styles.baText}>{item.after}</span>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* ── Business Context — 2-column free-flow ── */}
         <div className={styles.card}>
@@ -726,53 +773,6 @@ export default function FinalResultPage() {
 
           </div>
         </div>
-
-        {/* ── Operational Improvement Priorities ── */}
-        {Array.isArray(context.roomForImprovement) && context.roomForImprovement.length > 0 && (
-          <div className={styles.card}>
-            <h2 className={styles.sectionLabel}>Operational Improvement Priorities</h2>
-            <p className={styles.improvementIntro}>
-              Prioritized areas to strengthen before and during AI adoption. These feed directly
-              into your Transformation Blueprint.
-            </p>
-            <div className={styles.improvementList}>
-              {context.roomForImprovement.map((item) => (
-                <div key={item.id} className={styles.improvementItem}>
-                  <div className={styles.improvementHeader}>
-                    <span className={styles.improvementTitle}>{item.title}</span>
-                    <span className={`${styles.improvementBadge} ${styles[`priority_${item.priority}`]}`}>
-                      {item.priority} priority
-                    </span>
-                    <span className={styles.improvementArea}>{item.area}</span>
-                  </div>
-                  <div className={styles.improvementBody}>
-                    <p className={styles.improvementField}>
-                      <span className={styles.improvementFieldLabel}>What to improve</span>
-                      {item.recommendedAction}
-                    </p>
-                    <p className={styles.improvementField}>
-                      <span className={styles.improvementFieldLabel}>Operational impact</span>
-                      {item.operationalImpact}
-                    </p>
-                  </div>
-                  <div className={styles.beforeAfter}>
-                    <div className={`${styles.baCell} ${styles.baBefore}`}>
-                      <span className={styles.baLabel}>Before</span>
-                      <span className={styles.baText}>{item.before}</span>
-                    </div>
-                    <div className={styles.baArrow} aria-hidden="true">
-                      <ArrowRight size={20} strokeWidth={2} />
-                    </div>
-                    <div className={`${styles.baCell} ${styles.baAfter}`}>
-                      <span className={styles.baLabel}>After</span>
-                      <span className={styles.baText}>{item.after}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* ── Generate Blueprint CTA ── */}
         <div className={styles.blueprintCta}>

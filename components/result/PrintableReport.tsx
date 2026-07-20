@@ -71,40 +71,6 @@ export default function PrintableReport({ context, llmResult }: PrintableReportP
       </div>
 
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>Financial Case</h2>
-        <div className={styles.grid}>
-          <div className={styles.tile}>
-            <div className={styles.tileLabel}>Business Value Created</div>
-            <div className={styles.tileValue} style={totalAnnualSavings && totalAnnualSavings < 0 ? { color: '#dc2626' } : undefined}>{fmtCurrency(totalAnnualSavings)}</div>
-          </div>
-          <div className={styles.tile}>
-            <div className={styles.tileLabel}>Recovered Labor Value</div>
-            <div className={styles.tileValue} style={annualLaborSavings && annualLaborSavings < 0 ? { color: '#dc2626' } : undefined}>{fmtCurrency(annualLaborSavings)}</div>
-          </div>
-          <div className={styles.tile}>
-            <div className={styles.tileLabel}>Process Efficiency Value</div>
-            <div className={styles.tileValue} style={annualProcessSavings && annualProcessSavings < 0 ? { color: '#dc2626' } : undefined}>{fmtCurrency(annualProcessSavings)}</div>
-          </div>
-          <div className={styles.tile}>
-            <div className={styles.tileLabel}>Payback Period</div>
-            <div className={styles.tileValue} style={calculations.paybackMonths && calculations.paybackMonths < 0 ? { color: '#dc2626' } : undefined}>{formatMonths(calculations.paybackMonths)}</div>
-          </div>
-          <div className={styles.tile}>
-            <div className={styles.tileLabel}>3-Year ROI</div>
-            <div className={styles.tileValue} style={(calculations.threeYearROIPercent ?? 0) < 0 ? { color: '#dc2626' } : undefined}>{(calculations.threeYearROIPercent ?? 0) >= 999 ? '>999%' : formatPercent(calculations.threeYearROIPercent ?? 0)}</div>
-          </div>
-          <div className={styles.tile}>
-            <div className={styles.tileLabel}>3-Year NPV (10% discount)</div>
-            <div className={styles.tileValue}>{fmtCurrency(((calculations as any).npv3YearLocal) ?? null)}</div>
-          </div>
-          <div className={styles.tile}>
-            <div className={styles.tileLabel}>Operational Cost of Delay (90 Days)</div>
-            <div className={styles.tileValue} style={costOfInaction90Days && costOfInaction90Days < 0 ? { color: '#dc2626' } : undefined}>{fmtCurrency(costOfInaction90Days)}</div>
-          </div>
-        </div>
-      </div>
-      
-      <div className={styles.section}>
         <h2 className={styles.sectionTitle}>Business Operations Analysis</h2>
         {llmResult ? (
           <>
@@ -154,6 +120,40 @@ export default function PrintableReport({ context, llmResult }: PrintableReportP
             </li>
           ))}
         </ul>
+      </div>
+
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>Financial Case</h2>
+        <div className={styles.grid}>
+          <div className={styles.tile}>
+            <div className={styles.tileLabel}>Business Value Created</div>
+            <div className={styles.tileValue} style={totalAnnualSavings && totalAnnualSavings < 0 ? { color: '#dc2626' } : undefined}>{fmtCurrency(totalAnnualSavings)}</div>
+          </div>
+          <div className={styles.tile}>
+            <div className={styles.tileLabel}>Recovered Labor Value</div>
+            <div className={styles.tileValue} style={annualLaborSavings && annualLaborSavings < 0 ? { color: '#dc2626' } : undefined}>{fmtCurrency(annualLaborSavings)}</div>
+          </div>
+          <div className={styles.tile}>
+            <div className={styles.tileLabel}>Process Efficiency Value</div>
+            <div className={styles.tileValue} style={annualProcessSavings && annualProcessSavings < 0 ? { color: '#dc2626' } : undefined}>{fmtCurrency(annualProcessSavings)}</div>
+          </div>
+          <div className={styles.tile}>
+            <div className={styles.tileLabel}>Payback Period</div>
+            <div className={styles.tileValue} style={calculations.paybackMonths && calculations.paybackMonths < 0 ? { color: '#dc2626' } : undefined}>{formatMonths(calculations.paybackMonths)}</div>
+          </div>
+          <div className={styles.tile}>
+            <div className={styles.tileLabel}>3-Year ROI</div>
+            <div className={styles.tileValue} style={(calculations.threeYearROIPercent ?? 0) < 0 ? { color: '#dc2626' } : undefined}>{(calculations.threeYearROIPercent ?? 0) >= 999 ? '>999%' : formatPercent(calculations.threeYearROIPercent ?? 0)}</div>
+          </div>
+          <div className={styles.tile}>
+            <div className={styles.tileLabel}>3-Year NPV (10% discount)</div>
+            <div className={styles.tileValue}>{fmtCurrency(((calculations as any).npv3YearLocal) ?? null)}</div>
+          </div>
+          <div className={styles.tile}>
+            <div className={styles.tileLabel}>Operational Cost of Delay (90 Days)</div>
+            <div className={styles.tileValue} style={costOfInaction90Days && costOfInaction90Days < 0 ? { color: '#dc2626' } : undefined}>{fmtCurrency(costOfInaction90Days)}</div>
+          </div>
+        </div>
       </div>
     </div>
   )

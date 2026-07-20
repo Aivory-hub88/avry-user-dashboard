@@ -1242,8 +1242,9 @@ function renderScenarioRange(
 }
 
 /**
- * Risk Register renderer — shared by both layout branches (with and without an
- * Operational Improvement Priorities section), replacing two previously duplicated loops.
+ * Operational Constraints (risk register) renderer — shared by both layout branches
+ * (with and without an Operational Improvement Priorities section), replacing two
+ * previously duplicated loops.
  */
 function renderRiskRegister(pdf: jsPDF, y: number, risks: DiagnosticContext['risks']): number {
   if (y > PAGE_H - 30) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 } else { y += 6 }
@@ -1252,7 +1253,7 @@ function renderRiskRegister(pdf: jsPDF, y: number, risks: DiagnosticContext['ris
     setC(pdf, SEC_LBL, 'text')
     pdf.setFont(F(), 'normal')
     pdf.setFontSize(7)
-    const rLblW = spacedText(pdf, 'RISK REGISTER', ML, y, 0.5)
+    const rLblW = spacedText(pdf, 'OPERATIONAL CONSTRAINTS', ML, y, 0.5)
     setC(pdf, ACCENT, 'text')
     pdf.setFontSize(7)
     pdf.text('✓', ML + rLblW + 6, y)
@@ -1261,7 +1262,7 @@ function renderRiskRegister(pdf: jsPDF, y: number, risks: DiagnosticContext['ris
     return y + 8
   }
 
-  y = sectionLabel(pdf, y, 'Risk Register')
+  y = sectionLabel(pdf, y, 'Operational Constraints')
   const sevC: Record<string, string> = { HIGH: '#c04040', MEDIUM: WARN_AMB, LOW: ACCENT }
   const sorted = [...risks].sort((a, b) =>
     ({ HIGH: 0, MEDIUM: 1, LOW: 2 } as Record<string, number>)[a.severity]! -
@@ -1915,7 +1916,7 @@ export async function exportReportToPdf(
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // OPERATIONAL IMPROVEMENT PRIORITIES + RISK REGISTER
+  // OPERATIONAL IMPROVEMENT PRIORITIES + OPERATIONAL CONSTRAINTS (RISK REGISTER)
   // ════════════════════════════════════════════════════════════════════════════
   if (Array.isArray(roomForImprovement) && roomForImprovement.length > 0) {
     y = ensureSpace(pdf, y, 26)
