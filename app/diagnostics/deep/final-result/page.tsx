@@ -49,7 +49,7 @@ import {
   DIM_CONSEQUENCE_CHAINS,
   DIM_LABELS,
 } from '@/lib/readinessNarrative'
-import { quantifyPainPoints, formatPainPointHours } from '@/lib/bottleneckQuantification'
+import { quantifyPainPoints, formatPainPointHours, displayPainPointCost } from '@/lib/bottleneckQuantification'
 import styles from './final-result.module.css'
 
 // TODO: add schema version field to DiagnosticContext for forward compatibility
@@ -962,7 +962,8 @@ export default function FinalResultPage() {
                       assumedHourlyRateLocal: calculations.assumedHourlyRateLocal,
                     }).map((item, i) => {
                       const hoursLabel = formatPainPointHours(item)
-                      const costLabel = item.annualCostLocal != null ? fmtLocal(item.annualCostLocal) : null
+                      const displayCost = displayPainPointCost(item)
+                      const costLabel = displayCost != null ? fmtLocal(displayCost) : null
                       return (
                         <li key={i} className={styles.contextBulletItem}>
                           <span className={styles.contextBulletIcon}>▶</span>

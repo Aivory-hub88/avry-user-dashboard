@@ -192,3 +192,21 @@ export function formatPainPointHours(item: QuantifiedPainPoint): string | null {
   const hrs = Number.isInteger(item.hoursPerWeek) ? String(item.hoursPerWeek) : item.hoursPerWeek.toFixed(1)
   return item.isEstimated ? `~${hrs} hrs/week (estimated allocation)` : `~${hrs} hrs/week`
 }
+
+/**
+ * The cost figure to DISPLAY for a pain point — full precision for real,
+ * user-provided hours; rounded to ~2 significant figures for the
+ * equal-weight fallback. An even split of the same total across N pain
+ * points produces byte-identical costs for every item (e.g. two different
+ * pain points both landing on exactly "IDR 109,042,500/yr") — at full
+ * precision that reads as a copy-paste bug, not a proportional estimate.
+ * Rounding it (to ~IDR 110,000,000) keeps the shared-estimate framing
+ * honest without changing the underlying number used anywhere else.
+ */
+export function displayPainPointCost(item: QuantifiedPainPoint): number | null {
+  const v = item.annualCostLocal
+  if (v == null) return v
+  if (!item.isEstimated || v === 0) return v
+  const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(v))) - 1)
+  return Math.round(v / magnitude) * magnitude
+}

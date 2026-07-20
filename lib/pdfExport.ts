@@ -31,7 +31,7 @@ import {
   buildFoldedConstraintNote,
 } from '@/lib/readinessNarrative'
 import { getIndustryBenchmark, formatVsMedian, BENCHMARK_DISCLAIMER } from '@/lib/industryBenchmarks'
-import { quantifyPainPoints, formatPainPointHours } from '@/lib/bottleneckQuantification'
+import { quantifyPainPoints, formatPainPointHours, displayPainPointCost } from '@/lib/bottleneckQuantification'
 import { getROISensitivity } from '@/services/deepDiagnostic'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
@@ -1823,7 +1823,12 @@ export async function exportReportToPdf(
     : priorRaw
       ? 'Previous AI attempts give the team practical deployment experience to build on.'
       : ''
-  y = renderNarrative(pdf, y, `${company} operates at a "${scores.maturityLevel}" maturity level with a composite score of ${Math.round(scores.composite)}. The strongest dimension is ${DIM_LABELS[strongestKey] ?? cap(strongestKey)} (${scoreOf(strongestKey)}), while ${DIM_LABELS[weakestKey] ?? cap(weakestKey)} (${scoreOf(weakestKey)}) represents the clearest gap and the first constraint to address. ${leadershipClause}${priorClause ? ' ' + priorClause : ''}`)
+  // Deliberately does NOT restate "operates at a [band] maturity level with a
+  // composite score of N" — the Executive Summary directly above already
+  // opens with that exact claim, and the score ring a few lines below shows
+  // it graphically. Repeating it a third way here read as copy-paste filler.
+  // This section's job is the scorecard breakdown, so it leads with that.
+  y = renderNarrative(pdf, y, `${DIM_LABELS[strongestKey] ?? cap(strongestKey)} (${scoreOf(strongestKey)}) is the strongest foundation to build on, while ${DIM_LABELS[weakestKey] ?? cap(weakestKey)} (${scoreOf(weakestKey)}) is the clearest gap and the first constraint to address. ${leadershipClause}${priorClause ? ' ' + priorClause : ''}`)
 
   // ── Two-column: score ring left · dimension bars right ──
   // C6: arcR 20 → 17 (the addendum flagged the ring + caption as oversized /
@@ -1929,130 +1934,14 @@ export async function exportReportToPdf(
     y += 4
   }
 
-  // ── Financial metrics — 2×2 grid ──
-  const gap = 0.4
-  const bdr = 0.2
-  const cellW = (CW - gap - 2 * bdr) / 2
-  const cellH = 40
-  const gridH = cellH * 2 + gap + 2 * bdr
-  const gridY = y
-
-  // Outer container fill (gap/border colour)
-  setC(pdf, TRACK, 'fill')
-  pdf.roundedRect(ML, gridY, CW, gridH, 2, 2, 'F')
-
-  // 4 white cells
-  setC(pdf, '#ffffff', 'fill')
-  const cx0 = ML + bdr
-  const cx1 = ML + bdr + cellW + gap
-  const cy0 = gridY + bdr
-  const cy1 = gridY + bdr + cellH + gap
-  pdf.rect(cx0, cy0, cellW, cellH, 'F')
-  pdf.rect(cx1, cy0, cellW, cellH, 'F')
-  pdf.rect(cx0, cy1, cellW, cellH, 'F')
-  pdf.rect(cx1, cy1, cellW, cellH, 'F')
-
-  // Outer border stroke
-  setC(pdf, TRACK, 'draw')
-  pdf.setLineWidth(0.18)
-  pdf.roundedRect(ML, gridY, CW, gridH, 2, 2, 'S')
-
-  // C2 — one hero metric per section. `hero` renders the value at TS.hero
-  // (30pt) instead of TS.display (19pt) — ~2× the supporting tiles — so a
-  // single figure (Business Value Created) is unmistakably the dominant read
-  // and the other three tiles clearly recede to supporting weight. The value
-  // shrinks to fit its cell so a long currency string (e.g. IDR) can never
-  // overflow the tile box (C6).
-  function tileContent(
-    tx: number, ty: number, tw: number,
-    label: string, value: string, unit: string, sub: string,
-    hero = false,
-  ) {
-    const padX = 8
-    const padY = 9
-    const ix = tx + padX
-    const iy = ty + padY
-    const availW = tw - padX * 2
-
-    // Hero label gets the accent colour to reinforce which tile leads.
-    setC(pdf, hero ? ACCENT : LABEL_A, 'text')
-    pdf.setFont(FB(), 'bold')
-    pdf.setFontSize(6.4)
-    spacedText(pdf, label.toUpperCase(), ix, iy, 0.32)
-
-    setC(pdf, INK, 'text')
-    pdf.setFont(F(), 'normal')
-    // Supporting tiles: 15pt (was 19). Hero: 30pt, shrunk to fit the cell.
-    let vSize = hero ? TS.hero : 15
-    pdf.setFontSize(vSize)
-    while (vSize > 9 && pdf.getTextWidth(value) > availW) {
-      vSize -= 1
-      pdf.setFontSize(vSize)
-    }
-    const valueBaseline = iy + (hero ? 13 : 10)
-    pdf.text(value, ix, valueBaseline)
-
-    setC(pdf, UNIT_C, 'text')
-    pdf.setFont(FB(), 'bold')
-    pdf.setFontSize(8)
-    const unitY = hero ? iy + 19 : iy + 16
-    pdf.text(unit, ix, unitY)
-
-    const subDivY = hero ? iy + 23 : iy + 20
-    setC(pdf, TRACK, 'draw')
-    pdf.setLineWidth(0.18)
-    pdf.line(ix, subDivY, tx + tw - padX, subDivY)
-    setC(pdf, LABEL, 'text')
-    pdf.setFont(F(), 'normal')
-    pdf.setFontSize(7)
-    spacedText(pdf, sub.toUpperCase(), ix, subDivY + 5, 0.15)
-  }
-
-  // Tile 1 — Business Value Created (HERO: the dominant figure of the block)
-  tileContent(cx0, cy0, cellW,
-    'Business Value Created',
-    fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD),
-    'labor + process',
-    // E1.7 — same label text/threshold as the on-screen ROI tiles (lib/readinessNarrative.ts).
-    confidenceTileLabel(calculations.confidenceLevel) ?? 'High confidence',
-    true,
-  )
-
-  // Tile 2 — Recovered Team Capacity
-  tileContent(cx1, cy0, cellW,
-    'Recovered Capacity/yr',
-    calculations.hoursReclaimedPerYear != null
-      ? String(calculations.hoursReclaimedPerYear.toLocaleString()) : '—',
-    'efficiency adjusted',
-    `${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}% efficiency factor`,
-  )
-
-  // Tile 3 — Payback Period. When payback is unknown (no budget provided),
-  // say so instead of rendering a broken claim.
-  const hasPayback = calculations.paybackMonths != null
-  tileContent(cx0, cy1, cellW,
-    'Payback Period',
-    fmtMonths(calculations.paybackMonths),
-    hasPayback ? `on ${fmt(calculations.assumedBudgetMidpointLocal)} investment` : 'not provided',
-    !hasPayback
-      ? 'Requires budget input'
-      : (calculations.paybackMonths as number) <= 36
-        ? 'Investment recovered yr 3'
-        : `Break-even ~${((calculations.paybackMonths as number) / 12).toFixed(1)} yrs`,
-  )
-
-  // Tile 4 — 3-Year ROI
-  const hasRoi3 = calculations.threeYearROIPercent != null
-  tileContent(cx1, cy1, cellW,
-    '3-Year ROI',
-    fmtPct(calculations.threeYearROIPercent),
-    hasRoi3 ? 'net of investment' : 'not provided',
-    calculations.costOfInaction90DaysLocal != null
-      ? `Cost of delay: ${fmt(calculations.costOfInaction90DaysLocal)}/90d`
-      : 'Requires budget input',
-  )
-
-  y = gridY + gridH + 4
+  // (A boxed 4-tile "Financial metrics" preview used to sit here — Business
+  // Value Created / Recovered Capacity / Payback / 3-Year ROI. It was removed
+  // entirely: it fully duplicated the Financial Case section one page later,
+  // which covers the same four figures plus seven more, borderless, in
+  // proper detail. A teaser that repeats what the very next section says in
+  // full is redundant, not a preview — Operational Health now ends with the
+  // scorecard (ring + bars + drivers) and hands off to the Diagnosis.
+  y += 4
 
   // ════════════════════════════════════════════════════════════════════════════
   // EXECUTIVE OPERATIONAL DIAGNOSIS — answers "what's slowing the business
@@ -2196,7 +2085,8 @@ export async function exportReportToPdf(
       .map((item) => {
         const hoursLabel = formatPainPointHours(item)
         if (!hoursLabel) return item.label
-        const costLabel = item.annualCostLocal != null ? ` (~${fmt(item.annualCostLocal)}/yr)` : ''
+        const displayCost = displayPainPointCost(item)
+        const costLabel = displayCost != null ? ` (~${fmt(displayCost)}/yr)` : ''
         return `${item.label} — ${hoursLabel}${costLabel}`
       })
       .join('; ')
