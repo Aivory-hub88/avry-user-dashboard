@@ -1458,6 +1458,11 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     dataResidency: answers.data_residency || '',
     annualRevenue: answers.annual_revenue || '',
     industry: answers.industry || '',
+    // Slice-2 optional answers — context/narrative only, never read by any
+    // scoreX() function or the driver table above.
+    kpiBaseline: answers.kpi_baseline || '',
+    processOwnership: answers.process_ownership || '',
+    painPointHours: answers.pain_point_hours || '',
   }
 
   const context: DiagnosticContext = {

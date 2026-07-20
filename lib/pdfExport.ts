@@ -1877,6 +1877,12 @@ export async function exportReportToPdf(
     ['Compliance Requirements', qstr(qualitative.compliance) || 'None'],
   ]
 
+  // Slice-2 optional intake answers — appended only when the user actually
+  // provided them, so contexts predating the questions render identically.
+  if (qstr(qualitative.kpiBaseline)) ctxRows.push(['Operational KPI Baselines', qstr(qualitative.kpiBaseline)])
+  if (qstr(qualitative.processOwnership)) ctxRows.push(['Process Ownership', qstr(qualitative.processOwnership)])
+  if (qstr(qualitative.painPointHours)) ctxRows.push(['Hours per Pain Point', qstr(qualitative.painPointHours)])
+
   const labelColW = 50
 
   ctxRows.forEach(([lbl, val]) => {

@@ -464,6 +464,11 @@ export interface DiagnosticContext {
     annualRevenue?: string
     /** Raw industry answer — used to re-derive the labor rate when upgrading old results. */
     industry?: string
+    /** Slice-2 optional intake answers (2026-07-20) — narrative context only,
+     *  NEVER scored; absent on contexts stored before the questions existed. */
+    kpiBaseline?: string
+    processOwnership?: string
+    painPointHours?: string
   }
 }
 

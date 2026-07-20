@@ -137,6 +137,14 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
         required: true
       },
       {
+        id: 'kpi_baseline',
+        question: 'What are the current baseline values for your most important operational KPIs?',
+        type: 'textarea',
+        placeholder: 'e.g., Order cycle time ~3 days; error rate ~4%; ~1,200 invoices/month',
+        helperText: 'Optional — lets the report anchor improvements against your real numbers (not scored)',
+        required: false
+      },
+      {
         id: 'success_timeline',
         question: 'What is your expected timeline for achieving these goals?',
         type: 'select',
@@ -203,6 +211,19 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
           'Completely ad-hoc'
         ],
         required: true
+      },
+      {
+        id: 'process_ownership',
+        question: 'Who owns your core processes day-to-day?',
+        type: 'radio',
+        options: [
+          'Clear owners with documented accountability',
+          'Owners exist but accountability is informal',
+          'Key processes depend on one or two specific people',
+          'No clear ownership'
+        ],
+        helperText: 'Optional — person-dependency is a key operational risk signal (not scored)',
+        required: false
       },
       {
         id: 'system_integration',
@@ -438,6 +459,14 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
           minLength: 20,
           maxLength: 1000
         }
+      },
+      {
+        id: 'pain_point_hours',
+        question: 'Roughly how many hours per week go into each pain point above?',
+        type: 'textarea',
+        placeholder: 'e.g., Invoice entry ~10 hrs/week; chasing approvals ~5 hrs/week',
+        helperText: 'Optional — sharpens the bottleneck cost estimates in your report (not scored)',
+        required: false
       },
       {
         id: 'decision_speed',

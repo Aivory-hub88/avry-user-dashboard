@@ -820,6 +820,20 @@ export default function FinalResultPage() {
                   {qualVal(qualitative.dataResidency)}
                 </span>
               </div>
+              {/* Slice-2 optional answers — rendered only when provided so
+                  contexts predating the questions look unchanged. */}
+              {qualitative.processOwnership ? (
+                <div className={styles.contextItem}>
+                  <span className={styles.contextLabel}>Process Ownership</span>
+                  <span className={styles.contextValue}>{qualVal(qualitative.processOwnership)}</span>
+                </div>
+              ) : null}
+              {qualitative.kpiBaseline ? (
+                <div className={styles.contextItem}>
+                  <span className={styles.contextLabel}>Operational KPI Baselines</span>
+                  <span className={styles.contextValue}>{qualVal(qualitative.kpiBaseline)}</span>
+                </div>
+              ) : null}
             </div>
 
             {/* Right column */}
@@ -846,6 +860,12 @@ export default function FinalResultPage() {
                   <span className={`${styles.contextValue} ${styles.notProvided}`}>Not provided</span>
                 )}
               </div>
+              {qualitative.painPointHours ? (
+                <div className={styles.contextItem}>
+                  <span className={styles.contextLabel}>Hours per Pain Point</span>
+                  <span className={styles.contextValue}>{qualVal(qualitative.painPointHours)}</span>
+                </div>
+              ) : null}
               <div className={styles.contextItem}>
                 <span className={styles.contextLabel}>Implementation Approach</span>
                 <span className={`${styles.contextValue} ${!qualitative.implementApproach ? styles.notProvided : ''}`}>
