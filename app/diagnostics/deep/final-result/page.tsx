@@ -107,7 +107,7 @@ export default function FinalResultPage() {
       await DeepDiagnosticService.generateBlueprint(
         diagnosticId,
         undefined,
-        diagnosticData.qualitative?.primaryObjective || 'AI readiness improvement',
+        diagnosticData.qualitative?.primaryObjective || 'Business operations improvement',
         diagnosticData
       )
       
@@ -199,7 +199,7 @@ export default function FinalResultPage() {
       // 30% AI assessment) so the PDF's composite matches the on-screen one
       // instead of silently reverting to the raw deterministic score.
       // llmResult must be forwarded too — without it the PDF silently drops
-      // the entire AI Analysis section the user sees on this page.
+      // the entire Business Operations Analysis section the user sees on this page.
       await exportReportToPdf('pdf-print-layout', context.company, { ...context, scores: displayScores }, llmResult)
     } catch (error) {
       console.error('Failed to generate PDF', error)
@@ -240,7 +240,7 @@ export default function FinalResultPage() {
     ? { ...scores, composite: _blended, maturityLevel: maturityFromScore(_blended) }
     : scores
 
-  // Readiness Verdict — identical strings to the PDF (shared builders in
+  // Executive Operational Diagnosis — identical strings to the PDF (shared builders in
   // lib/readinessNarrative.ts), fed the same blended displayScores the PDF gets.
   const dimScoreOf = (k: string) => Math.round((scores as unknown as Record<string, number>)[k] ?? 0)
   const verdictNarrative = buildVerdictNarrative({
@@ -289,9 +289,9 @@ export default function FinalResultPage() {
           isExportingPdf={isExportingPdf}
         />
 
-        {/* ── Executive Scorecard ── */}
+        {/* ── Operational Health ── */}
         <div className={styles.card}>
-          <h2 className={styles.sectionLabel}>Executive Scorecard</h2>
+          <h2 className={styles.sectionLabel}>Operational Health</h2>
 
           {/* Top row: ScoreRing | RadarChart */}
           <div className={styles.scorecardTopRow}>
@@ -331,9 +331,9 @@ export default function FinalResultPage() {
           </div>
         </div>
 
-        {/* ── Readiness Verdict — same narrative the PDF renders ── */}
+        {/* ── Executive Operational Diagnosis — same narrative the PDF renders ── */}
         <div className={styles.card}>
-          <h2 className={styles.sectionLabel}>Readiness Verdict</h2>
+          <h2 className={styles.sectionLabel}>Executive Operational Diagnosis</h2>
           <p className={styles.verdictNarrative}>{verdictNarrative}</p>
           <div className={styles.verdictMoves}>
             {firstMoves.map((move, i) => (
@@ -348,9 +348,9 @@ export default function FinalResultPage() {
           </div>
         </div>
 
-        {/* ── AI Analysis (model-generated; numbers stay deterministic) ── */}
+        {/* ── Business Operations Analysis (model-generated; numbers stay deterministic) ── */}
         <div className={styles.card}>
-          <h2 className={styles.sectionLabel}>AI Analysis</h2>
+          <h2 className={styles.sectionLabel}>Business Operations Analysis</h2>
           {llmResult ? (
             <>
               {(llmResult.narrative_summary || llmResult.narrative) && (
@@ -386,7 +386,7 @@ export default function FinalResultPage() {
                   const opps = llmResult.automation_opportunities ?? llmResult.opportunities
                   return Array.isArray(opps) && opps.length > 0 ? (
                     <div>
-                      <h3 className={styles.aiColLabel}>Automation opportunities</h3>
+                      <h3 className={styles.aiColLabel}>Transformation opportunities</h3>
                       <ul className={styles.aiList}>
                         {opps.slice(0, 5).map((s: string, i: number) => (
                           <li key={i}>{s}</li>
@@ -404,15 +404,15 @@ export default function FinalResultPage() {
             </>
           ) : (
             <p className={styles.aiUnavailable}>
-              AI analysis was unavailable for this submission. The scores and projections
+              Business operations analysis was unavailable for this submission. The scores and projections
               in this report are calculated directly from your answers.
             </p>
           )}
         </div>
 
-        {/* ── ROI Projection ── */}
+        {/* ── Financial Case ── */}
         <div className={styles.card}>
-          <h2 className={styles.sectionLabel}>ROI Projection</h2>
+          <h2 className={styles.sectionLabel}>Financial Case</h2>
 
           {!calculations.hasEnoughDataForProjection && (
             <div className={styles.confidenceBanner}>
@@ -429,11 +429,11 @@ export default function FinalResultPage() {
           )}
 
           <div className={styles.roiGrid}>
-            <ROIMetricTile label="Total Annual Savings" value={totalAnnualSavingsLocal} formatter={fmtLocal} />
-            <ROIMetricTile label="Annual Labor Savings" value={annualLaborSavingsLocal} formatter={fmtLocal} />
-            <ROIMetricTile label="Annual Process Savings" value={annualProcessSavingsLocal} formatter={fmtLocal} />
+            <ROIMetricTile label="Business Value Created" value={totalAnnualSavingsLocal} formatter={fmtLocal} />
+            <ROIMetricTile label="Recovered Labor Value" value={annualLaborSavingsLocal} formatter={fmtLocal} />
+            <ROIMetricTile label="Process Efficiency Value" value={annualProcessSavingsLocal} formatter={fmtLocal} />
             <ROIMetricTile
-              label="Hours Reclaimed / Year"
+              label="Recovered Team Capacity"
               value={calculations.hoursReclaimedPerYear}
               formatter={(v) => `${Math.round(v).toLocaleString('en-US')} hours`}
             />
@@ -448,7 +448,7 @@ export default function FinalResultPage() {
             <ROIMetricTile label="Net Annual Savings" value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtLocal} subtitle="After ongoing cost" />
             <ROIMetricTile label="Net Payback Period" value={(calculations as any).netPaybackMonths ?? null} formatter={formatMonths} subtitle="On net savings" />
             <ROIMetricTile
-              label="Cost of Inaction (90 days)"
+              label="Operational Cost of Delay (90 days)"
               value={costOfInaction90DaysLocal}
               formatter={fmtLocal}
               subtitle={
@@ -485,14 +485,14 @@ export default function FinalResultPage() {
               <p className={styles.assumptionsTitle}>How these figures were calculated</p>
               <ul className={styles.assumptionsList}>
                 <li className={styles.stepRow}>
-                  <span className={styles.stepLabel}>Step 1 — Hours reclaimed/year</span>
+                  <span className={styles.stepLabel}>Step 1 — Recovered team capacity/year</span>
                   <span className={styles.stepValue}>
                     {calculations.hoursReclaimedPerYear} hrs
                     {' = '}manual hours/week × 52 weeks × automation gap × {Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}% efficiency factor
                   </span>
                 </li>
                 <li className={styles.stepRow}>
-                  <span className={styles.stepLabel}>Step 2 — Labor savings</span>
+                  <span className={styles.stepLabel}>Step 2 — Recovered labor value</span>
                   <span className={styles.stepValue}>
                     {fmtLocal(calculations.annualLaborSavingsLocal)} = {calculations.hoursReclaimedPerYear} hrs × <strong>{fmtLocal(calculations.assumedHourlyRateLocal)}/hr</strong>
                     {calculations.smallTeamRateApplied
@@ -501,7 +501,7 @@ export default function FinalResultPage() {
                   </span>
                 </li>
                 <li className={styles.stepRow}>
-                  <span className={styles.stepLabel}>Step 3 — Process savings</span>
+                  <span className={styles.stepLabel}>Step 3 — Process efficiency value</span>
                   <span className={styles.stepValue}>
                     {fmtLocal(calculations.annualProcessSavingsLocal)} = 20% of labor savings (operational overhead reduction — internal benchmark estimate)
                   </span>
@@ -519,7 +519,7 @@ export default function FinalResultPage() {
                   </span>
                 </li>
                 <li className={styles.stepRow}>
-                  <span className={styles.stepLabel}>Step 4 — Total annual savings</span>
+                  <span className={styles.stepLabel}>Step 4 — Business value created</span>
                   <span className={styles.stepValue}>
                     <strong>{fmtLocal(calculations.totalAnnualSavingsLocal)}</strong> = labor + process savings
                   </span>
@@ -583,9 +583,9 @@ export default function FinalResultPage() {
           )}
         </div>
 
-        {/* ── Opportunity Priority Matrix ── */}
+        {/* ── Transformation Opportunities ── */}
         <div className={styles.card}>
-          <h2 className={styles.sectionLabel}>Opportunity Priority Matrix</h2>
+          <h2 className={styles.sectionLabel}>Transformation Opportunities</h2>
           {opportunities.length === 0 ? (
             <p className={styles.emptyMessage}>No opportunities identified.</p>
           ) : (
@@ -624,9 +624,9 @@ export default function FinalResultPage() {
           )}
         </div>
 
-        {/* ── Diagnostic Context — 2-column free-flow ── */}
+        {/* ── Business Context — 2-column free-flow ── */}
         <div className={styles.card}>
-          <h2 className={styles.sectionLabel}>Diagnostic Context</h2>
+          <h2 className={styles.sectionLabel}>Business Context</h2>
           <div className={styles.contextColumns}>
 
             {/* Left column */}
@@ -727,13 +727,13 @@ export default function FinalResultPage() {
           </div>
         </div>
 
-        {/* ── Room for Improvement ── */}
+        {/* ── Operational Improvement Priorities ── */}
         {Array.isArray(context.roomForImprovement) && context.roomForImprovement.length > 0 && (
           <div className={styles.card}>
-            <h2 className={styles.sectionLabel}>Room for Improvement</h2>
+            <h2 className={styles.sectionLabel}>Operational Improvement Priorities</h2>
             <p className={styles.improvementIntro}>
               Prioritized areas to strengthen before and during AI adoption. These feed directly
-              into your AI System Blueprint.
+              into your Transformation Blueprint.
             </p>
             <div className={styles.improvementList}>
               {context.roomForImprovement.map((item) => (
@@ -777,10 +777,10 @@ export default function FinalResultPage() {
         {/* ── Generate Blueprint CTA ── */}
         <div className={styles.blueprintCta}>
           <div className={styles.blueprintCtaLeft}>
-            <h2 className={styles.blueprintCtaTitle}>Next steps: AI System Blueprint</h2>
+            <h2 className={styles.blueprintCtaTitle}>Next steps: Transformation Blueprint</h2>
             <p className={styles.blueprintCtaText}>
-              With this diagnostic result, your AI System Blueprint is ready to generate.
-              Purchase the Blueprint + AI Roadmap to transform these insights into a deployment-ready architecture and actionable execution plan.
+              With this diagnostic result, your Transformation Blueprint is ready to generate.
+              Purchase the Blueprint + Transformation Roadmap to transform these insights into a deployment-ready architecture and actionable execution plan.
             </p>
           </div>
           <div className={styles.blueprintCtaRight}>

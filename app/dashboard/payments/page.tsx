@@ -121,7 +121,7 @@ export default function PaymentsPage() {
   const getProductName = (product: string) => {
     const names: Record<string, string> = {
       ai_snapshot: "AI Snapshot",
-      ai_blueprint: "AI System Blueprint",
+      ai_blueprint: "Transformation Blueprint",
       subscription: "Subscription",
       credits: "Credits",
     }

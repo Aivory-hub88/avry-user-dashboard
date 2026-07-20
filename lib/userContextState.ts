@@ -55,7 +55,7 @@ export function buildUserContextState(): UserContextState {
         const dims = Object.entries(scores)
           .map(([k, v]) => `${k}: ${v}/100`)
           .join(', ')
-        state.diagnostic_summary = `Overall AI readiness: ${overallAvg}/100. Dimensions: ${dims}.`
+        state.diagnostic_summary = `Overall operational health: ${overallAvg}/100. Dimensions: ${dims}.`
 
         // Add top risk if available
         if (diag.risks && Array.isArray(diag.risks) && diag.risks.length > 0) {
@@ -153,7 +153,7 @@ export function formatUserContextForAI(state: UserContextState): string {
   }
 
   if (state.has_blueprint) {
-    parts.push(` Has AI Blueprint.`)
+    parts.push(` Has Transformation Blueprint.`)
     if (state.blueprint_summary) {
       parts.push(` ${state.blueprint_summary}`)
     }

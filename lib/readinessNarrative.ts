@@ -1,9 +1,9 @@
 /**
- * Single source of truth for the Readiness Verdict narrative shared by the
- * PDF export (lib/pdfExport.ts) and the on-screen final-result page. Both
- * surfaces MUST render these exact strings — the sentences are built here,
- * not copy-pasted, because independent copies are how the report once showed
- * 32.5%, 33% and 38% for the same underlying gap.
+ * Single source of truth for the Executive Operational Diagnosis narrative
+ * shared by the PDF export (lib/pdfExport.ts) and the on-screen final-result
+ * page. Both surfaces MUST render these exact strings — the sentences are
+ * built here, not copy-pasted, because independent copies are how the report
+ * once showed 32.5%, 33% and 38% for the same underlying gap.
  */
 
 function cap(s: string): string {
@@ -42,19 +42,19 @@ export function humanizeRiskSource(src: string): string {
   return RISK_SOURCE_LABELS[src] ?? cap(src.replace(/_/g, ' '))
 }
 
-/** Five-band readiness scale — thresholds mirror services maturityFromScore. */
+/** Five-band operational maturity scale — thresholds mirror services maturityFromScore. */
 export const MATURITY_BANDS: Array<{ level: string; range: string; meaning: string }> = [
-  { level: 'Nascent', range: '0–34', meaning: 'the foundational building blocks — reliable data, documented processes, and clear ownership — are not yet in place, so readiness groundwork should come before any AI deployment' },
-  { level: 'Initiating', range: '35–49', meaning: 'the organization is ready for closely supervised pilots in narrow, low-risk workflows while the underlying data and process foundations are built up' },
-  { level: 'Developing', range: '50–64', meaning: 'the organization is ready to deploy its first production automations in well-bounded, low-risk workflows — but not yet ready for a broad, multi-department AI rollout' },
-  { level: 'Defined', range: '65–79', meaning: 'the organization is ready for systematic AI adoption across several functions, with governance mature enough to manage risk at scale' },
-  { level: 'Optimizing', range: '80–100', meaning: 'AI-ready foundations are in place across the organization, and the focus shifts from readiness to compounding advantage' },
+  { level: 'Nascent', range: '0–34', meaning: 'the foundational building blocks — reliable data, documented processes, and clear ownership — are not yet in place, so operational groundwork should come before any automation investment' },
+  { level: 'Initiating', range: '35–49', meaning: 'the organization can support closely supervised pilots in narrow, low-risk workflows while the underlying data and process foundations are built up' },
+  { level: 'Developing', range: '50–64', meaning: 'the organization can standardise and instrument its core workflows while piloting automation in narrow, low-risk areas — but is not yet ready for a broad, multi-department rollout' },
+  { level: 'Defined', range: '65–79', meaning: 'the organization is ready for systematic operational transformation across several functions, with governance mature enough to manage risk at scale' },
+  { level: 'Optimizing', range: '80–100', meaning: 'well-instrumented operational foundations are in place across the organization, and the focus shifts from standardisation to compounding advantage' },
 ]
 
 /** What a low score in each dimension concretely blocks. */
 export const DIM_CONSTRAINT_NOTES: Record<string, string> = {
-  strategy: 'without quantified KPIs it is hard to prove value and prioritise the next automation',
-  data: 'AI output quality stays capped until core data is centralized and cleaned',
+  strategy: 'without quantified KPIs, improvement value stays invisible and investment decisions stall',
+  data: 'inconsistent operational decisions and capped automation potential persist until core data is centralized and cleaned',
   process: 'automations stay fragile until core workflows are documented and standardized',
   people: 'adoption stalls without skills enablement and clear internal ownership',
   governance: 'scaling automation without oversight structures compounds operational risk',
@@ -86,7 +86,7 @@ export interface VerdictInputs {
 export function buildVerdictNarrative(v: VerdictInputs): string {
   const band = MATURITY_BANDS.find((b) => b.level === v.maturityLevel) ?? MATURITY_BANDS[2]
   const weakestNote = DIM_CONSTRAINT_NOTES[v.weakestKey] ?? 'this dimension needs strengthening before automation can scale'
-  return `With a composite score of ${Math.round(v.composite)}/100, ${v.company} sits in the "${v.maturityLevel}" band (${band.range}) of the five-level Aivory readiness scale (Nascent, Initiating, Developing, Defined, Optimizing). In practical terms, ${band.meaning}. The immediate constraint is ${DIM_LABELS[v.weakestKey] ?? cap(v.weakestKey)} (${v.weakestScore}): ${weakestNote}. ${DIM_LABELS[v.strongestKey] ?? cap(v.strongestKey)} (${v.strongestScore}) is the strongest foundation to build on.`
+  return `With a composite score of ${Math.round(v.composite)}/100, ${v.company} sits in the "${v.maturityLevel}" band (${band.range}) of the five-level Aivory operational maturity scale (Nascent, Initiating, Developing, Defined, Optimizing). In practical terms, ${band.meaning}. The immediate constraint is ${DIM_LABELS[v.weakestKey] ?? cap(v.weakestKey)} (${v.weakestScore}): ${weakestNote}. ${DIM_LABELS[v.strongestKey] ?? cap(v.strongestKey)} (${v.strongestScore}) is the strongest foundation to build on.`
 }
 
 export interface FirstMove {

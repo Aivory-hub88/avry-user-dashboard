@@ -56,7 +56,7 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
         <div className={styles.sampleBanner}>
           <span className={styles.bannerIcon}>i</span>
           <span className={styles.bannerText}>
-            This is a sample AI System Blueprint. In the next phase, this will be generated from your diagnostic.
+            This is a sample Transformation Blueprint. In the next phase, this will be generated from your diagnostic.
           </span>
         </div>
       )}
@@ -68,7 +68,7 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
           <div className={styles.companyName}>{companyName}</div>
 
           <div className={styles.titleRow}>
-            <h1 className={styles.blueprintTitle}>AI System Blueprint</h1>
+            <h1 className={styles.blueprintTitle}>Transformation Blueprint</h1>
             <span className={styles.blueprintId}>{blueprintId}</span>
           </div>
 

@@ -18,7 +18,7 @@ export default function DiagnosticSummary({
       <div className={styles.summaryContent}>
         <div className={styles.scoreSection}>
           <div className={styles.scoreValue}>{score}</div>
-          <div className={styles.scoreLabel}>AI Readiness Score</div>
+          <div className={styles.scoreLabel}>Operational Health Score</div>
         </div>
 
         <div className={styles.maturitySection}>
@@ -29,13 +29,13 @@ export default function DiagnosticSummary({
 
       <div className={styles.ctaSection}>
         <p className={styles.ctaText}>
-          Based on your responses, we can generate a customized AI System Blueprint for your organization.
+          Based on your responses, we can generate a customized Transformation Blueprint for your organization.
         </p>
         <button 
           className={styles.ctaButton}
           onClick={onGenerateBlueprint}
         >
-          Generate AI System Blueprint
+          Generate Transformation Blueprint
         </button>
       </div>
     </div>

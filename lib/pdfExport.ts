@@ -1,5 +1,5 @@
 /**
- * Aivory AI Readiness Assessment Report — Premium Editorial PDF Generator
+ * Aivory Business Operations Assessment Report — Premium Editorial PDF Generator
  *
  * Premium consultancy-grade design (McKinsey / BCG / Deloitte tier).
  * Cover/back: dark background images preserved. Inner pages: white editorial.
@@ -860,7 +860,7 @@ export async function applyPremiumCovers(
 
     // Headline — uppercase, 2 lines, tight leading, lower-left. Width-fitted so
     // the longest line lands at ~122mm regardless of font metrics.
-    const titleLines = (title || 'AI Readiness\nAssessment Report').toUpperCase().split('\n')
+    const titleLines = (title || 'Business Operations\nAssessment').toUpperCase().split('\n')
     setC(pdf, '#ffffff', 'text')
     pdf.setFont(F(), 'normal')
     let tfs = 40
@@ -956,14 +956,14 @@ function editorialSpread(pdf: jsPDF, context: DiagnosticContext) {
   pdf.setFontSize(11.5)
   pdf.setLineHeightFactor(1.7)
 
-  const p1 = `Thank you for completing the AI Readiness Assessment. What follows is a diagnostic of where ${companyLabel} stands today: not a generic scorecard, but a reading of your own answers, your goals, your constraints, and the gap between where you are and where you're aiming to be.`
+  const p1 = `Thank you for completing the Business Operations Assessment. What follows is a diagnostic of where ${companyLabel} stands today: not a generic scorecard, but a reading of your own answers, your goals, your constraints, and the gap between where you are and where you're aiming to be.`
   const p1Lines = pdf.splitTextToSize(p1, CW - 10)
   pdf.text(p1Lines, cx, 94)
   let ny = 94 + p1Lines.length * 6.3 + 8
 
   const p2 = topOppTitle
     ? `The findings point to a clear starting point: ${topOppTitle.toLowerCase()}, alongside the financial case and a sequenced plan to act on it. Every number that follows traces back to what you told us.`
-    : `The pages ahead lay out your composite readiness score, the opportunities with the fastest path to ROI, and a sequenced plan to act on them. Every number that follows traces back to what you told us.`
+    : `The pages ahead lay out your composite operational health score, the opportunities with the fastest path to ROI, and a sequenced plan to act on them. Every number that follows traces back to what you told us.`
   const p2Lines = pdf.splitTextToSize(p2, CW - 10)
   pdf.text(p2Lines, cx, ny)
   ny += p2Lines.length * 6.3 + 14
@@ -990,7 +990,7 @@ function editorialSpread(pdf: jsPDF, context: DiagnosticContext) {
   setC(pdf, '#8fb87f', 'text')
   pdf.setFont(FB(), 'bold')
   pdf.setFontSize(6.4)
-  spacedText(pdf, 'COMPOSITE READINESS SCORE', ML, stripY + 9, 0.3)
+  spacedText(pdf, 'COMPOSITE OPERATIONAL HEALTH SCORE', ML, stripY + 9, 0.3)
 
   setC(pdf, '#ffffff', 'text')
   pdf.setFont(FD(), 'normal')
@@ -1094,7 +1094,7 @@ function qstr(v: unknown): string {
 // DIM_CONSTRAINT_NOTES live in lib/readinessNarrative.ts — shared verbatim
 // with the on-screen result page.
 
-/** Labeled bullet list used by the AI Analysis section. Handles page breaks. */
+/** Labeled bullet list used by the Business Operations Analysis section. Handles page breaks. */
 function renderAiList(pdf: jsPDF, y: number, heading: string, items: string[]): number {
   y = ensureSpace(pdf, y, 18)
   setC(pdf, SEC_LBL, 'text')
@@ -1242,8 +1242,8 @@ function renderScenarioRange(
 }
 
 /**
- * Risk Register renderer — shared by both layout branches (with and without a
- * Room for Improvement section), replacing two previously duplicated loops.
+ * Risk Register renderer — shared by both layout branches (with and without an
+ * Operational Improvement Priorities section), replacing two previously duplicated loops.
  */
 function renderRiskRegister(pdf: jsPDF, y: number, risks: DiagnosticContext['risks']): number {
   if (y > PAGE_H - 30) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 } else { y += 6 }
@@ -1339,7 +1339,7 @@ export async function exportReportToPdf(
   // ════════════════════════════════════════════════════════════════════════════
   // PAGE 1 — COVER
   // ════════════════════════════════════════════════════════════════════════════
-  await applyPremiumCovers(pdf, 'front', `AI Readiness\nAssessment Report`, {
+  await applyPremiumCovers(pdf, 'front', `Business Operations\nAssessment`, {
     company: context.company,
     date: dateStr,
     reportId,
@@ -1351,14 +1351,14 @@ export async function exportReportToPdf(
   editorialSpread(pdf, context)
 
   // ════════════════════════════════════════════════════════════════════════════
-  // EXECUTIVE SCORECARD
+  // OPERATIONAL HEALTH
   // ════════════════════════════════════════════════════════════════════════════
   pdf.addPage()
   pageBg(pdf)
   pageFooter(pdf)
   let y = 16
 
-  y = sectionLabel(pdf, y, 'Executive Scorecard')
+  y = sectionLabel(pdf, y, 'Operational Health')
 
   // Data-driven narrative — previously a hardcoded template that claimed
   // "fully aligned leadership and previous AI successes" regardless of the
@@ -1462,17 +1462,17 @@ export async function exportReportToPdf(
     spacedText(pdf, sub.toUpperCase(), ix, subDivY + 5.5, 0.15)
   }
 
-  // Tile 1 — Total Annual Savings
+  // Tile 1 — Business Value Created
   tileContent(cx0, cy0, cellW,
-    'Total Annual Savings',
+    'Business Value Created',
     fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD),
     'labor + process',
     `${cap(calculations.confidenceLevel ?? 'medium')} confidence`,
   )
 
-  // Tile 2 — Hours Reclaimed/yr
+  // Tile 2 — Recovered Team Capacity
   tileContent(cx1, cy0, cellW,
-    'Hours Reclaimed/yr',
+    'Recovered Capacity/yr',
     calculations.hoursReclaimedPerYear != null
       ? String(calculations.hoursReclaimedPerYear.toLocaleString()) : '—',
     'efficiency adjusted',
@@ -1500,21 +1500,21 @@ export async function exportReportToPdf(
     fmtPct(calculations.threeYearROIPercent),
     hasRoi3 ? 'net of investment' : 'insufficient data',
     calculations.costOfInaction90DaysLocal != null
-      ? `Cost of inaction: ${fmt(calculations.costOfInaction90DaysLocal)}/90d`
+      ? `Cost of delay: ${fmt(calculations.costOfInaction90DaysLocal)}/90d`
       : 'Requires budget input',
   )
 
   y = gridY + gridH + 4
 
   // ════════════════════════════════════════════════════════════════════════════
-  // READINESS VERDICT — answers "how ready are we, and what do we do first?"
-  // directly from the score band, before any further data.
+  // EXECUTIVE OPERATIONAL DIAGNOSIS — answers "what's slowing the business
+  // down, and what do we do first?" directly from the score band.
   // ════════════════════════════════════════════════════════════════════════════
   y = ensureSpace(pdf, y, 26)
   y = renderTransition(pdf, y, `What this score means for ${company} — and what to do first — is summarised below.`)
 
   y = ensureSpace(pdf, y, 60)
-  y = sectionLabel(pdf, y, 'Readiness Verdict')
+  y = sectionLabel(pdf, y, 'Executive Operational Diagnosis')
 
   y = renderNarrative(pdf, y, buildVerdictNarrative({
     company,
@@ -1542,12 +1542,13 @@ export async function exportReportToPdf(
   })
 
   // ════════════════════════════════════════════════════════════════════════════
-  // AI ANALYSIS — the model-generated narrative the user sees on screen.
-  // Numbers elsewhere stay deterministic; this section is clearly labelled.
+  // BUSINESS OPERATIONS ANALYSIS — the model-generated narrative the user
+  // sees on screen. Numbers elsewhere stay deterministic; this section is
+  // clearly labelled.
   // ════════════════════════════════════════════════════════════════════════════
   if (aiAnalysis && typeof aiAnalysis === 'object') {
     y = ensureSpace(pdf, y, 55)
-    y = sectionLabel(pdf, y, 'AI Analysis')
+    y = sectionLabel(pdf, y, 'Business Operations Analysis')
 
     setC(pdf, LABEL, 'text')
     pdf.setFont(F(), 'normal')
@@ -1571,7 +1572,7 @@ export async function exportReportToPdf(
 
     if (aiStrengths.length) y = renderAiList(pdf, y, 'Strengths', aiStrengths)
     if (aiConstraints.length) y = renderAiList(pdf, y, 'Primary Constraints', aiConstraints)
-    if (aiOpps.length) y = renderAiList(pdf, y, 'Automation Opportunities', aiOpps)
+    if (aiOpps.length) y = renderAiList(pdf, y, 'Transformation Opportunities', aiOpps)
 
     if (typeof aiAnalysis.recommended_next_step === 'string' && aiAnalysis.recommended_next_step.trim()) {
       y = renderNextStepCallout(pdf, y, aiAnalysis.recommended_next_step.trim())
@@ -1582,19 +1583,19 @@ export async function exportReportToPdf(
     pdf.setFont(F(), 'normal')
     pdf.setFontSize(7.5)
     const unavail = pdf.splitTextToSize(
-      'AI analysis was unavailable for this submission. The verdict above and all figures in this report are derived deterministically from your answers.', CW)
+      'Business operations analysis was unavailable for this submission. The diagnosis above and all figures in this report are derived deterministically from your answers.', CW)
     pdf.text(unavail, ML, y)
     y += unavail.length * 4 + 6
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // DIAGNOSTIC CONTEXT — the inputs, placed BEFORE the analysis they ground.
+  // BUSINESS CONTEXT — the inputs, placed BEFORE the analysis they ground.
   // ════════════════════════════════════════════════════════════════════════════
   y = ensureSpace(pdf, y, 26)
-  y = renderTransition(pdf, y, 'That verdict rests on the specific context your team described in this assessment.')
+  y = renderTransition(pdf, y, 'That diagnosis rests on the specific context your team described in this assessment.')
 
   y = ensureSpace(pdf, y, 45)
-  y = sectionLabel(pdf, y, 'Diagnostic Context')
+  y = sectionLabel(pdf, y, 'Business Context')
 
   const ctxRows: [string, string][] = [
     ['Primary Business Objective', qstr(qualitative.primaryObjective) || 'Not provided'],
@@ -1635,13 +1636,13 @@ export async function exportReportToPdf(
   })
 
   // ════════════════════════════════════════════════════════════════════════════
-  // OPPORTUNITY ANALYSIS
+  // TRANSFORMATION OPPORTUNITIES
   // ════════════════════════════════════════════════════════════════════════════
   y = ensureSpace(pdf, y, 26)
   y = renderTransition(pdf, y, 'Against that context, these are the highest-leverage opportunities to pursue first.')
 
   y = ensureSpace(pdf, y, 55)
-  y = sectionLabel(pdf, y, 'Opportunity Analysis')
+  y = sectionLabel(pdf, y, 'Transformation Opportunities')
 
   if (opportunities.length === 0) {
     // Coherent empty state — the previous build rendered the "immediate
@@ -1671,7 +1672,7 @@ export async function exportReportToPdf(
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // ROI PROJECTION
+  // FINANCIAL CASE
   // ════════════════════════════════════════════════════════════════════════════
   y = ensureSpace(pdf, y, 26)
   y = renderTransition(pdf, y, opportunities.length > 0
@@ -1679,7 +1680,7 @@ export async function exportReportToPdf(
     : 'Here is the financial case built from the workload your team reported.')
 
   y = ensureSpace(pdf, y, 70)
-  y = sectionLabel(pdf, y, 'ROI Projection')
+  y = sectionLabel(pdf, y, 'Financial Case')
 
   // Mirror the on-screen low-confidence banner (incl. the missing inputs the
   // page shows) instead of burying confidence in a tile caption.
@@ -1701,8 +1702,8 @@ export async function exportReportToPdf(
     calculations.threeYearROIPercent != null &&
     (calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD) != null
   const roiNarrative = roiComplete
-    ? `An initial AI infrastructure investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} is projected to generate a ${fmtPct(calculations.threeYearROIPercent)} three-year ROI and reclaim ${roiHoursStr} hours of team capacity annually. The financial model indicates full payback in ${((calculations.paybackMonths as number) / 12).toFixed(1)} years, driven by ${roiSavingsStr} in continuous annual savings. Crucially, delaying this deployment incurs a direct "cost of inaction" totaling ${roiInactionStr} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`
-    : `Based on the manual workload your team reported, automation is projected to reclaim ${roiHoursStr} hours of team capacity annually${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, worth an estimated ${roiSavingsStr} in continuous annual savings` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Delaying this deployment carries an estimated "cost of inaction" of ${roiInactionStr} every 90 days.` : ''} Because no implementation budget was provided in the assessment, payback period and three-year ROI are not projected — supplying a budget range completes the financial model. These estimates carry ${calculations.confidenceLevel ?? 'low'} confidence and are based on internal benchmark assumptions rather than client-specific figures.`
+    ? `An initial transformation investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} is projected to generate a ${fmtPct(calculations.threeYearROIPercent)} three-year ROI and reclaim ${roiHoursStr} hours of team capacity annually. The financial model indicates full payback in ${((calculations.paybackMonths as number) / 12).toFixed(1)} years, driven by ${roiSavingsStr} in continuous annual savings. Crucially, delaying this transformation incurs a direct "operational cost of delay" totaling ${roiInactionStr} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`
+    : `Based on the manual workload your team reported, automation is projected to reclaim ${roiHoursStr} hours of team capacity annually${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, worth an estimated ${roiSavingsStr} in continuous annual savings` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Delaying this transformation carries an estimated "operational cost of delay" of ${roiInactionStr} every 90 days.` : ''} Because no implementation budget was provided in the assessment, payback period and three-year ROI are not projected — supplying a budget range completes the financial model. These estimates carry ${calculations.confidenceLevel ?? 'low'} confidence and are based on internal benchmark assumptions rather than client-specific figures.`
   y = renderNarrative(pdf, y, roiNarrative)
 
   // ── 3 primary metrics across top ──
@@ -1710,12 +1711,12 @@ export async function exportReportToPdf(
   const roiW = (CW - roiGap * 2) / 3
   const roiMetrics = [
     {
-      l: 'Total Annual Savings',
+      l: 'Business Value Created',
       v: fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD),
       n: 'labor + process savings',
     },
     {
-      l: 'Hours Reclaimed',
+      l: 'Recovered Team Capacity',
       v: calculations.hoursReclaimedPerYear != null
         ? `${calculations.hoursReclaimedPerYear.toLocaleString()} hrs` : '—',
       n: 'per year, efficiency adjusted',
@@ -1761,10 +1762,10 @@ export async function exportReportToPdf(
 
   // ── Secondary metrics — full parity with the on-screen ROI grid ──
   y = renderMetricGrid(pdf, y, [
-    { l: 'Annual Labor Savings', v: fmt(calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD) },
-    { l: 'Annual Process Savings', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
+    { l: 'Recovered Labor Value', v: fmt(calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD) },
+    { l: 'Process Efficiency Value', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
     { l: 'Payback Period', v: fmtMonths(calculations.paybackMonths) },
-    { l: 'Cost of Inaction (90d)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR) },
+    { l: 'Operational Cost of Delay (90d)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR) },
     { l: '3-Year NPV', v: fmt(cAny.npv3YearLocal), n: 'net present value @ 10% discount' },
     { l: 'Annual Ongoing Cost', v: fmt(cAny.annualOngoingCostLocal), n: 'licenses, maintenance & support' },
     { l: 'Net Annual Savings', v: fmt(cAny.netAnnualSavingsLocal), n: 'after ongoing cost' },
@@ -1795,13 +1796,13 @@ export async function exportReportToPdf(
     const rateNote = calculations.smallTeamRateApplied ? ' (opp-cost)' : ' (industry)'
 
     const stepsRaw: [string, string][] = [
-      ['Hours reclaimed per year',
+      ['Recovered team capacity per year',
         `${hrs} hrs = manual hrs/wk × 52 × gap × ${effPct}%`],
-      ['Annual labor savings',
+      ['Recovered labor value',
         `${fmt(calculations.annualLaborSavingsLocal)} = ${hrs} hrs × ${fmt(calculations.assumedHourlyRateLocal)}/hr${rateNote}`],
-      ['Annual process savings',
+      ['Process efficiency value',
         `${fmt(calculations.annualProcessSavingsLocal)} = 20% of labor savings`],
-      ['Total annual savings',
+      ['Business value created',
         `${fmt(calculations.totalAnnualSavingsLocal)} = labor + process`],
     ]
     if (calculations.assumedBudgetMidpointLocal != null) {
@@ -1914,14 +1915,14 @@ export async function exportReportToPdf(
   }
 
   // ════════════════════════════════════════════════════════════════════════════
-  // ROOM FOR IMPROVEMENT + RISK REGISTER
+  // OPERATIONAL IMPROVEMENT PRIORITIES + RISK REGISTER
   // ════════════════════════════════════════════════════════════════════════════
   if (Array.isArray(roomForImprovement) && roomForImprovement.length > 0) {
     y = ensureSpace(pdf, y, 26)
     y = renderTransition(pdf, y, 'This is where the greatest friction — and the fastest payoff — lies before and during adoption.')
 
     y = ensureSpace(pdf, y, 55)
-    y = sectionLabel(pdf, y, 'Room for Improvement')
+    y = sectionLabel(pdf, y, 'Operational Improvement Priorities')
 
     const rfiCurrent = context.quantitative.currentAutomationPct ?? 0
     const rfiTarget = context.quantitative.targetAutomationPct ?? 0
@@ -1965,7 +1966,7 @@ export async function exportReportToPdf(
   )
 
   y = nextStepRow(pdf, y, '02',
-    'Generate your AI System Blueprint',
+    'Generate your Transformation Blueprint',
     'Turn these findings into a deployment-ready architecture. Your Blueprint maps data sources, agent structure, and workflow sequencing.',
   )
 
@@ -1995,7 +1996,7 @@ export async function exportReportToPdf(
     ? `a "${scores.maturityLevel}" foundation ready for its first structured, low-risk AI deployments`
     : `a "${scores.maturityLevel}" foundation strong enough to move from isolated wins to systemic execution`
 
-  y = renderNarrative(pdf, y, `${company} enters this next phase with a composite readiness score of ${Math.round(scores.composite)} — ${foundationClause}. The path forward is not abstract: it starts with ${closingTopOpp ? closingTopOpp.title.toLowerCase() : 'the highest-impact opportunity identified in this assessment'}${nsGap > 0 ? `, and closes the ${fmtGap(nsGap)} automation gap` : ''} one phase at a time. Every figure in this report traces back to the answers your team provided, and every recommendation is sized to what is realistically achievable within the next planning cycle.`)
+  y = renderNarrative(pdf, y, `${company} enters this next phase with a composite operational health score of ${Math.round(scores.composite)} — ${foundationClause}. The path forward is not abstract: it starts with ${closingTopOpp ? closingTopOpp.title.toLowerCase() : 'the highest-impact opportunity identified in this assessment'}${nsGap > 0 ? `, and closes the ${fmtGap(nsGap)} automation gap` : ''} one phase at a time. Every figure in this report traces back to the answers your team provided, and every recommendation is sized to what is realistically achievable within the next planning cycle.`)
 
   y += 2
   y = renderNarrative(pdf, y,
@@ -2027,5 +2028,5 @@ export async function exportReportToPdf(
   pdf.addPage()
   await applyPremiumCovers(pdf, 'back')
 
-  pdf.save(`AI_Readiness_Report_${companyName.replace(/\s+/g, '_')}.pdf`)
+  pdf.save(`Business_Operations_Assessment_${companyName.replace(/\s+/g, '_')}.pdf`)
 }

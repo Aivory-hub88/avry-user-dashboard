@@ -24,7 +24,7 @@ export default function ExecutiveSummary({
 
       <div className={styles.metricsRow}>
         <div className={styles.metricItem}>
-          <div className={styles.metricLabel}>AI Readiness Score</div>
+          <div className={styles.metricLabel}>Operational Health Score</div>
           <div className={styles.metricValue}>{readinessScore}</div>
         </div>
         <div className={styles.metricItem}>

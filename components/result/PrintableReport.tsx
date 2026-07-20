@@ -50,12 +50,12 @@ export default function PrintableReport({ context, llmResult }: PrintableReportP
   return (
     <div className={styles.printContainer}>
       <div className={styles.header}>
-        <h1 className={styles.title}>AI Readiness Diagnostic</h1>
+        <h1 className={styles.title}>Business Operations Assessment</h1>
         <p className={styles.subtitle}>{company} • {formatDate(context.submittedAt)}</p>
       </div>
 
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>Executive Scorecard</h2>
+        <h2 className={styles.sectionTitle}>Operational Health</h2>
         <div className={styles.scorecardRow}>
           <ScoreRing score={_composite} maturityLevel={_maturity} isPrintMode={true} />
           <RadarChart scores={scores} isPrintMode={true} />
@@ -71,18 +71,18 @@ export default function PrintableReport({ context, llmResult }: PrintableReportP
       </div>
 
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>ROI Projection</h2>
+        <h2 className={styles.sectionTitle}>Financial Case</h2>
         <div className={styles.grid}>
           <div className={styles.tile}>
-            <div className={styles.tileLabel}>Total Annual Savings</div>
+            <div className={styles.tileLabel}>Business Value Created</div>
             <div className={styles.tileValue} style={totalAnnualSavings && totalAnnualSavings < 0 ? { color: '#dc2626' } : undefined}>{fmtCurrency(totalAnnualSavings)}</div>
           </div>
           <div className={styles.tile}>
-            <div className={styles.tileLabel}>Annual Labor Savings</div>
+            <div className={styles.tileLabel}>Recovered Labor Value</div>
             <div className={styles.tileValue} style={annualLaborSavings && annualLaborSavings < 0 ? { color: '#dc2626' } : undefined}>{fmtCurrency(annualLaborSavings)}</div>
           </div>
           <div className={styles.tile}>
-            <div className={styles.tileLabel}>Annual Process Savings</div>
+            <div className={styles.tileLabel}>Process Efficiency Value</div>
             <div className={styles.tileValue} style={annualProcessSavings && annualProcessSavings < 0 ? { color: '#dc2626' } : undefined}>{fmtCurrency(annualProcessSavings)}</div>
           </div>
           <div className={styles.tile}>
@@ -98,14 +98,14 @@ export default function PrintableReport({ context, llmResult }: PrintableReportP
             <div className={styles.tileValue}>{fmtCurrency(((calculations as any).npv3YearLocal) ?? null)}</div>
           </div>
           <div className={styles.tile}>
-            <div className={styles.tileLabel}>Cost of Inaction (90 Days)</div>
+            <div className={styles.tileLabel}>Operational Cost of Delay (90 Days)</div>
             <div className={styles.tileValue} style={costOfInaction90Days && costOfInaction90Days < 0 ? { color: '#dc2626' } : undefined}>{fmtCurrency(costOfInaction90Days)}</div>
           </div>
         </div>
       </div>
       
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>AI Analysis</h2>
+        <h2 className={styles.sectionTitle}>Business Operations Analysis</h2>
         {llmResult ? (
           <>
             {(llmResult.narrative_summary || llmResult.narrative) && (
@@ -139,7 +139,7 @@ export default function PrintableReport({ context, llmResult }: PrintableReportP
           </>
         ) : (
           <p style={{ fontSize: '11px', color: '#6b7280', margin: 0 }}>
-            AI analysis was unavailable for this submission. Scores and projections are computed deterministically from your answers.
+            Business operations analysis was unavailable for this submission. Scores and projections are computed deterministically from your answers.
           </p>
         )}
       </div>

@@ -192,29 +192,29 @@ export function ActivateFeaturesSection() {
 
       <div style={{ zoom: 0.85 }} className="grid grid-cols-1 xl:grid-cols-3 gap-5 lg:gap-6 items-stretch">
         <PricingCard
-          title="AI Readiness Deep Diagnostic"
+          title="Business Operations Deep Diagnostic"
           price={29}
           frequency="/ one time"
           description="Know exactly where your business stands on AI before you build anything."
           features={[
-            'AI readiness score',
+            'Operational health score',
             'Business objective mapping',
             'Gap & constraint analysis',
             'AI opportunity identification',
-            'Data & process readiness'
+            'Data & process maturity'
           ]}
           isActive={hasDiagnostic}
           isLoading={paymentLoading}
-          onActivate={() => handlePayment('ai_diagnostic', 29, 'AI Readiness Deep Diagnostic')}
+          onActivate={() => handlePayment('ai_diagnostic', 29, 'Business Operations Deep Diagnostic')}
         />
 
         <PricingCard
-          title="AI System Blueprint + Roadmap"
+          title="Transformation Blueprint + Roadmap"
           price={85}
           frequency="/ one time"
           description="Your full AI architecture and execution plan, built around your business, not a template."
           features={[
-            'Full AI system blueprint',
+            'Full transformation blueprint',
             'Workflow architecture',
             'Agent structure design',
             'Deployment-ready plan',
@@ -223,7 +223,7 @@ export function ActivateFeaturesSection() {
           ]}
           isActive={hasBlueprint}
           isLoading={paymentLoading}
-          onActivate={() => handlePayment('ai_blueprint', 85, 'AI System Blueprint + Roadmap')}
+          onActivate={() => handlePayment('ai_blueprint', 85, 'Transformation Blueprint + Roadmap')}
         />
 
         <PricingCard

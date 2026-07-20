@@ -26,9 +26,9 @@ export const PLANS: Record<string, Plan> = {
     features: ["500 credits", "10 workflows", "Priority support", "AI Snapshot report"],
   },
   blueprint: {
-    name: "AI System Blueprint",
+    name: "Transformation Blueprint",
     price: 85,
-    features: ["2000 credits", "50 workflows", "Priority support", "AI Blueprint report", "Workflow templates"],
+    features: ["2000 credits", "50 workflows", "Priority support", "Transformation Blueprint report", "Workflow templates"],
   },
   enterprise: {
     name: "Enterprise",

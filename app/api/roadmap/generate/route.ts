@@ -101,7 +101,7 @@ Generate 3-4 phases. Each phase should have 2-4 milestones and 2-3 KPIs. Be spec
 
       roadmap = {
         id: parsed.id || `roadmap-${Date.now()}`,
-        title: parsed.title || 'AI Implementation Roadmap',
+        title: parsed.title || 'Transformation Roadmap',
         createdAt: new Date().toISOString(),
         source: source as AiryRoadmap['source'],
         blueprintId,
@@ -126,7 +126,7 @@ Generate 3-4 phases. Each phase should have 2-4 milestones and 2-3 KPIs. Be spec
 function buildFallbackRoadmap(source: string, blueprintId?: string): AiryRoadmap {
   return {
     id: `roadmap-${Date.now()}`,
-    title: 'AI Implementation Roadmap',
+    title: 'Transformation Roadmap',
     createdAt: new Date().toISOString(),
     source: source as AiryRoadmap['source'],
     blueprintId,

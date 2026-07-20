@@ -64,7 +64,7 @@ export default function DashboardPage() {
     ? t('diagnosticsCard.startDiagnostic')
     : t('diagnosticsCard.continueDiagnostic')
   const diagnosticsDescription = deepDiagnosticCompleted
-    ? 'Deep diagnostic complete — your AI readiness report is ready.'
+    ? 'Deep diagnostic complete — your business operations report is ready.'
     : t('diagnosticsCard.descriptionNotStarted')
 
   return (

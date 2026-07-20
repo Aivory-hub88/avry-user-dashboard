@@ -34,7 +34,7 @@
     border-bottom: 1px solid #4a4a46;
   }
 
-/* ─── Executive Scorecard ────────────────────────────────────────────────── */
+/* ─── Operational Health ─────────────────────────────────────────────────── */
 
 /* Top row: ScoreRing | RadarChart */
 .scorecardTopRow {
@@ -147,7 +147,7 @@
   margin: 0;
 }
 
-/* ─── ROI Projection ─────────────────────────────────────────────────────── */
+/* ─── Financial Case ─────────────────────────────────────────────────────── */
 .confidenceBanner {
   border-left: 3px solid #fbbf24;
   background: rgba(251, 191, 36, 0.08);
@@ -194,7 +194,7 @@
   }
 }
 
-/* ─── Opportunity Priority Matrix ────────────────────────────────────────── */
+/* ─── Transformation Opportunities ───────────────────────────────────────── */
 .matrixLayout {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -228,7 +228,7 @@
   gap: 12px;
 }
 
-/* ─── Diagnostic Context — 2-column free-flow ────────────────────────────── */
+/* ─── Business Context — 2-column free-flow ──────────────────────────────── */
 .contextColumns {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -422,7 +422,7 @@
 .assumptionsList li { font-size: 14px; line-height: 1.6; color: #c8c8c4; }
 .assumptionsList li strong { color: #e8e8e6; font-weight: 600; }
 
-/* ─── Room for Improvement ───────────────────────────────────────────────── */
+/* ─── Operational Improvement Priorities ─────────────────────────────────── */
 .improvementIntro { font-size: 15px; color: #a3a39c; margin: 0 0 20px; line-height: 1.6; }
 .improvementList { display: flex; flex-direction: column; gap: 16px; }
 .improvementItem { background: linear-gradient(180deg, rgba(255, 255, 255, 0.028) 0%, rgba(255, 255, 255, 0) 60%), #323230; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 18px 20px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 4px 14px rgba(0, 0, 0, 0.22); }
@@ -466,7 +466,7 @@
 .roiFixLabel { display: block; font-size: 12px; font-weight: 700; color: #afd199; margin-bottom: 3px; }
 
 
-/* ── Readiness Verdict section ── */
+/* ── Executive Operational Diagnosis section ── */
 .verdictNarrative {
   font-size: 0.95rem;
   line-height: 1.7;

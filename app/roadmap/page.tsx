@@ -39,7 +39,7 @@ const LS_START_DATE     = 'aivory_roadmap_start_date';
 const LS_PHASE_COMPLETE = 'aivory_roadmap_phase_complete';
 
 // ─── Cover page intro ─────────────────────────────────────────
-const COVER_INTRO = 'This AI Implementation Roadmap translates the findings from your AI Readiness Assessment and the architectural decisions captured in your System Blueprint into a phased, milestone-driven execution plan. Use it to track deployment progress by checking off milestones, recording KPI actuals against targets, and exporting a snapshot at the end of each phase for stakeholder review. Successful completion at Month 12 means your organization will have automated 62.5% of targeted workflows, reclaimed 361 hours of annual capacity, and established a repeatable framework for the next investment cycle.';
+const COVER_INTRO = 'This Transformation Roadmap translates the findings from your Business Operations Assessment and the architectural decisions captured in your Transformation Blueprint into a phased, milestone-driven execution plan. Use it to track deployment progress by checking off milestones, recording KPI actuals against targets, and exporting a snapshot at the end of each phase for stakeholder review. Successful completion at Month 12 means your organization will have automated 62.5% of targeted workflows, reclaimed 361 hours of annual capacity, and established a repeatable framework for the next investment cycle.';
 
 // ─── Contextual phase descriptions (Feature 3) ───────────────
 const PHASE_DESCRIPTIONS: Record<number, string> = {
@@ -54,8 +54,8 @@ const MILESTONE_RESOURCES: Record<string, { link: string; label: string }> = {
   'first automated workflow': { link: '/blueprint#workflow-module-1', label: 'Blueprint: Workflow Module 1' },
   'connect crm': { link: '/blueprint#data-sources', label: 'Blueprint: Data Sources' },
   'communication tools': { link: '/blueprint#data-sources', label: 'Blueprint: Data Sources' },
-  'review kpi': { link: '/diagnostics/deep/result#roi', label: 'Readiness Report: ROI Projection' },
-  'kpi performance': { link: '/diagnostics/deep/result#roi', label: 'Readiness Report: ROI Projection' },
+  'review kpi': { link: '/diagnostics/deep/result#roi', label: 'Business Operations Report: Financial Case' },
+  'kpi performance': { link: '/diagnostics/deep/result#roi', label: 'Business Operations Report: Financial Case' },
 };
 
 function getResourceForMilestone(title: string): { link: string; label: string } | null {
@@ -736,7 +736,7 @@ Roadmap`, {
   renderAivoryNote(doc, {
     greeting: `Dear ${roadmap.title},`,
     paragraphs: [
-      `This is your AI Implementation Roadmap: the phased, milestone-by-milestone plan that turns your blueprint into deployed, working systems. It sequences what to build, in what order, and how to measure that each phase is landing.`,
+      `This is your Transformation Roadmap: the phased, milestone-by-milestone plan that turns your blueprint into deployed, working systems. It sequences what to build, in what order, and how to measure that each phase is landing.`,
       `Use it as a living document. As your team checks off milestones and records KPI actuals, the roadmap tracks how far you have progressed toward a fully operational AI capability.`,
     ],
     footerStats: [

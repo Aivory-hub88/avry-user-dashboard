@@ -53,7 +53,7 @@ export default function DiagnosticsPage() {
         <header className={styles.pageHeader}>
           <h1 className={styles.pageTitle}>{t('title')}</h1>
           <p className={styles.pageDescription}>
-            Take our comprehensive deep dive assessment to generate a full AI readiness report.
+            Take our comprehensive deep dive assessment to generate a full business operations report.
           </p>
         </header>
 
@@ -62,7 +62,7 @@ export default function DiagnosticsPage() {
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>{t('deepDiagnostic')}</h2>
             <p className={styles.sectionDescription}>
-              4-phase comprehensive assessment covering business objectives, data readiness, risk constraints, and AI opportunity mapping. Generates a full AI readiness report with ROI projections.
+              4-phase comprehensive assessment covering business objectives, data maturity, risk constraints, and AI opportunity mapping. Generates a full business operations report with ROI projections.
             </p>
           </div>
 

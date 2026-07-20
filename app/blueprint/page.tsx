@@ -60,10 +60,10 @@ const BLUEPRINT_INSIGHTS = {
   maturity: 'Emerging',
   heroDescription: `You are already well-positioned to accelerate your AI journey. At the Emerging stage, your organization has established foundational data infrastructure and begun automating key processes — the building blocks for rapid, scalable AI adoption. With focused effort over the next 12 months, you can close the remaining gaps and unlock measurable operational gains.`,
   levers: [
-    { label: 'Data Foundation', text: 'Partially centralized architecture makes it faster to close the remaining gaps and reach full data readiness.' },
+    { label: 'Data Foundation', text: 'Partially centralized architecture makes it faster to close the remaining gaps and reach full data maturity.' },
     { label: 'Automation Level', text: 'Current 25–50% automation creates a clear path to quick wins by extending existing pipelines.' },
     { label: 'Process Documentation', text: '50–75% coverage means your team already has the context needed to design reliable AI workflows.' },
-    { label: 'Team Readiness', text: 'Existing operational knowledge is your strongest asset — AI tools amplify what your team already does well.' },
+    { label: 'Team Enablement', text: 'Existing operational knowledge is your strongest asset — AI tools amplify what your team already does well.' },
   ],
   strategicObjective: {
     goal: 'Achieve 30% operational cost reduction and 40% productivity improvement through targeted AI automation within 12 months.',
@@ -289,7 +289,8 @@ function coerceList(value: any): string[] {
 // so the reader can pick out WHAT builds/runs each stage at a glance.
 const PRODUCT_TERMS = [
   'Aivory Workflow Builder', 'Aivory Console', 'AI Console', 'Aivory Agents',
-  'Deep Diagnostic', 'AI System Blueprint', 'Implementation Roadmap', 'n8n',
+  'Deep Diagnostic', 'AI System Blueprint', 'Transformation Blueprint',
+  'Implementation Roadmap', 'Transformation Roadmap', 'n8n',
 ]
 const PRODUCT_TERMS_RE = new RegExp(`(${PRODUCT_TERMS.join('|')})`, 'g')
 
@@ -455,7 +456,7 @@ function mapBlueprintToInsights(bp: any) {
       impact: coerceToString(k?.expected_impact ?? k?.impact, '—'),
     })).concat(BLUEPRINT_INSIGHTS.metrics.slice((Array.isArray(strategic.kpi_targets) ? strategic.kpi_targets : []).length)),
     currentState: {
-      summary: `Your company is at ${maturity} maturity with an AI readiness score of ${score}/100.`,
+      summary: `Your company is at ${maturity} maturity with an operational health score of ${score}/100.`,
       highlights: [
         ...coerceList(bp.diagnostic_summary?.primary_constraints),
         ...coerceList(risk.data_risks).slice(0, 2),
@@ -560,9 +561,9 @@ function BlueprintInsightsSection({
 
   return (
     <section className={styles.insightsSection}>
-      <h2 className={styles.insightsSectionTitle}>AI Blueprint Insights</h2>
+      <h2 className={styles.insightsSectionTitle}>Transformation Blueprint Insights</h2>
 
-      {/* Card 1 — Readiness Score. Reuses the same ScoreRing component as
+      {/* Card 1 — Operational Health Score. Reuses the same ScoreRing component as
           the Deep Diagnostic report (gradient arc, halo, tick marks, Doto
           Bold center number) so the score reads identically across both
           surfaces instead of a separately hand-rolled ring/font. */}
@@ -572,7 +573,7 @@ function BlueprintInsightsSection({
             <ScoreRing score={s.score} maturityLevel={s.maturity} />
           </div>
           <div className={styles.heroScoreInfo}>
-            <h3 className={styles.heroScoreTitle}>AI Blueprint Readiness Score</h3>
+            <h3 className={styles.heroScoreTitle}>Operational Health Score</h3>
             <div className={styles.heroMaturityBadge}>
               <span className={styles.heroMaturityDot} aria-hidden="true" />
               {s.maturity} Maturity
@@ -1401,7 +1402,7 @@ export default function BlueprintPage() {
           </section>
         )}
 
-        {/* ── AI Blueprint Insights ─────────────────────────── */}
+        {/* ── Transformation Blueprint Insights ─────────────────────────── */}
         <BlueprintInsightsSection
           blueprint={blueprint}
           workflowModules={blueprint.workflow_modules ?? []}
