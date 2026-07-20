@@ -2038,14 +2038,23 @@ export async function exportReportToPdf(
     calculations.paybackMonths != null &&
     calculations.threeYearROIPercent != null &&
     (calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD) != null
+  // Express payback with the SAME months/years threshold the card uses
+  // (fmtMonths: <12 → "N months", ≥12 → "X.X years"), so the prose and the
+  // Payback Period tile can never disagree — the old prose always said
+  // "(months/12).toFixed(1) years", rendering a 9-month payback as "0.8
+  // years" (0.8×12 = 9.6 ≠ 9) beside a card reading "9 mo".
+  const roiPaybackStr = calculations.paybackMonths != null
+    ? ((calculations.paybackMonths as number) >= 12
+        ? `${((calculations.paybackMonths as number) / 12).toFixed(1)} years`
+        : `${Math.round(calculations.paybackMonths as number)} months`)
+    : null
   const roiNarrative = roiComplete
-    ? `An initial transformation investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} is projected to generate a ${fmtPct(calculations.threeYearROIPercent)} three-year ROI and reclaim ${roiHoursStr} hours of team capacity annually. The financial model indicates full payback in ${((calculations.paybackMonths as number) / 12).toFixed(1)} years, driven by ${roiSavingsStr} in continuous annual savings. Crucially, delaying this transformation incurs a direct "operational cost of delay" totaling ${roiInactionStr} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`
+    ? `An initial transformation investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} is projected to generate a ${fmtPct(calculations.threeYearROIPercent)} three-year ROI and reclaim ${roiHoursStr} hours of team capacity annually. The financial model indicates full payback in ${roiPaybackStr}, driven by ${roiSavingsStr} in continuous annual savings. Crucially, delaying this transformation incurs a direct "operational cost of delay" totaling ${roiInactionStr} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`
     : `Based on the manual workload your team reported, automation is projected to reclaim ${roiHoursStr} hours of team capacity annually${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, worth an estimated ${roiSavingsStr} in continuous annual savings` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Delaying this transformation carries an estimated "operational cost of delay" of ${roiInactionStr} every 90 days.` : ''} Because no implementation budget was provided in the assessment, payback period and three-year ROI are not projected — supplying a budget range completes the financial model. These estimates carry ${calculations.confidenceLevel ?? 'low'} confidence and are based on internal benchmark assumptions rather than client-specific figures.`
   // Bold the figures the financial case hinges on: investment, 3-year ROI,
   // payback, savings, and cost-of-delay — the "so what" of the paragraph.
   const roiInvestmentStr = fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)
-  const roiPaybackYearsStr = calculations.paybackMonths != null
-    ? `${((calculations.paybackMonths as number) / 12).toFixed(1)} years` : null
+  const roiPaybackYearsStr = roiPaybackStr
   y = renderNarrativeSegments(pdf, y, boldSubstrings(roiNarrative, roiComplete
     ? [roiInvestmentStr, fmtPct(calculations.threeYearROIPercent), roiPaybackYearsStr, roiSavingsStr, roiInactionStr]
     : [roiSavingsStr, roiInactionStr]))
