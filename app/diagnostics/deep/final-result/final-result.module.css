@@ -498,6 +498,28 @@
   color: #a3a39c;
 }
 
+.advisoryLink {
+  font-size: 0.8125rem;
+  color: #d0e0af;
+  text-decoration: none;
+  text-align: center;
+  white-space: nowrap;
+  opacity: 0.85;
+  transition: opacity 0.15s ease;
+}
+
+.advisoryLink:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  .advisoryLink {
+    text-align: left;
+    white-space: normal;
+  }
+}
+
 /* ─── ROI Methodology Transparency ───────────────────────────────────────── */
 .assumptionsNote {
   margin-top: 20px;

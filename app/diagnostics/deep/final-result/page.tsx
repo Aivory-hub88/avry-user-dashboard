@@ -1038,6 +1038,9 @@ export default function FinalResultPage() {
               {isGeneratingBlueprint ? 'Generating...' : 'Generate Blueprint'}
             </button>
             <span className={styles.blueprintPrice}>$85 One time</span>
+            <a href="mailto:advisory@aivory.uk" className={styles.advisoryLink}>
+              Prefer a guided walkthrough? Talk to our advisory team →
+            </a>
           </div>
         </div>
 
