@@ -48,6 +48,7 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
           'Financial Services / Fintech',
           'Healthcare / Medtech',
           'Manufacturing',
+          'Food & Beverages',
           'Logistics / Supply Chain',
           'Education / Edtech',
           'Media / Entertainment',

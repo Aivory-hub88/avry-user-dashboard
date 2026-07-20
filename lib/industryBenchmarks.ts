@@ -72,6 +72,13 @@ export const INDUSTRY_BENCHMARKS: Record<string, IndustryBenchmark> = {
     strategy: pt(48), data: pt(45), process: pt(60),
     people: pt(50), governance: pt(52), security: pt(45), composite: pt(50),
   },
+  // F&B archetype: process discipline is comparatively strong (production
+  // lines, QC, food-safety routines) but digitization lags manufacturing —
+  // data/strategy lower; governance moderate on compliance (HACCP etc.).
+  'Food & Beverages': {
+    strategy: pt(45), data: pt(42), process: pt(56),
+    people: pt(48), governance: pt(50), security: pt(42), composite: pt(47),
+  },
   'Logistics / Supply Chain': {
     strategy: pt(50), data: pt(50), process: pt(62),
     people: pt(48), governance: pt(48), security: pt(44), composite: pt(50),
