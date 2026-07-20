@@ -2,7 +2,17 @@ import { PhaseConfig } from '@/types/deepDiagnostic'
 
 /**
  * Deep Diagnostic Phase Questions
- * Four sequential phases with comprehensive questions for AI readiness assessment
+ * Four sequential phases assessing business operations maturity — with AI
+ * positioned as the execution layer, not the headline (ops-transformation
+ * narrative, see docs/OPS-TRANSFORMATION-NARRATIVE-BRIEF.md).
+ *
+ * ⚠️ Question `id`s and OPTION STRINGS are load-bearing: the deterministic
+ * scorer, risk classifier, and score-driver table in
+ * services/deepDiagnostic.ts match on the literal option text, and stored
+ * answers (localStorage resume + Postgres) contain the old strings. Reword
+ * question/title/description/helperText/placeholder freely; never change
+ * ids or option strings without a synchronized scorer change +
+ * methodologyVersion bump.
  */
 export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
   {
@@ -83,7 +93,7 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
       },
       {
         id: 'primary_objective',
-        question: 'What is your primary business objective for AI implementation?',
+        question: 'What is the primary business outcome you want to improve?',
         type: 'textarea',
         placeholder: 'Describe your main goal (e.g., reduce operational costs, improve customer experience)',
         helperText: 'Be as specific as possible',
@@ -142,8 +152,8 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
   },
   {
     id: 'data_process_readiness',
-    title: 'Data & Process Readiness',
-    description: 'Assess your data infrastructure and process maturity',
+    title: 'Operations & Data Foundation',
+    description: 'Assess how your core processes and data actually run today',
     questions: [
       {
         id: 'data_centralization',
@@ -235,7 +245,7 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
       },
       {
         id: 'fte_count',
-        question: 'How many full-time employees (FTEs) are in scope for AI automation?',
+        question: 'How many full-time employees (FTEs) are in scope for automation?',
         type: 'select',
         options: [
           '1-5 FTEs',
@@ -258,7 +268,7 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
           'Data warehouse or data lake',
           'Modern data platform (streaming, catalog, governance)'
         ],
-        helperText: 'Higher-maturity data platforms shorten AI time-to-value',
+        helperText: 'Higher-maturity data platforms shorten automation time-to-value',
         required: false
       }
     ]
@@ -270,7 +280,7 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
     questions: [
       {
         id: 'budget_allocated',
-        question: 'Do you have a dedicated budget for AI initiatives?',
+        question: 'Do you have a dedicated budget for operational improvement and automation?',
         type: 'radio',
         options: [
           'Yes, with specific allocation',
@@ -296,7 +306,7 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
       },
       {
         id: 'leadership_alignment',
-        question: 'How aligned is your leadership on AI initiatives?',
+        question: 'How aligned is your leadership on operational transformation?',
         type: 'radio',
         options: [
           'Fully aligned and championing',
@@ -336,7 +346,7 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
       },
       {
         id: 'risk_tolerance',
-        question: 'What is your organization\'s risk tolerance for AI projects?',
+        question: 'What is your organization\'s risk tolerance for operational change and automation?',
         type: 'radio',
         options: [
           'High - willing to experiment and iterate',
@@ -401,8 +411,8 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
   },
   {
     id: 'ai_opportunity_mapping',
-    title: 'AI Opportunity Mapping',
-    description: 'Identify specific areas where AI can add value',
+    title: 'Bottlenecks & Opportunities',
+    description: 'Pinpoint what slows the business down and where to improve first',
     questions: [
       {
         id: 'pain_points',
@@ -442,7 +452,7 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
       },
       {
         id: 'internal_capability',
-        question: 'What is your internal AI/technical capability?',
+        question: 'What is your internal technical capability for automation and AI?',
         type: 'radio',
         options: [
           'Strong AI team with experience',
@@ -454,7 +464,7 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
       },
       {
         id: 'preferred_approach',
-        question: 'What is your preferred approach to AI implementation?',
+        question: 'What is your preferred approach to implementing these improvements?',
         type: 'radio',
         options: [
           'Build in-house with internal team',
@@ -466,7 +476,7 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
       },
       {
         id: 'priority_areas',
-        question: 'Which areas are highest priority for AI implementation?',
+        question: 'Which areas are highest priority for operational improvement?',
         type: 'multiselect',
         options: [
           'Customer service/support',
@@ -497,7 +507,7 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
       },
       {
         id: 'delay_consequence',
-        question: 'What is the consequence of delaying AI implementation by 6-12 months?',
+        question: 'What is the consequence of delaying these operational improvements by 6-12 months?',
         type: 'radio',
         options: [
           'Significant competitive disadvantage',
