@@ -25,6 +25,7 @@ import {
   DIM_CONSEQUENCE_CHAINS,
   formatConsequenceChain,
 } from '@/lib/readinessNarrative'
+import { getIndustryBenchmark, formatVsMedian, BENCHMARK_DISCLAIMER } from '@/lib/industryBenchmarks'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
 export const INK       = '#0a1a0f'   // primary text, display values
@@ -499,6 +500,10 @@ async function scoreArc(
 /** Dimension bar: name (11px #888) · 1.5px track · green fill · value right (Doto 13px #0a1a0f). */
 function dimBar(
   pdf: jsPDF, x: number, y: number, w: number, label: string, score: number,
+  /** Phase E1.1/E2.1 — optional industry median (0-100). Undefined/null =
+   *  no benchmark for this industry, bar renders exactly as before. */
+  medianVsLabel?: string | null,
+  median?: number | null,
 ): number {
   // Name
   setC(pdf, MUTED, 'text')
@@ -506,11 +511,17 @@ function dimBar(
   pdf.setFontSize(8.5) // 11px
   pdf.text(cap(label), x, y + 3)
 
-  // Value — right-aligned, Doto 13px
+  // Value — right-aligned, Doto 13px (with "vs median" note alongside when present)
   setC(pdf, INK, 'text')
   pdf.setFont(FD(), 'normal')
   pdf.setFontSize(10) // 13px
   pdf.text(String(score), x + w, y + 3, { align: 'right' })
+  if (medianVsLabel) {
+    setC(pdf, LABEL, 'text')
+    pdf.setFont(F(), 'italic')
+    pdf.setFontSize(6.2)
+    pdf.text(medianVsLabel, x + w, y + 7.5, { align: 'right' })
+  }
 
   // Track + fill — 1.5px, rounded ends and a gradient fill (matching the
   // on-screen dimension bars) instead of a flat rectangle.
@@ -534,7 +545,15 @@ function dimBar(
     pdf.circle(x + barH / 2, barY, barH / 2, 'F')
   }
 
-  return y + 14
+  // Median tick — thin vertical mark at the industry-median position.
+  if (typeof median === 'number') {
+    const tickX = x + w * (Math.max(0, Math.min(100, median)) / 100)
+    setC(pdf, '#c9b872', 'draw')
+    pdf.setLineWidth(0.35)
+    pdf.line(tickX, barY - 1.6, tickX, barY + 1.6)
+  }
+
+  return y + (medianVsLabel ? 15.5 : 14)
 }
 
 /** Opportunity card — bordered, with header badge, 4-col metrics, impact bar. */
@@ -1421,6 +1440,20 @@ export async function exportReportToPdf(
   const arcR = 20
   await scoreArc(pdf, arcCx, arcCy, arcR, scores.composite, scores.maturityLevel)
 
+  // Phase E1.1/E2.1 — industry benchmark overlay (pure display, no score
+  // change). null when qualitative.industry is missing/unrecognized; every
+  // consumer below degrades to its pre-Phase-E rendering in that case.
+  const industryBenchmark = getIndustryBenchmark(qualitative.industry)
+  if (industryBenchmark) {
+    setC(pdf, LABEL, 'text')
+    pdf.setFont(F(), 'italic')
+    pdf.setFontSize(6.4)
+    pdf.text(
+      formatVsMedian(scores.composite, industryBenchmark.composite) ?? '',
+      arcCx, arcCy + arcR + 15, { align: 'center' },
+    )
+  }
+
   const barX = ML + 82
   const barW = CW - 82
   let by = y + 2
@@ -1433,10 +1466,18 @@ export async function exportReportToPdf(
   dims.forEach((d) => {
     const s = (scores as unknown as Record<string, number | undefined>)[d]
     if (typeof s !== 'number') return
-    by = dimBar(pdf, barX, by, barW, DIM_LABELS[d] ?? d, s)
+    const point = industryBenchmark?.[d]
+    by = dimBar(pdf, barX, by, barW, DIM_LABELS[d] ?? d, s, point ? formatVsMedian(s, point) : null, point?.median ?? null)
   })
+  if (industryBenchmark) {
+    setC(pdf, LABEL, 'text')
+    pdf.setFont(F(), 'italic')
+    pdf.setFontSize(6)
+    pdf.text(BENCHMARK_DISCLAIMER, barX, by + 2, { maxWidth: barW })
+    by += 7
+  }
 
-  y = Math.max(arcCy + arcR + 12, by) + 6
+  y = Math.max(arcCy + arcR + (industryBenchmark ? 20 : 12), by) + 6
 
   // ── Financial metrics — 2×2 grid ──
   const gap = 0.4

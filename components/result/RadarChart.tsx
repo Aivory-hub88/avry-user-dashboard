@@ -1,10 +1,19 @@
 import type { DimensionKey, DimensionScores } from '@/types/diagnostic'
 import { humanizeDimensionKey } from '@/lib/resultFormatters'
+import type { IndustryBenchmark } from '@/lib/industryBenchmarks'
+import { BENCHMARK_DISCLAIMER } from '@/lib/industryBenchmarks'
 import styles from './RadarChart.module.css'
 
 interface RadarChartProps {
   scores: Pick<DimensionScores, 'strategy' | 'data' | 'process' | 'people' | 'governance' | 'security'>
   isPrintMode?: boolean
+  /**
+   * Phase E1.1/E2.1 — optional second faint series showing the industry
+   * median per dimension. When absent (unmatched/missing industry), the
+   * chart renders exactly as before — single series, no overlay, no
+   * disclaimer caption (graceful degradation, brief §8 exit gate).
+   */
+  benchmark?: IndustryBenchmark | null
 }
 
 const CENTER_X = 150
@@ -43,13 +52,18 @@ function guidePolygon(pct: number): string {
   }).join(' ')
 }
 
-export default function RadarChart({ scores, isPrintMode }: RadarChartProps) {
+export default function RadarChart({ scores, isPrintMode, benchmark }: RadarChartProps) {
   const dataPoints = RADAR_AXES.map(({ key, angle }) => {
     const score = scores[key] ?? 0
     return vertex(score, angle)
   })
 
   const dataPolygon = dataPoints.map(p => `${p.x},${p.y}`).join(' ')
+
+  const benchmarkPoints = benchmark
+    ? RADAR_AXES.map(({ key, angle }) => vertex(benchmark[key]?.median ?? 0, angle))
+    : null
+  const benchmarkPolygon = benchmarkPoints ? benchmarkPoints.map(p => `${p.x},${p.y}`).join(' ') : null
 
   return (
     <div className={styles.container}>
@@ -102,6 +116,17 @@ export default function RadarChart({ scores, isPrintMode }: RadarChartProps) {
           )
         })}
 
+        {/* Industry median overlay (E1.1/E2.1) — faint dashed outline, no
+            fill, drawn behind the vertex dots so the real score stays the
+            primary read. Absent entirely when no benchmark is available. */}
+        {benchmarkPolygon && (
+          <polygon
+            className={styles.benchmarkPolygon}
+            points={benchmarkPolygon}
+            stroke={isPrintMode ? '#9a9a90' : undefined}
+          />
+        )}
+
         {/* Data polygon */}
         <polygon
           className={styles.dataPolygon}
@@ -138,6 +163,20 @@ export default function RadarChart({ scores, isPrintMode }: RadarChartProps) {
           )
         })}
       </svg>
+
+      {/* Legend + disclaimer only render when a benchmark overlay exists — a
+          bare caption with no dashed series above it would be confusing, and
+          the disclaimer must sit next to the number/overlay it describes
+          (brief §8), not only in a tooltip. */}
+      {benchmarkPolygon && !isPrintMode && (
+        <div className={styles.benchmarkCaption}>
+          <span className={styles.benchmarkLegend}>
+            <span className={styles.benchmarkLegendSwatch} /> Your score
+            <span className={`${styles.benchmarkLegendSwatch} ${styles.benchmarkLegendSwatchDashed}`} /> Industry median
+          </span>
+          <span className={styles.benchmarkDisclaimer}>{BENCHMARK_DISCLAIMER}</span>
+        </div>
+      )}
     </div>
   )
 }

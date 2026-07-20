@@ -53,8 +53,25 @@
 
 .scorecardRingCol {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+  gap: 8px;
+}
+
+/* Phase E1.1 — composite score vs industry median, under the ring. */
+.compositeBenchmarkCaption {
+  margin: 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: #a3a39c;
+  line-height: 1.4;
+}
+
+.compositeBenchmarkDisclaimer {
+  font-size: 9.5px;
+  font-style: italic;
+  color: #7a7a72;
 }
 
 .scorecardChartCol {

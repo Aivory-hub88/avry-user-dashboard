@@ -8,6 +8,7 @@ import { upgradeDiagnosticContext, DeepDiagnosticService, maturityFromScore } fr
 import HeaderBar from '@/components/result/HeaderBar'
 import ScoreRing from '@/components/result/ScoreRing'
 import RadarChart from '@/components/result/RadarChart'
+import DimensionBenchmarkBars from '@/components/result/DimensionBenchmarkBars'
 import ROIMetricTile from '@/components/result/ROIMetricTile'
 import OpportunityMatrix from '@/components/result/OpportunityMatrix'
 import OpportunityCard from '@/components/result/OpportunityCard'
@@ -25,6 +26,7 @@ import {
   type CurrencyCode,
 } from '@/lib/resultFormatters'
 import { ensureLiveRates, getFxAsOfLabel } from '@/lib/liveRates'
+import { getIndustryBenchmark, formatVsMedian } from '@/lib/industryBenchmarks'
 import {
   buildVerdictNarrative,
   buildFirstMoves,
@@ -249,6 +251,14 @@ export default function FinalResultPage() {
     ? { ...scores, composite: _blended, maturityLevel: maturityFromScore(_blended) }
     : scores
 
+  // Phase E1.1 — industry benchmark overlay (pure display, no score change).
+  // null when qualitative.industry is missing/unrecognized — every consumer
+  // below must degrade gracefully to the pre-Phase-E layout in that case.
+  const industryBenchmark = getIndustryBenchmark(qualitative.industry)
+  const compositeVsMedian = industryBenchmark
+    ? formatVsMedian(displayScores.composite, industryBenchmark.composite)
+    : null
+
   // Executive Operational Diagnosis — identical strings to the PDF (shared builders in
   // lib/readinessNarrative.ts), fed the same blended displayScores the PDF gets.
   const dimScoreOf = (k: string) => Math.round((scores as unknown as Record<string, number>)[k] ?? 0)
@@ -351,9 +361,16 @@ export default function FinalResultPage() {
           <div className={styles.scorecardTopRow}>
             <div className={styles.scorecardRingCol}>
               <ScoreRing score={displayScores.composite} maturityLevel={displayScores.maturityLevel} />
+              {compositeVsMedian && (
+                <p className={styles.compositeBenchmarkCaption}>
+                  {compositeVsMedian}
+                  <br />
+                  <span className={styles.compositeBenchmarkDisclaimer}>Directional benchmark, not a measured statistic.</span>
+                </p>
+              )}
             </div>
             <div className={styles.scorecardChartCol}>
-              <RadarChart scores={scores} />
+              <RadarChart scores={scores} benchmark={industryBenchmark} />
             </div>
           </div>
 
@@ -383,6 +400,8 @@ export default function FinalResultPage() {
               ))}
             </ul>
           </div>
+
+          <DimensionBenchmarkBars scores={scores} benchmark={industryBenchmark} />
         </div>
 
         {/* ── Executive Operational Diagnosis — same narrative the PDF renders ── */}

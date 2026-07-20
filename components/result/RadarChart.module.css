@@ -38,3 +38,54 @@
   fill: #a3a39c;
   dominant-baseline: middle;
 }
+
+/* ── Industry benchmark overlay (E1.1/E2.1) ── */
+.benchmarkPolygon {
+  fill: none;
+  stroke: #d9c98a;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  opacity: 0.7;
+}
+
+.benchmarkCaption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  text-align: center;
+}
+
+.benchmarkLegend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: #a3a39c;
+}
+
+.benchmarkLegendSwatch {
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: #7fae6f;
+  margin-left: 8px;
+}
+
+.benchmarkLegendSwatch:first-child {
+  margin-left: 0;
+}
+
+.benchmarkLegendSwatchDashed {
+  background: repeating-linear-gradient(90deg, #d9c98a 0 3px, transparent 3px 5px);
+}
+
+.benchmarkDisclaimer {
+  font-size: 9.5px;
+  font-style: italic;
+  color: #7a7a72;
+  max-width: 260px;
+  line-height: 1.4;
+}
