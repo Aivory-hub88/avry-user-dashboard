@@ -499,6 +499,11 @@
 }
 
 .advisoryLink {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
   font-size: 0.8125rem;
   color: #d0e0af;
   text-decoration: none;

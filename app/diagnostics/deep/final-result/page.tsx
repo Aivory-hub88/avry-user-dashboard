@@ -21,6 +21,7 @@ import LoadingState from '@/components/result/LoadingState'
 import ErrorCard from '@/components/result/ErrorCard'
 import PrintableReport from '@/components/result/PrintableReport'
 import SectionNavRail from '@/components/result/SectionNavRail'
+import AdvisoryContactModal from '@/components/result/AdvisoryContactModal'
 import { exportReportToPdf } from '@/lib/pdfExport'
 import {
   formatLocalAmount,
@@ -92,6 +93,7 @@ export default function FinalResultPage() {
 
   const [isExportingPdf, setIsExportingPdf] = useState(false)
   const [isGeneratingBlueprint, setIsGeneratingBlueprint] = useState(false)
+  const [isAdvisoryModalOpen, setIsAdvisoryModalOpen] = useState(false)
 
   const handleGenerateBlueprint = async () => {
     if (state.status !== 'loaded') {
@@ -1038,9 +1040,13 @@ export default function FinalResultPage() {
               {isGeneratingBlueprint ? 'Generating...' : 'Generate Blueprint'}
             </button>
             <span className={styles.blueprintPrice}>$85 One time</span>
-            <a href="mailto:advisory@aivory.uk" className={styles.advisoryLink}>
+            <button
+              type="button"
+              className={styles.advisoryLink}
+              onClick={() => setIsAdvisoryModalOpen(true)}
+            >
               Prefer a guided walkthrough? Talk to our advisory team →
-            </a>
+            </button>
           </div>
         </div>
 
@@ -1053,6 +1059,12 @@ export default function FinalResultPage() {
       <div id="pdf-print-layout" style={{ display: 'none' }}>
         <PrintableReport context={context} llmResult={llmResult ?? undefined} />
       </div>
+
+      <AdvisoryContactModal
+        open={isAdvisoryModalOpen}
+        onClose={() => setIsAdvisoryModalOpen(false)}
+        companyName={context.company}
+      />
     </div>
   )
 }
