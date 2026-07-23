@@ -17,6 +17,8 @@ export type NodeIntent =
   | 'cleanup'
   | 'respond'
   | 'filter'
+  | 'switch'
+  | 'code'
   | 'transform'
   | 'schedule'
   | 'rss'
@@ -35,7 +37,11 @@ export const ZEROCLAW_WEBHOOK_URL = process.env.ZEROCLAW_WEBHOOK_URL || ''
 // e.g. "notification" contains "if", "classify" contains "if"
 const INTENT_PATTERNS: Record<NodeIntent, RegExp> = {
   respond: /\brespond\b|return\b|send.*response|reply\b|deliver.*result|webhook.*response|final.*output/i,
-  filter: /condition|\bif\b|decision|\bcheck\b|\bflag\b|\bfilter\b|validate|validation|branch|switch/i,
+  // Must be checked before `filter` — "switch" used to be a filter synonym,
+  // which shadowed a real Switch (multi-branch) intent from ever matching.
+  switch: /\bswitch\b|multi-?way|route.*based on|multiple branches/i,
+  code: /\bcode\b|\bjavascript\b|custom script|\bfunction node\b/i,
+  filter: /condition|\bif\b|decision|\bcheck\b|\bflag\b|\bfilter\b|validate|validation|\bbranch\b/i,
   email: /email|mail\b|smtp|inbox/i,
   messaging: /slack|discord|telegram|whatsapp|\bsms\b|\bteams\b/i,
   schedule: /schedule|cron|daily|hourly|weekly|timer|interval/i,
@@ -62,6 +68,10 @@ export function detectNodeIntent(action: string, tool?: string): NodeIntent {
   if (INTENT_PATTERNS.email.test(text)) return 'email'
   if (INTENT_PATTERNS.messaging.test(text)) return 'messaging'
   if (INTENT_PATTERNS.respond.test(text)) return 'respond'
+  // switch/code checked before filter — filter's "branch" wording would
+  // otherwise shadow both (see INTENT_PATTERNS comment).
+  if (INTENT_PATTERNS.switch.test(text)) return 'switch'
+  if (INTENT_PATTERNS.code.test(text)) return 'code'
   if (INTENT_PATTERNS.filter.test(text)) return 'filter'
   if (INTENT_PATTERNS.schedule.test(text)) return 'schedule'
   if (INTENT_PATTERNS.rss.test(text)) return 'rss'
@@ -94,6 +104,12 @@ interface N8nNode {
   parameters: Record<string, any>
   id?: string
   credentials?: Record<string, { id: string; name: string }>
+  // Retry/error-handling — n8n keeps these as sibling fields on the node
+  // object, not nested inside `parameters`.
+  retryOnFail?: boolean
+  maxTries?: number
+  waitBetweenTries?: number
+  onError?: 'stopWorkflow' | 'continueRegularOutput' | 'continueErrorOutput'
 }
 
 /**
@@ -173,6 +189,44 @@ export function mapIntentToN8nNode(
             ],
             combinator: 'and',
           },
+        },
+      }
+
+    case 'switch':
+      return {
+        ...baseNode,
+        type: 'n8n-nodes-base.switch',
+        typeVersion: 3,
+        parameters: {
+          mode: 'rules',
+          rules: {
+            values: [
+              {
+                conditions: {
+                  options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' },
+                  conditions: [
+                    { leftValue: '={{ $json.response }}', rightValue: '', operator: { type: 'string', operation: 'isNotEmpty' } },
+                  ],
+                  combinator: 'and',
+                },
+                renameOutput: true,
+                outputKey: 'Output 0',
+              },
+            ],
+          },
+          options: { fallbackOutput: 'extra' },
+        },
+      }
+
+    case 'code':
+      return {
+        ...baseNode,
+        type: 'n8n-nodes-base.code',
+        typeVersion: 2,
+        parameters: {
+          mode: 'runOnceForAllItems',
+          language: 'javaScript',
+          jsCode: 'return items;',
         },
       }
 

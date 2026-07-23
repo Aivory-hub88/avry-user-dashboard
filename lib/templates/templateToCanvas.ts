@@ -17,6 +17,8 @@ const INTENT_TO_CATEGORY: Record<NodeIntent, string> = {
   messaging: "channel",
   respond: "channel",
   filter: "condition",
+  switch: "condition",
+  code: "transform",
   schedule: "trigger",
   http: "http",
   database: "http",
@@ -25,6 +27,7 @@ const INTENT_TO_CATEGORY: Record<NodeIntent, string> = {
   ssh: "action",
   cleanup: "action",
   transform: "transform",
+  rss: "http",
   ai: "ai",
 };
 

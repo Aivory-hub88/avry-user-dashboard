@@ -1,0 +1,135 @@
+/* Same dark warm theme as ActivationModal/ApplyTargetDialog */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.modal {
+  background: var(--bg-main, #353531);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  width: 480px;
+  max-width: 95vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 300;
+  font-family: 'Manrope', system-ui, sans-serif;
+  color: #e8e6e1;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #a8a6a2;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e8e6e1;
+}
+
+.hint {
+  font-size: 12px;
+  color: #a8a6a2;
+  line-height: 1.6;
+}
+
+.error {
+  font-size: 12px;
+  color: #f87171;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.rowInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rowVersion {
+  font-size: 12px;
+  font-weight: 700;
+  color: #dddac5;
+}
+
+.rowReason {
+  font-size: 12px;
+  color: #d4d2ce;
+}
+
+.rowDate {
+  font-size: 11px;
+  color: #a8a6a2;
+}
+
+.restoreBtn {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: #a8a6a2;
+  font-size: 12px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.restoreBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+  color: #e8e6e1;
+  border-color: #666864;
+}
+
+.restoreBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

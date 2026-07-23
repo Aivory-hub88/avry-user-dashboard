@@ -35,7 +35,18 @@ export type WorkflowNodeData = {
   config?: NodeConfig;
   // Last test result from "Test this step"
   testResult?: TestStepResult | null;
+  // Retry/error-handling — n8n models these as fields sibling to a node's
+  // `parameters`, not part of them, so this lives outside `NodeConfig`
+  // (which mirrors `parameters`) and applies to any node type uniformly.
+  errorHandling?: NodeErrorHandling;
 };
+
+export interface NodeErrorHandling {
+  retryOnFail?: boolean;
+  maxTries?: number;
+  waitBetweenTries?: number; // milliseconds
+  onError?: 'stopWorkflow' | 'continueRegularOutput' | 'continueErrorOutput';
+}
 
 // ── Node Config Types (discriminated union) ──
 
@@ -52,6 +63,8 @@ export type NodeConfig =
   | RssFeedConfig
   | SlackConfig
   | GmailConfig
+  | SwitchConfig
+  | CodeConfig
   | GenericConfig;
 
 export interface HttpRequestConfig {
@@ -137,6 +150,26 @@ export interface HttpResponseConfig {
   type: 'httpResponse';
   statusCode: number;
   responseBody: string;
+}
+
+export interface SwitchConfig {
+  type: 'switch';
+  /** n8n Switch v3 supports 'rules' (condition-based) and 'expression'
+   *  (numeric-index) modes — the inspector only exposes 'rules' today. */
+  mode: 'rules' | 'expression';
+  rules: {
+    outputKey: string;
+    condition: { field: string; operator: string; value: string };
+  }[];
+  /** 'none' drops unmatched items; 'extra' routes them to one more output. */
+  fallbackOutput: 'none' | 'extra';
+}
+
+export interface CodeConfig {
+  type: 'code';
+  language: 'javaScript' | 'python';
+  mode: 'runOnceForAllItems' | 'runOnceForEachItem';
+  code: string;
 }
 
 export interface GenericConfig {

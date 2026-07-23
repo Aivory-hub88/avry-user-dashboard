@@ -64,6 +64,30 @@ export function extractConfigFromNode(data: WorkflowNodeData): NodeConfig {
         subject: p.subject ?? '',
         message: p.message ?? '',
       };
+    case 'n8n-nodes-base.switch':
+      return {
+        type: 'switch',
+        mode: p.mode === 'expression' ? 'expression' : 'rules',
+        rules: (p.rules?.values ?? []).map((r: any, i: number) => {
+          const c = r.conditions?.conditions?.[0] ?? {};
+          return {
+            outputKey: r.outputKey || `Output ${i}`,
+            condition: {
+              field: c.leftValue ?? '',
+              operator: c.operator?.operation ?? 'equals',
+              value: c.rightValue ?? '',
+            },
+          };
+        }),
+        fallbackOutput: p.options?.fallbackOutput === 'extra' ? 'extra' : 'none',
+      };
+    case 'n8n-nodes-base.code':
+      return {
+        type: 'code',
+        language: p.language === 'python' ? 'python' : 'javaScript',
+        mode: p.mode === 'runOnceForEachItem' ? 'runOnceForEachItem' : 'runOnceForAllItems',
+        code: p.pythonCode ?? p.jsCode ?? '',
+      };
     case 'n8n-nodes-base.openAi':
     case '@n8n/n8n-nodes-langchain.lmChatOpenAi':
       return {
@@ -154,6 +178,12 @@ export function validateConfig(config: NodeConfig): Record<string, string> {
     case 'aiStep':
       if (!config.whatHappens) errors.whatHappens = 'Description is required';
       break;
+    case 'switch':
+      if (config.rules.length === 0) errors.rules = 'At least one rule required';
+      break;
+    case 'code':
+      if (!config.code.trim()) errors.code = 'Code is required';
+      break;
   }
   return errors;
 }
@@ -233,6 +263,14 @@ export function getDeployChecklist(config: NodeConfig, data: WorkflowNodeData): 
       items.push({ label: 'Recipient is set', ok: Boolean(config.to), severity: 'error' });
       items.push({ label: 'Gmail account connected', ok: false, severity: 'warn', hint: 'Attach the Gmail OAuth2 credential in n8n after deploy — Aivory cannot complete Google OAuth for you' });
       break;
+    case 'switch': {
+      const hasRule = config.rules.length > 0 && config.rules.every(r => Boolean(r.condition.field));
+      items.push({ label: 'At least one rule defined', ok: hasRule, severity: 'error', hint: 'Each rule needs a field to compare' });
+      break;
+    }
+    case 'code':
+      items.push({ label: 'Code is not empty', ok: Boolean(config.code.trim()), severity: 'error' });
+      break;
     default: {
       // generic / app nodes
       if (data.category === 'app') {
@@ -281,6 +319,10 @@ export function summarizeConfig(config: NodeConfig): { key: string; value: strin
       return [{ key: 'Channel', value: config.channel || '—' }, { key: 'Token', value: config.botToken ? '••••••' : '—' }];
     case 'gmail':
       return [{ key: 'To', value: config.to || '—' }, { key: 'Subject', value: config.subject || '—' }];
+    case 'switch':
+      return [{ key: 'Rules', value: String(config.rules.length) }, { key: 'Fallback', value: config.fallbackOutput }];
+    case 'code':
+      return [{ key: 'Language', value: config.language }, { key: 'Mode', value: config.mode }];
     default:
       return [];
   }
@@ -295,7 +337,9 @@ export function getNodeTypeLabel(data: WorkflowNodeData): string {
       'n8n-nodes-base.webhook': 'Webhook Trigger',
       'n8n-nodes-base.scheduleTrigger': 'Schedule Trigger',
       'n8n-nodes-base.manualTrigger': 'Manual Trigger',
-      'n8n-nodes-base.if': 'If / Switch',
+      'n8n-nodes-base.if': 'If',
+      'n8n-nodes-base.switch': 'Switch',
+      'n8n-nodes-base.code': 'Code',
       'n8n-nodes-base.set': 'Edit Fields',
       'n8n-nodes-base.respondToWebhook': 'HTTP Response',
       'n8n-nodes-base.rssFeedRead': 'RSS Feed Read',

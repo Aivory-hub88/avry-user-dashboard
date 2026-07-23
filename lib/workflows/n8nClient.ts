@@ -450,6 +450,101 @@ export async function deployAndActivateWithCreds(
   return { n8nWorkflowId: n8nId, n8nWorkflowUrl, n8nWebhookPath }
 }
 
+/**
+ * Fetch a workflow's current n8n JSON using explicit user credentials.
+ * Backs GET /api/n8n/workflow/[id] — WorkflowCanvas.tsx loads an ACTIVE
+ * workflow's canvas straight from n8n (rather than Aivory's own canvas
+ * store) via this exact route.
+ */
+export async function getWorkflowWithCreds(
+  conn: N8nConnectionParams,
+  n8nWorkflowId: string
+): Promise<N8nWorkflowResponse> {
+  const { apiBase, key } = getConnConfig(conn)
+  return await n8nFetch(
+    'get workflow (creds)',
+    `${apiBase}/workflows/${n8nWorkflowId}`,
+    { method: 'GET', headers: authHeaders(key) }
+  ) as N8nWorkflowResponse
+}
+
+/**
+ * Overwrite a workflow's n8n JSON using explicit user credentials.
+ * Backs PUT /api/n8n/workflow/[id] — WorkflowCanvas.tsx's "Save" action for
+ * an ACTIVE workflow (handleSave) writes back through this exact route.
+ */
+export async function updateWorkflowWithCreds(
+  conn: N8nConnectionParams,
+  n8nWorkflowId: string,
+  workflow: Record<string, unknown>
+): Promise<N8nWorkflowResponse> {
+  const { apiBase, key } = getConnConfig(conn)
+  return await n8nFetch(
+    'update workflow (creds)',
+    `${apiBase}/workflows/${n8nWorkflowId}`,
+    { method: 'PUT', headers: authHeaders(key), body: JSON.stringify(workflow) }
+  ) as N8nWorkflowResponse
+}
+
+/**
+ * List recent executions for a workflow using explicit user credentials.
+ * Backs GET /api/n8n/workflow/[id]/executions (Execution Logs tab).
+ */
+export interface N8nExecutionSummary {
+  id: string
+  workflowId?: string
+  status?: string
+  startedAt?: string
+  stoppedAt?: string
+  finished?: boolean
+  mode?: string
+  [key: string]: unknown
+}
+
+export async function getExecutionsWithCreds(
+  conn: N8nConnectionParams,
+  n8nWorkflowId: string,
+  limit = 20
+): Promise<N8nExecutionSummary[]> {
+  const { apiBase, key } = getConnConfig(conn)
+  const url = `${apiBase}/executions?workflowId=${encodeURIComponent(n8nWorkflowId)}&limit=${encodeURIComponent(String(limit))}`
+
+  const result = await n8nFetch('list executions (creds)', url, {
+    method: 'GET',
+    headers: authHeaders(key),
+  }) as { data?: N8nExecutionSummary[] } | N8nExecutionSummary[] | null
+
+  if (Array.isArray(result)) return result
+  return result?.data ?? []
+}
+
+/**
+ * Fetch ONE execution's full per-node input/output data using explicit user
+ * credentials. Unlike getExecutionsWithCreds() (list summaries only), this
+ * is the raw material for fixture capture (lib/workflows/versionRepository.ts's
+ * sibling, dashboard.workflow_fixtures) — n8n's `includeData=true` returns
+ * each node's actual runData, not just the execution's status/timestamps.
+ */
+export interface N8nExecutionDetail extends N8nExecutionSummary {
+  data?: unknown
+  [key: string]: unknown
+}
+
+export async function getExecutionDetailWithCreds(
+  conn: N8nConnectionParams,
+  executionId: string
+): Promise<N8nExecutionDetail> {
+  const { apiBase, key } = getConnConfig(conn)
+  const url = `${apiBase}/executions/${encodeURIComponent(executionId)}?includeData=true`
+
+  const result = await n8nFetch('get execution detail (creds)', url, {
+    method: 'GET',
+    headers: authHeaders(key),
+  }) as N8nExecutionDetail
+
+  return result
+}
+
 // ── Error classification helper ───────────────────────────────────────────────
 
 /**

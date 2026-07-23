@@ -113,7 +113,8 @@
       "errorInvalidCreds": "Invalid n8n credentials. Please check your API key.",
       "errorUnreachable": "Could not reach your n8n instance. Verify the URL.",
       "errorDeployFailed": "Deployment failed. Please try again.",
-      "errorNetwork": "Could not reach server. Check your connection."
+      "errorNetwork": "Could not reach server. Check your connection.",
+      "errorCredentialDbSave": "Credentials saved locally, but the database save failed. They will still work for this session."
     }
   },
   "aivory": {

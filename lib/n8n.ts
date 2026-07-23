@@ -19,6 +19,12 @@ export interface N8nNode {
   disabled?: boolean
   notes?: string
   credentials?: Record<string, any>
+  // Retry/error-handling — sibling fields on the node object, not nested
+  // inside `parameters` (matches n8n's own model).
+  retryOnFail?: boolean
+  maxTries?: number
+  waitBetweenTries?: number
+  onError?: 'stopWorkflow' | 'continueRegularOutput' | 'continueErrorOutput'
 }
 
 // ── Connections ───────────────────────────────────────────────────────────────

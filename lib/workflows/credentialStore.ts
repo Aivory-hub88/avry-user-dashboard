@@ -2,8 +2,9 @@
  * Credential Store — persists and retrieves n8n credentials.
  *
  * Supports two storage backends:
- *   - localStorage (browser-only, immediate)
- *   - database (calls PATCH /api/user/credentials — stub for future)
+ *   - localStorage (browser-only, immediate — always written, regardless of preference)
+ *   - database (PATCH /api/user/credentials, encrypted server-side —
+ *     see lib/workflows/n8nCredentialsServer.ts)
  *
  * This module runs client-side only.
  */
@@ -53,10 +54,14 @@ export function isValidN8nUrl(url: string): boolean {
 // ── localStorage helpers ──────────────────────────────────────────────────────
 
 /**
- * Save credentials. Persists to localStorage immediately.
- * If storagePreference is 'database', also calls the database stub endpoint.
+ * Save credentials. Persists to localStorage immediately (always — this is
+ * the fallback the rest of the app reads from). If storagePreference is
+ * 'database', also awaits a save to the real /api/user/credentials endpoint
+ * and REJECTS on failure — callers must surface this to the user instead of
+ * silently pretending the database save succeeded (it used to 404 against a
+ * stub with no user-visible signal at all).
  */
-export function saveCredentials(creds: N8nCredentials): void {
+export async function saveCredentials(creds: N8nCredentials): Promise<void> {
   const persisted: PersistedCredentials = {
     instanceUrl: creds.instanceUrl,
     apiKey: creds.apiKey,
@@ -66,11 +71,8 @@ export function saveCredentials(creds: N8nCredentials): void {
 
   localStorage.setItem(CRED_KEY, JSON.stringify(persisted))
 
-  // If user chose database storage, also persist server-side (stub)
   if (creds.storagePreference === 'database') {
-    saveToDatabaseStub(persisted).catch((err) => {
-      console.warn('[credentialStore] Database save failed (stub):', err)
-    })
+    await saveToDatabase(persisted)
   }
 }
 
@@ -102,13 +104,10 @@ export function clearCredentials(): void {
   localStorage.removeItem(CRED_KEY)
 }
 
-// ── Database storage stub ─────────────────────────────────────────────────────
+// ── Database storage ──────────────────────────────────────────────────────────
 
-/**
- * Placeholder for future database persistence.
- * Calls PATCH /api/user/credentials — endpoint does not exist yet.
- */
-async function saveToDatabaseStub(creds: PersistedCredentials): Promise<void> {
+/** Persists credentials server-side, encrypted at rest (see app/api/user/credentials/route.ts). */
+async function saveToDatabase(creds: PersistedCredentials): Promise<void> {
   const res = await fetch(asset('/api/user/credentials'), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

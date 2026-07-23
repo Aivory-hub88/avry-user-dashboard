@@ -16,10 +16,12 @@ import { retrieveWorkflowSpec, clearWorkflowSpec, convertHandoffToNodes } from '
 import { StandardNodePalette } from '@/components/workflow/StandardNodePalette'
 import { DynamicNodePalette } from '@/components/workflow/DynamicNodePalette'
 import { clearCanvasState, loadCanvasState } from '@/hooks/useCanvasPersistence'
-import { reactFlowToN8n } from '@/lib/n8nMapper'
+import { reactFlowToN8n, n8nToReactFlow } from '@/lib/n8nMapper'
+import type { N8nWorkflow } from '@/lib/n8n'
 import { ActivationModal } from '@/components/workflow/ActivationModal'
+import { ApplyTargetDialog } from '@/components/workflow/ApplyTargetDialog'
+import { VersionHistoryPanel } from '@/components/workflow/VersionHistoryPanel'
 import { saveCredentials, N8nCredentials } from '@/lib/workflows/credentialStore'
-import { detectNodeIntent } from '@/lib/workflows/nodeMapper'
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
 import { fetchTemplateById } from '@/lib/templates/resolveTemplate'
 import { templateToCanvas } from '@/lib/templates/templateToCanvas'
@@ -662,6 +664,16 @@ function WorkflowsPageInner() {
   const pendingHandoffRef = useRef<{ nodes: any[]; edges: any[] } | null>(null)
   const [canvasCanUndo, setCanvasCanUndo] = useState(false)
   const undoCanvasRef = useRef<(() => void) | null>(null)
+  // Copilot "Apply" while a workflow is already open — holds the built
+  // nodes/edges until the user picks update-existing vs save-as-new-draft.
+  const [pendingApply, setPendingApply] = useState<{
+    rfNodes: any[]
+    rfEdges: any[]
+    workflow: import('@/lib/workflows/copilotClient').GeneratedWorkflow
+    allSteps: { step: number; action: string; tool: string; output: string; type: string; config: Record<string, unknown> }[]
+    title: string
+  } | null>(null)
+  const [showVersionHistory, setShowVersionHistory] = useState(false)
 
   const { pendingContext, clearPendingContext } = useRouterContext()
   const [routingNotice, setRoutingNotice] = useState<string | null>(null)
@@ -700,6 +712,21 @@ function WorkflowsPageInner() {
   }
 
   const selected = workflows.find(w => w.workflow_id === selectedId) ?? null
+
+  // Snapshots the CURRENT (pre-change) spec+canvas for `selected` — call this
+  // BEFORE applying a mutation at one of the 4 real version-history trigger
+  // points (never wired into the debounced canvas autosave, which would be
+  // far too noisy). Fire-and-forget: a version-history hiccup must not block
+  // the save the user is actually waiting on.
+  const snapshotBeforeChange = (reason: 'ai_apply' | 'manual_edit' | 'status_change' | 'title_change') => {
+    if (!selected) return
+    const canvas = loadCanvasState(selected.workflow_id)
+    fetch(asset(`/api/workflows/${selected.workflow_id}/versions`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spec: savedToSpec(selected), canvas, reason }),
+    }).catch(() => {})
+  }
 
   // ── Onboarding empty state ───────────────────────────────
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -832,6 +859,7 @@ function WorkflowsPageInner() {
 
   const handleSaveStep = async (updated: SavedWorkflow) => {
     if (selected) setUndoStack(prev => [...prev.slice(-9), selected])
+    snapshotBeforeChange('manual_edit')
     // If this is an API-backed workflow, patch via API
     if (apiWorkflows.find(aw => aw.id === updated.workflow_id)) {
       try {
@@ -850,6 +878,7 @@ function WorkflowsPageInner() {
 
   const handleStatusChange = async (status: SavedWorkflow['status']) => {
     if (!selected) return
+    snapshotBeforeChange('status_change')
     if (apiWorkflows.find(aw => aw.id === selected.workflow_id)) {
       try {
         await patchWorkflow(selected.workflow_id, { status })
@@ -863,6 +892,7 @@ function WorkflowsPageInner() {
 
   const handleTitleSave = async (newTitle: string) => {
     if (!selected || !newTitle.trim()) return
+    snapshotBeforeChange('title_change')
     if (apiWorkflows.find(aw => aw.id === selected.workflow_id)) {
       try {
         await patchWorkflow(selected.workflow_id, { title: newTitle.trim() })
@@ -982,8 +1012,17 @@ function WorkflowsPageInner() {
     setActivationLoading(true)
     setActivating(true)
     try {
-      // Persist credentials to chosen storage
-      saveCredentials(credentials)
+      // Persist credentials to chosen storage. localStorage is always
+      // written synchronously inside saveCredentials(); a 'database'
+      // preference additionally awaits a real server save and can reject —
+      // that failure must not abort deployment (localStorage already has
+      // the credential), just surface a heads-up toast.
+      try {
+        await saveCredentials(credentials)
+      } catch (credErr) {
+        console.warn('[activate] Database credential save failed:', credErr)
+        showToast(t('activationModal.errorCredentialDbSave'), 'error')
+      }
 
       // Build the n8n workflow JSON from the current canvas so the deployed
       // workflow carries the node configs (inspector / setup copilot edits).
@@ -1081,70 +1120,77 @@ function WorkflowsPageInner() {
   }
 
   // ── Copilot apply suggestion ────────────────────────────
-  // ALWAYS creates a NEW workflow — never appends to existing canvas
+  // If a workflow is already open, ask whether to update it in place or save
+  // as a separate new draft — see ApplyTargetDialog. With nothing open
+  // (blank canvas / onboarding), goes straight to "new draft" as before.
   const handleCopilotApply = async (workflow: import('@/lib/workflows/copilotClient').GeneratedWorkflow) => {
-    // Build React Flow nodes + edges from the generated workflow.
-    // Map nodeMapper intents to canvas icon/category
-    const intentToIcon: Record<string, string> = {
-      email: 'mail', messaging: 'slack', http: 'http', respond: 'respond',
-      filter: 'branch', transform: 'set', schedule: 'schedule', ai: 'http',
-    }
-    const intentToCategory: Record<string, string> = {
-      email: 'channel', messaging: 'channel', http: 'action', respond: 'channel',
-      filter: 'condition', transform: 'action', schedule: 'trigger', ai: 'action',
-    }
-    // step.app ("gmail", "slack", "openai", …) is the definitive signal for
-    // brand icons and category colors — step.type/intent guessing is only the
-    // fallback. Without it every node collapsed to generic icons and two
-    // body colors.
-    const AI_APPS = new Set(['openai', 'anthropic', 'claude', 'ai', 'llm', 'gemini'])
-    const DB_APPS = new Set(['postgres', 'postgresql', 'mysql', 'mongodb', 'redis', 'airtable', 'google sheets', 'notion', 'supabase'])
-    const categoryForStep = (app: string, type: string, intent: string): string => {
-      if (type === 'trigger') return 'trigger'
-      if (type === 'condition') return 'condition'
-      if (AI_APPS.has(app)) return 'ai'
-      if (DB_APPS.has(app)) return 'database'
-      if (type === 'channel') return 'channel'
-      return intentToCategory[intent] ?? 'action'
-    }
+    // Build the canvas nodes/edges via the SAME conversion pipeline already
+    // used elsewhere in this app for correct n8n typing — NOT the old ad-hoc
+    // icon-only heuristic, which never set rawN8n/typed config on the nodes
+    // it built. That meant reactFlowToN8n() had nothing to resolve a real
+    // node type from at deploy time and every node silently fell back to
+    // 'n8n-nodes-base.set' ("Edit Fields"), regardless of intent.
+    //   1. convertToN8nWorkflow() (used today by the "Export n8n JSON"
+    //      button) turns the copilot steps into real n8n workflow JSON via
+    //      the nodeMapper engine (also expands AI steps into an Agent +
+    //      Chat Model sub-node pair).
+    //   2. n8nToReactFlow() (used today when importing an existing n8n
+    //      workflow into the canvas) turns that n8n JSON into correctly
+    //      typed React Flow nodes/edges (rawN8n populated, category/edges
+    //      derived from the real n8n type).
     const allSteps = workflow.steps.map((step, index) => ({
       step: index + 1,
       action: step.title,
-      tool: step.type,
+      tool: [step.app, step.type].filter(Boolean).join(' '),
       output: step.description || '',
       type: step.type,
       app: (step.app || '').toLowerCase().trim(),
       config: step.config || {},
     }))
-    const rfNodes = allSteps.map((s, i) => {
-      const intent = detectNodeIntent(s.action || '', s.tool || '')
-      return {
-        id: `copilot-${Date.now()}-${i}`,
-        type: 'standardNode' as const,
-        position: { x: 400, y: 100 + i * 180 },
-        data: {
-          label: s.action || `Step ${i + 1}`,
-          icon: i === 0 ? 'webhook' : (intentToIcon[intent] ?? 'http'),
-          category: i === 0 ? 'trigger' : categoryForStep(s.app, s.type, intent),
-          app: s.app || undefined,
-          title: s.action || `Step ${i + 1}`,
-          description: s.output || s.tool || '',
-          config: s.config || {},
-        },
-      }
-    })
-    const rfEdges = allSteps.slice(0, -1).map((_, i) => ({
-      id: `copilot-e-${Date.now()}-${i}`,
-      source: rfNodes[i].id,
-      target: rfNodes[i + 1].id,
-      type: 'smoothstep' as const,
-      animated: false,
-    }))
 
-    console.log('[Aivory Copilot] Creating NEW workflow → nodes:', rfNodes.length, 'edges:', rfEdges.length)
-
-    // Generate a meaningful title from the suggestion trigger text
     const title = workflow.workflowName || allSteps[0]?.action || `Aivory Workflow ${new Date().toLocaleTimeString()}`
+
+    const n8nWorkflow = convertToN8nWorkflow({
+      workflow_id: `copilot-${Date.now()}`,
+      title,
+      trigger: allSteps[0]?.action || '',
+      steps: allSteps.slice(1).map((s) => ({
+        step: s.step,
+        action: s.action,
+        tool: s.tool,
+        output: s.output,
+        inputs: s.config,
+      })),
+    })
+
+    // convertToN8nWorkflow()/n8nToReactFlow() declare their own local
+    // N8nWorkflow/N8nNode interfaces (pre-existing duplication across
+    // lib/workflowConverter.ts, lib/workflows/nodeMapper.ts and lib/n8n.ts)
+    // that are structurally identical but not nominally the same type.
+    const { nodes: rfNodes, edges: rfEdges } = n8nToReactFlow(n8nWorkflow as unknown as N8nWorkflow)
+
+    // A workflow is already open — ask whether to merge into it or fork a
+    // new draft, instead of always silently forking (which orphaned the
+    // workflow the user was actually looking at while chatting).
+    if (selected) {
+      setPendingApply({ rfNodes, rfEdges, workflow, allSteps, title })
+      return
+    }
+
+    await applyAsNewWorkflow(rfNodes, rfEdges, workflow, allSteps, title)
+  }
+
+  // Extracted from handleCopilotApply: always forks a brand-new SavedWorkflow
+  // + canvas record. Used directly when nothing is open yet, and via the
+  // ApplyTargetDialog's "Save as new draft" choice when something is.
+  const applyAsNewWorkflow = async (
+    rfNodes: any[],
+    rfEdges: any[],
+    workflow: import('@/lib/workflows/copilotClient').GeneratedWorkflow,
+    allSteps: { step: number; action: string; tool: string; output: string; type: string; config: Record<string, unknown> }[],
+    title: string
+  ) => {
+    console.log('[Aivory Copilot] Creating NEW workflow → nodes:', rfNodes.length, 'edges:', rfEdges.length)
 
     const newWorkflow: SavedWorkflow = {
       workflow_id: `workflow_${Date.now()}`,
@@ -1196,6 +1242,35 @@ function WorkflowsPageInner() {
 
     showToast('New workflow created from Aivory suggestion', 'success')
   }
+
+  // ── Apply-target dialog handlers ────────────────────────
+  const handleApplyUpdateExisting = () => {
+    if (!pendingApply) return
+    const { rfNodes, rfEdges } = pendingApply
+    setPendingApply(null)
+    // Snapshot what's on the canvas RIGHT NOW, before the AI-generated steps
+    // overwrite it — this is the "AI generated something wrong, no way back"
+    // case the whole version-history feature exists for.
+    snapshotBeforeChange('ai_apply')
+    // canvasInjectRef merges these into the currently-mounted canvas's live
+    // React Flow state (with undo history) — the canvas's own autosave then
+    // persists the merge, same as any other manual canvas edit.
+    if (canvasInjectRef.current) {
+      canvasInjectRef.current(rfNodes, rfEdges)
+      showToast('Added to the current workflow', 'success')
+    } else {
+      showToast('Could not reach the open canvas — try again', 'error')
+    }
+  }
+
+  const handleApplySaveAsNew = async () => {
+    if (!pendingApply) return
+    const { rfNodes, rfEdges, workflow, allSteps, title } = pendingApply
+    setPendingApply(null)
+    await applyAsNewWorkflow(rfNodes, rfEdges, workflow, allSteps, title)
+  }
+
+  const handleApplyDialogClose = () => setPendingApply(null)
 
   // ── Generation apply handler ─────────────────────────────
   // ALWAYS creates a NEW workflow — never appends to existing canvas
@@ -1756,6 +1831,13 @@ function WorkflowsPageInner() {
               {Icons.undo}
               {t('undoLastChange')}
             </button>
+            <button
+              className={styles.canvasUndoBtn}
+              onClick={() => setShowVersionHistory(true)}
+              title="Version history"
+            >
+              Version history
+            </button>
           </div>
 
 
@@ -1811,6 +1893,28 @@ function WorkflowsPageInner() {
         onSubmit={handleActivationSubmit}
         loading={activationLoading}
       />
+
+      {/* ── Apply-target dialog (Copilot suggestion, workflow already open) ── */}
+      <ApplyTargetDialog
+        open={!!pendingApply}
+        workflowName={selected?.title ?? ''}
+        onUpdateExisting={handleApplyUpdateExisting}
+        onSaveAsNew={handleApplySaveAsNew}
+        onClose={handleApplyDialogClose}
+      />
+
+      {/* ── Version history ── */}
+      {selected && (
+        <VersionHistoryPanel
+          open={showVersionHistory}
+          workflowId={selected.workflow_id}
+          onClose={() => setShowVersionHistory(false)}
+          onRestored={() => {
+            showToast('Restored — reloading…', 'success')
+            window.location.reload()
+          }}
+        />
+      )}
     </div>
   )
 }

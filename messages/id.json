@@ -113,7 +113,8 @@
       "errorInvalidCreds": "Kredensial n8n tidak valid. Periksa API key Anda.",
       "errorUnreachable": "Tidak dapat menjangkau instance n8n Anda. Periksa URL.",
       "errorDeployFailed": "Deployment gagal. Silakan coba lagi.",
-      "errorNetwork": "Tidak dapat menjangkau server. Periksa koneksi Anda."
+      "errorNetwork": "Tidak dapat menjangkau server. Periksa koneksi Anda.",
+      "errorCredentialDbSave": "Kredensial tersimpan lokal, tapi gagal disimpan ke database. Tetap berfungsi untuk sesi ini."
     }
   },
   "aivory": {

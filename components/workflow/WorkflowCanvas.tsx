@@ -157,6 +157,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
   const [executions, setExecutions] = useState<any[]>([]);
   const [execLoading, setExecLoading] = useState(false);
   const [execError, setExecError] = useState<string | null>(null);
+  const [capturingExecId, setCapturingExecId] = useState<string | null>(null);
   // Aivory modals state
   const [showStepCopilotModal, setShowStepCopilotModal] = useState(false);
   const [stepCopilotIndex, setStepCopilotIndex] = useState<number | null>(null);
@@ -266,7 +267,9 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     schedule: 'n8n-nodes-base.scheduleTrigger',
     manual: 'n8n-nodes-base.manualTrigger',
     branch: 'n8n-nodes-base.if',
+    switch: 'n8n-nodes-base.switch',
     edit: 'n8n-nodes-base.set',
+    code: 'n8n-nodes-base.code',
     http: 'n8n-nodes-base.httpRequest',
     respond: 'n8n-nodes-base.respondToWebhook',
   };
@@ -622,6 +625,32 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     }
   }, [n8nWorkflowId, workflowId]);
 
+  // Fixture capture — grabs this execution's full input/output data via the
+  // user's own n8n instance and stores it as a named regression fixture
+  // (dashboard.workflow_fixtures). Uses Aivory's own workflowId (the fixture
+  // is scoped to the Aivory workflow record, not the n8n one).
+  const handleCaptureFixture = useCallback(async (execId: string) => {
+    const name = window.prompt('Name this fixture (e.g. "happy path", "rate-limit error"):');
+    if (!name) return;
+    setCapturingExecId(execId);
+    try {
+      const res = await fetch(asset(`/api/workflows/${workflowId}/fixtures`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ executionId: execId, name }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || `HTTP ${res.status}`);
+      }
+      window.alert(`Fixture "${name}" captured.`);
+    } catch (err: any) {
+      window.alert(`Failed to capture fixture: ${err?.message ?? 'unknown error'}`);
+    } finally {
+      setCapturingExecId(null);
+    }
+  }, [n8nWorkflowId, workflowId]);
+
   const nodeTypes = useMemo(() => ({
     standardNode:  WorkflowNode as any,
     appNode:       WorkflowNode as any,
@@ -897,7 +926,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                 <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                      {['ID', 'Status', 'Started', 'Stopped'].map(h => (
+                      {['ID', 'Status', 'Started', 'Stopped', ''].map(h => (
                         <th key={h} style={{ padding: '6px 12px', textAlign: 'left', color: '#5a5a58', fontWeight: 600, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                       ))}
                     </tr>
@@ -918,6 +947,19 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                         </td>
                         <td style={{ padding: '7px 12px', fontSize: 11, color: '#a8a6a2' }}>{new Date(exec.startedAt || exec.startTime).toLocaleString()}</td>
                         <td style={{ padding: '7px 12px', fontSize: 11, color: '#a8a6a2' }}>{exec.stoppedAt || exec.endTime ? new Date(exec.stoppedAt || exec.endTime).toLocaleString() : '—'}</td>
+                        <td style={{ padding: '7px 12px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleCaptureFixture(String(exec.id))}
+                            disabled={capturingExecId === String(exec.id)}
+                            style={{
+                              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6,
+                              color: '#a8a6a2', fontSize: 10, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
+                            }}
+                          >
+                            {capturingExecId === String(exec.id) ? 'Saving…' : 'Save as fixture'}
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

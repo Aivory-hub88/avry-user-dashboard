@@ -222,6 +222,8 @@ export function configToN8nType(config: NodeConfig): string | null {
     case 'rssFeed':       return 'n8n-nodes-base.rssFeedRead'
     case 'slack':         return 'n8n-nodes-base.slack'
     case 'gmail':         return 'n8n-nodes-base.gmail'
+    case 'switch':        return 'n8n-nodes-base.switch'
+    case 'code':          return 'n8n-nodes-base.code'
     // No rawN8n type to preserve means this AI step was never bound to a
     // concrete node (e.g. built purely from the inspector). Default to a
     // real, deployable OpenAI node rather than silently downgrading to Set.
@@ -241,6 +243,8 @@ export function configToN8nTypeVersion(config: NodeConfig): number | null {
     case 'rssFeed':       return 1.1
     case 'slack':         return 2.2
     case 'gmail':         return 2.1
+    case 'switch':        return 3
+    case 'code':          return 2
     case 'aiStep':        return 1.3
     default:              return 1
   }
@@ -335,6 +339,30 @@ export function configToN8nParameters(config: NodeConfig, rawType?: string | nul
         subject: config.subject,
         message: config.message,
       }
+    case 'switch':
+      return {
+        mode: config.mode,
+        rules: {
+          values: config.rules.map((r) => ({
+            conditions: {
+              options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' },
+              conditions: [
+                { leftValue: r.condition.field, rightValue: r.condition.value, operator: { type: 'string', operation: r.condition.operator } },
+              ],
+              combinator: 'and',
+            },
+            renameOutput: true,
+            outputKey: r.outputKey,
+          })),
+        },
+        options: { fallbackOutput: config.fallbackOutput },
+      }
+    case 'code':
+      return {
+        mode: config.mode,
+        language: config.language,
+        ...(config.language === 'python' ? { pythonCode: config.code } : { jsCode: config.code }),
+      }
     case 'aiStep': {
       // Zeroclaw ignores a separate system_prompt field — it must be embedded
       // in the message text (see workflow-builder-architecture memory).
@@ -417,6 +445,18 @@ export function reactFlowToN8n(
     const configParams = config ? configToN8nParameters(config, resolvedType) : null
     const baseParams = rawN8n?.parameters || originalN8nNode?.parameters || {}
 
+    // Retry/error-handling — sibling fields on the node object, not nested
+    // inside `parameters` (matches n8n's own model). Only written when the
+    // user has actually turned retry on or picked a non-default onError, so
+    // untouched nodes don't grow extra keys.
+    const eh = node.data.errorHandling
+    const errorHandlingFields = eh && (eh.retryOnFail || eh.onError)
+      ? {
+          ...(eh.retryOnFail ? { retryOnFail: true, maxTries: eh.maxTries ?? 3, waitBetweenTries: eh.waitBetweenTries ?? 1000 } : {}),
+          ...(eh.onError ? { onError: eh.onError } : {}),
+        }
+      : {}
+
     const n8nNode: N8nNode = {
       id: node.id,
       name,
@@ -424,6 +464,7 @@ export function reactFlowToN8n(
       typeVersion: rawN8n?.typeVersion || originalN8nNode?.typeVersion || (config ? configToN8nTypeVersion(config) : null) || 1,
       position: [node.position.x, node.position.y] as [number, number],
       parameters: configParams ? { ...baseParams, ...configParams } : baseParams,
+      ...errorHandlingFields,
     }
 
     workflow.nodes.push(n8nNode)
@@ -542,6 +583,12 @@ function mapN8nNodeToWorkflowData(
     rawN8n: linkedModelNode
       ? { ...n8nNode, linkedModel: { type: linkedModelNode.type, parameters: linkedModelNode.parameters } }
       : n8nNode,
+    // Retry/error-handling live as fields sibling to `parameters` on the raw
+    // n8n node, not inside it — surface them here so the inspector's
+    // ErrorHandlingSection has something to read regardless of node type.
+    ...(n8nNode.retryOnFail !== undefined || n8nNode.maxTries !== undefined || n8nNode.waitBetweenTries !== undefined || n8nNode.onError !== undefined
+      ? { errorHandling: { retryOnFail: n8nNode.retryOnFail, maxTries: n8nNode.maxTries, waitBetweenTries: n8nNode.waitBetweenTries, onError: n8nNode.onError } }
+      : {}),
   };
 
   // For condition nodes, add YES/NO outputs

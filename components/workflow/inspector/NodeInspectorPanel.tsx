@@ -17,6 +17,9 @@ import GenericNodeForm from './forms/GenericNodeForm';
 import RssFeedForm from './forms/RssFeedForm';
 import SlackForm from './forms/SlackForm';
 import GmailForm from './forms/GmailForm';
+import SwitchForm from './forms/SwitchForm';
+import CodeForm from './forms/CodeForm';
+import ErrorHandlingSection from './ErrorHandlingSection';
 import { asset } from '@/lib/asset'
 
 type Tab = 'configure' | 'advanced' | 'output';
@@ -39,6 +42,10 @@ export default function NodeInspectorPanel({ selectedNode, onChange, onDelete, o
   const errors = useMemo(() => config ? validateConfig(config) : {}, [config]);
   const typeLabel = useMemo(() => data ? getNodeTypeLabel(data) : '', [data]);
   const handleConfigChange = useCallback((c: NodeConfig) => onChange(nodeId, { config: c }), [nodeId, onChange]);
+  const handleErrorHandlingChange = useCallback(
+    (eh: import('@/types/workflow-node').NodeErrorHandling) => onChange(nodeId, { errorHandling: eh }),
+    [nodeId, onChange]
+  );
   const handleUpdate = useCallback(() => {
     if (!config || !data) return;
     if (Object.keys(validateConfig(config)).length > 0) return;
@@ -113,7 +120,14 @@ export default function NodeInspectorPanel({ selectedNode, onChange, onDelete, o
         ))}
       </div>
       <div className={styles.body}>
-        {activeTab === 'configure' && <ConfigureTab config={config} onChange={handleConfigChange} errors={errors} />}
+        {activeTab === 'configure' && (
+          <>
+            <ConfigureTab config={config} onChange={handleConfigChange} errors={errors} />
+            {config.type !== 'manualTrigger' && (
+              <ErrorHandlingSection value={data.errorHandling} onChange={handleErrorHandlingChange} />
+            )}
+          </>
+        )}
         {activeTab === 'advanced' && <AdvancedTab config={config} />}
         {activeTab === 'output' && <OutputTab testResult={data.testResult ?? null} />}
       </div>
@@ -144,6 +158,8 @@ function ConfigureTab({ config, onChange, errors }: { config: NodeConfig; onChan
     case 'rssFeed':       return <RssFeedForm config={config} onChange={onChange} errors={errors} />;
     case 'slack':         return <SlackForm config={config} onChange={onChange} errors={errors} />;
     case 'gmail':         return <GmailForm config={config} onChange={onChange} errors={errors} />;
+    case 'switch':        return <SwitchForm config={config} onChange={onChange} errors={errors} />;
+    case 'code':          return <CodeForm config={config} onChange={onChange} errors={errors} />;
     case 'generic':       return <GenericNodeForm config={config} onChange={onChange} errors={errors} />;
     default:              return <p style={{ color: '#5a5a58', fontSize: 12 }}>No configuration available.</p>;
   }
