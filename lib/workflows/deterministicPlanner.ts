@@ -232,7 +232,7 @@ export function matchTemplate(text: string, analysis?: RequestAnalysis): Templat
 
 // ── Workflow sanitation ──────────────────────────────────────────────────────
 
-const VALID_STEP_TYPES = new Set(['trigger', 'action', 'condition', 'channel'])
+const VALID_STEP_TYPES = new Set(['trigger', 'action', 'condition', 'channel', 'switch', 'loop'])
 const TYPE_COERCIONS: Record<string, GeneratedWorkflowStep['type']> = {
   ai: 'action',
   filter: 'condition',
@@ -241,6 +241,12 @@ const TYPE_COERCIONS: Record<string, GeneratedWorkflowStep['type']> = {
   notification: 'channel',
 }
 
+// Step types that carry `branches` — condition (if/else, 2 branches) and
+// switch (N-way routing) both use them directly; loop's single "body"
+// branch also lives here. Kept as a Set so the branches/loopConfig
+// extraction below and any future caller share one definition.
+const BRANCHING_TYPES = new Set<GeneratedWorkflowStep['type']>(['condition', 'switch', 'loop'])
+
 export interface SanitizeResult {
   steps: GeneratedWorkflowStep[]
   /** Human-readable list of local fixes applied (empty = already clean). */
@@ -248,12 +254,13 @@ export interface SanitizeResult {
 }
 
 /**
- * Normalize an LLM-generated step list locally. Every fix here is one the
- * old flow paid an LLM "repair" round for — structural defects are
- * deterministic to detect and deterministic to fix.
+ * Sanitize one step array — id/type/title/config/branches/loopConfig fixups
+ * plus id-dedupe, scoped to whichever array it's given. Does NOT enforce
+ * "first step is a trigger" — that's a top-level-workflow rule, not a
+ * property of every branch body, so it lives only in sanitizeWorkflow()
+ * below. Recurses into `branches[].steps` via itself.
  */
-export function sanitizeWorkflow(rawSteps: unknown): SanitizeResult {
-  const fixes: string[] = []
+function sanitizeStepArray(rawSteps: unknown, fixes: string[]): GeneratedWorkflowStep[] {
   const stepsIn: Record<string, unknown>[] = Array.isArray(rawSteps)
     ? rawSteps.filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
     : []
@@ -290,6 +297,25 @@ export function sanitizeWorkflow(rawSteps: unknown): SanitizeResult {
     const app = typeof s.app === 'string' && s.app ? s.app.toLowerCase() : undefined
     const action = typeof s.action === 'string' && s.action ? s.action : undefined
 
+    // branches/loopConfig — only meaningful for condition/switch/loop steps.
+    // Recursing here (not calling sanitizeWorkflow()) is what keeps the
+    // trigger-first rule from leaking into branch bodies.
+    const branchesRaw = Array.isArray(s.branches) ? s.branches : []
+    const branches = BRANCHING_TYPES.has(type as GeneratedWorkflowStep['type']) && branchesRaw.length
+      ? branchesRaw
+          .filter((b): b is Record<string, unknown> => !!b && typeof b === 'object')
+          .map((b, bi) => ({
+            key: typeof b.key === 'string' && b.key.trim() ? b.key.trim() : `branch_${bi + 1}`,
+            ...(typeof b.label === 'string' && b.label.trim() ? { label: b.label.trim() } : {}),
+            steps: sanitizeStepArray(b.steps, fixes),
+          }))
+      : undefined
+
+    const loopConfigRaw = s.loopConfig && typeof s.loopConfig === 'object' ? s.loopConfig as Record<string, unknown> : null
+    const loopConfig = type === 'loop' && loopConfigRaw
+      ? { ...(typeof loopConfigRaw.batchSize === 'number' ? { batchSize: loopConfigRaw.batchSize } : {}) }
+      : undefined
+
     return {
       id,
       type: type as GeneratedWorkflowStep['type'],
@@ -300,10 +326,12 @@ export function sanitizeWorkflow(rawSteps: unknown): SanitizeResult {
       ...(nodeType ? { nodeType } : {}),
       ...(app ? { app } : {}),
       ...(action ? { action } : {}),
+      ...(branches ? { branches } : {}),
+      ...(loopConfig ? { loopConfig } : {}),
     }
   })
 
-  // Dedupe ids
+  // Dedupe ids (within this array only — branch bodies are separate scopes)
   const seen = new Set<string>()
   for (let i = 0; i < steps.length; i++) {
     if (seen.has(steps[i].id)) {
@@ -314,7 +342,19 @@ export function sanitizeWorkflow(rawSteps: unknown): SanitizeResult {
     seen.add(steps[i].id)
   }
 
-  // First step must be the trigger
+  return steps
+}
+
+/**
+ * Normalize an LLM-generated step list locally. Every fix here is one the
+ * old flow paid an LLM "repair" round for — structural defects are
+ * deterministic to detect and deterministic to fix.
+ */
+export function sanitizeWorkflow(rawSteps: unknown): SanitizeResult {
+  const fixes: string[] = []
+  const steps = sanitizeStepArray(rawSteps, fixes)
+
+  // First step must be the trigger (top-level only — branch bodies don't need one)
   if (steps.length > 0 && steps[0].type !== 'trigger') {
     const triggerIdx = steps.findIndex((s) => s.type === 'trigger')
     if (triggerIdx > 0) {

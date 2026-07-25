@@ -195,13 +195,21 @@ export function normalizeZeroclawToWorkflow(
 // (server.js, workflow_* entrypoints) and GeneratedWorkflowStep. "app" names
 // the integration so sandbox MCP node resolution has a concrete service to
 // match against instead of guessing from the title text.
+//
+// "switch"/"loop" + "branches"/"loopConfig" mirror GeneratedWorkflowStep's
+// nested-branch schema (see copilotStateMachine.ts) — empirically validated
+// against the live VPS bridge before adding this: the model reliably returns
+// well-formed nested branches/loopConfig for both multi-way routing and
+// per-item loop requests when given this exact hint, with no changes needed
+// on the Zeroclaw/bridge side.
 const WORKFLOW_JSON_HINT =
   '\n\n[IMPORTANT: Respond ONLY with a single JSON object matching this schema, ' +
   'no prose, no markdown fences: ' +
-  '{"workflowName": string, "steps": [{"id": string, "type": "trigger"|"action"|"condition"|"channel", "app": string, "action": string, "title": string, "description": string, "config": object}], ' +
+  '{"workflowName": string, "steps": [{"id": string, "type": "trigger"|"action"|"condition"|"channel"|"switch"|"loop", "app": string, "action": string, "title": string, "description": string, "config": object, "branches": [{"key": string, "label": string, "steps": [<same step shape, nested>]}], "loopConfig": {"batchSize": number}}], ' +
   '"estimate_hours": number, "automation_score": number, "summary": string}. ' +
   '"app" is the lowercase integration/service (e.g. slack, gmail, hubspot, webhook, schedule); "action" is the operation. ' +
-  'The first step must be type "trigger".]'
+  'The first step must be type "trigger". ' +
+  'Only "condition" (if/else, exactly 2 branches keyed "true"/"false"), "switch" (multi-way routing, one branch per case, key = the matched value), and "loop" (iterate over items, exactly 1 branch keyed "body", with optional loopConfig.batchSize) steps use "branches" — every other step type omits both "branches" and "loopConfig" entirely. Each branch\'s "steps" is itself a step list and may be empty.]'
 
 function buildOutbound(op: CopilotOperation, bodyRecord: Record<string, unknown>): { targetPath: string; outbound: unknown } {
   const history = Array.isArray(bodyRecord.conversation_history)

@@ -306,6 +306,33 @@ export interface BridgeStep {
   loopConfig?: { batchSize?: number }
 }
 
+/**
+ * Render a step list for the chat summary, recursing into `branches` with
+ * indentation so condition/switch/loop steps don't silently disappear from
+ * what the user sees — the applied canvas already reflects them (Stage 12),
+ * this just keeps the chat text honest about the same structure.
+ *
+ * Every line starts with a real CommonMark list marker ("N." or "-") on
+ * purpose — a bare "↳ label:" line doesn't start a recognized block, so
+ * ReactMarkdown's lazy-continuation rule merges it into the previous list
+ * item instead of rendering it as its own line (confirmed by rendering this
+ * in the actual chat panel before landing on this shape).
+ */
+function formatStepList(steps: GeneratedWorkflowStep[], depth = 0): string[] {
+  const indent = '   '.repeat(depth)
+  const lines: string[] = []
+  steps.forEach((s, i) => {
+    lines.push(`${indent}${i + 1}. **${s.title}** (${s.type}) — ${s.description}`)
+    if (s.branches?.length) {
+      s.branches.forEach((b) => {
+        lines.push(`${indent}   - ↳ *${b.label || b.key}*:`)
+        lines.push(...formatStepList(b.steps, depth + 2))
+      })
+    }
+  })
+  return lines
+}
+
 function workflowStepToBridgeStep(step: GeneratedWorkflowStep): BridgeStep {
   return {
     id: step.id,
@@ -1029,9 +1056,7 @@ export class CopilotStateMachine {
     workflowName: string,
     isEdit = false,
   ): string {
-    const stepList = steps
-      .map((s, i) => `${i + 1}. **${s.title}** (${s.type}) — ${s.description}`)
-      .join('\n')
+    const stepList = formatStepList(steps).join('\n')
     const summary = this.state.generatedWorkflow?.summary
       ? `\n\n📝 *${this.state.generatedWorkflow.summary}*`
       : ''
