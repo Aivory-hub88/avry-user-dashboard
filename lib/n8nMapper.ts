@@ -47,7 +47,8 @@ function handleIdForBranch(n8nType: string, branchIndex: number): string | undef
   }
   if (n8nType === 'n8n-nodes-base.splitInBatches') {
     // See lib/workflowConverter.ts's LOOP_DONE_OUTPUT/LOOP_BODY_OUTPUT comment
-    // — same unverified-but-documented n8n convention (done=0, loop=1).
+    // — same n8n convention (done=0, loop=1), confirmed against a real n8n
+    // instance during Stage B6.
     return branchIndex === 0 ? 'out-done' : branchIndex === 1 ? 'out-loop' : undefined
   }
   return undefined

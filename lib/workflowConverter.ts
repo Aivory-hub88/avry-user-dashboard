@@ -18,11 +18,11 @@ import type { NodeIntent, MapContext } from '@/lib/workflows/nodeMapper'
 // RSS Read -> Limit -> AI Agent).
 const MULTI_ITEM_INTENTS: NodeIntent[] = ['rss', 'http', 'database']
 
-// n8n-nodes-base.splitInBatches output convention (per n8n's own node
-// definition — no local n8n install to verify against in this sandbox, see
-// plan file Track B §B5's own caveat on this exact point): output 0 fires
-// once after all batches are done, output 1 fires once per batch and is
-// where the loop body connects.
+// n8n-nodes-base.splitInBatches output convention: output 0 fires once
+// after all batches are done, output 1 fires once per batch and is where
+// the loop body connects. Confirmed against a real n8n instance during
+// Stage B6's VPS deploy (a trigger->loop->body->finish sandbox test executed
+// end to end with this exact wiring) — not just inferred from docs.
 const LOOP_DONE_OUTPUT = 0
 const LOOP_BODY_OUTPUT = 1
 
