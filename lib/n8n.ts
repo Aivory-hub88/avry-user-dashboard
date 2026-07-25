@@ -77,6 +77,13 @@ export interface N8nWorkflow {
   description?: string
   createdAt?: string
   updatedAt?: string
+  /**
+   * n8n's real "pinned data" mechanism — {[nodeName]: [{json:{...}}]} — must
+   * be persisted on the workflow definition itself (this field, via PUT) to
+   * take effect; passing pinData as a run-request parameter is a no-op,
+   * confirmed by direct experiment against a live n8n instance this session.
+   */
+  pinData?: Record<string, unknown>
 }
 
 // ── Execution ─────────────────────────────────────────────────────────────────

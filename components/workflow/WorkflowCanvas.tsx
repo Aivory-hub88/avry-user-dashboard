@@ -159,6 +159,11 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
   const [execError, setExecError] = useState<string | null>(null);
   const [capturingExecId, setCapturingExecId] = useState<string | null>(null);
   const [comparingExecId, setComparingExecId] = useState<string | null>(null);
+  const [replayingExecId, setReplayingExecId] = useState<string | null>(null);
+  // Tracks whether THIS workflow currently has a fixture pinned on the real
+  // n8n instance — swaps the button to "Clear pin" until reverted, so a pin
+  // doesn't silently sit on production data unnoticed.
+  const [pinnedFixtureName, setPinnedFixtureName] = useState<string | null>(null);
   // Aivory modals state
   const [showStepCopilotModal, setShowStepCopilotModal] = useState(false);
   const [stepCopilotIndex, setStepCopilotIndex] = useState<number | null>(null);
@@ -676,6 +681,59 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     }
   }, [n8nWorkflowId, workflowId]);
 
+  // True offline replay for this ALREADY-DEPLOYED workflow — pins the newest
+  // fixture's data onto the real n8n workflow definition. Unlike Stage 15/C4
+  // (bridge-only, for copilot-generated drafts under sandbox test), there is
+  // no way to also trigger the run ourselves — n8n's public API has no
+  // API-key-authenticated "run now" endpoint, confirmed against a live
+  // instance. The user must trigger it (its real webhook/schedule, or
+  // manually in n8n's editor) and come back to clear the pin afterward.
+  const handleReplayFixture = useCallback(async (execId: string) => {
+    const fetchId = n8nWorkflowId || workflowId;
+    setReplayingExecId(execId);
+    try {
+      const res = await fetch(asset(`/api/workflows/${workflowId}/fixtures/replay`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ n8nWorkflowId: fetchId, executionId: execId }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`);
+      setPinnedFixtureName(body.fixtureName ?? 'fixture');
+      const nodes = (body.pinnedNodes || []).join(', ') || 'none';
+      const trigger = body.webhookUrl
+        ? `Trigger it via its webhook: ${body.webhookUrl}`
+        : 'Trigger it manually inside n8n\'s editor, or wait for its next real trigger.';
+      window.alert(
+        `Fixture "${body.fixtureName}" pinned to nodes: ${nodes}.\n\n${trigger}\n\n` +
+        `This affects the LIVE workflow until cleared — click "Clear pin" when you're done.`
+      );
+    } catch (err: any) {
+      window.alert(`Failed to pin fixture: ${err?.message ?? 'unknown error'}`);
+    } finally {
+      setReplayingExecId(null);
+    }
+  }, [n8nWorkflowId, workflowId]);
+
+  const handleClearReplayPin = useCallback(async () => {
+    const fetchId = n8nWorkflowId || workflowId;
+    setReplayingExecId('__clearing__');
+    try {
+      const res = await fetch(asset(`/api/workflows/${workflowId}/fixtures/replay/clear`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ n8nWorkflowId: fetchId }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`);
+      setPinnedFixtureName(null);
+    } catch (err: any) {
+      window.alert(`Failed to clear pin: ${err?.message ?? 'unknown error'}`);
+    } finally {
+      setReplayingExecId(null);
+    }
+  }, [n8nWorkflowId, workflowId]);
+
   const nodeTypes = useMemo(() => ({
     standardNode:  WorkflowNode as any,
     appNode:       WorkflowNode as any,
@@ -995,6 +1053,32 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                           >
                             {comparingExecId === String(exec.id) ? 'Comparing…' : 'Compare to latest fixture'}
                           </button>
+                          {pinnedFixtureName ? (
+                            <button
+                              type="button"
+                              onClick={handleClearReplayPin}
+                              disabled={replayingExecId === '__clearing__'}
+                              title={`"${pinnedFixtureName}" is pinned to this workflow`}
+                              style={{
+                                background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 6,
+                                color: '#fbbf24', fontSize: 10, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
+                              }}
+                            >
+                              {replayingExecId === '__clearing__' ? 'Clearing…' : 'Clear pin'}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleReplayFixture(String(exec.id))}
+                              disabled={replayingExecId === String(exec.id)}
+                              style={{
+                                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6,
+                                color: '#a8a6a2', fontSize: 10, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
+                              }}
+                            >
+                              {replayingExecId === String(exec.id) ? 'Pinning…' : 'Replay against fixture'}
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

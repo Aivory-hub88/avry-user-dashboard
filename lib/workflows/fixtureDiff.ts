@@ -1,11 +1,15 @@
 /**
- * Pure regression-compare logic for fixture-based testing (Track C, "cheap
- * interim" stage — a LIVE re-run comparison, not true offline replay against
- * pinned data; that's a separate, VPS-side capability). No I/O here: takes
- * two already-fetched n8n execution `data` payloads (the shape returned by
- * n8n's `includeData=true` execution-detail endpoint, i.e. what
+ * Pure fixture-based-testing logic for Track C. No I/O here — everything
+ * operates on already-fetched n8n execution `data` payloads (the shape
+ * returned by n8n's `includeData=true` execution-detail endpoint, i.e. what
  * lib/workflows/n8nClient.ts's getExecutionDetailWithCreds()/fixtureRepository's
- * captured `run_data` both contain) and reports which nodes' outcomes match.
+ * captured `run_data` both contain). Two capabilities:
+ *   - diffRunData()                  — C3, live re-run comparison.
+ *   - buildPinDataFromFixtureRunData() — C4-equivalent for an already-
+ *     deployed workflow (Stage 15/C4 itself is bridge-only, for
+ *     copilot-generated drafts under sandbox test — this is the frontend
+ *     twin, same parsing convention, feeding lib/workflows/n8nClient.ts's
+ *     setWorkflowPinDataWithCreds()).
  */
 
 export interface FixtureDiffEntry {
@@ -73,4 +77,38 @@ export function diffRunData(fixtureData: unknown, freshData: unknown): FixtureDi
     }
   }
   return results
+}
+
+/**
+ * Transforms a captured fixture's raw execution data into n8n's real
+ * pinData shape ({[nodeName]: [{json:{...}}]}) — the exact TS twin of
+ * n8n-as-code-service/index.js's buildPinDataFromFixtureRunData() (bridge,
+ * JS) added for Stage 15/C4, same parsing convention as extractRunData()
+ * above. Kept as a separate function rather than reusing extractRunData()
+ * since that one only extracts {error, itemCount} for diffing — pinData
+ * needs the actual items themselves.
+ */
+export function buildPinDataFromFixtureRunData(fixtureRunData: unknown): Record<string, { json: Record<string, unknown> }[]> {
+  const pinData: Record<string, { json: Record<string, unknown> }[]> = {}
+  if (!fixtureRunData || typeof fixtureRunData !== 'object') return pinData
+
+  const root = fixtureRunData as Record<string, unknown>
+  const resultData = root.resultData as Record<string, unknown> | undefined
+  const runData = (resultData?.runData ?? root.runData) as Record<string, unknown[]> | undefined
+  if (!runData || typeof runData !== 'object') return pinData
+
+  for (const [nodeName, runs] of Object.entries(runData)) {
+    if (!Array.isArray(runs) || runs.length === 0) continue
+    const lastRun = runs[runs.length - 1] as Record<string, unknown>
+    const items = (lastRun?.data as any)?.main?.[0]
+    if (!Array.isArray(items) || items.length === 0) continue
+    // Items are already {json:{...}} envelopes — keep only json/binary,
+    // dropping execution-time metadata (pairedItem indices) that won't
+    // resolve against a different run.
+    pinData[nodeName] = items.map((item: any) => ({
+      json: item?.json ?? {},
+      ...(item?.binary ? { binary: item.binary } : {}),
+    }))
+  }
+  return pinData
 }

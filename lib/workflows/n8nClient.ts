@@ -487,6 +487,46 @@ export async function updateWorkflowWithCreds(
 }
 
 /**
+ * True offline replay for an already-deployed workflow (Stage 15/C4 was
+ * bridge-only, for copilot-generated drafts under sandbox test — this is
+ * the twin for a real, already-deployed workflow the user is looking at in
+ * Execution Logs). n8n's pinData mechanism only takes effect when persisted
+ * on the workflow definition itself (confirmed by direct experiment against
+ * a live n8n instance this session — passing pinData as a run-request
+ * parameter is a no-op on this n8n version), so this fetches the current
+ * definition and PUTs it back with pinData merged in — same
+ * fetch-then-spread-through pattern WorkflowCanvas.tsx's handleSave already
+ * uses successfully for saving edited canvases.
+ *
+ * IMPORTANT: there is no API-key-authenticated way to trigger an ad-hoc run
+ * on the user's own n8n instance (confirmed: POST .../workflows/:id/run
+ * returns 405 via API-key auth — only n8n's internal, session-cookie-only
+ * endpoints support that, which the VPS's own sandbox testing uses via
+ * VPS-owned admin login). So pinning takes effect the next time the
+ * workflow is triggered normally (webhook/schedule) or run manually inside
+ * n8n's own editor — the caller is responsible for prompting the user to do
+ * that, and for calling clearWorkflowPinDataWithCreds() afterward so a
+ * stale pin doesn't silently affect real production traffic.
+ */
+export async function setWorkflowPinDataWithCreds(
+  conn: N8nConnectionParams,
+  n8nWorkflowId: string,
+  pinData: Record<string, unknown>
+): Promise<void> {
+  const current = await getWorkflowWithCreds(conn, n8nWorkflowId)
+  await updateWorkflowWithCreds(conn, n8nWorkflowId, { ...current, pinData })
+}
+
+/** Reverts setWorkflowPinDataWithCreds() — sets pinData back to empty. */
+export async function clearWorkflowPinDataWithCreds(
+  conn: N8nConnectionParams,
+  n8nWorkflowId: string
+): Promise<void> {
+  const current = await getWorkflowWithCreds(conn, n8nWorkflowId)
+  await updateWorkflowWithCreds(conn, n8nWorkflowId, { ...current, pinData: {} })
+}
+
+/**
  * List recent executions for a workflow using explicit user credentials.
  * Backs GET /api/n8n/workflow/[id]/executions (Execution Logs tab).
  */
