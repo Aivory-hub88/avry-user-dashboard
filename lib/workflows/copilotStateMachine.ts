@@ -60,10 +60,13 @@ export interface GeneratedWorkflowStep {
   /**
    * Nested branch containers — only present for 'condition' | 'switch' |
    * 'loop' steps. Chosen over a flat next[]/successor-pointer graph so every
-   * existing linear consumer (workflowStepToBridgeStep, this file's own
-   * chat-history rendering, etc.) keeps working unchanged: `branches` is
-   * simply undefined on 100% of today's linear workflows. See plan file
-   * Track B §B5 for the rejected alternatives.
+   * consumer that doesn't care about branching (this file's own chat-history
+   * rendering, etc.) keeps working unchanged: `branches` is simply undefined
+   * on 100% of today's linear workflows. `workflowStepToBridgeStep()` below
+   * DOES forward this field (Stage B6) — the VPS bridge's own
+   * buildRealN8nWorkflow() needs it to build the same real branch/loop graph
+   * the canvas-deploy path does. See plan file Track B §B5 for the rejected
+   * schema alternatives.
    */
   branches?: { key: string; label?: string; steps: GeneratedWorkflowStep[] }[]
   /** Only present for 'loop' steps — the single branch in `branches` is the loop body. */
@@ -289,7 +292,21 @@ function applyInspectedNodeTypes(
   })
 }
 
-function workflowStepToBridgeStep(step: GeneratedWorkflowStep) {
+export interface BridgeStep {
+  id: string
+  type: string
+  title: string
+  description: string
+  config: Record<string, unknown>
+  app?: string
+  action?: string
+  nodeType?: string
+  /** Only present for 'condition'|'switch'|'loop' steps — see GeneratedWorkflowStep. */
+  branches?: { key: string; label?: string; steps: BridgeStep[] }[]
+  loopConfig?: { batchSize?: number }
+}
+
+function workflowStepToBridgeStep(step: GeneratedWorkflowStep): BridgeStep {
   return {
     id: step.id,
     type: step.type,
@@ -301,6 +318,14 @@ function workflowStepToBridgeStep(step: GeneratedWorkflowStep) {
     ...(step.app ? { app: step.app } : {}),
     ...(step.action ? { action: step.action } : {}),
     ...(step.nodeType ? { nodeType: step.nodeType } : {}),
+    // Forwarded so n8n-as-code-service's buildRealN8nWorkflow() (Stage B6)
+    // can build the same real branch/loop graph the canvas-deploy path
+    // (Stage B5) does — without this, "Test in sandbox" silently flattens
+    // every condition/switch/loop step back into a linear chain.
+    ...(step.branches?.length
+      ? { branches: step.branches.map((b) => ({ key: b.key, label: b.label, steps: b.steps.map(workflowStepToBridgeStep) })) }
+      : {}),
+    ...(step.loopConfig ? { loopConfig: step.loopConfig } : {}),
   }
 }
 
@@ -371,14 +396,7 @@ class BridgeClient {
     organization_id: string
     workflowId?: string
     description: string
-    steps: {
-      id: string
-      type: string
-      title: string
-      description: string
-      config: Record<string, unknown>
-      nodeType?: string
-    }[]
+    steps: BridgeStep[]
   }): Promise<BridgeDraftTestResponse> {
     const result = await this.call<BridgeDraftTestResponse>(
       'draft-test',
