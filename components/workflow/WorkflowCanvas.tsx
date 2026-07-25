@@ -158,6 +158,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
   const [execLoading, setExecLoading] = useState(false);
   const [execError, setExecError] = useState<string | null>(null);
   const [capturingExecId, setCapturingExecId] = useState<string | null>(null);
+  const [comparingExecId, setComparingExecId] = useState<string | null>(null);
   // Aivory modals state
   const [showStepCopilotModal, setShowStepCopilotModal] = useState(false);
   const [stepCopilotIndex, setStepCopilotIndex] = useState<number | null>(null);
@@ -651,6 +652,30 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     }
   }, [n8nWorkflowId, workflowId]);
 
+  // Regression compare — diffs this execution's run data against the newest
+  // captured fixture for this workflow. This is a LIVE re-run comparison, not
+  // true offline replay against pinned data (that's a separate, VPS-side
+  // capability) — worded that way in the result so it isn't confused with it.
+  const handleCompareFixture = useCallback(async (execId: string) => {
+    setComparingExecId(execId);
+    try {
+      const res = await fetch(asset(`/api/workflows/${workflowId}/fixtures/compare`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ executionId: execId }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`);
+      const entries = (body.entries || []) as { nodeName: string; matched: boolean; detail: string }[];
+      const lines = entries.map(e => `${e.matched ? '✓' : '✗'} ${e.nodeName} — ${e.detail}`);
+      window.alert(`Compared to fixture "${body.fixtureName}" (live re-run, not offline replay):\n\n${lines.join('\n') || 'No nodes to compare.'}`);
+    } catch (err: any) {
+      window.alert(`Failed to compare fixture: ${err?.message ?? 'unknown error'}`);
+    } finally {
+      setComparingExecId(null);
+    }
+  }, [n8nWorkflowId, workflowId]);
+
   const nodeTypes = useMemo(() => ({
     standardNode:  WorkflowNode as any,
     appNode:       WorkflowNode as any,
@@ -947,7 +972,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                         </td>
                         <td style={{ padding: '7px 12px', fontSize: 11, color: '#a8a6a2' }}>{new Date(exec.startedAt || exec.startTime).toLocaleString()}</td>
                         <td style={{ padding: '7px 12px', fontSize: 11, color: '#a8a6a2' }}>{exec.stoppedAt || exec.endTime ? new Date(exec.stoppedAt || exec.endTime).toLocaleString() : '—'}</td>
-                        <td style={{ padding: '7px 12px' }}>
+                        <td style={{ padding: '7px 12px', display: 'flex', gap: 6 }}>
                           <button
                             type="button"
                             onClick={() => handleCaptureFixture(String(exec.id))}
@@ -958,6 +983,17 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                             }}
                           >
                             {capturingExecId === String(exec.id) ? 'Saving…' : 'Save as fixture'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCompareFixture(String(exec.id))}
+                            disabled={comparingExecId === String(exec.id)}
+                            style={{
+                              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6,
+                              color: '#a8a6a2', fontSize: 10, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
+                            }}
+                          >
+                            {comparingExecId === String(exec.id) ? 'Comparing…' : 'Compare to latest fixture'}
                           </button>
                         </td>
                       </tr>
