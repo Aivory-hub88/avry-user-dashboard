@@ -22,7 +22,8 @@ import { ActivationModal } from '@/components/workflow/ActivationModal'
 import { ApplyTargetDialog } from '@/components/workflow/ApplyTargetDialog'
 import { VersionHistoryPanel } from '@/components/workflow/VersionHistoryPanel'
 import { saveCredentials, N8nCredentials } from '@/lib/workflows/credentialStore'
-import { convertToN8nWorkflow } from '@/lib/workflowConverter'
+import { convertToN8nWorkflow, type WorkflowStep as ConverterWorkflowStep } from '@/lib/workflowConverter'
+import type { GeneratedWorkflowStep } from '@/lib/workflows/copilotStateMachine'
 import { fetchTemplateById } from '@/lib/templates/resolveTemplate'
 import { templateToCanvas } from '@/lib/templates/templateToCanvas'
 import type { AivoryWorkflowSpec } from '@/types/workflow'
@@ -1150,17 +1151,32 @@ function WorkflowsPageInner() {
 
     const title = workflow.workflowName || allSteps[0]?.action || `Aivory Workflow ${new Date().toLocaleTimeString()}`
 
+    // convertToN8nWorkflow() needs the FULL nested step tree — condition/
+    // switch/loop steps' `branches` — not the flattened `allSteps` above
+    // (which stays flat on purpose, it's just the display/summary list for
+    // SavedWorkflow.steps). Losing branches to a flat .slice(1).map() here
+    // would silently turn every real branch/loop into a dead end, the exact
+    // bug class Stage B5 exists to fix.
+    const toConverterStep = (step: GeneratedWorkflowStep): ConverterWorkflowStep => ({
+      step: 0,
+      action: step.title,
+      tool: [step.app, step.type].filter(Boolean).join(' '),
+      output: step.description || '',
+      inputs: step.config,
+      type: step.type,
+      branches: step.branches?.map((b) => ({
+        key: b.key,
+        label: b.label,
+        steps: b.steps.map(toConverterStep),
+      })),
+      loopConfig: step.loopConfig,
+    })
+
     const n8nWorkflow = convertToN8nWorkflow({
       workflow_id: `copilot-${Date.now()}`,
       title,
-      trigger: allSteps[0]?.action || '',
-      steps: allSteps.slice(1).map((s) => ({
-        step: s.step,
-        action: s.action,
-        tool: s.tool,
-        output: s.output,
-        inputs: s.config,
-      })),
+      trigger: workflow.steps[0]?.title || '',
+      steps: workflow.steps.slice(1).map(toConverterStep),
     })
 
     // convertToN8nWorkflow()/n8nToReactFlow() declare their own local

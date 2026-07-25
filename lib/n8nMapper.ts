@@ -31,6 +31,37 @@ export interface AivoryNode extends Node {
  */
 const AI_SUB_CONNECTION_TYPES = ['ai_languageModel', 'ai_memory', 'ai_tool'] as const
 
+// ── Branch handle ↔ output-index mapping ────────────────────
+// n8n's `main` connections are Array<Array<target>> — the outer index IS the
+// output index. These two functions are inverses of each other: one picks a
+// stable, type-aware ReactFlow sourceHandle id for a given n8n output index
+// (n8nToReactFlow), the other decodes that same id back to an index
+// (reactFlowToN8n). If/Switch/SplitInBatches are the only node types with
+// more than one output today.
+function handleIdForBranch(n8nType: string, branchIndex: number): string | undefined {
+  if (n8nType === 'n8n-nodes-base.if') {
+    return branchIndex === 0 ? 'out-yes' : branchIndex === 1 ? 'out-no' : undefined
+  }
+  if (n8nType === 'n8n-nodes-base.switch') {
+    return `out-${branchIndex}`
+  }
+  if (n8nType === 'n8n-nodes-base.splitInBatches') {
+    // See lib/workflowConverter.ts's LOOP_DONE_OUTPUT/LOOP_BODY_OUTPUT comment
+    // — same unverified-but-documented n8n convention (done=0, loop=1).
+    return branchIndex === 0 ? 'out-done' : branchIndex === 1 ? 'out-loop' : undefined
+  }
+  return undefined
+}
+
+function branchIndexForHandle(handleId: string | null | undefined): number {
+  if (!handleId) return 0
+  if (handleId === 'out-yes' || handleId === 'out-done') return 0
+  if (handleId === 'out-no' || handleId === 'out-loop') return 1
+  const m = /^out-(\d+)$/.exec(handleId)
+  if (m) return parseInt(m[1], 10)
+  return 0
+}
+
 export function n8nToReactFlow(
   workflow: N8nWorkflow
 ): { nodes: Node<WorkflowNodeData>[]; edges: Edge[] } {
@@ -151,21 +182,14 @@ export function n8nToReactFlow(
       const sourceId = nameToId.get(sourceName)
       if (!sourceId) return
 
-      const sourceData = mapN8nNodeToWorkflowData(
-        workflow.nodes.find((n) => n.id === sourceId)!
-      )
-      const isCondition = sourceData.category === 'condition'
+      const sourceType = workflow.nodes.find((n) => n.id === sourceId)?.type || ''
 
-      // outputs.main is Array<Array<N8nConnectionTarget>> — index = branch index (0=true, 1=false)
+      // outputs.main is Array<Array<N8nConnectionTarget>> — index = output index
       const branches = outputs.main ?? []
       branches.forEach((branch, branchIndex) => {
         branch.forEach((conn) => {
           const targetId = nameToId.get(conn.node) ?? conn.node
-
-          let handleId: string | undefined
-          if (isCondition) {
-            handleId = branchIndex === 0 ? 'out-yes' : branchIndex === 1 ? 'out-no' : undefined
-          }
+          const handleId = handleIdForBranch(sourceType, branchIndex)
 
           edges.push({
             id: `${sourceId}-${targetId}-${branchIndex}`,
@@ -490,8 +514,9 @@ export function reactFlowToN8n(
     }
     const branchArray = workflow.connections[sourceName][connType]!
 
-    // Determine branch index: 0 = true/main, 1 = false/no (only meaningful for 'main')
-    const branchIndex = connType === 'main' && edge.sourceHandle === 'out-no' ? 1 : 0
+    // Determine output index this edge originates from (only meaningful for 'main' —
+    // ai_* sub-connections are always a single array, index 0).
+    const branchIndex = connType === 'main' ? branchIndexForHandle(edge.sourceHandle) : 0
 
     while (branchArray.length <= branchIndex) {
       branchArray.push([])
@@ -591,11 +616,26 @@ function mapN8nNodeToWorkflowData(
       : {}),
   };
 
-  // For condition nodes, add YES/NO outputs
-  if (category === 'condition') {
+  // Multi-output node types get their real output list — If stays a fixed
+  // Yes/No pair, Switch reflects however many rules the node actually has
+  // (+ a fallback slot if configured), Split In Batches gets its two fixed
+  // outputs. Every other node type keeps the default single (unlabeled) output.
+  if (n8nNode.type === 'n8n-nodes-base.if') {
     data.outputs = [
       { id: 'out-yes', label: 'Yes' },
       { id: 'out-no', label: 'No' },
+    ];
+  } else if (n8nNode.type === 'n8n-nodes-base.switch') {
+    const rules = (n8nNode.parameters?.rules as { values?: { outputKey?: string }[] } | undefined)?.values ?? [];
+    const fallbackOutput = (n8nNode.parameters?.options as { fallbackOutput?: string } | undefined)?.fallbackOutput;
+    const ruleOutputs = rules.map((r, i) => ({ id: `out-${i}`, label: r.outputKey || `Output ${i}` }));
+    data.outputs = fallbackOutput === 'extra'
+      ? [...ruleOutputs, { id: `out-${ruleOutputs.length}`, label: 'Fallback' }]
+      : ruleOutputs;
+  } else if (n8nNode.type === 'n8n-nodes-base.splitInBatches') {
+    data.outputs = [
+      { id: 'out-done', label: 'Done' },
+      { id: 'out-loop', label: 'Loop' },
     ];
   }
 

@@ -9,7 +9,7 @@
  * Trigger node always uses Webhook with auto-generated path.
  */
 
-import { detectNodeIntent, mapIntentToN8nNodes } from '@/lib/workflows/nodeMapper'
+import { detectNodeIntent, mapIntentToN8nNode, mapIntentToN8nNodes } from '@/lib/workflows/nodeMapper'
 import type { NodeIntent, MapContext } from '@/lib/workflows/nodeMapper'
 
 // Intents whose n8n node can return multiple items — when immediately
@@ -18,12 +18,32 @@ import type { NodeIntent, MapContext } from '@/lib/workflows/nodeMapper'
 // RSS Read -> Limit -> AI Agent).
 const MULTI_ITEM_INTENTS: NodeIntent[] = ['rss', 'http', 'database']
 
-interface WorkflowStep {
+// n8n-nodes-base.splitInBatches output convention (per n8n's own node
+// definition — no local n8n install to verify against in this sandbox, see
+// plan file Track B §B5's own caveat on this exact point): output 0 fires
+// once after all batches are done, output 1 fires once per batch and is
+// where the loop body connects.
+const LOOP_DONE_OUTPUT = 0
+const LOOP_BODY_OUTPUT = 1
+
+export interface WorkflowStep {
   step: number
   action: string
   tool: string
   output: string
   inputs?: { url?: string; [key: string]: any }
+  /**
+   * Only meaningfully populated for steps sourced from the copilot's
+   * GeneratedWorkflowStep ('trigger'|'action'|'condition'|'channel'|
+   * 'switch'|'loop') — kept as plain `string` here (not that literal union)
+   * because the OTHER producer of this shape, types/workflow.ts's
+   * AivoryWorkflowStep (Deep Diagnostic-generated, always linear, never
+   * carries `branches`), already types it as a bare `string`.
+   */
+  type?: string
+  /** Nested branch containers — only present for 'condition' | 'switch' | 'loop'. */
+  branches?: { key: string; label?: string; steps: WorkflowStep[] }[]
+  loopConfig?: { batchSize?: number }
 }
 
 interface AivoryWorkflow {
@@ -67,10 +87,34 @@ function generateNodeId(): string {
 }
 
 /**
+ * Build the n8n-nodes-base.splitInBatches primary node for a 'loop' step.
+ * No matching NodeIntent exists in nodeMapper.ts — loop steps are only ever
+ * selected explicitly via step.type (never guessed from text), so this stays
+ * local rather than forcing an always-false regex entry into nodeMapper's
+ * NodeIntent-keyed pattern table.
+ */
+function buildLoopNode(step: WorkflowStep, ctx: MapContext): N8nNode {
+  return {
+    id: generateNodeId(),
+    name: `Step ${ctx.stepIndex + 1}: ${step.action.substring(0, 40)}`,
+    type: 'n8n-nodes-base.splitInBatches',
+    typeVersion: 3,
+    position: [250 + ((ctx.stepIndex + 1) * 220), 300],
+    parameters: { batchSize: step.loopConfig?.batchSize ?? 1, options: {} },
+  }
+}
+
+/**
  * Convert Aivory workflow to n8n format using the nodeMapper engine.
  *
  * Each step is classified via detectNodeIntent() then mapped to a fully
- * configured n8n node via mapIntentToN8nNode().
+ * configured n8n node via mapIntentToN8nNode(). Steps with `branches` (real
+ * condition/switch/loop nodes, not the old single-output if/filter guess)
+ * are walked recursively: convertSteps() returns the tail node name a
+ * caller should continue its own chain from, and internally wires each
+ * branch's tail into a shared n8n-nodes-base.noOp join node (condition/
+ * switch) or back into the loop node itself (loop, forming the cyclic
+ * back-edge n8n expects for Split In Batches).
  */
 export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
   const nodes: N8nNode[] = []
@@ -111,68 +155,182 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
 
   // Merge a connection into `connections` without clobbering other
   // connection types (or branches) already registered for the same source.
-  const addConnection = (from: string, to: string, type: 'main' | 'ai_languageModel' | 'ai_memory' | 'ai_tool') => {
+  // `branchIndex` selects which of the source's n8n outputs this connection
+  // comes from — always 0 (the only output) for a plain node; only
+  // condition/switch/loop primaries have more than one.
+  const addConnection = (
+    from: string,
+    to: string,
+    type: 'main' | 'ai_languageModel' | 'ai_memory' | 'ai_tool',
+    branchIndex = 0
+  ) => {
     if (!connections[from]) connections[from] = {}
-    if (!connections[from][type]) connections[from][type] = [[]]
-    connections[from][type][0].push({ node: to, type, index: 0 })
+    if (!connections[from][type]) connections[from][type] = []
+    while (connections[from][type].length <= branchIndex) connections[from][type].push([])
+    connections[from][type][branchIndex].push({ node: to, type, index: 0 })
   }
 
   // 2. Step nodes — classified via nodeMapper engine
   let aiNodeCount = 0
-  const nodeNames: string[] = []
-  const stepCount = workflow.steps.length
-  let prevIntent: NodeIntent | null = null
+  let globalStepCounter = 0
 
-  workflow.steps.forEach((step, i) => {
-    const isLast = i === stepCount - 1
+  /**
+   * Recursively convert a step array, wiring each step's primary node from
+   * `entryNodeName`'s `entryBranchIndex`-th output (only meaningful for the
+   * very first step in `steps`; every step after that chains off the
+   * previous one's single default output). Returns the tail node name a
+   * caller should continue its own chain from — always that tail's default
+   * (index 0) output, since a branchy step's own continuation point (the
+   * join node for condition/switch, or the loop node's "done" output for
+   * loop) is itself index 0.
+   */
+  const convertSteps = (
+    steps: WorkflowStep[],
+    entryNodeName: string,
+    entryBranchIndex: number,
+    isTopLevel: boolean
+  ): string => {
+    let prevNodeName = entryNodeName
+    let prevBranchIndex = entryBranchIndex
+    let prevIntent: NodeIntent | null = null
+    const stepCount = steps.length
 
-    // Detect intent — last step defaults to 'respond' unless it has a specific channel intent
-    let intent: NodeIntent = detectNodeIntent(step.action, step.tool)
-    console.log(`[workflowConverter] Step ${i}: action="${step.action}" tool="${step.tool}" → intent="${intent}" isLast=${isLast}`)
-    // Only override last step to respondToWebhook for webhook-triggered workflows.
-    // Scheduled workflows have no webhook to respond to — keep the detected intent.
-    if (isLast && !isSchedule && intent !== 'respond' && intent !== 'filter' && intent !== 'email' && intent !== 'messaging') {
-      console.log(`[workflowConverter] Step ${i}: overriding intent from "${intent}" to "respond" (last step, webhook workflow)`)
-      intent = 'respond'
-    }
+    steps.forEach((step, i) => {
+      const isLast = isTopLevel && i === stepCount - 1
+      const hasBranches = !!step.branches?.length
 
-    const ctx: MapContext = { stepIndex: i, aiNodeCount, isLast }
-    const { primary, extraNodes, extraConnections } = mapIntentToN8nNodes(intent, step, ctx)
-    console.log(`[workflowConverter] Step ${i}: mapped to n8n type="${primary.type}" typeVersion=${primary.typeVersion}`)
+      let primary: N8nNode
+      let extraNodes: N8nNode[] | undefined
+      let extraConnections: { from: string; to: string; type: 'main' | 'ai_languageModel' | 'ai_memory' | 'ai_tool' }[] | undefined
+      let intent: NodeIntent | null = null
 
-    // Track AI nodes for input expression selection
-    if (intent === 'ai') aiNodeCount++
-
-    let prevNodeName = i === 0 ? triggerNode.name : nodeNames[i - 1]
-
-    // A multi-item producer feeding straight into an AI step gets a Limit
-    // node in between, so the agent runs once per batch instead of once
-    // per item (matches n8n's own recommended RSS -> Limit -> AI Agent shape).
-    if (intent === 'ai' && prevIntent && MULTI_ITEM_INTENTS.includes(prevIntent)) {
-      const limitNode: N8nNode = {
-        id: generateNodeId(),
-        name: `Limit ${i}`,
-        type: 'n8n-nodes-base.limit',
-        typeVersion: 1,
-        position: [primary.position[0] - 110, primary.position[1]],
-        parameters: { maxItems: 1 },
+      if (hasBranches && step.type === 'switch') {
+        const ctx: MapContext = { stepIndex: globalStepCounter++, aiNodeCount, isLast: false }
+        primary = mapIntentToN8nNode('switch', step, ctx)
+        // Generalize from the base 1-rule scaffold to a real N-way switch —
+        // one rule per branch, matching each branch's `key` against a
+        // generic field. Placeholder condition, same spirit as every other
+        // intent's default parameters (e.g. http's example.com URL) — the
+        // user fills in the real field via the inspector's SwitchForm.
+        primary.parameters = {
+          mode: 'rules',
+          rules: {
+            values: step.branches!.map((b) => ({
+              conditions: {
+                options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' },
+                conditions: [
+                  { leftValue: '={{ $json.response }}', rightValue: b.key, operator: { type: 'string', operation: 'equals' } },
+                ],
+                combinator: 'and',
+              },
+              renameOutput: true,
+              outputKey: b.label || b.key,
+            })),
+          },
+          options: { fallbackOutput: 'none' },
+        }
+        console.log(`[workflowConverter] Step ${ctx.stepIndex}: switch with ${step.branches!.length} branch(es)`)
+      } else if (hasBranches && step.type === 'loop') {
+        const ctx: MapContext = { stepIndex: globalStepCounter++, aiNodeCount, isLast: false }
+        primary = buildLoopNode(step, ctx)
+        console.log(`[workflowConverter] Step ${ctx.stepIndex}: loop (splitInBatches), batchSize=${step.loopConfig?.batchSize ?? 1}`)
+      } else if (hasBranches) {
+        // 'condition' — reuse the existing if-node scaffold as-is: it
+        // already produces exactly 2 outputs (true=0/false=1), matching
+        // branches[0]/branches[1] by array position.
+        const ctx: MapContext = { stepIndex: globalStepCounter++, aiNodeCount, isLast: false }
+        primary = mapIntentToN8nNode('filter', step, ctx)
+        console.log(`[workflowConverter] Step ${ctx.stepIndex}: condition with ${step.branches!.length} branch(es)`)
+      } else {
+        intent = detectNodeIntent(step.action, step.tool)
+        console.log(`[workflowConverter] Step ${globalStepCounter}: action="${step.action}" tool="${step.tool}" → intent="${intent}" isLast=${isLast}`)
+        // Only override last step to respondToWebhook for webhook-triggered workflows.
+        // Scheduled workflows have no webhook to respond to — keep the detected intent.
+        if (isLast && !isSchedule && intent !== 'respond' && intent !== 'filter' && intent !== 'email' && intent !== 'messaging') {
+          console.log(`[workflowConverter] Step ${globalStepCounter}: overriding intent from "${intent}" to "respond" (last step, webhook workflow)`)
+          intent = 'respond'
+        }
+        const ctx: MapContext = { stepIndex: globalStepCounter++, aiNodeCount, isLast }
+        const mapped = mapIntentToN8nNodes(intent, step, ctx)
+        primary = mapped.primary
+        extraNodes = mapped.extraNodes
+        extraConnections = mapped.extraConnections
+        console.log(`[workflowConverter] Step ${ctx.stepIndex}: mapped to n8n type="${primary.type}" typeVersion=${primary.typeVersion}`)
+        if (intent === 'ai') aiNodeCount++
       }
-      nodes.push(limitNode)
-      addConnection(prevNodeName, limitNode.name, 'main')
-      prevNodeName = limitNode.name
-    }
 
-    nodes.push(primary)
-    if (extraNodes) nodes.push(...extraNodes)
+      let connectFromName = prevNodeName
+      let connectFromBranch = i === 0 ? prevBranchIndex : 0
 
-    addConnection(prevNodeName, primary.name, 'main')
-    for (const conn of extraConnections ?? []) {
-      addConnection(conn.from, conn.to, conn.type)
-    }
+      // A multi-item producer feeding straight into an AI step gets a Limit
+      // node in between, so the agent runs once per batch instead of once
+      // per item (matches n8n's own recommended RSS -> Limit -> AI Agent shape).
+      if (intent === 'ai' && prevIntent && MULTI_ITEM_INTENTS.includes(prevIntent)) {
+        const limitNode: N8nNode = {
+          id: generateNodeId(),
+          name: `Limit ${globalStepCounter}`,
+          type: 'n8n-nodes-base.limit',
+          typeVersion: 1,
+          position: [primary.position[0] - 110, primary.position[1]],
+          parameters: { maxItems: 1 },
+        }
+        nodes.push(limitNode)
+        addConnection(connectFromName, limitNode.name, 'main', connectFromBranch)
+        connectFromName = limitNode.name
+        connectFromBranch = 0
+      }
 
-    nodeNames.push(primary.name)
-    prevIntent = intent
-  })
+      nodes.push(primary)
+      if (extraNodes) nodes.push(...extraNodes)
+
+      addConnection(connectFromName, primary.name, 'main', connectFromBranch)
+      for (const conn of extraConnections ?? []) {
+        addConnection(conn.from, conn.to, conn.type)
+      }
+
+      prevNodeName = primary.name
+      prevBranchIndex = 0
+      prevIntent = intent
+
+      if (hasBranches && step.type !== 'loop') {
+        // Condition/switch — every branch's tail feeds into a shared join
+        // node (n8n-nodes-base.noOp) before the outer chain resumes, so a
+        // step following this one in `steps` doesn't have to pick which
+        // branch to attach to.
+        const joinName = `${primary.name} · join`
+        nodes.push({
+          id: generateNodeId(),
+          name: joinName,
+          type: 'n8n-nodes-base.noOp',
+          typeVersion: 1,
+          position: [primary.position[0] + 110, primary.position[1] + 260],
+          parameters: {},
+        })
+        step.branches!.forEach((branch, branchIdx) => {
+          if (!branch.steps.length) return // unconnected output — no-op branch
+          const branchTail = convertSteps(branch.steps, primary.name, branchIdx, false)
+          addConnection(branchTail, joinName, 'main')
+        })
+        prevNodeName = joinName
+      } else if (hasBranches && step.type === 'loop') {
+        // Loop body recursively converted off the "loop" output; its tail
+        // wires back into the loop node itself (the cyclic back-edge n8n's
+        // Split In Batches expects). The outer chain resumes from the loop
+        // node's "done" output, which happens to also be index 0 — the same
+        // default `prevBranchIndex` value already set above.
+        const body = step.branches![0]
+        if (body?.steps.length) {
+          const bodyTail = convertSteps(body.steps, primary.name, LOOP_BODY_OUTPUT, false)
+          addConnection(bodyTail, primary.name, 'main')
+        }
+        prevBranchIndex = LOOP_DONE_OUTPUT
+      }
+    })
+
+    return prevNodeName
+  }
+
+  convertSteps(workflow.steps, triggerNode.name, 0, true)
 
   return {
     name: workflow.title,

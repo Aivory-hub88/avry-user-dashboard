@@ -42,7 +42,7 @@ export interface Message {
 
 export interface GeneratedWorkflowStep {
   id: string
-  type: 'trigger' | 'action' | 'condition' | 'channel'
+  type: 'trigger' | 'action' | 'condition' | 'channel' | 'switch' | 'loop'
   title: string
   description?: string
   config?: Record<string, unknown>
@@ -57,6 +57,17 @@ export interface GeneratedWorkflowStep {
    */
   app?: string
   action?: string
+  /**
+   * Nested branch containers — only present for 'condition' | 'switch' |
+   * 'loop' steps. Chosen over a flat next[]/successor-pointer graph so every
+   * existing linear consumer (workflowStepToBridgeStep, this file's own
+   * chat-history rendering, etc.) keeps working unchanged: `branches` is
+   * simply undefined on 100% of today's linear workflows. See plan file
+   * Track B §B5 for the rejected alternatives.
+   */
+  branches?: { key: string; label?: string; steps: GeneratedWorkflowStep[] }[]
+  /** Only present for 'loop' steps — the single branch in `branches` is the loop body. */
+  loopConfig?: { batchSize?: number }
 }
 
 export interface NodeConfig {
