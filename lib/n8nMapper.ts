@@ -114,24 +114,43 @@ export function n8nToReactFlow(
     })
   }
 
-  // Assign layout levels via BFS from trigger nodes (main-flow only)
+  // Assign layout levels via longest-path relaxation (main-flow only).
+  // A node reached by more than one branch (e.g. a merge/join after a
+  // Switch/If) must land AFTER ALL of its predecessors, not just whichever
+  // branch happens to reach it first. The previous approach was a plain DFS
+  // that marked nodes "visited" on first arrival and never revisited them,
+  // so a join node could get stuck in an earlier column than a
+  // later-converging branch — producing backward (right-to-left) edges and
+  // the tangled, looping connector lines seen on the canvas. Relaxing every
+  // edge until levels stop increasing (Bellman-Ford-style longest path)
+  // fixes that; a visit budget guards against n8n loop-back edges
+  // (e.g. SplitInBatches) creating an infinite loop.
   const levels = new Map<string, number>()
-  const visited = new Set<string>()
+  const mainFlowIds = workflow.nodes
+    .filter((n) => !subNodeParent.has(n.id))
+    .map((n) => n.id)
+  mainFlowIds.forEach((id) => levels.set(id, 0))
 
-  function assignLevel(nodeId: string, level: number) {
-    if (visited.has(nodeId)) return
-    visited.add(nodeId)
-    levels.set(nodeId, level)
+  const queue = [...mainFlowIds]
+  const visitCount = new Map<string, number>()
+  const MAX_VISITS = mainFlowIds.length + 5
+  while (queue.length) {
+    const nodeId = queue.shift() as string
+    const visits = (visitCount.get(nodeId) ?? 0) + 1
+    visitCount.set(nodeId, visits)
+    if (visits > MAX_VISITS) continue // cycle guard (loop-back edges)
+
+    const level = levels.get(nodeId) ?? 0
     const targets = adjacency.get(nodeId) || []
-    targets.forEach((targetId) => assignLevel(targetId, level + 1))
+    targets.forEach((targetId) => {
+      if (!levels.has(targetId)) return // not a main-flow node (e.g. sub-node)
+      const newLevel = level + 1
+      if (newLevel > (levels.get(targetId) as number)) {
+        levels.set(targetId, newLevel)
+        queue.push(targetId)
+      }
+    })
   }
-
-  workflow.nodes.forEach((n) => {
-    if (mapN8nNodeType(n.type) === 'trigger') assignLevel(n.id, 0)
-  })
-  workflow.nodes.forEach((n) => {
-    if (!visited.has(n.id) && !subNodeParent.has(n.id)) assignLevel(n.id, 0)
-  })
 
   // Count nodes per level for vertical stacking within a column
   const indexPerLevel = new Map<number, number>()
@@ -721,25 +740,6 @@ function getCategoryIcon(category: WorkflowNodeCategory): string {
     app:     'http',
   }
   return iconMap[category] || 'http'
-}
-
-/**
- * Map n8n node type to ReactFlow node type
- * @param n8nType n8n node type string
- * @returns ReactFlow node type ('trigger' or 'step')
- */
-function mapN8nNodeType(n8nType: string): 'trigger' | 'step' {
-  // Trigger node types
-  if (
-    n8nType.includes('trigger') ||
-    n8nType.includes('Trigger') ||
-    n8nType === 'n8n-nodes-base.manualTrigger'
-  ) {
-    return 'trigger'
-  }
-
-  // Everything else is a step
-  return 'step'
 }
 
 /**
