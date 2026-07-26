@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import {
   loadCredentials,
   isValidN8nUrl,
+  normalizeN8nBaseUrl,
   N8nCredentials,
 } from '@/lib/workflows/credentialStore'
 import styles from './ActivationModal.module.css'
@@ -46,11 +47,23 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
   const apiKeyValid = apiKey.trim().length > 0
   const canSubmit = urlValid && apiKeyValid && !loading
 
+  // Users paste the address bar from their n8n tab, which carries the editor
+  // route and query (…/workflow/AbC123?projectId=…). The REST API lives on the
+  // base URL, so trim it back on blur — visibly, so the corrected value is what
+  // they see and save, rather than being silently rewritten at submit time.
+  const normalizedUrl = normalizeN8nBaseUrl(instanceUrl)
+  const urlWasTrimmed = urlValid && normalizedUrl !== instanceUrl.trim()
+
+  const handleUrlBlur = () => {
+    setUrlTouched(true)
+    if (urlWasTrimmed) setInstanceUrl(normalizedUrl)
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!canSubmit) return
     onSubmit({
-      instanceUrl: instanceUrl.trim(),
+      instanceUrl: normalizeN8nBaseUrl(instanceUrl),
       apiKey: apiKey.trim(),
       storagePreference,
     })
@@ -87,12 +100,17 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
               placeholder="https://your-n8n.example.com"
               value={instanceUrl}
               onChange={(e) => setInstanceUrl(e.target.value)}
-              onBlur={() => setUrlTouched(true)}
+              onBlur={handleUrlBlur}
               autoComplete="url"
             />
             {urlTouched && instanceUrl.length > 0 && !urlValid && (
               <span className={styles.validationError}>
                 {t('activationModal.urlInvalid')}
+              </span>
+            )}
+            {urlWasTrimmed && (
+              <span className={styles.validationHint}>
+                Using <strong>{normalizedUrl}</strong> — the workflow path was removed.
               </span>
             )}
           </div>

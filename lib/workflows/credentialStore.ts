@@ -51,6 +51,56 @@ export function isValidN8nUrl(url: string): boolean {
   }
 }
 
+/**
+ * n8n editor-UI route prefixes. When a pasted URL's path starts with one of
+ * these, everything from that segment onward is UI routing, not part of the
+ * instance's base URL.
+ */
+const N8N_UI_ROUTES = [
+  'workflow', 'workflows', 'home', 'projects', 'executions', 'execution',
+  'credentials', 'settings', 'signin', 'setup', 'templates', 'variables',
+]
+
+/**
+ * Normalise whatever the user pasted into the base URL n8n's REST API lives on.
+ *
+ * Users naturally copy the address bar out of their n8n tab, which yields
+ * something like `https://n8n.example.com/workflow/AbC123?projectId=PR-1`.
+ * Callers append `/api/v1/...` to this value, so without normalisation the
+ * request goes to `…/workflow/AbC123?projectId=PR-1/api/v1/workflows` — n8n
+ * answers 404 with an HTML body and the user is told only "n8n returned 404",
+ * which reads like a bad API key rather than a bad URL.
+ *
+ * Query string and hash are always dropped (never part of a base URL). A
+ * genuine base path is PRESERVED — self-hosted n8n can live under a subpath
+ * via `N8N_PATH` (e.g. `https://example.com/n8n`), so we only strip the path
+ * from the first recognised UI route segment onward rather than reducing to
+ * `origin`.
+ *
+ * Returns the input trimmed and unchanged if it cannot be parsed, so the
+ * existing validation still produces the error message.
+ */
+export function normalizeN8nBaseUrl(raw: string): string {
+  const trimmed = (raw ?? '').trim()
+  if (!trimmed) return ''
+
+  let parsed: URL
+  try {
+    parsed = new URL(trimmed)
+  } catch {
+    return trimmed
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return trimmed
+
+  const segments = parsed.pathname.split('/').filter(Boolean)
+  const cut = segments.findIndex((s) => N8N_UI_ROUTES.includes(s.toLowerCase()))
+  const kept = cut === -1 ? segments : segments.slice(0, cut)
+  const basePath = kept.length ? `/${kept.join('/')}` : ''
+
+  // origin already excludes query/hash; basePath excludes UI routes.
+  return `${parsed.origin}${basePath}`
+}
+
 // ── localStorage helpers ──────────────────────────────────────────────────────
 
 /**

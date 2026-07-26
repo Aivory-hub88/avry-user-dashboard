@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { normalizeN8nBaseUrl } from '@/lib/workflows/credentialStore'
 
 /**
  * POST /api/workflows/activate
@@ -47,7 +48,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const url = (body?.n8n_instance_url ?? '').toString().trim().replace(/\/$/, '')
+  // Normalise defensively: this used to only strip a trailing slash, so a
+  // credential saved before the modal started trimming (or one written by any
+  // other caller) could still carry an editor path + query — which turned
+  // `${url}/api/v1/workflows` into a 404 against n8n's SPA router.
+  const rawUrl = (body?.n8n_instance_url ?? '').toString()
+  const url = normalizeN8nBaseUrl(rawUrl).replace(/\/$/, '')
   const apiKey = (body?.n8n_api_key ?? '').toString().trim()
   if (!url || !apiKey) {
     return NextResponse.json(
@@ -76,6 +82,23 @@ export async function POST(req: NextRequest) {
     }
     if (!res.ok) {
       const txt = await res.text().catch(() => '')
+      // A 404 whose body is HTML means we hit n8n's editor SPA, not its REST
+      // API — i.e. the base URL is wrong. Saying only "n8n returned 404" sends
+      // people hunting for a bad API key instead.
+      const isHtml =
+        (res.headers.get('content-type') || '').includes('text/html') ||
+        txt.trimStart().startsWith('<')
+      if (res.status === 404 && isHtml) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: 'BAD_INSTANCE_URL',
+            message:
+              `No n8n API found at ${url}. Use your instance's base URL (e.g. https://n8n.example.com), not a link to a specific workflow.`,
+          },
+          { status: 400 },
+        )
+      }
       return NextResponse.json(
         { success: false, code: 'DEPLOY_FAILED', message: `n8n returned ${res.status}`, details: txt.slice(0, 300) },
         { status: 502 },
