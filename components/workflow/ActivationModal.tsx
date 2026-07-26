@@ -8,7 +8,8 @@ import {
   normalizeN8nBaseUrl,
   N8nCredentials,
 } from '@/lib/workflows/credentialStore'
-import { isAdmin } from '@/lib/auth'
+import { getToken } from '@/lib/auth'
+import { asset } from '@/lib/asset'
 import styles from './ActivationModal.module.css'
 
 export interface ActivationModalProps {
@@ -43,10 +44,27 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
         setApiKey(stored.apiKey)
         setStoragePreference(stored.storageType)
       }
-      // Superadmins get a one-click path onto Aivory's own n8n for testing.
-      // This only decides whether the option is rendered — the server verifies
-      // the JWT claim again before it will touch the shared instance.
-      setIsSuperadmin(isAdmin())
+      // Whether the Aivory test-instance option exists for this caller is the
+      // SERVER's answer, from the same verified JWT the deploy path enforces —
+      // not `account_type` out of localStorage, which the browser owns and
+      // could edit to reveal a control it may not use.
+      let cancelled = false
+      setIsSuperadmin(false)
+      setUseAivoryInstance(false)
+      ;(async () => {
+        try {
+          const token = getToken()
+          const res = await fetch(asset('/api/workflows/activate'), {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          })
+          if (!res.ok) return
+          const data = await res.json()
+          if (!cancelled) setIsSuperadmin(data?.canUseAivoryInstance === true)
+        } catch {
+          // Stay hidden on any failure — the option is additive, never required.
+        }
+      })()
+      return () => { cancelled = true }
     }
   }, [open])
 

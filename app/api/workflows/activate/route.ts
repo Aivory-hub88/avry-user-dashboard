@@ -12,6 +12,35 @@ import { getAuthUser } from '@/lib/serverAuth'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
+/**
+ * GET /api/workflows/activate — what may this caller do?
+ *
+ * The modal used to decide whether to show the superadmin test-instance
+ * option by reading `account_type` out of localStorage, which the browser
+ * owns: a regular user could set it and reveal the control (the POST would
+ * still refuse, but it should never have been on screen), and conversely a
+ * real superadmin whose stored session lacked that field would never see it.
+ * The answer now comes from the same verified JWT the deploy path enforces,
+ * so what is rendered and what is permitted cannot drift apart.
+ *
+ * Returns { canUseAivoryInstance: boolean } and never leaks why it is false.
+ */
+export async function GET(req: NextRequest) {
+  const deny = NextResponse.json({ canUseAivoryInstance: false })
+
+  let authUser
+  try {
+    authUser = getAuthUser(req)
+  } catch {
+    return deny // auth not configured — fail closed
+  }
+  if (!authUser || authUser.account_type !== 'superadmin') return deny
+
+  // Don't advertise the option when the instance isn't actually configured.
+  const configured = Boolean((process.env.N8N_BASE_URL ?? '').trim() && (process.env.N8N_API_KEY ?? '').trim())
+  return NextResponse.json({ canUseAivoryInstance: configured })
+}
+
 function buildN8nWorkflow(wfData: any, workflowId: string) {
   const existing = wfData?.workflow_json || wfData?.n8n
   if (existing && Array.isArray(existing.nodes)) {
