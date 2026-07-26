@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { normalizeN8nBaseUrl } from '@/lib/workflows/credentialStore'
+import { getAuthUser } from '@/lib/serverAuth'
 
 /**
  * POST /api/workflows/activate
@@ -48,18 +49,71 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: 'Invalid JSON body' }, { status: 400 })
   }
 
-  // Normalise defensively: this used to only strip a trailing slash, so a
-  // credential saved before the modal started trimming (or one written by any
-  // other caller) could still carry an editor path + query — which turned
-  // `${url}/api/v1/workflows` into a 404 against n8n's SPA router.
-  const rawUrl = (body?.n8n_instance_url ?? '').toString()
-  const url = normalizeN8nBaseUrl(rawUrl).replace(/\/$/, '')
-  const apiKey = (body?.n8n_api_key ?? '').toString().trim()
-  if (!url || !apiKey) {
-    return NextResponse.json(
-      { success: false, code: 'MISSING_CREDS', message: 'n8n URL and API key are required' },
-      { status: 400 },
-    )
+  // ── Credential source ────────────────────────────────────────────────────
+  // Normally the caller supplies their own n8n (bring-your-own; we never store
+  // those server-side). Superadmins may instead deploy straight into Aivory's
+  // own self-hosted n8n for battle-testing — the instance's API key stays in
+  // server env and is never sent to, or accepted from, the browser.
+  const useAivoryInstance = body?.use_aivory_instance === true
+
+  let url: string
+  let apiKey: string
+  // Browser-reachable base for the "open in n8n" link. The internal service
+  // address (http://n8n:5678) is fine for server-side API calls but useless as
+  // a link, so the public host is configured separately.
+  let publicBase: string
+
+  if (useAivoryInstance) {
+    let authUser
+    try {
+      authUser = getAuthUser(req)
+    } catch {
+      return NextResponse.json(
+        { success: false, code: 'SERVER_MISCONFIGURED', message: 'Authentication is not configured on this server' },
+        { status: 500 },
+      )
+    }
+    // Gate on the cryptographically verified JWT claim — never on a flag the
+    // client could set for itself.
+    if (!authUser) {
+      return NextResponse.json(
+        { success: false, code: 'UNAUTHENTICATED', message: 'Sign in to use the Aivory test instance' },
+        { status: 401 },
+      )
+    }
+    if (authUser.account_type !== 'superadmin') {
+      return NextResponse.json(
+        { success: false, code: 'FORBIDDEN', message: 'The Aivory test instance is restricted to superadmins' },
+        { status: 403 },
+      )
+    }
+
+    const envUrl = (process.env.N8N_BASE_URL ?? '').trim()
+    const envKey = (process.env.N8N_API_KEY ?? '').trim()
+    if (!envUrl || !envKey) {
+      return NextResponse.json(
+        { success: false, code: 'INSTANCE_NOT_CONFIGURED', message: 'The Aivory n8n instance is not configured on this server' },
+        { status: 503 },
+      )
+    }
+    url = normalizeN8nBaseUrl(envUrl).replace(/\/$/, '')
+    apiKey = envKey
+    publicBase = (process.env.N8N_PUBLIC_URL ?? '').trim().replace(/\/$/, '') || url
+  } else {
+    // Normalise defensively: this used to only strip a trailing slash, so a
+    // credential saved before the modal started trimming (or one written by any
+    // other caller) could still carry an editor path + query — which turned
+    // `${url}/api/v1/workflows` into a 404 against n8n's SPA router.
+    const rawUrl = (body?.n8n_instance_url ?? '').toString()
+    url = normalizeN8nBaseUrl(rawUrl).replace(/\/$/, '')
+    apiKey = (body?.n8n_api_key ?? '').toString().trim()
+    publicBase = url
+    if (!url || !apiKey) {
+      return NextResponse.json(
+        { success: false, code: 'MISSING_CREDS', message: 'n8n URL and API key are required' },
+        { status: 400 },
+      )
+    }
   }
 
   const workflow = buildN8nWorkflow(body?.workflow_data, (body?.workflow_id ?? '').toString())
@@ -128,5 +182,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ success: true, n8n_workflow_id: n8nId, active, workflow_id: body?.workflow_id })
+  // The workflows page already opens `n8n_url` in a new tab, but this route
+  // never sent one — so a deploy gave no way to go look at the result. That is
+  // the whole point of the superadmin test path, so return it in both modes.
+  const n8nUrl = n8nId ? `${publicBase}/workflow/${n8nId}` : undefined
+
+  return NextResponse.json({
+    success: true,
+    n8n_workflow_id: n8nId,
+    active,
+    workflow_id: body?.workflow_id,
+    n8n_url: n8nUrl,
+    instance: useAivoryInstance ? 'aivory' : 'byo',
+  })
 }

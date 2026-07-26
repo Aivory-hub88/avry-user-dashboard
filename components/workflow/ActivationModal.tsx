@@ -8,6 +8,7 @@ import {
   normalizeN8nBaseUrl,
   N8nCredentials,
 } from '@/lib/workflows/credentialStore'
+import { isAdmin } from '@/lib/auth'
 import styles from './ActivationModal.module.css'
 
 export interface ActivationModalProps {
@@ -30,6 +31,8 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
   const [storagePreference, setStoragePreference] = useState<'localStorage' | 'database'>('localStorage')
   const [showApiKey, setShowApiKey] = useState(false)
   const [urlTouched, setUrlTouched] = useState(false)
+  const [useAivoryInstance, setUseAivoryInstance] = useState(false)
+  const [isSuperadmin, setIsSuperadmin] = useState(false)
 
   // Pre-fill from stored credentials on mount
   useEffect(() => {
@@ -40,12 +43,17 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
         setApiKey(stored.apiKey)
         setStoragePreference(stored.storageType)
       }
+      // Superadmins get a one-click path onto Aivory's own n8n for testing.
+      // This only decides whether the option is rendered — the server verifies
+      // the JWT claim again before it will touch the shared instance.
+      setIsSuperadmin(isAdmin())
     }
   }, [open])
 
   const urlValid = isValidN8nUrl(instanceUrl)
   const apiKeyValid = apiKey.trim().length > 0
-  const canSubmit = urlValid && apiKeyValid && !loading
+  // The Aivory instance needs no credentials from the user at all.
+  const canSubmit = (useAivoryInstance || (urlValid && apiKeyValid)) && !loading
 
   // Users paste the address bar from their n8n tab, which carries the editor
   // route and query (…/workflow/AbC123?projectId=…). The REST API lives on the
@@ -63,9 +71,10 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
     e.preventDefault()
     if (!canSubmit) return
     onSubmit({
-      instanceUrl: normalizeN8nBaseUrl(instanceUrl),
-      apiKey: apiKey.trim(),
+      instanceUrl: useAivoryInstance ? '' : normalizeN8nBaseUrl(instanceUrl),
+      apiKey: useAivoryInstance ? '' : apiKey.trim(),
       storagePreference,
+      useAivoryInstance,
     })
   }
 
@@ -88,8 +97,29 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
             </button>
           </div>
 
+          {/* Superadmin: deploy straight into Aivory's own n8n for testing */}
+          {isSuperadmin && (
+            <label className={styles.testInstance}>
+              <input
+                type="checkbox"
+                checked={useAivoryInstance}
+                onChange={(e) => setUseAivoryInstance(e.target.checked)}
+              />
+              <span className={styles.testInstanceText}>
+                <span className={styles.testInstanceTitle}>
+                  Use the Aivory test instance
+                  <span className={styles.badge}>Superadmin</span>
+                </span>
+                <span className={styles.testInstanceDesc}>
+                  Deploys to Aivory&apos;s own n8n so you can watch the run. No URL or API key
+                  needed — the server holds them.
+                </span>
+              </span>
+            </label>
+          )}
+
           {/* n8n Instance URL */}
-          <div className={styles.fieldGroup}>
+          <div className={styles.fieldGroup} hidden={useAivoryInstance}>
             <label className={styles.label} htmlFor="n8n-url">
               {t('activationModal.urlLabel')}
             </label>
@@ -116,7 +146,7 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
           </div>
 
           {/* API Key */}
-          <div className={styles.fieldGroup}>
+          <div className={styles.fieldGroup} hidden={useAivoryInstance}>
             <label className={styles.label} htmlFor="n8n-api-key">
               {t('activationModal.apiKeyLabel')}
             </label>
@@ -152,8 +182,8 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
             </div>
           </div>
 
-          {/* Storage Preference */}
-          <div className={styles.fieldGroup}>
+          {/* Storage Preference — nothing is stored for the Aivory instance */}
+          <div className={styles.fieldGroup} hidden={useAivoryInstance}>
             <span className={styles.label}>
               {t('activationModal.storageLabel')}
             </span>

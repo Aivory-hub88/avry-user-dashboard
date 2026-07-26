@@ -22,6 +22,7 @@ import { ActivationModal } from '@/components/workflow/ActivationModal'
 import { ApplyTargetDialog } from '@/components/workflow/ApplyTargetDialog'
 import { VersionHistoryPanel } from '@/components/workflow/VersionHistoryPanel'
 import { saveCredentials, N8nCredentials } from '@/lib/workflows/credentialStore'
+import { getToken } from '@/lib/auth'
 import { convertToN8nWorkflow, type WorkflowStep as ConverterWorkflowStep } from '@/lib/workflowConverter'
 import type { GeneratedWorkflowStep } from '@/lib/workflows/copilotStateMachine'
 import { fetchTemplateById } from '@/lib/templates/resolveTemplate'
@@ -1018,11 +1019,15 @@ function WorkflowsPageInner() {
       // preference additionally awaits a real server save and can reject —
       // that failure must not abort deployment (localStorage already has
       // the credential), just surface a heads-up toast.
-      try {
-        await saveCredentials(credentials)
-      } catch (credErr) {
-        console.warn('[activate] Database credential save failed:', credErr)
-        showToast(t('activationModal.errorCredentialDbSave'), 'error')
+      // The superadmin test path carries no credentials to persist — the
+      // server resolves Aivory's own instance from its env.
+      if (!credentials.useAivoryInstance) {
+        try {
+          await saveCredentials(credentials)
+        } catch (credErr) {
+          console.warn('[activate] Database credential save failed:', credErr)
+          showToast(t('activationModal.errorCredentialDbSave'), 'error')
+        }
       }
 
       // Build the n8n workflow JSON from the current canvas so the deployed
@@ -1040,14 +1045,21 @@ function WorkflowsPageInner() {
 
       // POST to activate route with user-provided n8n credentials
       // (asset() prefixes the /dashboard basePath — Next serves API routes there)
+      // The Aivory test path is superadmin-gated server-side, so the request
+      // must carry the session token for that JWT check to succeed.
+      const authToken = getToken()
       const res = await fetch(asset('/api/workflows/activate'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({
           workflow_id: selected.workflow_id,
           workflow_data: { ...selected, ...(workflow_json ? { workflow_json } : {}) },
           n8n_instance_url: credentials.instanceUrl,
           n8n_api_key: credentials.apiKey,
+          use_aivory_instance: credentials.useAivoryInstance === true,
         }),
       })
       const data = await res.json()

@@ -16,6 +16,14 @@ export interface N8nCredentials {
   instanceUrl: string
   apiKey: string
   storagePreference: 'localStorage' | 'database'
+  /**
+   * Superadmin-only: deploy into Aivory's own self-hosted n8n instead of a
+   * user-supplied instance. When set, `instanceUrl`/`apiKey` are ignored and
+   * nothing is persisted — the server resolves the instance from its own env
+   * after re-checking the caller's JWT. The client flag is a UI affordance
+   * only; it grants nothing on its own.
+   */
+  useAivoryInstance?: boolean
 }
 
 export interface StoredCredentials {
