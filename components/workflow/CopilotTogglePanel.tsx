@@ -60,6 +60,7 @@ export function CopilotTogglePanel({ onApplyWorkflow, onApplySuggestion }: Copil
     messages,
     loading,
     loadingHint,
+    isStreamingReply,
     error,
     stage,
     workflow,
@@ -88,6 +89,7 @@ export function CopilotTogglePanel({ onApplyWorkflow, onApplySuggestion }: Copil
           messages={messages}
           loading={loading}
           loadingHint={loadingHint}
+          isStreamingReply={isStreamingReply}
           error={error}
           stage={stage}
           isTesting={isTesting}
@@ -133,6 +135,7 @@ interface CopilotPanelExpandedProps {
   messages: CopilotMessage[]
   loading: boolean
   loadingHint: string | null
+  isStreamingReply: boolean
   error: string | null
   stage: string
   isTesting: boolean
@@ -147,7 +150,7 @@ interface CopilotPanelExpandedProps {
 }
 
 function CopilotPanelExpanded({
-  onClose, messages, loading, loadingHint, error,
+  onClose, messages, loading, loadingHint, isStreamingReply, error,
   stage, isTesting, workflow, canApply, isCompleted,
   onSendMessage, onEditMessage, onDeleteMessage, onApplyWorkflow, onClear,
 }: CopilotPanelExpandedProps) {
@@ -194,6 +197,7 @@ function CopilotPanelExpanded({
 
   const hasMessages = messages.length > 0 || loading
   const hasContent = input.trim().length > 0 || attachedFiles.length > 0
+  const busy = loading || isStreamingReply
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value)
@@ -204,12 +208,12 @@ function CopilotPanelExpanded({
 
   const handleSend = useCallback(() => {
     const trimmed = input.trim()
-    if (!hasContent || loading) return
+    if (!hasContent || busy) return
     setInput('')
     setAttachedFiles([])
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     if (trimmed) onSendMessage(trimmed)
-  }, [input, hasContent, loading, onSendMessage])
+  }, [input, hasContent, busy, onSendMessage])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -302,13 +306,13 @@ function CopilotPanelExpanded({
           </p>
         </div>
       ) : (
-        <div className="copilot-chat flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3" style={{ height: `${panelHeight}px` }}>
+        <div className="copilot-chat overflow-y-auto px-4 py-3 flex flex-col gap-3 shrink-0" style={{ height: `${panelHeight}px` }}>
           {messages.map((msg, i) => (
             <MessageRow
               key={i}
               index={i}
               msg={msg}
-              busy={loading}
+              busy={busy}
               onEdit={onEditMessage}
               onDelete={onDeleteMessage}
             />
@@ -408,7 +412,7 @@ function CopilotPanelExpanded({
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder="Enter an idea or app name to get started"
-          disabled={loading}
+          disabled={busy}
           aria-label="Message Aivory"
         />
         <button
@@ -425,7 +429,7 @@ function CopilotPanelExpanded({
         <button
           className={`w-9 h-9 rounded-[20px] flex items-center justify-center transition-colors shrink-0 ${hasContent ? 'bg-[#353532] border border-[#666864] hover:bg-[#444440]' : 'bg-[#555552]'}`}
           onClick={handleSend}
-          disabled={!hasContent || loading}
+          disabled={!hasContent || busy}
           aria-label="Send"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -589,6 +593,13 @@ function MessageRow({
         <div className="flex-1 min-w-0">
           <div className={`${MD_CLASSES} text-[#ecebe7]`}>
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+            {msg.isStreaming && (
+              <span
+                className="inline-block w-[3px] h-[1.125rem] bg-[#b7cba6] ml-0.5 align-middle rounded-sm"
+                style={{ animation: 'blink 1s step-end infinite' }}
+                aria-hidden="true"
+              />
+            )}
           </div>
           <div className="flex items-center gap-0.5 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <ActionBtn label={copied ? 'Copied' : 'Copy'} onClick={handleCopy}>{copied ? ICONS.check : ICONS.copy}</ActionBtn>
