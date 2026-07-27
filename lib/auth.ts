@@ -68,6 +68,10 @@ export function getToken(): string | null {
   } catch { return null; }
 }
 
+// For calls to the dashboard's own API routes, prefer authedFetch() from
+// lib/deployAuth — it covers the other token stores AND refreshes an expired
+// access token, which getToken() alone cannot do.
+
 export function isAdmin(): boolean {
   const u = getUser();
   return u?.account_type === "superadmin";

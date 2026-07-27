@@ -8,7 +8,7 @@ import {
   normalizeN8nBaseUrl,
   N8nCredentials,
 } from '@/lib/workflows/credentialStore'
-import { getToken } from '@/lib/auth'
+import { authedFetch } from '@/lib/deployAuth'
 import { asset } from '@/lib/asset'
 import styles from './ActivationModal.module.css'
 
@@ -34,6 +34,7 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
   const [urlTouched, setUrlTouched] = useState(false)
   const [useAivoryInstance, setUseAivoryInstance] = useState(false)
   const [isSuperadmin, setIsSuperadmin] = useState(false)
+  const [staleSession, setStaleSession] = useState(false)
 
   // Pre-fill from stored credentials on mount
   useEffect(() => {
@@ -51,15 +52,24 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
       let cancelled = false
       setIsSuperadmin(false)
       setUseAivoryInstance(false)
+      setStaleSession(false)
       ;(async () => {
         try {
-          const token = getToken()
-          const res = await fetch(asset('/api/workflows/activate'), {
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          })
+          // authedFetch refreshes an expired access token and retries once —
+          // without it, a superadmin more than 60 minutes into their session
+          // gets a silent "no" and the option disappears.
+          const res = await authedFetch(asset('/api/workflows/activate'))
+          if (cancelled) return
+          if (res.status === 401) {
+            // Refresh was attempted and still failed: the session is genuinely
+            // stale. Say so — a superadmin watching the option vanish with no
+            // explanation has no way to know a re-login is all that's needed.
+            setStaleSession(true)
+            return
+          }
           if (!res.ok) return
           const data = await res.json()
-          if (!cancelled) setIsSuperadmin(data?.canUseAivoryInstance === true)
+          setIsSuperadmin(data?.canUseAivoryInstance === true)
         } catch {
           // Stay hidden on any failure — the option is additive, never required.
         }
@@ -134,6 +144,12 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
                 </span>
               </span>
             </label>
+          )}
+
+          {staleSession && (
+            <p className={styles.staleSession}>
+              Your sign-in has expired. Reload the page to continue — some options are hidden until then.
+            </p>
           )}
 
           {/* n8n Instance URL */}

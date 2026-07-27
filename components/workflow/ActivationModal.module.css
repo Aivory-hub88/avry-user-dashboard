@@ -134,6 +134,18 @@
   margin-top: -2px;
 }
 
+/* Session went stale: explain it rather than silently hiding options. */
+.staleSession {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(224, 172, 82, 0.3);
+  border-radius: 8px;
+  background: rgba(224, 172, 82, 0.08);
+  color: #d8a44f;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
 /* ── Superadmin test-instance toggle ────────────────────── */
 .testInstance {
   display: flex;

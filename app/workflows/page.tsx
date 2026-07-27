@@ -22,7 +22,7 @@ import { ActivationModal } from '@/components/workflow/ActivationModal'
 import { ApplyTargetDialog } from '@/components/workflow/ApplyTargetDialog'
 import { VersionHistoryPanel } from '@/components/workflow/VersionHistoryPanel'
 import { saveCredentials, N8nCredentials } from '@/lib/workflows/credentialStore'
-import { getToken } from '@/lib/auth'
+import { authedFetch } from '@/lib/deployAuth'
 import { convertToN8nWorkflow, type WorkflowStep as ConverterWorkflowStep } from '@/lib/workflowConverter'
 import type { GeneratedWorkflowStep } from '@/lib/workflows/copilotStateMachine'
 import { fetchTemplateById } from '@/lib/templates/resolveTemplate'
@@ -1046,14 +1046,11 @@ function WorkflowsPageInner() {
       // POST to activate route with user-provided n8n credentials
       // (asset() prefixes the /dashboard basePath — Next serves API routes there)
       // The Aivory test path is superadmin-gated server-side, so the request
-      // must carry the session token for that JWT check to succeed.
-      const authToken = getToken()
-      const res = await fetch(asset('/api/workflows/activate'), {
+      // must carry the session token. authedFetch also refreshes an expired
+      // access token and retries, so a deploy an hour into a session doesn't
+      // fail on a stale JWT while the UI still looks signed in.
+      const res = await authedFetch(asset('/api/workflows/activate'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
         body: JSON.stringify({
           workflow_id: selected.workflow_id,
           workflow_data: { ...selected, ...(workflow_json ? { workflow_json } : {}) },

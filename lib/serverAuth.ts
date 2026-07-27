@@ -28,9 +28,15 @@ export function getAuthUser(request: NextRequest): AuthUser | null {
   }
 
   const bearer = request.headers.get('authorization')
+  // Cookie fallbacks cover both names in use: `aivory_access_token` (set at
+  // login by the dashboard's own proxy routes) and `aivory_session_token`
+  // (the cross-subdomain SSO cookie the landing-site login writes, which
+  // AuthManager reads). Accepting only the first made valid SSO sessions look
+  // unauthenticated to these routes.
   const token = bearer?.startsWith('Bearer ')
     ? bearer.slice('Bearer '.length)
     : request.cookies.get('aivory_access_token')?.value
+      ?? request.cookies.get('aivory_session_token')?.value
   if (!token) return null
 
   try {

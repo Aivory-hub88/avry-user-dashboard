@@ -34,7 +34,18 @@ export async function GET(req: NextRequest) {
   } catch {
     return deny // auth not configured — fail closed
   }
-  if (!authUser || authUser.account_type !== 'superadmin') return deny
+
+  // 401 (not a 200 "no") when the token is missing, invalid, or EXPIRED, so
+  // authedFetch() refreshes and retries. Access tokens live 60 minutes while
+  // the client-side gate only checks that a token exists — so a superadmin an
+  // hour into a session still looks signed in, yet every JWT-verifying route
+  // rejects them. Answering 200/false here made the option silently vanish
+  // instead of recovering.
+  if (!authUser) {
+    return NextResponse.json({ canUseAivoryInstance: false, code: 'UNAUTHENTICATED' }, { status: 401 })
+  }
+  // Authenticated but not entitled: a plain "no", with no reason disclosed.
+  if (authUser.account_type !== 'superadmin') return deny
 
   // Don't advertise the option when the instance isn't actually configured.
   const configured = Boolean((process.env.N8N_BASE_URL ?? '').trim() && (process.env.N8N_API_KEY ?? '').trim())
