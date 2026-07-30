@@ -8,7 +8,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PU
 export interface User {
   user_id: string;
   email: string;
-  account_type: "free" | "superadmin";
+  account_type: "free" | "demo" | "superadmin";
   company_name?: string;
   created_at: string;
   tier: "free" | "snapshot" | "blueprint" | "enterprise";
@@ -19,6 +19,7 @@ export interface User {
   credits: number;
   credits_max: number;
   token?: string;
+  allowed_modules?: string[];
 }
 
 export function isAuthenticated(): boolean {
@@ -52,6 +53,7 @@ export function getUser(): User | null {
       has_diagnostic: Boolean(meta.has_diagnostic),
       has_snapshot: Boolean(meta.has_snapshot),
       has_blueprint: Boolean(meta.has_blueprint),
+      allowed_modules: meta.allowed_modules,
       credits: Number(meta.credits || 0),
       credits_max: Number(meta.credits_max || 0),
       token,

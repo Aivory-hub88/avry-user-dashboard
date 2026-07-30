@@ -4,6 +4,7 @@ import Sidebar from "@/components/shared/Sidebar"
 import ClientShell from "@/components/ClientShell"
 import LocaleWrapper from "@/components/LocaleWrapper"
 import DashboardEntryGate from "@/components/routing/dashboard-entry-gate"
+import DemoRouteGuard from "@/components/routing/demo-route-guard"
 import { TokenInitializer } from "@/components/TokenInitializer"
 import { ModeProvider } from "@/contexts/ModeContext"
 import { RouterProvider } from "@/contexts/RouterContext"
@@ -44,6 +45,7 @@ export default function RootLayout({
             <RouterProvider>
               <SettingsModalProvider>
                 <DashboardEntryGate>
+                  <DemoRouteGuard />
                   <Sidebar />
                   <main className="flex-1 flex flex-col h-full min-w-0 overflow-y-auto">
                     {children}

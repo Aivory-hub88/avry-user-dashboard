@@ -27,6 +27,8 @@ export interface User {
   has_blueprint: boolean
   credits: number
   credits_max: number
+  /** Per-account module allowlist for restricted (demo) accounts; absent/undefined for everyone else. */
+  allowed_modules?: string[]
 }
 
 // Shared cross-subdomain cookie keys written by legacy `auth-manager.js`.
@@ -151,7 +153,7 @@ export const AuthManager = {
       if (_aiRaw) {
         try {
           const _s = JSON.parse(_aiRaw); const _u = _s?.user
-          if (_u) return { user_id: _u.id, email: _u.email, account_type: _u.user_metadata?.account_type || 'free', company_name: _u.user_metadata?.company_name, tier: _u.user_metadata?.tier || 'free', is_subscribed: false, has_diagnostic: false, has_snapshot: false, has_blueprint: false, credits: 0, credits_max: 0 } as any
+          if (_u) return { user_id: _u.id, email: _u.email, account_type: _u.user_metadata?.account_type || 'free', company_name: _u.user_metadata?.company_name, tier: _u.user_metadata?.tier || 'free', is_subscribed: false, has_diagnostic: false, has_snapshot: false, has_blueprint: false, credits: 0, credits_max: 0, allowed_modules: _u.user_metadata?.allowed_modules } as any
         } catch {}
       }
       const userStr = localStorage.getItem('user_data')

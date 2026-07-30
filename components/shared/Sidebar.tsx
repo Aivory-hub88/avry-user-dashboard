@@ -7,6 +7,8 @@ import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
 import { getWorkflowCount } from "@/hooks/useWorkflows"
+import { AuthManager } from "@/lib/authManager"
+import { canAccessNavKey } from "@/lib/moduleAccess"
 import LanguagePill from "./LanguagePill"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import ConversationHistory from "../sidebar/ConversationHistory"
@@ -181,6 +183,11 @@ const NAV_ICONS: Record<string, React.FC> = {
 export default function Sidebar() {
   const pathname = usePathname() || ""
   const [workflowCount, setWorkflowCount] = useState(0)
+  // account_type + allowedModules drive per-module gating (demo accounts see
+  // only their granted subset). Read after mount to stay SSR-safe and avoid
+  // a hydration mismatch.
+  const [accountType, setAccountType] = useState<string | null>(null)
+  const [allowedModules, setAllowedModules] = useState<string[] | null | undefined>(null)
   const t = useTranslations("nav")
   const { collapsed, toggle } = useSidebarCollapse()
 
@@ -195,6 +202,21 @@ export default function Sidebar() {
     }
   }, [])
 
+  useEffect(() => {
+    const readAccountType = () => {
+      const user = AuthManager.getUser()
+      setAccountType(user?.account_type ?? null)
+      setAllowedModules(user?.allowed_modules ?? null)
+    }
+    readAccountType()
+    window.addEventListener("authManager:login", readAccountType)
+    window.addEventListener("authManager:logout", readAccountType)
+    return () => {
+      window.removeEventListener("authManager:login", readAccountType)
+      window.removeEventListener("authManager:logout", readAccountType)
+    }
+  }, [])
+
   const navItems = [
     { key: "console",       href: "/console" },
     { key: "diagnostics",   href: "/diagnostics" },
@@ -206,7 +228,7 @@ export default function Sidebar() {
     { key: "templates",     href: "/templates", label: "Automation Templates" },
     { key: "agents",        href: "/agents" },
     { key: "profile",       href: "/overview", label: "Overview" },
-  ]
+  ].filter((item) => canAccessNavKey(accountType, item.key, allowedModules))
 
   return (
     <aside className={`flex flex-col h-full bg-[#353531] border-r border-white/5 transition-all duration-300 ${collapsed ? "w-12" : "w-[220px]"}`}>
