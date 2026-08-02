@@ -96,7 +96,7 @@ export default function SummaryPage() {
       <header className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>Review Your Answers</h1>
         <p className={styles.pageSubtitle}>
-          Take a moment to review before we analyze your business operations.
+          Take a moment to review before we analyse your business operations.
         </p>
       </header>
 

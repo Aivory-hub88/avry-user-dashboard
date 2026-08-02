@@ -41,7 +41,7 @@ export const ExplainPathModal: React.FC<ExplainPathModalProps> = ({
           {isExplaining ? (
             <div className={styles.loading}>
               <div className={styles.spinner} />
-              <p>Analyzing workflow path...</p>
+              <p>Analysing workflow path...</p>
             </div>
           ) : error ? (
             <div className={styles.error}>

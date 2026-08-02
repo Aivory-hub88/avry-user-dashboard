@@ -9,7 +9,7 @@
  * domain, a session established on `aivory.id` is readable on
  * `dashboard.aivory.id`. When the legacy global `window.AuthManager` is not
  * loaded in this standalone dashboard, these helpers fall back to reading the
- * shared cookie directly so the user is recognized as authenticated WITHOUT a
+ * shared cookie directly so the user is recognised as authenticated WITHOUT a
  * second sign-in. All cookie access is SSR-safe (no `document`/`window` access
  * during server render).
  */
@@ -106,7 +106,7 @@ export const AuthManager = {
 
   // Check if user is authenticated.
   // Falls back to the shared cross-subdomain cookie so a session established on
-  // aivory.id is recognized here without re-authenticating.
+  // aivory.id is recognised here without re-authenticating.
   // Also checks localStorage for tokens set by TokenInitializer from port 9000.
   isAuthenticated: (): boolean => {
     if (AuthManager.isAvailable()) return AuthManager.getInstance().isAuthenticated()

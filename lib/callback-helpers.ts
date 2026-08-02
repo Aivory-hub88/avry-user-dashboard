@@ -27,7 +27,7 @@ export type CallbackResult =
 /**
  * The set of failure `reason` codes the integrations page understands (plus the
  * callback-only `not_active`). `classifyCallbackParams` emits a reason from this
- * set whenever the provider error can be recognized; unrecognized provider
+ * set whenever the provider error can be recognised; unrecognized provider
  * errors are passed through as a sanitized slug so the page can fall back to its
  * generic "OAuth error: <reason>" message.
  *
@@ -92,7 +92,7 @@ function identifyApp(params: URLSearchParams): string | undefined {
 
 /**
  * Map a provider error (`error` / `error_description`) onto a `reason` code.
- * Prefers the structured `error` code; recognized OAuth 2.0 error codes and the
+ * Prefers the structured `error` code; recognised OAuth 2.0 error codes and the
  * known reasons collapse onto {@link KNOWN_ERROR_REASONS}. An unrecognized but
  * present `error` code is passed through as a sanitized slug. When no `error`
  * code is present (only an `error_description`), defaults to `access_denied`.

@@ -351,7 +351,7 @@ export default function DashboardPage() {
                     <h3 className="text-lg font-medium text-white">Enterprise</h3>
                     {AuthManager.getUser()?.tier === 'intelligence' && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
                   </div>
-                  <p className="text-sm text-gray-400 mb-4">For large organizations with advanced AI operations.</p>
+                  <p className="text-sm text-gray-400 mb-4">For large organisations with advanced AI operations.</p>
                   <div className="mb-6">
                     <span className="text-3xl font-bold text-white">$499</span>
                     <span className="text-sm text-gray-400">/month</span>

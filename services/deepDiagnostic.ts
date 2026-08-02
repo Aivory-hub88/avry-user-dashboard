@@ -718,7 +718,7 @@ export interface ROISensitivityLever {
  * above), compute Business Value Created at the low and high bound and
  * report the swing.
  *
- * Judgment call: `calculateROI` only defines a real low/high range for the
+ * Judgement call: `calculateROI` only defines a real low/high range for the
  * efficiency factor (0.5–0.9, the same bounds already used by
  * `scenarioThreeYearROI`). The hourly rate (`getHourlyRateUSD` — a fixed
  * per-industry lookup, only varied by the binary small-team-factor branch,
@@ -843,7 +843,7 @@ function scoreSecurity(a: DiagnosticAnswers): number {
 }
 
 export function maturityFromScore(composite: number): MaturityLevel {
-  if (composite >= 80) return 'Optimizing'
+  if (composite >= 80) return 'Optimising'
   if (composite >= 65) return 'Defined'
   if (composite >= 50) return 'Developing'
   if (composite >= 35) return 'Initiating'
@@ -949,10 +949,10 @@ const DATA_FACTORS: DriverFactor[] = [
   {
     answerKey: 'data_centralization', maxPoints: 30,
     evaluate: (a) => a.data_centralization?.includes('Fully centralized')
-      ? { points: 30, label: 'Data is fully centralized in a warehouse/lake' }
+      ? { points: 30, label: 'Data is fully centralised in a warehouse/lake' }
       : a.data_centralization?.includes('Partially')
-        ? { points: 15, label: 'Data is only partially centralized' }
-        : { points: 0, label: 'Data is siloed or not centralized' },
+        ? { points: 15, label: 'Data is only partially centralised' }
+        : { points: 0, label: 'Data is siloed or not centralised' },
   },
   {
     answerKey: 'data_quality', maxPoints: 25,
@@ -998,9 +998,9 @@ const PROCESS_FACTORS: DriverFactor[] = [
   {
     answerKey: 'workflow_standardization', maxPoints: 25,
     evaluate: (a) => a.workflow_standardization?.includes('Fully standardized')
-      ? { points: 25, label: 'Workflows are fully standardized with clear procedures' }
+      ? { points: 25, label: 'Workflows are fully standardised with clear procedures' }
       : a.workflow_standardization?.includes('Mostly standardized')
-        ? { points: 15, label: 'Workflows are mostly standardized with some variation' }
+        ? { points: 15, label: 'Workflows are mostly standardised with some variation' }
         : { points: 0, label: 'Workflows are largely ad-hoc' },
   },
   {
@@ -1032,12 +1032,12 @@ const PEOPLE_FACTORS: DriverFactor[] = [
   {
     answerKey: 'change_readiness', maxPoints: 20,
     evaluate: (a) => a.change_readiness?.includes('Embracing')
-      ? { points: 20, label: 'The organization is actively embracing change' }
+      ? { points: 20, label: 'The organisation is actively embracing change' }
       : a.change_readiness?.includes('Open')
-        ? { points: 12, label: 'The organization is open to change with proper planning' }
+        ? { points: 12, label: 'The organisation is open to change with proper planning' }
         : a.change_readiness?.includes('Cautious')
-          ? { points: 5, label: 'The organization is cautious about change' }
-          : { points: 0, label: 'The organization is resistant to change' },
+          ? { points: 5, label: 'The organisation is cautious about change' }
+          : { points: 0, label: 'The organisation is resistant to change' },
   },
   {
     answerKey: 'decision_speed', maxPoints: 15,
@@ -1063,12 +1063,12 @@ const GOVERNANCE_FACTORS: DriverFactor[] = [
   {
     answerKey: 'risk_tolerance', maxPoints: 15,
     evaluate: (a) => a.risk_tolerance?.includes('High')
-      ? { points: 15, label: 'The organization has high risk tolerance for AI projects' }
+      ? { points: 15, label: 'The organisation has high risk tolerance for AI projects' }
       : a.risk_tolerance?.includes('Moderate')
-        ? { points: 10, label: 'The organization has a moderate, balanced risk tolerance' }
+        ? { points: 10, label: 'The organisation has a moderate, balanced risk tolerance' }
         : a.risk_tolerance?.includes('Low') && !a.risk_tolerance?.includes('Very low')
-          ? { points: 5, label: 'The organization prefers proven, low-risk solutions' }
-          : { points: 0, label: 'The organization is extremely risk-averse' },
+          ? { points: 5, label: 'The organisation prefers proven, low-risk solutions' }
+          : { points: 0, label: 'The organisation is extremely risk-averse' },
   },
   {
     answerKey: 'budget_allocated', maxPoints: 15,
@@ -1327,7 +1327,7 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
   if (a.change_readiness?.includes('Resistant')) {
     risks.push({
       id: 'risk-change',
-      risk: 'Organizational resistance to change could undermine adoption',
+      risk: 'Organisational resistance to change could undermine adoption',
       severity: 'HIGH',
       source: 'change_readiness',
       detected: true,
@@ -1423,7 +1423,7 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
 // ---- Room for Improvement ----
 
 /**
- * Derives a prioritized list of improvement areas from the dimension scores,
+ * Derives a prioritised list of improvement areas from the dimension scores,
  * detected risks, and quantitative inputs. Each item carries an operational
  * impact statement plus a concrete before → after picture. This is consumed by
  * the result page AND fed into the AI System Blueprint generator as extra
@@ -1448,18 +1448,18 @@ function buildRoomForImprovement(
     items.push({
       id: 'rfi-process',
       area: 'Process',
-      title: 'Document & standardize core workflows',
+      title: 'Document & standardise core workflows',
       priority: priorityFromScore(scores.process),
       currentState:
         a.process_documentation
-          ? `Processes are ${String(a.process_documentation).toLowerCase()} documented and ${String(a.workflow_standardization || 'partially standardized').toLowerCase()}.`
-          : 'Key processes are only partially documented and standardized, making automation fragile.',
+          ? `Processes are ${String(a.process_documentation).toLowerCase()} documented and ${String(a.workflow_standardization || 'partially standardised').toLowerCase()}.`
+          : 'Key processes are only partially documented and standardised, making automation fragile.',
       recommendedAction:
-        'Map the top 3–5 highest-volume processes end-to-end, capture inputs/outputs and decision rules, and standardize variations into a single canonical flow before automating.',
+        'Map the top 3–5 highest-volume processes end-to-end, capture inputs/outputs and decision rules, and standardise variations into a single canonical flow before automating.',
       operationalImpact:
-        'Standardized, documented processes reduce automation rework, shorten onboarding, and make AI agents far more reliable because they act on consistent inputs.',
+        'Standardised, documented processes reduce automation rework, shorten onboarding, and make AI agents far more reliable because they act on consistent inputs.',
       before: 'Each team member runs the process slightly differently; tribal knowledge lives in people’s heads.',
-      after: 'One documented, standardized flow per process — ready to hand to an AI agent or new hire without retraining.',
+      after: 'One documented, standardised flow per process — ready to hand to an AI agent or new hire without retraining.',
     })
   }
 
@@ -1468,7 +1468,7 @@ function buildRoomForImprovement(
     items.push({
       id: 'rfi-data',
       area: 'Data',
-      title: 'Centralize & clean operational data',
+      title: 'Centralise & clean operational data',
       priority: priorityFromScore(scores.data),
       currentState:
         a.data_centralization
@@ -1477,7 +1477,7 @@ function buildRoomForImprovement(
       recommendedAction:
         'Consolidate the data sources that feed the priority workflows into a single source of truth (or connect them via APIs), then add basic validation to fix quality issues at entry.',
       operationalImpact:
-        'Clean, centralized data is the single biggest driver of AI output quality — it cuts manual reconciliation and reduces error-handling downstream.',
+        'Clean, centralised data is the single biggest driver of AI output quality — it cuts manual reconciliation and reduces error-handling downstream.',
       before: 'Staff manually pull and reconcile data from multiple tools before any decision or report.',
       after: 'A single connected data layer feeds workflows automatically — no manual reconciliation step.',
     })
@@ -1525,7 +1525,7 @@ function buildRoomForImprovement(
       recommendedAction:
         'Define 2–3 quantified KPIs per automation (e.g. hours saved/week, cycle time, error rate) and wire them into an automated dashboard from day one.',
       operationalImpact:
-        'Measurable KPIs let you prove ROI early, prioritize the next automation, and catch regressions before they compound.',
+        'Measurable KPIs let you prove ROI early, prioritise the next automation, and catch regressions before they compound.',
       before: 'Impact of automation is felt anecdotally but not measured.',
       after: 'Every automation reports live metrics, making ROI and next priorities obvious.',
     })
@@ -1579,7 +1579,7 @@ function buildRoomForImprovement(
 // ---- Main export ----
 
 export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticContext {
-  const companyName = answers.companyName || answers.company_name || 'Your Organization'
+  const companyName = answers.companyName || answers.company_name || 'Your Organisation'
   const currencyCode = parseCurrencyCode(answers.currency)
 
   const currentAutoPct = parsePct(answers.automation_current)

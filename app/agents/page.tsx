@@ -721,7 +721,7 @@ function AgentCard({ agent, deployments, onDeploy, onCustomize, onDisconnect }: 
           {onCustomize && (
             <button
               onClick={onCustomize}
-              title="Customize this agent's identity"
+              title="Customise this agent's identity"
               className="shrink-0 px-3 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.09] text-white/55 hover:text-white/90 text-[12.5px] font-medium transition-all border border-white/10 hover:border-white/20 flex items-center justify-center"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
@@ -744,7 +744,7 @@ const ACTION_META: Record<string, { label: string; emoji: string }> = {
   anomaly: { label: 'Anomaly flagged', emoji: '🚩' },
   workflow: { label: 'Workflow triggered', emoji: '⚡' },
   integration: { label: 'Integration action', emoji: '🔗' },
-  meeting: { label: 'Meeting summarized', emoji: '📝' },
+  meeting: { label: 'Meeting summarised', emoji: '📝' },
 };
 
 const AGENT_TITLES: Record<string, string> = {
@@ -972,7 +972,7 @@ export default function AgentsPage() {
         agentType={deployingAgent?.agentType ?? null}
       />
 
-      {/* Customize identity modal */}
+      {/* Customise identity modal */}
       <CustomizeAgentModal
         isOpen={!!customizingAgent}
         onClose={() => setCustomizingAgent(null)}

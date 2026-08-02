@@ -313,7 +313,7 @@ export interface BridgeStep {
  * this just keeps the chat text honest about the same structure.
  *
  * Every line starts with a real CommonMark list marker ("N." or "-") on
- * purpose — a bare "↳ label:" line doesn't start a recognized block, so
+ * purpose — a bare "↳ label:" line doesn't start a recognised block, so
  * ReactMarkdown's lazy-continuation rule merges it into the previous list
  * item instead of rendering it as its own line (confirmed by rendering this
  * in the actual chat panel before landing on this shape).
@@ -532,7 +532,7 @@ export class CopilotStateMachine {
     // user always reviews the result before anything is tested or applied.
     const analysis = analyzeRequest(userMessage)
 
-    // 1) Template fast-path: a recognized pattern with both pipeline
+    // 1) Template fast-path: a recognised pattern with both pipeline
     //    endpoints explicitly named builds instantly — zero LLM calls.
     const template = matchTemplate(userMessage, analysis)
     if (template) {

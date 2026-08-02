@@ -132,7 +132,7 @@ export async function exportBlueprintPDF(
     gap()
   }
   h2('Decision Engine')
-    y = renderNarrative(doc, y, "The Aivory High Intelligence Deterministic Engine serves as the core orchestration layer, guaranteeing that all automated decisions follow strict, predictable logic paths. This deterministic approach is essential for content approval and ticket routing because it eliminates hallucinations and ensures consistent, reliable outputs every time. By connecting your existing CRM and internal documentation directly to this execution layer, the system maintains a secure and centralized process knowledge base without compromising operational integrity.")
+    y = renderNarrative(doc, y, "The Aivory High Intelligence Deterministic Engine serves as the core orchestration layer, guaranteeing that all automated decisions follow strict, predictable logic paths. This deterministic approach is essential for content approval and ticket routing because it eliminates hallucinations and ensures consistent, reliable outputs every time. By connecting your existing CRM and internal documentation directly to this execution layer, the system maintains a secure and centralised process knowledge base without compromising operational integrity.")
     gap()
   if (Array.isArray(system_architecture?.execution_layer) && system_architecture.execution_layer.length > 0) {
     h2('Execution Layer')
@@ -148,7 +148,7 @@ export async function exportBlueprintPDF(
   // ── 3. Workflow Modules ─────────────────────────────────
   checkPage(20)
   y = sectionLabel(doc, y, '3. Workflow Modules')
-  y = renderNarrative(doc, y, "The following three modules represent the most critical intervention points for your organization. They are sequenced to build upon each other: Automated Reporting establishes baseline visibility, CS Ticket Automation addresses the highest volume of manual work, and Process Automation bridges the remaining operational gaps. Read them in this order to understand how foundational data flow enables more complex autonomous actions.")
+  y = renderNarrative(doc, y, "The following three modules represent the most critical intervention points for your organisation. They are sequenced to build upon each other: Automated Reporting establishes baseline visibility, CS Ticket Automation addresses the highest volume of manual work, and Process Automation bridges the remaining operational gaps. Read them in this order to understand how foundational data flow enables more complex autonomous actions.")
   gap(6)
   if (Array.isArray(workflow_modules)) {
     workflow_modules.forEach((wf, i) => {
@@ -170,13 +170,13 @@ export async function exportBlueprintPDF(
   // ── 4. Risk Assessment ──────────────────────────────────
   checkPage(20)
   y = sectionLabel(doc, y, '4. Risk Assessment')
-  y = renderNarrative(doc, y, "Your organization's strong, aligned leadership and prior success with AI implementations significantly de-risk this deployment. Furthermore, the absence of stringent compliance requirements or strict data residency constraints allows for maximum architectural flexibility. As a result, no critical operational or technical risks have been flagged, clearing the path for an accelerated rollout schedule.")
+  y = renderNarrative(doc, y, "Your organisation's strong, aligned leadership and prior success with AI implementations significantly de-risk this deployment. Furthermore, the absence of stringent compliance requirements or strict data residency constraints allows for maximum architectural flexibility. As a result, no critical operational or technical risks have been flagged, clearing the path for an accelerated rollout schedule.")
   gap(6)
 
   // ── 5. Deployment Plan ──────────────────────────────────
   checkPage(20)
   y = sectionLabel(doc, y, '5. Deployment Plan')
-  y = renderNarrative(doc, y, "The six-month rollout is intentionally sequenced to establish immediate technical capabilities while prioritizing quick wins. Launching Automated Reporting in Wave 1 builds crucial internal momentum and establishes data pipelines necessary for subsequent phases. This foundational success unlocks the execution of CS Ticket Automation in Wave 2, ensuring your team has the established infrastructure to capture the highest possible revenue impact securely.")
+  y = renderNarrative(doc, y, "The six-month rollout is intentionally sequenced to establish immediate technical capabilities while prioritising quick wins. Launching Automated Reporting in Wave 1 builds crucial internal momentum and establishes data pipelines necessary for subsequent phases. This foundational success unlocks the execution of CS Ticket Automation in Wave 2, ensuring your team has the established infrastructure to capture the highest possible revenue impact securely.")
   gap(4)
   if (deployment_plan?.phase) y = renderNarrative(doc, y, `Phase: ${deployment_plan.phase}`)
   if (deployment_plan?.estimated_impact) y = renderNarrative(doc, y, `Estimated Impact: ${deployment_plan.estimated_impact}`)

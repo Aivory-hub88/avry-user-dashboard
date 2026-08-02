@@ -21,7 +21,7 @@
 import { NextResponse } from 'next/server'
 import type { AuthError } from '@/lib/integration-auth'
 
-/** The recognized `Error_Contract` codes emitted by the integration routes. */
+/** The recognised `Error_Contract` codes emitted by the integration routes. */
 export type ErrorCode =
   | 'UNAUTHENTICATED'
   | 'FORBIDDEN'

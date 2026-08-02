@@ -18,7 +18,7 @@ export interface ErrorResponse {
 }
 
 /**
- * Creates a standardized error response object
+ * Creates a standardised error response object
  * 
  * @param error - Error type or category
  * @param message - Human-readable error message
@@ -28,7 +28,7 @@ export interface ErrorResponse {
  * @example
  * ```typescript
  * // Basic error
- * const error = createErrorResponse('ValidationError', 'Organization ID is required')
+ * const error = createErrorResponse('ValidationError', 'Organisation ID is required')
  * 
  * // Error with details
  * const error = createErrorResponse(

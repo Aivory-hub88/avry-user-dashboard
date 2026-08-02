@@ -58,16 +58,16 @@ function IconZap() {
 const BLUEPRINT_INSIGHTS = {
   score: 55,
   maturity: 'Emerging',
-  heroDescription: `You are already well-positioned to accelerate your AI journey. At the Emerging stage, your organization has established foundational data infrastructure and begun automating key processes — the building blocks for rapid, scalable AI adoption. With focused effort over the next 12 months, you can close the remaining gaps and unlock measurable operational gains.`,
+  heroDescription: `You are already well-positioned to accelerate your AI journey. At the Emerging stage, your organisation has established foundational data infrastructure and begun automating key processes — the building blocks for rapid, scalable AI adoption. With focused effort over the next 12 months, you can close the remaining gaps and unlock measurable operational gains.`,
   levers: [
-    { label: 'Data Foundation', text: 'Partially centralized architecture makes it faster to close the remaining gaps and reach full data maturity.' },
+    { label: 'Data Foundation', text: 'Partially centralised architecture makes it faster to close the remaining gaps and reach full data maturity.' },
     { label: 'Automation Level', text: 'Current 25–50% automation creates a clear path to quick wins by extending existing pipelines.' },
     { label: 'Process Documentation', text: '50–75% coverage means your team already has the context needed to design reliable AI workflows.' },
     { label: 'Team Enablement', text: 'Existing operational knowledge is your strongest asset — AI tools amplify what your team already does well.' },
   ],
   strategicObjective: {
     goal: 'Achieve 30% operational cost reduction and 40% productivity improvement through targeted AI automation within 12 months.',
-    rationale: `This ambition is realistic given your current state. Your partially centralized data architecture and existing automation baseline mean you are not starting from zero — you are accelerating from a running start. The two active workflow modules already demonstrate that your team can deliver AI-powered outcomes. Scaling these patterns across additional processes is the primary lever for hitting both targets.`,
+    rationale: `This ambition is realistic given your current state. Your partially centralised data architecture and existing automation baseline mean you are not starting from zero — you are accelerating from a running start. The two active workflow modules already demonstrate that your team can deliver AI-powered outcomes. Scaling these patterns across additional processes is the primary lever for hitting both targets.`,
   },
   metrics: [
     { metric: 'Client Onboarding Cycle', current: '2 weeks', target: '3 days', impact: '85% cycle time reduction' },
@@ -77,16 +77,16 @@ const BLUEPRINT_INSIGHTS = {
     { metric: 'Data Quality Score', current: 'Partial (est. 60%)', target: '>90% validated records', impact: 'Fewer errors, higher AI confidence' },
   ],
   currentState: {
-    summary: `Your organization sits at a pivotal inflection point. Data is partially centralized across Salesforce CRM, SAP ERP, and SharePoint — a strong foundation that only requires targeted quality improvements rather than a full rebuild. Automation currently covers 25–50% of eligible processes, which means the majority of efficiency gains are still ahead of you. Process documentation at 50–75% gives your AI systems enough context to operate reliably, while leaving room to formalize the remaining workflows. Organizationally, you have the operational knowledge and leadership alignment needed to move quickly.`,
+    summary: `Your organisation sits at a pivotal inflection point. Data is partially centralised across Salesforce CRM, SAP ERP, and SharePoint — a strong foundation that only requires targeted quality improvements rather than a full rebuild. Automation currently covers 25–50% of eligible processes, which means the majority of efficiency gains are still ahead of you. Process documentation at 50–75% gives your AI systems enough context to operate reliably, while leaving room to formalize the remaining workflows. Organizationally, you have the operational knowledge and leadership alignment needed to move quickly.`,
     highlights: [
-      'Data infrastructure: partially centralized, minor quality gaps',
+      'Data infrastructure: partially centralised, minor quality gaps',
       'Automation coverage: 25–50% of eligible processes',
       'Process documentation: 50–75% complete',
       'Two active AI workflow modules already in production',
     ],
   },
   architecture: {
-    reference: 'Aligned with the Gartner AI Maturity Model for organizations at an emerging stage and consistent with McKinsey\'s AI-at-Scale best practices for building reusable AI foundations.',
+    reference: 'Aligned with the Gartner AI Maturity Model for organisations at an emerging stage and consistent with McKinsey\'s AI-at-Scale best practices for building reusable AI foundations.',
     stages: [
       {
         label: 'Data Sources',
@@ -173,7 +173,7 @@ const BLUEPRINT_INSIGHTS = {
       theme: 'Data Quality & Silos',
       description: 'Fragmented data across Salesforce, SAP, and SharePoint creates inconsistencies that reduce AI model confidence and increase error rates in automated decisions.',
       actions: [
-        'Deploy a centralized data validation layer as the first Wave 1 deliverable',
+        'Deploy a centralised data validation layer as the first Wave 1 deliverable',
         'Assign a Data Steward role to own quality standards across systems',
         'Implement automated anomaly detection with weekly quality score reporting',
       ],
@@ -184,7 +184,7 @@ const BLUEPRINT_INSIGHTS = {
       actions: [
         'Run a 4-week process mapping sprint to document the remaining 25–50% of workflows',
         'Use AI-assisted documentation tools to accelerate capture and reduce team burden',
-        'Prioritize documentation for the highest-volume, highest-impact processes first',
+        'Prioritise documentation for the highest-volume, highest-impact processes first',
       ],
     },
     {
@@ -193,7 +193,7 @@ const BLUEPRINT_INSIGHTS = {
       actions: [
         'Designate an AI Champion with 20–30% dedicated time for Wave 1 delivery',
         'Run a 2-day AI literacy workshop for operational leads before Wave 2 begins',
-        'Celebrate and communicate early wins to build organizational confidence',
+        'Celebrate and communicate early wins to build organisational confidence',
       ],
     },
   ],
@@ -1300,7 +1300,7 @@ export default function BlueprintPage() {
     )
   }
 
-  const { organization, diagnostic_summary } = blueprint
+  const { organisation, diagnostic_summary } = blueprint
 
   return (
     <div className={`${styles.page} font-manrope`}>
@@ -1352,7 +1352,7 @@ export default function BlueprintPage() {
         {/* ── Header ─────────────────────────────────────────── */}
         <BlueprintHeader
           blueprintId={blueprint.blueprint_id || 'BP-001'}
-          companyName={organization?.name || 'Company'}
+          companyName={organisation?.name || 'Company'}
           version={currentVersionLabel || blueprint.version || '1'}
           status={blueprint.status || 'draft'}
           maturityLevel={diagnostic_summary?.maturity_level || 'Emerging'}

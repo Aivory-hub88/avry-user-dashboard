@@ -291,7 +291,7 @@ export default function CustomizeAgentModal({
 
   const handleReset = async () => {
     if (!agentType || saving) return;
-    if (!window.confirm('Reset this agent to its default Aivory identity? Your saved customization will be removed.')) return;
+    if (!window.confirm('Reset this agent to its default Aivory identity? Your saved customisation will be removed.')) return;
     setSaving(true);
     setError(null);
     try {
@@ -319,7 +319,7 @@ export default function CustomizeAgentModal({
             </svg>
           </button>
           <h3 style={{ fontSize: 20, fontWeight: 300, color: '#fff', margin: '0 0 8px', lineHeight: 1.3 }}>
-            Customize {agentName}
+            Customise {agentName}
           </h3>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: 0 }}>
             Give this agent your business identity. It will introduce itself with your name, follow your tone, and answer from your business knowledge — on every channel it is deployed to.

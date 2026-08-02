@@ -306,7 +306,7 @@ export default function FinalResultPage() {
   // lib/readinessNarrative.ts), fed the same blended displayScores the PDF gets.
   const dimScoreOf = (k: string) => Math.round((scores as unknown as Record<string, number>)[k] ?? 0)
   const verdictNarrative = buildVerdictNarrative({
-    company: context.company || 'Your organization',
+    company: context.company || 'Your organisation',
     composite: displayScores.composite,
     maturityLevel: displayScores.maturityLevel,
     weakestKey: scores.weakestDimension,
@@ -327,7 +327,7 @@ export default function FinalResultPage() {
   const topOpportunityTitle = opportunities[0]?.title ?? null
   const businessValueLabel = totalAnnualSavingsLocal != null ? fmtLocal(totalAnnualSavingsLocal) : null
   const executiveSummary = buildExecutiveSummary({
-    company: context.company || 'Your organization',
+    company: context.company || 'Your organisation',
     composite: displayScores.composite,
     maturityLevel: displayScores.maturityLevel,
     weakestKey: scores.weakestDimension,
@@ -370,7 +370,7 @@ export default function FinalResultPage() {
   const riskRegisterCaption = buildRiskRegisterCaption(risks)
 
   const assessmentBullets: { icon: string; color: string; text: string }[] = [
-    { icon: '▲', color: '#afd199', text: `Your company / organization scores ${displayScores.composite}/100, placing it at ${displayScores.maturityLevel} maturity.${_llmScore != null ? ' (composite blended 70% deterministic + 30% AI assessment)' : ''}` },
+    { icon: '▲', color: '#afd199', text: `Your company / organisation scores ${displayScores.composite}/100, placing it at ${displayScores.maturityLevel} maturity.${_llmScore != null ? ' (composite blended 70% deterministic + 30% AI assessment)' : ''}` },
     { icon: '▲', color: '#afd199', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension)}.` },
     { icon: '▽', color: '#fbbf24', text: `Greatest gap: ${humanizeDimensionKey(scores.weakestDimension)}.` },
     { icon: '▽', color: '#fbbf24', text: `${highRiskCount} high-severity risk${highRiskCount !== 1 ? 's' : ''} identified.` },
@@ -841,7 +841,7 @@ export default function FinalResultPage() {
           <div id="section-improvement-priorities" className={styles.card}>
             <h2 className={styles.sectionLabel}>Operational Improvement Priorities</h2>
             <p className={styles.improvementIntro}>
-              Prioritized areas to strengthen before and during AI adoption. These feed directly
+              Prioritised areas to strengthen before and during AI adoption. These feed directly
               into your Transformation Blueprint.
             </p>
             <div className={styles.improvementList}>

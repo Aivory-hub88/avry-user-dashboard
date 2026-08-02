@@ -1707,7 +1707,7 @@ export async function exportReportToPdf(
   const currency = (context.currency || 'USD') as 'USD' | 'EUR' | 'GBP' | 'IDR'
   const fmt = (v: number | null | undefined) => fmtCurrency(v, currency)
   const cAny = calculations as any
-  const company = context.company || 'Your organization'
+  const company = context.company || 'Your organisation'
 
   const pdf = new jsPDF('p', 'mm', 'a4')
   await loadManrope(pdf)
@@ -1825,7 +1825,7 @@ export async function exportReportToPdf(
   const priorRaw = qualitative.priorAIAttempts || ''
   const isFirstAttempt = priorRaw.startsWith('No')
   const priorClause = isFirstAttempt
-    ? 'As this is the organization’s first AI initiative, the sequencing below prioritises proven, low-complexity automations first.'
+    ? 'As this is the organisation’s first AI initiative, the sequencing below prioritises proven, low-complexity automations first.'
     : priorRaw
       ? 'Previous AI attempts give the team practical deployment experience to build on.'
       : ''
@@ -2530,7 +2530,7 @@ export async function exportReportToPdf(
     const rfiTarget = context.quantitative.targetAutomationPct ?? 0
     const rfiGap = rfiTarget - rfiCurrent
     const rootCauseClause = weakestKey === 'process'
-      ? 'Closing this deficit starts with standardizing undocumented core workflows — the root cause of the lower Process score.'
+      ? 'Closing this deficit starts with standardising undocumented core workflows — the root cause of the lower Process score.'
       : `Closing this deficit starts with the ${DIM_LABELS[weakestKey] ?? cap(weakestKey)} improvements below.`
     y = renderNarrative(pdf, y, `${company} currently maintains ${fmtGap(rfiCurrent)} automation coverage against a strategic target of ${fmtGap(rfiTarget)}.${rfiGap > 0 ? ` This ${fmtGap(rfiGap)} gap is manual effort spent on routine, unautomated tasks.` : ''} ${rootCauseClause} Bridging this gap gives AI agents consistent, reliable inputs and steadily reduces operational friction.`)
 

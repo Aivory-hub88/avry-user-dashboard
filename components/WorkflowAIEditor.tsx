@@ -112,7 +112,7 @@ export function WorkflowAIEditor({ workflow, onClose, onApply }: WorkflowAIEdito
                   onClick={handleGeneratePreview}
                   disabled={loading || !instruction.trim()}
                 >
-                  {loading ? 'Analyzing…' : 'Preview Changes'}
+                  {loading ? 'Analysing…' : 'Preview Changes'}
                 </button>
               </div>
             </div>

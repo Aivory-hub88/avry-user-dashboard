@@ -29,7 +29,7 @@ export default function DiagnosticSummary({
 
       <div className={styles.ctaSection}>
         <p className={styles.ctaText}>
-          Based on your responses, we can generate a customized Transformation Blueprint for your organization.
+          Based on your responses, we can generate a customised Transformation Blueprint for your organisation.
         </p>
         <button 
           className={styles.ctaButton}

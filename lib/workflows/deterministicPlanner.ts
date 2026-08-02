@@ -163,7 +163,7 @@ function step(
 }
 
 /**
- * Recognize common automation patterns and build the workflow locally.
+ * Recognise common automation patterns and build the workflow locally.
  * Returns null when no template applies with high confidence — the LLM
  * handles everything else. Templates only fire when BOTH endpoints of the
  * pipeline are explicitly named, so we never guess the user's stack.

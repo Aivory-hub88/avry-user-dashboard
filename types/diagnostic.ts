@@ -195,7 +195,7 @@ export const DIAGNOSTIC_PHASES: DiagnosticPhaseConfig[] = [
         id: 'dataDescription',
         label: 'Data Description',
         type: 'textarea',
-        placeholder: 'Describe where your data lives and how it\'s organized'
+        placeholder: 'Describe where your data lives and how it\'s organised'
       },
       {
         id: 'hasAPIs',
@@ -255,7 +255,7 @@ export interface DiagnosticRequest {
 export interface DiagnosticResponse {
   diagnostic_id: string
   ai_readiness_score: number
-  maturity_level: 'Initial' | 'Developing' | 'Defined' | 'Managed' | 'Optimizing'
+  maturity_level: 'Initial' | 'Developing' | 'Defined' | 'Managed' | 'Optimising'
   primary_constraints: string[]
   timestamp: string
 }
@@ -266,7 +266,7 @@ export interface DiagnosticResponse {
 // ============================================================================
 
 export type DimensionKey = 'strategy' | 'data' | 'process' | 'people' | 'governance' | 'security'
-export type MaturityLevel = 'Nascent' | 'Initiating' | 'Developing' | 'Defined' | 'Optimizing'
+export type MaturityLevel = 'Nascent' | 'Initiating' | 'Developing' | 'Defined' | 'Optimising'
 export type OpportunityQuadrant = 'quick_win' | 'major_project' | 'fill_in' | 'thankless_task'
 
 export interface ROIProjection {
@@ -456,7 +456,7 @@ export interface DiagnosticContext {
   scores: DimensionScores
   opportunities: RankedOpportunity[]
   risks: RiskFlag[]
-  /** Prioritized improvement areas with operational before/after — feeds the AI System Blueprint. */
+  /** Prioritised improvement areas with operational before/after — feeds the AI System Blueprint. */
   roomForImprovement?: ImprovementItem[]
   /**
    * Phase E1.2 — score traceability/drivers. Computed at build time as a

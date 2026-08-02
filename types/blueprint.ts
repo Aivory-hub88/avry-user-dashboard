@@ -152,7 +152,7 @@ export function getSampleBlueprint(): BlueprintData {
   return {
     blueprint_id: 'BP-2024-001',
     version: '1.0',
-    organization: 'Sample Organization',
+    organization: 'Sample Organisation',
     diagnostic_summary: {
       readiness_score: 75,
       maturity_level: 'Developing',
@@ -177,7 +177,7 @@ export function getSampleBlueprint(): BlueprintData {
       decision_engine: {
         title: 'Decision Engine',
         items: ['Rule-based Routing', 'ML Classification Model', 'Priority Scoring', 'Approval Workflow Logic'],
-        description: 'Intelligent decision-making for routing, prioritization, and automation triggers'
+        description: 'Intelligent decision-making for routing, prioritisation, and automation triggers'
       },
       memory_layer: {
         title: 'Memory Layer',

@@ -56,7 +56,7 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
       ...(attachment ? [attachment] : []),
       ...pendingAttachments,
     ]
-    const finalMessage = trimmed || `Please analyze this file`
+    const finalMessage = trimmed || `Please analyse this file`
     console.log('[INPUT DEBUG] calling onSend with message:', finalMessage)
     onSend(finalMessage, allAttachments)
     setMessage("")

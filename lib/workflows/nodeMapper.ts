@@ -53,7 +53,7 @@ const INTENT_PATTERNS: Record<NodeIntent, RegExp> = {
   compress: /compress|zip\b|tar\b|gzip|rar\b|archive|unzip|extract.*file|decompress/i,
   ssh: /\bssh\b|\bscp\b|\bexec\b|remote.*command|run.*command|shell\b|execute.*server/i,
   cleanup: /delete\b|remove\b|cleanup|clean.*up|purge\b|clear\b|truncate|drop\b|erase\b/i,
-  ai: /\bai\b|\bllm\b|analyze|process\b|generate\b|summarize|classify|nlp|\bgpt\b|claude|qwen/i,
+  ai: /\bai\b|\bllm\b|analyse|process\b|generate\b|summarise|classify|nlp|\bgpt\b|claude|qwen/i,
 }
 
 /**

@@ -163,11 +163,11 @@ function buildFallbackRoadmap(source: string, blueprintId?: string): AiryRoadmap
       },
       {
         id: 'phase-3',
-        name: 'Optimize & Measure',
+        name: 'Optimise & Measure',
         timeframe: 'Month 7–12',
         description: 'Refine workflows based on data, measure ROI, and plan next expansion.',
         milestones: [
-          { id: 'm-3-1', title: 'Review KPI performance and optimize workflows', linkedWorkflowIds: [] },
+          { id: 'm-3-1', title: 'Review KPI performance and optimise workflows', linkedWorkflowIds: [] },
           { id: 'm-3-2', title: 'Identify next automation opportunities', linkedWorkflowIds: [] },
           { id: 'm-3-3', title: 'Document learnings and update roadmap', linkedWorkflowIds: [] },
         ],

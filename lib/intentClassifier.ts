@@ -26,7 +26,7 @@ function buildClassifierPrompt(userMessage: string, aiReply: string): string {
   ).join('\n\n')
 
   return `You are an intent classifier for Aivory Console.
-Analyze user message and AI reply, then determine which Aivory tab is most relevant.
+Analyse user message and AI reply, then determine which Aivory tab is most relevant.
 
 TAB DEFINITIONS:
 ${boundaryDefs}

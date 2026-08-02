@@ -63,7 +63,7 @@ export interface DeepDiagnosticRequest {
 export interface DeepDiagnosticResponse {
   diagnostic_id: string
   score: number
-  maturity_level: 'Nascent' | 'Initiating' | 'Developing' | 'Defined' | 'Optimizing'
+  maturity_level: 'Nascent' | 'Initiating' | 'Developing' | 'Defined' | 'Optimising'
   dimensions: {
     business_alignment: number
     data_readiness: number

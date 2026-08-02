@@ -220,7 +220,7 @@ export function WorkflowCopilotRefineModal({
                 onMouseEnter={handleApplyMouseEnter}
                 onMouseLeave={handleApplyMouseLeave}
               >
-                {loading ? 'Analyzing…' : 'Ask Aivory to refine workflow'}
+                {loading ? 'Analysing…' : 'Ask Aivory to refine workflow'}
               </button>
             </div>
           </>

@@ -20,7 +20,7 @@ export interface DiagnosticDelta {
  * Compares the two most recent history rows (assumed newest-first, as
  * returned by GET /api/storage/history).
  *
- * Judgment call: "since" means since the immediately preceding assessment,
+ * Judgement call: "since" means since the immediately preceding assessment,
  * not the first-ever one. diagnostic_history gets a new row on every save,
  * so entry[1] IS "your last assessment" — that reads more naturally as
  * "improved since March" than a comparison against an arbitrary first

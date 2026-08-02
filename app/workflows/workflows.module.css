@@ -1263,7 +1263,7 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── React Flow customization ────────────────────────────── */
+/* ── React Flow customisation ────────────────────────────── */
 .canvasBody :global(.react-flow__container) {
   background-color: var(--bg-main, #353531);
   background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);

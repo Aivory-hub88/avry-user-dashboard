@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     let bridgeResponse: Response
     try {
-      // Strip sensitive fields before forwarding to bridge — defense in depth
+      // Strip sensitive fields before forwarding to bridge — defence in depth
       const safeContext: Record<string, unknown> = {}
       if (context?.page) safeContext.page = context.page
       if (context?.mode) safeContext.mode = context.mode

@@ -56,14 +56,14 @@ function parseBlueprintContent(content: string): BlueprintV1 | null {
 function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
   const company = typeof diagnostic?.company === 'string' && diagnostic.company.trim()
     ? diagnostic.company
-    : 'Aivory Organization'
+    : 'Aivory Organisation'
   const qualitative = diagnostic?.qualitative || {}
   const scores = diagnostic?.scores || {}
   const opportunities = Array.isArray(diagnostic?.opportunities) ? diagnostic.opportunities : []
   const risks = Array.isArray(diagnostic?.risks) ? diagnostic.risks : []
 
   // ── Try to extract structured fields from the markdown LLM output ──────────
-  // The LLM tends to write headers like "**Maturity Level:** Optimizing (Score: 80/100)"
+  // The LLM tends to write headers like "**Maturity Level:** Optimising (Score: 80/100)"
   // and "**Strategic Objectives** Transform operational efficiency through ...".
   const text = typeof content === 'string' ? content : ''
   const scoreMatch = text.match(/(?:Score|Readiness Score|AI Readiness)[^\d]{0,20}(\d{1,3})\s*\/\s*100/i)
@@ -111,7 +111,7 @@ function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
         {
           metric: 'Operational Health Score',
           current: `${extractedScore}/100`,
-          target: 'Improve through prioritized automation initiatives',
+          target: 'Improve through prioritised automation initiatives',
           expected_impact: 'Higher automation coverage and reduced manual workload'
         }
       ]
@@ -120,7 +120,7 @@ function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
       data_sources: ['Business context'],
       processing_layers: ['Aivory Workflow Builder'],
       decision_engine: 'Rule-based routing with AI-assisted decisions',
-      memory_layer: 'Centralized operational data store',
+      memory_layer: 'Centralised operational data store',
       execution_layer: ['Built with Aivory Workflow Builder, deployed to n8n for execution']
     },
     workflow_modules: opportunities.slice(0, 3).map((opportunity: any, index: number) => ({
@@ -143,7 +143,7 @@ function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
     },
     deployment_plan: {
       phase: 'Blueprint draft',
-      estimated_impact: 'Prioritized AI implementation plan generated from diagnostic results',
+      estimated_impact: 'Prioritised AI implementation plan generated from diagnostic results',
       estimated_roi_months: 6,
       waves: [
         { name: 'Validation', included_workflows: [], notes: 'Validate blueprint assumptions with stakeholders' }
@@ -204,7 +204,7 @@ interface BlueprintV1 {
   deployment_plan: { phase: string; estimated_impact: string; estimated_roi_months: number; waves: { name: string; included_workflows: string[]; notes: string }[] };
 }
 
-IMPORTANT: The diagnostic includes a "roomForImprovement" array — each item has the area, the recommended action, its operational impact, and a concrete before/after. Use these improvement items to shape the blueprint's workflows, deployment phases, and expected operational outcomes (map each high-priority improvement to at least one workflow or phase). If the diagnostic includes an "ai_analysis" object (summary, strengths, constraints, automation_opportunities, recommended_next_step), treat it as prior analysis of this organization and keep the blueprint consistent with it. Make sure to map the exact "composite" score and "maturityLevel" from the diagnostic data to "ai_readiness_score" and "maturity_level".
+IMPORTANT: The diagnostic includes a "roomForImprovement" array — each item has the area, the recommended action, its operational impact, and a concrete before/after. Use these improvement items to shape the blueprint's workflows, deployment phases, and expected operational outcomes (map each high-priority improvement to at least one workflow or phase). If the diagnostic includes an "ai_analysis" object (summary, strengths, constraints, automation_opportunities, recommended_next_step), treat it as prior analysis of this organisation and keep the blueprint consistent with it. Make sure to map the exact "composite" score and "maturityLevel" from the diagnostic data to "ai_readiness_score" and "maturity_level".
 
 KPI TARGETS: For each kpi_targets entry, "current" is the baseline value taken from the diagnostic data (e.g. "$4.20 per ticket", "22% automation coverage"), "target" is the goal value (e.g. "$1.80 per ticket"), and "expected_impact" is the BUSINESS OUTCOME of reaching that target (e.g. "~57% lower support cost, ≈$22,500/yr saved") — expected_impact must NEVER be a copy of the target value.
 

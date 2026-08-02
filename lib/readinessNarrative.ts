@@ -65,12 +65,12 @@ export const DRIVER_ANSWER_LABELS: Record<string, string> = {
   quantified_goal: 'Quantified objective',
   kpi_tracking: 'KPI tracking',
   success_timeline: 'Success timeline',
-  data_centralization: 'Data centralization',
+  data_centralization: 'Data centralisation',
   data_quality: 'Data quality',
   system_integration: 'System integration',
   data_infrastructure: 'Data infrastructure',
   process_documentation: 'Process documentation',
-  workflow_standardization: 'Workflow standardization',
+  workflow_standardization: 'Workflow standardisation',
   automation_current: 'Current automation level',
   internal_capability: 'Internal AI capability',
   change_readiness: 'Change readiness',
@@ -91,17 +91,30 @@ export function humanizeDriverAnswerKey(key: string): string {
 /** Five-band operational maturity scale — thresholds mirror services maturityFromScore. */
 export const MATURITY_BANDS: Array<{ level: string; range: string; meaning: string }> = [
   { level: 'Nascent', range: '0–34', meaning: 'the foundational building blocks — reliable data, documented processes, and clear ownership — are not yet in place, so operational groundwork should come before any automation investment' },
-  { level: 'Initiating', range: '35–49', meaning: 'the organization can support closely supervised pilots in narrow, low-risk workflows while the underlying data and process foundations are built up' },
-  { level: 'Developing', range: '50–64', meaning: 'the organization can standardise and instrument its core workflows while piloting automation in narrow, low-risk areas — but is not yet ready for a broad, multi-department rollout' },
-  { level: 'Defined', range: '65–79', meaning: 'the organization is ready for systematic operational transformation across several functions, with governance mature enough to manage risk at scale' },
-  { level: 'Optimizing', range: '80–100', meaning: 'well-instrumented operational foundations are in place across the organization, and the focus shifts from standardisation to compounding advantage' },
+  { level: 'Initiating', range: '35–49', meaning: 'the organisation can support closely supervised pilots in narrow, low-risk workflows while the underlying data and process foundations are built up' },
+  { level: 'Developing', range: '50–64', meaning: 'the organisation can standardise and instrument its core workflows while piloting automation in narrow, low-risk areas — but is not yet ready for a broad, multi-department rollout' },
+  { level: 'Defined', range: '65–79', meaning: 'the organisation is ready for systematic operational transformation across several functions, with governance mature enough to manage risk at scale' },
+  { level: 'Optimising', range: '80–100', meaning: 'well-instrumented operational foundations are in place across the organisation, and the focus shifts from standardisation to compounding advantage' },
 ]
+
+/**
+ * Resolves a stored maturity level to its current spelling.
+ *
+ * The top band was spelled "Optimizing" until 2026-08-02. Reports generated
+ * before then still carry that value, and both band lookups below fall back to
+ * Developing when they miss — which would silently show a 90/100 report the
+ * wrong range and the wrong meaning. Normalising here keeps historical reports
+ * accurate instead.
+ */
+function canonicalMaturityLevel(level: string): string {
+  return level === 'Optimizing' ? 'Optimising' : level
+}
 
 /** What a low score in each dimension concretely blocks. */
 export const DIM_CONSTRAINT_NOTES: Record<string, string> = {
   strategy: 'without quantified KPIs, improvement value stays invisible and investment decisions stall',
-  data: 'inconsistent operational decisions and capped automation potential persist until core data is centralized and cleaned',
-  process: 'automations stay fragile until core workflows are documented and standardized',
+  data: 'inconsistent operational decisions and capped automation potential persist until core data is centralised and cleaned',
+  process: 'automations stay fragile until core workflows are documented and standardised',
   people: 'adoption stalls without skills enablement and clear internal ownership',
   governance: 'scaling automation without oversight structures compounds operational risk',
   security: 'security and compliance guardrails need defining before sensitive data reaches AI systems',
@@ -149,9 +162,10 @@ export interface VerdictInputs {
 
 /** The band sentence: score, band range, practical meaning, constraint, foundation. */
 export function buildVerdictNarrative(v: VerdictInputs): string {
-  const band = MATURITY_BANDS.find((b) => b.level === v.maturityLevel) ?? MATURITY_BANDS[2]
+  const level = canonicalMaturityLevel(v.maturityLevel)
+  const band = MATURITY_BANDS.find((b) => b.level === level) ?? MATURITY_BANDS[2]
   const weakestNote = DIM_CONSTRAINT_NOTES[v.weakestKey] ?? 'this dimension needs strengthening before automation can scale'
-  return `With a composite score of ${Math.round(v.composite)}/100, ${v.company} sits in the "${v.maturityLevel}" band (${band.range}) of the five-level Aivory operational maturity scale (Nascent, Initiating, Developing, Defined, Optimizing). In practical terms, ${band.meaning}. The immediate constraint is ${DIM_LABELS[v.weakestKey] ?? cap(v.weakestKey)} (${v.weakestScore}): ${weakestNote}. ${DIM_LABELS[v.strongestKey] ?? cap(v.strongestKey)} (${v.strongestScore}) is the strongest foundation to build on.`
+  return `With a composite score of ${Math.round(v.composite)}/100, ${v.company} sits in the "${level}" band (${band.range}) of the five-level Aivory operational maturity scale (Nascent, Initiating, Developing, Defined, Optimising). In practical terms, ${band.meaning}. The immediate constraint is ${DIM_LABELS[v.weakestKey] ?? cap(v.weakestKey)} (${v.weakestScore}): ${weakestNote}. ${DIM_LABELS[v.strongestKey] ?? cap(v.strongestKey)} (${v.strongestScore}) is the strongest foundation to build on.`
 }
 
 export interface FirstMove {
@@ -210,7 +224,7 @@ const MATURITY_BAND_POSTURE: Record<string, string> = {
   Initiating: 'results still depend more on individual effort than on repeatable systems',
   Developing: 'core workflows exist but are applied unevenly across the business',
   Defined: 'processes are documented and followed consistently enough to scale on',
-  Optimizing: 'operations are measured and instrumented, and improvement compounds',
+  Optimising: 'operations are measured and instrumented, and improvement compounds',
 }
 
 /**
@@ -228,11 +242,12 @@ const MATURITY_BAND_POSTURE: Record<string, string> = {
 export function buildExecutiveSummary(
   v: VerdictInputs & { businessValueLabel: string | null; topOpportunityTitle: string | null },
 ): string {
-  const posture = MATURITY_BAND_POSTURE[v.maturityLevel] ?? MATURITY_BAND_POSTURE.Developing
-  const article = /^[AEIOU]/i.test(v.maturityLevel) ? 'an' : 'a'
+  const level = canonicalMaturityLevel(v.maturityLevel)
+  const posture = MATURITY_BAND_POSTURE[level] ?? MATURITY_BAND_POSTURE.Developing
+  const article = /^[AEIOU]/i.test(level) ? 'an' : 'a'
   const weakLabel = DIM_LABELS[v.weakestKey] ?? cap(v.weakestKey)
 
-  const opening = `${v.company} operates at ${Math.round(v.composite)} out of 100 on the Aivory operational maturity scale — ${article} "${v.maturityLevel}" posture, where ${posture}.`
+  const opening = `${v.company} operates at ${Math.round(v.composite)} out of 100 on the Aivory operational maturity scale — ${article} "${level}" posture, where ${posture}.`
 
   let valueSentence = ''
   if (v.businessValueLabel && v.topOpportunityTitle) {
@@ -298,7 +313,7 @@ export function buildExecutiveInsight(
   switch (section) {
     case 'diagnosis': {
       const key = inputs.weakestKey ?? ''
-      const label = DIM_INSIGHT_LABEL[key] ?? 'operational inconsistency across the organization'
+      const label = DIM_INSIGHT_LABEL[key] ?? 'operational inconsistency across the organisation'
       const action = DIM_INSIGHT_ACTION[key] ?? 'Strengthening this dimension before automation'
       return `Your greatest constraint is not AI capability. It is ${label}. ${action} will reduce implementation risk, improve adoption, and accelerate ROI.`
     }
@@ -366,7 +381,7 @@ export function buildDimensionSpreadCaption(
  * and the PDF's dimension-bar block. Only meaningful once an industry
  * benchmark exists (the bars themselves show "vs median" ticks); returns
  * null so callers can omit the caption line entirely when there's no
- * benchmark to summarize, matching the bars' own graceful degradation.
+ * benchmark to summarise, matching the bars' own graceful degradation.
  */
 export function buildDimensionBenchmarkCaption(
   scores: Record<string, number>,

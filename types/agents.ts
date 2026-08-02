@@ -31,7 +31,7 @@ export type AgentRuntime = 'zeroclaw' | 'direct' | 'n8n'
  * @property {AgentStatus} status - Current status (draft, active, disabled)
  * @property {string} [slug] - URL-friendly slug (unique per workspace, optional for now)
  * @property {Record<string, any>} [config] - JSON config for future: prompt, tools, policies
- * @property {string[]} [tags] - Array of tags for organization
+ * @property {string[]} [tags] - Array of tags for organisation
  * @property {string} createdAt - ISO timestamp
  * @property {string} updatedAt - ISO timestamp
  * @property {string | null} deletedAt - ISO timestamp for soft delete (null = not deleted)

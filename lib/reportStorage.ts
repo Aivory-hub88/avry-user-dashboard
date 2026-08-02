@@ -3,7 +3,7 @@
  * docs/DEEP-DIAGNOSTIC-RESULT-PLANNING.md). Replaces lib/supabaseStorage.ts.
  *
  * Rows are keyed server-side by the signed-in user's JWT — this module never
- * sends an organization id or user id; the token IS the key. Deep Diagnostic
+ * sends an organisation id or user id; the token IS the key. Deep Diagnostic
  * is a signed-in-only service (decision D4), so an absent token simply means
  * localStorage-only operation.
  *

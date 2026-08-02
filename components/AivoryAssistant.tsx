@@ -165,7 +165,7 @@ export default function AivoryAssistant() {
     if (!sessionId) return
 
     const defaultMsg = attachment
-      ? `Please analyze this ${attachment.type === "image" ? "image" : attachment.type === "blueprint" ? "blueprint" : "file"}`
+      ? `Please analyse this ${attachment.type === "image" ? "image" : attachment.type === "blueprint" ? "blueprint" : "file"}`
       : ""
 
     let messageContent = trimmed || defaultMsg
@@ -335,7 +335,7 @@ export default function AivoryAssistant() {
                 ref={closeBtnRef}
                 onClick={handleClose}
                 className="flex items-center justify-center w-6 h-6 rounded-md text-white/30 hover:text-white/70 hover:bg-white/[0.08] transition-all duration-150"
-                aria-label="Minimize Aivory assistant"
+                aria-label="Minimise Aivory assistant"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 15l-6-6-6 6"/>
@@ -415,7 +415,7 @@ export default function AivoryAssistant() {
             onChange={e => {
               const files = Array.from(e.target.files ?? [])
               if (files.length > 0) {
-                handleSend(`Please analyze this file: ${files[0].name}`)
+                handleSend(`Please analyse this file: ${files[0].name}`)
               }
               if (fileInputRef.current) fileInputRef.current.value = ""
             }}
