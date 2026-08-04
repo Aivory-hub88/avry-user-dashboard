@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { PhaseId, PhaseData, DeepDiagnosticProgress } from '@/types/deepDiagnostic'
 import { DEEP_DIAGNOSTIC_PHASES } from '@/constants/deepDiagnosticQuestions'
+import { ID_PHASE_COPY } from '@/constants/deepDiagnosticQuestionsId'
 import { DeepDiagnosticService } from '@/services/deepDiagnostic'
+import { useLocaleContext } from '@/hooks/useLocale'
 import PhaseNavigator from '@/components/diagnostics/PhaseNavigator'
 import ProgressTracker from '@/components/diagnostics/ProgressTracker'
 import PhaseContent from '@/components/diagnostics/PhaseContent'
@@ -27,6 +29,7 @@ function buildEmptyPhaseData(): Record<PhaseId, PhaseData> {
 
 export default function DeepDiagnosticPage() {
   const router = useRouter()
+  const { locale, setLocale } = useLocaleContext()
 
   const [currentPhase, setCurrentPhase] = useState<PhaseId>('business_objective_kpi')
   const [phaseData, setPhaseData] = useState<Record<PhaseId, PhaseData>>(buildEmptyPhaseData)
@@ -86,7 +89,11 @@ export default function DeepDiagnosticPage() {
   }
 
   const handleStartFresh = useCallback(() => {
-    const confirmed = window.confirm('Are you sure you want to start fresh? All saved progress will be lost.')
+    const confirmed = window.confirm(
+      locale === 'id'
+        ? 'Anda yakin ingin memulai dari awal? Semua progres yang tersimpan akan hilang.'
+        : 'Are you sure you want to start fresh? All saved progress will be lost.'
+    )
     if (!confirmed) return
     DeepDiagnosticService.clearProgress()
     localStorage.removeItem('aivory_diagnostic_context')
@@ -96,7 +103,7 @@ export default function DeepDiagnosticPage() {
     setCompanyNameError('')
     setValidationErrors({})
     setSavedProgress(null)
-  }, [])
+  }, [locale])
 
   const handleResponseChange = useCallback((questionId: string, value: any) => {
     setPhaseData(prev => ({
@@ -134,7 +141,7 @@ export default function DeepDiagnosticPage() {
   const handleNext = () => {
     // Validate company name before leaving the first phase
     if (currentPhase === PHASE_ORDER[0] && !companyName.trim()) {
-      setCompanyNameError('Company name is required')
+      setCompanyNameError(locale === 'id' ? 'Nama perusahaan wajib diisi' : 'Company name is required')
       return
     }
 
@@ -182,29 +189,60 @@ export default function DeepDiagnosticPage() {
     return (
       <DiagnosticErrorBoundary>
         <div className={styles.loadingContainer}>
-          <div className={styles.spinner} aria-label="Loading..." />
+          <div className={styles.spinner} aria-label={locale === 'id' ? 'Memuat...' : 'Loading...'} />
         </div>
       </DiagnosticErrorBoundary>
     )
   }
 
+  const savedPhaseConfig = savedProgress
+    ? DEEP_DIAGNOSTIC_PHASES.find(p => p.id === savedProgress.currentPhase)
+    : undefined
+  const savedPhaseTitle = savedPhaseConfig
+    ? (locale === 'id' ? ID_PHASE_COPY[savedPhaseConfig.id]?.title ?? savedPhaseConfig.title : savedPhaseConfig.title)
+    : ''
+
   return (
     <DiagnosticErrorBoundary>
     <div className={`${styles.pageContainer} font-manrope`}>
+      {/* Language switcher */}
+      <div className={styles.languageSwitcherRow}>
+        <label htmlFor="assessment-lang" className={styles.languageSwitcherLabel}>
+          {locale === 'id' ? 'Bahasa' : 'Language'}
+        </label>
+        <select
+          id="assessment-lang"
+          className={styles.languageSwitcher}
+          value={locale}
+          onChange={(e) => setLocale(e.target.value as 'en' | 'id')}
+        >
+          <option value="en">English</option>
+          <option value="id">Bahasa Indonesia</option>
+        </select>
+      </div>
+
       {/* Resume banner */}
       {savedProgress && (
         <div className={styles.resumeBanner} role="alert">
           <span className={styles.resumeText}>
-            You have saved progress — resume from Phase{' '}
-            {PHASE_ORDER.indexOf(savedProgress.currentPhase) + 1}:{' '}
-            {DEEP_DIAGNOSTIC_PHASES.find(p => p.id === savedProgress.currentPhase)?.title}
+            {locale === 'id' ? (
+              <>
+                Anda memiliki progres tersimpan — lanjutkan dari Fase{' '}
+                {PHASE_ORDER.indexOf(savedProgress.currentPhase) + 1}: {savedPhaseTitle}
+              </>
+            ) : (
+              <>
+                You have saved progress — resume from Phase{' '}
+                {PHASE_ORDER.indexOf(savedProgress.currentPhase) + 1}: {savedPhaseTitle}
+              </>
+            )}
           </span>
           <div className={styles.resumeActions}>
             <button className={styles.resumeButton} onClick={handleResume}>
-              Resume
+              {locale === 'id' ? 'Lanjutkan' : 'Resume'}
             </button>
             <button className={styles.startFreshBannerButton} onClick={handleStartFresh}>
-              Start Fresh
+              {locale === 'id' ? 'Mulai Baru' : 'Start Fresh'}
             </button>
           </div>
         </div>
@@ -213,7 +251,9 @@ export default function DeepDiagnosticPage() {
       {/* Storage warning */}
       {storageWarning && (
         <div className={styles.warningBanner} role="alert">
-          Progress cannot be saved in your browser. You can still complete the diagnostic, but you'll need to finish in one session.
+          {locale === 'id'
+            ? 'Progres tidak dapat disimpan di browser Anda. Anda tetap dapat menyelesaikan diagnostik ini, tetapi harus diselesaikan dalam satu sesi.'
+            : "Progress cannot be saved in your browser. You can still complete the diagnostic, but you'll need to finish in one session."}
         </div>
       )}
 
@@ -240,13 +280,13 @@ export default function DeepDiagnosticPage() {
             {currentPhase === PHASE_ORDER[0] && (
               <div className={styles.companyNameField}>
                 <label htmlFor="companyName" className={styles.companyNameLabel}>
-                  Company Name
+                  {locale === 'id' ? 'Nama Perusahaan' : 'Company Name'}
                 </label>
                 <input
                   id="companyName"
                   type="text"
                   className={`${styles.companyNameInput} ${companyNameError ? styles.companyNameInputError : ''}`}
-                  placeholder="Enter your company name..."
+                  placeholder={locale === 'id' ? 'Masukkan nama perusahaan Anda...' : 'Enter your company name...'}
                   value={companyName}
                   onChange={e => {
                     setCompanyName(e.target.value)
@@ -271,14 +311,14 @@ export default function DeepDiagnosticPage() {
           </div>
 
           {/* Bottom navigation */}
-          <nav className={styles.bottomNav} aria-label="Phase navigation">
+          <nav className={styles.bottomNav} aria-label={locale === 'id' ? 'Navigasi fase' : 'Phase navigation'}>
             <button
               className={styles.prevButton}
               onClick={handlePrevious}
               disabled={isFirstPhase}
               aria-disabled={isFirstPhase}
             >
-              &lt; Previous Phase
+              {locale === 'id' ? '< Fase Sebelumnya' : '< Previous Phase'}
             </button>
 
             <button
@@ -286,7 +326,7 @@ export default function DeepDiagnosticPage() {
               onClick={handleStartFresh}
               type="button"
             >
-              Start Fresh
+              {locale === 'id' ? 'Mulai Baru' : 'Start Fresh'}
             </button>
 
             <button
@@ -294,7 +334,9 @@ export default function DeepDiagnosticPage() {
               onClick={handleNext}
               type="button"
             >
-              {isLastPhase ? 'Complete & Review' : 'Next Phase >'}
+              {locale === 'id'
+                ? (isLastPhase ? 'Selesai & Tinjau >' : 'Fase Berikutnya >')
+                : (isLastPhase ? 'Complete & Review' : 'Next Phase >')}
             </button>
           </nav>
         </main>

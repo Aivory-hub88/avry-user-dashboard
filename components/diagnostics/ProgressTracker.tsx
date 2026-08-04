@@ -1,3 +1,4 @@
+import { useLocaleContext } from '@/hooks/useLocale'
 import styles from './ProgressTracker.module.css'
 
 interface ProgressTrackerProps {
@@ -11,25 +12,26 @@ export default function ProgressTracker({
   completedPhases,
   currentPhase
 }: ProgressTrackerProps) {
+  const { locale } = useLocaleContext()
   const percentageComplete = (completedPhases / totalPhases) * 100
 
   return (
-    <div className={styles.progressTracker} role="region" aria-label="Diagnostic progress">
+    <div className={styles.progressTracker} role="region" aria-label={locale === 'id' ? 'Progres diagnostik' : 'Diagnostic progress'}>
       <div className={styles.progressInfo}>
         <span className={styles.phaseLabel} aria-live="polite">
-          Phase {currentPhase} of {totalPhases}
+          {locale === 'id' ? `Fase ${currentPhase} dari ${totalPhases}` : `Phase ${currentPhase} of ${totalPhases}`}
         </span>
         <span className={styles.completionStatus} aria-live="polite">
-          {completedPhases}/{totalPhases} phases complete
+          {locale === 'id' ? `${completedPhases}/${totalPhases} fase selesai` : `${completedPhases}/${totalPhases} phases complete`}
         </span>
       </div>
-      <div 
-        className={styles.progressBarContainer} 
-        role="progressbar" 
-        aria-valuenow={percentageComplete} 
-        aria-valuemin={0} 
-        aria-valuemax={100} 
-        aria-label={`${Math.round(percentageComplete)}% complete`}
+      <div
+        className={styles.progressBarContainer}
+        role="progressbar"
+        aria-valuenow={percentageComplete}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={locale === 'id' ? `${Math.round(percentageComplete)}% selesai` : `${Math.round(percentageComplete)}% complete`}
       >
         <div 
           className={styles.progressBarFill} 

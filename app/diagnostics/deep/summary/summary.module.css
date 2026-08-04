@@ -35,6 +35,35 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.languageSwitcherRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.languageSwitcherLabel {
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.languageSwitcher {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #f5f5f4;
+  font-size: 0.8125rem;
+  font-family: var(--font-manrope), sans-serif;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.languageSwitcher:focus-visible {
+  outline: 2px solid #afd199;
+  outline-offset: 1px;
+}
+
 .pageTitle {
   font-size: 1.75rem;
   font-weight: 300;

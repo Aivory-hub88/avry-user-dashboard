@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { PhaseId, PhaseData } from '@/types/deepDiagnostic'
+import { PhaseId, PhaseData, DeepDiagnosticQuestion } from '@/types/deepDiagnostic'
 import { DEEP_DIAGNOSTIC_PHASES } from '@/constants/deepDiagnosticQuestions'
+import { ID_PHASE_COPY, ID_QUESTION_COPY } from '@/constants/deepDiagnosticQuestionsId'
 import { DeepDiagnosticService, buildDiagnosticContext, ensureLiveRates } from '@/services/deepDiagnostic'
+import { useLocaleContext } from '@/hooks/useLocale'
 import type { DiagnosticAnswers } from '@/types/diagnostic'
 import styles from './summary.module.css'
 
@@ -15,14 +17,25 @@ const PHASE_ORDER: PhaseId[] = [
   'ai_opportunity_mapping',
 ]
 
-function formatAnswer(value: any): string {
+// Displays the stored (canonical, English) answer using its translated label
+// when one exists — the underlying value itself is never altered.
+function formatAnswer(value: any, question: DeepDiagnosticQuestion, locale: 'en' | 'id'): string {
   if (value === undefined || value === null || value === '') return ''
-  if (Array.isArray(value)) return value.join(', ')
-  return String(value)
+  const t = locale === 'id' ? ID_QUESTION_COPY[question.id] : undefined
+  const translateOne = (v: any): string => {
+    if (t?.options && question.options) {
+      const idx = question.options.indexOf(v)
+      if (idx >= 0 && t.options[idx]) return t.options[idx]
+    }
+    return String(v)
+  }
+  if (Array.isArray(value)) return value.map(translateOne).join(', ')
+  return translateOne(value)
 }
 
 export default function SummaryPage() {
   const router = useRouter()
+  const { locale, setLocale } = useLocaleContext()
   const [phaseData, setPhaseData] = useState<Record<PhaseId, PhaseData> | null>(null)
   const [companyName, setCompanyName] = useState('demo_org')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -86,7 +99,7 @@ export default function SummaryPage() {
   if (!phaseData) {
     return (
       <div className={styles.loadingContainer}>
-        <div className={styles.spinner} aria-label="Loading..." />
+        <div className={styles.spinner} aria-label={locale === 'id' ? 'Memuat...' : 'Loading...'} />
       </div>
     )
   }
@@ -94,9 +107,25 @@ export default function SummaryPage() {
   return (
     <div className={styles.pageContainer}>
       <header className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Review Your Answers</h1>
+        <div className={styles.languageSwitcherRow}>
+          <label htmlFor="assessment-lang-summary" className={styles.languageSwitcherLabel}>
+            {locale === 'id' ? 'Bahasa' : 'Language'}
+          </label>
+          <select
+            id="assessment-lang-summary"
+            className={styles.languageSwitcher}
+            value={locale}
+            onChange={(e) => setLocale(e.target.value as 'en' | 'id')}
+          >
+            <option value="en">English</option>
+            <option value="id">Bahasa Indonesia</option>
+          </select>
+        </div>
+        <h1 className={styles.pageTitle}>{locale === 'id' ? 'Tinjau Jawaban Anda' : 'Review Your Answers'}</h1>
         <p className={styles.pageSubtitle}>
-          Take a moment to review before we analyse your business operations.
+          {locale === 'id'
+            ? 'Luangkan waktu sejenak untuk meninjau sebelum kami menganalisis operasional bisnis Anda.'
+            : 'Take a moment to review before we analyse your business operations.'}
         </p>
       </header>
 
@@ -104,30 +133,35 @@ export default function SummaryPage() {
         {DEEP_DIAGNOSTIC_PHASES.map((phase, index) => {
           const data = phaseData[phase.id]
           const responses = data?.responses ?? {}
+          const phaseCopy = locale === 'id' ? ID_PHASE_COPY[phase.id] : undefined
+          const displayPhaseTitle = phaseCopy?.title ?? phase.title
+          const phaseLabel = locale === 'id' ? `Fase ${index + 1}` : `Phase ${index + 1}`
+          const editLabel = locale === 'id' ? `Ubah Fase ${index + 1}` : `Edit Phase ${index + 1}`
 
           return (
             <div key={phase.id} className={styles.phaseCard}>
               <div className={styles.phaseCardHeader}>
                 <div className={styles.phaseCardMeta}>
-                  <span className={styles.phaseNumber}>Phase {index + 1}</span>
-                  <h2 className={styles.phaseTitle}>{phase.title}</h2>
+                  <span className={styles.phaseNumber}>{phaseLabel}</span>
+                  <h2 className={styles.phaseTitle}>{displayPhaseTitle}</h2>
                 </div>
                 <button
                   className={styles.editButton}
                   onClick={handleEditPhase}
-                  aria-label={`Edit Phase ${index + 1}: ${phase.title}`}
+                  aria-label={`${editLabel}: ${displayPhaseTitle}`}
                 >
-                  Edit Phase {index + 1}
+                  {editLabel}
                 </button>
               </div>
 
               <div className={styles.qaList}>
                 {phase.questions.map(question => {
-                  const answer = formatAnswer(responses[question.id])
+                  const answer = formatAnswer(responses[question.id], question, locale)
                   if (!answer) return null
+                  const questionCopy = locale === 'id' ? ID_QUESTION_COPY[question.id] : undefined
                   return (
                     <div key={question.id} className={styles.qaItem}>
-                      <p className={styles.questionLabel}>{question.question}</p>
+                      <p className={styles.questionLabel}>{questionCopy?.question ?? question.question}</p>
                       <p className={styles.answerText}>{answer}</p>
                     </div>
                   )
@@ -145,7 +179,7 @@ export default function SummaryPage() {
               onClick={handleSubmit}
               disabled={isSubmitting}
             >
-              Retry
+              {locale === 'id' ? 'Coba Lagi' : 'Retry'}
             </button>
           </div>
         )}
@@ -160,10 +194,10 @@ export default function SummaryPage() {
             {isSubmitting ? (
               <>
                 <span className={styles.buttonSpinner} aria-hidden="true" />
-                Submitting…
+                {locale === 'id' ? 'Mengirim…' : 'Submitting…'}
               </>
             ) : (
-              'Submit Diagnostic'
+              locale === 'id' ? 'Kirim Diagnostik' : 'Submit Diagnostic'
             )}
           </button>
         </div>

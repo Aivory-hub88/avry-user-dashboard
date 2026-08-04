@@ -1,4 +1,6 @@
 import { PhaseConfig, PhaseId } from '@/types/deepDiagnostic'
+import { useLocaleContext } from '@/hooks/useLocale'
+import { ID_PHASE_COPY } from '@/constants/deepDiagnosticQuestionsId'
 import styles from './PhaseNavigator.module.css'
 
 interface PhaseNavigatorProps {
@@ -14,6 +16,8 @@ export default function PhaseNavigator({
   completedPhases,
   onNavigate
 }: PhaseNavigatorProps) {
+  const { locale } = useLocaleContext()
+
   const getPhaseStatus = (phaseId: PhaseId): 'completed' | 'current' | 'locked' | 'available' => {
     if (completedPhases.includes(phaseId)) {
       return 'completed'
@@ -56,6 +60,9 @@ export default function PhaseNavigator({
           const status = getPhaseStatus(phase.id)
           const isNavigable = canNavigate(phase.id)
           const isCurrent = phase.id === currentPhase
+          const phaseCopy = locale === 'id' ? ID_PHASE_COPY[phase.id] : undefined
+          const displayTitle = phaseCopy?.title ?? phase.title
+          const displayDescription = phaseCopy?.description ?? phase.description
 
           return (
             <div
@@ -65,7 +72,7 @@ export default function PhaseNavigator({
               onKeyDown={(e) => handleKeyDown(e, phase.id)}
               role="button"
               tabIndex={isNavigable ? 0 : -1}
-              aria-label={`Phase ${index + 1}: ${phase.title}`}
+              aria-label={`Phase ${index + 1}: ${displayTitle}`}
               aria-current={isCurrent ? 'step' : undefined}
               aria-disabled={!isNavigable}
             >
@@ -88,8 +95,8 @@ export default function PhaseNavigator({
                 )}
               </div>
               <div className={styles.phaseContent}>
-                <h3 className={styles.phaseTitle}>{phase.title}</h3>
-                <p className={styles.phaseDescription}>{phase.description}</p>
+                <h3 className={styles.phaseTitle}>{displayTitle}</h3>
+                <p className={styles.phaseDescription}>{displayDescription}</p>
               </div>
               {status === 'locked' && (
                 <svg

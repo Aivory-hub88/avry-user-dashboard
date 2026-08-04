@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { PhaseConfig, DeepDiagnosticQuestion } from '@/types/deepDiagnostic'
+import { useLocaleContext } from '@/hooks/useLocale'
+import { ID_PHASE_COPY, ID_QUESTION_COPY } from '@/constants/deepDiagnosticQuestionsId'
 import styles from './PhaseContent.module.css'
 
 interface PhaseContentProps {
@@ -17,6 +19,8 @@ export default function PhaseContent({
   onResponseChange,
   validationErrors
 }: PhaseContentProps) {
+  const { locale } = useLocaleContext()
+
   // Debounce timers for each question
   const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({})
 
@@ -46,6 +50,14 @@ export default function PhaseContent({
     const error = validationErrors[question.id]
     const inputId = `question-${question.id}`
 
+    // Display-only Indonesian labels, keyed off the canonical question id.
+    // The `value`/`onResponseChange` payload always stays the canonical
+    // (English) option string from `question.options` — never the
+    // translated label — so the scorer and stored answers are unaffected.
+    const t = locale === 'id' ? ID_QUESTION_COPY[question.id] : undefined
+    const displayPlaceholder = t?.placeholder ?? question.placeholder
+    const displayOptions = question.options?.map((option, i) => t?.options?.[i] ?? option)
+
     switch (question.type) {
       case 'text':
         return (
@@ -53,7 +65,7 @@ export default function PhaseContent({
             id={inputId}
             type="text"
             className={`${styles.textInput} ${error ? styles.inputError : ''}`}
-            placeholder={question.placeholder}
+            placeholder={displayPlaceholder}
             defaultValue={value}
             onChange={(e) => handleChange(question.id, e.target.value)}
             aria-invalid={!!error}
@@ -66,7 +78,7 @@ export default function PhaseContent({
           <textarea
             id={inputId}
             className={`${styles.textareaInput} ${error ? styles.inputError : ''}`}
-            placeholder={question.placeholder}
+            placeholder={displayPlaceholder}
             defaultValue={value}
             onChange={(e) => handleChange(question.id, e.target.value)}
             rows={4}
@@ -87,10 +99,10 @@ export default function PhaseContent({
             aria-invalid={!!error}
             aria-describedby={error ? `${inputId}-error` : question.helperText ? `${inputId}-helper` : undefined}
           >
-            <option value="">Select an option...</option>
-            {question.options?.map((option) => (
+            <option value="">{locale === 'id' ? 'Pilih salah satu...' : 'Select an option...'}</option>
+            {question.options?.map((option, i) => (
               <option key={option} value={option}>
-                {option}
+                {displayOptions?.[i] ?? option}
               </option>
             ))}
           </select>
@@ -99,7 +111,7 @@ export default function PhaseContent({
       case 'radio':
         return (
           <div className={styles.radioGroup} role="radiogroup" aria-labelledby={inputId}>
-            {question.options?.map((option) => {
+            {question.options?.map((option, i) => {
               const optionId = `${inputId}-${option.replace(/\s+/g, '-').toLowerCase()}`
               const isSelected = value === option
               // Selecting a radio is a discrete choice — commit immediately and
@@ -132,7 +144,7 @@ export default function PhaseContent({
                     className={styles.radioInput}
                     tabIndex={-1}
                   />
-                  <span className={styles.radioText}>{option}</span>
+                  <span className={styles.radioText}>{displayOptions?.[i] ?? option}</span>
                 </label>
               )
             })}
@@ -142,7 +154,7 @@ export default function PhaseContent({
       case 'multiselect':
         return (
           <div className={styles.multiselectGroup} role="group" aria-labelledby={inputId}>
-            {question.options?.map((option) => {
+            {question.options?.map((option, i) => {
               const optionId = `${inputId}-${option.replace(/\s+/g, '-').toLowerCase()}`
               const selectedValues = Array.isArray(value) ? value : []
               const isChecked = selectedValues.includes(option)
@@ -162,7 +174,7 @@ export default function PhaseContent({
                     }}
                     className={styles.checkboxInput}
                   />
-                  <span className={styles.checkboxText}>{option}</span>
+                  <span className={styles.checkboxText}>{displayOptions?.[i] ?? option}</span>
                 </label>
               )
             })}
@@ -175,7 +187,7 @@ export default function PhaseContent({
             id={inputId}
             type="number"
             className={`${styles.numberInput} ${error ? styles.inputError : ''}`}
-            placeholder={question.placeholder}
+            placeholder={displayPlaceholder}
             value={value}
             onChange={(e) => {
               const numValue = e.target.value === '' ? '' : Number(e.target.value)
@@ -193,24 +205,27 @@ export default function PhaseContent({
     }
   }
 
+  const phaseCopy = locale === 'id' ? ID_PHASE_COPY[phase.id] : undefined
+
   return (
     <div className={styles.phaseContent}>
       <div className={styles.phaseHeader}>
-        <h2 className={styles.phaseTitle}>{phase.title}</h2>
-        <p className={styles.phaseDescription}>{phase.description}</p>
+        <h2 className={styles.phaseTitle}>{phaseCopy?.title ?? phase.title}</h2>
+        <p className={styles.phaseDescription}>{phaseCopy?.description ?? phase.description}</p>
       </div>
 
       <div className={styles.questionsList}>
         {phase.questions.map((question, index) => {
           const inputId = `question-${question.id}`
           const error = validationErrors[question.id]
+          const t = locale === 'id' ? ID_QUESTION_COPY[question.id] : undefined
 
           return (
             <div key={question.id} className={styles.questionItem}>
               <label htmlFor={inputId} className={styles.questionLabel}>
                 <span className={styles.questionNumber}>{index + 1}.</span>
                 <span className={styles.questionText}>
-                  {question.question}
+                  {t?.question ?? question.question}
                   {question.required && (
                     <span className={styles.requiredIndicator} aria-label="required">
                       *
@@ -221,7 +236,7 @@ export default function PhaseContent({
 
               {question.helperText && !error && (
                 <p id={`${inputId}-helper`} className={styles.helperText}>
-                  {question.helperText}
+                  {t?.helperText ?? question.helperText}
                 </p>
               )}
 
