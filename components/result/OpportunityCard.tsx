@@ -1,5 +1,6 @@
 import type { RankedOpportunity } from '@/types/diagnostic'
 import { formatLocalAmount, humanizeQuadrant, type CurrencyCode } from '@/lib/resultFormatters'
+import { buildWhyThisRecommendation } from '@/lib/readinessNarrative'
 import styles from './OpportunityCard.module.css'
 
 interface OpportunityCardProps {
@@ -7,6 +8,7 @@ interface OpportunityCardProps {
   isHighlighted: boolean
   colorIndex?: number
   currencyCode: CurrencyCode
+  locale?: 'en' | 'id'
 }
 
 // Must stay in sync with DOT_COLORS in OpportunityMatrix.tsx
@@ -21,10 +23,14 @@ const DOT_COLORS = [
   '#e879f9',
 ]
 
-const dataReadinessLabel: Record<string, string> = {
-  ready: 'Data Ready',
-  needs_prep: 'Needs Data Prep',
-  not_ready: 'Data Not Ready',
+const dataReadinessLabel: Record<'en' | 'id', Record<string, string>> = {
+  en: { ready: 'Data Ready', needs_prep: 'Needs Data Prep', not_ready: 'Data Not Ready' },
+  id: { ready: 'Data Siap', needs_prep: 'Perlu Persiapan Data', not_ready: 'Data Belum Siap' },
+}
+
+const complexityLabel: Record<'en' | 'id', Record<string, string>> = {
+  en: { low: 'low', medium: 'medium', high: 'high' },
+  id: { low: 'rendah', medium: 'sedang', high: 'tinggi' },
 }
 
 const dataReadinessClass: Record<string, string> = {
@@ -38,6 +44,7 @@ export default function OpportunityCard({
   isHighlighted,
   colorIndex = 0,
   currencyCode,
+  locale = 'en',
 }: OpportunityCardProps) {
   const color = DOT_COLORS[colorIndex % DOT_COLORS.length]
   const cardStyle = isHighlighted
@@ -50,8 +57,20 @@ export default function OpportunityCard({
     opportunity.estimatedSavingsLocal ?? opportunity.estimatedSavingsIDR ?? null
   const savingsLine =
     typeof estimatedSavings === 'number'
-      ? `Est. ${formatLocalAmount(estimatedSavings, currencyCode)}/yr savings`
+      ? (locale === 'id'
+        ? `Estimasi penghematan ${formatLocalAmount(estimatedSavings, currencyCode)}/tahun`
+        : `Est. ${formatLocalAmount(estimatedSavings, currencyCode)}/yr savings`)
       : null
+
+  // Phase 2.1 — "Why This Recommendation": every input is already a field on
+  // this opportunity, this only rephrases them as a short reason list.
+  const whyReasons = buildWhyThisRecommendation({
+    quadrant: opportunity.quadrant,
+    complexity: opportunity.complexity,
+    dataReadiness: opportunity.dataReadiness,
+    timeToValueWeeks: opportunity.timeToValueWeeks,
+    prerequisites: opportunity.prerequisites ?? [],
+  }, locale)
 
   return (
     <div className={styles.card} style={cardStyle}>
@@ -62,33 +81,33 @@ export default function OpportunityCard({
           <h3 className={styles.name}>{opportunity.title}</h3>
         </div>
         <span className={styles.quadrantBadge}>
-          {humanizeQuadrant(opportunity.quadrant)}
+          {humanizeQuadrant(opportunity.quadrant, locale)}
         </span>
       </div>
 
       <div className={styles.metrics}>
         <div className={styles.metric}>
-          <span className={styles.metricLabel}>Impact</span>
+          <span className={styles.metricLabel}>{locale === 'id' ? 'Dampak' : 'Impact'}</span>
           {/* FIX 4: opportunity.impactScore → opportunity.impact */}
           <span className={styles.metricValue}>{opportunity.impact}/10</span>
         </div>
         <div className={styles.metric}>
-          <span className={styles.metricLabel}>Effort</span>
+          <span className={styles.metricLabel}>{locale === 'id' ? 'Usaha' : 'Effort'}</span>
           {/* FIX 5: opportunity.effortScore → opportunity.effort */}
           <span className={styles.metricValue}>{opportunity.effort}/10</span>
         </div>
         <div className={styles.metric}>
-          <span className={styles.metricLabel}>Time to Value</span>
-          <span className={styles.metricValue}>{opportunity.timeToValueWeeks}w</span>
+          <span className={styles.metricLabel}>{locale === 'id' ? 'Waktu ke Nilai' : 'Time to Value'}</span>
+          <span className={styles.metricValue}>{opportunity.timeToValueWeeks}{locale === 'id' ? 'mgg' : 'w'}</span>
         </div>
         <div className={styles.metric}>
-          <span className={styles.metricLabel}>Complexity</span>
+          <span className={styles.metricLabel}>{locale === 'id' ? 'Kompleksitas' : 'Complexity'}</span>
           {/* FIX 6: opportunity.errorComplexity → opportunity.complexity */}
           <span
             className={styles.metricValue}
             style={{ textTransform: 'capitalize' }}
           >
-            {opportunity.complexity}
+            {complexityLabel[locale][opportunity.complexity] ?? opportunity.complexity}
           </span>
         </div>
       </div>
@@ -107,15 +126,22 @@ export default function OpportunityCard({
             dataReadinessClass[opportunity.dataReadiness] ?? ''
           }`}
         >
-          {dataReadinessLabel[opportunity.dataReadiness] ?? opportunity.dataReadiness}
+          {dataReadinessLabel[locale][opportunity.dataReadiness] ?? opportunity.dataReadiness}
         </span>
         {/* FIX 7: optional chaining — prerequisites bisa undefined/null */}
         {opportunity.prerequisites?.length > 0 && (
           <span className={styles.badge}>
-            Prereqs: {opportunity.prerequisites.join(', ')}
+            {locale === 'id' ? 'Prasyarat: ' : 'Prereqs: '}{opportunity.prerequisites.join(', ')}
           </span>
         )}
       </div>
+
+      {whyReasons.length > 0 && (
+        <p className={styles.whyLine}>
+          <span className={styles.whyLabel}>{locale === 'id' ? 'Mengapa ini: ' : 'Why this: '}</span>
+          {whyReasons.join(' · ')}
+        </p>
+      )}
     </div>
   )
 }

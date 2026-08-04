@@ -334,26 +334,36 @@ export function calcEffectiveHours(
 //  GENERAL FORMATTERS
 // ────────────────────────────────────────────
 
-/** Format a number as a percentage with one decimal place: "42.5%" */
-export function formatPercent(value: number | null | undefined): string {
+export type ResultLocale = 'en' | 'id'
+
+/**
+ * Format a number as a percentage with one decimal place: "42.5%" (id:
+ * "42,5%" — Indonesian convention uses a comma decimal separator).
+ */
+export function formatPercent(value: number | null | undefined, locale: ResultLocale = 'en'): string {
   if (value === null || value === undefined || !isFinite(value) || isNaN(value)) return '—'
-  return `${value.toFixed(1)}%`
+  const fixed = value.toFixed(1)
+  return locale === 'id' ? `${fixed.replace('.', ',')}%` : `${fixed}%`
 }
 
-/** Format a number of months with singular/plural: "1 month" or "N months" */
-export function formatMonths(value: number | null | undefined): string {
+/**
+ * Format a number of months: "1 month" / "N months" (id: "1 bulan" / "N
+ * bulan" — Indonesian has no plural marking, so both cases share one form).
+ */
+export function formatMonths(value: number | null | undefined, locale: ResultLocale = 'en'): string {
   if (value === null || value === undefined || !isFinite(value) || isNaN(value)) return '—'
   const rounded = Math.round(value)
+  if (locale === 'id') return `${rounded} bulan`
   return rounded === 1 ? '1 month' : `${rounded} months`
 }
 
-/** Format an ISO date string as "15 Jun 2025" */
-export function formatDate(isoString: string | null | undefined): string {
+/** Format an ISO date string as "15 Jun 2025" (id: "15 Jun 2025" with Indonesian month names). */
+export function formatDate(isoString: string | null | undefined, locale: ResultLocale = 'en'): string {
   if (!isoString) return '—'
   try {
     const date = new Date(isoString)
     if (isNaN(date.getTime())) return '—'
-    return date.toLocaleDateString('en-GB', {
+    return date.toLocaleDateString(locale === 'id' ? 'id-ID' : 'en-GB', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -364,18 +374,29 @@ export function formatDate(isoString: string | null | undefined): string {
 }
 
 /** Map a DimensionKey to its human-readable label */
-export function humanizeDimensionKey(key: string): string {
-  const map: Record<string, string> = {
-    strategy: 'Strategy',
-    data: 'Data',
-    process: 'Process',
-    people: 'People',
-    governance: 'Governance',
-    // 'Security' only — the old 'Security & Governance' label collided with
-    // the separate Governance dimension and read as two governance scores.
-    security: 'Security',
+export function humanizeDimensionKey(key: string, locale: ResultLocale = 'en'): string {
+  const map: Record<ResultLocale, Record<string, string>> = {
+    en: {
+      strategy: 'Strategy',
+      data: 'Data',
+      process: 'Process',
+      people: 'People',
+      governance: 'Governance',
+      // 'Security' only — the old 'Security & Governance' label collided with
+      // the separate Governance dimension and read as two governance scores.
+      security: 'Security',
+    },
+    id: {
+      strategy: 'Strategi',
+      data: 'Data',
+      process: 'Proses',
+      people: 'SDM',
+      governance: 'Tata Kelola',
+      security: 'Keamanan',
+    },
   }
-  if (key in map) return map[key]
+  const localized = map[locale]
+  if (key in localized) return localized[key]
   if (!key) return '—'
   return key.charAt(0).toUpperCase() + key.slice(1)
 }
@@ -383,13 +404,22 @@ export function humanizeDimensionKey(key: string): string {
 /** Map an OpportunityQuadrant to its human-readable label */
 export function humanizeQuadrant(
   quadrant: OpportunityQuadrant | string | null | undefined,
+  locale: ResultLocale = 'en',
 ): string {
   if (!quadrant) return '—'
-  const map: Record<string, string> = {
-    quick_win: 'Quick Win',
-    major_project: 'Major Project',
-    fill_in: 'Fill In',
-    thankless_task: 'Thankless Task',
+  const map: Record<ResultLocale, Record<string, string>> = {
+    en: {
+      quick_win: 'Quick Win',
+      major_project: 'Major Project',
+      fill_in: 'Fill In',
+      thankless_task: 'Thankless Task',
+    },
+    id: {
+      quick_win: 'Quick Win',
+      major_project: 'Proyek Besar',
+      fill_in: 'Selingan',
+      thankless_task: 'Nilai Rendah',
+    },
   }
-  return map[quadrant] ?? '—'
+  return map[locale][quadrant] ?? '—'
 }

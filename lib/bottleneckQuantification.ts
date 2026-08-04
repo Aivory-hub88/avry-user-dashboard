@@ -187,9 +187,13 @@ export function quantifyPainPoints(params: {
 }
 
 /** "~10 hrs/week" or "~10 hrs/week (estimated allocation)"; null when hours are unknown. */
-export function formatPainPointHours(item: QuantifiedPainPoint): string | null {
+export function formatPainPointHours(item: QuantifiedPainPoint, locale: 'en' | 'id' = 'en'): string | null {
   if (item.hoursPerWeek == null) return null
-  const hrs = Number.isInteger(item.hoursPerWeek) ? String(item.hoursPerWeek) : item.hoursPerWeek.toFixed(1)
+  const hrsRaw = Number.isInteger(item.hoursPerWeek) ? String(item.hoursPerWeek) : item.hoursPerWeek.toFixed(1)
+  const hrs = locale === 'id' ? hrsRaw.replace('.', ',') : hrsRaw
+  if (locale === 'id') {
+    return item.isEstimated ? `~${hrs} jam/minggu (alokasi estimasi)` : `~${hrs} jam/minggu`
+  }
   return item.isEstimated ? `~${hrs} hrs/week (estimated allocation)` : `~${hrs} hrs/week`
 }
 

@@ -10,9 +10,10 @@ interface HeaderBarProps {
   isExportingPdf?: boolean
   /** Phase E2.3 — null/undefined renders no chip (signed out, <2 history rows, or flat score). */
   delta?: DiagnosticDelta | null
+  locale?: 'en' | 'id'
 }
 
-export default function HeaderBar({ company, submittedAt, onDownloadPdf, isExportingPdf, delta }: HeaderBarProps) {
+export default function HeaderBar({ company, submittedAt, onDownloadPdf, isExportingPdf, delta, locale = 'en' }: HeaderBarProps) {
   return (
     <div className="relative w-full rounded-[18px] overflow-hidden bg-[#3a3a37] p-8 md:p-12 mb-8 border border-white/5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
       {/* Background Gradient Mesh */}
@@ -23,21 +24,23 @@ export default function HeaderBar({ company, submittedAt, onDownloadPdf, isExpor
       </div>
 
       <div className="relative z-10 max-w-2xl flex flex-col gap-2">
-        <span className="text-[#a3a39c] text-xs uppercase tracking-wider font-semibold">BUSINESS OPERATIONS ASSESSMENT</span>
+        <span className="text-[#a3a39c] text-xs uppercase tracking-wider font-semibold">
+          {locale === 'id' ? 'ASESMEN OPERASIONAL BISNIS' : 'BUSINESS OPERATIONS ASSESSMENT'}
+        </span>
         <h1 className={`text-3xl md:text-4xl font-semibold text-white tracking-tight ${styles.companyName}`}>
           {company}
         </h1>
-        <span className="text-[#a1a1aa] text-base font-light">{formatDate(submittedAt)}</span>
-        <DeltaChip delta={delta ?? null} />
+        <span className="text-[#a1a1aa] text-base font-light">{formatDate(submittedAt, locale)}</span>
+        <DeltaChip delta={delta ?? null} locale={locale} />
       </div>
 
       <div className="relative z-10">
-        <button 
+        <button
           className={styles.btnFilled}
           onClick={onDownloadPdf}
           disabled={!onDownloadPdf || isExportingPdf}
         >
-          {isExportingPdf ? 'Generating...' : 'Download Full Report'}
+          {isExportingPdf ? (locale === 'id' ? 'Membuat...' : 'Generating...') : (locale === 'id' ? 'Unduh Laporan Lengkap' : 'Download Full Report')}
         </button>
       </div>
     </div>

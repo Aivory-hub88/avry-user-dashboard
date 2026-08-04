@@ -34,11 +34,16 @@ export interface BenchmarkPoint {
 export type IndustryBenchmark = Record<BenchmarkDimensionKey, BenchmarkPoint>
 
 /** Short, must-render disclaimer — pair with every benchmark number/overlay. */
-export const BENCHMARK_DISCLAIMER =
-  'Directional benchmark — a modeled estimate from published operations-maturity research, not a measured industry statistic.'
+export const BENCHMARK_DISCLAIMER = {
+  en: 'Directional benchmark — a modeled estimate from published operations-maturity research, not a measured industry statistic.',
+  id: 'Benchmark yang bersifat arah — estimasi model dari riset kematangan operasional yang telah dipublikasikan, bukan statistik industri yang terukur.',
+}
 
 /** Attribution line for a slightly longer caption spot (e.g. PDF footnote). */
-export const BENCHMARK_SOURCE_LABEL = 'Source: Aivory operations-maturity model (directional benchmark)'
+export const BENCHMARK_SOURCE_LABEL = {
+  en: 'Source: Aivory operations-maturity model (directional benchmark)',
+  id: 'Sumber: model kematangan operasional Aivory (benchmark yang bersifat arah)',
+}
 
 function pt(median: number, p75Delta = 12): BenchmarkPoint {
   return { median, p75: Math.min(95, median + p75Delta) }
@@ -126,7 +131,9 @@ export function getIndustryBenchmark(industry: string | null | undefined): Indus
 }
 
 /** "58 vs industry median 52" — shared formatter so page/PDF never diverge. */
-export function formatVsMedian(score: number, benchmark: BenchmarkPoint | undefined): string | null {
+export function formatVsMedian(score: number, benchmark: BenchmarkPoint | undefined, locale: 'en' | 'id' = 'en'): string | null {
   if (!benchmark) return null
-  return `${Math.round(score)} vs industry median ${Math.round(benchmark.median)}`
+  return locale === 'id'
+    ? `${Math.round(score)} vs median industri ${Math.round(benchmark.median)}`
+    : `${Math.round(score)} vs industry median ${Math.round(benchmark.median)}`
 }

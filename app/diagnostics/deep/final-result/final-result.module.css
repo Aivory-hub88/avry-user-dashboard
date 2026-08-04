@@ -26,6 +26,34 @@
   gap: 24px;
 }
 
+.languageSwitcherRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.languageSwitcherLabel {
+  font-size: 0.8125rem;
+  color: #a1a1aa;
+}
+
+.languageSwitcher {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #e5e5e3;
+  font-size: 0.8125rem;
+  font-family: var(--font-manrope), sans-serif;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.languageSwitcher:focus-visible {
+  outline: 2px solid #afd199;
+  outline-offset: 1px;
+}
+
 /* ─── Card wrapper (shared by every section) ─────────────────────────────── */
 .card {
   background: #3a3a36;

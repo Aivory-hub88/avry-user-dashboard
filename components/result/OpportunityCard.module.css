@@ -112,3 +112,17 @@
   border-color: rgba(248, 113, 113, 0.3);
   background: rgba(248, 113, 113, 0.08);
 }
+
+.whyLine {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a1a1aa;
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.whyLabel {
+  font-weight: 600;
+  color: #d4d4d8;
+}

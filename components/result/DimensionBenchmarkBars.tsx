@@ -10,6 +10,7 @@ const DIMENSION_ORDER: DimensionKey[] = ['strategy', 'data', 'process', 'people'
 interface DimensionBenchmarkBarsProps {
   scores: Pick<DimensionScores, 'strategy' | 'data' | 'process' | 'people' | 'governance' | 'security'>
   benchmark: IndustryBenchmark | null | undefined
+  locale?: 'en' | 'id'
 }
 
 /**
@@ -18,34 +19,34 @@ interface DimensionBenchmarkBarsProps {
  * industry, so old/unmatched contexts fall back to exactly the pre-Phase-E
  * layout — no broken layout, no crash (brief §8 exit gate).
  */
-export default function DimensionBenchmarkBars({ scores, benchmark }: DimensionBenchmarkBarsProps) {
+export default function DimensionBenchmarkBars({ scores, benchmark, locale = 'en' }: DimensionBenchmarkBarsProps) {
   if (!benchmark) return null
 
   // Phase E2.6 — shared with the PDF's dimension-bar block via the same
   // builder (lib/readinessNarrative.ts) so the "so what" line can never
   // independently drift between the two surfaces.
-  const caption = buildDimensionBenchmarkCaption(scores, benchmark)
+  const caption = buildDimensionBenchmarkCaption(scores, benchmark, locale)
 
   return (
     <div className={styles.container}>
-      <span className={styles.heading}>Dimensions vs industry median</span>
+      <span className={styles.heading}>{locale === 'id' ? 'Dimensi vs median industri' : 'Dimensions vs industry median'}</span>
       {caption && <p className={styles.caption}>{caption}</p>}
       <div className={styles.rows}>
         {DIMENSION_ORDER.map((key) => {
           const score = Math.round(scores[key] ?? 0)
           const point = benchmark[key]
           if (!point) return null
-          const vsLabel = formatVsMedian(score, point)
+          const vsLabel = formatVsMedian(score, point, locale)
           const medianPct = Math.max(0, Math.min(100, point.median))
           return (
             <div key={key} className={styles.row}>
-              <span className={styles.rowLabel}>{humanizeDimensionKey(key)}</span>
+              <span className={styles.rowLabel}>{humanizeDimensionKey(key, locale)}</span>
               <div className={styles.track}>
                 <div className={styles.fill} style={{ width: `${Math.max(0, Math.min(100, score))}%` }} />
                 <div
                   className={styles.medianTick}
                   style={{ left: `${medianPct}%` }}
-                  title={`Industry median: ${Math.round(point.median)}`}
+                  title={locale === 'id' ? `Median industri: ${Math.round(point.median)}` : `Industry median: ${Math.round(point.median)}`}
                 />
               </div>
               <span className={styles.rowValue}>{vsLabel}</span>
@@ -53,7 +54,7 @@ export default function DimensionBenchmarkBars({ scores, benchmark }: DimensionB
           )
         })}
       </div>
-      <p className={styles.disclaimer}>{BENCHMARK_DISCLAIMER}</p>
+      <p className={styles.disclaimer}>{BENCHMARK_DISCLAIMER[locale]}</p>
     </div>
   )
 }

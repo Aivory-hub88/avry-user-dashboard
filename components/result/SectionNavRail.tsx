@@ -10,6 +10,7 @@ export interface SectionNavItem {
 
 interface SectionNavRailProps {
   sections: SectionNavItem[]
+  locale?: 'en' | 'id'
 }
 
 /**
@@ -20,7 +21,7 @@ interface SectionNavRailProps {
  * tracked with an IntersectionObserver scroll-spy instead of a scroll
  * listener, so this never causes layout thrash.
  */
-export default function SectionNavRail({ sections }: SectionNavRailProps) {
+export default function SectionNavRail({ sections, locale = 'en' }: SectionNavRailProps) {
   const [activeId, setActiveId] = useState<string | null>(sections[0]?.id ?? null)
   // Sections list is effectively static per render of a loaded report, but
   // keep a ref so the observer effect below doesn't need it in its deps.
@@ -59,7 +60,7 @@ export default function SectionNavRail({ sections }: SectionNavRailProps) {
   if (sections.length === 0) return null
 
   return (
-    <nav className={styles.rail} aria-label="Report sections">
+    <nav className={styles.rail} aria-label={locale === 'id' ? 'Bagian laporan' : 'Report sections'}>
       <ul className={styles.list}>
         {sections.map((s) => (
           <li key={s.id} className={styles.item}>

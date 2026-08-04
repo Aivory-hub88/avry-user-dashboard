@@ -9,6 +9,7 @@ interface ROISensitivityTornadoProps {
   /** The report's actual assumed efficiency, e.g. "75%". */
   baseBoundLabel: string
   formatter: (value: number) => string
+  locale?: 'en' | 'id'
 }
 
 /**
@@ -24,12 +25,14 @@ export default function ROISensitivityTornado({
   baseValueLocal,
   baseBoundLabel,
   formatter,
+  locale = 'en',
 }: ROISensitivityTornadoProps) {
   if (!Array.isArray(sensitivity) || sensitivity.length === 0) return null
+  const at = locale === 'id' ? 'pada' : 'at'
 
   return (
     <div className={styles.container}>
-      <span className={styles.heading}>Which assumption moves this number most</span>
+      <span className={styles.heading}>{locale === 'id' ? 'Asumsi mana yang paling mempengaruhi angka ini' : 'Which assumption moves this number most'}</span>
       <div className={styles.rows}>
         {sensitivity.map((lever) => {
           if (lever.lowValueLocal === null || lever.highValueLocal === null) return null
@@ -49,18 +52,20 @@ export default function ROISensitivityTornado({
                   <div
                     className={styles.baseTick}
                     style={{ left: `${basePct}%` }}
-                    title={`Base case: ${formatter(baseValueLocal as number)} at ${baseBoundLabel}`}
+                    title={locale === 'id'
+                      ? `Skenario dasar: ${formatter(baseValueLocal as number)} pada ${baseBoundLabel}`
+                      : `Base case: ${formatter(baseValueLocal as number)} at ${baseBoundLabel}`}
                   />
                 )}
               </div>
               <div className={styles.endLabels}>
                 <span className={styles.endLabelLow}>
                   {formatter(lever.lowValueLocal)}
-                  <span className={styles.endLabelBound}> at {lever.lowBoundLabel}</span>
+                  <span className={styles.endLabelBound}> {at} {lever.lowBoundLabel}</span>
                 </span>
                 <span className={styles.endLabelHigh}>
                   {formatter(lever.highValueLocal)}
-                  <span className={styles.endLabelBound}> at {lever.highBoundLabel}</span>
+                  <span className={styles.endLabelBound}> {at} {lever.highBoundLabel}</span>
                 </span>
               </div>
             </div>
@@ -68,10 +73,12 @@ export default function ROISensitivityTornado({
         })}
       </div>
       <p className={styles.disclaimer}>
-        Sensitivity is computed by re-evaluating the same Business Value Created formula at the efficiency
+        {locale === 'id'
+          ? <>Sensitivitas dihitung dengan mengevaluasi ulang rumus Nilai Bisnis yang Dihasilkan yang sama pada batas skenario faktor efisiensi ({sensitivity[0]?.lowBoundLabel}–{sensitivity[0]?.highBoundLabel}); input rumus lainnya (tarif per jam, kesenjangan otomasi) bersifat tetap untuk asesmen ini dan tidak disimulasikan, karena metodologi tidak mendefinisikan batas alternatif untuk keduanya.</>
+          : <>Sensitivity is computed by re-evaluating the same Business Value Created formula at the efficiency
         factor&apos;s scenario bounds ({sensitivity[0]?.lowBoundLabel}–{sensitivity[0]?.highBoundLabel}); other
         formula inputs (hourly rate, automation gap) are fixed for this assessment and not swept, since the
-        methodology does not define alternate bounds for them.
+        methodology does not define alternate bounds for them.</>}
       </p>
     </div>
   )

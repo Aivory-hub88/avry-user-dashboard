@@ -14,6 +14,7 @@ interface RadarChartProps {
    * disclaimer caption (graceful degradation, brief §8 exit gate).
    */
   benchmark?: IndustryBenchmark | null
+  locale?: 'en' | 'id'
 }
 
 const CENTER_X = 150
@@ -52,7 +53,7 @@ function guidePolygon(pct: number): string {
   }).join(' ')
 }
 
-export default function RadarChart({ scores, isPrintMode, benchmark }: RadarChartProps) {
+export default function RadarChart({ scores, isPrintMode, benchmark, locale = 'en' }: RadarChartProps) {
   const dataPoints = RADAR_AXES.map(({ key, angle }) => {
     const score = scores[key] ?? 0
     return vertex(score, angle)
@@ -72,7 +73,7 @@ export default function RadarChart({ scores, isPrintMode, benchmark }: RadarChar
         width="260"
         height="260"
         className={styles.svg}
-        aria-label="Radar chart showing dimension scores"
+        aria-label={locale === 'id' ? 'Diagram radar yang menunjukkan skor per dimensi' : 'Radar chart showing dimension scores'}
         role="img"
       >
         {!isPrintMode && (
@@ -158,7 +159,7 @@ export default function RadarChart({ scores, isPrintMode, benchmark }: RadarChar
               textAnchor={anchor}
               fill={isPrintMode ? '#3d3d3d' : undefined}
             >
-              {humanizeDimensionKey(key)}
+              {humanizeDimensionKey(key, locale)}
             </text>
           )
         })}
@@ -171,10 +172,10 @@ export default function RadarChart({ scores, isPrintMode, benchmark }: RadarChar
       {benchmarkPolygon && !isPrintMode && (
         <div className={styles.benchmarkCaption}>
           <span className={styles.benchmarkLegend}>
-            <span className={styles.benchmarkLegendSwatch} /> Your score
-            <span className={`${styles.benchmarkLegendSwatch} ${styles.benchmarkLegendSwatchDashed}`} /> Industry median
+            <span className={styles.benchmarkLegendSwatch} /> {locale === 'id' ? 'Skor Anda' : 'Your score'}
+            <span className={`${styles.benchmarkLegendSwatch} ${styles.benchmarkLegendSwatchDashed}`} /> {locale === 'id' ? 'Median industri' : 'Industry median'}
           </span>
-          <span className={styles.benchmarkDisclaimer}>{BENCHMARK_DISCLAIMER}</span>
+          <span className={styles.benchmarkDisclaimer}>{BENCHMARK_DISCLAIMER[locale]}</span>
         </div>
       )}
     </div>

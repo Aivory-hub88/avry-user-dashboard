@@ -3,6 +3,7 @@ import styles from './DeltaChip.module.css'
 
 interface DeltaChipProps {
   delta: DiagnosticDelta | null
+  locale?: 'en' | 'id'
 }
 
 /**
@@ -12,7 +13,7 @@ interface DeltaChipProps {
  * hasn't got history yet — same graceful-degradation contract as
  * DimensionBenchmarkBars (E1.1).
  */
-export default function DeltaChip({ delta }: DeltaChipProps) {
+export default function DeltaChip({ delta, locale = 'en' }: DeltaChipProps) {
   if (!delta) return null
 
   const isUp = delta.direction === 'up'
@@ -22,7 +23,7 @@ export default function DeltaChip({ delta }: DeltaChipProps) {
   return (
     <span className={`${styles.chip} ${isUp ? styles.up : styles.down}`}>
       <span className={styles.arrow}>{arrow}</span>
-      {isUp ? '+' : '-'}{magnitude} since {delta.sinceLabel}
+      {isUp ? '+' : '-'}{magnitude} {locale === 'id' ? 'sejak' : 'since'} {delta.sinceLabel}
     </span>
   )
 }

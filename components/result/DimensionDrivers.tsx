@@ -10,6 +10,7 @@ const DIMENSION_ORDER: DimensionKey[] = ['strategy', 'data', 'process', 'people'
 
 interface DimensionDriversProps {
   scoreDrivers: ScoreDrivers | null | undefined
+  locale?: 'en' | 'id'
 }
 
 /**
@@ -22,20 +23,20 @@ interface DimensionDriversProps {
  * before this feature shipped) fall back to exactly the pre-E1.2 layout,
  * no crash (brief §8 exit gate: graceful degradation).
  */
-export default function DimensionDrivers({ scoreDrivers }: DimensionDriversProps) {
+export default function DimensionDrivers({ scoreDrivers, locale = 'en' }: DimensionDriversProps) {
   const [openKey, setOpenKey] = useState<DimensionKey | null>(null)
 
   if (!scoreDrivers) return null
 
   return (
     <div className={styles.container}>
-      <span className={styles.heading}>Score drivers — what moved each dimension</span>
+      <span className={styles.heading}>{locale === 'id' ? 'Faktor skor — apa yang menggerakkan setiap dimensi' : 'Score drivers — what moved each dimension'}</span>
       <div className={styles.rows}>
         {DIMENSION_ORDER.map((key) => {
           const drivers = scoreDrivers[key]
           if (!drivers || drivers.length === 0) return null
           const isOpen = openKey === key
-          const chain = DIM_CONSEQUENCE_CHAINS[key]
+          const chain = DIM_CONSEQUENCE_CHAINS[locale][key]
 
           return (
             <div key={key} className={styles.row}>
@@ -45,7 +46,7 @@ export default function DimensionDrivers({ scoreDrivers }: DimensionDriversProps
                 onClick={() => setOpenKey(isOpen ? null : key)}
                 aria-expanded={isOpen}
               >
-                <span className={styles.rowLabel}>{humanizeDimensionKey(key)}</span>
+                <span className={styles.rowLabel}>{humanizeDimensionKey(key, locale)}</span>
                 <span className={`${styles.chevron} ${isOpen ? styles.chevronOpen : ''}`}>▾</span>
               </button>
 
@@ -65,7 +66,7 @@ export default function DimensionDrivers({ scoreDrivers }: DimensionDriversProps
                   </ul>
                   {chain && (
                     <p className={styles.chainLine}>
-                      <span className={styles.chainLabel}>If unaddressed: </span>
+                      <span className={styles.chainLabel}>{locale === 'id' ? 'Jika tidak ditangani: ' : 'If unaddressed: '}</span>
                       {formatConsequenceChain(chain)}
                     </p>
                   )}

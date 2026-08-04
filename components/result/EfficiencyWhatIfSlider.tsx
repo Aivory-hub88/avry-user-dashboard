@@ -13,6 +13,7 @@ interface EfficiencyWhatIfSliderProps {
   fmtLocal: (v: number | null | undefined) => string
   formatMonths: (v: number | null | undefined) => string
   formatPercent: (v: number | null | undefined) => string
+  locale?: 'en' | 'id'
 }
 
 /**
@@ -38,6 +39,7 @@ export default function EfficiencyWhatIfSlider({
   fmtLocal,
   formatMonths,
   formatPercent,
+  locale = 'en',
 }: EfficiencyWhatIfSliderProps) {
   const assumedEfficiency = calculations.efficiencyFactor ?? 0.75
   const defaultPct = Math.round(assumedEfficiency * 100)
@@ -67,18 +69,22 @@ export default function EfficiencyWhatIfSlider({
   return (
     <div className={styles.container}>
       <div className={styles.headerRow}>
-        <span className={styles.heading}>What-if: efficiency scenario</span>
+        <span className={styles.heading}>{locale === 'id' ? 'Skenario bagaimana-jika: efisiensi' : 'What-if: efficiency scenario'}</span>
         {isSimulating ? (
-          <span className={styles.simulationBadge}>Simulation</span>
+          <span className={styles.simulationBadge}>{locale === 'id' ? 'Simulasi' : 'Simulation'}</span>
         ) : (
-          <span className={styles.realBadge}>Your saved report</span>
+          <span className={styles.realBadge}>{locale === 'id' ? 'Laporan tersimpan Anda' : 'Your saved report'}</span>
         )}
       </div>
 
       <p className={styles.caption}>
-        {isSimulating
-          ? `Simulation — your report assumes ${defaultPct}% efficiency. Adjust to explore scenarios; this does not change your saved report.`
-          : `Your report assumes ${defaultPct}% automation efficiency. Drag the slider to see how the figures below would change — nothing here is saved.`}
+        {locale === 'id'
+          ? (isSimulating
+            ? `Simulasi — laporan Anda mengasumsikan efisiensi ${defaultPct}%. Sesuaikan untuk menjajaki skenario; ini tidak mengubah laporan tersimpan Anda.`
+            : `Laporan Anda mengasumsikan efisiensi otomasi ${defaultPct}%. Geser slider untuk melihat bagaimana angka di bawah akan berubah — tidak ada yang disimpan di sini.`)
+          : (isSimulating
+            ? `Simulation — your report assumes ${defaultPct}% efficiency. Adjust to explore scenarios; this does not change your saved report.`
+            : `Your report assumes ${defaultPct}% automation efficiency. Drag the slider to see how the figures below would change — nothing here is saved.`)}
       </p>
 
       <input
@@ -89,7 +95,7 @@ export default function EfficiencyWhatIfSlider({
         value={sliderPct}
         onChange={(e) => setSliderPct(Number(e.target.value))}
         className={styles.slider}
-        aria-label="Simulated automation efficiency factor"
+        aria-label={locale === 'id' ? 'Simulasi faktor efisiensi otomasi' : 'Simulated automation efficiency factor'}
         aria-valuetext={`${sliderPct}%`}
       />
       <div className={styles.sliderScale}>
@@ -100,21 +106,23 @@ export default function EfficiencyWhatIfSlider({
 
       <div className={styles.tileGrid}>
         <div className={styles.tile}>
-          <span className={styles.tileLabel}>Business Value Created</span>
+          <span className={styles.tileLabel}>{locale === 'id' ? 'Nilai Bisnis yang Dihasilkan' : 'Business Value Created'}</span>
           <span className={styles.tileValue}>{fmtLocal(display.totalAnnualSavingsLocal)}</span>
         </div>
         <div className={styles.tile}>
-          <span className={styles.tileLabel}>Recovered Team Capacity</span>
+          <span className={styles.tileLabel}>{locale === 'id' ? 'Kapasitas Tim yang Dipulihkan' : 'Recovered Team Capacity'}</span>
           <span className={styles.tileValue}>
-            {display.hoursReclaimedPerYear != null ? `${Math.round(display.hoursReclaimedPerYear).toLocaleString('en-US')} hours` : '—'}
+            {display.hoursReclaimedPerYear != null
+              ? (locale === 'id' ? `${Math.round(display.hoursReclaimedPerYear).toLocaleString('id-ID')} jam` : `${Math.round(display.hoursReclaimedPerYear).toLocaleString('en-US')} hours`)
+              : '—'}
           </span>
         </div>
         <div className={styles.tile}>
-          <span className={styles.tileLabel}>Payback Period</span>
+          <span className={styles.tileLabel}>{locale === 'id' ? 'Periode Payback' : 'Payback Period'}</span>
           <span className={styles.tileValue}>{formatMonths(display.paybackMonths)}</span>
         </div>
         <div className={styles.tile}>
-          <span className={styles.tileLabel}>3-Year ROI</span>
+          <span className={styles.tileLabel}>{locale === 'id' ? 'ROI 3 Tahun' : '3-Year ROI'}</span>
           <span className={styles.tileValue}>
             {display.threeYearROIPercent != null
               ? (display.threeYearROIPercent >= 999 ? '>999%' : formatPercent(display.threeYearROIPercent))

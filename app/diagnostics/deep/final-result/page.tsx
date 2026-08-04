@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { DiagnosticContext } from '@/types/diagnostic'
-import { upgradeDiagnosticContext, DeepDiagnosticService, maturityFromScore, getROISensitivity } from '@/services/deepDiagnostic'
+import { upgradeDiagnosticContext, DeepDiagnosticService, maturityFromScore, getROISensitivity, humanizeAnswerId } from '@/services/deepDiagnostic'
 import HeaderBar from '@/components/result/HeaderBar'
 import ScoreRing from '@/components/result/ScoreRing'
 import RadarChart from '@/components/result/RadarChart'
@@ -47,10 +47,14 @@ import {
   buildRoiTilesCaption,
   buildRiskRegisterCaption,
   buildFoldedConstraintNote,
+  buildEvidenceUsed,
+  buildConfidenceReasoning,
+  maturityLevelLabel,
   DIM_CONSEQUENCE_CHAINS,
   DIM_LABELS,
 } from '@/lib/readinessNarrative'
 import { quantifyPainPoints, formatPainPointHours, displayPainPointCost } from '@/lib/bottleneckQuantification'
+import { useLocaleContext } from '@/hooks/useLocale'
 import styles from './final-result.module.css'
 
 // TODO: add schema version field to DiagnosticContext for forward compatibility
@@ -83,6 +87,7 @@ const fmtRoi = (v: number | null | undefined): string =>
 
 export default function FinalResultPage() {
   const router = useRouter()
+  const { locale, setLocale } = useLocaleContext()
   const [state, setState] = useState<PageState>({ status: 'loading' })
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
   const [llmResult, setLlmResult] = useState<Record<string, any> | null>(null)
@@ -144,7 +149,7 @@ export default function FinalResultPage() {
       router.push('/blueprint')
     } catch (err) {
       console.error('Failed to generate blueprint:', err)
-      alert('Failed to generate blueprint. Please try again.')
+      alert(locale === 'id' ? 'Gagal membuat blueprint. Silakan coba lagi.' : 'Failed to generate blueprint. Please try again.')
     } finally {
       setIsGeneratingBlueprint(false)
     }
@@ -213,12 +218,12 @@ export default function FinalResultPage() {
       try {
         parsed = JSON.parse(raw)
       } catch (e) {
-        setState({ status: 'error', message: 'Failed to parse diagnostic data. Please run the diagnostic again.' })
+        setState({ status: 'error', message: locale === 'id' ? 'Gagal membaca data diagnostik. Silakan jalankan diagnostik lagi.' : 'Failed to parse diagnostic data. Please run the diagnostic again.' })
         return
       }
       const context = validateContext(parsed)
       if (!context) {
-        setState({ status: 'error', message: 'Diagnostic data is malformed or incomplete. Please run the diagnostic again.' })
+        setState({ status: 'error', message: locale === 'id' ? 'Data diagnostik rusak atau tidak lengkap. Silakan jalankan diagnostik lagi.' : 'Diagnostic data is malformed or incomplete. Please run the diagnostic again.' })
         return
       }
       setState({ status: 'loaded', context: upgradeDiagnosticContext(context, findIndustryHint()) })
@@ -227,12 +232,20 @@ export default function FinalResultPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  if (state.status === 'loading') return <LoadingState />
-  if (state.status === 'error') return <ErrorCard message={state.message} />
+  if (state.status === 'loading') return <LoadingState locale={locale} />
+  if (state.status === 'error') return <ErrorCard message={state.message} locale={locale} />
 
   const { context } = state
-  const { scores, calculations, opportunities, risks, qualitative } = context
-
+  const { scores, calculations, qualitative } = context
+  // Bahasa Indonesia phase 2 — prefer the Indonesian-composed arrays when the
+  // stored context has them (contexts created after this feature shipped);
+  // fall back to the English fields for older contexts, so the report never
+  // renders broken/blank for legacy data (graceful degradation, matching the
+  // existing `scoreDrivers?` convention in types/diagnostic.ts).
+  const opportunities = (locale === 'id' && context.opportunitiesId) ? context.opportunitiesId : context.opportunities
+  const risks = (locale === 'id' && context.risksId) ? context.risksId : context.risks
+  const roomForImprovement = (locale === 'id' && context.roomForImprovementId) ? context.roomForImprovementId : context.roomForImprovement
+  const scoreDriversLocalized = (locale === 'id' && context.scoreDriversId) ? context.scoreDriversId : context.scoreDrivers
 
   const handleDownloadPdf = async () => {
     setIsExportingPdf(true)
@@ -242,7 +255,7 @@ export default function FinalResultPage() {
       // instead of silently reverting to the raw deterministic score.
       // llmResult must be forwarded too — without it the PDF silently drops
       // the entire Business Operations Analysis section the user sees on this page.
-      await exportReportToPdf('pdf-print-layout', context.company, { ...context, scores: displayScores }, llmResult)
+      await exportReportToPdf('pdf-print-layout', context.company, { ...context, scores: displayScores }, llmResult, locale)
     } catch (error) {
       console.error('Failed to generate PDF', error)
     } finally {
@@ -261,7 +274,11 @@ export default function FinalResultPage() {
   // Phase E1.4 — tornado-chart sensitivity data. Pure, display-only
   // re-evaluation of calculateROI at the efficiency factor's scenario
   // bounds; never touches `context.calculations`.
-  const roiSensitivity = getROISensitivity(context)
+  const roiSensitivity = getROISensitivity(context, locale)
+
+  // Phase 2.3 — Confidence display: inverts calculations.missingInputs (already
+  // computed by calculateROI) into a "known vs not provided" reasoning line.
+  const confidenceReasons = buildConfidenceReasoning(calculations.missingInputs, locale)
 
   // Bug 1 fix: support both new *Local field names and legacy *IDR names from
   // stored DiagnosticContext objects that were saved before this fix was deployed.
@@ -296,10 +313,10 @@ export default function FinalResultPage() {
   // empty (and therefore invisible) for signed-out users, users with fewer
   // than 2 saved assessments, or a flat composite score — see
   // lib/diagnosticHistory.ts for the exact gating.
-  const historyDelta = computeDelta(history)
+  const historyDelta = computeDelta(history, locale)
   const historySeries = compositeSeries(history)
   const compositeVsMedian = industryBenchmark
-    ? formatVsMedian(displayScores.composite, industryBenchmark.composite)
+    ? formatVsMedian(displayScores.composite, industryBenchmark.composite, locale)
     : null
 
   // Executive Operational Diagnosis — identical strings to the PDF (shared builders in
@@ -313,14 +330,14 @@ export default function FinalResultPage() {
     weakestScore: dimScoreOf(scores.weakestDimension),
     strongestKey: scores.strongestDimension,
     strongestScore: dimScoreOf(scores.strongestDimension),
-  })
+  }, locale)
   const firstMoves = buildFirstMoves({
-    firstImprovement: Array.isArray(context.roomForImprovement) && context.roomForImprovement.length > 0
-      ? context.roomForImprovement[0] : null,
+    firstImprovement: Array.isArray(roomForImprovement) && roomForImprovement.length > 0
+      ? roomForImprovement[0] : null,
     topOpportunity: opportunities[0] ?? null,
     hasBudgetInput: (calculations.assumedBudgetMidpointLocal ?? (calculations as any).assumedBudgetMidpointUSD) != null,
-    leadershipClause: buildLeadershipClause(qualitative.leadershipAlignment || ''),
-  })
+    leadershipClause: buildLeadershipClause(qualitative.leadershipAlignment || '', locale),
+  }, locale)
 
   // Executive Summary (section 1) + Executive Insights (per-section closers)
   // + AI Enablement (section 10) — identical builders/strings to the PDF.
@@ -336,43 +353,49 @@ export default function FinalResultPage() {
     strongestScore: dimScoreOf(scores.strongestDimension),
     businessValueLabel,
     topOpportunityTitle,
-  })
-  const weakestConsequenceChain = DIM_CONSEQUENCE_CHAINS[scores.weakestDimension] ?? null
-  const diagnosisInsight = buildExecutiveInsight('diagnosis', { weakestKey: scores.weakestDimension })
+  }, locale)
+  const weakestConsequenceChain = DIM_CONSEQUENCE_CHAINS[locale][scores.weakestDimension] ?? null
+  const diagnosisInsight = buildExecutiveInsight('diagnosis', { weakestKey: scores.weakestDimension }, locale)
   const topOpportunity = opportunities[0] ?? null
   const opportunitiesInsight = buildExecutiveInsight('opportunities', {
     topOpportunityTitle: topOpportunity?.title ?? null,
     topOpportunityTimeToValueWeeks: topOpportunity?.timeToValueWeeks ?? null,
     topOpportunityDataReadiness: topOpportunity?.dataReadiness ?? null,
-  })
+  }, locale)
   const financialInsight = buildExecutiveInsight('financial', {
     hasBudgetInput: (calculations.assumedBudgetMidpointLocal ?? (calculations as any).assumedBudgetMidpointUSD) != null,
     paybackMonths: calculations.paybackMonths,
     threeYearROIPercent: calculations.threeYearROIPercent,
-  })
-  const topImprovement = Array.isArray(context.roomForImprovement) && context.roomForImprovement.length > 0
-    ? context.roomForImprovement[0] : null
+  }, locale)
+  const topImprovement = Array.isArray(roomForImprovement) && roomForImprovement.length > 0
+    ? roomForImprovement[0] : null
   const improvementsInsight = buildExecutiveInsight('improvements', {
     topImprovementTitle: topImprovement?.title ?? null,
     topImprovementAction: topImprovement?.recommendedAction ?? null,
-  })
+  }, locale)
   const aiEnablement = buildAiEnablement({
     topOpportunityTitle,
-    weakestLabel: DIM_LABELS[scores.weakestDimension] ?? scores.weakestDimension,
-  })
+    weakestLabel: DIM_LABELS[locale][scores.weakestDimension] ?? scores.weakestDimension,
+  }, locale)
 
   // Phase E2.6 — section-level "so what" captions. Dimension bars' caption
   // lives inside DimensionBenchmarkBars itself (shared with the PDF via the
   // same builder); these four are page-only or need page-local data.
-  const radarCaption = buildDimensionSpreadCaption(scores as unknown as Record<string, number>)
-  const opportunityMatrixCaption = buildOpportunityMatrixCaption(opportunities)
-  const roiTilesCaption = buildRoiTilesCaption(annualLaborSavingsLocal, annualProcessSavingsLocal)
-  const riskRegisterCaption = buildRiskRegisterCaption(risks)
+  const radarCaption = buildDimensionSpreadCaption(scores as unknown as Record<string, number>, locale)
+  const opportunityMatrixCaption = buildOpportunityMatrixCaption(opportunities, locale)
+  const roiTilesCaption = buildRoiTilesCaption(annualLaborSavingsLocal, annualProcessSavingsLocal, locale)
+  const riskRegisterCaption = buildRiskRegisterCaption(risks, locale)
 
-  const assessmentBullets: { icon: string; color: string; text: string }[] = [
-    { icon: '▲', color: '#afd199', text: `Your company / organisation scores ${displayScores.composite}/100, placing it at ${displayScores.maturityLevel} maturity.${_llmScore != null ? ' (composite blended 70% deterministic + 30% AI assessment)' : ''}` },
-    { icon: '▲', color: '#afd199', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension)}.` },
-    { icon: '▽', color: '#fbbf24', text: `Greatest gap: ${humanizeDimensionKey(scores.weakestDimension)}.` },
+  const assessmentBullets: { icon: string; color: string; text: string }[] = locale === 'id' ? [
+    { icon: '▲', color: '#afd199', text: `Perusahaan/organisasi Anda memperoleh skor ${displayScores.composite}/100, berada pada kematangan ${maturityLevelLabel(displayScores.maturityLevel, locale)}.${_llmScore != null ? ' (komposit gabungan 70% deterministik + 30% asesmen AI)' : ''}` },
+    { icon: '▲', color: '#afd199', text: `Dimensi terkuat: ${humanizeDimensionKey(scores.strongestDimension, locale)}.` },
+    { icon: '▽', color: '#fbbf24', text: `Kesenjangan terbesar: ${humanizeDimensionKey(scores.weakestDimension, locale)}.` },
+    { icon: '▽', color: '#fbbf24', text: `${highRiskCount} risiko tingkat tinggi teridentifikasi.` },
+    { icon: '▶', color: '#afd199', text: `${quickWinCount} peluang quick win tersedia.` },
+  ] : [
+    { icon: '▲', color: '#afd199', text: `Your company / organisation scores ${displayScores.composite}/100, placing it at ${maturityLevelLabel(displayScores.maturityLevel, locale)} maturity.${_llmScore != null ? ' (composite blended 70% deterministic + 30% AI assessment)' : ''}` },
+    { icon: '▲', color: '#afd199', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension, locale)}.` },
+    { icon: '▽', color: '#fbbf24', text: `Greatest gap: ${humanizeDimensionKey(scores.weakestDimension, locale)}.` },
     { icon: '▽', color: '#fbbf24', text: `${highRiskCount} high-severity risk${highRiskCount !== 1 ? 's' : ''} identified.` },
     { icon: '▶', color: '#afd199', text: `${quickWinCount} quick-win opportunit${quickWinCount !== 1 ? 'ies' : 'y'} available.` },
   ]
@@ -388,20 +411,38 @@ export default function FinalResultPage() {
   // render nothing. Keeps a lone risk from reading as an empty, templated
   // section.
   const hasStandaloneConstraints = risks.length >= 2
-  const foldedConstraint = buildFoldedConstraintNote(risks)
+  const foldedConstraint = buildFoldedConstraintNote(risks, locale)
 
-  function qualVal(v: string | string[] | undefined): string {
-    if (!v) return 'Not provided'
-    if (Array.isArray(v)) return v.length > 0 ? v.join(', ') : 'Not provided'
-    return v.trim() || 'Not provided'
+  // `questionId` lets qualVal translate a canonical stored answer (a radio/
+  // multiselect option string from the intake flow) to its Bahasa Indonesia
+  // display label via the same dictionary the intake flow itself uses.
+  // Omit it for free-text answers (primaryObjective, topPainPoints,
+  // kpiBaseline) — there is no canonical value to look up for those.
+  function qualVal(v: string | string[] | undefined, questionId?: string): string {
+    const fallback = locale === 'id' ? 'Belum diberikan' : 'Not provided'
+    const translate = (s: string) => (locale === 'id' && questionId) ? humanizeAnswerId(questionId, s) : s
+    if (!v) return fallback
+    if (Array.isArray(v)) return v.length > 0 ? v.map(translate).join(', ') : fallback
+    return v.trim() ? translate(v.trim()) : fallback
   }
 
   // Phase E2.5 — sticky section nav rail. Mirrors the section order below;
   // the "Improvement Priorities" entry is only included when that card
   // actually renders, so the rail never points at a missing anchor.
   const hasImprovementPriorities =
-    Array.isArray(context.roomForImprovement) && context.roomForImprovement.length > 0
-  const navSections = [
+    Array.isArray(roomForImprovement) && roomForImprovement.length > 0
+  const navSections = locale === 'id' ? [
+    { id: 'section-executive-summary', label: 'Ringkasan Eksekutif' },
+    { id: 'section-operational-health', label: 'Kesehatan Operasional' },
+    { id: 'section-executive-diagnosis', label: 'Diagnosis' },
+    { id: 'section-operations-analysis', label: 'Analisis Operasional' },
+    ...(hasStandaloneConstraints ? [{ id: 'section-operational-constraints', label: 'Kendala' }] : []),
+    { id: 'section-transformation-opportunities', label: 'Peluang' },
+    { id: 'section-financial-case', label: 'Kasus Keuangan' },
+    ...(hasImprovementPriorities ? [{ id: 'section-improvement-priorities', label: 'Prioritas' }] : []),
+    { id: 'section-business-context', label: 'Konteks Bisnis' },
+    { id: 'section-ai-enablement', label: 'Pemanfaatan AI' },
+  ] : [
     { id: 'section-executive-summary', label: 'Executive Summary' },
     { id: 'section-operational-health', label: 'Operational Health' },
     { id: 'section-executive-diagnosis', label: 'Diagnosis' },
@@ -420,40 +461,58 @@ export default function FinalResultPage() {
     <div className={styles.page}>
       <div className={styles.reportRow}>
       <div className={styles.content} id="diagnostic-report">
+        <div className={styles.languageSwitcherRow}>
+          <label htmlFor="result-lang" className={styles.languageSwitcherLabel}>
+            {locale === 'id' ? 'Bahasa' : 'Language'}
+          </label>
+          <select
+            id="result-lang"
+            className={styles.languageSwitcher}
+            value={locale}
+            onChange={(e) => setLocale(e.target.value as 'en' | 'id')}
+          >
+            <option value="en">English</option>
+            <option value="id">Bahasa Indonesia</option>
+          </select>
+        </div>
+
         <HeaderBar
           company={context.company}
           submittedAt={context.submittedAt}
           onDownloadPdf={handleDownloadPdf}
           isExportingPdf={isExportingPdf}
           delta={historyDelta}
+          locale={locale}
         />
 
         {/* ── Executive Summary ── */}
         <div id="section-executive-summary" className={`${styles.card} ${styles.executiveSummaryCard}`}>
-          <h2 className={styles.sectionLabel}>Executive Summary</h2>
+          <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Ringkasan Eksekutif' : 'Executive Summary'}</h2>
           <p className={styles.executiveSummaryText}>{executiveSummary}</p>
         </div>
 
         {/* ── Operational Health ── */}
         <div id="section-operational-health" className={styles.card}>
-          <h2 className={styles.sectionLabel}>Operational Health</h2>
+          <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Kesehatan Operasional' : 'Operational Health'}</h2>
 
           {/* Top row: ScoreRing | RadarChart */}
           <div className={styles.scorecardTopRow}>
             <div className={styles.scorecardRingCol}>
-              <ScoreRing score={displayScores.composite} maturityLevel={displayScores.maturityLevel} />
+              <ScoreRing score={displayScores.composite} maturityLevel={maturityLevelLabel(displayScores.maturityLevel, locale)} locale={locale} />
               {compositeVsMedian && (
                 <p className={styles.compositeBenchmarkCaption}>
                   {compositeVsMedian}
                   <br />
-                  <span className={styles.compositeBenchmarkDisclaimer}>Directional benchmark, not a measured statistic.</span>
+                  <span className={styles.compositeBenchmarkDisclaimer}>
+                    {locale === 'id' ? 'Benchmark yang bersifat arah, bukan statistik terukur.' : 'Directional benchmark, not a measured statistic.'}
+                  </span>
                 </p>
               )}
-              <HistorySparkline series={historySeries} />
+              <HistorySparkline series={historySeries} locale={locale} />
             </div>
             <div className={styles.scorecardChartCol}>
               <div>
-                <RadarChart scores={scores} benchmark={industryBenchmark} />
+                <RadarChart scores={scores} benchmark={industryBenchmark} locale={locale} />
                 <p className={styles.vizCaption}>{radarCaption}</p>
               </div>
             </div>
@@ -464,13 +523,13 @@ export default function FinalResultPage() {
             {/* Left: Strongest + Weakest with colored underline bars */}
             <div className={styles.summaryRow}>
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Strongest</span>
-                <span className={styles.summaryValue}>{humanizeDimensionKey(scores.strongestDimension)}</span>
+                <span className={styles.summaryLabel}>{locale === 'id' ? 'Terkuat' : 'Strongest'}</span>
+                <span className={styles.summaryValue}>{humanizeDimensionKey(scores.strongestDimension, locale)}</span>
                 <span className={styles.summaryBar} style={{ background: '#afd199' }} />
               </div>
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Weakest</span>
-                <span className={styles.summaryValue}>{humanizeDimensionKey(scores.weakestDimension)}</span>
+                <span className={styles.summaryLabel}>{locale === 'id' ? 'Terlemah' : 'Weakest'}</span>
+                <span className={styles.summaryValue}>{humanizeDimensionKey(scores.weakestDimension, locale)}</span>
                 <span className={styles.summaryBar} style={{ background: '#fbbf24' }} />
               </div>
             </div>
@@ -486,13 +545,13 @@ export default function FinalResultPage() {
             </ul>
           </div>
 
-          <DimensionBenchmarkBars scores={scores} benchmark={industryBenchmark} />
-          <DimensionDrivers scoreDrivers={context.scoreDrivers} />
+          <DimensionBenchmarkBars scores={scores} benchmark={industryBenchmark} locale={locale} />
+          <DimensionDrivers scoreDrivers={scoreDriversLocalized} locale={locale} />
         </div>
 
         {/* ── Executive Operational Diagnosis — same narrative the PDF renders ── */}
         <div id="section-executive-diagnosis" className={styles.card}>
-          <h2 className={styles.sectionLabel}>Executive Operational Diagnosis</h2>
+          <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Diagnosis Operasional Eksekutif' : 'Executive Operational Diagnosis'}</h2>
           <p className={styles.verdictNarrative}>{verdictNarrative}</p>
           {weakestConsequenceChain && (
             <div className={styles.consequenceChain}>
@@ -520,14 +579,14 @@ export default function FinalResultPage() {
             <p className={styles.foldedConstraint}>{foldedConstraint}</p>
           )}
           <div className={styles.executiveInsight}>
-            <span className={styles.executiveInsightLabel}>Executive Insight</span>
+            <span className={styles.executiveInsightLabel}>{locale === 'id' ? 'Wawasan Eksekutif' : 'Executive Insight'}</span>
             {diagnosisInsight}
           </div>
         </div>
 
         {/* ── Business Operations Analysis (model-generated; numbers stay deterministic) ── */}
         <div id="section-operations-analysis" className={styles.card}>
-          <h2 className={styles.sectionLabel}>Business Operations Analysis</h2>
+          <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Analisis Operasional Bisnis' : 'Business Operations Analysis'}</h2>
           {llmResult ? (
             <>
               {(llmResult.narrative_summary || llmResult.narrative) && (
@@ -538,7 +597,7 @@ export default function FinalResultPage() {
               <div className={styles.aiGrid}>
                 {Array.isArray(llmResult.strengths) && llmResult.strengths.length > 0 && (
                   <div>
-                    <h3 className={styles.aiColLabel}>Strengths</h3>
+                    <h3 className={styles.aiColLabel}>{locale === 'id' ? 'Kekuatan' : 'Strengths'}</h3>
                     <ul className={styles.aiList}>
                       {llmResult.strengths.slice(0, 5).map((s: string, i: number) => (
                         <li key={i}>{s}</li>
@@ -550,7 +609,7 @@ export default function FinalResultPage() {
                   const constraints = llmResult.primary_constraints ?? llmResult.blockers
                   return Array.isArray(constraints) && constraints.length > 0 ? (
                     <div>
-                      <h3 className={styles.aiColLabel}>Primary constraints</h3>
+                      <h3 className={styles.aiColLabel}>{locale === 'id' ? 'Kendala utama' : 'Primary constraints'}</h3>
                       <ul className={styles.aiList}>
                         {constraints.slice(0, 5).map((s: string, i: number) => (
                           <li key={i}>{s}</li>
@@ -563,7 +622,7 @@ export default function FinalResultPage() {
                   const opps = llmResult.automation_opportunities ?? llmResult.opportunities
                   return Array.isArray(opps) && opps.length > 0 ? (
                     <div>
-                      <h3 className={styles.aiColLabel}>Transformation opportunities</h3>
+                      <h3 className={styles.aiColLabel}>{locale === 'id' ? 'Peluang transformasi' : 'Transformation opportunities'}</h3>
                       <ul className={styles.aiList}>
                         {opps.slice(0, 5).map((s: string, i: number) => (
                           <li key={i}>{s}</li>
@@ -575,14 +634,15 @@ export default function FinalResultPage() {
               </div>
               {llmResult.recommended_next_step && (
                 <p className={styles.aiNextStep}>
-                  <strong>Recommended next step:</strong> {llmResult.recommended_next_step}
+                  <strong>{locale === 'id' ? 'Langkah berikutnya yang disarankan:' : 'Recommended next step:'}</strong> {llmResult.recommended_next_step}
                 </p>
               )}
             </>
           ) : (
             <p className={styles.aiUnavailable}>
-              Business operations analysis was unavailable for this submission. The scores and projections
-              in this report are calculated directly from your answers.
+              {locale === 'id'
+                ? 'Analisis operasional bisnis tidak tersedia untuk pengajuan ini. Skor dan proyeksi dalam laporan ini dihitung langsung dari jawaban Anda.'
+                : 'Business operations analysis was unavailable for this submission. The scores and projections in this report are calculated directly from your answers.'}
             </p>
           )}
         </div>
@@ -592,11 +652,11 @@ export default function FinalResultPage() {
               above, 0 risks render nothing. ── */}
         {hasStandaloneConstraints && (
           <div id="section-operational-constraints" className={styles.card}>
-            <h2 className={styles.sectionLabel}>Operational Constraints</h2>
+            <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Kendala Operasional' : 'Operational Constraints'}</h2>
             {riskRegisterCaption && <p className={styles.vizCaption}>{riskRegisterCaption}</p>}
             <div className={styles.riskList}>
               {sortedRisks.map(risk => (
-                <RiskCard key={risk.id} risk={risk} />
+                <RiskCard key={risk.id} risk={risk} locale={locale} />
               ))}
             </div>
           </div>
@@ -604,9 +664,9 @@ export default function FinalResultPage() {
 
         {/* ── Transformation Opportunities ── */}
         <div id="section-transformation-opportunities" className={styles.card}>
-          <h2 className={styles.sectionLabel}>Transformation Opportunities</h2>
+          <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Peluang Transformasi' : 'Transformation Opportunities'}</h2>
           {opportunities.length === 0 ? (
-            <p className={styles.emptyMessage}>No opportunities identified.</p>
+            <p className={styles.emptyMessage}>{locale === 'id' ? 'Belum ada peluang yang teridentifikasi.' : 'No opportunities identified.'}</p>
           ) : (
             <div className={styles.matrixLayout}>
               <div>
@@ -614,6 +674,7 @@ export default function FinalResultPage() {
                   opportunities={opportunities}
                   highlightedId={highlightedId}
                   onDotClick={(id) => setHighlightedId(prev => prev === id ? null : id)}
+                  locale={locale}
                 />
                 {opportunityMatrixCaption && <p className={styles.vizCaption}>{opportunityMatrixCaption}</p>}
               </div>
@@ -625,88 +686,113 @@ export default function FinalResultPage() {
                     isHighlighted={opp.id === highlightedId}
                     colorIndex={idx}
                     currencyCode={currencyCode}
+                    locale={locale}
                   />
                 ))}
               </div>
             </div>
           )}
           <div className={styles.executiveInsight}>
-            <span className={styles.executiveInsightLabel}>Executive Insight</span>
+            <span className={styles.executiveInsightLabel}>{locale === 'id' ? 'Wawasan Eksekutif' : 'Executive Insight'}</span>
             {opportunitiesInsight}
           </div>
         </div>
 
         {/* ── Financial Case ── */}
         <div id="section-financial-case" className={styles.card}>
-          <h2 className={styles.sectionLabel}>Financial Case</h2>
+          <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Kasus Keuangan' : 'Financial Case'}</h2>
 
           {!calculations.hasEnoughDataForProjection && (
             <div className={styles.confidenceBanner}>
-              <p className={styles.confidenceHeadline}>{calculations.confidenceLevel} confidence projection</p>
+              <p className={styles.confidenceHeadline}>
+                {locale === 'id'
+                  ? `Proyeksi dengan keyakinan ${calculations.confidenceLevel === 'low' ? 'rendah' : calculations.confidenceLevel === 'medium' ? 'sedang' : 'tinggi'}`
+                  : `${calculations.confidenceLevel} confidence projection`}
+              </p>
               <p className={styles.confidenceBody}>
-                These projections are based on limited input data and may not reflect actual outcomes.
+                {locale === 'id'
+                  ? 'Proyeksi ini didasarkan pada data input yang terbatas dan mungkin tidak mencerminkan hasil sebenarnya.'
+                  : 'These projections are based on limited input data and may not reflect actual outcomes.'}
               </p>
               {calculations.missingInputs.length > 0 && (
                 <p className={styles.missingInputs}>
-                  Missing inputs: {calculations.missingInputs.join(', ')}
+                  {locale === 'id' ? 'Input yang belum tersedia: ' : 'Missing inputs: '}{calculations.missingInputs.join(', ')}
+                </p>
+              )}
+              {/* Phase 2.3 — Confidence display: inverts the same missingInputs
+                  list above into a "known vs not provided" reasoning line. */}
+              {confidenceReasons.length > 0 && (
+                <p className={styles.missingInputs}>
+                  {confidenceReasons.join(' · ')}
                 </p>
               )}
             </div>
           )}
 
           <div className={styles.roiGrid}>
-            <ROIMetricTile label="Business Value Created" value={totalAnnualSavingsLocal} formatter={fmtLocal} variant="hero" />
-            <ROIMetricTile label="Recovered Labor Value" value={annualLaborSavingsLocal} formatter={fmtLocal} />
-            <ROIMetricTile label="Process Efficiency Value" value={annualProcessSavingsLocal} formatter={fmtLocal} />
+            <ROIMetricTile label={locale === 'id' ? 'Nilai Bisnis yang Dihasilkan' : 'Business Value Created'} value={totalAnnualSavingsLocal} formatter={fmtLocal} variant="hero" confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Nilai Tenaga Kerja yang Dipulihkan' : 'Recovered Labor Value'} value={annualLaborSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Nilai Efisiensi Proses' : 'Process Efficiency Value'} value={annualProcessSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile
-              label="Recovered Team Capacity"
+              label={locale === 'id' ? 'Kapasitas Tim yang Dipulihkan' : 'Recovered Team Capacity'}
               value={calculations.hoursReclaimedPerYear}
-              formatter={(v) => `${Math.round(v).toLocaleString('en-US')} hours`}
-             
+              formatter={(v) => locale === 'id' ? `${Math.round(v).toLocaleString('id-ID')} jam` : `${Math.round(v).toLocaleString('en-US')} hours`}
+              confidenceLevel={calculations.confidenceLevel}
+              locale={locale}
             />
-            <ROIMetricTile label="Payback Period" value={calculations.paybackMonths} formatter={formatMonths} />
+            <ROIMetricTile label={locale === 'id' ? 'Periode Payback' : 'Payback Period'} value={calculations.paybackMonths} formatter={(v) => formatMonths(v, locale)} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile
-              label="3-Year ROI"
+              label={locale === 'id' ? 'ROI 3 Tahun' : '3-Year ROI'}
               value={calculations.threeYearROIPercent}
-              formatter={(v) => v >= 999 ? '>999%' : formatPercent(v)}
-             
+              formatter={(v) => v >= 999 ? '>999%' : formatPercent(v, locale)}
+              confidenceLevel={calculations.confidenceLevel}
+              locale={locale}
             />
-            <ROIMetricTile label="3-Year NPV" value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle="Net present value @ 10% discount" />
-            <ROIMetricTile label="Annual Ongoing Cost" value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle="Est. licenses, maintenance & support" />
-            <ROIMetricTile label="Net Annual Savings" value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtLocal} subtitle="After ongoing cost" />
-            <ROIMetricTile label="Net Payback Period" value={(calculations as any).netPaybackMonths ?? null} formatter={formatMonths} subtitle="On net savings" />
+            <ROIMetricTile label={locale === 'id' ? 'NPV 3 Tahun' : '3-Year NPV'} value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Nilai kini bersih @ diskonto 10%' : 'Net present value @ 10% discount'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Biaya Berjalan Tahunan' : 'Annual Ongoing Cost'} value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Estimasi lisensi, pemeliharaan & dukungan' : 'Est. licenses, maintenance & support'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Penghematan Bersih Tahunan' : 'Net Annual Savings'} value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Setelah biaya berjalan' : 'After ongoing cost'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Periode Payback Bersih' : 'Net Payback Period'} value={(calculations as any).netPaybackMonths ?? null} formatter={(v) => formatMonths(v, locale)} subtitle={locale === 'id' ? 'Berdasarkan penghematan bersih' : 'On net savings'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile
-              label="Operational Cost of Delay (90 days)"
+              label={locale === 'id' ? 'Biaya Keterlambatan Operasional (90 hari)' : 'Operational Cost of Delay (90 days)'}
               value={costOfInaction90DaysLocal}
               formatter={fmtLocal}
               subtitle={
-                qualitative.annualRevenue?.toLowerCase().includes('pre-revenue')
-                  ? 'Estimated opportunity cost if delayed'
-                  : 'Revenue at risk if delayed'
+                locale === 'id'
+                  ? (qualitative.annualRevenue?.toLowerCase().includes('pre-revenue')
+                    ? 'Estimasi biaya peluang jika ditunda'
+                    : 'Pendapatan yang berisiko jika ditunda')
+                  : (qualitative.annualRevenue?.toLowerCase().includes('pre-revenue')
+                    ? 'Estimated opportunity cost if delayed'
+                    : 'Revenue at risk if delayed')
               }
-             
+              confidenceLevel={calculations.confidenceLevel}
+              locale={locale}
             />
           </div>
           {roiTilesCaption && <p className={styles.vizCaption}>{roiTilesCaption}</p>}
 
           {(calculations as any).scenarioThreeYearROI && (
             <div className={styles.scenarioRow}>
-              <span className={styles.scenarioLabel}>3-Year ROI range</span>
+              <span className={styles.scenarioLabel}>{locale === 'id' ? 'Kisaran ROI 3 Tahun' : '3-Year ROI range'}</span>
               <div className={styles.scenarioGrid}>
                 <div className={`${styles.scenarioCell} ${styles.scenarioCellLow}`}>
-                  <span className={styles.scenarioCellLabel}>Conservative</span>
+                  <span className={styles.scenarioCellLabel}>{locale === 'id' ? 'Konservatif' : 'Conservative'}</span>
                   <span className={styles.scenarioCellValue}>{fmtRoi((calculations as any).scenarioThreeYearROI.low)}</span>
                 </div>
                 <div className={`${styles.scenarioCell} ${styles.scenarioCellBase}`}>
-                  <span className={styles.scenarioCellLabel}>Base</span>
+                  <span className={styles.scenarioCellLabel}>{locale === 'id' ? 'Dasar' : 'Base'}</span>
                   <span className={styles.scenarioCellValue}>{fmtRoi((calculations as any).scenarioThreeYearROI.base)}</span>
                 </div>
                 <div className={`${styles.scenarioCell} ${styles.scenarioCellHigh}`}>
-                  <span className={styles.scenarioCellLabel}>Optimistic</span>
+                  <span className={styles.scenarioCellLabel}>{locale === 'id' ? 'Optimistis' : 'Optimistic'}</span>
                   <span className={styles.scenarioCellValue}>{fmtRoi((calculations as any).scenarioThreeYearROI.high)}</span>
                 </div>
               </div>
-              <span className={styles.scenarioNote}>Range reflects 50%–90% automation efficiency; base case uses {Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%.</span>
+              <span className={styles.scenarioNote}>
+                {locale === 'id'
+                  ? `Kisaran mencerminkan efisiensi otomasi 50%–90%; skenario dasar menggunakan ${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%.`
+                  : `Range reflects 50%–90% automation efficiency; base case uses ${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%.`}
+              </span>
             </div>
           )}
 
@@ -716,6 +802,7 @@ export default function FinalResultPage() {
               baseValueLocal={totalAnnualSavingsLocal}
               baseBoundLabel={`${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%`}
               formatter={fmtLocal}
+              locale={locale}
             />
           )}
 
@@ -724,73 +811,100 @@ export default function FinalResultPage() {
               context={context}
               calculations={calculations}
               fmtLocal={fmtLocal}
-              formatMonths={formatMonths}
-              formatPercent={formatPercent}
+              formatMonths={(v: number | null | undefined) => formatMonths(v, locale)}
+              formatPercent={(v: number | null | undefined) => formatPercent(v, locale)}
+              locale={locale}
             />
           )}
 
           {calculations.hasEnoughDataForProjection && (
             <div className={styles.assumptionsNote}>
-              <p className={styles.assumptionsTitle}>How these figures were calculated</p>
+              <p className={styles.assumptionsTitle}>{locale === 'id' ? 'Bagaimana angka-angka ini dihitung' : 'How these figures were calculated'}</p>
               <ul className={styles.assumptionsList}>
                 <li className={styles.stepRow}>
-                  <span className={styles.stepLabel}>Step 1 — Recovered team capacity/year</span>
+                  <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 1 — Kapasitas tim yang dipulihkan/tahun' : 'Step 1 — Recovered team capacity/year'}</span>
                   <span className={styles.stepValue}>
-                    {calculations.hoursReclaimedPerYear} hrs
-                    {' = '}manual hours/week × 52 weeks × automation gap × {Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}% efficiency factor
+                    {locale === 'id' ? (
+                      <>
+                        {calculations.hoursReclaimedPerYear} jam
+                        {' = '}jam manual/minggu × 52 minggu × kesenjangan otomasi × {Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}% faktor efisiensi
+                      </>
+                    ) : (
+                      <>
+                        {calculations.hoursReclaimedPerYear} hrs
+                        {' = '}manual hours/week × 52 weeks × automation gap × {Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}% efficiency factor
+                      </>
+                    )}
                   </span>
                 </li>
                 <li className={styles.stepRow}>
-                  <span className={styles.stepLabel}>Step 2 — Recovered labor value</span>
+                  <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 2 — Nilai tenaga kerja yang dipulihkan' : 'Step 2 — Recovered labor value'}</span>
                   <span className={styles.stepValue}>
-                    {fmtLocal(calculations.annualLaborSavingsLocal)} = {calculations.hoursReclaimedPerYear} hrs × <strong>{fmtLocal(calculations.assumedHourlyRateLocal)}/hr</strong>
-                    {calculations.smallTeamRateApplied
-                      ? ' (opportunity-cost rate for teams of 1–5 FTEs — 50% of industry blended rate)'
-                      : ' (industry blended rate)'}
+                    {locale === 'id' ? (
+                      <>
+                        {fmtLocal(calculations.annualLaborSavingsLocal)} = {calculations.hoursReclaimedPerYear} jam × <strong>{fmtLocal(calculations.assumedHourlyRateLocal)}/jam</strong>
+                        {calculations.smallTeamRateApplied
+                          ? ' (tarif biaya peluang untuk tim 1–5 FTE — 50% dari tarif gabungan industri)'
+                          : ' (tarif gabungan industri)'}
+                      </>
+                    ) : (
+                      <>
+                        {fmtLocal(calculations.annualLaborSavingsLocal)} = {calculations.hoursReclaimedPerYear} hrs × <strong>{fmtLocal(calculations.assumedHourlyRateLocal)}/hr</strong>
+                        {calculations.smallTeamRateApplied
+                          ? ' (opportunity-cost rate for teams of 1–5 FTEs — 50% of industry blended rate)'
+                          : ' (industry blended rate)'}
+                      </>
+                    )}
                   </span>
                 </li>
                 <li className={styles.stepRow}>
-                  <span className={styles.stepLabel}>Step 3 — Process efficiency value</span>
+                  <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 3 — Nilai efisiensi proses' : 'Step 3 — Process efficiency value'}</span>
                   <span className={styles.stepValue}>
-                    {fmtLocal(calculations.annualProcessSavingsLocal)} = 20% of labor savings (operational overhead reduction — internal benchmark estimate)
+                    {locale === 'id'
+                      ? `${fmtLocal(calculations.annualProcessSavingsLocal)} = 20% dari penghematan tenaga kerja (pengurangan overhead operasional — estimasi benchmark internal)`
+                      : `${fmtLocal(calculations.annualProcessSavingsLocal)} = 20% of labor savings (operational overhead reduction — internal benchmark estimate)`}
                   </span>
                 </li>
                 <li className={styles.stepRow}>
-                  <span className={styles.stepLabel}>Ongoing run cost</span>
+                  <span className={styles.stepLabel}>{locale === 'id' ? 'Biaya operasional berjalan' : 'Ongoing run cost'}</span>
                   <span className={styles.stepValue}>
-                    {fmtLocal((calculations as any).annualOngoingCostLocal)} / year = {Math.round(((calculations as any).ongoingCostRate ?? 0.2) * 100)}% of the initial investment (licenses, maintenance, support). Net figures and payback are computed after this cost.
+                    {locale === 'id'
+                      ? `${fmtLocal((calculations as any).annualOngoingCostLocal)} / tahun = ${Math.round(((calculations as any).ongoingCostRate ?? 0.2) * 100)}% dari investasi awal (lisensi, pemeliharaan, dukungan). Angka bersih dan payback dihitung setelah biaya ini.`
+                      : `${fmtLocal((calculations as any).annualOngoingCostLocal)} / year = ${Math.round(((calculations as any).ongoingCostRate ?? 0.2) * 100)}% of the initial investment (licenses, maintenance, support). Net figures and payback are computed after this cost.`}
                   </span>
                 </li>
                 <li className={styles.stepRow}>
-                  <span className={styles.stepLabel}>Currency &amp; sources</span>
+                  <span className={styles.stepLabel}>{locale === 'id' ? 'Mata uang & sumber' : 'Currency & sources'}</span>
                   <span className={styles.stepValue}>
-                    FX rates as of {(calculations as any).fxAsOf ?? getFxAsOfLabel()} (auto-refreshed every 2 hours from live market data); the 75% efficiency factor and 20% process-overhead figure are internal benchmark estimates, not client-specific guarantees.
+                    {locale === 'id'
+                      ? `Kurs valuta asing per ${(calculations as any).fxAsOf ?? getFxAsOfLabel()} (diperbarui otomatis setiap 2 jam dari data pasar langsung); faktor efisiensi 75% dan angka overhead proses 20% adalah estimasi benchmark internal, bukan jaminan khusus klien.`
+                      : `FX rates as of ${(calculations as any).fxAsOf ?? getFxAsOfLabel()} (auto-refreshed every 2 hours from live market data); the 75% efficiency factor and 20% process-overhead figure are internal benchmark estimates, not client-specific guarantees.`}
                   </span>
                 </li>
                 <li className={styles.stepRow}>
-                  <span className={styles.stepLabel}>Step 4 — Business value created</span>
+                  <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 4 — Nilai bisnis yang dihasilkan' : 'Step 4 — Business value created'}</span>
                   <span className={styles.stepValue}>
-                    <strong>{fmtLocal(calculations.totalAnnualSavingsLocal)}</strong> = labor + process savings
+                    <strong>{fmtLocal(calculations.totalAnnualSavingsLocal)}</strong> {locale === 'id' ? '= tenaga kerja + penghematan proses' : '= labor + process savings'}
                   </span>
                 </li>
                 {calculations.assumedBudgetMidpointLocal != null && (
                   <li className={styles.stepRow}>
-                    <span className={styles.stepLabel}>Step 5 — Payback period</span>
+                    <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 5 — Periode payback' : 'Step 5 — Payback period'}</span>
                     <span className={styles.stepValue}>
-                      {calculations.paybackMonths != null ? `${Math.round(calculations.paybackMonths)} months` : '—'}{' '}
-                      = <strong>{fmtLocal(calculations.assumedBudgetMidpointLocal)}</strong> investment ÷ {fmtLocal(calculations.totalAnnualSavingsLocal)}/yr × 12
-                      {' '}(midpoint of your selected budget range)
+                      {calculations.paybackMonths != null ? (locale === 'id' ? `${Math.round(calculations.paybackMonths)} bulan` : `${Math.round(calculations.paybackMonths)} months`) : '—'}{' '}
+                      = <strong>{fmtLocal(calculations.assumedBudgetMidpointLocal)}</strong> {locale === 'id' ? 'investasi ÷' : 'investment ÷'} {fmtLocal(calculations.totalAnnualSavingsLocal)}/{locale === 'id' ? 'thn' : 'yr'} × 12
+                      {' '}{locale === 'id' ? '(titik tengah kisaran anggaran yang Anda pilih)' : '(midpoint of your selected budget range)'}
                     </span>
                   </li>
                 )}
                 {calculations.assumedBudgetMidpointLocal != null && (
                   <li className={styles.stepRow}>
-                    <span className={styles.stepLabel}>Step 6 — 3-Year ROI</span>
+                    <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 6 — ROI 3 Tahun' : 'Step 6 — 3-Year ROI'}</span>
                     <span className={styles.stepValue}>
                     <strong style={{ color: calculations.threeYearROIPercent != null && calculations.threeYearROIPercent < 0 ? '#f87171' : '#4ade80' }}>
-                      {calculations.threeYearROIPercent != null ? `${calculations.threeYearROIPercent.toFixed(1)}%` : '—'}
+                      {calculations.threeYearROIPercent != null ? `${formatPercent(calculations.threeYearROIPercent, locale)}` : '—'}
                     </strong>
-                    {' = '}({fmtLocal(calculations.totalAnnualSavingsLocal)}/yr × 3 − {fmtLocal(calculations.assumedBudgetMidpointLocal)}) ÷ {fmtLocal(calculations.assumedBudgetMidpointLocal)} × 100
+                    {' = '}({fmtLocal(calculations.totalAnnualSavingsLocal)}/{locale === 'id' ? 'thn' : 'yr'} × 3 − {fmtLocal(calculations.assumedBudgetMidpointLocal)}) ÷ {fmtLocal(calculations.assumedBudgetMidpointLocal)} × 100
                     </span>
 
                     {calculations.threeYearROIPercent != null && calculations.threeYearROIPercent < 0 && calculations.totalAnnualSavingsLocal != null && calculations.assumedBudgetMidpointLocal != null && (() => {
@@ -799,7 +913,27 @@ export default function FinalResultPage() {
                       const shortfall = budget - savings3yr
                       const breakEvenYears = budget / calculations.totalAnnualSavingsLocal!
                       const savingsNeededPerYear = budget / 3
-                      return (
+                      return locale === 'id' ? (
+                        <ul className={styles.roiNegativeList}>
+                          <li className={styles.roiNegativeReason}>
+                            <span className={styles.roiNegativeLabel}>⚠ Mengapa negatif?</span>
+                            Penghematan kumulatif 3 tahun Anda (<strong>{fmtLocal(savings3yr)}</strong>) kurang{' '}
+                            <strong style={{ color: '#f87171' }}>{fmtLocal(shortfall)}</strong>{' '}
+                            dari total investasi ({fmtLocal(budget)}). Titik impas berada pada{' '}
+                            <strong>~{breakEvenYears.toFixed(1).replace('.', ',')} tahun</strong>, bukan 3 tahun.
+                          </li>
+                          <li className={styles.roiFixItem}>
+                            <span className={styles.roiFixLabel}>Solusi A — Kurangi ruang lingkup anggaran awal</span>
+                            Mulai dengan anggaran <strong>{fmtLocal(savings3yr)}</strong> atau lebih kecil.
+                            Jumlah tersebut sepenuhnya kembali pada tahun ke-3 dengan tingkat penghematan Anda saat ini.
+                          </li>
+                          <li className={styles.roiFixItem}>
+                            <span className={styles.roiFixLabel}>Solusi B — Tingkatkan kedalaman otomasi</span>
+                            Otomasikan lebih banyak jam kerja atau tutup kesenjangan otomasi yang lebih besar untuk mendorong penghematan tahunan menjadi setidaknya{' '}
+                            <strong>{fmtLocal(savingsNeededPerYear)}/tahun</strong> (saat ini {fmtLocal(calculations.totalAnnualSavingsLocal)}/tahun).
+                          </li>
+                        </ul>
+                      ) : (
                         <ul className={styles.roiNegativeList}>
                           <li className={styles.roiNegativeReason}>
                             <span className={styles.roiNegativeLabel}>⚠ Why negative?</span>
@@ -823,7 +957,7 @@ export default function FinalResultPage() {
                     })()}
 
                     {calculations.threeYearROIPercent != null && calculations.threeYearROIPercent >= 0 &&
-                      <span style={{ color: '#86efac', gridColumn: '2' }}>✓ Fully recovered within 3 years.</span>
+                      <span style={{ color: '#86efac', gridColumn: '2' }}>{locale === 'id' ? '✓ Sepenuhnya kembali dalam 3 tahun.' : '✓ Fully recovered within 3 years.'}</span>
                     }
                   </li>
                 )}
@@ -831,49 +965,72 @@ export default function FinalResultPage() {
             </div>
           )}
           <div className={styles.executiveInsight}>
-            <span className={styles.executiveInsightLabel}>Executive Insight</span>
+            <span className={styles.executiveInsightLabel}>{locale === 'id' ? 'Wawasan Eksekutif' : 'Executive Insight'}</span>
             {financialInsight}
           </div>
         </div>
 
         {/* ── Operational Improvement Priorities ── */}
-        {Array.isArray(context.roomForImprovement) && context.roomForImprovement.length > 0 && (
+        {Array.isArray(roomForImprovement) && roomForImprovement.length > 0 && (
           <div id="section-improvement-priorities" className={styles.card}>
-            <h2 className={styles.sectionLabel}>Operational Improvement Priorities</h2>
+            <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Prioritas Peningkatan Operasional' : 'Operational Improvement Priorities'}</h2>
             <p className={styles.improvementIntro}>
-              Prioritised areas to strengthen before and during AI adoption. These feed directly
-              into your Transformation Blueprint.
+              {locale === 'id'
+                ? 'Area yang diprioritaskan untuk diperkuat sebelum dan selama adopsi AI. Ini langsung menjadi masukan untuk Transformation Blueprint Anda.'
+                : 'Prioritised areas to strengthen before and during AI adoption. These feed directly into your Transformation Blueprint.'}
             </p>
             <div className={styles.improvementList}>
-              {context.roomForImprovement.map((item) => (
+              {roomForImprovement.map((item) => (
                 <div key={item.id} className={styles.improvementItem}>
                   <div className={styles.improvementHeader}>
                     <span className={styles.improvementTitle}>{item.title}</span>
                     <span className={`${styles.improvementBadge} ${styles[`priority_${item.priority}`]}`}>
-                      {item.priority} priority
+                      {locale === 'id'
+                        ? `Prioritas ${item.priority === 'high' ? 'tinggi' : item.priority === 'medium' ? 'sedang' : 'rendah'}`
+                        : `${item.priority} priority`}
                     </span>
-                    <span className={styles.improvementArea}>{item.area}</span>
+                    <span className={styles.improvementArea}>
+                      {locale === 'id'
+                        ? ({ Process: 'Proses', Data: 'Data', Strategy: 'Strategi', People: 'SDM', Governance: 'Tata Kelola', 'Automation Coverage': 'Cakupan Otomasi' } as Record<string, string>)[item.area] ?? item.area
+                        : item.area}
+                    </span>
                   </div>
                   <div className={styles.improvementBody}>
                     <p className={styles.improvementField}>
-                      <span className={styles.improvementFieldLabel}>What to improve</span>
+                      <span className={styles.improvementFieldLabel}>{locale === 'id' ? 'Kondisi saat ini' : 'Current state'}</span>
+                      {item.currentState}
+                    </p>
+                    <p className={styles.improvementField}>
+                      <span className={styles.improvementFieldLabel}>{locale === 'id' ? 'Yang perlu diperbaiki' : 'What to improve'}</span>
                       {item.recommendedAction}
                     </p>
                     <p className={styles.improvementField}>
-                      <span className={styles.improvementFieldLabel}>Operational impact</span>
+                      <span className={styles.improvementFieldLabel}>{locale === 'id' ? 'Dampak operasional' : 'Operational impact'}</span>
                       {item.operationalImpact}
                     </p>
+                    {(() => {
+                      // Phase 2.2 — "Evidence Used": the answers computeScoreDrivers
+                      // already resolved for this item's dimension (or the raw
+                      // automation/hours answers for the automation-gap item).
+                      const evidence = buildEvidenceUsed(item, scoreDriversLocalized, context.quantitative, locale)
+                      return evidence ? (
+                        <p className={styles.improvementField}>
+                          <span className={styles.improvementFieldLabel}>{locale === 'id' ? 'Bukti yang digunakan' : 'Evidence used'}</span>
+                          {evidence.join(' → ')}
+                        </p>
+                      ) : null
+                    })()}
                   </div>
                   <div className={styles.beforeAfter}>
                     <div className={`${styles.baCell} ${styles.baBefore}`}>
-                      <span className={styles.baLabel}>Before</span>
+                      <span className={styles.baLabel}>{locale === 'id' ? 'Sebelum' : 'Before'}</span>
                       <span className={styles.baText}>{item.before}</span>
                     </div>
                     <div className={styles.baArrow} aria-hidden="true">
                       <ArrowRight size={20} strokeWidth={2} />
                     </div>
                     <div className={`${styles.baCell} ${styles.baAfter}`}>
-                      <span className={styles.baLabel}>After</span>
+                      <span className={styles.baLabel}>{locale === 'id' ? 'Setelah' : 'After'}</span>
                       <span className={styles.baText}>{item.after}</span>
                     </div>
                   </div>
@@ -881,7 +1038,7 @@ export default function FinalResultPage() {
               ))}
             </div>
             <div className={styles.executiveInsight}>
-              <span className={styles.executiveInsightLabel}>Executive Insight</span>
+              <span className={styles.executiveInsightLabel}>{locale === 'id' ? 'Wawasan Eksekutif' : 'Executive Insight'}</span>
               {improvementsInsight}
             </div>
           </div>
@@ -889,63 +1046,63 @@ export default function FinalResultPage() {
 
         {/* ── Business Context — 2-column free-flow ── */}
         <div id="section-business-context" className={styles.card}>
-          <h2 className={styles.sectionLabel}>Business Context</h2>
+          <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Konteks Bisnis' : 'Business Context'}</h2>
           <div className={styles.contextColumns}>
 
             {/* Left column */}
             <div className={styles.contextCol}>
               <div className={styles.contextItem}>
-                <span className={styles.contextLabel}>Primary Objective</span>
+                <span className={styles.contextLabel}>{locale === 'id' ? 'Tujuan Utama' : 'Primary Objective'}</span>
                 <span className={`${styles.contextValue} ${!qualitative.primaryObjective ? styles.notProvided : ''}`}>
                   {qualVal(qualitative.primaryObjective)}
                 </span>
               </div>
               <div className={styles.contextItem}>
-                <span className={styles.contextLabel}>Compliance</span>
+                <span className={styles.contextLabel}>{locale === 'id' ? 'Kepatuhan' : 'Compliance'}</span>
                 {qualitative.compliance && qualitative.compliance.length > 0 ? (
                   <span className={styles.contextValueBullet}>
                     <span className={styles.contextBulletIcon}>▶</span>
-                    <span className={styles.contextValue}>{qualVal(qualitative.compliance)}</span>
+                    <span className={styles.contextValue}>{qualVal(qualitative.compliance, 'compliance_requirements')}</span>
                   </span>
                 ) : (
-                  <span className={`${styles.contextValue} ${styles.notProvided}`}>Not provided</span>
+                  <span className={`${styles.contextValue} ${styles.notProvided}`}>{locale === 'id' ? 'Belum diberikan' : 'Not provided'}</span>
                 )}
               </div>
               <div className={styles.contextItem}>
-                <span className={styles.contextLabel}>AI Capability</span>
+                <span className={styles.contextLabel}>{locale === 'id' ? 'Kapabilitas AI' : 'AI Capability'}</span>
                 <span className={`${styles.contextValue} ${!qualitative.aiCapability ? styles.notProvided : ''}`}>
-                  {qualVal(qualitative.aiCapability)}
+                  {qualVal(qualitative.aiCapability, 'internal_capability')}
                 </span>
               </div>
               <div className={styles.contextItem}>
-                <span className={styles.contextLabel}>Prior AI Attempts</span>
+                <span className={styles.contextLabel}>{locale === 'id' ? 'Percobaan AI Sebelumnya' : 'Prior AI Attempts'}</span>
                 <span className={`${styles.contextValue} ${!qualitative.priorAIAttempts ? styles.notProvided : ''}`}>
-                  {qualVal(qualitative.priorAIAttempts)}
+                  {qualVal(qualitative.priorAIAttempts, 'prior_ai_attempts')}
                 </span>
               </div>
               <div className={styles.contextItem}>
-                <span className={styles.contextLabel}>Delay Consequence</span>
+                <span className={styles.contextLabel}>{locale === 'id' ? 'Konsekuensi Keterlambatan' : 'Delay Consequence'}</span>
                 <span className={`${styles.contextValue} ${!qualitative.delayConsequence ? styles.notProvided : ''}`}>
-                  {qualVal(qualitative.delayConsequence)}
+                  {qualVal(qualitative.delayConsequence, 'delay_consequence')}
                 </span>
               </div>
               <div className={styles.contextItem}>
-                <span className={styles.contextLabel}>Data Residency</span>
+                <span className={styles.contextLabel}>{locale === 'id' ? 'Residensi Data' : 'Data Residency'}</span>
                 <span className={`${styles.contextValue} ${!qualitative.dataResidency ? styles.notProvided : ''}`}>
-                  {qualVal(qualitative.dataResidency)}
+                  {qualVal(qualitative.dataResidency, 'data_residency')}
                 </span>
               </div>
               {/* Slice-2 optional answers — rendered only when provided so
                   contexts predating the questions look unchanged. */}
               {qualitative.processOwnership ? (
                 <div className={styles.contextItem}>
-                  <span className={styles.contextLabel}>Process Ownership</span>
-                  <span className={styles.contextValue}>{qualVal(qualitative.processOwnership)}</span>
+                  <span className={styles.contextLabel}>{locale === 'id' ? 'Kepemilikan Proses' : 'Process Ownership'}</span>
+                  <span className={styles.contextValue}>{qualVal(qualitative.processOwnership, 'process_ownership')}</span>
                 </div>
               ) : null}
               {qualitative.kpiBaseline ? (
                 <div className={styles.contextItem}>
-                  <span className={styles.contextLabel}>Operational KPI Baselines</span>
+                  <span className={styles.contextLabel}>{locale === 'id' ? 'Baseline KPI Operasional' : 'Operational KPI Baselines'}</span>
                   <span className={styles.contextValue}>{qualVal(qualitative.kpiBaseline)}</span>
                 </div>
               ) : null}
@@ -954,7 +1111,7 @@ export default function FinalResultPage() {
             {/* Right column */}
             <div className={styles.contextCol}>
               <div className={styles.contextItem}>
-                <span className={styles.contextLabel}>Top Pain Points</span>
+                <span className={styles.contextLabel}>{locale === 'id' ? 'Kendala Utama' : 'Top Pain Points'}</span>
                 {qualitative.topPainPoints ? (
                   <ul className={styles.contextBulletList}>
                     {quantifyPainPoints({
@@ -963,7 +1120,7 @@ export default function FinalResultPage() {
                       hoursReclaimedPerYear: calculations.hoursReclaimedPerYear,
                       assumedHourlyRateLocal: calculations.assumedHourlyRateLocal,
                     }).map((item, i) => {
-                      const hoursLabel = formatPainPointHours(item)
+                      const hoursLabel = formatPainPointHours(item, locale)
                       const displayCost = displayPainPointCost(item)
                       const costLabel = displayCost != null ? fmtLocal(displayCost) : null
                       return (
@@ -975,7 +1132,7 @@ export default function FinalResultPage() {
                               <>
                                 {' — '}
                                 <span className={styles.contextBulletFigure}>{hoursLabel}</span>
-                                {costLabel ? ` (~${costLabel}/yr)` : ''}
+                                {costLabel ? ` (~${costLabel}/${locale === 'id' ? 'thn' : 'yr'})` : ''}
                               </>
                             ) : null}
                           </span>
@@ -984,31 +1141,31 @@ export default function FinalResultPage() {
                     })}
                   </ul>
                 ) : (
-                  <span className={`${styles.contextValue} ${styles.notProvided}`}>Not provided</span>
+                  <span className={`${styles.contextValue} ${styles.notProvided}`}>{locale === 'id' ? 'Belum diberikan' : 'Not provided'}</span>
                 )}
               </div>
               <div className={styles.contextItem}>
-                <span className={styles.contextLabel}>Implementation Approach</span>
+                <span className={styles.contextLabel}>{locale === 'id' ? 'Pendekatan Implementasi' : 'Implementation Approach'}</span>
                 <span className={`${styles.contextValue} ${!qualitative.implementApproach ? styles.notProvided : ''}`}>
-                  {qualVal(qualitative.implementApproach)}
+                  {qualVal(qualitative.implementApproach, 'preferred_approach')}
                 </span>
               </div>
               <div className={styles.contextItem}>
-                <span className={styles.contextLabel}>Leadership Alignment</span>
+                <span className={styles.contextLabel}>{locale === 'id' ? 'Keselarasan Kepemimpinan' : 'Leadership Alignment'}</span>
                 <span className={`${styles.contextValue} ${!qualitative.leadershipAlignment ? styles.notProvided : ''}`}>
-                  {qualVal(qualitative.leadershipAlignment)}
+                  {qualVal(qualitative.leadershipAlignment, 'leadership_alignment')}
                 </span>
               </div>
               <div className={styles.contextItem}>
-                <span className={styles.contextLabel}>Resistance Sources</span>
+                <span className={styles.contextLabel}>{locale === 'id' ? 'Sumber Resistensi' : 'Resistance Sources'}</span>
                 <span className={`${styles.contextValue} ${!qualitative.resistanceSources || qualitative.resistanceSources.length === 0 ? styles.notProvided : ''}`}>
                   {qualVal(qualitative.resistanceSources)}
                 </span>
               </div>
               <div className={styles.contextItem}>
-                <span className={styles.contextLabel}>Error Tolerance</span>
+                <span className={styles.contextLabel}>{locale === 'id' ? 'Toleransi Risiko' : 'Error Tolerance'}</span>
                 <span className={`${styles.contextValue} ${!qualitative.errorTolerance ? styles.notProvided : ''}`}>
-                  {qualVal(qualitative.errorTolerance)}
+                  {qualVal(qualitative.errorTolerance, 'risk_tolerance')}
                 </span>
               </div>
             </div>
@@ -1018,17 +1175,18 @@ export default function FinalResultPage() {
 
         {/* ── AI Enablement (closing section) ── */}
         <div id="section-ai-enablement" className={styles.card}>
-          <h2 className={styles.sectionLabel}>AI Enablement</h2>
+          <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Pemanfaatan AI' : 'AI Enablement'}</h2>
           <p className={styles.aiEnablementText}>{aiEnablement}</p>
         </div>
 
         {/* ── Generate Blueprint CTA ── */}
         <div className={styles.blueprintCta}>
           <div className={styles.blueprintCtaLeft}>
-            <h2 className={styles.blueprintCtaTitle}>Next steps: Transformation Blueprint</h2>
+            <h2 className={styles.blueprintCtaTitle}>{locale === 'id' ? 'Langkah berikutnya: Transformation Blueprint' : 'Next steps: Transformation Blueprint'}</h2>
             <p className={styles.blueprintCtaText}>
-              With this diagnostic result, your Transformation Blueprint is ready to generate.
-              Purchase the Blueprint + Transformation Roadmap to transform these insights into a deployment-ready architecture and actionable execution plan.
+              {locale === 'id'
+                ? 'Dengan hasil diagnostik ini, Transformation Blueprint Anda siap untuk dibuat. Beli Blueprint + Transformation Roadmap untuk mengubah wawasan ini menjadi arsitektur yang siap diterapkan dan rencana eksekusi yang dapat ditindaklanjuti.'
+                : 'With this diagnostic result, your Transformation Blueprint is ready to generate. Purchase the Blueprint + Transformation Roadmap to transform these insights into a deployment-ready architecture and actionable execution plan.'}
             </p>
           </div>
           <div className={styles.blueprintCtaRight}>
@@ -1037,22 +1195,22 @@ export default function FinalResultPage() {
               onClick={handleGenerateBlueprint}
               disabled={isGeneratingBlueprint}
             >
-              {isGeneratingBlueprint ? 'Generating...' : 'Generate Blueprint'}
+              {isGeneratingBlueprint ? (locale === 'id' ? 'Membuat...' : 'Generating...') : (locale === 'id' ? 'Buat Blueprint' : 'Generate Blueprint')}
             </button>
-            <span className={styles.blueprintPrice}>$85 One time</span>
+            <span className={styles.blueprintPrice}>{locale === 'id' ? '$85 Sekali bayar' : '$85 One time'}</span>
             <button
               type="button"
               className={styles.advisoryLink}
               onClick={() => setIsAdvisoryModalOpen(true)}
             >
-              Prefer a guided walkthrough? Talk to our advisory team →
+              {locale === 'id' ? 'Ingin penjelasan langsung? Bicara dengan tim advisory kami →' : 'Prefer a guided walkthrough? Talk to our advisory team →'}
             </button>
           </div>
         </div>
 
       </div>
 
-      <SectionNavRail sections={navSections} />
+      <SectionNavRail sections={navSections} locale={locale} />
       </div>
 
       {/* Hidden printable layout for PDF generation */}
@@ -1064,6 +1222,7 @@ export default function FinalResultPage() {
         open={isAdvisoryModalOpen}
         onClose={() => setIsAdvisoryModalOpen(false)}
         companyName={context.company}
+        locale={locale}
       />
     </div>
   )

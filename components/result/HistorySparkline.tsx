@@ -3,6 +3,7 @@ import styles from './HistorySparkline.module.css'
 interface HistorySparklineProps {
   /** Chronological (oldest → newest) composite scores, 0–100. */
   series: number[]
+  locale?: 'en' | 'id'
 }
 
 const WIDTH = 160
@@ -18,7 +19,7 @@ const PAD_Y = 4
  * the caller (final-result page) already gates the whole history block on
  * ≥2 rows, but this component stays defensive on its own too.
  */
-export default function HistorySparkline({ series }: HistorySparklineProps) {
+export default function HistorySparkline({ series, locale = 'en' }: HistorySparklineProps) {
   if (!Array.isArray(series) || series.length < 2) return null
 
   const min = Math.min(...series)
@@ -42,14 +43,20 @@ export default function HistorySparkline({ series }: HistorySparklineProps) {
         className={styles.svg}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="img"
-        aria-label={`Composite score trend across last ${series.length} assessments, from ${series[0]} to ${series[series.length - 1]}`}
+        aria-label={locale === 'id'
+          ? `Tren skor komposit selama ${series.length} asesmen terakhir, dari ${series[0]} ke ${series[series.length - 1]}`
+          : `Composite score trend across last ${series.length} assessments, from ${series[0]} to ${series[series.length - 1]}`}
       >
         <path d={path} className={styles.line} fill="none" />
         {points.map((p, i) => (
           <circle key={i} cx={p.x} cy={p.y} r={i === points.length - 1 ? 2.5 : 1.5} className={styles.dot} />
         ))}
       </svg>
-      <span className={styles.caption}>Last {series.length} assessments · latest {last ? Math.round(series[series.length - 1]) : '—'}</span>
+      <span className={styles.caption}>
+        {locale === 'id'
+          ? `${series.length} asesmen terakhir · terbaru ${last ? Math.round(series[series.length - 1]) : '—'}`
+          : `Last ${series.length} assessments · latest ${last ? Math.round(series[series.length - 1]) : '—'}`}
+      </span>
     </div>
   )
 }

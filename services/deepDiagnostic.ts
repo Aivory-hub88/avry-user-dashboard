@@ -14,6 +14,37 @@ import { getUser } from '@/lib/auth'
 import { FX_AS_OF } from '@/lib/currencyConfig'
 import { getRate, getFxAsOfLabel, ensureLiveRates } from '@/lib/liveRates'
 import { asset } from '@/lib/asset'
+import { DEEP_DIAGNOSTIC_PHASES } from '@/constants/deepDiagnosticQuestions'
+import { ID_QUESTION_COPY } from '@/constants/deepDiagnosticQuestionsId'
+
+export type Locale = 'en' | 'id'
+
+const QUESTION_OPTIONS_BY_ID: Record<string, string[]> = (() => {
+  const map: Record<string, string[]> = {}
+  for (const phase of DEEP_DIAGNOSTIC_PHASES) {
+    for (const q of phase.questions) {
+      if (q.options) map[q.id] = q.options
+    }
+  }
+  return map
+})()
+
+/**
+ * Translates a stored canonical (English) answer string back to its Bahasa
+ * Indonesia display label, reusing the exact same dictionary the intake flow
+ * uses (constants/deepDiagnosticQuestionsId.ts) so wording stays consistent
+ * wherever the same answer is quoted — in the intake review page and here,
+ * in the report narrative. Falls back to the raw value when no translation
+ * exists (e.g. the question has no options, or the value is free text).
+ */
+export function humanizeAnswerId(questionId: string, value: string | undefined | null): string {
+  if (!value) return ''
+  const canonicalOptions = QUESTION_OPTIONS_BY_ID[questionId]
+  if (!canonicalOptions) return value
+  const idx = canonicalOptions.indexOf(value)
+  if (idx < 0) return value
+  return ID_QUESTION_COPY[questionId]?.options?.[idx] ?? value
+}
 
 // Re-export so callers (summary/final-result pages) can prefetch live FX
 // before running the deterministic ROI computation.
@@ -733,7 +764,8 @@ export interface ROISensitivityLever {
  * lever here without changing callers.
  */
 export function getROISensitivity(
-  context: Pick<DiagnosticContext, 'quantitative' | 'currency' | 'qualitative'>
+  context: Pick<DiagnosticContext, 'quantitative' | 'currency' | 'qualitative'>,
+  locale: Locale = 'en'
 ): ROISensitivityLever[] {
   // Contexts missing `quantitative` (very old stored reports, or contexts
   // that predate this field) have nothing to sweep — render nothing rather
@@ -753,7 +785,7 @@ export function getROISensitivity(
   return [
     {
       key: 'efficiencyFactor',
-      label: 'Automation efficiency factor',
+      label: locale === 'id' ? 'Faktor efisiensi otomasi' : 'Automation efficiency factor',
       lowValueLocal,
       highValueLocal,
       swingLocal,
@@ -856,8 +888,9 @@ export function maturityFromScore(composite: number): MaturityLevel {
  * differently (the report previously showed 32.5%, 33% and 38% for the same
  * underlying numbers depending on the section).
  */
-export function formatGapPct(value: number): string {
-  return Number.isInteger(value) ? `${value}%` : `${value.toFixed(1)}%`
+export function formatGapPct(value: number, locale: 'en' | 'id' = 'en'): string {
+  if (Number.isInteger(value)) return `${value}%`
+  return locale === 'id' ? `${value.toFixed(1).replace('.', ',')}%` : `${value.toFixed(1)}%`
 }
 
 function calculateDimensionScores(a: DiagnosticAnswers): DimensionScores {
@@ -904,11 +937,11 @@ interface DriverFactor {
   answerKey: string
   maxPoints: number
   /** Returns the points this answer actually earned + a human label, given the raw answer. */
-  evaluate: (a: DiagnosticAnswers) => { points: number; label: string }
+  evaluate: (a: DiagnosticAnswers, locale: Locale) => { points: number; label: string }
 }
 
-function driverItem(f: DriverFactor, a: DiagnosticAnswers): ScoreDriverItem {
-  const { points, label } = f.evaluate(a)
+function driverItem(f: DriverFactor, a: DiagnosticAnswers, locale: Locale): ScoreDriverItem {
+  const { points, label } = f.evaluate(a, locale)
   const direction: ScoreDriverItem['direction'] = points >= f.maxPoints / 2 ? 'raised' : 'lowered'
   return { answerKey: f.answerKey, label, direction, points, maxPoints: f.maxPoints }
 }
@@ -923,96 +956,96 @@ function topDrivers(items: ScoreDriverItem[], n = 3): ScoreDriverItem[] {
 const STRATEGY_FACTORS: DriverFactor[] = [
   {
     answerKey: 'quantified_goal', maxPoints: 20,
-    evaluate: (a) => a.quantified_goal?.includes('specific metrics')
-      ? { points: 20, label: 'Objectives are tied to specific, tracked metrics' }
+    evaluate: (a, locale) => a.quantified_goal?.includes('specific metrics')
+      ? { points: 20, label: locale === 'id' ? 'Tujuan terkait dengan metrik spesifik yang terlacak' : 'Objectives are tied to specific, tracked metrics' }
       : a.quantified_goal?.includes('not quantified')
-        ? { points: 5, label: 'Objectives are set but not quantified' }
-        : { points: 0, label: 'No quantified objective defined yet' },
+        ? { points: 5, label: locale === 'id' ? 'Tujuan telah ditetapkan namun belum terukur' : 'Objectives are set but not quantified' }
+        : { points: 0, label: locale === 'id' ? 'Belum ada tujuan terukur yang ditetapkan' : 'No quantified objective defined yet' },
   },
   {
     answerKey: 'kpi_tracking', maxPoints: 15,
-    evaluate: (a) => a.kpi_tracking === 'Automated dashboards'
-      ? { points: 15, label: 'KPIs are tracked via automated dashboards' }
+    evaluate: (a, locale) => a.kpi_tracking === 'Automated dashboards'
+      ? { points: 15, label: locale === 'id' ? 'KPI dilacak melalui dasbor otomatis' : 'KPIs are tracked via automated dashboards' }
       : a.kpi_tracking === 'Manual reports'
-        ? { points: 5, label: 'KPIs are tracked via manual reports' }
-        : { points: 0, label: 'KPIs are not tracked systematically' },
+        ? { points: 5, label: locale === 'id' ? 'KPI dilacak melalui laporan manual' : 'KPIs are tracked via manual reports' }
+        : { points: 0, label: locale === 'id' ? 'KPI tidak dilacak secara sistematis' : 'KPIs are not tracked systematically' },
   },
   {
     answerKey: 'success_timeline', maxPoints: 10,
-    evaluate: (a) => (a.success_timeline === '1-3 months' || a.success_timeline === '3-6 months')
-      ? { points: 10, label: 'A realistic 1–6 month success timeline is set' }
-      : { points: 0, label: 'Success timeline is long or open-ended' },
+    evaluate: (a, locale) => (a.success_timeline === '1-3 months' || a.success_timeline === '3-6 months')
+      ? { points: 10, label: locale === 'id' ? 'Jangka waktu keberhasilan yang realistis (1–6 bulan) telah ditetapkan' : 'A realistic 1–6 month success timeline is set' }
+      : { points: 0, label: locale === 'id' ? 'Jangka waktu keberhasilan panjang atau tidak ditentukan' : 'Success timeline is long or open-ended' },
   },
 ]
 
 const DATA_FACTORS: DriverFactor[] = [
   {
     answerKey: 'data_centralization', maxPoints: 30,
-    evaluate: (a) => a.data_centralization?.includes('Fully centralized')
-      ? { points: 30, label: 'Data is fully centralised in a warehouse/lake' }
+    evaluate: (a, locale) => a.data_centralization?.includes('Fully centralized')
+      ? { points: 30, label: locale === 'id' ? 'Data sepenuhnya terpusat dalam warehouse/lake' : 'Data is fully centralised in a warehouse/lake' }
       : a.data_centralization?.includes('Partially')
-        ? { points: 15, label: 'Data is only partially centralised' }
-        : { points: 0, label: 'Data is siloed or not centralised' },
+        ? { points: 15, label: locale === 'id' ? 'Data hanya sebagian terpusat' : 'Data is only partially centralised' }
+        : { points: 0, label: locale === 'id' ? 'Data tersebar (silo) atau tidak terpusat' : 'Data is siloed or not centralised' },
   },
   {
     answerKey: 'data_quality', maxPoints: 25,
-    evaluate: (a) => a.data_quality?.includes('High quality')
-      ? { points: 25, label: 'Data quality is high, clean, and consistent' }
+    evaluate: (a, locale) => a.data_quality?.includes('High quality')
+      ? { points: 25, label: locale === 'id' ? 'Kualitas data tinggi, bersih, dan konsisten' : 'Data quality is high, clean, and consistent' }
       : a.data_quality?.includes('Good quality')
-        ? { points: 15, label: 'Data quality is good with minor issues' }
+        ? { points: 15, label: locale === 'id' ? 'Kualitas data baik dengan sedikit masalah' : 'Data quality is good with minor issues' }
         : a.data_quality?.includes('Moderate')
-          ? { points: 5, label: 'Data quality is moderate and needs cleanup' }
-          : { points: 0, label: 'Data quality has significant issues' },
+          ? { points: 5, label: locale === 'id' ? 'Kualitas data sedang dan perlu dibersihkan' : 'Data quality is moderate and needs cleanup' }
+          : { points: 0, label: locale === 'id' ? 'Kualitas data memiliki masalah signifikan' : 'Data quality has significant issues' },
   },
   {
     answerKey: 'system_integration', maxPoints: 15,
-    evaluate: (a) => a.system_integration?.includes('Fully integrated')
-      ? { points: 15, label: 'Systems are fully integrated with APIs and automation' }
+    evaluate: (a, locale) => a.system_integration?.includes('Fully integrated')
+      ? { points: 15, label: locale === 'id' ? 'Sistem terintegrasi penuh dengan API dan otomasi' : 'Systems are fully integrated with APIs and automation' }
       : a.system_integration?.includes('Some integration')
-        ? { points: 7, label: 'Some integration exists between key systems' }
-        : { points: 0, label: 'Systems are disconnected or not integrated' },
+        ? { points: 7, label: locale === 'id' ? 'Ada sebagian integrasi antar sistem utama' : 'Some integration exists between key systems' }
+        : { points: 0, label: locale === 'id' ? 'Sistem terputus atau tidak terintegrasi' : 'Systems are disconnected or not integrated' },
   },
   {
     answerKey: 'data_infrastructure', maxPoints: 15,
-    evaluate: (a) => a.data_infrastructure?.includes('Modern data platform')
-      ? { points: 15, label: 'A modern data platform (streaming, catalog, governance) is in place' }
+    evaluate: (a, locale) => a.data_infrastructure?.includes('Modern data platform')
+      ? { points: 15, label: locale === 'id' ? 'Platform data modern (streaming, katalog, tata kelola) telah tersedia' : 'A modern data platform (streaming, catalog, governance) is in place' }
       : (a.data_infrastructure?.includes('warehouse') || a.data_infrastructure?.includes('lake'))
-        ? { points: 10, label: 'A data warehouse or data lake is in place' }
+        ? { points: 10, label: locale === 'id' ? 'Data warehouse atau data lake telah tersedia' : 'A data warehouse or data lake is in place' }
         : a.data_infrastructure?.includes('Databases')
-          ? { points: 5, label: 'Data lives in databases without a warehouse/lake' }
-          : { points: 0, label: 'Data infrastructure is spreadsheets/manual files' },
+          ? { points: 5, label: locale === 'id' ? 'Data berada dalam basis data tanpa warehouse/lake' : 'Data lives in databases without a warehouse/lake' }
+          : { points: 0, label: locale === 'id' ? 'Infrastruktur data berupa spreadsheet/berkas manual' : 'Data infrastructure is spreadsheets/manual files' },
   },
 ]
 
 const PROCESS_FACTORS: DriverFactor[] = [
   {
     answerKey: 'process_documentation', maxPoints: 25,
-    evaluate: (a) => a.process_documentation === '75-100%'
-      ? { points: 25, label: '75–100% of key processes are documented' }
+    evaluate: (a, locale) => a.process_documentation === '75-100%'
+      ? { points: 25, label: locale === 'id' ? '75–100% proses utama telah terdokumentasi' : '75–100% of key processes are documented' }
       : a.process_documentation === '50-75%'
-        ? { points: 15, label: '50–75% of key processes are documented' }
+        ? { points: 15, label: locale === 'id' ? '50–75% proses utama telah terdokumentasi' : '50–75% of key processes are documented' }
         : a.process_documentation === '25-50%'
-          ? { points: 7, label: '25–50% of key processes are documented' }
-          : { points: 0, label: 'Under 25% of key processes are documented' },
+          ? { points: 7, label: locale === 'id' ? '25–50% proses utama telah terdokumentasi' : '25–50% of key processes are documented' }
+          : { points: 0, label: locale === 'id' ? 'Di bawah 25% proses utama yang terdokumentasi' : 'Under 25% of key processes are documented' },
   },
   {
     answerKey: 'workflow_standardization', maxPoints: 25,
-    evaluate: (a) => a.workflow_standardization?.includes('Fully standardized')
-      ? { points: 25, label: 'Workflows are fully standardised with clear procedures' }
+    evaluate: (a, locale) => a.workflow_standardization?.includes('Fully standardized')
+      ? { points: 25, label: locale === 'id' ? 'Alur kerja sepenuhnya terstandardisasi dengan prosedur yang jelas' : 'Workflows are fully standardised with clear procedures' }
       : a.workflow_standardization?.includes('Mostly standardized')
-        ? { points: 15, label: 'Workflows are mostly standardised with some variation' }
-        : { points: 0, label: 'Workflows are largely ad-hoc' },
+        ? { points: 15, label: locale === 'id' ? 'Alur kerja sebagian besar terstandardisasi dengan sedikit variasi' : 'Workflows are mostly standardised with some variation' }
+        : { points: 0, label: locale === 'id' ? 'Alur kerja sebagian besar bersifat ad-hoc' : 'Workflows are largely ad-hoc' },
   },
   {
     answerKey: 'automation_current', maxPoints: 20,
-    evaluate: (a) => {
+    evaluate: (a, locale) => {
       const pct = parsePct(a.automation_current)
       const points = pct !== null ? Math.round(pct * 0.2) : 0
       return {
         points,
         label: pct !== null
-          ? `Automation currently covers ${formatGapPct(pct)} of processes`
-          : 'Current automation coverage was not reported',
+          ? (locale === 'id' ? `Otomasi saat ini mencakup ${formatGapPct(pct, locale)} dari proses` : `Automation currently covers ${formatGapPct(pct, locale)} of processes`)
+          : (locale === 'id' ? 'Cakupan otomasi saat ini tidak dilaporkan' : 'Current automation coverage was not reported'),
       }
     },
   },
@@ -1021,95 +1054,95 @@ const PROCESS_FACTORS: DriverFactor[] = [
 const PEOPLE_FACTORS: DriverFactor[] = [
   {
     answerKey: 'internal_capability', maxPoints: 35,
-    evaluate: (a) => a.internal_capability?.includes('Strong AI team')
-      ? { points: 35, label: 'A strong, experienced AI team is in place' }
+    evaluate: (a, locale) => a.internal_capability?.includes('Strong AI team')
+      ? { points: 35, label: locale === 'id' ? 'Tim AI yang kuat dan berpengalaman telah tersedia' : 'A strong, experienced AI team is in place' }
       : a.internal_capability?.includes('Some AI knowledge')
-        ? { points: 20, label: 'Some AI knowledge exists but needs guidance' }
+        ? { points: 20, label: locale === 'id' ? 'Ada sedikit pengetahuan AI namun masih perlu bimbingan' : 'Some AI knowledge exists but needs guidance' }
         : a.internal_capability?.includes('Limited')
-          ? { points: 8, label: 'Technical skills for AI are limited' }
-          : { points: 0, label: 'There is no internal technical team' },
+          ? { points: 8, label: locale === 'id' ? 'Kemampuan teknis untuk AI masih terbatas' : 'Technical skills for AI are limited' }
+          : { points: 0, label: locale === 'id' ? 'Tidak ada tim teknis internal' : 'There is no internal technical team' },
   },
   {
     answerKey: 'change_readiness', maxPoints: 20,
-    evaluate: (a) => a.change_readiness?.includes('Embracing')
-      ? { points: 20, label: 'The organisation is actively embracing change' }
+    evaluate: (a, locale) => a.change_readiness?.includes('Embracing')
+      ? { points: 20, label: locale === 'id' ? 'Organisasi secara aktif menyambut perubahan' : 'The organisation is actively embracing change' }
       : a.change_readiness?.includes('Open')
-        ? { points: 12, label: 'The organisation is open to change with proper planning' }
+        ? { points: 12, label: locale === 'id' ? 'Organisasi terbuka terhadap perubahan dengan perencanaan yang tepat' : 'The organisation is open to change with proper planning' }
         : a.change_readiness?.includes('Cautious')
-          ? { points: 5, label: 'The organisation is cautious about change' }
-          : { points: 0, label: 'The organisation is resistant to change' },
+          ? { points: 5, label: locale === 'id' ? 'Organisasi berhati-hati terhadap perubahan' : 'The organisation is cautious about change' }
+          : { points: 0, label: locale === 'id' ? 'Organisasi menolak perubahan' : 'The organisation is resistant to change' },
   },
   {
     answerKey: 'decision_speed', maxPoints: 15,
-    evaluate: (a) => a.decision_speed?.includes('Hours to days')
-      ? { points: 15, label: 'Decisions on new initiatives happen in hours to days' }
+    evaluate: (a, locale) => a.decision_speed?.includes('Hours to days')
+      ? { points: 15, label: locale === 'id' ? 'Keputusan atas inisiatif baru diambil dalam hitungan jam hingga hari' : 'Decisions on new initiatives happen in hours to days' }
       : a.decision_speed?.includes('Days to weeks')
-        ? { points: 8, label: 'Decisions on new initiatives take days to weeks' }
-        : { points: 0, label: 'Decisions on new initiatives take weeks or longer' },
+        ? { points: 8, label: locale === 'id' ? 'Keputusan atas inisiatif baru membutuhkan waktu hari hingga minggu' : 'Decisions on new initiatives take days to weeks' }
+        : { points: 0, label: locale === 'id' ? 'Keputusan atas inisiatif baru membutuhkan waktu minggu atau lebih lama' : 'Decisions on new initiatives take weeks or longer' },
   },
 ]
 
 const GOVERNANCE_FACTORS: DriverFactor[] = [
   {
     answerKey: 'leadership_alignment', maxPoints: 30,
-    evaluate: (a) => a.leadership_alignment?.includes('Fully aligned')
-      ? { points: 30, label: 'Leadership is fully aligned and championing this' }
+    evaluate: (a, locale) => a.leadership_alignment?.includes('Fully aligned')
+      ? { points: 30, label: locale === 'id' ? 'Kepemimpinan sepenuhnya selaras dan menjadi penggerak utama' : 'Leadership is fully aligned and championing this' }
       : a.leadership_alignment?.includes('Supportive')
-        ? { points: 18, label: 'Leadership is supportive but cautious' }
+        ? { points: 18, label: locale === 'id' ? 'Kepemimpinan mendukung namun tetap berhati-hati' : 'Leadership is supportive but cautious' }
         : a.leadership_alignment?.includes('Some interest')
-          ? { points: 8, label: 'Leadership has some interest but needs convincing' }
-          : { points: 0, label: 'Leadership shows no alignment or interest' },
+          ? { points: 8, label: locale === 'id' ? 'Kepemimpinan memiliki sedikit ketertarikan namun masih perlu diyakinkan' : 'Leadership has some interest but needs convincing' }
+          : { points: 0, label: locale === 'id' ? 'Kepemimpinan tidak menunjukkan keselarasan atau ketertarikan' : 'Leadership shows no alignment or interest' },
   },
   {
     answerKey: 'risk_tolerance', maxPoints: 15,
-    evaluate: (a) => a.risk_tolerance?.includes('High')
-      ? { points: 15, label: 'The organisation has high risk tolerance for AI projects' }
+    evaluate: (a, locale) => a.risk_tolerance?.includes('High')
+      ? { points: 15, label: locale === 'id' ? 'Organisasi memiliki toleransi risiko tinggi untuk proyek AI' : 'The organisation has high risk tolerance for AI projects' }
       : a.risk_tolerance?.includes('Moderate')
-        ? { points: 10, label: 'The organisation has a moderate, balanced risk tolerance' }
+        ? { points: 10, label: locale === 'id' ? 'Organisasi memiliki toleransi risiko sedang dan seimbang' : 'The organisation has a moderate, balanced risk tolerance' }
         : a.risk_tolerance?.includes('Low') && !a.risk_tolerance?.includes('Very low')
-          ? { points: 5, label: 'The organisation prefers proven, low-risk solutions' }
-          : { points: 0, label: 'The organisation is extremely risk-averse' },
+          ? { points: 5, label: locale === 'id' ? 'Organisasi lebih memilih solusi berisiko rendah yang telah terbukti' : 'The organisation prefers proven, low-risk solutions' }
+          : { points: 0, label: locale === 'id' ? 'Organisasi sangat menghindari risiko' : 'The organisation is extremely risk-averse' },
   },
   {
     answerKey: 'budget_allocated', maxPoints: 15,
-    evaluate: (a) => a.budget_allocated?.includes('specific allocation')
-      ? { points: 15, label: 'A dedicated budget with specific allocation exists' }
+    evaluate: (a, locale) => a.budget_allocated?.includes('specific allocation')
+      ? { points: 15, label: locale === 'id' ? 'Anggaran khusus dengan alokasi spesifik telah tersedia' : 'A dedicated budget with specific allocation exists' }
       : a.budget_allocated?.includes('flexible')
-        ? { points: 8, label: 'A flexible/exploratory budget exists' }
-        : { points: 0, label: 'No dedicated budget has been allocated' },
+        ? { points: 8, label: locale === 'id' ? 'Anggaran yang fleksibel/eksploratif telah tersedia' : 'A flexible/exploratory budget exists' }
+        : { points: 0, label: locale === 'id' ? 'Belum ada anggaran khusus yang dialokasikan' : 'No dedicated budget has been allocated' },
   },
 ]
 
 const SECURITY_FACTORS: DriverFactor[] = [
   {
     answerKey: 'ai_governance', maxPoints: 22,
-    evaluate: (a) => a.ai_governance?.includes('Formal AI governance')
-      ? { points: 22, label: 'Formal AI governance and oversight is in place' }
+    evaluate: (a, locale) => a.ai_governance?.includes('Formal AI governance')
+      ? { points: 22, label: locale === 'id' ? 'Tata kelola dan pengawasan AI formal telah tersedia' : 'Formal AI governance and oversight is in place' }
       : a.ai_governance?.includes('Informal')
-        ? { points: 11, label: 'AI oversight exists but is informal/ad-hoc' }
-        : { points: 0, label: 'No AI governance process exists' },
+        ? { points: 11, label: locale === 'id' ? 'Pengawasan AI ada namun bersifat informal/ad-hoc' : 'AI oversight exists but is informal/ad-hoc' }
+        : { points: 0, label: locale === 'id' ? 'Belum ada proses tata kelola AI' : 'No AI governance process exists' },
   },
   {
     answerKey: 'ai_data_privacy', maxPoints: 22,
-    evaluate: (a) => a.ai_data_privacy?.includes('Formal privacy')
-      ? { points: 22, label: 'A formal AI data privacy policy with controls is in place' }
+    evaluate: (a, locale) => a.ai_data_privacy?.includes('Formal privacy')
+      ? { points: 22, label: locale === 'id' ? 'Kebijakan privasi data AI formal dengan kontrol telah tersedia' : 'A formal AI data privacy policy with controls is in place' }
       : a.ai_data_privacy?.includes('Basic')
-        ? { points: 11, label: 'A basic AI data privacy policy exists' }
-        : { points: 0, label: 'No formal AI data privacy policy exists' },
+        ? { points: 11, label: locale === 'id' ? 'Kebijakan privasi data AI dasar telah tersedia' : 'A basic AI data privacy policy exists' }
+        : { points: 0, label: locale === 'id' ? 'Belum ada kebijakan privasi data AI formal' : 'No formal AI data privacy policy exists' },
   },
   {
     answerKey: 'compliance_requirements', maxPoints: 10,
-    evaluate: (a) => Array.isArray(a.compliance_requirements) &&
+    evaluate: (a, locale) => Array.isArray(a.compliance_requirements) &&
       a.compliance_requirements.length > 0 &&
       !a.compliance_requirements.includes('None')
-      ? { points: 10, label: `Compliance requirements are tracked (${a.compliance_requirements.join(', ')})` }
-      : { points: 0, label: 'No compliance requirements were captured' },
+      ? { points: 10, label: locale === 'id' ? `Persyaratan kepatuhan dilacak (${a.compliance_requirements.join(', ')})` : `Compliance requirements are tracked (${a.compliance_requirements.join(', ')})` }
+      : { points: 0, label: locale === 'id' ? 'Tidak ada persyaratan kepatuhan yang tercatat' : 'No compliance requirements were captured' },
   },
   {
     answerKey: 'data_residency', maxPoints: 6,
-    evaluate: (a) => a.data_residency && !a.data_residency.includes('Not sure')
-      ? { points: 6, label: 'Data residency requirements are defined' }
-      : { points: 0, label: 'Data residency requirements are undefined' },
+    evaluate: (a, locale) => a.data_residency && !a.data_residency.includes('Not sure')
+      ? { points: 6, label: locale === 'id' ? 'Persyaratan residensi data telah ditentukan' : 'Data residency requirements are defined' }
+      : { points: 0, label: locale === 'id' ? 'Persyaratan residensi data belum ditentukan' : 'Data residency requirements are undefined' },
   },
 ]
 
@@ -1129,10 +1162,10 @@ const DIMENSION_DRIVER_FACTORS: Record<DimensionKey, DriverFactor[]> = {
  * touches `scores`, weights, or thresholds. Safe to call from
  * buildDiagnosticContext as an additive field only (E-invariant 1/4).
  */
-export function computeScoreDrivers(a: DiagnosticAnswers): ScoreDrivers {
+export function computeScoreDrivers(a: DiagnosticAnswers, locale: Locale = 'en'): ScoreDrivers {
   const result = {} as ScoreDrivers
   for (const [dim, factors] of Object.entries(DIMENSION_DRIVER_FACTORS) as [DimensionKey, DriverFactor[]][]) {
-    const items = factors.map((f) => driverItem(f, a))
+    const items = factors.map((f) => driverItem(f, a, locale))
     result[dim] = topDrivers(items, 3)
   }
   return result
@@ -1152,10 +1185,12 @@ function classifyQuadrant(impact: number, effort: number): OpportunityQuadrant {
 interface OppCandidate {
   id: string
   title: string   // FIX #6: was `name` — renamed to match RankedOpportunity.title
+  titleId: string
   impact: number
   effort: number
   timeToValueWeeks: number
   prerequisites: string[]
+  prerequisitesId: string[]
   trigger: (a: DiagnosticAnswers) => boolean
   dataScoreKey: 'data' | 'process'
 }
@@ -1174,8 +1209,10 @@ const OPP_CANDIDATES: OppCandidate[] = [
   {
     id: 'opp-cs-automation',
     title: 'CS Ticket Automation',  // FIX #6
+    titleId: 'Otomasi Tiket Layanan Pelanggan',
     impact: 9, effort: 5, timeToValueWeeks: 8,
     prerequisites: [],
+    prerequisitesId: [],
     dataScoreKey: 'data',
     trigger: (a) =>
       hasPriorityArea(a, 'customer service') ||
@@ -1185,8 +1222,10 @@ const OPP_CANDIDATES: OppCandidate[] = [
   {
     id: 'opp-process-automation',
     title: 'Process Automation',   // FIX #6
+    titleId: 'Otomasi Proses',
     impact: 8, effort: 5, timeToValueWeeks: 8,
     prerequisites: [],
+    prerequisitesId: [],
     dataScoreKey: 'process',
     trigger: (a) =>
       hasPriorityArea(a, 'operations') ||
@@ -1195,8 +1234,10 @@ const OPP_CANDIDATES: OppCandidate[] = [
   {
     id: 'opp-reporting',
     title: 'Automated Reporting',  // FIX #6
+    titleId: 'Pelaporan Otomatis',
     impact: 7, effort: 4, timeToValueWeeks: 5,
     prerequisites: [],
+    prerequisitesId: [],
     dataScoreKey: 'data',
     trigger: (a) =>
       hasPriorityArea(a, 'data analysis') ||
@@ -1206,16 +1247,20 @@ const OPP_CANDIDATES: OppCandidate[] = [
   {
     id: 'opp-sales-intelligence',
     title: 'Sales Intelligence',   // FIX #6
+    titleId: 'Intelijen Penjualan',
     impact: 7, effort: 6, timeToValueWeeks: 10,
     prerequisites: ['CRM integration'],
+    prerequisitesId: ['Integrasi CRM'],
     dataScoreKey: 'data',
     trigger: (a) => hasPriorityArea(a, 'sales'),
   },
   {
     id: 'opp-cross-reporting',
     title: 'Cross-system Reporting',  // FIX #6
+    titleId: 'Pelaporan Lintas Sistem',
     impact: 6, effort: 5, timeToValueWeeks: 5,
     prerequisites: [],
+    prerequisitesId: [],
     dataScoreKey: 'data',
     trigger: () => true,
   },
@@ -1225,7 +1270,8 @@ function rankOpportunities(
   a: DiagnosticAnswers,
   scores: DimensionScores,
   currencyCode: CurrencyCode = 'USD',
-  totalAnnualSavingsUSD: number | null = null
+  totalAnnualSavingsUSD: number | null = null,
+  locale: Locale = 'en',
 ): RankedOpportunity[] {
   const dataReadiness = (score: number): RankedOpportunity['dataReadiness'] =>
     score >= 70 ? 'ready' : score >= 45 ? 'needs_prep' : 'not_ready'
@@ -1252,18 +1298,20 @@ function rankOpportunities(
       const weight = c.impact / totalImpact
       const oppSavingsUSD = totalAnnualSavingsUSD * weight
       estimatedSavingsLocal = oppSavingsUSD * rate
-      projectedROINote = `Est. ${formatCurrency(oppSavingsUSD, currencyCode)}/yr savings at target automation`
+      projectedROINote = locale === 'id'
+        ? `Estimasi penghematan ${formatCurrency(oppSavingsUSD, currencyCode)}/tahun pada target otomasi`
+        : `Est. ${formatCurrency(oppSavingsUSD, currencyCode)}/yr savings at target automation`
     } else if (c.id === 'opp-sales-intelligence') {
-      projectedROINote = 'Est. 15-25% pipeline improvement'
+      projectedROINote = locale === 'id' ? 'Estimasi peningkatan pipeline 15-25%' : 'Est. 15-25% pipeline improvement'
     } else {
-      projectedROINote = 'Savings estimate requires budget & hours data'
+      projectedROINote = locale === 'id' ? 'Estimasi penghematan membutuhkan data anggaran & jam kerja' : 'Savings estimate requires budget & hours data'
     }
 
     const relevantScore = c.dataScoreKey === 'process' ? scores.process : scores.data
 
     return {
       id: c.id,
-      title: c.title,                          // FIX #6: was `name`
+      title: locale === 'id' ? c.titleId : c.title,   // FIX #6: was `name`
       impact: c.impact,                        // FIX #6: was `impactScore`
       effort: c.effort,                        // FIX #6: was `effortScore`
       complexity: complexity(c.effort),        // FIX #6: was `errorComplexity`
@@ -1272,7 +1320,7 @@ function rankOpportunities(
       projectedROINote,
       estimatedSavingsLocal: estimatedSavingsLocal, // currency-neutral savings for OpportunityCard
       estimatedSavingsIDR: estimatedSavingsLocal, // @deprecated backward compat alias
-      prerequisites: c.prerequisites,
+      prerequisites: locale === 'id' ? c.prerequisitesId : c.prerequisites,
       dataReadiness: dataReadiness(relevantScore),
     }
   })
@@ -1285,8 +1333,9 @@ function rankOpportunities(
 
 // ---- Risk classification ----
 
-function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[] {
+function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores, locale: Locale = 'en'): RiskFlag[] {
   const risks: RiskFlag[] = []
+  const id = locale === 'id'
 
   const compliance: string[] = Array.isArray(a.compliance_requirements)
     ? a.compliance_requirements
@@ -1294,7 +1343,7 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
   if (compliance.some(c => c !== 'None')) {
     risks.push({
       id: 'risk-compliance',
-      risk: 'Compliance requirements add implementation overhead',
+      risk: id ? 'Persyaratan kepatuhan menambah beban implementasi' : 'Compliance requirements add implementation overhead',
       severity: 'MEDIUM',
       source: 'compliance_requirements',
       detected: true,
@@ -1304,7 +1353,7 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
   if (scores.data < 50) {
     risks.push({
       id: 'risk-data-quality',
-      risk: 'Data quality issues may delay AI model training and reduce accuracy',
+      risk: id ? 'Masalah kualitas data dapat menunda pelatihan model AI dan menurunkan akurasi' : 'Data quality issues may delay AI model training and reduce accuracy',
       severity: scores.data < 35 ? 'HIGH' : 'MEDIUM',
       source: 'data_quality',
       detected: true,
@@ -1317,7 +1366,7 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
   ) {
     risks.push({
       id: 'risk-leadership',
-      risk: 'Insufficient leadership alignment may stall initiative funding and adoption',
+      risk: id ? 'Keselarasan kepemimpinan yang kurang dapat menghambat pendanaan inisiatif dan adopsi' : 'Insufficient leadership alignment may stall initiative funding and adoption',
       severity: 'HIGH',
       source: 'leadership_alignment',
       detected: true,
@@ -1327,7 +1376,7 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
   if (a.change_readiness?.includes('Resistant')) {
     risks.push({
       id: 'risk-change',
-      risk: 'Organisational resistance to change could undermine adoption',
+      risk: id ? 'Resistensi organisasi terhadap perubahan dapat melemahkan adopsi' : 'Organisational resistance to change could undermine adoption',
       severity: 'HIGH',
       source: 'change_readiness',
       detected: true,
@@ -1337,7 +1386,7 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
   if (a.budget_allocated?.includes('No budget')) {
     risks.push({
       id: 'risk-budget',
-      risk: 'No dedicated budget increases risk of project stalling mid-implementation',
+      risk: id ? 'Tidak adanya anggaran khusus meningkatkan risiko proyek terhenti di tengah implementasi' : 'No dedicated budget increases risk of project stalling mid-implementation',
       severity: 'HIGH',
       source: 'budget_allocated',
       detected: true,
@@ -1347,7 +1396,7 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
   if (scores.process < 45) {
     risks.push({
       id: 'risk-process',
-      risk: 'Undocumented or unstandardized processes make automation fragile',
+      risk: id ? 'Proses yang tidak terdokumentasi atau tidak terstandardisasi membuat otomasi rapuh' : 'Undocumented or unstandardized processes make automation fragile',
       severity: 'MEDIUM',
       source: 'process_documentation',
       detected: false,
@@ -1363,7 +1412,9 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
   if (budgetMid !== null && budgetMid <= 5_000 && targetAuto !== null && targetAuto >= 75) {
     risks.push({
       id: 'risk-budget-ambition',
-      risk: 'Target automation of 75–90% within 12 months is highly ambitious for a sub-$10k budget, significantly increasing timeline slippage risk.',
+      risk: id
+        ? 'Target otomasi 75–90% dalam 12 bulan sangat ambisius untuk anggaran di bawah $10rb, yang secara signifikan meningkatkan risiko keterlambatan jadwal.'
+        : 'Target automation of 75–90% within 12 months is highly ambitious for a sub-$10k budget, significantly increasing timeline slippage risk.',
       severity: 'HIGH',
       source: 'budget_range',
       detected: true,
@@ -1376,7 +1427,9 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
   if ((ftes !== null && ftes <= 1) && (manualHrs !== null && manualHrs >= 10)) {
     risks.push({
       id: 'risk-solo-operator',
-      risk: 'All automation implementation depends on a single person. Illness, scope creep, or context switching can stall the entire program.',
+      risk: id
+        ? 'Seluruh implementasi otomasi bergantung pada satu orang. Sakit, perluasan lingkup kerja yang tidak terkendali, atau pengalihan fokus dapat menghentikan seluruh program.'
+        : 'All automation implementation depends on a single person. Illness, scope creep, or context switching can stall the entire program.',
       severity: 'MEDIUM',
       source: 'fte_count',
       detected: true,
@@ -1390,7 +1443,9 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
   if (isPreRevenue && budgetMid !== null && budgetMid <= 5_000) {
     risks.push({
       id: 'risk-prerevenue-cash',
-      risk: 'Investing in automation tooling before revenue is established creates financial runway risk if automation outcomes take longer than projected.',
+      risk: id
+        ? 'Berinvestasi pada perangkat otomasi sebelum pendapatan stabil menciptakan risiko keuangan (runway) jika hasil otomasi memakan waktu lebih lama dari yang diproyeksikan.'
+        : 'Investing in automation tooling before revenue is established creates financial runway risk if automation outcomes take longer than projected.',
       severity: 'MEDIUM',
       source: 'annual_revenue',
       detected: true,
@@ -1409,7 +1464,9 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores): RiskFlag[
   ) {
     risks.push({
       id: 'risk-automation-gap',
-      risk: `Current automation coverage (~${Math.round(currentAuto)}%) vs target (${Math.round(targetAuto)}%) represents a ${Math.round(targetAuto - currentAuto)}% gap — ambitious for a 12-month timeline and may require phased implementation.`,
+      risk: id
+        ? `Cakupan otomasi saat ini (~${Math.round(currentAuto)}%) dibandingkan dengan target (${Math.round(targetAuto)}%) menunjukkan kesenjangan ${Math.round(targetAuto - currentAuto)}% — ambisius untuk jangka waktu 12 bulan dan mungkin memerlukan implementasi bertahap.`
+        : `Current automation coverage (~${Math.round(currentAuto)}%) vs target (${Math.round(targetAuto)}%) represents a ${Math.round(targetAuto - currentAuto)}% gap — ambitious for a 12-month timeline and may require phased implementation.`,
       severity: 'LOW',
       source: 'automation_current',
       detected: true,
@@ -1433,8 +1490,10 @@ function buildRoomForImprovement(
   scores: DimensionScores,
   q: DiagnosticContext['quantitative'],
   a: DiagnosticAnswers,
+  locale: Locale = 'en',
 ): ImprovementItem[] {
   const items: ImprovementItem[] = []
+  const id = locale === 'id'
 
   const priorityFromScore = (score: number): ImprovementItem['priority'] =>
     score < 45 ? 'high' : score < 70 ? 'medium' : 'low'
@@ -1448,18 +1507,27 @@ function buildRoomForImprovement(
     items.push({
       id: 'rfi-process',
       area: 'Process',
-      title: 'Document & standardise core workflows',
+      title: id ? 'Dokumentasikan & standardisasi alur kerja inti' : 'Document & standardise core workflows',
       priority: priorityFromScore(scores.process),
-      currentState:
-        a.process_documentation
+      currentState: id
+        ? (a.process_documentation
+          ? `Proses ${humanizeAnswerId('process_documentation', a.process_documentation)} terdokumentasi dan ${(a.workflow_standardization ? humanizeAnswerId('workflow_standardization', a.workflow_standardization) : 'sebagian terstandardisasi').toLowerCase()}.`
+          : 'Proses utama hanya sebagian terdokumentasi dan terstandardisasi, sehingga otomasi menjadi rapuh.')
+        : (a.process_documentation
           ? `Processes are ${String(a.process_documentation).toLowerCase()} documented and ${String(a.workflow_standardization || 'partially standardised').toLowerCase()}.`
-          : 'Key processes are only partially documented and standardised, making automation fragile.',
-      recommendedAction:
-        'Map the top 3–5 highest-volume processes end-to-end, capture inputs/outputs and decision rules, and standardise variations into a single canonical flow before automating.',
-      operationalImpact:
-        'Standardised, documented processes reduce automation rework, shorten onboarding, and make AI agents far more reliable because they act on consistent inputs.',
-      before: 'Each team member runs the process slightly differently; tribal knowledge lives in people’s heads.',
-      after: 'One documented, standardised flow per process — ready to hand to an AI agent or new hire without retraining.',
+          : 'Key processes are only partially documented and standardised, making automation fragile.'),
+      recommendedAction: id
+        ? 'Petakan 3–5 proses dengan volume tertinggi secara menyeluruh, catat input/output dan aturan pengambilan keputusan, lalu standardisasi variasinya menjadi satu alur baku sebelum melakukan otomasi.'
+        : 'Map the top 3–5 highest-volume processes end-to-end, capture inputs/outputs and decision rules, and standardise variations into a single canonical flow before automating.',
+      operationalImpact: id
+        ? 'Proses yang terstandardisasi dan terdokumentasi mengurangi pengerjaan ulang saat otomasi, mempersingkat proses onboarding, dan membuat agen AI jauh lebih andal karena bekerja dengan input yang konsisten.'
+        : 'Standardised, documented processes reduce automation rework, shorten onboarding, and make AI agents far more reliable because they act on consistent inputs.',
+      before: id
+        ? 'Setiap anggota tim menjalankan proses dengan cara yang sedikit berbeda; pengetahuan penting hanya ada di kepala masing-masing orang.'
+        : 'Each team member runs the process slightly differently; tribal knowledge lives in people’s heads.',
+      after: id
+        ? 'Satu alur yang terdokumentasi dan terstandardisasi per proses — siap diserahkan ke agen AI atau karyawan baru tanpa perlu pelatihan ulang.'
+        : 'One documented, standardised flow per process — ready to hand to an AI agent or new hire without retraining.',
     })
   }
 
@@ -1468,18 +1536,27 @@ function buildRoomForImprovement(
     items.push({
       id: 'rfi-data',
       area: 'Data',
-      title: 'Centralise & clean operational data',
+      title: id ? 'Pusatkan & bersihkan data operasional' : 'Centralise & clean operational data',
       priority: priorityFromScore(scores.data),
-      currentState:
-        a.data_centralization
+      currentState: id
+        ? (a.data_centralization
+          ? `Data ${humanizeAnswerId('data_centralization', a.data_centralization).toLowerCase()}; ${a.data_quality ? humanizeAnswerId('data_quality', a.data_quality).toLowerCase() : 'kualitasnya bervariasi'}.`
+          : 'Data tersebar di berbagai sistem dengan kualitas yang tidak konsisten, sehingga membatasi akurasi AI.')
+        : (a.data_centralization
           ? `Data is ${String(a.data_centralization).toLowerCase()}; quality is ${String(a.data_quality || 'mixed').toLowerCase()}.`
-          : 'Data is spread across systems with inconsistent quality, limiting AI accuracy.',
-      recommendedAction:
-        'Consolidate the data sources that feed the priority workflows into a single source of truth (or connect them via APIs), then add basic validation to fix quality issues at entry.',
-      operationalImpact:
-        'Clean, centralised data is the single biggest driver of AI output quality — it cuts manual reconciliation and reduces error-handling downstream.',
-      before: 'Staff manually pull and reconcile data from multiple tools before any decision or report.',
-      after: 'A single connected data layer feeds workflows automatically — no manual reconciliation step.',
+          : 'Data is spread across systems with inconsistent quality, limiting AI accuracy.'),
+      recommendedAction: id
+        ? 'Satukan sumber data yang memasok alur kerja prioritas ke dalam satu sumber kebenaran (atau hubungkan melalui API), lalu tambahkan validasi dasar untuk memperbaiki masalah kualitas sejak data dimasukkan.'
+        : 'Consolidate the data sources that feed the priority workflows into a single source of truth (or connect them via APIs), then add basic validation to fix quality issues at entry.',
+      operationalImpact: id
+        ? 'Data yang bersih dan terpusat adalah faktor pendorong terbesar untuk kualitas output AI — ini memangkas rekonsiliasi manual dan mengurangi penanganan kesalahan di tahap selanjutnya.'
+        : 'Clean, centralised data is the single biggest driver of AI output quality — it cuts manual reconciliation and reduces error-handling downstream.',
+      before: id
+        ? 'Staf menarik dan merekonsiliasi data secara manual dari berbagai alat sebelum membuat keputusan atau laporan apa pun.'
+        : 'Staff manually pull and reconcile data from multiple tools before any decision or report.',
+      after: id
+        ? 'Satu lapisan data yang terhubung memasok alur kerja secara otomatis — tanpa langkah rekonsiliasi manual.'
+        : 'A single connected data layer feeds workflows automatically — no manual reconciliation step.',
     })
   }
 
@@ -1488,7 +1565,7 @@ function buildRoomForImprovement(
     // Keep the gap exact (e.g. 32.5%) — rounding here made this card disagree
     // with the Next Steps / Room for Improvement narratives built elsewhere.
     const gap = targetAuto - currentAuto
-    const gapStr = formatGapPct(gap)
+    const gapStr = formatGapPct(gap, locale)
     // Weekly hours actually recoverable by closing the gap — same formula as
     // calculateROI (manual hrs × gap × 75% efficiency), so this narrative can
     // never disagree with the report's "Hours Reclaimed/yr" figure.
@@ -1497,17 +1574,27 @@ function buildRoomForImprovement(
     items.push({
       id: 'rfi-automation-gap',
       area: 'Automation Coverage',
-      title: `Close the Automation Gap (${gapStr})`,
+      title: id ? `Tutup Kesenjangan Otomasi (${gapStr})` : `Close the Automation Gap (${gapStr})`,
       priority: gap >= 40 ? 'high' : 'medium',
-      currentState: `Your team currently automates ${formatGapPct(currentAuto)} of in-scope work against a stated target of ${formatGapPct(targetAuto)}. The ${gapStr} between them is repetitive work still handled manually — your most immediate opportunity for untapped efficiency.`,
-      recommendedAction:
-        'Sequence automation in phases — start with the highest-volume, lowest-complexity tasks (quick wins) to build momentum, then expand to multi-step workflows.',
-      operationalImpact:
-        weeklyReclaimable != null
+      currentState: id
+        ? `Tim Anda saat ini mengotomasi ${formatGapPct(currentAuto, locale)} dari pekerjaan yang menjadi ruang lingkup, sementara target yang ditetapkan adalah ${formatGapPct(targetAuto, locale)}. Selisih ${gapStr} di antaranya adalah pekerjaan berulang yang masih dikerjakan secara manual — peluang paling langsung untuk efisiensi yang belum tergarap.`
+        : `Your team currently automates ${formatGapPct(currentAuto, locale)} of in-scope work against a stated target of ${formatGapPct(targetAuto, locale)}. The ${gapStr} between them is repetitive work still handled manually — your most immediate opportunity for untapped efficiency.`,
+      recommendedAction: id
+        ? 'Urutkan otomasi secara bertahap — mulai dari tugas dengan volume tertinggi dan kompleksitas terendah (quick win) untuk membangun momentum, lalu perluas ke alur kerja multi-langkah.'
+        : 'Sequence automation in phases — start with the highest-volume, lowest-complexity tasks (quick wins) to build momentum, then expand to multi-step workflows.',
+      operationalImpact: id
+        ? (weeklyReclaimable != null
+          ? `Menutup kesenjangan ini akan mengubah sekitar ${weeklyReclaimable} dari ~${manualHrs} jam kerja manual/minggu menjadi kapasitas terotomasi (setelah faktor efisiensi 75%), sehingga membebaskan tim untuk tugas yang lebih bernilai.`
+          : 'Menutup kesenjangan ini mengalihkan usaha manual yang berulang ke pekerjaan yang lebih bernilai.')
+        : (weeklyReclaimable != null
           ? `Closing this gap converts roughly ${weeklyReclaimable} of the ~${manualHrs} manual hours/week into automated capacity (after a 75% efficiency factor), freeing the team for higher-value tasks.`
-          : 'Closing this gap redirects repetitive manual effort toward higher-value work.',
-      before: `Roughly ${formatGapPct(100 - currentAuto)} of in-scope work is still manual and repetitive.`,
-      after: `Up to ${formatGapPct(targetAuto)} of in-scope work runs automatically with human oversight only on exceptions.`,
+          : 'Closing this gap redirects repetitive manual effort toward higher-value work.'),
+      before: id
+        ? `Sekitar ${formatGapPct(100 - currentAuto, locale)} dari pekerjaan dalam ruang lingkup masih dikerjakan secara manual dan berulang.`
+        : `Roughly ${formatGapPct(100 - currentAuto, locale)} of in-scope work is still manual and repetitive.`,
+      after: id
+        ? `Hingga ${formatGapPct(targetAuto, locale)} dari pekerjaan dalam ruang lingkup berjalan otomatis, dengan pengawasan manusia hanya pada pengecualian.`
+        : `Up to ${formatGapPct(targetAuto, locale)} of in-scope work runs automatically with human oversight only on exceptions.`,
     })
   }
 
@@ -1516,18 +1603,23 @@ function buildRoomForImprovement(
     items.push({
       id: 'rfi-strategy',
       area: 'Strategy',
-      title: 'Tie automation to measurable KPIs',
+      title: id ? 'Kaitkan otomasi dengan KPI yang terukur' : 'Tie automation to measurable KPIs',
       priority: priorityFromScore(scores.strategy),
-      currentState:
-        a.kpi_tracking
+      currentState: id
+        ? (a.kpi_tracking
+          ? `Keberhasilan dilacak melalui ${humanizeAnswerId('kpi_tracking', a.kpi_tracking).toLowerCase()}; tujuan belum sepenuhnya terukur.`
+          : 'Tujuan belum dikaitkan dengan metrik spesifik yang terlacak.')
+        : (a.kpi_tracking
           ? `Success is tracked via ${String(a.kpi_tracking).toLowerCase()}; objectives are not yet fully quantified.`
-          : 'Goals are not yet tied to specific, tracked metrics.',
-      recommendedAction:
-        'Define 2–3 quantified KPIs per automation (e.g. hours saved/week, cycle time, error rate) and wire them into an automated dashboard from day one.',
-      operationalImpact:
-        'Measurable KPIs let you prove ROI early, prioritise the next automation, and catch regressions before they compound.',
-      before: 'Impact of automation is felt anecdotally but not measured.',
-      after: 'Every automation reports live metrics, making ROI and next priorities obvious.',
+          : 'Goals are not yet tied to specific, tracked metrics.'),
+      recommendedAction: id
+        ? 'Tetapkan 2–3 KPI terukur per otomasi (misalnya jam yang dihemat/minggu, waktu siklus, tingkat kesalahan) dan hubungkan ke dasbor otomatis sejak hari pertama.'
+        : 'Define 2–3 quantified KPIs per automation (e.g. hours saved/week, cycle time, error rate) and wire them into an automated dashboard from day one.',
+      operationalImpact: id
+        ? 'KPI yang terukur memungkinkan Anda membuktikan ROI lebih awal, memprioritaskan otomasi berikutnya, dan menangkap kemunduran sebelum membesar.'
+        : 'Measurable KPIs let you prove ROI early, prioritise the next automation, and catch regressions before they compound.',
+      before: id ? 'Dampak otomasi dirasakan secara anekdotal namun tidak terukur.' : 'Impact of automation is felt anecdotally but not measured.',
+      after: id ? 'Setiap otomasi melaporkan metrik secara langsung, sehingga ROI dan prioritas berikutnya menjadi jelas.' : 'Every automation reports live metrics, making ROI and next priorities obvious.',
     })
   }
 
@@ -1536,18 +1628,23 @@ function buildRoomForImprovement(
     items.push({
       id: 'rfi-people',
       area: 'People',
-      title: 'Build internal AI ownership',
+      title: id ? 'Bangun kepemilikan AI internal' : 'Build internal AI ownership',
       priority: priorityFromScore(scores.people),
-      currentState:
-        a.internal_capability
+      currentState: id
+        ? (a.internal_capability
+          ? `Kapabilitas internal: ${humanizeAnswerId('internal_capability', a.internal_capability).toLowerCase()}.`
+          : 'Kapabilitas internal terbatas untuk memiliki dan mengembangkan otomasi.')
+        : (a.internal_capability
           ? `Internal capability: ${String(a.internal_capability).toLowerCase()}.`
-          : 'Limited internal capability to own and extend automations.',
-      recommendedAction:
-        'Designate an internal "automation champion", pair them with the implementation, and document runbooks so the team can maintain workflows without external help.',
-      operationalImpact:
-        'Internal ownership prevents automations from going stale and reduces dependence on outside vendors for every change.',
-      before: 'Every workflow change requires external help or stalls.',
-      after: 'An internal owner maintains and extends automations independently.',
+          : 'Limited internal capability to own and extend automations.'),
+      recommendedAction: id
+        ? 'Tetapkan seorang "juru bicara otomasi" internal, libatkan mereka dalam implementasi, dan dokumentasikan runbook agar tim dapat memelihara alur kerja tanpa bantuan eksternal.'
+        : 'Designate an internal "automation champion", pair them with the implementation, and document runbooks so the team can maintain workflows without external help.',
+      operationalImpact: id
+        ? 'Kepemilikan internal mencegah otomasi menjadi usang dan mengurangi ketergantungan pada vendor eksternal untuk setiap perubahan.'
+        : 'Internal ownership prevents automations from going stale and reduces dependence on outside vendors for every change.',
+      before: id ? 'Setiap perubahan alur kerja membutuhkan bantuan eksternal atau justru terhambat.' : 'Every workflow change requires external help or stalls.',
+      after: id ? 'Seorang pemilik internal memelihara dan mengembangkan otomasi secara mandiri.' : 'An internal owner maintains and extends automations independently.',
     })
   }
 
@@ -1556,18 +1653,23 @@ function buildRoomForImprovement(
     items.push({
       id: 'rfi-governance',
       area: 'Governance',
-      title: 'Establish budget & oversight guardrails',
+      title: id ? 'Bangun pagar pembatas anggaran & pengawasan' : 'Establish budget & oversight guardrails',
       priority: priorityFromScore(scores.governance),
-      currentState:
-        a.budget_allocated
+      currentState: id
+        ? (a.budget_allocated
+          ? `Posisi anggaran: ${humanizeAnswerId('budget_allocated', a.budget_allocated).toLowerCase()}; keselarasan kepemimpinan: ${(a.leadership_alignment ? humanizeAnswerId('leadership_alignment', a.leadership_alignment) : 'belum jelas').toLowerCase()}.`
+          : 'Kepemilikan anggaran dan pengawasan untuk otomasi belum terformalisasi.')
+        : (a.budget_allocated
           ? `Budget posture: ${String(a.budget_allocated).toLowerCase()}; leadership alignment: ${String(a.leadership_alignment || 'unclear').toLowerCase()}.`
-          : 'Budget ownership and oversight for automation are not yet formalized.',
-      recommendedAction:
-        'Secure a ring-fenced budget line for automation, define a simple approval and review cadence, and assign clear accountability for outcomes.',
-      operationalImpact:
-        'Clear guardrails prevent mid-project stalls and ensure automations stay funded, reviewed, and aligned with priorities.',
-      before: 'Automation work competes ad-hoc for funding and attention.',
-      after: 'A dedicated budget and review cadence keep the program on track.',
+          : 'Budget ownership and oversight for automation are not yet formalized.'),
+      recommendedAction: id
+        ? 'Amankan alokasi anggaran khusus untuk otomasi, tetapkan alur persetujuan dan tinjauan yang sederhana, serta tetapkan akuntabilitas yang jelas atas hasilnya.'
+        : 'Secure a ring-fenced budget line for automation, define a simple approval and review cadence, and assign clear accountability for outcomes.',
+      operationalImpact: id
+        ? 'Pagar pembatas yang jelas mencegah proyek terhenti di tengah jalan dan memastikan otomasi tetap terdanai, ditinjau, dan sejalan dengan prioritas.'
+        : 'Clear guardrails prevent mid-project stalls and ensure automations stay funded, reviewed, and aligned with priorities.',
+      before: id ? 'Pekerjaan otomasi bersaing secara ad-hoc untuk mendapatkan pendanaan dan perhatian.' : 'Automation work competes ad-hoc for funding and attention.',
+      after: id ? 'Anggaran khusus dan alur tinjauan rutin menjaga program tetap pada jalurnya.' : 'A dedicated budget and review cadence keep the program on track.',
     })
   }
 
@@ -1619,12 +1721,19 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
 
   const { totalAnnualSavingsUSD } = calculations
 
-  const opportunities = rankOpportunities(answers, scores, currencyCode, totalAnnualSavingsUSD)
-  const risks = classifyRisks(answers, scores)
-  const roomForImprovement = buildRoomForImprovement(scores, quantitative, answers)
+  const opportunities = rankOpportunities(answers, scores, currencyCode, totalAnnualSavingsUSD, 'en')
+  // Bahasa Indonesia phase 2 — computed once, alongside the English version,
+  // and stored on the context (never recomputed on a locale toggle). Same
+  // numeric/decision fields as `opportunities`, only the prose differs.
+  const opportunitiesId = rankOpportunities(answers, scores, currencyCode, totalAnnualSavingsUSD, 'id')
+  const risks = classifyRisks(answers, scores, 'en')
+  const risksId = classifyRisks(answers, scores, 'id')
+  const roomForImprovement = buildRoomForImprovement(scores, quantitative, answers, 'en')
+  const roomForImprovementId = buildRoomForImprovement(scores, quantitative, answers, 'id')
   // Phase E1.2 — pure read-only derived pass over the same raw answers;
   // never touches scores/calculations. See computeScoreDrivers above.
-  const scoreDrivers = computeScoreDrivers(answers)
+  const scoreDrivers = computeScoreDrivers(answers, 'en')
+  const scoreDriversId = computeScoreDrivers(answers, 'id')
 
   const compliance: string[] = Array.isArray(answers.compliance_requirements)
     ? answers.compliance_requirements.filter((c: string) => c !== 'None')
@@ -1662,9 +1771,13 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     calculations,
     scores,
     opportunities,
+    opportunitiesId,
     risks,
+    risksId,
     roomForImprovement,
+    roomForImprovementId,
     scoreDrivers,
+    scoreDriversId,
     qualitative,
   }
 

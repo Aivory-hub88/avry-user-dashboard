@@ -8,6 +8,7 @@ export interface AdvisoryContactModalProps {
   onClose: () => void
   /** Pre-fills the Company field with the report's company name, if known. */
   companyName?: string
+  locale?: 'en' | 'id'
 }
 
 /**
@@ -29,7 +30,7 @@ const FORMSUBMIT_ENDPOINT = 'https://formsubmit.co/ajax/advisory@aivory.uk'
 
 type SubmitState = 'idle' | 'submitting' | 'sent' | 'error'
 
-export default function AdvisoryContactModal({ open, onClose, companyName }: AdvisoryContactModalProps) {
+export default function AdvisoryContactModal({ open, onClose, companyName, locale = 'en' }: AdvisoryContactModalProps) {
   const [name, setName] = useState('')
   const [company, setCompany] = useState('')
   const [email, setEmail] = useState('')
@@ -49,13 +50,17 @@ export default function AdvisoryContactModal({ open, onClose, companyName }: Adv
 
   const canSubmit = name.trim().length > 0 && email.trim().length > 0 && state !== 'submitting'
 
+  const defaultMessage = locale === 'id'
+    ? 'Saya ingin menjadwalkan sesi untuk membahas Business Operations Assessment saya.'
+    : 'I would like to schedule a session to walk through my Business Operations Assessment.'
+
   const mailtoFallback = () => {
     const subject = `Advisory session request — ${company.trim() || name.trim()}`
     const body =
       `Name: ${name.trim()}\n` +
       `Company: ${company.trim()}\n` +
       `Email: ${email.trim()}\n\n` +
-      `${message.trim() || 'I would like to schedule a session to walk through my Business Operations Assessment.'}`
+      `${message.trim() || defaultMessage}`
     window.location.href = `mailto:advisory@aivory.uk?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
   }
 
@@ -73,7 +78,7 @@ export default function AdvisoryContactModal({ open, onClose, companyName }: Adv
           name: name.trim(),
           company: company.trim(),
           email: email.trim(),
-          message: message.trim() || 'I would like to schedule a session to walk through my Business Operations Assessment.',
+          message: message.trim() || defaultMessage,
           _subject: `Advisory session request — ${company.trim() || name.trim()}`,
           _captcha: 'false',
           _template: 'table',
@@ -94,14 +99,19 @@ export default function AdvisoryContactModal({ open, onClose, companyName }: Adv
         <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
           <div className={styles.form}>
             <div className={styles.header}>
-              <h2 className={styles.title}>Request sent</h2>
-              <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
+              <h2 className={styles.title}>{locale === 'id' ? 'Permintaan terkirim' : 'Request sent'}</h2>
+              <button type="button" className={styles.closeBtn} onClick={onClose} aria-label={locale === 'id' ? 'Tutup' : 'Close'}>
                 ✕
               </button>
             </div>
             <p className={styles.intro}>
-              Thanks, {name.trim().split(' ')[0]} — we&apos;ve received your request and will follow up at{' '}
-              {email.trim()} to schedule your session.
+              {locale === 'id' ? (
+                <>Terima kasih, {name.trim().split(' ')[0]} — kami telah menerima permintaan Anda dan akan menghubungi Anda di{' '}
+                {email.trim()} untuk menjadwalkan sesi.</>
+              ) : (
+                <>Thanks, {name.trim().split(' ')[0]} — we&apos;ve received your request and will follow up at{' '}
+                {email.trim()} to schedule your session.</>
+              )}
             </p>
           </div>
         </div>
@@ -114,14 +124,15 @@ export default function AdvisoryContactModal({ open, onClose, companyName }: Adv
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <form className={styles.form} onSubmit={handleSubmit}>
           <div className={styles.header}>
-            <h2 className={styles.title}>Talk to our advisory team</h2>
-            <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
+            <h2 className={styles.title}>{locale === 'id' ? 'Bicara dengan tim advisory kami' : 'Talk to our advisory team'}</h2>
+            <button type="button" className={styles.closeBtn} onClick={onClose} aria-label={locale === 'id' ? 'Tutup' : 'Close'}>
               ✕
             </button>
           </div>
           <p className={styles.intro}>
-            Tell us a little about yourself and we&apos;ll follow up to schedule a session
-            debriefing your report and aligning it with your roadmap.
+            {locale === 'id'
+              ? 'Ceritakan sedikit tentang diri Anda dan kami akan menghubungi Anda untuk menjadwalkan sesi pembahasan laporan Anda dan menyelaraskannya dengan peta jalan Anda.'
+              : "Tell us a little about yourself and we'll follow up to schedule a session debriefing your report and aligning it with your roadmap."}
           </p>
 
           {/* Honeypot — hidden from real users via CSS, bots tend to fill every field */}
@@ -137,32 +148,32 @@ export default function AdvisoryContactModal({ open, onClose, companyName }: Adv
           />
 
           <div className={styles.fieldGroup}>
-            <label className={styles.label} htmlFor="advisory-name">Name *</label>
+            <label className={styles.label} htmlFor="advisory-name">{locale === 'id' ? 'Nama *' : 'Name *'}</label>
             <input
               id="advisory-name"
               className={styles.input}
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. John Doe"
+              placeholder={locale === 'id' ? 'mis. Budi Santoso' : 'e.g. John Doe'}
               required
             />
           </div>
 
           <div className={styles.fieldGroup}>
-            <label className={styles.label} htmlFor="advisory-company">Company</label>
+            <label className={styles.label} htmlFor="advisory-company">{locale === 'id' ? 'Perusahaan' : 'Company'}</label>
             <input
               id="advisory-company"
               className={styles.input}
               type="text"
               value={company}
               onChange={(e) => setCompany(e.target.value)}
-              placeholder="e.g. Acme Logistics"
+              placeholder={locale === 'id' ? 'mis. PT Logistik Nusantara' : 'e.g. Acme Logistics'}
             />
           </div>
 
           <div className={styles.fieldGroup}>
-            <label className={styles.label} htmlFor="advisory-email">Email *</label>
+            <label className={styles.label} htmlFor="advisory-email">{locale === 'id' ? 'Email *' : 'Email *'}</label>
             <input
               id="advisory-email"
               className={styles.input}
@@ -175,25 +186,27 @@ export default function AdvisoryContactModal({ open, onClose, companyName }: Adv
           </div>
 
           <div className={styles.fieldGroup}>
-            <label className={styles.label} htmlFor="advisory-message">Message</label>
+            <label className={styles.label} htmlFor="advisory-message">{locale === 'id' ? 'Pesan' : 'Message'}</label>
             <textarea
               id="advisory-message"
               className={styles.textarea}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="What would you like to cover in the session?"
+              placeholder={locale === 'id' ? 'Apa yang ingin Anda bahas dalam sesi ini?' : 'What would you like to cover in the session?'}
               rows={3}
             />
           </div>
 
           {state === 'error' && (
             <p className={styles.errorNote}>
-              Couldn&apos;t reach our form service — opening your email client instead.
+              {locale === 'id'
+                ? 'Tidak dapat terhubung ke layanan formulir kami — membuka klien email Anda sebagai gantinya.'
+                : "Couldn't reach our form service — opening your email client instead."}
             </p>
           )}
 
           <button type="submit" className={styles.submitBtn} disabled={!canSubmit}>
-            {state === 'submitting' ? 'Sending…' : 'Send to our advisory team'}
+            {state === 'submitting' ? (locale === 'id' ? 'Mengirim…' : 'Sending…') : (locale === 'id' ? 'Kirim ke tim advisory kami' : 'Send to our advisory team')}
           </button>
         </form>
       </div>

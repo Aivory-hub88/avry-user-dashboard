@@ -455,9 +455,35 @@ export interface DiagnosticContext {
   calculations: ROIProjection
   scores: DimensionScores
   opportunities: RankedOpportunity[]
+  /**
+   * Bahasa Indonesia phase 2 (2026-08) — the same ranked opportunities
+   * (identical `id`/`impact`/`effort`/`quadrant`/numeric fields) with only
+   * `title`, `projectedROINote`, and `prerequisites` composed in Indonesian.
+   * Same absence-safe convention as `roomForImprovementId?`.
+   */
+  opportunitiesId?: RankedOpportunity[]
   risks: RiskFlag[]
+  /**
+   * Bahasa Indonesia phase 2 (2026-08) — the same risk flags (identical
+   * `id`/`severity`/`source`/`detected`) with only `risk` (the description
+   * sentence) composed in Indonesian. Same absence-safe convention as
+   * `roomForImprovementId?`.
+   */
+  risksId?: RiskFlag[]
   /** Prioritised improvement areas with operational before/after — feeds the AI System Blueprint. */
   roomForImprovement?: ImprovementItem[]
+  /**
+   * Bahasa Indonesia phase 2 (2026-08) — the SAME room-for-improvement items
+   * as `roomForImprovement` (identical `id`/`area`/`priority`/numeric fields)
+   * with only the prose fields (`title`, `currentState`, `recommendedAction`,
+   * `operationalImpact`, `before`, `after`) composed in Indonesian. Computed
+   * once at submission time alongside the English version — never
+   * recomputed on a locale toggle. Optional/absent on contexts stored before
+   * this feature shipped; consumers MUST fall back to `roomForImprovement`
+   * when absent, not treat it as an error (same graceful-degradation
+   * convention as `scoreDrivers?` below).
+   */
+  roomForImprovementId?: ImprovementItem[]
   /**
    * Phase E1.2 — score traceability/drivers. Computed at build time as a
    * read-only derived view over the same answers the scorer used; never
@@ -466,6 +492,13 @@ export interface DiagnosticContext {
    * drill-down available", not an error (graceful degradation).
    */
   scoreDrivers?: ScoreDrivers
+  /**
+   * Bahasa Indonesia phase 2 (2026-08) — the same `scoreDrivers` shape with
+   * only each driver's `label` composed in Indonesian; `answerKey`,
+   * `direction`, `points`, `maxPoints` are locale-independent and identical
+   * to `scoreDrivers`. Same absence-safe convention as `roomForImprovementId?`.
+   */
+  scoreDriversId?: ScoreDrivers
   qualitative: {
     primaryObjective: string
     topPainPoints: string

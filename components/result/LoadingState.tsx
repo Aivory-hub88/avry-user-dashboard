@@ -1,8 +1,12 @@
 import styles from './LoadingState.module.css'
 
-export default function LoadingState() {
+interface LoadingStateProps {
+  locale?: 'en' | 'id'
+}
+
+export default function LoadingState({ locale = 'en' }: LoadingStateProps) {
   return (
-    <div className={styles.container} aria-label="Loading diagnostic results…">
+    <div className={styles.container} aria-label={locale === 'id' ? 'Memuat hasil diagnostik…' : 'Loading diagnostic results…'}>
       <div className={`${styles.block} ${styles.headerBlock}`} />
       <div className={`${styles.block} ${styles.scorecardBlock}`} />
       <div className={`${styles.block} ${styles.roiBlock}`} />

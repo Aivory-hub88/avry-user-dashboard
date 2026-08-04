@@ -21,10 +21,11 @@ interface ROIMetricTileProps {
    * colour alone, matching the PDF's Financial Case grid.
    */
   variant?: 'default' | 'hero'
+  locale?: 'en' | 'id'
 }
 
-export default function ROIMetricTile({ label, value, formatter, subtitle, confidenceLevel, variant = 'default' }: ROIMetricTileProps) {
-  const confidenceTag = confidenceTileLabel(confidenceLevel)
+export default function ROIMetricTile({ label, value, formatter, subtitle, confidenceLevel, variant = 'default', locale = 'en' }: ROIMetricTileProps) {
+  const confidenceTag = confidenceTileLabel(confidenceLevel, locale)
   const isHero = variant === 'hero'
   return (
     <div className={`${styles.tile} ${isHero ? styles.tileHero : ''}`}>
@@ -36,7 +37,7 @@ export default function ROIMetricTile({ label, value, formatter, subtitle, confi
           neighbours', which was invisible inside the old bordered cards but
           obvious once the boxes came off and the rows share a hairline. */}
       {value === null ? (
-        <span className={styles.insufficient}>Not provided</span>
+        <span className={styles.insufficient}>{locale === 'id' ? 'Belum diberikan' : 'Not provided'}</span>
       ) : (
         <span className={`${styles.value} ${isHero ? styles.valueHero : ''}`} style={value < 0 ? { color: '#f87171' } : undefined}>
           {formatter(value)}

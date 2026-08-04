@@ -7,12 +7,13 @@ interface ScoreRingProps {
   score: number
   maturityLevel: string
   isPrintMode?: boolean
+  locale?: 'en' | 'id'
 }
 
 const RADIUS = 80
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
-export default function ScoreRing({ score, maturityLevel, isPrintMode }: ScoreRingProps) {
+export default function ScoreRing({ score, maturityLevel, isPrintMode, locale = 'en' }: ScoreRingProps) {
   const [animated, setAnimated] = useState(false)
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export default function ScoreRing({ score, maturityLevel, isPrintMode }: ScoreRi
         width="200"
         height="200"
         className={styles.svg}
-        aria-label={`Score: ${clampedScore} out of 100, ${maturityLevel} maturity`}
+        aria-label={locale === 'id' ? `Skor: ${clampedScore} dari 100, kematangan ${maturityLevel}` : `Score: ${clampedScore} out of 100, ${maturityLevel} maturity`}
         role="img"
       >
         {!isPrintMode && (

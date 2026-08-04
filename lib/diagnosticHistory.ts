@@ -28,7 +28,7 @@ export interface DiagnosticDelta {
  * fewer than 2 entries, either snapshot is malformed, or the composite is
  * unchanged — brief explicitly calls for no chip when flat.
  */
-export function computeDelta(history: DiagnosticHistoryEntry[] | null | undefined): DiagnosticDelta | null {
+export function computeDelta(history: DiagnosticHistoryEntry[] | null | undefined, locale: 'en' | 'id' = 'en'): DiagnosticDelta | null {
   if (!Array.isArray(history) || history.length < 2) return null
   const [latest, previous] = history
   const latestComposite = latest?.data?.composite
@@ -41,7 +41,7 @@ export function computeDelta(history: DiagnosticHistoryEntry[] | null | undefine
   return {
     delta,
     direction: delta > 0 ? 'up' : 'down',
-    sinceLabel: formatDate(previous.createdAt),
+    sinceLabel: formatDate(previous.createdAt, locale),
   }
 }
 

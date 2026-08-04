@@ -5,6 +5,7 @@ interface OpportunityMatrixProps {
   opportunities: RankedOpportunity[]
   highlightedId: string | null
   onDotClick: (id: string) => void
+  locale?: 'en' | 'id'
 }
 
 // Plot region bounds — sized to fit comfortably inside a card
@@ -43,7 +44,7 @@ function dotY(impactScore: number): number {
 // Known limitation: if opportunities array exceeds ~15 items, dots may overlap
 // in the plot area. No fix needed now — document as code comment.
 
-export default function OpportunityMatrix({ opportunities, highlightedId, onDotClick }: OpportunityMatrixProps) {
+export default function OpportunityMatrix({ opportunities, highlightedId, onDotClick, locale = 'en' }: OpportunityMatrixProps) {
   return (
     <div className={styles.container}>
       <svg
@@ -51,7 +52,7 @@ export default function OpportunityMatrix({ opportunities, highlightedId, onDotC
         width="320"
         height="300"
         className={styles.svg}
-        aria-label="Opportunity priority matrix"
+        aria-label={locale === 'id' ? 'Matriks prioritas peluang' : 'Opportunity priority matrix'}
         role="img"
       >
         <defs>
@@ -77,7 +78,7 @@ export default function OpportunityMatrix({ opportunities, highlightedId, onDotC
 
         {/* Axis labels */}
         <text className={styles.axisLabel} x={(PLOT_LEFT + PLOT_RIGHT) / 2} y={310}>
-          Effort →
+          {locale === 'id' ? 'Usaha →' : 'Effort →'}
         </text>
         <text
           className={styles.axisLabelY}
@@ -85,7 +86,7 @@ export default function OpportunityMatrix({ opportunities, highlightedId, onDotC
           y={(PLOT_TOP + PLOT_BOTTOM) / 2}
           transform={`rotate(-90, 12, ${(PLOT_TOP + PLOT_BOTTOM) / 2})`}
         >
-          Impact ↑
+          {locale === 'id' ? 'Dampak ↑' : 'Impact ↑'}
         </text>
 
         {/* Quadrant dividers */}
@@ -93,10 +94,10 @@ export default function OpportunityMatrix({ opportunities, highlightedId, onDotC
         <line className={styles.divider} x1={PLOT_LEFT} y1={MID_Y} x2={PLOT_RIGHT} y2={MID_Y} />
 
         {/* Quadrant labels */}
-        <text className={`${styles.quadrantLabel} ${styles.labelQuickWin}`} x={PLOT_LEFT + 8} y={PLOT_TOP + 16}>Quick Win</text>
-        <text className={`${styles.quadrantLabel} ${styles.labelNeutral}`} x={MID_X + 8} y={PLOT_TOP + 16}>Major Project</text>
-        <text className={`${styles.quadrantLabel} ${styles.labelNeutral}`} x={PLOT_LEFT + 8} y={MID_Y + 16}>Fill In</text>
-        <text className={`${styles.quadrantLabel} ${styles.labelThankless}`} x={MID_X + 8} y={MID_Y + 16}>Thankless Task</text>
+        <text className={`${styles.quadrantLabel} ${styles.labelQuickWin}`} x={PLOT_LEFT + 8} y={PLOT_TOP + 16}>{locale === 'id' ? 'Quick Win' : 'Quick Win'}</text>
+        <text className={`${styles.quadrantLabel} ${styles.labelNeutral}`} x={MID_X + 8} y={PLOT_TOP + 16}>{locale === 'id' ? 'Proyek Besar' : 'Major Project'}</text>
+        <text className={`${styles.quadrantLabel} ${styles.labelNeutral}`} x={PLOT_LEFT + 8} y={MID_Y + 16}>{locale === 'id' ? 'Selingan' : 'Fill In'}</text>
+        <text className={`${styles.quadrantLabel} ${styles.labelThankless}`} x={MID_X + 8} y={MID_Y + 16}>{locale === 'id' ? 'Nilai Rendah' : 'Thankless Task'}</text>
 
         {/* Dots — each opportunity gets a distinct color */}
         {opportunities.map((opp, idx) => {
