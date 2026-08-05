@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useLocaleContext } from '@/hooks/useLocale';
 import { loadRoadmap, saveRoadmap } from '@/hooks/useRoadmap';
 import type { AiryRoadmap, AiryRoadmapPhase, AiryRoadmapKpi, AiryRoadmapMilestone } from '@/types/roadmap';
 import { useRouterContext } from '@/contexts/RouterContext';
@@ -49,16 +50,17 @@ const PHASE_DESCRIPTIONS: Record<number, string> = {
 };
 
 // ─── Milestone resource links (Feature 4) ─────────────────────
-const MILESTONE_RESOURCES: Record<string, { link: string; label: string }> = {
-  'deploy first': { link: '/blueprint#workflow-module-1', label: 'Blueprint: Workflow Module 1' },
-  'first automated workflow': { link: '/blueprint#workflow-module-1', label: 'Blueprint: Workflow Module 1' },
-  'connect crm': { link: '/blueprint#data-sources', label: 'Blueprint: Data Sources' },
-  'communication tools': { link: '/blueprint#data-sources', label: 'Blueprint: Data Sources' },
-  'review kpi': { link: '/diagnostics/deep/result#roi', label: 'Business Operations Report: Financial Case' },
-  'kpi performance': { link: '/diagnostics/deep/result#roi', label: 'Business Operations Report: Financial Case' },
+// labelKey references a key in the "roadmap" i18n namespace (translated at render time).
+const MILESTONE_RESOURCES: Record<string, { link: string; labelKey: string }> = {
+  'deploy first': { link: '/blueprint#workflow-module-1', labelKey: 'resourceWorkflowModule1' },
+  'first automated workflow': { link: '/blueprint#workflow-module-1', labelKey: 'resourceWorkflowModule1' },
+  'connect crm': { link: '/blueprint#data-sources', labelKey: 'resourceDataSources' },
+  'communication tools': { link: '/blueprint#data-sources', labelKey: 'resourceDataSources' },
+  'review kpi': { link: '/diagnostics/deep/result#roi', labelKey: 'resourceFinancialCase' },
+  'kpi performance': { link: '/diagnostics/deep/result#roi', labelKey: 'resourceFinancialCase' },
 };
 
-function getResourceForMilestone(title: string): { link: string; label: string } | null {
+function getResourceForMilestone(title: string): { link: string; labelKey: string } | null {
   const lower = title.toLowerCase();
   for (const [keyword, resource] of Object.entries(MILESTONE_RESOURCES)) {
     if (lower.includes(keyword)) return resource;
@@ -157,6 +159,7 @@ function OverallProgressBar({ phases, allChecked, activeIdx, onNodeClick }: {
   activeIdx: number;
   onNodeClick: (idx: number) => void;
 }) {
+  const t = useTranslations("roadmap");
   const [startDate, setStartDate] = useState<string>('');
   const [daysElapsed, setDaysElapsed] = useState<number | null>(null);
 
@@ -208,9 +211,9 @@ function OverallProgressBar({ phases, allChecked, activeIdx, onNodeClick }: {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: T.text }}>
-            {checkedMilestones}/{totalMilestones} milestones
+            {t("milestonesProgress", { checked: checkedMilestones, total: totalMilestones })}
           </span>
-          <span style={{ fontSize: 10, color: T.textMuted }}>completed</span>
+          <span style={{ fontSize: 10, color: T.textMuted }}>{t("completedCaption")}</span>
         </div>
       </div>
 
@@ -225,7 +228,7 @@ function OverallProgressBar({ phases, allChecked, activeIdx, onNodeClick }: {
             border: `1px solid ${i === activeIdx ? T.borderGreen : 'transparent'}`,
             transition: 'all 0.15s', whiteSpace: 'nowrap',
           }}>
-            Phase {i + 1}
+            {t("phaseNumber", { number: i + 1 })}
           </button>
         ))}
       </div>
@@ -234,14 +237,14 @@ function OverallProgressBar({ phases, allChecked, activeIdx, onNodeClick }: {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         {daysElapsed !== null && (
           <span style={{ fontSize: 11, color: T.textMuted, fontVariantNumeric: 'tabular-nums' }}>
-            Day {daysElapsed}
+            {t("dayElapsed", { days: daysElapsed })}
           </span>
         )}
         <input
           type="date"
           value={startDate}
           onChange={e => handleDateChange(e.target.value)}
-          title="Set project start date"
+          title={t("setStartDate")}
           style={{
             fontSize: 11, padding: '4px 8px', borderRadius: 6,
             background: 'rgba(255,255,255,0.04)', color: T.textSub,
@@ -261,6 +264,7 @@ function RoadmapTimeline({ phases, activeIdx, onNodeClick }: {
   activeIdx: number;
   onNodeClick: (idx: number) => void;
 }) {
+  const t = useTranslations("roadmap");
   return (
     <div style={{
       background: 'rgba(255,255,255,0.02)',
@@ -294,7 +298,7 @@ function RoadmapTimeline({ phases, activeIdx, onNodeClick }: {
               {/* node */}
               <button
                 onClick={() => onNodeClick(i)}
-                aria-label={`Go to ${phase.name}`}
+                aria-label={t("goToPhase", { name: phase.name })}
                 style={{
                   width: isActive ? 38 : 34,
                   height: isActive ? 38 : 34,
@@ -332,8 +336,14 @@ function MilestoneRow({ m, checked, onToggle, onWorkflow }: {
   m: AiryRoadmapMilestone; checked: boolean;
   onToggle: () => void; onWorkflow: (id: string) => void;
 }) {
+  const t = useTranslations("roadmap");
   const [helpHover, setHelpHover] = useState(false);
-  const resource = m.resourceLink ? { link: m.resourceLink, label: m.resourceLabel || 'View resource' } : getResourceForMilestone(m.title);
+  const matchedResource = getResourceForMilestone(m.title);
+  const resource = m.resourceLink
+    ? { link: m.resourceLink, label: m.resourceLabel || t("viewResource") }
+    : matchedResource
+      ? { link: matchedResource.link, label: t(matchedResource.labelKey) }
+      : null;
   const router = useRouter();
 
   const handleAskHelp = () => {
@@ -347,7 +357,7 @@ function MilestoneRow({ m, checked, onToggle, onWorkflow }: {
     <li style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
       <button
         onClick={onToggle}
-        aria-label={checked ? `Uncheck ${m.title}` : `Check ${m.title}`}
+        aria-label={checked ? t("uncheckMilestone", { title: m.title }) : t("checkMilestone", { title: m.title })}
         style={{
           width: 18, height: 18, borderRadius: 5, flexShrink: 0, marginTop: 2,
           border: `1.5px solid ${checked ? T.green : 'rgba(255,255,255,0.18)'}`,
@@ -370,7 +380,7 @@ function MilestoneRow({ m, checked, onToggle, onWorkflow }: {
             onClick={handleAskHelp}
             onMouseEnter={() => setHelpHover(true)}
             onMouseLeave={() => setHelpHover(false)}
-            title={`Ask: How do I complete "${m.title}"?`}
+            title={t("askHowToComplete", { title: m.title })}
             style={{
               width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
               background: helpHover ? 'rgba(255,255,255,0.08)' : 'transparent',
@@ -417,6 +427,7 @@ function MilestoneRow({ m, checked, onToggle, onWorkflow }: {
 function KpiCard({ kpi, actual, onActualChange }: {
   kpi: AiryRoadmapKpi; actual: string; onActualChange: (val: string) => void;
 }) {
+  const t = useTranslations("roadmap");
   const status = getKpiStatus(kpi.target, actual);
   const colors = STATUS_COLORS[status];
   const [focused, setFocused] = useState(false);
@@ -438,20 +449,20 @@ function KpiCard({ kpi, actual, onActualChange }: {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-          <span style={{ fontSize: 10, color: T.textMuted, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>TARGET</span>
+          <span style={{ fontSize: 10, color: T.textMuted, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{t("target")}</span>
           <span style={{ fontSize: '1.1rem', fontWeight: 700, color: T.green, letterSpacing: '-0.3px' }}>
             {kpi.target}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 10, color: T.textMuted, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>ACTUAL</span>
+          <span style={{ fontSize: 10, color: T.textMuted, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{t("actual")}</span>
           <input
             type="text"
             value={actual}
             onChange={e => onActualChange(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            placeholder="Enter actual"
+            placeholder={t("enterActual")}
             style={{
               fontSize: '0.95rem', fontWeight: 600,
               color: status === 'green' ? '#4CAF50' : status === 'yellow' ? T.yellow : status === 'red' ? T.red : T.textSub,
@@ -887,7 +898,7 @@ function EmptyState({ generating, error, onGenerate, router }: {
             <text x={cx} y="32.5" textAnchor="middle" fontSize="10" fontWeight="700"
               fill={i === 0 ? T.green : 'rgba(255,255,255,0.5)'} fontFamily="var(--font-manrope), Manrope, sans-serif">{i + 1}</text>
             <text x={cx} y="52" textAnchor="middle" fontSize="9" fontWeight="500" fill="rgba(255,255,255,0.4)" fontFamily="var(--font-manrope), Manrope, sans-serif">
-              {['Build','Scale','Optimise'][i]}
+              {[t("build"), t("scale"), t("optimize")][i]}
             </text>
           </g>
         ))}
@@ -934,6 +945,7 @@ function EmptyState({ generating, error, onGenerate, router }: {
 export default function RoadmapPage() {
   const router = useRouter();
   const t = useTranslations("roadmap");
+  const { locale, setLocale } = useLocaleContext();
   const [roadmap, setRoadmap] = useState<AiryRoadmap | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -1099,6 +1111,31 @@ export default function RoadmapPage() {
       )}
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '40px 24px 100px', display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+        {/* language switcher */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+          <label htmlFor="roadmap-lang" style={{ fontSize: '0.8125rem', color: T.textMuted }}>
+            {locale === 'id' ? 'Bahasa' : 'Language'}
+          </label>
+          <select
+            id="roadmap-lang"
+            value={locale}
+            onChange={(e) => setLocale(e.target.value as 'en' | 'id')}
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: `1px solid ${T.border}`,
+              borderRadius: 6,
+              color: T.text,
+              fontSize: '0.8125rem',
+              fontFamily: font,
+              padding: '6px 10px',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="en">English</option>
+            <option value="id">Bahasa Indonesia</option>
+          </select>
+        </div>
 
         {/* header */}
         <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', paddingBottom: 24, borderBottom: `1px solid ${T.border}` }}>

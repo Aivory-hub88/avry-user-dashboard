@@ -13,6 +13,7 @@ import ScoreRing from '@/components/result/ScoreRing'
 import styles from './blueprint.module.css'
 import { exportBlueprintPDF, exportBlueprintDOCX } from '@/lib/blueprintExport'
 import { useTranslations } from 'next-intl'
+import { useLocaleContext } from '@/hooks/useLocale'
 import { saveRoadmap } from '@/hooks/useRoadmap'
 import { asset } from '@/lib/asset'
 
@@ -550,6 +551,8 @@ function BlueprintInsightsSection({
   onGenerateWorkflow,
   onViewWorkflows,
 }: InsightsSectionProps & { blueprint?: any }) {
+  const t = useTranslations("blueprint")
+  const tCommon = useTranslations("common")
   const s = mapBlueprintToInsights(blueprint)
 
   function ArchIcon({ type }: { type: string }) {
@@ -561,7 +564,7 @@ function BlueprintInsightsSection({
 
   return (
     <section className={styles.insightsSection}>
-      <h2 className={styles.insightsSectionTitle}>Transformation Blueprint Insights</h2>
+      <h2 className={styles.insightsSectionTitle}>{t("insightsSectionTitle")}</h2>
 
       {/* Card 1 — Operational Health Score. Reuses the same ScoreRing component as
           the Deep Diagnostic report (gradient arc, halo, tick marks, Doto
@@ -573,10 +576,10 @@ function BlueprintInsightsSection({
             <ScoreRing score={s.score} maturityLevel={s.maturity} />
           </div>
           <div className={styles.heroScoreInfo}>
-            <h3 className={styles.heroScoreTitle}>Operational Health Score</h3>
+            <h3 className={styles.heroScoreTitle}>{t("operationalHealthScore")}</h3>
             <div className={styles.heroMaturityBadge}>
               <span className={styles.heroMaturityDot} aria-hidden="true" />
-              {s.maturity} Maturity
+              {t("maturityLabel", { level: s.maturity })}
             </div>
           </div>
         </div>
@@ -593,7 +596,7 @@ function BlueprintInsightsSection({
 
       {/* Card 2 — Strategic Objective */}
       <div className={styles.insightCard}>
-        <h3 className={styles.insightCardTitle}>Strategic Objective</h3>
+        <h3 className={styles.insightCardTitle}>{t("strategicObjectiveTitle")}</h3>
         <div className={styles.insightCardBody}>
           <p className={styles.insightParagraph}><strong style={{ color: '#f0f0f0', fontWeight: 600 }}>{s.strategicObjective.goal}</strong></p>
           <p className={styles.insightParagraph}>{s.strategicObjective.rationale}</p>
@@ -602,15 +605,15 @@ function BlueprintInsightsSection({
 
       {/* Card 3 — Metrics Table */}
       <div className={styles.insightCard}>
-        <h3 className={styles.insightCardTitle}>Key Metrics &amp; Targets</h3>
+        <h3 className={styles.insightCardTitle}>{t("keyMetricsTargets")}</h3>
         <div className={styles.insightCardBody}>
           <table className={styles.metricsTable}>
             <thead>
               <tr>
-                <th>Metric</th>
-                <th>Current</th>
-                <th>Target</th>
-                <th>Expected Impact</th>
+                <th>{t("metricColumn")}</th>
+                <th>{t("currentColumn")}</th>
+                <th>{t("targetColumn")}</th>
+                <th>{t("expectedImpactColumn")}</th>
               </tr>
             </thead>
             <tbody>
@@ -629,10 +632,10 @@ function BlueprintInsightsSection({
 
       {/* Card 4 — Current State */}
       <div className={styles.insightCard}>
-        <h3 className={styles.insightCardTitle}>Current State Summary</h3>
+        <h3 className={styles.insightCardTitle}>{t("currentStateSummary")}</h3>
         <div className={styles.insightCardBody}>
           <p className={styles.insightParagraph}>{s.currentState.summary}</p>
-          <span className={styles.insightSubheading}>Highlights</span>
+          <span className={styles.insightSubheading}>{t("highlights")}</span>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {s.currentState.highlights.map((h, i) => (
               <li key={i} style={{ fontSize: '0.875rem', color: '#c6c6bf', paddingLeft: 14, position: 'relative', lineHeight: 1.5 }}>
@@ -646,7 +649,7 @@ function BlueprintInsightsSection({
 
       {/* Card 5 — Recommended Architecture */}
       <div className={styles.insightCard}>
-        <h3 className={styles.insightCardTitle}>Recommended Architecture</h3>
+        <h3 className={styles.insightCardTitle}>{t("recommendedArchitecture")}</h3>
         <div className={styles.insightCardBody}>
           <div className={styles.archPipeline}>
             {s.architecture.stages.map((stage, i) => (
@@ -676,7 +679,7 @@ function BlueprintInsightsSection({
 
       {/* Card 6 — Workflow Modules */}
       <div className={styles.insightCard}>
-        <h3 className={styles.insightCardTitle}>Workflow Modules</h3>
+        <h3 className={styles.insightCardTitle}>{t("workflowModulesTitle")}</h3>
         <div className={styles.insightCardBody}>
           <div className={styles.workflowModulesGrid}>
             {(workflowModules.length > 0 ? workflowModules : BLUEPRINT_INSIGHTS.workflowModules).map((wf, i) => {
@@ -705,17 +708,17 @@ function BlueprintInsightsSection({
                         aria-busy={isGenerating}
                       >
                         {isGenerating ? (
-                          <><span className={styles.btnSpinnerSmall} aria-hidden="true" />Generating…</>
-                        ) : generated ? 'Regenerate' : 'Generate'}
+                          <><span className={styles.btnSpinnerSmall} aria-hidden="true" />{tCommon("generating")}</>
+                        ) : generated ? t("regenerate") : t("generateAction")}
                       </button>
                     </div>
                     <p className={styles.workflowModuleNext} style={{ borderTop: 'none', paddingTop: 0 }}>
-                      <span className={styles.workflowModuleNextLabel}>Trigger: </span>
+                      <span className={styles.workflowModuleNextLabel}>{t("triggerLabel")}: </span>
                       {dynWf.trigger}
                     </p>
                     {steps.length > 0 && (
                       <div className={styles.workflowModuleNext}>
-                        <span className={styles.workflowModuleNextLabel}>Steps ({steps.length}): </span>
+                        <span className={styles.workflowModuleNextLabel}>{t("stepsCount", { count: steps.length })}: </span>
                         <ol style={{ margin: '4px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 2 }}>
                           {steps.map((st, j) => (
                             <li key={j} style={{ lineHeight: 1.45 }}>{coerceToString((st as any)?.action, '')}</li>
@@ -725,14 +728,14 @@ function BlueprintInsightsSection({
                     )}
                     {integrations.length > 0 && (
                       <p className={styles.workflowModuleNext}>
-                        <span className={styles.workflowModuleNextLabel}>Integrations: </span>
+                        <span className={styles.workflowModuleNextLabel}>{t("integrationsLabel")}: </span>
                         {integrations.join(', ')}
                       </p>
                     )}
                     {err && <p className={styles.workflowError}>{err}</p>}
                     {saved && (
                       <button className={styles.viewInWorkflowsBtn} onClick={onViewWorkflows}>
-                        View in Workflows →
+                        {t("viewInWorkflows")}
                       </button>
                     )}
                   </div>
@@ -764,8 +767,8 @@ function BlueprintInsightsSection({
                       aria-busy={isGenerating}
                     >
                       {isGenerating ? (
-                        <><span className={styles.btnSpinnerSmall} aria-hidden="true" />Generating…</>
-                      ) : generated ? 'Regenerate' : 'Generate'}
+                        <><span className={styles.btnSpinnerSmall} aria-hidden="true" />{tCommon("generating")}</>
+                      ) : generated ? t("regenerate") : t("generateAction")}
                     </button>
                   </div>
                   <span className={styles.workflowModuleStatus}>
@@ -775,13 +778,13 @@ function BlueprintInsightsSection({
                   <p className={styles.workflowModuleText}>{staticWf.value}</p>
                   <p className={styles.workflowModuleText} style={{ color: '#666' }}>{staticWf.maturity}</p>
                   <p className={styles.workflowModuleNext}>
-                    <span className={styles.workflowModuleNextLabel}>Next step: </span>
+                    <span className={styles.workflowModuleNextLabel}>{t("nextStepLabel")}: </span>
                     {staticWf.next}
                   </p>
                   {err && <p className={styles.workflowError}>{err}</p>}
                   {saved && (
                     <button className={styles.viewInWorkflowsBtn} onClick={onViewWorkflows}>
-                      View in Workflows →
+                      {t("viewInWorkflows")}
                     </button>
                   )}
                 </div>
@@ -793,7 +796,7 @@ function BlueprintInsightsSection({
 
       {/* Card 7 — Phased Roadmap */}
       <div className={styles.insightCard}>
-        <h3 className={styles.insightCardTitle}>Phased Roadmap</h3>
+        <h3 className={styles.insightCardTitle}>{t("phasedRoadmapTitle")}</h3>
         <div className={styles.insightCardBody}>
           <div className={styles.roadmapWaves}>
             {s.roadmap.map((wave: any, i: number) => (
@@ -809,7 +812,7 @@ function BlueprintInsightsSection({
                   ))}
                 </ul>
                 <p className={styles.roadmapWaveOwner}>
-                  <span className={styles.roadmapWaveOwnerLabel}>Owner: </span>
+                  <span className={styles.roadmapWaveOwnerLabel}>{t("ownerLabel")}: </span>
                   {wave.owner}
                 </p>
               </div>
@@ -821,16 +824,16 @@ function BlueprintInsightsSection({
       {/* Card 7b — Deployment Plan */}
       {deploymentPlan && (
         <div className={styles.insightCard}>
-          <h3 className={styles.insightCardTitle}>Deployment Plan</h3>
+          <h3 className={styles.insightCardTitle}>{t("deploymentPlanTitle")}</h3>
           <div className={styles.insightCardBody}>
             <div className={styles.deployMetaRow}>
               <div className={styles.deployMetaItem}>
-                <span className={styles.deployMetaLabel}>Phase</span>
+                <span className={styles.deployMetaLabel}>{t("phaseLabel")}</span>
                 <span className={styles.deployMetaValue}>{deploymentPlan.phase}</span>
               </div>
               <div className={styles.deployMetaItem}>
-                <span className={styles.deployMetaLabel}>Estimated ROI</span>
-                <span className={styles.deployMetaValue} style={{ color: '#b7cba6', fontWeight: 600 }}>{deploymentPlan.estimated_roi_months} months</span>
+                <span className={styles.deployMetaLabel}>{t("estimatedRoiLabel")}</span>
+                <span className={styles.deployMetaValue} style={{ color: '#b7cba6', fontWeight: 600 }}>{t("monthsCount", { count: deploymentPlan.estimated_roi_months })}</span>
               </div>
             </div>
             <p className={styles.insightParagraph}>{deploymentPlan.estimated_impact}</p>
@@ -866,11 +869,11 @@ function BlueprintInsightsSection({
 
       {/* Card 8 — Risk Mitigation */}
       <div className={styles.insightCard}>
-        <h3 className={styles.insightCardTitle}>Risk Mitigation &amp; Opportunities</h3>
+        <h3 className={styles.insightCardTitle}>{t("riskMitigationOpportunities")}</h3>
         <div className={styles.insightCardBody}>
           <div className={styles.riskThemes}>
             {s.risks.length === 0 ? (
-              <p style={{ color: '#888', fontStyle: 'italic', padding: '1rem 0' }}>No specific risks were flagged for mitigation in this blueprint.</p>
+              <p style={{ color: '#888', fontStyle: 'italic', padding: '1rem 0' }}>{t("noRisksFlagged")}</p>
             ) : (
               s.risks.map((risk, i) => (
                 <div key={i} className={styles.riskTheme}>
@@ -893,7 +896,7 @@ function BlueprintInsightsSection({
 
       {/* Card 9 — Next Steps */}
       <div className={styles.insightCard}>
-        <h3 className={styles.insightCardTitle}>Next 30–90 Days — Action Checklist</h3>
+        <h3 className={styles.insightCardTitle}>{t("actionChecklistTitle")}</h3>
         <div className={styles.insightCardBody}>
           <div className={styles.actionChecklist}>
             {s.actions.map((action: any, i: number) => (
@@ -902,8 +905,8 @@ function BlueprintInsightsSection({
                 <div className={styles.actionItemBody}>
                   <span className={styles.actionItemLabel}>{action.label}</span>
                   <div className={styles.actionItemMeta}>
-                    <span className={styles.actionItemOwner}><span>Owner:</span> {action.owner}</span>
-                    <span className={styles.actionItemDeadline}><span>Deadline:</span> {action.deadline}</span>
+                    <span className={styles.actionItemOwner}><span>{t("ownerLabel")}:</span> {action.owner}</span>
+                    <span className={styles.actionItemDeadline}><span>{t("deadlineLabel")}:</span> {action.deadline}</span>
                   </div>
                 </div>
               </div>
@@ -980,6 +983,7 @@ export default function BlueprintPage() {
   const router = useRouter()
   const t = useTranslations("blueprint")
   const tCommon = useTranslations("common")
+  const { locale, setLocale } = useLocaleContext()
   const [blueprint, setBlueprint] = useState<BlueprintV1 | null>(null)
   const [parseError, setParseError] = useState(false)
   const [empty, setEmpty] = useState(false)
@@ -1088,9 +1092,9 @@ export default function BlueprintPage() {
     setDownloadLoading(true)
     try {
       await exportBlueprintPDF(blueprint, currentVersionLabel ?? 'Draft')
-      showToast('Blueprint downloaded successfully')
+      showToast(t("downloadSuccess"))
     } catch (e) {
-      showToast('PDF export failed. Try again.')
+      showToast(t("pdfExportFailed"))
     } finally {
       setDownloadLoading(false)
     }
@@ -1102,9 +1106,9 @@ export default function BlueprintPage() {
     setDownloadLoading(true)
     try {
       await exportBlueprintDOCX(blueprint, currentVersionLabel ?? 'Draft')
-      showToast('Blueprint downloaded successfully')
+      showToast(t("downloadSuccess"))
     } catch (e) {
-      showToast('DOCX export failed. Try again.')
+      showToast(t("docxExportFailed"))
     } finally {
       setDownloadLoading(false)
     }
@@ -1132,12 +1136,12 @@ export default function BlueprintPage() {
         }),
       })
       const data = await res.json()
-      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to generate roadmap')
+      if (!res.ok || !data.success) throw new Error(data.error || t("roadmapGenerationFailed"))
       saveRoadmap(data.roadmap)
-      showToast('Roadmap generated! Redirecting…')
+      showToast(t("roadmapGeneratedRedirecting"))
       setTimeout(() => router.push('/roadmap'), 800)
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to generate roadmap')
+      showToast(err instanceof Error ? err.message : t("roadmapGenerationFailed"))
       setGeneratingRoadmap(false)
     }
   }
@@ -1165,8 +1169,8 @@ export default function BlueprintPage() {
       })
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: 'Failed to generate workflow' }))
-        throw new Error(err.message || 'Failed to generate workflow')
+        const err = await res.json().catch(() => ({ message: t("workflowGenerationFailed") }))
+        throw new Error(err.message || t("workflowGenerationFailed"))
       }
 
       const result: GeneratedWorkflow = await res.json()
@@ -1204,7 +1208,7 @@ export default function BlueprintPage() {
       setSavedWorkflowIds(prev => ({ ...prev, [id]: savedId }))
       
       // Show brief success toast then redirect
-      showToast('Workflow berhasil dibuat! Membuka sekarang...')
+      showToast(t("workflowCreatedRedirecting"))
       setTimeout(() => {
         // Navigate to the workflows list with the new workflow auto-selected
         // Use savedId (actual stored ID) not result.workflow_id — saveWorkflow may suffix -v2 on collision
@@ -1213,7 +1217,7 @@ export default function BlueprintPage() {
     } catch (err) {
       setWorkflowErrors(prev => ({
         ...prev,
-        [id]: err instanceof Error ? err.message : 'Failed to generate workflow'
+        [id]: err instanceof Error ? err.message : t("workflowGenerationFailed")
       }))
     } finally {
       setGeneratingWorkflow(prev => ({ ...prev, [id]: false }))
@@ -1262,18 +1266,38 @@ export default function BlueprintPage() {
     if (currentVersionLabel === versionLabel) setCurrentVersionLabel(null)
   }
 
+  const languageSwitcher = (
+    <div className={styles.languageSwitcherRow}>
+      <label htmlFor="blueprint-lang" className={styles.languageSwitcherLabel}>
+        {locale === 'id' ? 'Bahasa' : 'Language'}
+      </label>
+      <select
+        id="blueprint-lang"
+        className={styles.languageSwitcher}
+        value={locale}
+        onChange={(e) => setLocale(e.target.value as 'en' | 'id')}
+      >
+        <option value="en">English</option>
+        <option value="id">Bahasa Indonesia</option>
+      </select>
+    </div>
+  )
+
   if (empty) {
     return (
       <div className={styles.emptyContainer}>
-        <div className={styles.emptyContent}>
-          <p className={styles.emptyIcon}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
-          </p>
-          <h1 className={styles.emptyTitle}>{t("noBlueprint")}</h1>
-          <p className={styles.emptyText}>
-            {t("emptyText")}
-          </p>
-          <Link href="/diagnostics" className={styles.ctaLink}>{t("generate")}</Link>
+        {languageSwitcher}
+        <div className={styles.emptyBody}>
+          <div className={styles.emptyContent}>
+            <p className={styles.emptyIcon}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+            </p>
+            <h1 className={styles.emptyTitle}>{t("noBlueprint")}</h1>
+            <p className={styles.emptyText}>
+              {t("emptyText")}
+            </p>
+            <Link href="/diagnostics" className={styles.ctaLink}>{t("generate")}</Link>
+          </div>
         </div>
       </div>
     )
@@ -1282,11 +1306,14 @@ export default function BlueprintPage() {
   if (parseError) {
     return (
       <div className={styles.emptyContainer}>
-        <div className={styles.emptyContent}>
-          <p className={styles.emptyIcon}>!</p>
-          <h1 className={styles.emptyTitle}>{t("corruptedTitle")}</h1>
-          <p className={styles.emptyText}>{t("corruptedText")}</p>
-          <button className={styles.ctaLink} onClick={handleRegenerate}>{t("regenerateBlueprint")}</button>
+        {languageSwitcher}
+        <div className={styles.emptyBody}>
+          <div className={styles.emptyContent}>
+            <p className={styles.emptyIcon}>!</p>
+            <h1 className={styles.emptyTitle}>{t("corruptedTitle")}</h1>
+            <p className={styles.emptyText}>{t("corruptedText")}</p>
+            <button className={styles.ctaLink} onClick={handleRegenerate}>{t("regenerateBlueprint")}</button>
+          </div>
         </div>
       </div>
     )
@@ -1319,10 +1346,10 @@ export default function BlueprintPage() {
             borderBottom: '1px solid #92400e',
           }}
         >
-          <span>⚠️ Saved locally. Cloud sync failed — your blueprint won&apos;t appear on other devices.</span>
+          <span>{t("cloudSyncWarningText")}</span>
           <button
             onClick={() => setCloudSyncWarning(false)}
-            aria-label="Dismiss cloud sync warning"
+            aria-label={t("dismissCloudSyncWarning")}
             style={{
               background: 'transparent', border: 'none', color: '#fef3c7',
               cursor: 'pointer', fontSize: '1rem', padding: '0 4px', lineHeight: 1,
@@ -1344,15 +1371,17 @@ export default function BlueprintPage() {
             borderBottom: '1px solid #92400e',
           }}
         >
-          <span>⚠️ This blueprint was built from a simplified template because AI generation didn&apos;t return a complete result. Use &quot;Regenerate Blueprint&quot; to try again.</span>
+          <span>{t("fallbackGeneratedWarning")}</span>
         </div>
       )}
+      {languageSwitcher}
+
       <div className={styles.content} ref={contentRef}>
 
         {/* ── Header ─────────────────────────────────────────── */}
         <BlueprintHeader
           blueprintId={blueprint.blueprint_id || 'BP-001'}
-          companyName={organisation?.name || 'Company'}
+          companyName={organisation?.name || t("companyFallback")}
           version={currentVersionLabel || blueprint.version || '1'}
           status={blueprint.status || 'draft'}
           maturityLevel={diagnostic_summary?.maturity_level || 'Emerging'}

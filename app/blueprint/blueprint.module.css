@@ -27,6 +27,37 @@
   gap: 36px;
 }
 
+/* ── Language switcher ──────────────────────────────────────── */
+
+.languageSwitcherRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px 0;
+}
+
+.languageSwitcherLabel {
+  font-size: 0.8125rem;
+  color: var(--text-secondary, rgba(232, 230, 227, 0.5));
+}
+
+.languageSwitcher {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text-primary, #e8e6e3);
+  font-size: 0.8125rem;
+  font-family: 'Manrope', sans-serif;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.languageSwitcher:focus-visible {
+  outline: 2px solid #b7cba6;
+  outline-offset: 1px;
+}
+
 /* ── Loading ─────────────────────────────────────────────── */
 
 .loadingContainer {
@@ -56,9 +87,16 @@
   height: 100%;
   background-color: var(--bg-main, #353531);
   display: flex;
+  flex-direction: column;
+  padding: 0 0 24px;
+}
+
+.emptyBody {
+  flex: 1;
+  display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 0 24px;
 }
 
 .emptyContent {

@@ -303,6 +303,8 @@ export interface ROIProjection {
   fxRateUsed?: number
   /** Human label for when the FX rate was sourced (e.g. "18 Jul 2026 (live)"). */
   fxAsOf?: string
+  /** Indonesian-locale rendering of fxAsOf (e.g. "18 Jul 2026 (live)" with Indonesian month). */
+  fxAsOfId?: string
   /** Assumed annual ongoing cost as a fraction of the initial investment. */
   ongoingCostRate?: number
   /** Annual ongoing run cost (licenses/maintenance/support), USD and local. */

@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl'
 import styles from './BlueprintHeader.module.css'
 
 interface BlueprintVersion {
@@ -29,6 +30,7 @@ interface BlueprintHeaderProps {
 }
 
 export default function BlueprintHeader(props: BlueprintHeaderProps) {
+  const t = useTranslations("blueprint")
   const {
     blueprintId,
     companyName,
@@ -56,7 +58,7 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
         <div className={styles.sampleBanner}>
           <span className={styles.bannerIcon}>i</span>
           <span className={styles.bannerText}>
-            This is a sample Transformation Blueprint. In the next phase, this will be generated from your diagnostic.
+            {t("sampleBannerText")}
           </span>
         </div>
       )}
@@ -64,11 +66,11 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
       <div className={styles.headerContent}>
         {/* LEFT: company + blueprint meta */}
         <div className={styles.blueprintHeaderLeft}>
-          <span className={styles.companyLabel}>COMPANY</span>
+          <span className={styles.companyLabel}>{t("companyLabel")}</span>
           <div className={styles.companyName}>{companyName}</div>
 
           <div className={styles.titleRow}>
-            <h1 className={styles.blueprintTitle}>Transformation Blueprint</h1>
+            <h1 className={styles.blueprintTitle}>{t("title")}</h1>
             <span className={styles.blueprintId}>{blueprintId}</span>
           </div>
 
@@ -81,12 +83,12 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
               >
                 {versions.map((v) => (
                   <option key={v.version} value={v.version}>
-                    Version {v.version}
+                    {t("versionLabel", { version: v.version })}
                   </option>
                 ))}
               </select>
             ) : (
-              <span className={styles.versionText}>Version {version}</span>
+              <span className={styles.versionText}>{t("versionLabel", { version })}</span>
             )}
             <span className={styles.separator}>•</span>
             <span className={styles.draftPill}>{status}</span>
@@ -94,12 +96,12 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
 
           <div className={styles.pillsRow}>
             <div className={styles.pill}>
-              <span className={styles.pillLabel}>Maturity level</span>
+              <span className={styles.pillLabel}>{t("maturityLevelPillLabel")}</span>
               <span className={styles.pillValue}>{maturityLevel}</span>
             </div>
             <div className={styles.pill}>
-              <span className={styles.pillLabel}>Estimated ROI</span>
-              <span className={styles.pillValue}>{estimatedROI} months</span>
+              <span className={styles.pillLabel}>{t("estimatedRoiLabel")}</span>
+              <span className={styles.pillValue}>{t("monthsCount", { count: estimatedROI })}</span>
             </div>
           </div>
         </div>
@@ -109,30 +111,30 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
           <div className={styles.actionRow}>
             <span className={styles.draftBadge}>{status}</span>
             {onSaveVersion && (
-              <button onClick={onSaveVersion} className={`${styles.saveVersionBtn} btn-style-a`} title="Save this version">
-                Save Version
+              <button onClick={onSaveVersion} className={`${styles.saveVersionBtn} btn-style-a`} title={t("saveThisVersionTooltip")}>
+                {t("saveVersion")}
               </button>
             )}
             {onDownloadPDF || onDownloadDOCX ? (
-              <button onClick={onDownloadPDF} className={`${styles.downloadBtn} btn-style-b`} title="Download blueprint">
-                Download ↓
+              <button onClick={onDownloadPDF} className={`${styles.downloadBtn} btn-style-b`} title={t("downloadBlueprintTooltip")}>
+                {t("download")} ↓
               </button>
             ) : null}
             {onShowHistory && (
-              <button onClick={onShowHistory} className={`${styles.historyBtn} btn-style-a`} title="View version history">
-                History ({versionsCount})
+              <button onClick={onShowHistory} className={`${styles.historyBtn} btn-style-a`} title={t("viewVersionHistoryTooltip")}>
+                {t("history")} ({versionsCount})
               </button>
             )}
           </div>
 
           {onGenerateRoadmap && (
-            <button 
-              onClick={onGenerateRoadmap} 
+            <button
+              onClick={onGenerateRoadmap}
               className={`${styles.generateRoadmapBtn} btn-style-b`}
               disabled={generatingRoadmap}
-              title="Generate roadmap from this blueprint"
+              title={t("generateRoadmapTooltip")}
             >
-              {generatingRoadmap ? 'Generating...' : 'Generate Roadmap'}
+              {generatingRoadmap ? t("generatingRoadmap") : t("generateRoadmap")}
             </button>
           )}
         </div>

@@ -804,6 +804,12 @@
   color: #9ca3af;
   font-size: 0.85rem;
 }
+.aiLanguageNote {
+  color: #9ca3af;
+  font-size: 0.78rem;
+  font-style: italic;
+  margin: -0.5rem 0 1rem;
+}
 
 /* ── AI Enablement (closing section) ── */
 .aiEnablementText {

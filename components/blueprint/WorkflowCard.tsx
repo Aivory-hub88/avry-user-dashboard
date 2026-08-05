@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import styles from './WorkflowCard.module.css'
 
 interface WorkflowCardProps {
@@ -14,20 +15,22 @@ export default function WorkflowCard({
   steps,
   integrations
 }: WorkflowCardProps) {
+  const t = useTranslations("blueprint")
+  const tCommon = useTranslations("common")
   const displaySteps = steps.length > 5 ? steps.slice(0, 5) : steps
   const hasMoreSteps = steps.length > 5
 
   return (
     <div className={styles.workflowCard}>
       <h3 className={styles.workflowName}>{name}</h3>
-      
+
       <div className={styles.triggerSection}>
-        <div className={styles.triggerLabel}>Trigger</div>
+        <div className={styles.triggerLabel}>{t("triggerLabel")}</div>
         <div className={styles.triggerText}>{trigger}</div>
       </div>
 
       <div className={styles.stepsSection}>
-        <div className={styles.stepsLabel}>Steps</div>
+        <div className={styles.stepsLabel}>{t("stepsLabel")}</div>
         <ol className={styles.stepsList}>
           {displaySteps.map((step, index) => (
             <li key={index} className={styles.stepItem}>
@@ -37,13 +40,13 @@ export default function WorkflowCard({
         </ol>
         {hasMoreSteps && (
           <div className={styles.moreSteps}>
-            +{steps.length - 5} more steps
+            {t("moreSteps", { count: steps.length - 5 })}
           </div>
         )}
       </div>
 
       <div className={styles.integrationsSection}>
-        <div className={styles.integrationsLabel}>Integrations</div>
+        <div className={styles.integrationsLabel}>{t("integrationsLabel")}</div>
         <div className={styles.integrationsContainer}>
           {integrations.map((integration, index) => (
             <div key={index} className={styles.integrationChip}>
@@ -55,13 +58,13 @@ export default function WorkflowCard({
 
       <div className={styles.actionsRow}>
         <button className={styles.actionButton} disabled>
-          Edit
+          {tCommon("edit")}
         </button>
         <button className={styles.actionButton} disabled>
-          Simulate
+          {t("simulate")}
         </button>
         <Link href="/workflows" className={styles.primaryButton}>
-          Deploy
+          {t("deploy")}
         </Link>
       </div>
     </div>

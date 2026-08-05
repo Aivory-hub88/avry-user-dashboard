@@ -80,10 +80,10 @@ export function getRate(currencyCode: string): number {
 }
 
 /** Human label for "FX rates as of …" footnotes. */
-export function getFxAsOfLabel(): string {
+export function getFxAsOfLabel(locale: 'en' | 'id' = 'en'): string {
   if (!cache) cache = readStorage()
   if (cache?.live && cache.lastUpdatedUnix) {
-    return new Date(cache.lastUpdatedUnix * 1000).toLocaleDateString('en-GB', {
+    return new Date(cache.lastUpdatedUnix * 1000).toLocaleDateString(locale === 'id' ? 'id-ID' : 'en-GB', {
       day: '2-digit', month: 'short', year: 'numeric',
     }) + ' (live)'
   }

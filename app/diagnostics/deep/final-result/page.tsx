@@ -587,6 +587,11 @@ export default function FinalResultPage() {
         {/* ── Business Operations Analysis (model-generated; numbers stay deterministic) ── */}
         <div id="section-operations-analysis" className={styles.card}>
           <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Analisis Operasional Bisnis' : 'Business Operations Analysis'}</h2>
+          {locale === 'id' && llmResult && (
+            <p className={styles.aiLanguageNote}>
+              Analisis naratif di bawah ini saat ini masih dalam Bahasa Inggris — dukungan Bahasa Indonesia untuk bagian ini sedang dalam pengembangan.
+            </p>
+          )}
           {llmResult ? (
             <>
               {(llmResult.narrative_summary || llmResult.narrative) && (
@@ -877,7 +882,7 @@ export default function FinalResultPage() {
                   <span className={styles.stepLabel}>{locale === 'id' ? 'Mata uang & sumber' : 'Currency & sources'}</span>
                   <span className={styles.stepValue}>
                     {locale === 'id'
-                      ? `Kurs valuta asing per ${(calculations as any).fxAsOf ?? getFxAsOfLabel()} (diperbarui otomatis setiap 2 jam dari data pasar langsung); faktor efisiensi 75% dan angka overhead proses 20% adalah estimasi benchmark internal, bukan jaminan khusus klien.`
+                      ? `Kurs valuta asing per ${(calculations as any).fxAsOfId ?? (calculations as any).fxAsOf ?? getFxAsOfLabel('id')} (diperbarui otomatis setiap 2 jam dari data pasar langsung); faktor efisiensi 75% dan angka overhead proses 20% adalah estimasi benchmark internal, bukan jaminan khusus klien.`
                       : `FX rates as of ${(calculations as any).fxAsOf ?? getFxAsOfLabel()} (auto-refreshed every 2 hours from live market data); the 75% efficiency factor and 20% process-overhead figure are internal benchmark estimates, not client-specific guarantees.`}
                   </span>
                 </li>

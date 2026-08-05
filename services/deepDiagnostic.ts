@@ -607,6 +607,7 @@ export function calculateROI(
     // FX transparency: the exact rate used for the *Local conversions above
     fxRateUsed: rate,
     fxAsOf: getFxAsOfLabel(),
+    fxAsOfId: getFxAsOfLabel('id'),
     // Ongoing cost + net economics + scenario range
     ongoingCostRate: ONGOING_COST_RATE,
     annualOngoingCostUSD,
