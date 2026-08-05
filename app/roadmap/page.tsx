@@ -783,7 +783,7 @@ async function exportRoadmapPdf(
       ),
       tr(
         `Use it as a living document. As your team checks off milestones and records KPI actuals, the roadmap tracks how far you have progressed toward a fully operational AI capability.`,
-        `Gunakan dokumen ini sebagai living document. Seiring tim Anda menyelesaikan setiap milestone dan mencatat KPI aktual, roadmap ini akan menunjukkan seberapa jauh Anda telah bergerak menuju kapabilitas AI yang sepenuhnya operasional.`
+        `Gunakan dokumen ini sebagai living document. Seiring tim Anda menyelesaikan setiap milestone dan mencatat KPI aktual, roadmap ini akan menunjukkan seberapa jauh Anda telah bergerak menuju kapabilitas tata kelola bisnis (Business Operation) yang lebih baik.`
       ),
     ],
     footerStats: [
