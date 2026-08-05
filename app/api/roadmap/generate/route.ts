@@ -11,24 +11,25 @@ import { formatLocalAmount, parseCurrencyCode } from '@/lib/resultFormatters';
  * fall back to qualitative language (never an invented number) otherwise.
  * See §1.6 row 11 of DEEP-DIAGNOSTIC-EXPERIENCE-V2-PLANNING.md.
  */
-function deriveFallbackKpiTargets(diagnosticContext: Record<string, any>) {
+function deriveFallbackKpiTargets(diagnosticContext: Record<string, any>, locale: 'en' | 'id' = 'en') {
   const calc = diagnosticContext?.calculations;
   const quant = diagnosticContext?.quantitative;
   const currencyCode = parseCurrencyCode(diagnosticContext?.currency);
+  const tr = (en: string, id: string) => locale === 'id' ? id : en
 
   const hoursSavedPerWeek = typeof calc?.hoursReclaimedPerYear === 'number'
-    ? `${Math.max(1, Math.round(calc.hoursReclaimedPerYear / 52))}+ hours`
-    : 'Meaningful reduction in manual hours';
+    ? `${Math.max(1, Math.round(calc.hoursReclaimedPerYear / 52))}+ ${tr('hours', 'jam')}`
+    : tr('Meaningful reduction in manual hours', 'Pengurangan berarti pada jam kerja manual')
 
   const automationCoverage = typeof quant?.targetAutomationPct === 'number'
     ? `${quant.targetAutomationPct}%`
-    : 'Increased automation coverage';
+    : tr('Increased automation coverage', 'Peningkatan cakupan otomasi')
 
   const roiOutcome = typeof calc?.netThreeYearROIPercent === 'number'
-    ? `${Math.max(0, Math.round(calc.netThreeYearROIPercent))}% 3-yr ROI`
+    ? `${Math.max(0, Math.round(calc.netThreeYearROIPercent))}% ${tr('3-yr ROI', 'ROI 3 tahun')}`
     : typeof calc?.totalAnnualSavingsLocal === 'number'
-      ? `${formatLocalAmount(calc.totalAnnualSavingsLocal, currencyCode)}/yr savings`
-      : 'Positive return on automation investment';
+      ? `${formatLocalAmount(calc.totalAnnualSavingsLocal, currencyCode)}${tr('/yr savings', '/thn penghematan')}`
+      : tr('Positive return on automation investment', 'Imbal hasil positif atas investasi otomasi')
 
   return { hoursSavedPerWeek, automationCoverage, roiOutcome };
 }
@@ -137,7 +138,7 @@ LANGUAGE: Write every freeform narrative/text field VALUE in formal Bahasa Indon
 
       roadmap = {
         id: parsed.id || `roadmap-${Date.now()}`,
-        title: parsed.title || 'Transformation Roadmap',
+        title: parsed.title || (locale === 'id' ? 'Roadmap Transformasi' : 'Transformation Roadmap'),
         createdAt: new Date().toISOString(),
         source: source as AiryRoadmap['source'],
         blueprintId,
@@ -146,7 +147,7 @@ LANGUAGE: Write every freeform narrative/text field VALUE in formal Bahasa Indon
     } catch (aiErr) {
       // Fallback: generate a sensible default roadmap if AI call fails
       console.error('[roadmap/generate] AI call failed, using fallback:', aiErr);
-      roadmap = buildFallbackRoadmap(source, blueprintId, diagnosticContext);
+      roadmap = buildFallbackRoadmap(source, blueprintId, diagnosticContext, locale);
     }
 
     return NextResponse.json({ success: true, roadmap });
@@ -159,58 +160,59 @@ LANGUAGE: Write every freeform narrative/text field VALUE in formal Bahasa Indon
   }
 }
 
-function buildFallbackRoadmap(source: string, blueprintId?: string, diagnosticContext: Record<string, any> = {}): AiryRoadmap {
-  const kpiTargets = deriveFallbackKpiTargets(diagnosticContext);
+function buildFallbackRoadmap(source: string, blueprintId?: string, diagnosticContext: Record<string, any> = {}, locale: 'en' | 'id' = 'en'): AiryRoadmap {
+  const kpiTargets = deriveFallbackKpiTargets(diagnosticContext, locale);
+  const tr = (en: string, id: string) => locale === 'id' ? id : en
   return {
     id: `roadmap-${Date.now()}`,
-    title: 'Transformation Roadmap',
+    title: tr('Transformation Roadmap', 'Roadmap Transformasi'),
     createdAt: new Date().toISOString(),
     source: source as AiryRoadmap['source'],
     blueprintId,
     phases: [
       {
         id: 'phase-1',
-        name: 'Foundation & Quick Wins',
-        timeframe: 'Month 1–3',
-        description: 'Establish data infrastructure and deploy first automation workflows.',
+        name: tr('Foundation & Quick Wins', 'Fondasi & Kemenangan Cepat'),
+        timeframe: tr('Month 1–3', 'Bulan 1–3'),
+        description: tr('Establish data infrastructure and deploy first automation workflows.', 'Membangun infrastruktur data dan menerapkan alur kerja otomasi pertama.'),
         milestones: [
-          { id: 'm-1-1', title: 'Audit existing data sources and integrations', linkedWorkflowIds: [] },
-          { id: 'm-1-2', title: 'Deploy first automated workflow (highest ROI)', linkedWorkflowIds: [] },
-          { id: 'm-1-3', title: 'Train team on AI tools and processes', linkedWorkflowIds: [] },
+          { id: 'm-1-1', title: tr('Audit existing data sources and integrations', 'Audit sumber data dan integrasi yang ada'), linkedWorkflowIds: [] },
+          { id: 'm-1-2', title: tr('Deploy first automated workflow (highest ROI)', 'Terapkan alur kerja terotomasi pertama (ROI tertinggi)'), linkedWorkflowIds: [] },
+          { id: 'm-1-3', title: tr('Train team on AI tools and processes', 'Latih tim mengenai alat dan proses AI'), linkedWorkflowIds: [] },
         ],
         kpis: [
-          { id: 'kpi-1-1', label: 'Manual tasks automated', target: '3+' },
-          { id: 'kpi-1-2', label: 'Time saved per week', target: kpiTargets.hoursSavedPerWeek },
+          { id: 'kpi-1-1', label: tr('Manual tasks automated', 'Tugas manual terotomasi'), target: '3+' },
+          { id: 'kpi-1-2', label: tr('Time saved per week', 'Waktu yang dihemat per minggu'), target: kpiTargets.hoursSavedPerWeek },
         ],
       },
       {
         id: 'phase-2',
-        name: 'Scale & Integrate',
-        timeframe: 'Month 4–6',
-        description: 'Expand automation coverage and integrate AI into core business processes.',
+        name: tr('Scale & Integrate', 'Skalakan & Integrasikan'),
+        timeframe: tr('Month 4–6', 'Bulan 4–6'),
+        description: tr('Expand automation coverage and integrate AI into core business processes.', 'Perluas cakupan otomasi dan integrasikan AI ke proses bisnis inti.'),
         milestones: [
-          { id: 'm-2-1', title: 'Connect CRM and communication tools', linkedWorkflowIds: [] },
-          { id: 'm-2-2', title: 'Deploy AI-assisted decision workflows', linkedWorkflowIds: [] },
-          { id: 'm-2-3', title: 'Establish monitoring and alerting', linkedWorkflowIds: [] },
+          { id: 'm-2-1', title: tr('Connect CRM and communication tools', 'Hubungkan CRM dan alat komunikasi'), linkedWorkflowIds: [] },
+          { id: 'm-2-2', title: tr('Deploy AI-assisted decision workflows', 'Terapkan alur kerja keputusan berbantuan AI'), linkedWorkflowIds: [] },
+          { id: 'm-2-3', title: tr('Establish monitoring and alerting', 'Bangun pemantauan dan pemberitahuan'), linkedWorkflowIds: [] },
         ],
         kpis: [
-          { id: 'kpi-2-1', label: 'Workflows in production', target: '5+' },
-          { id: 'kpi-2-2', label: 'Automation coverage', target: kpiTargets.automationCoverage },
+          { id: 'kpi-2-1', label: tr('Workflows in production', 'Alur kerja di produksi'), target: '5+' },
+          { id: 'kpi-2-2', label: tr('Automation coverage', 'Cakupan otomasi'), target: kpiTargets.automationCoverage },
         ],
       },
       {
         id: 'phase-3',
-        name: 'Optimise & Measure',
-        timeframe: 'Month 7–12',
-        description: 'Refine workflows based on data, measure ROI, and plan next expansion.',
+        name: tr('Optimise & Measure', 'Optimalkan & Ukur'),
+        timeframe: tr('Month 7–12', 'Bulan 7–12'),
+        description: tr('Refine workflows based on data, measure ROI, and plan next expansion.', 'Sempurnakan alur kerja berdasarkan data, ukur ROI, dan rencanakan ekspansi berikutnya.'),
         milestones: [
-          { id: 'm-3-1', title: 'Review KPI performance and optimise workflows', linkedWorkflowIds: [] },
-          { id: 'm-3-2', title: 'Identify next automation opportunities', linkedWorkflowIds: [] },
-          { id: 'm-3-3', title: 'Document learnings and update roadmap', linkedWorkflowIds: [] },
+          { id: 'm-3-1', title: tr('Review KPI performance and optimise workflows', 'Tinjau kinerja KPI dan optimalkan alur kerja'), linkedWorkflowIds: [] },
+          { id: 'm-3-2', title: tr('Identify next automation opportunities', 'Identifikasi peluang otomasi berikutnya'), linkedWorkflowIds: [] },
+          { id: 'm-3-3', title: tr('Document learnings and update roadmap', 'Dokumentasikan pembelajaran dan perbarui roadmap'), linkedWorkflowIds: [] },
         ],
         kpis: [
-          { id: 'kpi-3-1', label: 'ROI achieved', target: kpiTargets.roiOutcome },
-          { id: 'kpi-3-2', label: 'Team AI adoption rate', target: '80%' },
+          { id: 'kpi-3-1', label: tr('ROI achieved', 'ROI tercapai'), target: kpiTargets.roiOutcome },
+          { id: 'kpi-3-2', label: tr('Team AI adoption rate', 'Tingkat adopsi AI tim'), target: '80%' },
         ],
       },
     ],

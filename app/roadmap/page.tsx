@@ -729,6 +729,7 @@ async function exportRoadmapPdf(
   kpiActuals: Record<string, string>,
   phaseCompletes: Record<string, boolean>,
   locale: 'en' | 'id' = 'en',
+  companyName: string = 'Company',
 ) {
   const { default: jsPDF } = await import('jspdf');
   const { applyPremiumCovers, renderAivoryNote, loadManrope, pageBg, pageFooter, sectionLabel, renderNarrative, thinDiv } = await import('@/lib/pdfExport');
@@ -752,16 +753,20 @@ async function exportRoadmapPdf(
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 
-  // Cover
-  await applyPremiumCovers(doc, 'front', tr('AI Implementation\nRoadmap', 'Roadmap\nImplementasi AI'), {
-    company: roadmap.title,
+  // Cover — matches Blueprint's "Transformation\nBlueprint" branding (this
+  // used to say "AI Implementation Roadmap" and put `roadmap.title` — a
+  // generic roadmap title like "Transformation Roadmap", not the company —
+  // in the "company" slot, so the note on the next page literally read
+  // "Dear Transformation Roadmap,". Use the real company name instead.
+  await applyPremiumCovers(doc, 'front', tr('Transformation\nRoadmap', 'Roadmap\nTransformasi'), {
+    company: companyName,
     date: dateStr,
     reportId: `RM-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-001`
   });
 
   // ── A note from Aivory ───────────────────────────────────
   renderAivoryNote(doc, {
-    greeting: tr(`Dear ${roadmap.title},`, `Kepada ${roadmap.title},`),
+    greeting: tr(`Dear ${companyName},`, `Kepada ${companyName},`),
     paragraphs: [
       tr(
         `This is your Transformation Roadmap: the phased, milestone-by-milestone plan that turns your blueprint into deployed, working systems. It sequences what to build, in what order, and how to measure that each phase is landing.`,
@@ -892,7 +897,8 @@ async function exportRoadmapPdf(
   doc.addPage();
   await applyPremiumCovers(doc, 'back', '', {});
 
-  doc.save(`AI_Roadmap_${now.toISOString().slice(0, 10)}.pdf`);
+  const safeCompany = companyName.replace(/[^a-zA-Z0-9-_]/g, '-').replace(/-+/g, '-').slice(0, 40);
+  doc.save(`Aivory-Roadmap-${safeCompany}-${now.toISOString().slice(0, 10)}.pdf`);
 }
 
 // ─── Empty state ──────────────────────────────────────────────
@@ -1105,7 +1111,12 @@ export default function RoadmapPage() {
 
   const handleExportPdf = useCallback(() => {
     if (!roadmap) return;
-    exportRoadmapPdf(roadmap, allChecked, kpiActuals, phaseCompletes, locale);
+    // roadmap.title is a generic title ("Transformation Roadmap"), not the
+    // company — pull the real company name from the linked blueprint.
+    const companyName = (() => {
+      try { return JSON.parse(localStorage.getItem('aivory_blueprint') || '{}')?.organization?.name } catch { return undefined }
+    })() || 'Company';
+    exportRoadmapPdf(roadmap, allChecked, kpiActuals, phaseCompletes, locale, companyName);
   }, [roadmap, allChecked, kpiActuals, phaseCompletes, locale]);
 
   const font = "var(--font-manrope), 'Manrope', system-ui, sans-serif";
