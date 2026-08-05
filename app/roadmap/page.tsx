@@ -779,11 +779,11 @@ async function exportRoadmapPdf(
     paragraphs: [
       tr(
         `This is your Transformation Roadmap: the phased, milestone-by-milestone plan that turns your blueprint into deployed, working systems. It sequences what to build, in what order, and how to measure that each phase is landing.`,
-        `Ini adalah Roadmap Transformasi Anda: rencana bertahap milestone demi milestone yang mengubah blueprint Anda menjadi sistem yang diterapkan dan berjalan. Roadmap ini mengurutkan apa yang perlu dibangun, dalam urutan apa, dan bagaimana mengukur keberhasilan setiap fase.`
+        `Ini adalah Roadmap Transformasi Anda dalam rencana bertahap, milestone demi milestone, yang mengubah blueprint menjadi sistem yang benar-benar berjalan. Roadmap ini menyusun apa yang perlu dibangun, dalam urutan yang tepat, serta bagaimana mengukur keberhasilan di setiap fase.`
       ),
       tr(
         `Use it as a living document. As your team checks off milestones and records KPI actuals, the roadmap tracks how far you have progressed toward a fully operational AI capability.`,
-        `Gunakan dokumen ini sebagai dokumen hidup. Seiring tim Anda mencentang milestone dan mencatat KPI aktual, roadmap ini melacak sejauh mana Anda telah maju menuju kapabilitas AI yang sepenuhnya operasional.`
+        `Gunakan dokumen ini sebagai living document. Seiring tim Anda menyelesaikan setiap milestone dan mencatat KPI aktual, roadmap ini akan menunjukkan seberapa jauh Anda telah bergerak menuju kapabilitas AI yang sepenuhnya operasional.`
       ),
     ],
     footerStats: [
