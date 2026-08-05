@@ -40,13 +40,26 @@ const LS_START_DATE     = 'aivory_roadmap_start_date';
 const LS_PHASE_COMPLETE = 'aivory_roadmap_phase_complete';
 
 // ─── Cover page intro ─────────────────────────────────────────
-const COVER_INTRO = 'This Transformation Roadmap translates the findings from your Business Operations Assessment and the architectural decisions captured in your Transformation Blueprint into a phased, milestone-driven execution plan. Use it to track deployment progress by checking off milestones, recording KPI actuals against targets, and exporting a snapshot at the end of each phase for stakeholder review. Successful completion at Month 12 means your organisation will have automated 62.5% of targeted workflows, reclaimed 361 hours of annual capacity, and established a repeatable framework for the next investment cycle.';
+// Kept generic (no fabricated numbers) — this used to hardcode a fixed
+// "62.5%... 361 hours... Month 12" outcome regardless of the roadmap's
+// actual phases/KPIs, which never matched most roadmaps.
+const COVER_INTRO: Record<'en' | 'id', string> = {
+  en: 'This Transformation Roadmap translates the findings from your Business Operations Assessment and the architectural decisions captured in your Transformation Blueprint into a phased, milestone-driven execution plan. Use it to track deployment progress by checking off milestones, recording KPI actuals against targets, and exporting a snapshot at the end of each phase for stakeholder review.',
+  id: 'Roadmap Transformasi ini menerjemahkan temuan dari Asesmen Operasional Bisnis Anda dan keputusan arsitektur yang tertuang dalam Blueprint Transformasi Anda menjadi rencana eksekusi bertahap berbasis milestone. Gunakan dokumen ini untuk melacak progres penerapan dengan mencentang milestone, mencatat KPI aktual terhadap target, dan mengekspor ringkasan pada akhir setiap fase untuk ditinjau pemangku kepentingan.',
+};
 
 // ─── Contextual phase descriptions (Feature 3) ───────────────
-const PHASE_DESCRIPTIONS: Record<number, string> = {
-  0: 'Start here. The goal is to prove AI works in your environment by shipping 3 automated workflows in 90 days. Every 90 days of delay costs your organisation approximately $3,525 in unrealized savings, so speed matters more than perfection in this phase. Automated Reporting goes first because its 5-week time to value is the fastest of all modules, and the data pipelines it establishes become the foundation that CS Ticket Automation and Process Automation depend on. Phase 1 is complete when your team has three workflows running in production, at least 10 hours per week are being reclaimed, and your internal stakeholders can point to measurable proof that AI delivers results in your environment.',
-  1: 'With quick wins validated, this phase expands automation into the core revenue-impacting area: CS Ticket Automation. The 40% automation coverage target is deliberately conservative — this phase prioritizes operational stability over speed, ensuring each workflow is reliable before adding the next. Connecting your CRM and communication tools is a hard prerequisite because CS Ticket Automation cannot function without real-time access to customer data and routing logic. Do not advance to Phase 3 until you have at least 5 workflows running in production; proceeding earlier creates measurement gaps that undermine the ROI validation work ahead.',
-  2: 'Shift from building to measuring. If your actual annual savings are tracking below the $14,296 target, check two factors first: the efficiency factor applied to each automated workflow and whether automation coverage has genuinely reached the projected 62.5%. The 80% team adoption rate target means more than login frequency — it means team members are incorporating AI tools into their daily workflow without being prompted, a behavioural shift that typically requires 4–6 weeks of reinforcement after deployment. Success at Month 12 builds the quantitative case for the next investment cycle, demonstrating that your $30,000 initial investment is on track to deliver a 43% return over three years.',
+const PHASE_DESCRIPTIONS: Record<'en' | 'id', Record<number, string>> = {
+  en: {
+    0: 'Start here. The goal is to prove AI works in your environment by shipping 3 automated workflows in 90 days. Every 90 days of delay costs your organisation approximately $3,525 in unrealized savings, so speed matters more than perfection in this phase. Automated Reporting goes first because its 5-week time to value is the fastest of all modules, and the data pipelines it establishes become the foundation that CS Ticket Automation and Process Automation depend on. Phase 1 is complete when your team has three workflows running in production, at least 10 hours per week are being reclaimed, and your internal stakeholders can point to measurable proof that AI delivers results in your environment.',
+    1: 'With quick wins validated, this phase expands automation into the core revenue-impacting area: CS Ticket Automation. The 40% automation coverage target is deliberately conservative — this phase prioritizes operational stability over speed, ensuring each workflow is reliable before adding the next. Connecting your CRM and communication tools is a hard prerequisite because CS Ticket Automation cannot function without real-time access to customer data and routing logic. Do not advance to Phase 3 until you have at least 5 workflows running in production; proceeding earlier creates measurement gaps that undermine the ROI validation work ahead.',
+    2: 'Shift from building to measuring. If your actual annual savings are tracking below the $14,296 target, check two factors first: the efficiency factor applied to each automated workflow and whether automation coverage has genuinely reached the projected 62.5%. The 80% team adoption rate target means more than login frequency — it means team members are incorporating AI tools into their daily workflow without being prompted, a behavioural shift that typically requires 4–6 weeks of reinforcement after deployment. Success at Month 12 builds the quantitative case for the next investment cycle, demonstrating that your $30,000 initial investment is on track to deliver a 43% return over three years.',
+  },
+  id: {
+    0: 'Mulai di sini. Tujuannya adalah membuktikan bahwa AI berhasil di lingkungan Anda dengan meluncurkan 3 alur kerja terotomasi dalam 90 hari. Setiap keterlambatan 90 hari membebani organisasi Anda sekitar $3.525 dalam penghematan yang belum terealisasi, sehingga kecepatan lebih penting daripada kesempurnaan pada fase ini. Automated Reporting dijalankan lebih dulu karena waktu-ke-nilai 5 minggunya adalah yang tercepat dari semua modul, dan jalur data yang dibangunnya menjadi fondasi bagi CS Ticket Automation dan Process Automation. Fase 1 dianggap selesai ketika tim Anda memiliki tiga alur kerja yang berjalan di produksi, setidaknya 10 jam per minggu berhasil dibebaskan, dan pemangku kepentingan internal Anda dapat menunjukkan bukti terukur bahwa AI memberikan hasil nyata di lingkungan Anda.',
+    1: 'Setelah kemenangan cepat tervalidasi, fase ini memperluas otomasi ke area inti yang berdampak pada pendapatan: CS Ticket Automation. Target cakupan otomasi 40% sengaja dibuat konservatif — fase ini mengutamakan stabilitas operasional di atas kecepatan, memastikan setiap alur kerja andal sebelum menambahkan yang berikutnya. Menghubungkan CRM dan alat komunikasi Anda adalah prasyarat mutlak karena CS Ticket Automation tidak dapat berfungsi tanpa akses real-time ke data pelanggan dan logika perutean. Jangan lanjut ke Fase 3 sebelum Anda memiliki setidaknya 5 alur kerja yang berjalan di produksi; melanjutkan lebih awal menciptakan celah pengukuran yang merusak validasi ROI pada tahap berikutnya.',
+    2: 'Beralih dari membangun ke mengukur. Jika penghematan tahunan aktual Anda berada di bawah target $14.296, periksa dua faktor terlebih dahulu: faktor efisiensi yang diterapkan pada setiap alur kerja terotomasi dan apakah cakupan otomasi benar-benar telah mencapai proyeksi 62,5%. Target tingkat adopsi tim 80% bermakna lebih dari sekadar frekuensi login — artinya anggota tim mengintegrasikan alat AI ke dalam alur kerja harian mereka tanpa perlu diminta, suatu perubahan perilaku yang biasanya membutuhkan 4–6 minggu penguatan setelah penerapan. Keberhasilan pada Bulan ke-12 membangun basis kuantitatif untuk siklus investasi berikutnya, menunjukkan bahwa investasi awal Anda sebesar $30.000 berada di jalur untuk memberikan imbal hasil 43% dalam tiga tahun.',
+  },
 };
 
 // ─── Milestone resource links (Feature 4) ─────────────────────
@@ -491,13 +504,14 @@ function PhaseSection({ phase, index, open, phaseRef, onToggle, onWorkflow, chec
   onPhaseComplete: () => void;
 }) {
   const t = useTranslations("roadmap");
+  const { locale } = useLocaleContext();
   const [hov, setHov] = useState(false);
 
   const checkedN = Object.values(checked).filter(Boolean).length;
   const total = phase.milestones.length;
   const pct = phaseComplete ? 100 : total > 0 ? Math.round((checkedN / total) * 100) : 0;
   const icon = PHASE_ICONS[index % 3];
-  const contextDescription = PHASE_DESCRIPTIONS[index] || phase.description;
+  const contextDescription = PHASE_DESCRIPTIONS[locale][index] || phase.description;
 
   return (
     <div ref={phaseRef} style={{
@@ -714,9 +728,12 @@ async function exportRoadmapPdf(
   allChecked: Record<string, Record<string, boolean>>,
   kpiActuals: Record<string, string>,
   phaseCompletes: Record<string, boolean>,
+  locale: 'en' | 'id' = 'en',
 ) {
   const { default: jsPDF } = await import('jspdf');
   const { applyPremiumCovers, renderAivoryNote, loadManrope, pageBg, pageFooter, sectionLabel, renderNarrative, thinDiv } = await import('@/lib/pdfExport');
+
+  const tr = (en: string, id: string) => locale === 'id' ? id : en
 
   const doc = new jsPDF('p', 'mm', 'a4');
   await loadManrope(doc);
@@ -736,8 +753,7 @@ async function exportRoadmapPdf(
   const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
 
   // Cover
-  await applyPremiumCovers(doc, 'front', `AI Implementation
-Roadmap`, {
+  await applyPremiumCovers(doc, 'front', tr('AI Implementation\nRoadmap', 'Roadmap\nImplementasi AI'), {
     company: roadmap.title,
     date: dateStr,
     reportId: `RM-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-001`
@@ -745,24 +761,30 @@ Roadmap`, {
 
   // ── A note from Aivory ───────────────────────────────────
   renderAivoryNote(doc, {
-    greeting: `Dear ${roadmap.title},`,
+    greeting: tr(`Dear ${roadmap.title},`, `Kepada ${roadmap.title},`),
     paragraphs: [
-      `This is your Transformation Roadmap: the phased, milestone-by-milestone plan that turns your blueprint into deployed, working systems. It sequences what to build, in what order, and how to measure that each phase is landing.`,
-      `Use it as a living document. As your team checks off milestones and records KPI actuals, the roadmap tracks how far you have progressed toward a fully operational AI capability.`,
+      tr(
+        `This is your Transformation Roadmap: the phased, milestone-by-milestone plan that turns your blueprint into deployed, working systems. It sequences what to build, in what order, and how to measure that each phase is landing.`,
+        `Ini adalah Roadmap Transformasi Anda: rencana bertahap milestone demi milestone yang mengubah blueprint Anda menjadi sistem yang diterapkan dan berjalan. Roadmap ini mengurutkan apa yang perlu dibangun, dalam urutan apa, dan bagaimana mengukur keberhasilan setiap fase.`
+      ),
+      tr(
+        `Use it as a living document. As your team checks off milestones and records KPI actuals, the roadmap tracks how far you have progressed toward a fully operational AI capability.`,
+        `Gunakan dokumen ini sebagai dokumen hidup. Seiring tim Anda mencentang milestone dan mencatat KPI aktual, roadmap ini melacak sejauh mana Anda telah maju menuju kapabilitas AI yang sepenuhnya operasional.`
+      ),
     ],
     footerStats: [
-      { label: 'Overall Progress', value: `${overallPct}%` },
-      { label: 'Milestones', value: `${checkedMilestones}/${totalMilestones}`, align: 'right' },
+      { label: tr('Overall Progress', 'Progres Keseluruhan'), value: `${overallPct}%` },
+      { label: tr('Milestones', 'Milestone'), value: `${checkedMilestones}/${totalMilestones}`, align: 'right' },
     ],
-  });
+  }, locale);
 
   // Cover page intro (first inner page)
   doc.addPage();
   pageBg(doc);
   pageFooter(doc);
   let y = ML;
-  y = sectionLabel(doc, y, 'About This Roadmap');
-  y = renderNarrative(doc, y, COVER_INTRO);
+  y = sectionLabel(doc, y, tr('About This Roadmap', 'Tentang Roadmap Ini'));
+  y = renderNarrative(doc, y, COVER_INTRO[locale]);
   y += 6;
   thinDiv(doc, y);
 
@@ -776,6 +798,7 @@ Roadmap`, {
       pageFooter(doc);
       y = ML;
     }
+    return y;
   };
 
   for (let i = 0; i < roadmap.phases.length; i++) {
@@ -786,7 +809,7 @@ Roadmap`, {
     y = ML;
 
     // Phase header
-    y = sectionLabel(doc, y, `Phase ${i + 1}: ${phase.name}`);
+    y = sectionLabel(doc, y, `${tr('Phase', 'Fase')} ${i + 1}: ${phase.name}`);
     doc.setFontSize(9);
     doc.setTextColor(136, 136, 136);
     doc.text(phase.timeframe, ML, y);
@@ -795,13 +818,13 @@ Roadmap`, {
     if (phaseCompletes[phase.id]) {
       doc.setFontSize(9);
       doc.setTextColor(76, 175, 80);
-      doc.text('✓ PHASE COMPLETE', PAGE_W - ML - 40, ML + 5);
+      doc.text(tr('✓ PHASE COMPLETE', '✓ FASE SELESAI'), PAGE_W - ML - 40, ML + 5);
     }
 
     // Description
-    const desc = PHASE_DESCRIPTIONS[i] || phase.description;
+    const desc = PHASE_DESCRIPTIONS[locale][i] || phase.description;
     if (desc) {
-      y = renderNarrative(doc, y, desc);
+      y = renderNarrative(doc, y, desc, checkPage);
       y += 4;
     }
 
@@ -810,7 +833,7 @@ Roadmap`, {
     doc.setFontSize(8);
     doc.setFont(FB(), 'bold');
     doc.setTextColor(136, 136, 136);
-    doc.text('MILESTONES', ML, y);
+    doc.text(tr('MILESTONES', 'MILESTONE'), ML, y);
     y += 6;
 
     const phaseChecked = allChecked[phase.id] || {};
@@ -831,14 +854,14 @@ Roadmap`, {
       doc.setFontSize(8);
       doc.setFont(FB(), 'bold');
       doc.setTextColor(136, 136, 136);
-      doc.text('KPI TARGETS', ML, y);
+      doc.text(tr('KPI TARGETS', 'TARGET KPI'), ML, y);
       y += 6;
 
       for (const k of phase.kpis) {
         checkPage(12);
         const actual = kpiActuals[k.id] || '—';
         const status = getKpiStatus(k.target, kpiActuals[k.id]);
-        const statusLabel = status === 'green' ? '● On Track' : status === 'yellow' ? '● Progressing' : status === 'red' ? '● Below Target' : '';
+        const statusLabel = status === 'green' ? tr('● On Track', '● Sesuai Target') : status === 'yellow' ? tr('● Progressing', '● Dalam Progres') : status === 'red' ? tr('● Below Target', '● Di Bawah Target') : '';
 
         doc.setFontSize(9);
         doc.setFont(FB(), 'bold');
@@ -849,12 +872,13 @@ Roadmap`, {
         doc.setFont(FB(), 'normal');
         doc.setFontSize(9);
         doc.setTextColor(80, 80, 80);
-        doc.text(`Target: ${k.target}  ·  Actual: ${actual}`, ML + 4, y);
+        const targetActualLine = tr(`Target: ${k.target}  ·  Actual: ${actual}`, `Target: ${k.target}  ·  Aktual: ${actual}`);
+        doc.text(targetActualLine, ML + 4, y);
 
         if (statusLabel) {
           const sColor = status === 'green' ? [76, 175, 80] : status === 'yellow' ? [251, 191, 36] : [248, 113, 113];
           doc.setTextColor(sColor[0], sColor[1], sColor[2]);
-          doc.text(`  ${statusLabel}`, ML + 4 + doc.getTextWidth(`Target: ${k.target}  ·  Actual: ${actual}`), y);
+          doc.text(`  ${statusLabel}`, ML + 4 + doc.getTextWidth(targetActualLine), y);
         }
         y += 7;
       }
@@ -1049,7 +1073,7 @@ export default function RoadmapPage() {
       const bpCtx   = (() => { try { return JSON.parse(localStorage.getItem('aivory_blueprint') || '{}'); } catch { return {}; } })();
       const res = await fetch(asset('/api/roadmap/generate'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: 'direct', diagnosticContext: diagCtx, blueprintContext: bpCtx }),
+        body: JSON.stringify({ source: 'direct', diagnosticContext: diagCtx, blueprintContext: bpCtx, locale }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Generation failed');
@@ -1081,8 +1105,8 @@ export default function RoadmapPage() {
 
   const handleExportPdf = useCallback(() => {
     if (!roadmap) return;
-    exportRoadmapPdf(roadmap, allChecked, kpiActuals, phaseCompletes);
-  }, [roadmap, allChecked, kpiActuals, phaseCompletes]);
+    exportRoadmapPdf(roadmap, allChecked, kpiActuals, phaseCompletes, locale);
+  }, [roadmap, allChecked, kpiActuals, phaseCompletes, locale]);
 
   const font = "var(--font-manrope), 'Manrope', system-ui, sans-serif";
 

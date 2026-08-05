@@ -1,6 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SERVICES } from '@/config/services';
 import type { AiryRoadmap } from '@/types/roadmap';
+import { formatLocalAmount, parseCurrencyCode } from '@/lib/resultFormatters';
+
+/**
+ * The fallback roadmap's KPI targets used to be hardcoded placeholders
+ * ("3x investment", "40%", "10+ hours") that read to a user exactly like
+ * computed figures even though this path only runs when the AI call
+ * failed. Ground them in the diagnostic engine's own fields when present;
+ * fall back to qualitative language (never an invented number) otherwise.
+ * See §1.6 row 11 of DEEP-DIAGNOSTIC-EXPERIENCE-V2-PLANNING.md.
+ */
+function deriveFallbackKpiTargets(diagnosticContext: Record<string, any>) {
+  const calc = diagnosticContext?.calculations;
+  const quant = diagnosticContext?.quantitative;
+  const currencyCode = parseCurrencyCode(diagnosticContext?.currency);
+
+  const hoursSavedPerWeek = typeof calc?.hoursReclaimedPerYear === 'number'
+    ? `${Math.max(1, Math.round(calc.hoursReclaimedPerYear / 52))}+ hours`
+    : 'Meaningful reduction in manual hours';
+
+  const automationCoverage = typeof quant?.targetAutomationPct === 'number'
+    ? `${quant.targetAutomationPct}%`
+    : 'Increased automation coverage';
+
+  const roiOutcome = typeof calc?.netThreeYearROIPercent === 'number'
+    ? `${Math.max(0, Math.round(calc.netThreeYearROIPercent))}% 3-yr ROI`
+    : typeof calc?.totalAnnualSavingsLocal === 'number'
+      ? `${formatLocalAmount(calc.totalAnnualSavingsLocal, currencyCode)}/yr savings`
+      : 'Positive return on automation investment';
+
+  return { hoursSavedPerWeek, automationCoverage, roiOutcome };
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,6 +40,7 @@ export async function POST(req: NextRequest) {
     const blueprintId: string | undefined = body.blueprintId;
     const diagnosticContext: Record<string, any> = body.diagnosticContext ?? {};
     const blueprintContext: Record<string, any> = body.blueprintContext ?? {};
+    const locale: 'en' | 'id' = body.locale === 'id' ? 'id' : 'en';
 
     // Build a prompt for Aivory to generate a structured roadmap
     const contextParts: string[] = [];
@@ -59,7 +91,11 @@ Return ONLY valid JSON matching this exact schema (no markdown, no explanation):
   ]
 }
 
-Generate 3-4 phases. Each phase should have 2-4 milestones and 2-3 KPIs. Be specific and actionable.`;
+Generate 3-4 phases. Each phase should have 2-4 milestones and 2-3 KPIs. Be specific and actionable.
+
+GROUNDING RULES (do not violate): every KPI "target" value must trace back to a field that is actually present in the DIAGNOSTIC RESULTS or BLUEPRINT DATA above — do not invent a number. Prefer these pre-computed fields verbatim, never recompute or approximate them: "calculations.totalAnnualSavingsLocal", "calculations.paybackMonths"/"netPaybackMonths", "calculations.threeYearROIPercent"/"netThreeYearROIPercent", "calculations.hoursReclaimedPerYear", and "quantitative.targetAutomationPct"/"currentAutomationPct" (the user's own answers). If none of these fields are present in the context above for a given KPI, use qualitative language (e.g. "meaningful reduction in manual hours") instead of a specific invented number.${locale === 'id' ? `
+
+LANGUAGE: Write every freeform narrative/text field VALUE in formal Bahasa Indonesia (business register) — this includes "title", "phases[].name", "phases[].timeframe", "phases[].description", "phases[].milestones[].title/description", and "phases[].kpis[].label/target". Do NOT translate the fixed "id" slug fields ("phases[].id", "milestones[].id", "kpis[].id") — keep those exactly as specified in the schema. Currency figures and dollar amounts stay as-is (do not convert currency).` : ''}`;
 
     // Call Zeroclaw/VPS Bridge
     let roadmap: AiryRoadmap;
@@ -110,7 +146,7 @@ Generate 3-4 phases. Each phase should have 2-4 milestones and 2-3 KPIs. Be spec
     } catch (aiErr) {
       // Fallback: generate a sensible default roadmap if AI call fails
       console.error('[roadmap/generate] AI call failed, using fallback:', aiErr);
-      roadmap = buildFallbackRoadmap(source, blueprintId);
+      roadmap = buildFallbackRoadmap(source, blueprintId, diagnosticContext);
     }
 
     return NextResponse.json({ success: true, roadmap });
@@ -123,7 +159,8 @@ Generate 3-4 phases. Each phase should have 2-4 milestones and 2-3 KPIs. Be spec
   }
 }
 
-function buildFallbackRoadmap(source: string, blueprintId?: string): AiryRoadmap {
+function buildFallbackRoadmap(source: string, blueprintId?: string, diagnosticContext: Record<string, any> = {}): AiryRoadmap {
+  const kpiTargets = deriveFallbackKpiTargets(diagnosticContext);
   return {
     id: `roadmap-${Date.now()}`,
     title: 'Transformation Roadmap',
@@ -143,7 +180,7 @@ function buildFallbackRoadmap(source: string, blueprintId?: string): AiryRoadmap
         ],
         kpis: [
           { id: 'kpi-1-1', label: 'Manual tasks automated', target: '3+' },
-          { id: 'kpi-1-2', label: 'Time saved per week', target: '10+ hours' },
+          { id: 'kpi-1-2', label: 'Time saved per week', target: kpiTargets.hoursSavedPerWeek },
         ],
       },
       {
@@ -158,7 +195,7 @@ function buildFallbackRoadmap(source: string, blueprintId?: string): AiryRoadmap
         ],
         kpis: [
           { id: 'kpi-2-1', label: 'Workflows in production', target: '5+' },
-          { id: 'kpi-2-2', label: 'Automation coverage', target: '40%' },
+          { id: 'kpi-2-2', label: 'Automation coverage', target: kpiTargets.automationCoverage },
         ],
       },
       {
@@ -172,7 +209,7 @@ function buildFallbackRoadmap(source: string, blueprintId?: string): AiryRoadmap
           { id: 'm-3-3', title: 'Document learnings and update roadmap', linkedWorkflowIds: [] },
         ],
         kpis: [
-          { id: 'kpi-3-1', label: 'ROI achieved', target: '3x investment' },
+          { id: 'kpi-3-1', label: 'ROI achieved', target: kpiTargets.roiOutcome },
           { id: 'kpi-3-2', label: 'Team AI adoption rate', target: '80%' },
         ],
       },

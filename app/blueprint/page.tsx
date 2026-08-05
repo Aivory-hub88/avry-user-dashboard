@@ -1091,7 +1091,7 @@ export default function BlueprintPage() {
     setShowDownloadMenu(false)
     setDownloadLoading(true)
     try {
-      await exportBlueprintPDF(blueprint, currentVersionLabel ?? 'Draft')
+      await exportBlueprintPDF(blueprint, currentVersionLabel ?? 'Draft', locale)
       showToast(t("downloadSuccess"))
     } catch (e) {
       showToast(t("pdfExportFailed"))
@@ -1105,7 +1105,7 @@ export default function BlueprintPage() {
     setShowDownloadMenu(false)
     setDownloadLoading(true)
     try {
-      await exportBlueprintDOCX(blueprint, currentVersionLabel ?? 'Draft')
+      await exportBlueprintDOCX(blueprint, currentVersionLabel ?? 'Draft', locale)
       showToast(t("downloadSuccess"))
     } catch (e) {
       showToast(t("docxExportFailed"))
@@ -1133,6 +1133,7 @@ export default function BlueprintPage() {
           source: 'blueprint',
           blueprintContext: blueprint,
           diagnosticContext,
+          locale,
         }),
       })
       const data = await res.json()

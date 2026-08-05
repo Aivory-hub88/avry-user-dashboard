@@ -143,7 +143,8 @@ export default function FinalResultPage() {
         diagnosticId,
         undefined,
         diagnosticData.qualitative?.primaryObjective || 'Business operations improvement',
-        diagnosticData
+        diagnosticData,
+        locale
       )
       
       router.push('/blueprint')

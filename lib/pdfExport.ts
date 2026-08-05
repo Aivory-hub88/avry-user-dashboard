@@ -465,13 +465,22 @@ export function renderContents(pdf: jsPDF, entries: TocEntry[], locale: Locale =
   })
 }
 
-/** Renders a narrative block and returns the new Y position. */
-export function renderNarrative(pdf: jsPDF, y: number, text: string): number {
-  setC(pdf, CONTENT_C, 'text')
+/**
+ * Renders a narrative block and returns the new Y position.
+ * Pass `checkPage` (the caller's local page-break helper, returning the
+ * possibly-reset y) so a long paragraph triggers a page break BEFORE
+ * drawing instead of overflowing past the page boundary — mirrors
+ * `bullet()`'s measure-then-checkPage order. `checkPage` mutates the
+ * caller's own `y` via closure, so its return value (not just the call)
+ * must be re-assigned here to keep this function's local `y` in sync.
+ */
+export function renderNarrative(pdf: jsPDF, y: number, text: string, checkPage?: (needed: number) => number): number {
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(10) // Increased for better readability
-  pdf.setLineHeightFactor(1.5)
   const lines = pdf.splitTextToSize(text, CW)
+  if (checkPage) y = checkPage(lines.length * 5.2 + 8)
+  setC(pdf, CONTENT_C, 'text')
+  pdf.setLineHeightFactor(1.5)
   pdf.text(lines, ML, y + 4)
   pdf.setLineHeightFactor(1.15)
   return y + lines.length * 5.2 + 8
@@ -1369,6 +1378,7 @@ export function renderAivoryNote(
     paragraphs: string[]
     footerStats?: Array<{ label: string; value: string; align?: 'left' | 'right' }>
   },
+  locale: Locale = 'en',
 ) {
   doc.addPage()
   setC(doc, COVER_BG, 'fill')
@@ -1379,7 +1389,7 @@ export function renderAivoryNote(
   setC(doc, '#8fb87f', 'text')
   doc.setFont(FB(), 'bold')
   doc.setFontSize(7.5)
-  spacedText(doc, 'A NOTE FROM AIVORY', cx, 58, 0.5)
+  spacedText(doc, locale === 'id' ? 'CATATAN DARI AIVORY' : 'A NOTE FROM AIVORY', cx, 58, 0.5)
 
   setC(doc, '#ffffff', 'text')
   doc.setFont(F(), 'normal')
@@ -1402,7 +1412,7 @@ export function renderAivoryNote(
   setC(doc, '#8fb87f', 'text')
   doc.setFont(F(), 'normal')
   doc.setFontSize(11)
-  doc.text('Warmly, The Aivory Team', cx, ny)
+  doc.text(locale === 'id' ? 'Salam hangat, Tim Aivory' : 'Warmly, The Aivory Team', cx, ny)
 
   const sigW = 46
   const sigH = sigW * (62.9 / 498.7)

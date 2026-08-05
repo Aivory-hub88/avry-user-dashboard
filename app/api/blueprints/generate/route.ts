@@ -12,6 +12,7 @@ import { NextRequest } from 'next/server'
 import { getConfig } from '@/lib/config'
 import { createErrorResponse } from '@/types/errors'
 import type { BlueprintV1 } from '@/types/blueprint'
+import { formatLocalAmount, parseCurrencyCode } from '@/lib/resultFormatters'
 
 export const maxDuration = 120
 
@@ -53,6 +54,22 @@ function parseBlueprintContent(content: string): BlueprintV1 | null {
   }
 }
 
+/**
+ * The one number in this route that must never come from an LLM or a
+ * hardcoded constant when real data exists: derive it from the diagnostic
+ * engine's own ROI projection (services/deepDiagnostic.ts `calculateROI`),
+ * falling back to a generic default only when that projection genuinely
+ * couldn't be computed (see §1.6 row 11 of DEEP-DIAGNOSTIC-EXPERIENCE-V2-PLANNING.md).
+ */
+function deriveEstimatedRoiMonths(diagnostic: any): number {
+  const calc = diagnostic?.calculations
+  const months = calc?.netPaybackMonths ?? calc?.paybackMonths
+  if (typeof months === 'number' && isFinite(months) && months > 0) {
+    return Math.max(1, Math.round(months))
+  }
+  return 6
+}
+
 function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
   const company = typeof diagnostic?.company === 'string' && diagnostic.company.trim()
     ? diagnostic.company
@@ -89,6 +106,17 @@ function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
   const fallbackObjective = qualitative.primaryObjective || 'Generate an AI implementation blueprint from the diagnostic.'
   const primaryGoal = cleanedObjective || fallbackObjective
 
+  const currencyCode = parseCurrencyCode(diagnostic?.currency)
+  const calc = diagnostic?.calculations || {}
+  const roiKpi = typeof calc.totalAnnualSavingsLocal === 'number' && typeof calc.paybackMonths === 'number'
+    ? {
+        metric: 'Annual Operational Savings',
+        current: formatLocalAmount(0, currencyCode),
+        target: formatLocalAmount(calc.totalAnnualSavingsLocal, currencyCode),
+        expected_impact: `Payback in ~${Math.round(calc.paybackMonths)} months, per the diagnostic's own ROI model`
+      }
+    : null
+
   return {
     blueprint_id: `BP_${Date.now()}`,
     version: '1',
@@ -113,7 +141,8 @@ function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
           current: `${extractedScore}/100`,
           target: 'Improve through prioritised automation initiatives',
           expected_impact: 'Higher automation coverage and reduced manual workload'
-        }
+        },
+        ...(roiKpi ? [roiKpi] : [])
       ]
     },
     system_architecture: {
@@ -144,7 +173,7 @@ function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
     deployment_plan: {
       phase: 'Blueprint draft',
       estimated_impact: 'Prioritised AI implementation plan generated from diagnostic results',
-      estimated_roi_months: 6,
+      estimated_roi_months: deriveEstimatedRoiMonths(diagnostic),
       waves: [
         { name: 'Validation', included_workflows: [], notes: 'Validate blueprint assumptions with stakeholders' }
       ]
@@ -155,8 +184,9 @@ function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
 export async function POST(request: NextRequest) {
   try {
     // Parse request body
-    const body = await request.json() as { diagnostic?: any; diagnostic_data?: any }
+    const body = await request.json() as { diagnostic?: any; diagnostic_data?: any; locale?: 'en' | 'id' }
     const diagnostic = body.diagnostic || body.diagnostic_data
+    const locale = body.locale === 'id' ? 'id' : 'en'
 
     if (!diagnostic) {
       return Response.json(
@@ -206,13 +236,17 @@ interface BlueprintV1 {
 
 IMPORTANT: The diagnostic includes a "roomForImprovement" array — each item has the area, the recommended action, its operational impact, and a concrete before/after. Use these improvement items to shape the blueprint's workflows, deployment phases, and expected operational outcomes (map each high-priority improvement to at least one workflow or phase). If the diagnostic includes an "ai_analysis" object (summary, strengths, constraints, automation_opportunities, recommended_next_step), treat it as prior analysis of this organisation and keep the blueprint consistent with it. Make sure to map the exact "composite" score and "maturityLevel" from the diagnostic data to "ai_readiness_score" and "maturity_level".
 
-KPI TARGETS: For each kpi_targets entry, "current" is the baseline value taken from the diagnostic data (e.g. "$4.20 per ticket", "22% automation coverage"), "target" is the goal value (e.g. "$1.80 per ticket"), and "expected_impact" is the BUSINESS OUTCOME of reaching that target (e.g. "~57% lower support cost, ≈$22,500/yr saved") — expected_impact must NEVER be a copy of the target value.
+KPI TARGETS: Every kpi_targets entry must be grounded in a field that actually exists in the Diagnostic Data below — never invent a number. Prefer these pre-computed fields verbatim, do not recalculate or approximate them: "calculations.totalAnnualSavingsLocal", "calculations.annualLaborSavingsLocal", "calculations.paybackMonths"/"netPaybackMonths", "calculations.threeYearROIPercent"/"netThreeYearROIPercent". Where the user answered a concrete quantitative field directly (e.g. "quantitative.costCurrentPerTicket"/"costTargetPerTicket", "quantitative.currentAutomationPct"/"targetAutomationPct"), use those verbatim too. "current" is the real baseline value, "target" is the goal state, and "expected_impact" is the business outcome in plain language, citing the engine's own savings/ROI figures where relevant — expected_impact must NEVER be a copy of the target value. If none of the fields above are present for a given metric, use qualitative language (e.g. "meaningful reduction in manual cost") instead of a specific invented figure.
+
+NOTE: "deployment_plan.estimated_roi_months" is overwritten server-side from "calculations.paybackMonths" after generation — estimate it for internal narrative consistency if you like, but it is not the number that reaches the user.
 
 ARCHITECTURE GROUNDING: Aivory's actual product suite is: Deep Diagnostic (business operations scoring), Transformation Blueprint, Transformation Roadmap, AI Console (assistant), Workflow Builder (designs automation workflows from natural language and DEPLOYS THEM TO n8n — automations execute on n8n, not on Aivory), Agents, Automation Templates, and Connectors (Slack, WhatsApp, Telegram, Gmail, HubSpot, Notion, Salesforce, and similar). The system_architecture must be honest and grounded in this reality: "processing_layers" should name the client's real processing needs (e.g. intent classification, data validation) plus "Aivory Workflow Builder" where workflow design fits; "decision_engine" describes the client's decision logic (rules, LLM-assisted routing); "execution_layer" must lead with exactly "Built with Aivory Workflow Builder, deployed to n8n for execution" as its first item, followed by the specific Connectors/integrations needed (each as a short, plain phrase). Recommend third-party tools by name where they genuinely fit (n8n, a CRM API, a helpdesk platform). Do NOT invent Aivory products that do not exist (there is no "Aivory Workflow Engine" runtime and no "Aivory High Intelligence Deterministic Engine" in the client's architecture), and do not mention VPS Bridge or Zeroclaw.
 
 DEPLOYMENT WAVES: In deployment_plan.waves, "included_workflows" must contain the exact "name" values of workflows from workflow_modules (human-readable names, never workflow_id codes).
 
 If the diagnostic data contains no risks (the risks array is empty or missing), do NOT hallucinate or invent risks. You MUST return empty arrays for data_risks, operational_risks, and mitigation_strategies.
+${locale === 'id' ? `
+LANGUAGE: Write every freeform narrative/text field VALUE in formal Bahasa Indonesia (business register) — this includes "organization.industry", "diagnostic_summary.maturity_level", "diagnostic_summary.primary_constraints", "strategic_objective.primary_goal", "strategic_objective.kpi_targets[].metric/current/target/expected_impact", "system_architecture.data_sources/processing_layers/decision_engine/memory_layer/execution_layer", "workflow_modules[].name/trigger/steps[].action/integrations_required", "risk_assessment.data_risks/operational_risks/mitigation_strategies", and "deployment_plan.phase/estimated_impact/waves[].name/notes". Do NOT translate fixed schema keys or literal enum values: "organization.size" ('micro'|'sme'|'mid-market'|'enterprise'), "status" ('draft'|'published'), "workflow_id" codes, and "steps[].type" ('ingestion'|'ai_processing'|'decision'|'execution'|'notification'|'human_review') must stay exactly as specified in the interface. Currency figures and dollar amounts stay as-is (do not convert currency).` : ''}
 
 Diagnostic Data:
 ${JSON.stringify(diagnostic)}`
@@ -272,6 +306,14 @@ ${JSON.stringify(diagnostic)}`
 
     const parsed = parseBlueprintContent(content)
     if (parsed) {
+      // Architecture Principle 2 ("the LLM never computes... must never be
+      // the source of a number that reaches the page") — enforced here, not
+      // just requested in the prompt below, so it holds regardless of what
+      // the model actually returned. See §1.6 row 11 of
+      // DEEP-DIAGNOSTIC-EXPERIENCE-V2-PLANNING.md.
+      if (parsed.deployment_plan) {
+        parsed.deployment_plan.estimated_roi_months = deriveEstimatedRoiMonths(diagnostic)
+      }
       return Response.json(parsed)
     }
 

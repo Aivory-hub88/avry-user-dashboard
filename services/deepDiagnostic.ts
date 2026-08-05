@@ -213,7 +213,8 @@ export class DeepDiagnosticService {
     diagnosticId: string,
     organizationId?: string,
     objective: string = 'Operational health improvement',
-    diagnosticData?: Record<string, any>
+    diagnosticData?: Record<string, any>,
+    locale: 'en' | 'id' = 'en'
   ): Promise<BlueprintV1> {
     // Blueprint runs are attributed to the signed-in user, not a shared demo
     // key or a collision-prone company name.
@@ -232,6 +233,7 @@ export class DeepDiagnosticService {
           diagnostic_id: diagnosticId,
           organization_id: orgId,
           objective,
+          locale,
           ...(diagnosticData ? { diagnostic_data: diagnosticData } : {}),
         }),
         signal: controller.signal,
