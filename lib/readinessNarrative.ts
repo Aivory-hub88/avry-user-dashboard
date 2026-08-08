@@ -413,7 +413,7 @@ export function buildExecutiveSummary(
   const weakLabel = DIM_LABELS[locale][v.weakestKey] ?? cap(v.weakestKey)
 
   if (locale === 'id') {
-    const opening = `${v.company} beroperasi pada skor ${Math.round(v.composite)} dari 100 pada skala kematangan operasional Aivory — posisi "${levelLabel}", di mana ${posture}.`
+    const opening = `${v.company} memperoleh skor ${Math.round(v.composite)} dari 100 berdasarkan metodologi penilaian Kematangan Operasional Aivory — posisi "${levelLabel}", di mana ${posture}.`
 
     let valueSentence = ''
     if (v.businessValueLabel && v.topOpportunityTitle) {
@@ -430,7 +430,7 @@ export function buildExecutiveSummary(
   }
 
   const article = /^[AEIOU]/i.test(level) ? 'an' : 'a'
-  const opening = `${v.company} operates at ${Math.round(v.composite)} out of 100 on the Aivory operational maturity scale — ${article} "${levelLabel}" posture, where ${posture}.`
+  const opening = `${v.company} scores ${Math.round(v.composite)} out of 100 under Aivory's Operational Maturity Assessment methodology — ${article} "${levelLabel}" posture, where ${posture}.`
 
   let valueSentence = ''
   if (v.businessValueLabel && v.topOpportunityTitle) {

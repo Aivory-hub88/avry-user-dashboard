@@ -147,10 +147,10 @@ function buildBlueprintFromText(content: string, diagnostic: any): BlueprintV1 {
     },
     system_architecture: {
       data_sources: ['Business context'],
-      processing_layers: ['Aivory Workflow Builder'],
+      processing_layers: ['Data validation and preparation'],
       decision_engine: 'Rule-based routing with AI-assisted decisions',
       memory_layer: 'Centralised operational data store',
-      execution_layer: ['Built with Aivory Workflow Builder, deployed to n8n for execution']
+      execution_layer: ['Automated workflows, communications, and system integrations']
     },
     workflow_modules: opportunities.slice(0, 3).map((opportunity: any, index: number) => ({
       workflow_id: `WF_${index + 1}`,
@@ -240,7 +240,7 @@ KPI TARGETS: Every kpi_targets entry must be grounded in a field that actually e
 
 NOTE: "deployment_plan.estimated_roi_months" is overwritten server-side from "calculations.paybackMonths" after generation — estimate it for internal narrative consistency if you like, but it is not the number that reaches the user.
 
-ARCHITECTURE GROUNDING: Aivory's actual product suite is: Deep Diagnostic (business operations scoring), Transformation Blueprint, Transformation Roadmap, AI Console (assistant), Workflow Builder (designs automation workflows from natural language and DEPLOYS THEM TO n8n — automations execute on n8n, not on Aivory), Agents, Automation Templates, and Connectors (Slack, WhatsApp, Telegram, Gmail, HubSpot, Notion, Salesforce, and similar). The system_architecture must be honest and grounded in this reality: "processing_layers" should name the client's real processing needs (e.g. intent classification, data validation) plus "Aivory Workflow Builder" where workflow design fits; "decision_engine" describes the client's decision logic (rules, LLM-assisted routing); "execution_layer" must lead with exactly "Built with Aivory Workflow Builder, deployed to n8n for execution" as its first item, followed by the specific Connectors/integrations needed (each as a short, plain phrase). Recommend third-party tools by name where they genuinely fit (n8n, a CRM API, a helpdesk platform). Do NOT invent Aivory products that do not exist (there is no "Aivory Workflow Engine" runtime and no "Aivory High Intelligence Deterministic Engine" in the client's architecture), and do not mention VPS Bridge or Zeroclaw.
+ARCHITECTURE GROUNDING: Describe system_architecture at the business-capability level only — Data → Understand → Decide → Act — never at the technical/implementation level. "data_sources" names the client's real operational data inputs grounded in the diagnostic (business systems, customer records, workflow/ticketing history, tracking data, and other structured or unstructured sources) — plain business language, not a product name. "processing_layers" describes the client's data preparation needs in plain business language (e.g. validation, normalisation, classification, enrichment of data to prepare relevant information for operational processes). "decision_engine" describes how operational context is evaluated to determine priority, action, and handling path based on business policy — a business description, not a specific engine, model, or vendor. "execution_layer" describes how the decided actions are carried out in plain business language (automated workflows, communications, system integrations, operational alerts). Under NO circumstances name any internal Aivory product (Workflow Builder, Console, Agents, etc.), any underlying execution platform (e.g. n8n), or any specific third-party tool or vendor (e.g. Slack, WhatsApp, Telegram, Gmail, HubSpot, Notion, Salesforce) anywhere in system_architecture — refer to integrations only by business function (e.g. "customer communication channels", "CRM integration", "helpdesk system"). Do NOT invent fictitious Aivory product names either, and do not mention VPS Bridge or Zeroclaw.
 
 DEPLOYMENT WAVES: In deployment_plan.waves, "included_workflows" must contain the exact "name" values of workflows from workflow_modules (human-readable names, never workflow_id codes).
 
