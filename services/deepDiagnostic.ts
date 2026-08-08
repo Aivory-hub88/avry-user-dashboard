@@ -219,16 +219,16 @@ export class DeepDiagnosticService {
     // Blueprint runs are attributed to the signed-in user, not a shared demo
     // key or a collision-prone company name.
     const orgId = organizationId?.trim() || getUser()?.user_id || 'current'
-    const controller = new AbortController()
-    // Matches the server route's own 480s budget (app/api/blueprints/generate/route.ts)
-    // — blueprint generation can legitimately take 5+ minutes.
-    const timeout = setTimeout(() => controller.abort(), 480_000)
 
-    let response: Response
+    // 1) Enqueue — the bridge returns a job_id immediately (2026-08-09: moved
+    // off a single held request, which can't survive Cloudflare's ~100-120s
+    // edge timeout on the 1-5+ minute real generation time). See
+    // app/api/blueprints/generate/route.ts + .../result/[jobId]/route.ts.
+    let submitRes: Response
     try {
       // asset() prepends the /dashboard basePath — raw fetch() paths don't
       // get it automatically (same gotcha as the PDF cover assets).
-      response = await fetch(asset('/api/blueprints/generate'), {
+      submitRes = await fetch(asset('/api/blueprints/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -238,22 +238,40 @@ export class DeepDiagnosticService {
           locale,
           ...(diagnosticData ? { diagnostic_data: diagnosticData } : {}),
         }),
-        signal: controller.signal,
       })
     } catch (err: any) {
-      if (err?.name === 'AbortError')
-        throw new Error('Blueprint generation timed out. Please try again.')
-      throw err
-    } finally {
-      clearTimeout(timeout)
+      throw new Error(err?.message || 'Failed to generate blueprint')
     }
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Failed to generate blueprint' }))
+    if (!submitRes.ok) {
+      const error = await submitRes.json().catch(() => ({ message: 'Failed to generate blueprint' }))
       throw new Error(error.message || 'Failed to generate blueprint')
     }
+    const queued = await submitRes.json().catch(() => ({} as any))
+    const jobId = queued?.job_id
+    if (!jobId) throw new Error('Invalid response format from server')
 
-    const blueprint: BlueprintV1 = await response.json()
+    // 2) Poll for the result until complete.
+    const deadline = Date.now() + 480_000
+    const POLL_INTERVAL_MS = 5_000
+    let blueprint: BlueprintV1 | null = null
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
+      let pollRes: Response
+      try {
+        pollRes = await fetch(asset(`/api/blueprints/result/${jobId}`))
+      } catch {
+        continue // transient network blip — keep polling
+      }
+      if (!pollRes.ok) {
+        const error = await pollRes.json().catch(() => ({ message: 'Blueprint generation failed' }))
+        throw new Error(error.message || 'Blueprint generation failed')
+      }
+      const data = await pollRes.json().catch(() => ({} as any))
+      if (data?.jobStatus && data.jobStatus !== 'completed') continue // still running
+      blueprint = data as BlueprintV1
+      break
+    }
+    if (!blueprint) throw new Error('Blueprint generation timed out. Please try again.')
 
     // Dual-write blueprint to Postgres (per signed-in user) + localStorage
     const { saveBlueprint: _remoteSaveBlueprint } = await import('@/lib/reportStorage')
