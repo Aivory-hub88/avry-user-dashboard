@@ -141,6 +141,12 @@ export function buildUserContextState(): UserContextState {
 export function formatUserContextForAI(state: UserContextState): string {
   const parts: string[] = []
 
+  // Zeroclaw's soul.md STATE AWARENESS section keys its exact-match decision
+  // logic off this specific tag/format — the [USER STATE: ...] prose block
+  // below is a separate, human-readable summary for the console personas'
+  // general "use it as background context" instruction, not a substitute.
+  parts.push(`[AIVORY_STATE: has_diagnostic=${state.has_diagnostic}, has_blueprint=${state.has_blueprint}] `)
+
   parts.push(`[USER STATE: `)
 
   if (state.has_diagnostic) {
