@@ -42,6 +42,7 @@ import type { WorkflowNodeData } from '@/types/workflow-node';
 import type { SavedWorkflow } from '@/hooks/useWorkflows';
 import type { WorkflowStep, AivoryWorkflowSpec } from '@/types/workflows';
 import { asset } from '@/lib/asset'
+import { authedFetch } from '@/lib/deployAuth'
 
 type Props = {
   workflowId: string;
@@ -573,7 +574,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       setSyncState('loading');
       setErrorMsg(null);
       try {
-        const res = await fetch(asset(`/api/n8n/workflow/${fetchId}`));
+        const res = await authedFetch(asset(`/api/n8n/workflow/${fetchId}`));
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const wf = await res.json();
         if (cancelled) return;
@@ -599,9 +600,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     setSyncState('saving'); setErrorMsg(null);
     try {
       const payload = reactFlowToN8n(nodes, edges, rawWorkflow);
-      const res = await fetch(asset(`/api/n8n/workflow/${saveId}`), {
+      const res = await authedFetch(asset(`/api/n8n/workflow/${saveId}`), {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
@@ -639,7 +639,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     const fetchId = n8nWorkflowId || workflowId;
     setExecLoading(true); setExecError(null);
     try {
-      const res = await fetch(asset(`/api/n8n/workflow/${fetchId}/executions?limit=20`));
+      const res = await authedFetch(asset(`/api/n8n/workflow/${fetchId}/executions?limit=20`));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setExecutions(data.data || []);
@@ -659,9 +659,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     if (!name) return;
     setCapturingExecId(execId);
     try {
-      const res = await fetch(asset(`/api/workflows/${workflowId}/fixtures`), {
+      const res = await authedFetch(asset(`/api/workflows/${workflowId}/fixtures`), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ executionId: execId, name }),
       });
       if (!res.ok) {
@@ -683,9 +682,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
   const handleCompareFixture = useCallback(async (execId: string) => {
     setComparingExecId(execId);
     try {
-      const res = await fetch(asset(`/api/workflows/${workflowId}/fixtures/compare`), {
+      const res = await authedFetch(asset(`/api/workflows/${workflowId}/fixtures/compare`), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ executionId: execId }),
       });
       const body = await res.json().catch(() => ({}));
@@ -711,9 +709,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     const fetchId = n8nWorkflowId || workflowId;
     setReplayingExecId(execId);
     try {
-      const res = await fetch(asset(`/api/workflows/${workflowId}/fixtures/replay`), {
+      const res = await authedFetch(asset(`/api/workflows/${workflowId}/fixtures/replay`), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ n8nWorkflowId: fetchId, executionId: execId }),
       });
       const body = await res.json().catch(() => ({}));
@@ -738,9 +735,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     const fetchId = n8nWorkflowId || workflowId;
     setReplayingExecId('__clearing__');
     try {
-      const res = await fetch(asset(`/api/workflows/${workflowId}/fixtures/replay/clear`), {
+      const res = await authedFetch(asset(`/api/workflows/${workflowId}/fixtures/replay/clear`), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ n8nWorkflowId: fetchId }),
       });
       const body = await res.json().catch(() => ({}));

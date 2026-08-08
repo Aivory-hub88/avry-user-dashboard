@@ -51,6 +51,7 @@
     "deleteWorkflow": "Delete Workflow",
     "activateWorkflow": "Activate Workflow",
     "deactivateWorkflow": "Deactivate Workflow",
+    "updateCredentials": "Update n8n Credentials",
     "designWorkflow": "Design Workflow",
     "onboardingTitle": "What would you like to automate?",
     "onboardingSubtitle": "Describe a process and Aivory will generate a workflow for you — or head to Blueprint to build one from a diagnostic.",
@@ -100,6 +101,8 @@
     "deployToN8n": "Deploy this workflow to n8n",
     "activationModal": {
       "title": "Deploy to n8n",
+      "updateCredentialsTitle": "Update n8n Credentials",
+      "updateCredentialsSubmit": "Save Credentials",
       "urlLabel": "n8n Instance URL",
       "urlInvalid": "Please enter a valid HTTP or HTTPS URL",
       "apiKeyLabel": "n8n API Key",

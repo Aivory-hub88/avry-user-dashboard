@@ -18,6 +18,14 @@ export interface ActivationModalProps {
   onClose: () => void
   onSubmit: (credentials: N8nCredentials) => void
   loading: boolean
+  /**
+   * Reopened from an already-active workflow's "Update n8n Credentials"
+   * menu item — only saves the credential, doesn't re-create the workflow
+   * in n8n (that would leave a duplicate behind, since the activate route
+   * has no update path). The Aivory test-instance option is hidden here:
+   * it stores nothing, so there's nothing for this mode to fix.
+   */
+  credentialsOnly?: boolean
 }
 
 export const ActivationModal: React.FC<ActivationModalProps> = ({
@@ -25,6 +33,7 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
   onClose,
   onSubmit,
   loading,
+  credentialsOnly = false,
 }) => {
   const t = useTranslations('workflow')
 
@@ -121,7 +130,9 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
         <form onSubmit={handleSubmit} className={styles.form}>
           {/* Header */}
           <div className={styles.header}>
-            <h2 className={styles.title}>{t('activationModal.title')}</h2>
+            <h2 className={styles.title}>
+              {credentialsOnly ? t('activationModal.updateCredentialsTitle') : t('activationModal.title')}
+            </h2>
             <button
               type="button"
               className={styles.closeBtn}
@@ -132,8 +143,9 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
             </button>
           </div>
 
-          {/* Superadmin: deploy straight into Aivory's own n8n for testing */}
-          {isSuperadmin && (
+          {/* Superadmin: deploy straight into Aivory's own n8n for testing —
+              irrelevant in credentials-only mode, nothing to persist there. */}
+          {isSuperadmin && !credentialsOnly && (
             <label className={styles.testInstance}>
               <input
                 type="checkbox"
@@ -284,7 +296,11 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
               className={styles.submitBtn}
               disabled={!canSubmit}
             >
-              {loading ? t('activationModal.submitting') : t('activationModal.submit')}
+              {loading
+                ? t('activationModal.submitting')
+                : credentialsOnly
+                  ? t('activationModal.updateCredentialsSubmit')
+                  : t('activationModal.submit')}
             </button>
           </div>
         </form>

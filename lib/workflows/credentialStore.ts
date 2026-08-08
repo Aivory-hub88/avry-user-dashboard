@@ -9,6 +9,7 @@
  * This module runs client-side only.
  */
 import { asset } from '@/lib/asset'
+import { authedFetch } from '@/lib/deployAuth'
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -164,11 +165,19 @@ export function clearCredentials(): void {
 
 // ── Database storage ──────────────────────────────────────────────────────────
 
-/** Persists credentials server-side, encrypted at rest (see app/api/user/credentials/route.ts). */
+/**
+ * Persists credentials server-side, encrypted at rest (see
+ * app/api/user/credentials/route.ts). Uses authedFetch — the route requires
+ * a verified user, and a plain fetch() here relied entirely on the login
+ * cookie (no refresh, unlike the localStorage access token authedFetch
+ * manages), so it started silently 401ing the moment that cookie went stale.
+ * That 401 was caught by the caller and only surfaced as a toast — the
+ * credential was never actually persisted, which is why n8n workflow reload/
+ * executions/fixtures kept 400ing even after picking "database" storage.
+ */
 async function saveToDatabase(creds: PersistedCredentials): Promise<void> {
-  const res = await fetch(asset('/api/user/credentials'), {
+  const res = await authedFetch(asset('/api/user/credentials'), {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       n8n_instance_url: creds.instanceUrl,
       n8n_api_key: creds.apiKey,

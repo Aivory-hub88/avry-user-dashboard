@@ -652,6 +652,12 @@ function WorkflowsPageInner() {
   const [activating, setActivating] = useState(false)
   const [activationModalOpen, setActivationModalOpen] = useState(false)
   const [activationLoading, setActivationLoading] = useState(false)
+  // Once a workflow is active, the header only offers Deactivate/View in n8n —
+  // there was no way back into the credential form to fix a bad/never-saved
+  // n8n credential without deactivating first (which orphans the live n8n
+  // workflow instead of just reconnecting). This mode reuses the same modal
+  // to save credentials only, skipping the create-in-n8n call entirely.
+  const [credentialsOnlyMode, setCredentialsOnlyMode] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [showActivateDropdown, setShowActivateDropdown] = useState(false)
   const [isWorkflowListCollapsed, setIsWorkflowListCollapsed] = useState(false) // default expanded
@@ -1006,11 +1012,41 @@ function WorkflowsPageInner() {
 
   const handleActivate = async () => {
     if (!selected || activating) return
+    setCredentialsOnlyMode(false)
+    setActivationModalOpen(true)
+  }
+
+  // Reopen the credential form for an already-active workflow, WITHOUT
+  // re-creating it in n8n (that already exists — /api/workflows/activate has
+  // no update path, only create, so running the full deploy again here would
+  // leave a duplicate workflow behind in the user's n8n instance).
+  const handleUpdateCredentials = () => {
+    if (!selected || activating) return
+    setCredentialsOnlyMode(true)
     setActivationModalOpen(true)
   }
 
   const handleActivationSubmit = async (credentials: N8nCredentials) => {
     if (!selected) return
+    if (credentialsOnlyMode) {
+      setActivationLoading(true)
+      try {
+        if (!credentials.useAivoryInstance) {
+          await saveCredentials(credentials)
+        }
+        setActivationModalOpen(false)
+        showToast('n8n credentials saved. Reloading…', 'success')
+        // The canvas only re-fetches on mount/dep change — reload is the
+        // simplest way to pick up the credential that just landed in the DB.
+        setTimeout(() => window.location.reload(), 800)
+      } catch (err) {
+        showToast(t('activationModal.errorCredentialDbSave'), 'error')
+        console.error('[update-credentials]', err)
+      } finally {
+        setActivationLoading(false)
+      }
+      return
+    }
     setActivationLoading(true)
     setActivating(true)
     try {
@@ -1742,6 +1778,13 @@ function WorkflowsPageInner() {
                       <div className={styles.activateDropdownMenu}>
                         <button
                           className={styles.activateDropdownItem}
+                          onClick={() => { handleUpdateCredentials(); setShowActivateDropdown(false) }}
+                        >
+                          {Icons.play}
+                          {t('updateCredentials')}
+                        </button>
+                        <button
+                          className={styles.activateDropdownItem}
                           onClick={() => { handleDeactivate(); setShowActivateDropdown(false) }}
                         >
                           {Icons.stop}
@@ -1919,6 +1962,7 @@ function WorkflowsPageInner() {
         onClose={() => setActivationModalOpen(false)}
         onSubmit={handleActivationSubmit}
         loading={activationLoading}
+        credentialsOnly={credentialsOnlyMode}
       />
 
       {/* ── Apply-target dialog (Copilot suggestion, workflow already open) ── */}

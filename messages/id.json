@@ -51,6 +51,7 @@
     "deleteWorkflow": "Hapus Alur Kerja",
     "activateWorkflow": "Aktifkan Alur Kerja",
     "deactivateWorkflow": "Nonaktifkan Alur Kerja",
+    "updateCredentials": "Perbarui Kredensial n8n",
     "designWorkflow": "Desain Alur Kerja",
     "onboardingTitle": "Apa yang ingin Anda otomasi?",
     "onboardingSubtitle": "Jelaskan sebuah proses dan Aivory akan membuat alur kerja untuk Anda — atau buka Cetak Biru untuk membuatnya dari diagnostik.",
@@ -100,6 +101,8 @@
     "deployToN8n": "Deploy alur kerja ini ke n8n",
     "activationModal": {
       "title": "Deploy ke n8n",
+      "updateCredentialsTitle": "Perbarui Kredensial n8n",
+      "updateCredentialsSubmit": "Simpan Kredensial",
       "urlLabel": "URL Instance n8n",
       "urlInvalid": "Masukkan URL HTTP atau HTTPS yang valid",
       "apiKeyLabel": "API Key n8n",
