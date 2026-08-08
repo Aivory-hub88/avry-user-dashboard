@@ -8,7 +8,7 @@
  * survive the ~100-120s edge timeout, but real generation takes 1-5+ minutes.
  */
 
-import type { BlueprintV1 } from '@/types/blueprint'
+import type { BlueprintV1, BlueprintV1DeploymentPlan } from '@/types/blueprint'
 import { formatLocalAmount, parseCurrencyCode } from '@/lib/resultFormatters'
 
 export function buildBlueprintPrompt(diagnostic: any, locale: 'en' | 'id'): string {
@@ -44,15 +44,72 @@ Diagnostic Data:
 ${JSON.stringify(diagnostic)}`
 }
 
+/**
+ * The model sometimes returns `deployment_plan` as an array of per-phase
+ * objects (each with its own `phase`/`waves`/`estimated_roi_months`) instead
+ * of the single object with one `waves` array the prompt's TypeScript
+ * interface declares — a natural drift, since a real deployment plan does
+ * have multiple phases, it just belongs in `waves`, not a top-level array.
+ * Left unnormalized this silently breaks every downstream reader
+ * (app/blueprint/page.tsx, lib/blueprintExport.ts, roadmap generation all
+ * read `deployment_plan.phase`/`.waves` as a single object) and the
+ * estimated_roi_months override below becomes a no-op — `Array.prototype`
+ * doesn't serialize arbitrary named properties via JSON.stringify, so
+ * setting `.estimated_roi_months` on an array is silently dropped.
+ */
+function normalizeDeploymentPlan(raw: any): BlueprintV1DeploymentPlan {
+  if (!Array.isArray(raw)) {
+    return {
+      phase: typeof raw?.phase === 'string' ? raw.phase : 'Blueprint draft',
+      estimated_impact: typeof raw?.estimated_impact === 'string' ? raw.estimated_impact : '',
+      estimated_roi_months: typeof raw?.estimated_roi_months === 'number' ? raw.estimated_roi_months : 6,
+      waves: Array.isArray(raw?.waves) ? raw.waves : [],
+    }
+  }
+
+  const phases = raw.filter((p) => p && typeof p === 'object')
+  const waves = phases.flatMap((p: any) => {
+    if (Array.isArray(p.waves) && p.waves.length > 0) return p.waves
+    // A phase with no waves of its own still carries useful information —
+    // represent it as one wave named after the phase rather than dropping it.
+    if (typeof p.phase === 'string') {
+      return [{
+        name: p.phase,
+        included_workflows: [],
+        notes: typeof p.estimated_impact === 'string' ? p.estimated_impact : '',
+      }]
+    }
+    return []
+  })
+  const first = phases[0] || {}
+
+  return {
+    phase: typeof first.phase === 'string' ? first.phase : 'Blueprint draft',
+    estimated_impact: phases
+      .map((p: any) => (typeof p.estimated_impact === 'string' ? p.estimated_impact : ''))
+      .filter(Boolean)
+      .join(' '),
+    estimated_roi_months: typeof first.estimated_roi_months === 'number' ? first.estimated_roi_months : 6,
+    waves,
+  }
+}
+
 export function parseBlueprintContent(content: string): BlueprintV1 | null {
+  const normalize = (bp: BlueprintV1): BlueprintV1 => {
+    if (bp && bp.deployment_plan !== undefined) {
+      bp.deployment_plan = normalizeDeploymentPlan(bp.deployment_plan)
+    }
+    return bp
+  }
+
   try {
-    return JSON.parse(content) as BlueprintV1
+    return normalize(JSON.parse(content) as BlueprintV1)
   } catch {
     const match = content.match(/```(?:json)?\s*([\s\S]*?)```/) || content.match(/\{[\s\S]*\}/)
     if (!match) return null
 
     try {
-      return JSON.parse(match[1] || match[0]) as BlueprintV1
+      return normalize(JSON.parse(match[1] || match[0]) as BlueprintV1)
     } catch {
       return null
     }
