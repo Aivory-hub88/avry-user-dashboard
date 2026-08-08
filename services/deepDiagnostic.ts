@@ -437,6 +437,29 @@ function getHourlyRateUSD(industry: string | undefined): number {
   return INDUSTRY_HOURLY_RATE_USD[industry] ?? DEFAULT_HOURLY_RATE_USD
 }
 
+// FIX: IDR reports must not price labour by running a US-centric industry
+// rate through the market FX rate — a $65/hr Tech/Software assumption at a
+// ~16,600 IDR/USD rate prices Indonesian labour at ~Rp 1,000,000/hour, ~30x
+// the real Jakarta wage floor. Anchor the IDR rate to the DKI Jakarta UMP
+// (Upah Minimum Provinsi) instead, keeping the same industry-relative
+// multipliers so a Tech company still costs proportionally more than
+// Manufacturing, just at a realistic absolute magnitude.
+//
+// UMP DKI Jakarta 2026 = Rp 5,729,876/month (Kepgub DKI Jakarta, +6.17% on
+// 2025's Rp 5,396,791, effective 1 Jan 2026). Update this constant when a
+// new UMP is announced (usually late November for the following year).
+const UMP_JAKARTA_MONTHLY_IDR = 5_729_876
+// Statutory monthly working-hour divisor for a 40-hour/5-day week
+// (Kepmenaker No. 102/MEN/VI/2004).
+const IDR_MONTHLY_WORK_HOURS = 173
+const UMR_JAKARTA_HOURLY_IDR = UMP_JAKARTA_MONTHLY_IDR / IDR_MONTHLY_WORK_HOURS // ≈ Rp 33,121/hr
+
+function getHourlyRateIDR(industry: string | undefined): number {
+  const usdRate = getHourlyRateUSD(industry)
+  const industryMultiplier = usdRate / DEFAULT_HOURLY_RATE_USD // e.g. Tech 65/30 ≈ 2.17x
+  return Math.round(UMR_JAKARTA_HOURLY_IDR * industryMultiplier)
+}
+
 // ---- ROI calculation ----
 
 export interface ROIProjectionInternal extends ROIProjection {
@@ -483,11 +506,28 @@ export function calculateROI(
   // converts to opportunity value (rework, growth, billable work) at roughly
   // half the fully-loaded employment cost. A Tech team at $65/hr → $32.5/hr.
   const SMALL_TEAM_RATE_FACTOR = 0.5
-  const baseHourlyRateUSD = getHourlyRateUSD(industry)
   const smallTeamRateApplied = (q.fteCountInScope ?? 1) <= 5
-  const hourlyRateUSD = smallTeamRateApplied
-    ? Math.round(baseHourlyRateUSD * SMALL_TEAM_RATE_FACTOR)
-    : baseHourlyRateUSD
+
+  // For IDR, apply the small-team factor to the UMP-anchored Rupiah figure
+  // (rounds cleanly at Rupiah scale, e.g. 71,763 → 35,882) and only then
+  // derive the "USD" rate backwards (localRate / fxRate) so the existing
+  // *rate conversion below reproduces that exact Jakarta-realistic figure.
+  // Rounding at the pseudo-USD scale instead (≈4.6 → 2) would have thrown
+  // away most of the precision. This field stops being a literal USD number
+  // for IDR contexts, but it's only ever consumed inside this same
+  // currency's calculation, never compared across currencies.
+  let baseHourlyRateUSD: number
+  let hourlyRateUSD: number
+  if (currencyCode === 'IDR') {
+    const idrRate = getHourlyRateIDR(industry)
+    baseHourlyRateUSD = idrRate / rate
+    hourlyRateUSD = (smallTeamRateApplied ? Math.round(idrRate * SMALL_TEAM_RATE_FACTOR) : idrRate) / rate
+  } else {
+    baseHourlyRateUSD = getHourlyRateUSD(industry)
+    hourlyRateUSD = smallTeamRateApplied
+      ? Math.round(baseHourlyRateUSD * SMALL_TEAM_RATE_FACTOR)
+      : baseHourlyRateUSD
+  }
 
   const weeklyHours = q.totalManualHoursWeekly ?? 0
   const hoursPerYear = weeklyHours * 52

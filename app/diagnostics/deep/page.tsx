@@ -42,13 +42,18 @@ export default function DeepDiagnosticPage() {
 
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // On mount: check for saved progress
+  // On mount: check for saved progress. Only stage it in `savedProgress` for
+  // the resume/start-fresh banner — do NOT apply companyName (or anything
+  // else) to live state yet. Applying it here unconditionally meant a user
+  // who ignored the banner and just answered fresh questions still had their
+  // submission tagged with a leftover company name from an old, unrelated,
+  // incomplete session (phaseData correctly stayed empty until Resume was
+  // clicked, but companyName didn't wait for that same explicit choice).
   useEffect(() => {
     try {
       const progress = DeepDiagnosticService.loadProgress()
       if (progress) {
         setSavedProgress(progress)
-        if (progress.companyName) setCompanyName(progress.companyName)
       }
     } catch {
       // localStorage unavailable — continue with in-memory state

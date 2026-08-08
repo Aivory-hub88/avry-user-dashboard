@@ -67,7 +67,14 @@ function splitHoursSegments(text: string): string[] {
   return t.split(/,\s*/).map((s) => s.trim()).filter(Boolean)
 }
 
-const HOURS_RE = /([\d]+(?:\.\d+)?)\s*(?:hrs?|hours?)\b/i
+// Recognizes both English ("10 hrs"/"10 hours") and Indonesian ("10 jam"/
+// "10j") hour units, and both decimal separators ("10.5"/"10,5"). Missing
+// the Indonesian unit meant every Bahasa Indonesia painPointHours answer
+// (e.g. "onboarding ~10j, pelaporan ~6j") silently failed to parse at all —
+// parsedHours.length stayed 0, so real per-item estimates always fell
+// through to the equal-weight fallback below, producing the exact same
+// hours/cost figure for every distinct pain point.
+const HOURS_RE = /([\d]+(?:[.,]\d+)?)\s*(?:hrs?|hours?|jam|j)\b/i
 
 interface ParsedHoursEntry {
   label: string
@@ -81,7 +88,7 @@ function parsePainPointHoursText(text: string | null | undefined): ParsedHoursEn
   for (const seg of segments) {
     const m = seg.match(HOURS_RE)
     if (!m || m.index == null) continue
-    const hours = parseFloat(m[1])
+    const hours = parseFloat(m[1].replace(',', '.'))
     if (!isFinite(hours) || hours <= 0) continue
     const label = seg.slice(0, m.index).trim().replace(/[-:~]+$/, '').trim()
     results.push({ label: label || seg.trim(), hoursPerWeek: hours })
@@ -98,11 +105,32 @@ function significantWords(s: string): string[] {
     .filter((w) => w.length > 2 && !STOPWORDS.has(w))
 }
 
+// Minimum shared-substring length before two differently-inflected words
+// count as a match (see stemMatch below). Short enough to catch real
+// Indonesian affixation, long enough to avoid coincidental hits.
+const STEM_MATCH_MIN_LEN = 5
+
+/**
+ * True if two words are plausibly the same root under Indonesian (or
+ * English) affixation — e.g. "laporan"/"pelaporan" (report/reporting,
+ * pe-...-an circumfix) or "otomasi"/"mengotomasi". Exact-word overlap alone
+ * misses these because prefixes/circumfixes change the token entirely, which
+ * silently defeated per-item hour matching for Indonesian-language
+ * submissions and forced them into the equal-weight estimate fallback even
+ * when the user had typed distinct per-item numbers.
+ */
+function stemMatch(a: string, b: string): boolean {
+  if (a === b) return true
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a]
+  if (short.length < STEM_MATCH_MIN_LEN) return false
+  return long.includes(short)
+}
+
 function overlapScore(a: string, b: string): number {
-  const wa = new Set(significantWords(a))
+  const wa = [...significantWords(a)]
   const wb = significantWords(b)
   let hits = 0
-  for (const w of wb) if (wa.has(w)) hits++
+  for (const w of wb) if (wa.some((x) => stemMatch(x, w))) hits++
   return hits
 }
 
@@ -138,6 +166,23 @@ function matchHoursToPainPoints(painPoints: string[], parsed: ParsedHoursEntry[]
   // aligned even if wording didn't overlap (e.g. label rephrased entirely).
   if (painPoints.length === 1 && parsed.length === 1 && result[0] == null) {
     result[0] = parsed[0].hoursPerWeek
+  }
+
+  // Equal counts strongly imply a 1:1 correspondence the user intended (they
+  // listed N pain points and N hour estimates) even when a couple of labels
+  // didn't share a stem at all (e.g. "laporan tersebar" vs "koordinasi ~4j"
+  // once the other two pairs already claimed their better-scoring matches).
+  // Fill any still-unmatched slots positionally in original order rather
+  // than leaving them blank or falling through to the equal-weight
+  // fallback — this is what actually differentiates 3 distinct pain points
+  // instead of showing the same estimated figure for all of them.
+  if (painPoints.length === parsed.length) {
+    const remainingP = painPoints.map((_, i) => i).filter((i) => !usedP.has(i))
+    const remainingH = parsed.map((_, i) => i).filter((i) => !usedH.has(i))
+    remainingP.forEach((pi, idx) => {
+      const hi = remainingH[idx]
+      if (hi !== undefined) result[pi] = parsed[hi].hoursPerWeek
+    })
   }
 
   return result
