@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { DiagnosticContext } from '@/types/diagnostic'
@@ -57,6 +57,12 @@ import { quantifyPainPoints, formatPainPointHours, displayPainPointCost } from '
 import { useLocaleContext } from '@/hooks/useLocale'
 import styles from './final-result.module.css'
 
+function formatElapsed(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60)
+  const s = totalSeconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 // TODO: add schema version field to DiagnosticContext for forward compatibility
 function validateContext(raw: unknown): DiagnosticContext | null {
   if (raw === null || typeof raw !== 'object') return null
@@ -99,6 +105,9 @@ export default function FinalResultPage() {
   const [isExportingPdf, setIsExportingPdf] = useState(false)
   const [isGeneratingBlueprint, setIsGeneratingBlueprint] = useState(false)
   const [isAdvisoryModalOpen, setIsAdvisoryModalOpen] = useState(false)
+  const [blueprintPercent, setBlueprintPercent] = useState(0)
+  const [blueprintElapsedSec, setBlueprintElapsedSec] = useState(0)
+  const blueprintTickRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleGenerateBlueprint = async () => {
     if (state.status !== 'loaded') {
@@ -107,6 +116,10 @@ export default function FinalResultPage() {
     }
     try {
       setIsGeneratingBlueprint(true)
+      setBlueprintPercent(0)
+      setBlueprintElapsedSec(0)
+      if (blueprintTickRef.current) clearInterval(blueprintTickRef.current)
+      blueprintTickRef.current = setInterval(() => setBlueprintElapsedSec((s) => s + 1), 1000)
       // Send the same blended composite the user sees on this page (70%
       // deterministic + 30% AI assessment) so the blueprint's
       // ai_readiness_score matches the on-screen report instead of the raw
@@ -144,14 +157,17 @@ export default function FinalResultPage() {
         undefined,
         diagnosticData.qualitative?.primaryObjective || 'Business operations improvement',
         diagnosticData,
-        locale
+        locale,
+        (progress) => setBlueprintPercent(progress.percent)
       )
-      
+
       router.push('/blueprint')
     } catch (err) {
       console.error('Failed to generate blueprint:', err)
       alert(locale === 'id' ? 'Gagal membuat blueprint. Silakan coba lagi.' : 'Failed to generate blueprint. Please try again.')
     } finally {
+      if (blueprintTickRef.current) clearInterval(blueprintTickRef.current)
+      blueprintTickRef.current = null
       setIsGeneratingBlueprint(false)
     }
   }
@@ -160,6 +176,10 @@ export default function FinalResultPage() {
     try {
       setLlmResult(DeepDiagnosticService.loadResult() as unknown as Record<string, any> | null)
     } catch { /* AI analysis is optional — never block the report */ }
+  }, [])
+
+  useEffect(() => () => {
+    if (blueprintTickRef.current) clearInterval(blueprintTickRef.current)
   }, [])
 
   // Phase E1.3 — fetch history independently of the main context load; it's
@@ -1196,6 +1216,21 @@ export default function FinalResultPage() {
             </p>
           </div>
           <div className={styles.blueprintCtaRight}>
+            {isGeneratingBlueprint && (
+              <div className={styles.blueprintProgress} role="progressbar" aria-valuenow={blueprintPercent} aria-valuemin={0} aria-valuemax={100}>
+                <div className={styles.blueprintProgressTrack}>
+                  <div className={styles.blueprintProgressFill} style={{ width: `${blueprintPercent}%` }} />
+                </div>
+                <div className={styles.blueprintProgressLabel}>
+                  <span>{blueprintPercent}%</span>
+                  <span>
+                    {formatElapsed(blueprintElapsedSec)}
+                    {' · '}
+                    {locale === 'id' ? 'estimasi 1-2 menit' : 'estimated 1-2 min'}
+                  </span>
+                </div>
+              </div>
+            )}
             <button
               className={styles.generateBlueprintButton}
               onClick={handleGenerateBlueprint}

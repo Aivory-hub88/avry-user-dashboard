@@ -53,6 +53,31 @@ export { ensureLiveRates }
 // In-memory fallback when localStorage is unavailable
 let _memoryProgress: DeepDiagnosticProgress | null = null
 
+export interface BlueprintGenerationProgress {
+  elapsedMs: number
+  /** 0-100. Estimated — the backend has no real completion fraction to report,
+   *  only "still running"/"done" — so this is time-based, not measured. */
+  percent: number
+}
+
+// Real generation is a single large structured LLM completion (deployment
+// plan, workflow modules, risk assessment, ROI narrative) and typically
+// finishes in ~60-90s. Used only to drive the progress bar's ease-out curve —
+// never to cut generation short (the actual poll loop in generateBlueprint
+// runs up to 480s regardless of this estimate).
+const EXPECTED_BLUEPRINT_DURATION_MS = 75_000
+
+/**
+ * Time-based progress estimate for the Generate Blueprint button. Eases
+ * toward 95% and deliberately never reaches 100% on its own — the real
+ * completion (or a slower-than-usual run) always supplies the final jump, so
+ * the bar never lies about being done before the server confirms it.
+ */
+export function estimateBlueprintProgress(elapsedMs: number): BlueprintGenerationProgress {
+  const percent = Math.round(95 * (1 - Math.exp(-elapsedMs / EXPECTED_BLUEPRINT_DURATION_MS)))
+  return { elapsedMs, percent }
+}
+
 export class DeepDiagnosticService {
   private static readonly STORAGE_KEY = 'aivory_deep_diagnostic'
   private static readonly RESULT_KEY = 'aivory_deep_result'
@@ -214,11 +239,15 @@ export class DeepDiagnosticService {
     organizationId?: string,
     objective: string = 'Operational health improvement',
     diagnosticData?: Record<string, any>,
-    locale: 'en' | 'id' = 'en'
+    locale: 'en' | 'id' = 'en',
+    onProgress?: (progress: BlueprintGenerationProgress) => void
   ): Promise<BlueprintV1> {
     // Blueprint runs are attributed to the signed-in user, not a shared demo
     // key or a collision-prone company name.
     const orgId = organizationId?.trim() || getUser()?.user_id || 'current'
+    const startedAt = Date.now()
+    const reportProgress = () => onProgress?.(estimateBlueprintProgress(Date.now() - startedAt))
+    reportProgress()
 
     // 1) Enqueue — the bridge returns a job_id immediately (2026-08-09: moved
     // off a single held request, which can't survive Cloudflare's ~100-120s
@@ -256,6 +285,7 @@ export class DeepDiagnosticService {
     let blueprint: BlueprintV1 | null = null
     while (Date.now() < deadline) {
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
+      reportProgress()
       let pollRes: Response
       try {
         pollRes = await fetch(asset(`/api/blueprints/result/${jobId}`))
@@ -272,6 +302,7 @@ export class DeepDiagnosticService {
       break
     }
     if (!blueprint) throw new Error('Blueprint generation timed out. Please try again.')
+    onProgress?.({ elapsedMs: Date.now() - startedAt, percent: 100 })
 
     // Dual-write blueprint to Postgres (per signed-in user) + localStorage
     const { saveBlueprint: _remoteSaveBlueprint } = await import('@/lib/reportStorage')

@@ -503,6 +503,38 @@
   }
 }
 
+.blueprintProgress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 220px;
+}
+
+.blueprintProgressTrack {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.blueprintProgressFill {
+  height: 100%;
+  border-radius: 3px;
+  background: #d0e0af;
+  transition: width 5s linear;
+}
+
+.blueprintProgressLabel {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: #a3a39c;
+  font-variant-numeric: tabular-nums;
+}
+
 .generateBlueprintButton {
   background-color: #d0e0af;
   color: #073d34;
