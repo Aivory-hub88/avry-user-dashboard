@@ -146,6 +146,17 @@
   line-height: 1.45;
 }
 
+.staleSessionAction {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #d8a44f;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* ── Superadmin test-instance toggle ────────────────────── */
 .testInstance {
   display: flex;

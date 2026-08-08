@@ -9,6 +9,7 @@ import {
   N8nCredentials,
 } from '@/lib/workflows/credentialStore'
 import { authedFetch } from '@/lib/deployAuth'
+import { logout } from '@/lib/auth'
 import { asset } from '@/lib/asset'
 import styles from './ActivationModal.module.css'
 
@@ -61,9 +62,11 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
           const res = await authedFetch(asset('/api/workflows/activate'))
           if (cancelled) return
           if (res.status === 401) {
-            // Refresh was attempted and still failed: the session is genuinely
-            // stale. Say so — a superadmin watching the option vanish with no
-            // explanation has no way to know a re-login is all that's needed.
+            // authedFetch already tried exchanging the refresh token once; a
+            // 401 surviving that means the refresh token itself is dead (past
+            // its 7-day life, or this browser never had one), not just the
+            // 60-minute access token. Reloading re-reads the same dead token
+            // from localStorage and fails again — only a fresh login clears it.
             setStaleSession(true)
             return
           }
@@ -148,7 +151,10 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
 
           {staleSession && (
             <p className={styles.staleSession}>
-              Your sign-in has expired. Reload the page to continue — some options are hidden until then.
+              Your sign-in has expired and needs a fresh login — reloading won&apos;t fix it.{' '}
+              <button type="button" className={styles.staleSessionAction} onClick={() => logout()}>
+                Log in again
+              </button>
             </p>
           )}
 

@@ -18,6 +18,7 @@
  *   the storage cutover. Signed-out or server failure → localStorage.
  */
 import { getToken } from '@/lib/auth'
+import { authedFetch } from '@/lib/deployAuth'
 import { asset } from '@/lib/asset'
 import type { DeepDiagnosticResult } from '@/types/deepDiagnostic'
 import type { BlueprintV1 } from '@/types/blueprint'
@@ -63,13 +64,21 @@ function lsRead<T>(key: string): T | null {
   }
 }
 
+/**
+ * authedFetch (not plain fetch) so a stale-but-refreshable access token gets
+ * exchanged and retried instead of silently 401ing. Access tokens live only
+ * 60 minutes; before this, any save/load past the first hour of a session
+ * degraded to localStorage-only with no visible error — reports looked like
+ * they "only persisted briefly" because everything after minute 60 never
+ * actually reached Postgres.
+ */
 async function apiFetch(entity: Entity, init: RequestInit): Promise<Response> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
     // asset() prepends the /dashboard basePath — raw fetch() paths don't get
     // it automatically (recurring 404 class).
-    return await fetch(asset(`/api/storage/${entity}`), { ...init, signal: controller.signal })
+    return await authedFetch(asset(`/api/storage/${entity}`), { ...init, signal: controller.signal })
   } finally {
     clearTimeout(timer)
   }
@@ -77,10 +86,13 @@ async function apiFetch(entity: Entity, init: RequestInit): Promise<Response> {
 
 /** GET the signed-in user's stored payload. ok=false → signed out or server unreachable. */
 async function remoteLoad<T>(entity: Entity): Promise<{ ok: boolean; value: T | null }> {
+  // Fast, sync, no-network gate: skip entirely when there is no session at
+  // all (incl. server-side render). authedFetch handles refreshing a
+  // stale-but-present token itself.
   const token = isBrowser() ? getToken() : null
   if (!token) return { ok: false, value: null }
   try {
-    const res = await apiFetch(entity, { headers: { Authorization: `Bearer ${token}` } })
+    const res = await apiFetch(entity, {})
     if (!res.ok) {
       if (res.status !== 401) console.warn(`[ReportStorage] load ${entity}: HTTP ${res.status}`)
       return { ok: false, value: null }
@@ -98,7 +110,6 @@ async function remoteSave(entity: Entity, data: unknown): Promise<boolean> {
   try {
     const res = await apiFetch(entity, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ data }),
     })
     if (!res.ok) console.warn(`[ReportStorage] save ${entity}: HTTP ${res.status}`)
@@ -173,8 +184,7 @@ export async function loadDiagnosticHistory(): Promise<DiagnosticHistoryEntry[]>
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
     try {
-      const res = await fetch(asset('/api/storage/history'), {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await authedFetch(asset('/api/storage/history'), {
         signal: controller.signal,
       })
       if (!res.ok) {
