@@ -54,6 +54,13 @@ export interface AivoryWorkflowSpec {
   n8n_workflow_id?: string;          // n8n's internal workflow ID (e.g. "yQv9FEBFXKuNUgeO")
   n8n_url?: string;                  // n8n UI link: <N8N_BASE_URL>/workflow/<n8nWorkflowId>
   n8nWebhookPath?: string | null;    // relative webhook path returned by n8n, e.g. "/webhook/<uuid>"
+  // Which n8n instance this workflow was deployed to — 'aivory' (superadmin
+  // test instance, credentials resolved from server env) or 'byo' (the
+  // user's own instance, credentials in dashboard.n8n_credentials). Reload/
+  // executions/fixtures need this to know how to resolve credentials again;
+  // 'byo' is assumed when absent (matches every workflow deployed before
+  // this field existed).
+  n8n_instance?: 'aivory' | 'byo';
   createdAt: string;
   updatedAt: string;
 }

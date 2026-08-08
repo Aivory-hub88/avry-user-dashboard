@@ -1031,13 +1031,28 @@ function WorkflowsPageInner() {
     if (credentialsOnlyMode) {
       setActivationLoading(true)
       try {
-        if (!credentials.useAivoryInstance) {
+        if (credentials.useAivoryInstance) {
+          // Nothing to save — this just tells reload/executions/fixtures to
+          // resolve credentials from the server's own Aivory instance
+          // instead of a personal n8n. Covers workflows deployed to the
+          // Aivory instance before this field existed on the record.
+          if (apiWorkflows.find(aw => aw.id === selected.workflow_id)) {
+            await patchWorkflow(selected.workflow_id, { n8n_instance: 'aivory' })
+          } else {
+            updateWorkflow(selected.workflow_id, { n8n_instance: 'aivory' })
+          }
+        } else {
           await saveCredentials(credentials)
+          if (apiWorkflows.find(aw => aw.id === selected.workflow_id)) {
+            await patchWorkflow(selected.workflow_id, { n8n_instance: 'byo' })
+          } else {
+            updateWorkflow(selected.workflow_id, { n8n_instance: 'byo' })
+          }
         }
         setActivationModalOpen(false)
-        showToast('n8n credentials saved. Reloading…', 'success')
+        showToast('n8n connection updated. Reloading…', 'success')
         // The canvas only re-fetches on mount/dep change — reload is the
-        // simplest way to pick up the credential that just landed in the DB.
+        // simplest way to pick up the credential/instance change that just landed.
         setTimeout(() => window.location.reload(), 800)
       } catch (err) {
         showToast(t('activationModal.errorCredentialDbSave'), 'error')
@@ -1124,6 +1139,7 @@ function WorkflowsPageInner() {
           n8n_workflow_id: data.n8n_workflow_id,
           n8n_url: data.n8n_url,
           n8nWebhookPath: data.n8nWebhookUrl || null,
+          n8n_instance: data.instance === 'aivory' ? 'aivory' : 'byo',
         })
         setLocalWorkflows(loadWorkflows())
       }
@@ -1849,6 +1865,7 @@ function WorkflowsPageInner() {
               fallbackSteps={selected.steps}
               fallbackTrigger={selected.trigger}
               fallbackTitle={selected.title}
+              n8nInstanceHint={selected.n8n_instance}
               onInjectNodes={(fn) => {
                 canvasInjectRef.current = fn
                 // If there are pending handoff nodes, inject them now

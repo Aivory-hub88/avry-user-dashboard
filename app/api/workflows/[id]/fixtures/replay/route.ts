@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, type AuthUser } from '@/lib/serverAuth'
-import { getUserN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
+import { resolveN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
 import { getWorkflowWithCreds, setWorkflowPinDataWithCreds, getN8nWebhookUrl, classifyN8nError } from '@/lib/workflows/n8nClient'
 import { listFixtures } from '@/lib/workflows/fixtureRepository'
 import { buildPinDataFromFixtureRunData } from '@/lib/workflows/fixtureDiff'
@@ -43,7 +43,7 @@ export async function POST(
   const auth = authenticate(request)
   if ('response' in auth) return auth.response
 
-  let body: { n8nWorkflowId?: string; executionId?: string }
+  let body: { n8nWorkflowId?: string; executionId?: string; instance?: string }
   try {
     body = await request.json()
   } catch {
@@ -69,7 +69,7 @@ export async function POST(
 
   let creds
   try {
-    creds = await getUserN8nCredentials(auth.user.user_id)
+    creds = await resolveN8nCredentials(auth.user, body.instance ?? null)
   } catch (err) {
     console.error('[api/workflows/fixtures/replay] credential lookup failed:', err)
     return NextResponse.json({ error: 'Replay unavailable' }, { status: 500 })

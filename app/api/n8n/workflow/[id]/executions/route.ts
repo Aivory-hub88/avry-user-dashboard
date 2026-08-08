@@ -17,7 +17,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, type AuthUser } from '@/lib/serverAuth'
-import { getUserN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
+import { resolveN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
 import { getExecutionsWithCreds, classifyN8nError } from '@/lib/workflows/n8nClient'
 
 export const runtime = 'nodejs'
@@ -49,7 +49,7 @@ export async function GET(
 
   let creds
   try {
-    creds = await getUserN8nCredentials(auth.user.user_id)
+    creds = await resolveN8nCredentials(auth.user, request.nextUrl.searchParams.get('instance'))
   } catch (err) {
     console.error('[api/n8n/workflow/executions] credential lookup failed:', err)
     return NextResponse.json({ error: 'Executions unavailable' }, { status: 500 })

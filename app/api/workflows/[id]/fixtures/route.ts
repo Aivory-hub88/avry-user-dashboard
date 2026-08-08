@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, type AuthUser } from '@/lib/serverAuth'
-import { getUserN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
+import { resolveN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
 import { getExecutionDetailWithCreds, classifyN8nError } from '@/lib/workflows/n8nClient'
 import { captureFixture, listFixtures } from '@/lib/workflows/fixtureRepository'
 
@@ -52,7 +52,7 @@ export async function POST(
   const auth = authenticate(request)
   if ('response' in auth) return auth.response
 
-  let body: { executionId?: string; name?: string }
+  let body: { executionId?: string; name?: string; instance?: string }
   try {
     body = await request.json()
   } catch {
@@ -64,7 +64,7 @@ export async function POST(
 
   let creds
   try {
-    creds = await getUserN8nCredentials(auth.user.user_id)
+    creds = await resolveN8nCredentials(auth.user, body.instance ?? null)
   } catch (err) {
     console.error('[api/workflows/fixtures] credential lookup failed:', err)
     return NextResponse.json({ error: 'Fixtures unavailable' }, { status: 500 })

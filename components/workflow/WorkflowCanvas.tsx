@@ -51,6 +51,11 @@ type Props = {
   fallbackSteps?: Array<{ step: number; action: string; tool: string; output: string; type?: string }>;
   fallbackTrigger?: string;
   fallbackTitle?: string;
+  // Which n8n instance this workflow was deployed to — see
+  // types/workflow.ts's AivoryWorkflowSpec.n8n_instance. Sent along on every
+  // n8n-backed fetch so the server knows to resolve credentials from its own
+  // env (superadmin test instance) instead of the caller's stored BYO creds.
+  n8nInstanceHint?: 'aivory' | 'byo';
   onInjectNodes?: (inject: (nodes: Node[], edges: Edge[]) => void) => void;
   onHistoryChange?: (canUndo: boolean) => void;
   registerUndo?: (undoFn: () => void) => void;
@@ -179,7 +184,8 @@ function rehydrateNodeCallbacks(
   }));
 }
 
-export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fallbackSteps, fallbackTrigger, fallbackTitle, onInjectNodes, onHistoryChange, registerUndo }: Props) {
+export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fallbackSteps, fallbackTrigger, fallbackTitle, n8nInstanceHint, onInjectNodes, onHistoryChange, registerUndo }: Props) {
+  const instanceQuery = n8nInstanceHint === 'aivory' ? '?instance=aivory' : '';
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<WorkflowNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [rawWorkflow, setRawWorkflow] = useState<any>(null);
@@ -574,7 +580,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       setSyncState('loading');
       setErrorMsg(null);
       try {
-        const res = await authedFetch(asset(`/api/n8n/workflow/${fetchId}`));
+        const res = await authedFetch(asset(`/api/n8n/workflow/${fetchId}${instanceQuery}`));
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const wf = await res.json();
         if (cancelled) return;
@@ -591,7 +597,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     load();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, n8nWorkflowId, workflowId, JSON.stringify(fallbackSteps)]);
+  }, [isActive, n8nWorkflowId, workflowId, n8nInstanceHint, JSON.stringify(fallbackSteps)]);
 
   // ── Save to n8n ──────────────────────────────────────────
   const handleSave = useCallback(async () => {
@@ -600,7 +606,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     setSyncState('saving'); setErrorMsg(null);
     try {
       const payload = reactFlowToN8n(nodes, edges, rawWorkflow);
-      const res = await authedFetch(asset(`/api/n8n/workflow/${saveId}`), {
+      const res = await authedFetch(asset(`/api/n8n/workflow/${saveId}${instanceQuery}`), {
         method: 'PUT',
         body: JSON.stringify(payload),
       });
@@ -639,7 +645,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     const fetchId = n8nWorkflowId || workflowId;
     setExecLoading(true); setExecError(null);
     try {
-      const res = await authedFetch(asset(`/api/n8n/workflow/${fetchId}/executions?limit=20`));
+      const res = await authedFetch(asset(`/api/n8n/workflow/${fetchId}/executions?limit=20${n8nInstanceHint === 'aivory' ? '&instance=aivory' : ''}`));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setExecutions(data.data || []);
@@ -661,7 +667,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     try {
       const res = await authedFetch(asset(`/api/workflows/${workflowId}/fixtures`), {
         method: 'POST',
-        body: JSON.stringify({ executionId: execId, name }),
+        body: JSON.stringify({ executionId: execId, name, instance: n8nInstanceHint }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -684,7 +690,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     try {
       const res = await authedFetch(asset(`/api/workflows/${workflowId}/fixtures/compare`), {
         method: 'POST',
-        body: JSON.stringify({ executionId: execId }),
+        body: JSON.stringify({ executionId: execId, instance: n8nInstanceHint }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`);
@@ -711,7 +717,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     try {
       const res = await authedFetch(asset(`/api/workflows/${workflowId}/fixtures/replay`), {
         method: 'POST',
-        body: JSON.stringify({ n8nWorkflowId: fetchId, executionId: execId }),
+        body: JSON.stringify({ n8nWorkflowId: fetchId, executionId: execId, instance: n8nInstanceHint }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`);
@@ -737,7 +743,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     try {
       const res = await authedFetch(asset(`/api/workflows/${workflowId}/fixtures/replay/clear`), {
         method: 'POST',
-        body: JSON.stringify({ n8nWorkflowId: fetchId }),
+        body: JSON.stringify({ n8nWorkflowId: fetchId, instance: n8nInstanceHint }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`);

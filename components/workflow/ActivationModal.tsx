@@ -143,9 +143,11 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
             </button>
           </div>
 
-          {/* Superadmin: deploy straight into Aivory's own n8n for testing —
-              irrelevant in credentials-only mode, nothing to persist there. */}
-          {isSuperadmin && !credentialsOnly && (
+          {/* Superadmin: use Aivory's own n8n instance. In credentials-only
+              mode this doesn't deploy anything — it just marks THIS workflow
+              as Aivory-instance so reload/executions/fixtures know to resolve
+              credentials from the server env instead of a personal n8n. */}
+          {isSuperadmin && (
             <label className={styles.testInstance}>
               <input
                 type="checkbox"
@@ -158,8 +160,9 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
                   <span className={styles.badge}>Superadmin</span>
                 </span>
                 <span className={styles.testInstanceDesc}>
-                  Deploys to Aivory&apos;s own n8n so you can watch the run. No URL or API key
-                  needed — the server holds them.
+                  {credentialsOnly
+                    ? 'This workflow was deployed to Aivory’s own n8n — check this to reconnect it. No URL or API key needed.'
+                    : 'Deploys to Aivory’s own n8n so you can watch the run. No URL or API key needed — the server holds them.'}
                 </span>
               </span>
             </label>

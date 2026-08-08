@@ -10,11 +10,12 @@
  *
  * Same auth + credential-resolution pattern as the sibling
  * app/api/n8n/workflow/[id]/executions/route.ts — see that file for why
- * credentials are resolved server-side instead of sent by the client.
+ * credentials are resolved server-side instead of sent by the client, and
+ * see resolveN8nCredentials() for the '?instance=aivory' hint.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, type AuthUser } from '@/lib/serverAuth'
-import { getUserN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
+import { resolveN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
 import { getWorkflowWithCreds, updateWorkflowWithCreds, classifyN8nError } from '@/lib/workflows/n8nClient'
 
 export const runtime = 'nodejs'
@@ -43,7 +44,7 @@ export async function GET(
 
   let creds
   try {
-    creds = await getUserN8nCredentials(auth.user.user_id)
+    creds = await resolveN8nCredentials(auth.user, request.nextUrl.searchParams.get('instance'))
   } catch (err) {
     console.error('[api/n8n/workflow] credential lookup failed:', err)
     return NextResponse.json({ error: 'Workflow sync unavailable' }, { status: 500 })
@@ -78,7 +79,7 @@ export async function PUT(
 
   let creds
   try {
-    creds = await getUserN8nCredentials(auth.user.user_id)
+    creds = await resolveN8nCredentials(auth.user, request.nextUrl.searchParams.get('instance'))
   } catch (err) {
     console.error('[api/n8n/workflow] credential lookup failed:', err)
     return NextResponse.json({ error: 'Workflow sync unavailable' }, { status: 500 })

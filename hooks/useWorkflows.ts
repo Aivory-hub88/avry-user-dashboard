@@ -42,6 +42,10 @@ export interface SavedWorkflow {
   n8n_workflow_id?: string
   n8n_url?: string
   n8nWebhookPath?: string | null
+  // Which n8n instance this workflow was deployed to — see types/workflow.ts's
+  // AivoryWorkflowSpec.n8n_instance for the full explanation. 'byo' assumed
+  // when absent.
+  n8n_instance?: 'aivory' | 'byo'
 }
 
 export function loadWorkflows(): SavedWorkflow[] {

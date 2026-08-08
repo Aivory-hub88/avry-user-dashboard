@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, type AuthUser } from '@/lib/serverAuth'
-import { getUserN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
+import { resolveN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
 import { clearWorkflowPinDataWithCreds, classifyN8nError } from '@/lib/workflows/n8nClient'
 
 // POST /api/workflows/:id/fixtures/replay/clear — reverts the sibling
@@ -30,7 +30,7 @@ export async function POST(
   const auth = authenticate(request)
   if ('response' in auth) return auth.response
 
-  let body: { n8nWorkflowId?: string }
+  let body: { n8nWorkflowId?: string; instance?: string }
   try {
     body = await request.json()
   } catch {
@@ -42,7 +42,7 @@ export async function POST(
 
   let creds
   try {
-    creds = await getUserN8nCredentials(auth.user.user_id)
+    creds = await resolveN8nCredentials(auth.user, body.instance ?? null)
   } catch (err) {
     console.error('[api/workflows/fixtures/replay/clear] credential lookup failed:', err)
     return NextResponse.json({ error: 'Clear-pin unavailable' }, { status: 500 })
