@@ -30,7 +30,11 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
 
   const [instanceUrl, setInstanceUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
-  const [storagePreference, setStoragePreference] = useState<'localStorage' | 'database'>('localStorage')
+  // 'database' is the default: reopening a deployed workflow, its Execution
+  // Logs, and fixture replay all resolve credentials server-side only
+  // (dashboard.n8n_credentials) — 'localStorage'-only credentials never reach
+  // the server, so those features 400 the moment you leave this modal.
+  const [storagePreference, setStoragePreference] = useState<'localStorage' | 'database'>('database')
   const [showApiKey, setShowApiKey] = useState(false)
   const [urlTouched, setUrlTouched] = useState(false)
   const [useAivoryInstance, setUseAivoryInstance] = useState(false)

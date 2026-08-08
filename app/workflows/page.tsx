@@ -1804,6 +1804,8 @@ function WorkflowsPageInner() {
               isActive={isActiveWorkflow(selected)}
               n8nWorkflowId={selected.n8n_workflow_id}
               fallbackSteps={selected.steps}
+              fallbackTrigger={selected.trigger}
+              fallbackTitle={selected.title}
               onInjectNodes={(fn) => {
                 canvasInjectRef.current = fn
                 // If there are pending handoff nodes, inject them now

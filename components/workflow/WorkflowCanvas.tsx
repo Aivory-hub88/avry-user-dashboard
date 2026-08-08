@@ -36,11 +36,11 @@ import AgentNode from './AgentNode';
 import { N8NAdaptiveEdge, AiSubConnectionEdge } from './WorkflowEdges';
 import NodeInspectorPanel from './inspector/NodeInspectorPanel';
 import { n8nToReactFlow, reactFlowToN8n } from '@/lib/n8nMapper';
+import { convertToN8nWorkflow } from '@/lib/workflowConverter';
 import { loadCanvasState, fetchCanvasState, useCanvasAutosave } from '@/hooks/useCanvasPersistence';
 import type { WorkflowNodeData } from '@/types/workflow-node';
 import type { SavedWorkflow } from '@/hooks/useWorkflows';
 import type { WorkflowStep, AivoryWorkflowSpec } from '@/types/workflows';
-import { detectNodeIntent } from '@/lib/workflows/nodeMapper';
 import { asset } from '@/lib/asset'
 
 type Props = {
@@ -48,6 +48,8 @@ type Props = {
   isActive?: boolean;
   n8nWorkflowId?: string;
   fallbackSteps?: Array<{ step: number; action: string; tool: string; output: string; type?: string }>;
+  fallbackTrigger?: string;
+  fallbackTitle?: string;
   onInjectNodes?: (inject: (nodes: Node[], edges: Edge[]) => void) => void;
   onHistoryChange?: (canUndo: boolean) => void;
   registerUndo?: (undoFn: () => void) => void;
@@ -82,6 +84,38 @@ const pillStyle = (active: boolean): React.CSSProperties => ({
   fontFamily: 'inherit',
   whiteSpace: 'nowrap' as const,
 });
+
+/**
+ * Turn plain {action, tool, output} steps into correctly n8n-typed canvas
+ * nodes/edges — the SAME pipeline handleCopilotApply() (app/workflows/page.tsx)
+ * uses for the Aivory Copilot tab: convertToN8nWorkflow() classifies each step
+ * via the nodeMapper engine (real n8n types, AI steps expand into an Agent +
+ * Chat Model sub-node pair, a proper Webhook/Schedule trigger node is
+ * prepended) and n8nToReactFlow() turns that into typed React Flow
+ * nodes/edges (rawN8n populated, category/icon derived from the real type).
+ * Any caller building a fresh canvas from step text (blueprint import, the
+ * Copilot refine modal) should go through this rather than hand-rolling
+ * nodes with no rawN8n — that silently deploys as "Edit Fields" in n8n.
+ */
+function stepsToTypedReactFlow(
+  steps: Array<{ action: string; tool?: string; output?: string }>,
+  trigger: string,
+  title: string
+): { nodes: Node<WorkflowNodeData>[]; edges: Edge[] } {
+  const n8nWorkflow = convertToN8nWorkflow({
+    workflow_id: `wf-${Date.now()}`,
+    title,
+    trigger,
+    steps: steps.map((s, i) => ({
+      step: i + 1,
+      action: s.action,
+      tool: s.tool || '',
+      output: s.output || '',
+    })),
+  })
+  const { nodes, edges } = n8nToReactFlow(n8nWorkflow as unknown as import('@/lib/n8n').N8nWorkflow)
+  return { nodes: nodes as Node<WorkflowNodeData>[], edges }
+}
 
 /** Normalize edges loaded from any external source to use canonical n8nAdaptive type + marker.
  * `aiSubConnection` edges (LangChain Chat Model/Memory/Tool -> Agent) are left
@@ -144,7 +178,7 @@ function rehydrateNodeCallbacks(
   }));
 }
 
-export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fallbackSteps, onInjectNodes, onHistoryChange, registerUndo }: Props) {
+export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fallbackSteps, fallbackTrigger, fallbackTitle, onInjectNodes, onHistoryChange, registerUndo }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<WorkflowNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [rawWorkflow, setRawWorkflow] = useState<any>(null);
@@ -464,34 +498,19 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
   // ── Fetch workflow ───────────────────────────────────────
   const applyFallbackSteps = useCallback((steps: NonNullable<Props['fallbackSteps']>) => {
     if (steps.length > 0) {
-      const iconMap: Record<string, string> = {
-        ingestion: 'http', ai_processing: 'code', decision: 'branch',
-        execution: 'edit', notification: 'respond', human_review: 'manual',
-      };
-      const categoryMap: Record<string, WorkflowNodeData['category']> = {
-        ingestion: 'action', ai_processing: 'ai', decision: 'condition',
-        execution: 'action', notification: 'channel', human_review: 'system',
-      };
-      const rfNodes = steps.map((s, i) => ({
-        id: `step-${i}`,
-        type: 'standardNode' as const,
-        position: { x: 0, y: i * 160 },
-        data: {
-          label: s.action || `Step ${i + 1}`,
-          icon: iconMap[s.type || ''] ?? 'http',
-          category: categoryMap[s.type || ''] ?? 'action',
-          title: s.action || `Step ${i + 1}`,
-          description: s.output || s.tool || '',
-        } as WorkflowNodeData,
-      }));
-      const rfEdges = steps.slice(0, -1).map((_, i) => ({
-        id: `e-${i}-${i + 1}`,
-        source: `step-${i}`,
-        target: `step-${i + 1}`,
-        animated: false,
-        type: 'n8nAdaptive' as const,
-        markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12, color: '#9ca3af' },
-      }));
+      // Steps arriving here (e.g. from the blueprint page's "Buat" button)
+      // carry only free-text action/tool/output — go through the SAME
+      // convertToN8nWorkflow()/n8nToReactFlow() pipeline the Aivory Copilot
+      // tab uses (see stepsToTypedReactFlow above) so a workflow deployed
+      // from the blueprint page ends up with the identical real n8n node
+      // types (including AI Agent + Chat Model expansion and a proper
+      // trigger node) instead of a bespoke, weaker mapping that silently
+      // fell back to "Edit Fields" (n8n-nodes-base.set) for every node.
+      const { nodes: rfNodes, edges: rfEdges } = stepsToTypedReactFlow(
+        steps,
+        fallbackTrigger || 'Manual or scheduled start',
+        fallbackTitle || 'Workflow'
+      );
       setNodes(rehydrate(rfNodes));
       setEdges(normalizeEdges(rfEdges, rfNodes));
       setIsEmpty(false);
@@ -500,7 +519,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     }
     setSyncState('idle');
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setNodes, setEdges, rehydrate]);
+  }, [setNodes, setEdges, rehydrate, fallbackTrigger, fallbackTitle]);
 
   useEffect(() => {
     if (!isActive) {
@@ -1107,36 +1126,16 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
           workflow={currentWorkflow}
           onClose={() => setShowWorkflowCopilotModal(false)}
           onApply={(updatedWorkflow) => {
-            // Update nodes and edges based on updated workflow
-            const updatedNodes = updatedWorkflow.steps.map((step, i) => {
-              const intentToIcon: Record<string, string> = {
-                email: 'mail', messaging: 'send', http: 'http', respond: 'respond',
-                filter: 'branch', transform: 'edit', schedule: 'schedule', ai: 'sparkles',
-              }
-              const intent = detectNodeIntent(step.action || '', step.tool || '')
-              return {
-              id: `step-${i}`,
-              type: 'standardNode' as const,
-              position: { x: 0, y: i * 160 },
-              data: {
-                label: step.action || `Step ${i + 1}`,
-                title: step.action || `Step ${i + 1}`,
-                subtitle: step.tool || undefined,
-                description: step.output || undefined,
-                category: 'action' as const,
-                icon: intentToIcon[intent] ?? 'http',
-              } as WorkflowNodeData,
-            }
-            })
-            const updatedEdges = updatedNodes.slice(0, -1).map((_, i) => ({
-              id: `e-${i}-${i + 1}`,
-              source: `step-${i}`,
-              target: `step-${i + 1}`,
-              animated: false,
-              type: 'n8nAdaptive' as const,
-              markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12, color: '#9ca3af' },
-            }))
-            setNodes(updatedNodes)
+            // Same typed pipeline as the blueprint import and the Aivory
+            // Copilot tab (see stepsToTypedReactFlow above) — this modal used
+            // to build nodes with only a display icon and no rawN8n, which
+            // deployed as "Edit Fields" for every step regardless of intent.
+            const { nodes: updatedNodes, edges: updatedEdges } = stepsToTypedReactFlow(
+              updatedWorkflow.steps,
+              updatedWorkflow.trigger || 'Manual or scheduled start',
+              updatedWorkflow.title || 'Workflow'
+            )
+            setNodes(rehydrate(updatedNodes))
             setEdges(normalizeEdges(updatedEdges, updatedNodes))
             setShowWorkflowCopilotModal(false)
           }}
