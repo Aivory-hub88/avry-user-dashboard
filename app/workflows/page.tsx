@@ -1132,6 +1132,18 @@ function WorkflowsPageInner() {
 
       // Success — update workflow state
       if (apiWorkflows.find(aw => aw.id === selected.workflow_id)) {
+        // This never actually persisted the deploy result — it just
+        // re-fetched the list, so n8n_workflow_id/n8n_instance never landed
+        // on the record. Every reload of a backend-tracked workflow was
+        // exactly this same NO_CREDENTIALS/wrong-instance bug, permanently,
+        // not just for workflows deployed before today's fix.
+        await patchWorkflow(selected.workflow_id, {
+          status: 'active',
+          n8n_workflow_id: data.n8n_workflow_id,
+          n8n_url: data.n8n_url,
+          n8nWebhookPath: data.n8nWebhookUrl || null,
+          n8n_instance: data.instance === 'aivory' ? 'aivory' : 'byo',
+        })
         await refreshWorkflows()
       } else {
         updateWorkflow(selected.workflow_id, {
