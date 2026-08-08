@@ -220,7 +220,9 @@ export class DeepDiagnosticService {
     // key or a collision-prone company name.
     const orgId = organizationId?.trim() || getUser()?.user_id || 'current'
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 120_000)
+    // Matches the server route's own 480s budget (app/api/blueprints/generate/route.ts)
+    // — blueprint generation can legitimately take 5+ minutes.
+    const timeout = setTimeout(() => controller.abort(), 480_000)
 
     let response: Response
     try {

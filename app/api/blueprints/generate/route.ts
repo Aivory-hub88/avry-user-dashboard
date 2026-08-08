@@ -14,7 +14,7 @@ import { createErrorResponse } from '@/types/errors'
 import type { BlueprintV1 } from '@/types/blueprint'
 import { formatLocalAmount, parseCurrencyCode } from '@/lib/resultFormatters'
 
-export const maxDuration = 120
+export const maxDuration = 480
 
 function extractSseContent(raw: string): { content: string; error: string | null } {
   let error: string | null = null
@@ -205,9 +205,13 @@ export async function POST(request: NextRequest) {
     // Get VPS bridge configuration
     const config = getConfig()
 
-    // Forward request to VPS bridge with 120s timeout (blueprint generation is slow)
+    // Forward request to VPS bridge with 480s timeout — blueprint generation can
+    // legitimately take 5+ minutes; this must stay comfortably above Zeroclaw's
+    // own [gateway] request_timeout_secs (450s) so Zeroclaw's own timeout fires
+    // first with a clean empty-content result instead of this abort cutting the
+    // connection mid-stream.
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 120_000)
+    const timeout = setTimeout(() => controller.abort(), 480_000)
 
     let response: Response
     try {
