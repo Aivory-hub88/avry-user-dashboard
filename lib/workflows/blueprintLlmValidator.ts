@@ -139,7 +139,7 @@ export async function llmSemanticReview(planned: PlannedWorkflow, title: string)
       `If the workflow is semantically correct, reply with exactly: []\n\n` +
       `Workflow graph:\n${graph}`
 
-    const result = await callCopilotOperation('edit', { edit_request: request })
+    const result = await callCopilotOperation('semantic-review', { review_request: request })
     const message = typeof result?.message === 'string' ? result.message.trim() : ''
 
     if (!message) return { ok: true, findings: [] }

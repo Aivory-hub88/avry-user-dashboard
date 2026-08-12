@@ -28,6 +28,7 @@ export type CopilotOperation =
   | 'repair'
   | 'edit'
   | 'draft-test'
+  | 'semantic-review'
 
 const TIMEOUT_MS = 120_000
 
@@ -285,6 +286,23 @@ function buildOutbound(op: CopilotOperation, bodyRecord: Record<string, unknown>
       return {
         targetPath: '/workflows/draft-test',
         outbound: bodyRecord,
+      }
+    case 'semantic-review':
+      // Dedicated semantic-review entrypoint — does NOT append the workflow-JSON
+      // hint (that would bias the model toward emitting a workflow, not findings).
+      return {
+        targetPath: '/console/stream',
+        outbound: {
+          message: (bodyRecord.review_request ?? '') as string,
+          history: [],
+          mode: 'console',
+          channel: 'console_ui',
+          entrypoint: 'workflow_semantic_review',
+          context: {
+            session_id: bodyRecord.session_id ?? 'blueprint-review',
+            organization_id: bodyRecord.organization_id ?? 'default',
+          },
+        },
       }
   }
 }
