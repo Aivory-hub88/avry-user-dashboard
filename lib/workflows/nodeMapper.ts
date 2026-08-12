@@ -3,7 +3,15 @@
  * Detects intent from step action text and maps to appropriate n8n node.
  *
  * Intents: email, messaging, http, respond, filter, transform, schedule,
- *          compress, ssh, cleanup, ai (default)
+ *          calendar, humanReview, audit, compress, ssh, cleanup, ai
+ *
+ * AI governance: 'ai' is reserved for steps that genuinely require semantic
+ * reasoning/interpretation (classification, open-ended judgement). It is
+ * never the silent default for unrecognized text — see detectNodeIntent()'s
+ * final fallback, which resolves to 'http' (a generic, user-configurable
+ * action placeholder) instead. Preference order for an unclassified step:
+ * deterministic node > integration/API node > condition/switch node >
+ * human review node > AI agent (last resort).
  */
 
 export type NodeIntent =
@@ -21,6 +29,9 @@ export type NodeIntent =
   | 'code'
   | 'transform'
   | 'schedule'
+  | 'calendar'
+  | 'humanReview'
+  | 'audit'
   | 'rss'
   | 'ai'
 
@@ -35,25 +46,50 @@ export const ZEROCLAW_WEBHOOK_URL = process.env.ZEROCLAW_WEBHOOK_URL || ''
 // Intent detection patterns (priority order matters)
 // NOTE: Use \b word boundaries for short words like "if", "ai" to avoid substring matches
 // e.g. "notification" contains "if", "classify" contains "if"
+// Bilingual (EN + Indonesian/ID) — blueprint step text is frequently
+// generated in Bahasa Indonesia (see docs on Deep Diagnostic ID support).
 const INTENT_PATTERNS: Record<NodeIntent, RegExp> = {
   respond: /\brespond\b|return\b|send.*response|reply\b|deliver.*result|webhook.*response|final.*output/i,
   // Must be checked before `filter` — "switch" used to be a filter synonym,
   // which shadowed a real Switch (multi-branch) intent from ever matching.
   switch: /\bswitch\b|multi-?way|route.*based on|multiple branches/i,
   code: /\bcode\b|\bjavascript\b|custom script|\bfunction node\b/i,
-  filter: /condition|\bif\b|decision|\bcheck\b|\bflag\b|\bfilter\b|validate|validation|\bbranch\b/i,
-  email: /email|mail\b|smtp|inbox/i,
-  messaging: /slack|discord|telegram|whatsapp|\bsms\b|\bteams\b/i,
-  schedule: /schedule|cron|daily|hourly|weekly|timer|interval/i,
+  // Human-in-the-loop review/approval/escalation — checked before `filter`
+  // ("validate"/"check" would otherwise shadow it) and before `ai` (review
+  // text often contains words like "assess"/"tinjau" that could be mistaken
+  // for reasoning-only text).
+  humanReview: /human review|manual review|human.in.the.loop|needs? approval|require.*approval|escalat|\bapprov(e|al)\b|meninjau|peninjauan|tinjau\b|persetujuan|kasus (luar biasa|khusus|eksepsional)|exceptional case|tidak lengkap.*(review|tinjau)/i,
+  // Calendar/scheduling of a specific event (meeting, session, appointment)
+  // — distinct from `schedule` below, which is a recurring/cron trigger.
+  // Checked before `filter`/`ai` so "menjadwalkan sesi pengenalan" doesn't
+  // fall through to a generic action or AI node.
+  calendar: /\bcalendar\b|kalender|\bmeeting\b|\bappointment\b|book.*(session|meeting|call)|schedule.*(session|meeting|call|intro|interview)|menjadwalkan|penjadwalan|jadwalkan|sesi (pengenalan|perkenalan|wawancara)/i,
+  // "validate"/"classify" wording is deliberately NOT here — validating
+  // completeness or classifying a free-text case is a reasoning task (see
+  // the `ai` pattern below), even though the resulting route is later
+  // implemented as a condition/switch node by the blueprint planner.
+  // "menentukan"/"tentukan" (determine/decide) IS here — routing text like
+  // "determine the onboarding path" maps to a condition by default.
+  filter: /condition|\bif\b|decision|\bcheck\b|\bflag\b|\bfilter\b|validate|validation|\bbranch\b|menentukan\b|tentukan\b|\bjalur\b|\brute\b/i,
+  email: /email|mail\b|smtp|inbox|surel|\be-mail\b/i,
+  messaging: /slack|discord|telegram|whatsapp|\bsms\b|\bteams\b|pesan\b/i,
+  // Recurring/cron trigger only — plain "jadwal"/"schedule" without a
+  // calendar-event keyword above.
+  schedule: /schedule|cron|daily|hourly|weekly|timer|interval|setiap (hari|jam|minggu|bulan)|harian|mingguan|bulanan|berkala/i,
   rss: /\brss\b|\bfeed\b/i,
-  http: /\bhttp\b|\bapi\b|request\b|fetch\b|call.*endpoint|webhook.*call|post.*to|get.*from/i,
-  transform: /transform|convert|format\b|parse\b|extract\b|set.*value/i,
-  database: /mysql|postgres|postgresql|sql\b|database|db\b|query|insert|select.*from/i,
+  http: /\bhttp\b|\bapi\b|request\b|fetch\b|call.*endpoint|webhook.*call|post.*to|get.*from|ambil data|mengambil data|dapatkan data|dari sistem|dari crm|\bcrm\b/i,
+  transform: /transform|convert|format\b|parse\b|extract\b|set.*value|ubah\b|konversi|format ulang/i,
+  database: /mysql|postgres|postgresql|sql\b|database|db\b|query|insert|select.*from|basis data/i,
   ftp: /ftp|sftp|file.*transfer|upload.*file|download.*file|file.*server/i,
   compress: /compress|zip\b|tar\b|gzip|rar\b|archive|unzip|extract.*file|decompress/i,
   ssh: /\bssh\b|\bscp\b|\bexec\b|remote.*command|run.*command|shell\b|execute.*server/i,
-  cleanup: /delete\b|remove\b|cleanup|clean.*up|purge\b|clear\b|truncate|drop\b|erase\b/i,
-  ai: /\bai\b|\bllm\b|analyse|process\b|generate\b|summarise|classify|nlp|\bgpt\b|claude|qwen/i,
+  cleanup: /delete\b|remove\b|cleanup|clean.*up|purge\b|clear\b|truncate|drop\b|erase\b|hapus\b/i,
+  // Explicit audit/logging phrasing only — deliberately narrow (no bare
+  // "log", which false-positives on "login"/"logic") since most audit
+  // trail nodes are appended structurally by the blueprint planner rather
+  // than detected from free text.
+  audit: /\baudit\b|\blogging\b|audit trail|catat riwayat|rekam (hasil|log)|log.*(hasil|activity|aktivitas)/i,
+  ai: /\bai\b|\bllm\b|analyse|process\b|generate\b|summarise|classify|nlp|\bgpt\b|claude|qwen|reasoning|interpret|analisa|menganalisis|validasi|memvalidasi|klasifikasi|mengklasifikasikan|menilai|interpretasi/i,
 }
 
 /**
@@ -72,6 +108,10 @@ export function detectNodeIntent(action: string, tool?: string): NodeIntent {
   // otherwise shadow both (see INTENT_PATTERNS comment).
   if (INTENT_PATTERNS.switch.test(text)) return 'switch'
   if (INTENT_PATTERNS.code.test(text)) return 'code'
+  // Human review and calendar are specific node types that would otherwise
+  // be swallowed by the broader filter/ai patterns below.
+  if (INTENT_PATTERNS.humanReview.test(text)) return 'humanReview'
+  if (INTENT_PATTERNS.calendar.test(text)) return 'calendar'
   if (INTENT_PATTERNS.filter.test(text)) return 'filter'
   if (INTENT_PATTERNS.schedule.test(text)) return 'schedule'
   if (INTENT_PATTERNS.rss.test(text)) return 'rss'
@@ -81,11 +121,15 @@ export function detectNodeIntent(action: string, tool?: string): NodeIntent {
   if (INTENT_PATTERNS.compress.test(text)) return 'compress'
   if (INTENT_PATTERNS.ssh.test(text)) return 'ssh'
   if (INTENT_PATTERNS.cleanup.test(text)) return 'cleanup'
+  if (INTENT_PATTERNS.audit.test(text)) return 'audit'
   if (INTENT_PATTERNS.transform.test(text)) return 'transform'
   if (INTENT_PATTERNS.ai.test(text)) return 'ai'
 
-  // Default to AI for any unrecognized step
-  return 'ai'
+  // AI governance: an unrecognized step is NOT assumed to need reasoning.
+  // Default to a generic, user-configurable HTTP action instead of silently
+  // spinning up an AI Agent node — 'ai' is only ever returned above, from an
+  // explicit reasoning-signal match.
+  return 'http'
 }
 
 interface WorkflowStep {
@@ -363,6 +407,55 @@ export function mapIntentToN8nNode(
         parameters: {
           operation: 'executeQuery',
           query: step.inputs?.query || 'SELECT * FROM table_name LIMIT 10;',
+        },
+      }
+
+    case 'calendar':
+      return {
+        ...baseNode,
+        type: 'n8n-nodes-base.googleCalendar',
+        typeVersion: 1.3,
+        parameters: {
+          operation: 'create',
+          calendar: { mode: 'list', value: step.inputs?.calendar || 'primary' },
+          start: step.inputs?.start || '={{ $json.start_time }}',
+          end: step.inputs?.end || '={{ $json.end_time }}',
+          additionalFields: { summary: step.action },
+        },
+        // No credentials — user attaches their Google Calendar OAuth2 credential in n8n
+      }
+
+    // Human-in-the-loop node: pauses the workflow until an external
+    // approve/reject webhook call resumes it — n8n's standard mechanism for
+    // manual review/approval gates (see n8n-nodes-base.wait, resume: webhook).
+    case 'humanReview':
+      return {
+        ...baseNode,
+        type: 'n8n-nodes-base.wait',
+        typeVersion: 1.1,
+        parameters: {
+          resume: 'webhook',
+          options: {},
+        },
+      }
+
+    // Audit/log trail — appends a timestamped record via a Set node.
+    // Deliberately not an AI node: recording what happened requires no
+    // reasoning, only deterministic field assignment.
+    case 'audit':
+      return {
+        ...baseNode,
+        type: 'n8n-nodes-base.set',
+        typeVersion: 3,
+        parameters: {
+          assignments: {
+            assignments: [
+              { name: 'audit_step', value: step.action, type: 'string' },
+              { name: 'audit_logged_at', value: '={{ $now.toISO() }}', type: 'string' },
+              { name: 'audit_status', value: '={{ $json.status || "completed" }}', type: 'string' },
+            ],
+          },
+          options: {},
         },
       }
 

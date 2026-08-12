@@ -128,7 +128,14 @@ export function useCanvasAutosave(
 ) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const enabledRef = useRef(enabled);
-  enabledRef.current = enabled;
+  // Written in its own effect (runs after commit) rather than during
+  // render — refs shouldn't be mutated synchronously in the render body
+  // (unsafe under concurrent rendering); this only needs to be updated
+  // before the OTHER effect below next reads it, which effect ordering
+  // after each commit already guarantees.
+  useEffect(() => {
+    enabledRef.current = enabled;
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabledRef.current) return;

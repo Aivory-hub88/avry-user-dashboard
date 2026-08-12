@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useState, useRef, useEffect } from 'react';
+import React, { memo, useState, useRef, useEffect, useCallback } from 'react';
 import styles from './NodeTooltip.module.css';
 
 /**
@@ -63,7 +63,7 @@ const NodeTooltip = memo(
      * Calculate tooltip position relative to trigger element
      * Adjusts position if tooltip would overflow viewport
      */
-    const calculatePosition = () => {
+    const calculatePosition = useCallback(() => {
       if (!triggerRef.current || !tooltipRef.current) return;
 
       const triggerRect = triggerRef.current.getBoundingClientRect();
@@ -109,7 +109,7 @@ const NodeTooltip = memo(
       }
 
       setTooltipPosition({ top, left });
-    };
+    }, [position]);
 
     /**
      * Handle mouse enter - show tooltip after delay
@@ -145,7 +145,7 @@ const NodeTooltip = memo(
         });
         return () => cancelAnimationFrame(rafId);
       }
-    }, [isVisible]);
+    }, [isVisible, calculatePosition]);
 
     /**
      * Cleanup timeout on unmount

@@ -69,6 +69,15 @@ const StickyNode = ({ data }: { data: any }) => {
 export default function TemplateCanvasPreview({ template }: { template: Template }) {
   const nodeTypes = useMemo(() => ({ n8nNode: N8nNode, stickyNode: StickyNode }), []);
 
+  // Hooks must run unconditionally on every render (Rules of Hooks) — the
+  // "no flowData" case used to return before these were ever called, which
+  // crashes ("Rendered fewer hooks than expected") if the same mounted
+  // instance later receives a template whose flowData IS present. Falling
+  // back to an empty array keeps the hook call itself unconditional; the
+  // early-return check below only gates what gets rendered.
+  const [nodes, setNodes, onNodesChange] = useNodesState(template.flowData?.nodes ?? []);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(template.flowData?.edges ?? []);
+
   if (!template.flowData) {
     return (
       <div className="w-full h-full flex items-center justify-center text-white/30">
@@ -76,9 +85,6 @@ export default function TemplateCanvasPreview({ template }: { template: Template
       </div>
     );
   }
-
-  const [nodes, setNodes, onNodesChange] = useNodesState(template.flowData.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(template.flowData.edges);
 
   return (
     <ReactFlow

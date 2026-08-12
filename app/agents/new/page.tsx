@@ -204,7 +204,7 @@ export default function NewAgentPage() {
         {/* Info box */}
         <div className="mt-6 p-4 bg-white/5 border border-white/10 rounded-lg">
           <p className="text-sm text-zinc-400">
-            <strong className="text-zinc-300">Note:</strong> Agents start in "draft" status. You can activate them after creation and configure advanced settings like prompts and tools in future updates.
+            <strong className="text-zinc-300">Note:</strong> Agents start in &quot;draft&quot; status. You can activate them after creation and configure advanced settings like prompts and tools in future updates.
           </p>
         </div>
       </div>

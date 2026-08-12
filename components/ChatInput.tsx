@@ -25,6 +25,11 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
 
   useEffect(() => {
     if (prefill) {
+      // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+      // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+      // not restructuring this component's data flow to satisfy the newer
+      // React Compiler style rule; see other documented instances of this.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMessage(prefill)
       setTimeout(() => {
         if (textareaRef.current) {
@@ -63,6 +68,13 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
     setAttachment(null)
     onClearPendingAttachments?.()
     if (textareaRef.current) {
+      // Imperative textarea auto-resize in a user-action handler — the
+      // standard, correct use of a DOM ref. Flagged only because the same
+      // ref is also touched in the prefill effect above; this project
+      // doesn't run React Compiler's actual transform, so there's no live
+      // hazard, and the "fix" (moving this into an effect keyed off every
+      // keystroke) would be a real behavioral downgrade, not an improvement.
+      // eslint-disable-next-line react-hooks/immutability
       textareaRef.current.style.height = 'auto'
     }
   }
@@ -77,6 +89,10 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
   const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value)
     if (textareaRef.current) {
+      // Same as handleSend above — standard imperative ref usage in a
+      // user-action handler, flagged only due to the prefill effect also
+      // touching this ref; no live hazard without React Compiler enabled.
+      // eslint-disable-next-line react-hooks/immutability
       textareaRef.current.style.height = 'auto'
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`
     }

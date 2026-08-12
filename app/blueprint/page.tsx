@@ -934,16 +934,37 @@ const SIZE_LABELS: Record<string, string> = {
   enterprise: 'Enterprise',
 }
 
+interface GeneratedWorkflowStepBranch {
+  key: string
+  label?: string
+  steps: GeneratedWorkflowStepEntry[]
+}
+
+interface GeneratedWorkflowStepEntry {
+  step: number
+  action: string
+  tool: string
+  output: string
+  /** 'condition' | 'switch' for branching nodes the blueprint planner
+   *  generated (decision routing, exception/human-review gates) — absent
+   *  for plain linear action steps. */
+  type?: string
+  branches?: GeneratedWorkflowStepBranch[]
+}
+
 interface GeneratedWorkflow {
   workflow_id: string
   title: string
   trigger: string
-  steps: Array<{ step: number; action: string; tool: string; output: string }>
+  steps: GeneratedWorkflowStepEntry[]
   integrations: string[]
   estimated_time: string
   automation_percentage: string
   error_handling: string
   notes: string
+  /** Blueprint planner warnings — unresolved integrations, degraded
+   *  exception-gate fallbacks, etc. Non-fatal. */
+  warnings?: string[]
 }
 
 interface BlueprintVersion {
@@ -1164,6 +1185,12 @@ export default function BlueprintPage() {
           workflow_id: id,
           workflow_title: wf.name,
           workflow_steps: wf.steps,
+          // Was never sent — the planner's integration-mapping (CRM/email/
+          // calendar resolution, unresolved-integration warnings) silently
+          // ran with an empty list in production even when the blueprint
+          // module clearly declared its required integrations.
+          integrations_required: wf.integrations_required,
+          trigger: wf.trigger,
           diagnostic_context: diagnosticContext,
           company_name: blueprint?.organization?.name || 'SME'
         })

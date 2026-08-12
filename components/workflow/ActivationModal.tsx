@@ -55,6 +55,11 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
     if (open) {
       const stored = loadCredentials()
       if (stored) {
+        // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+        // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+        // not restructuring this component's data flow to satisfy the newer
+        // React Compiler style rule; see other documented instances of this.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setInstanceUrl(stored.instanceUrl)
         setApiKey(stored.apiKey)
         setStoragePreference(stored.storageType)

@@ -51,6 +51,31 @@ const formatNumber = (num: number) => {
   return new Intl.NumberFormat("en-US").format(num)
 }
 
+// Module-scoped — a component defined inside a parent's render body is a
+// NEW component type every render, which makes React fully unmount+remount
+// it instead of just updating props each time the parent re-renders.
+const ProgressCard = ({ title, used, max, percentage, unit }: { title: string; used: number; max: number; percentage: number; unit: string }) => (
+  <div className="rounded-xl border border-white/[0.07] bg-[#2a2a27] p-6">
+    <div className="flex items-center justify-between mb-3">
+      <h3 className="text-sm font-medium text-white">{title}</h3>
+      <span className="text-sm text-gray-400">
+        {formatNumber(used)} / {formatNumber(max)} {unit}
+      </span>
+    </div>
+    <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+      <div
+        className="h-full rounded-full bg-gradient-to-r from-brand-purple to-brand-mint"
+        style={{ width: `${percentage}%` }}
+      />
+    </div>
+    <div className="mt-2 text-right">
+      <span className={`text-sm font-medium ${percentage >= 90 ? "text-red-400" : "text-gray-400"}`}>
+        {percentage}% used
+      </span>
+    </div>
+  </div>
+)
+
 export default function WalletPage() {
   const t = useTranslations("dashboard")
   const [walletData, setWalletData] = useState<WalletData | null>(null)
@@ -58,42 +83,9 @@ export default function WalletPage() {
   const [error, setError] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      if (!window.AuthManagerReady) {
-        await new Promise(resolve => {
-          const checkInterval = setInterval(() => {
-            if (window.AuthManagerReady) {
-              clearInterval(checkInterval)
-              resolve(true)
-            }
-          }, 50)
-          setTimeout(() => {
-            clearInterval(checkInterval)
-            resolve(true)
-          }, 5000)
-        })
-      }
-
-      if (typeof AuthManager !== "undefined") {
-        if (!AuthManager.isAuthenticated()) {
-          setError("Please log in to view your wallet")
-          setAuthLoading(false)
-          return
-        }
-      }
-      setAuthLoading(false)
-    }
-
-    checkAuth()
-  }, [])
-
-  useEffect(() => {
-    if (authLoading) return
-
-    fetchWalletData()
-  }, [authLoading])
-
+  // Declared before the effects that call it (deferred execution, so this
+  // was never an actual runtime hazard — but this ordering also satisfies
+  // static declaration-order analysis).
   const fetchWalletData = async () => {
     if (!AuthManager.isAuthenticated()) return
 
@@ -176,27 +168,46 @@ export default function WalletPage() {
     }
   }
 
-  const ProgressCard = ({ title, used, max, percentage, unit }: { title: string; used: number; max: number; percentage: number; unit: string }) => (
-    <div className="rounded-xl border border-white/[0.07] bg-[#2a2a27] p-6">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-white">{title}</h3>
-        <span className="text-sm text-gray-400">
-          {formatNumber(used)} / {formatNumber(max)} {unit}
-        </span>
-      </div>
-      <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-brand-purple to-brand-mint"
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-      <div className="mt-2 text-right">
-        <span className={`text-sm font-medium ${percentage >= 90 ? "text-red-400" : "text-gray-400"}`}>
-          {percentage}% used
-        </span>
-      </div>
-    </div>
-  )
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (!window.AuthManagerReady) {
+        await new Promise(resolve => {
+          const checkInterval = setInterval(() => {
+            if (window.AuthManagerReady) {
+              clearInterval(checkInterval)
+              resolve(true)
+            }
+          }, 50)
+          setTimeout(() => {
+            clearInterval(checkInterval)
+            resolve(true)
+          }, 5000)
+        })
+      }
+
+      if (typeof AuthManager !== "undefined") {
+        if (!AuthManager.isAuthenticated()) {
+          setError("Please log in to view your wallet")
+          setAuthLoading(false)
+          return
+        }
+      }
+      setAuthLoading(false)
+    }
+
+    checkAuth()
+  }, [])
+
+  useEffect(() => {
+    if (authLoading) return
+
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchWalletData()
+  }, [authLoading])
 
   if (authLoading) {
     return <LoadingState />

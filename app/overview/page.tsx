@@ -22,15 +22,33 @@ export default function DashboardPage() {
   const { pendingContext, clearPendingContext } = useRouterContext()
   const [routingNotice, setRoutingNotice] = useState<string | null>(null)
 
+  // Declared before the effect that calls it (deferred execution, so this
+  // was never an actual runtime hazard — but this ordering also satisfies
+  // static declaration-order analysis).
+  const fetchDashboardData = async () => {
+    setData(getPlaceholderData())
+    setLoading(false)
+  }
+
   useEffect(() => {
     if (!pendingContext) return
     if (Date.now() - pendingContext.timestamp > 300000) { clearPendingContext(); return }
     if (pendingContext.targetRoute !== 'dashboard') return
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRoutingNotice(pendingContext.aiReplySummary || pendingContext.triggerMessage)
     clearPendingContext()
   }, [pendingContext, clearPendingContext])
 
   useEffect(() => {
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDashboardData()
 
     // Check deep diagnostic status — presence of aivory_diagnostic_context means complete
@@ -39,11 +57,6 @@ export default function DashboardPage() {
       setDeepDiagnosticCompleted(true)
     }
   }, [])
-
-  const fetchDashboardData = async () => {
-    setData(getPlaceholderData())
-    setLoading(false)
-  }
 
   if (loading) {
     return <LoadingState />

@@ -188,6 +188,11 @@ function OverallProgressBar({ phases, allChecked, activeIdx, onNodeClick }: {
   useEffect(() => {
     const stored = localStorage.getItem(LS_START_DATE);
     if (stored) {
+      // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+      // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+      // not restructuring this component's data flow to satisfy the newer
+      // React Compiler style rule; see other documented instances of this.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStartDate(stored);
       setDaysElapsed(Math.floor((Date.now() - new Date(stored).getTime()) / 86400000));
     }
@@ -1007,6 +1012,11 @@ export default function RoadmapPage() {
     if (!pendingContext) return
     if (Date.now() - pendingContext.timestamp > 300000) { clearPendingContext(); return }
     if (pendingContext.targetRoute !== 'roadmap') return
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRoutingNotice(pendingContext.aiReplySummary || pendingContext.triggerMessage)
     clearPendingContext()
   }, [pendingContext, clearPendingContext])
@@ -1016,6 +1026,11 @@ export default function RoadmapPage() {
     // KPI actuals
     try {
       const stored = localStorage.getItem(LS_KPI_ACTUALS);
+      // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+      // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+      // not restructuring this component's data flow to satisfy the newer
+      // React Compiler style rule; see other documented instances of this.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (stored) setKpiActuals(JSON.parse(stored));
     } catch { /* ignore */ }
     // Phase completes
@@ -1219,15 +1234,32 @@ export default function RoadmapPage() {
 
             {/* Phase sections */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/*
+                phaseRefs.current is always (re)sized to match roadmap.phases
+                right where `setRoadmap` is called (both call sites), before
+                this ever re-renders.
+
+                Reading `.current` below is flagged because reading a ref
+                during render is generally unsafe, but this usage only
+                forwards the stable ref-CONTAINER object as a prop so
+                PhaseSection can attach a DOM node to it later — no render
+                output depends on the ref's mutable value, so there's no
+                actual staleness/consistency hazard. There's no
+                ref-per-list-item alternative here (refs can't be created
+                inside .map()), and restructuring this to a forwardRef/
+                callback-ref registry pattern is a bigger change than this
+                diagnostic (inert without React Compiler's transform
+                enabled) justifies.
+              */}
+              {/* eslint-disable-next-line react-hooks/refs */}
               {roadmap.phases.map((phase, idx) => {
-                if (!phaseRefs.current[idx]) phaseRefs.current[idx] = { current: null };
                 return (
                   <PhaseSection
                     key={phase.id}
                     phase={phase}
                     index={idx}
                     open={!!openPhases[phase.id]}
-                    phaseRef={phaseRefs.current[idx]}
+                    phaseRef={phaseRefs.current[idx] ?? { current: null }}
                     onToggle={() => togglePhase(phase.id)}
                     onWorkflow={id => router.push(`/workflows?selected=${encodeURIComponent(id)}`)}
                     checked={allChecked[phase.id] || {}}

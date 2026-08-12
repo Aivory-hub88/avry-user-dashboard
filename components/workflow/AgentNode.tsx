@@ -121,7 +121,7 @@ const AgentNode = memo(({ data, selected, isConnecting }: AgentNodeProps) => {
           {promptSummary && (
             <div className={styles.description}>
               <div className={styles.promptSummary} title={promptSummary}>
-                "{truncate(promptSummary)}"
+                &quot;{truncate(promptSummary)}&quot;
               </div>
             </div>
           )}

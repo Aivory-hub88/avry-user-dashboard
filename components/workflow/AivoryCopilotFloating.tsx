@@ -1,5 +1,6 @@
 'use client'
 import { asset } from "@/lib/asset";
+import Image from 'next/image'
 
 import { useRef, useState, useEffect, useCallback } from 'react'
 import type { CopilotMessage } from '@/hooks/useWorkflowCopilot'
@@ -82,7 +83,7 @@ export function AivoryCopilotFloating({
         onClick={() => onOpenChange(true)}
         aria-label="Open Aivory Copilot"
       >
-        <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" className="w-[18px] h-[18px]" />
+        <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={18} height={18} className="w-[18px] h-[18px]" />
         <span className="text-xs font-semibold text-text-secondary tracking-wide">Aivory Copilot</span>
         <span className="text-[11px] text-gray-600">/ or ⌘K</span>
         <span className="text-gray-600 hover:text-accent transition-colors duration-150 flex-shrink-0">
@@ -109,7 +110,7 @@ export function AivoryCopilotFloating({
     >
       <div className="flex items-center justify-between px-4 py-3 border-b border-border-soft flex-shrink-0 cursor-grab select-none active:cursor-grabbing">
         <div className="flex items-center gap-2.5">
-          <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" className="w-5 h-5" />
+          <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={20} height={20} className="w-5 h-5" />
           <span className="font-semibold text-sm text-text-primary">Workflow Copilot</span>
           <div className="flex items-center gap-1.5 text-xs text-emerald-400">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -150,7 +151,7 @@ export function AivoryCopilotFloating({
            style={{ maxHeight: 'calc(480px - 120px)' }}>
         {messages.length === 0 && !loading && (
           <div className="flex flex-col items-center justify-center gap-1.5 py-6 text-center text-gray-600">
-            <img src={asset("/Aivory_Avatar.svg")} alt="" className="w-7 h-7 opacity-50" />
+            <Image src={asset("/Aivory_Avatar.svg")} alt="" width={28} height={28} className="w-7 h-7 opacity-50" />
             <p className="text-sm font-medium text-text-secondary m-0">Ask Aivory anything</p>
             <p className="text-xs text-gray-600 m-0 leading-relaxed max-w-90">
               Get expert advice on automation, or describe a workflow to build it on the canvas.
@@ -161,7 +162,7 @@ export function AivoryCopilotFloating({
           <div key={i} className={`flex items-start gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {msg.role === 'assistant' && (
               <div className="flex-shrink-0 mt-0.5">
-                <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" className="w-[18px] h-[18px]" />
+                <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={18} height={18} className="w-[18px] h-[18px]" />
               </div>
             )}
             <div className={`flex flex-col gap-1.5 ${msg.role === 'user' ? 'items-end' : ''}`}>
@@ -196,7 +197,7 @@ export function AivoryCopilotFloating({
         {loading && (
           <div className="flex items-start gap-2">
             <div className="flex-shrink-0 mt-0.5">
-              <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" className="w-[18px] h-[18px]" />
+              <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={18} height={18} className="w-[18px] h-[18px]" />
             </div>
             <div className="px-3.5 py-2.5 bg-white/4 border border-white/7 rounded-[10px] rounded-bl-[2px]">
               <div className="flex gap-1">

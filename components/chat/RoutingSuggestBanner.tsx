@@ -48,6 +48,11 @@ export function RoutingSuggestBanner({ intent: originalIntent, onAccept, onDismi
     
     if (state.is_subscription_member && !state.has_purchased_onetime_service) {
       if (premiumRoutes.includes(originalIntent.route)) {
+        // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+        // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+        // not restructuring this component's data flow to satisfy the newer
+        // React Compiler style rule; see other documented instances of this.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setEffectiveIntent({
           route: 'pricing',
           confidence: 1,

@@ -29,6 +29,9 @@ const INTENT_TO_CATEGORY: Record<NodeIntent, string> = {
   transform: "transform",
   rss: "http",
   ai: "ai",
+  calendar: "action",
+  humanReview: "action",
+  audit: "transform",
 };
 
 function categoryFor(label: string, isFirst: boolean, isTriggerHint?: boolean): string {

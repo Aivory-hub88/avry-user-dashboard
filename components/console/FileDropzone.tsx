@@ -26,7 +26,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; size: number } | null>(null);
 
-  const validateFile = (file: File): { valid: boolean; error?: string } => {
+  const validateFile = useCallback((file: File): { valid: boolean; error?: string } => {
     console.log('[FileDropzone] validateFile called:', { name: file.name, size: file.size, type: file.type });
 
     if (file.size > maxSize) {
@@ -44,7 +44,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
 
     console.log('[FileDropzone] validation passed');
     return { valid: true };
-  };
+  }, [maxSize, acceptedTypes]);
 
   const uploadFile = useCallback(async (file: File) => {
     console.log('[FileDropzone] uploadFile called:', { name: file.name, size: file.size, type: file.type });
@@ -121,7 +121,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
       clearInterval(progressInterval);
       setIsUploading(false);
     }
-  }, [maxSize, acceptedTypes, onFileSelect, onUploadStart, onUploadComplete]);
+  }, [onFileSelect, onUploadStart, onUploadComplete, validateFile]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     console.log('[FileDropzone] dragover event');

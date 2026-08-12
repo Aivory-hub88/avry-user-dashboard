@@ -15,6 +15,11 @@ export function useConversationHistory() {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         const parsed = JSON.parse(stored)
+        // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+        // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+        // not restructuring this component's data flow to satisfy the newer
+        // React Compiler style rule; see other documented instances of this.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setConversations(parsed.map((c: any) => ({ ...c, updatedAt: new Date(c.updatedAt) })))
       }
     } catch {

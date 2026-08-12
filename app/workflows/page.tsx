@@ -1,5 +1,6 @@
 'use client'
 import { asset } from "@/lib/asset";
+import Image from "next/image";
 
 import { useEffect, useState, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -147,7 +148,7 @@ const Icons = {
     </svg>
   ),
   aivoryAvatar: (
-    <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" style={{ width: '18px', height: '18px' }} />
+    <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={18} height={18} />
   ),
   robot: (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -275,6 +276,11 @@ function RightPanel({
 
   useEffect(() => {
     if (isTrigger) { 
+      // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+      // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+      // not restructuring this component's data flow to satisfy the newer
+      // React Compiler style rule; see other documented instances of this.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAction(workflow.trigger)
       setTool('')
       setOutput('')
@@ -290,7 +296,7 @@ function RightPanel({
       setAdditionalParams((step.config?.additionalFields as string) ?? '')
       setSelectedConnectionId(step.connectionId ?? '')
     }
-  }, [editTarget, workflow])
+  }, [editTarget, workflow, isTrigger, step])
 
   const handleSave = () => {
     if (isTrigger) {
@@ -404,7 +410,7 @@ function RightPanel({
           )}
         </div>
         <span className={styles.fieldHelperText}>
-          Describe what happens in this step in plain language. Example: 'Fetch client data from Salesforce when a new onboarding comes in.'
+          Describe what happens in this step in plain language. Example: &apos;Fetch client data from Salesforce when a new onboarding comes in.&apos;
         </span>
         <textarea className={styles.fieldTextarea} value={action} onChange={e => setAction(e.target.value)} rows={3} />
         
@@ -412,13 +418,13 @@ function RightPanel({
           <>
             <label className={styles.fieldLabel}>{t('toolService')}</label>
             <span className={styles.fieldHelperText}>
-              Enter the tool or API used. Example: 'Salesforce REST API', 'SendGrid v3', 'SharePoint Graph API', or 'HTTP Custom API'.
+              Enter the tool or API used. Example: &apos;Salesforce REST API&apos;, &apos;SendGrid v3&apos;, &apos;SharePoint Graph API&apos;, or &apos;HTTP Custom API&apos;.
             </span>
             <input className={styles.fieldInput} value={tool} onChange={e => setTool(e.target.value)} placeholder="e.g. Google Sheets, OpenAI, Slack" />
             
             <label className={styles.fieldLabel}>{t('whatProduces')}</label>
             <span className={styles.fieldHelperText}>
-              Describe the output this step produces. Example: 'Complete client data in JSON format, ready for the next step.'
+              Describe the output this step produces. Example: &apos;Complete client data in JSON format, ready for the next step.&apos;
             </span>
             <input className={styles.fieldInput} value={output} onChange={e => setOutput(e.target.value)} placeholder="e.g. Enriched lead record" />
 
@@ -457,7 +463,7 @@ function RightPanel({
                 <div className={styles.credField}>
                   <label className={styles.credFieldLabel}>{t('integration')}</label>
                   <span className={styles.credFieldHelper}>
-                    Select the system being used. If it's not in the list, choose 'Custom'.
+                    Select the system being used. If it&apos;s not in the list, choose &apos;Custom&apos;.
                   </span>
                   <select 
                     className={styles.credSelect}
@@ -542,7 +548,7 @@ function RightPanel({
                 <div className={styles.credField}>
                   <label className={styles.credFieldLabel}>{t('credentialName')}</label>
                   <span className={styles.credFieldHelper}>
-                    Give it a name so Aivory can reference it when building workflows. Example: 'Salesforce Production'.
+                    Give it a name so Aivory can reference it when building workflows. Example: &apos;Salesforce Production&apos;.
                   </span>
                   <input 
                     className={styles.credInput}
@@ -564,7 +570,7 @@ function RightPanel({
                   {showParamSection && (
                     <>
                       <span className={styles.credFieldHelper}>
-                        Add custom parameters in JSON format. Example: {'{'}  "timeout": 30, "version": "v2" {'}'}
+                        Add custom parameters in JSON format. Example: {'{'}  &quot;timeout&quot;: 30, &quot;version&quot;: &quot;v2&quot; {'}'}
                       </span>
                       <textarea 
                         className={styles.credTextarea}
@@ -690,6 +696,11 @@ function WorkflowsPageInner() {
     if (!pendingContext) return
     if (Date.now() - pendingContext.timestamp > 300000) { clearPendingContext(); return }
     if (pendingContext.targetRoute !== 'workflows') return
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRoutingNotice(pendingContext.aiReplySummary || pendingContext.triggerMessage)
     clearPendingContext()
   }, [pendingContext, clearPendingContext])
@@ -746,6 +757,11 @@ function WorkflowsPageInner() {
   // Load localStorage on mount; auto-select from ?selected param or first item
   useEffect(() => {
     const wfs = loadWorkflows()
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalWorkflows(wfs)
     
     // Check if coming from console with handoff spec
@@ -809,6 +825,10 @@ function WorkflowsPageInner() {
     } else if (wfs.length > 0) {
       setSelectedId(wfs[0].workflow_id)
     }
+  // Deliberately mount-only — reads the *initial* URL state once. Adding
+  // `searchParams` would re-run this on every navigation that changes it,
+  // clobbering whatever selection the user made afterward.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Apply a marketplace template to a brand-new workflow canvas
@@ -824,17 +844,33 @@ function WorkflowsPageInner() {
     ;(async () => {
       const template = await fetchTemplateById(templateId)
       if (!template) {
+        // showToast/handleGenerationApply are declared much further down
+        // this component — safe here because this whole block only runs
+        // inside the async IIFE (deferred), long after the component
+        // function has finished its render pass and both are initialized.
+        // eslint-disable-next-line react-hooks/immutability
         showToast('Template not found', 'error')
         return
       }
       const { nodes, edges } = templateToCanvas(template)
+      // eslint-disable-next-line react-hooks/immutability
       await handleGenerationApply(nodes, edges)
     })()
+  // Deliberately mount-only — the effect strips `applyTemplate` from the
+  // URL itself specifically so it never fires again; including
+  // `searchParams`/`handleGenerationApply` (neither stable across renders)
+  // would re-apply the template repeatedly instead of exactly once.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Auto-select first API workflow once loaded (if nothing selected yet)
   useEffect(() => {
     if (!selectedId && apiWorkflows.length > 0) {
+      // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+      // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+      // not restructuring this component's data flow to satisfy the newer
+      // React Compiler style rule; see other documented instances of this.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedId(apiWorkflows[0].id)
     }
   }, [apiWorkflows, selectedId])
@@ -1245,7 +1281,11 @@ function WorkflowsPageInner() {
       loopConfig: step.loopConfig,
     })
 
+    // Date.now() here runs inside handleCopilotApply, an async event
+    // handler invoked on user action — not during render — so this isn't
+    // the render-purity violation the rule is designed to catch.
     const n8nWorkflow = convertToN8nWorkflow({
+      // eslint-disable-next-line react-hooks/purity
       workflow_id: `copilot-${Date.now()}`,
       title,
       trigger: workflow.steps[0]?.title || '',
@@ -1458,7 +1498,7 @@ function WorkflowsPageInner() {
       <div className={styles.onboardingOverlay}>
         <div className={styles.onboardingContent}>
           <div className={styles.onboardingAvatarWrap}>
-            <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={28} height={28} />
+            <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={28} height={28} />
           </div>
           <h2 className={styles.onboardingTitle}>{t('onboardingTitle')}</h2>
           <p className={styles.onboardingSubtitle}>
@@ -1468,7 +1508,7 @@ function WorkflowsPageInner() {
             className={styles.onboardingCTA}
             onClick={() => {}}
           >
-            <img src={asset("/Aivory_Avatar.svg")} alt="" width={16} height={16} aria-hidden="true" />
+            <Image src={asset("/Aivory_Avatar.svg")} alt="" width={16} height={16} aria-hidden="true" />
             {t('askAivoryCopilot')}
           </button>
           <p className={styles.onboardingHotkey}>
@@ -1664,7 +1704,7 @@ function WorkflowsPageInner() {
                   title={`Drag ${app.name} to canvas`}
                 >
                   {app.iconPath ? (
-                    <img src={asset(app.iconPath)} alt="" className={styles.appItemIcon} data-brand={app.id.toLowerCase()} />
+                    <Image src={asset(app.iconPath)} alt="" width={20} height={20} className={styles.appItemIcon} data-brand={app.id.toLowerCase()} />
                   ) : (
                     <span className={styles.appItemIcon}>{app.icon}</span>
                   )}

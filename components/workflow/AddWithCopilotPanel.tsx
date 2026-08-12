@@ -12,6 +12,7 @@
 'use client'
 
 import React, { useMemo, useState, useCallback } from 'react'
+import Image from 'next/image'
 import type { Node } from '@xyflow/react'
 import { AivoryWorkflowSpec, WorkflowStep } from '@/types/workflows'
 import type { WorkflowNodeData, NodeConfig } from '@/types/workflow-node'
@@ -146,7 +147,7 @@ export const AddWithCopilotPanel: React.FC<AddWithCopilotPanelProps> = ({
       {/* ── Header ── */}
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <img src={asset('/Aivory_Avatar.svg')} alt="" className={styles.headerAvatar} />
+          <Image src={asset('/Aivory_Avatar.svg')} alt="" width={22} height={22} className={styles.headerAvatar} />
           <div className={styles.headerText}>
             <span className={styles.headerTitle}>{nodeTitle}</span>
             <span className={styles.headerSub}>{typeLabel} · Aivory copilot</span>

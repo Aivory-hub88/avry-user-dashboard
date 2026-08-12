@@ -11,7 +11,7 @@
  * - reset() only called by explicit "Clear" button, NOT on open/close
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   sendCopilotMessage,
   type CopilotApiResponse,
@@ -127,32 +127,37 @@ function clearPersistedState() {
 // ── Hook ──────────────────────────────────────────────────
 
 export function useWorkflowCopilot(): UseWorkflowCopilotReturn {
-  // Load initial state from localStorage
-  const initial = useRef(loadPersistedState())
-
-  const [messages, setMessages] = useState<CopilotMessage[]>(initial.current?.messages ?? [])
+  // Load initial state from localStorage. Each useState below uses the
+  // lazy-initializer function form (`() => ...`) rather than a shared
+  // useRef — that form is guaranteed to run exactly once, on mount, so
+  // there's no need to read a ref's `.current` during render (unsafe under
+  // concurrent rendering) to avoid recomputing on every re-render. The
+  // handful of extra loadPersistedState() calls only happen once, at mount.
+  const [messages, setMessages] = useState<CopilotMessage[]>(() => loadPersistedState()?.messages ?? [])
   const [loading, setLoading] = useState(false)
   const [loadingHint, setLoadingHint] = useState<string | null>(null)
   const [isStreamingReply, setIsStreamingReply] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const [serverState, setServerState] = useState<CopilotConversationState | null>(
-    initial.current?.serverState ?? null
+    () => loadPersistedState()?.serverState ?? null
   )
   const [sessionId, setSessionId] = useState<string | null>(
-    initial.current?.sessionId ?? null
+    () => loadPersistedState()?.sessionId ?? null
   )
 
   // Derived convenience fields surfaced from server state.
   // Rehydrated from the persisted serverState using the same rules as the
   // copilot API route — otherwise a reload would drop workflow/canApply and
   // the "Apply to canvas" button would vanish for a ready workflow.
-  const persisted = initial.current?.serverState ?? null
-  const [workflow, setWorkflow] = useState<GeneratedWorkflow | null>(persisted?.generatedWorkflow ?? null)
-  const [testResults, setTestResults] = useState<TestResult[] | null>(persisted?.testResults ?? null)
-  const [canApply, setCanApply] = useState(persisted?.stage === 'AWAITING_APPLY_APPROVAL')
-  const [isCompleted, setIsCompleted] = useState(persisted?.stage === 'COMPLETED')
-  const [isTesting, setIsTesting] = useState(persisted?.stage === 'SANDBOX_TESTING' || persisted?.stage === 'FIXING')
+  const [workflow, setWorkflow] = useState<GeneratedWorkflow | null>(() => loadPersistedState()?.serverState?.generatedWorkflow ?? null)
+  const [testResults, setTestResults] = useState<TestResult[] | null>(() => loadPersistedState()?.serverState?.testResults ?? null)
+  const [canApply, setCanApply] = useState(() => loadPersistedState()?.serverState?.stage === 'AWAITING_APPLY_APPROVAL')
+  const [isCompleted, setIsCompleted] = useState(() => loadPersistedState()?.serverState?.stage === 'COMPLETED')
+  const [isTesting, setIsTesting] = useState(() => {
+    const s = loadPersistedState()?.serverState?.stage
+    return s === 'SANDBOX_TESTING' || s === 'FIXING'
+  })
 
   const stage = serverState?.stage ?? 'IDLE'
 

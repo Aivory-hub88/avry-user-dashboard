@@ -37,12 +37,21 @@ export const WorkflowGenerationPanel: React.FC<WorkflowGenerationPanelProps> = (
   const [useConnections, setUseConnections] = useState(true)
   const [charCount, setCharCount] = useState(0)
 
-  // Set the initial prompt if provided
+  // Set the initial prompt if provided — `intent` is deliberately excluded:
+  // the `!intent` check exists specifically so a user who clears the field
+  // isn't overwritten again once `initialPrompt`'s effect has already run;
+  // adding `intent` here would re-fire on every clear and undo that.
   useEffect(() => {
     if (initialPrompt && initialPrompt.trim() && !intent) {
+      // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+      // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+      // not restructuring this component's data flow to satisfy the newer
+      // React Compiler style rule; see other documented instances of this.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIntent(initialPrompt)
       setCharCount(initialPrompt.length)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPrompt]);
 
   const handleIntentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {

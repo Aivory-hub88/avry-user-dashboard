@@ -25,6 +25,47 @@ export default function PaymentsPage() {
   const [error, setError] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
 
+  // Declared before the effect that calls it (deferred execution, so this
+  // was never an actual runtime hazard — but this ordering also satisfies
+  // static declaration-order analysis).
+  const fetchPayments = async () => {
+    if (!AuthManager.isAuthenticated()) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const userId = AuthManager.getUserId()
+      if (!userId) {
+        throw new Error("User ID not found")
+      }
+
+      const token = AuthManager.getAccessToken()
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch(asset(`/api/payments/history/${userId}`), {
+        method: 'GET',
+        headers,
+      })
+      if (!response.ok) {
+        throw new Error(`Failed to fetch payments (${response.status})`)
+      }
+
+      const data = await response.json()
+      setPayments(data.payments || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load payments")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     const checkAuth = async () => {
       if (!window.AuthManagerReady) {
@@ -58,46 +99,13 @@ export default function PaymentsPage() {
   useEffect(() => {
     if (authLoading) return
 
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPayments()
   }, [authLoading])
-
-  const fetchPayments = async () => {
-    if (!AuthManager.isAuthenticated()) return
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      const userId = AuthManager.getUserId()
-      if (!userId) {
-        throw new Error("User ID not found")
-      }
-
-      const token = AuthManager.getAccessToken()
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      }
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-
-      const response = await fetch(asset(`/api/payments/history/${userId}`), {
-        method: 'GET',
-        headers,
-      })
-      if (!response.ok) {
-        throw new Error(`Failed to fetch payments (${response.status})`)
-      }
-
-      const data = await response.json()
-      setPayments(data.payments || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load payments")
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const getStatusColor = (status: string) => {
     switch (status) {

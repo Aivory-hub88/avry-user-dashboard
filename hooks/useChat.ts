@@ -57,6 +57,11 @@ export function useChat({
   useEffect(() => {
     const sid = getSessionId() || generateSessionId()
     saveSession(sid)
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentSessionId(sid)
     const restored = loadSessionMessages(sid)
     if (restored.length > 0) setMessages(restored)

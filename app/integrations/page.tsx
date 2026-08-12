@@ -1,6 +1,7 @@
 'use client'
 import { asset } from "@/lib/asset";
 
+import Image from 'next/image'
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -148,7 +149,7 @@ function ConnectModal({ app, existingId, onClose, onSaved }: ConnectModalProps) 
         <div className={styles.modalHeader}>
           {app.iconPath ? (
             <span className={styles.modalAppIcon} data-brand={app.id.toLowerCase()}>
-              <img src={asset(app.iconPath)} alt="" style={{ width: 28, height: 28 }} />
+              <Image src={asset(app.iconPath)} alt="" width={28} height={28} />
             </span>
           ) : (
             <span className={styles.modalAppIcon}>{app.icon}</span>
@@ -240,6 +241,11 @@ function IntegrationsContent() {
     if (!pendingContext) return
     if (Date.now() - pendingContext.timestamp > 300000) { clearPendingContext(); return }
     if (pendingContext.targetRoute !== 'integrations') return
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRoutingNotice(pendingContext.aiReplySummary || pendingContext.triggerMessage)
     clearPendingContext()
   }, [pendingContext, clearPendingContext])
@@ -252,6 +258,11 @@ function IntegrationsContent() {
     const provider = searchParams.get('provider')
 
     if (connected) {
+      // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+      // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+      // not restructuring this component's data flow to satisfy the newer
+      // React Compiler style rule; see other documented instances of this.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFeedback({ type: 'success', message: `Successfully connected ${connected}` })
       // Auto-dismiss after 5s
       const timer = setTimeout(() => setFeedback(null), 5000)
@@ -460,7 +471,7 @@ function IntegrationsContent() {
                   <span className={styles.tableAppCell}>
                     {app?.iconPath ? (
                       <span className={styles.tableAppIcon} data-brand={app?.id.toLowerCase()}>
-                        <img src={asset(app.iconPath)} alt="" style={{ width: 20, height: 20 }} />
+                        <Image src={asset(app.iconPath)} alt="" width={20} height={20} />
                       </span>
                     ) : (
                       <span className={styles.tableAppIcon}>{conn.appIcon}</span>
@@ -512,7 +523,7 @@ function IntegrationsContent() {
                 <div className={styles.appCardTop}>
                   {app.iconPath ? (
                     <div className={styles.appIcon} data-brand={app.id.toLowerCase()}>
-                      <img src={asset(app.iconPath)} alt="" style={{ width: 32, height: 32 }} />
+                      <Image src={asset(app.iconPath)} alt="" width={32} height={32} />
                     </div>
                   ) : (
                     <div className={styles.appIcon}>{app.icon}</div>

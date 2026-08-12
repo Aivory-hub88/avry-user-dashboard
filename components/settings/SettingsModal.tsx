@@ -47,6 +47,11 @@ export function SettingsModal({ user }: SettingsModalProps) {
     const storedHistory = localStorage.getItem('settings_searchhistory')
     const storedNotes = localStorage.getItem('settings_notes')
 
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (storedRefill !== null) setAutoRefill(storedRefill === 'true')
     if (storedHistory !== null) setUseSearchHistory(storedHistory === 'true')
     if (storedNotes !== null) setUseNotes(storedNotes === 'true')

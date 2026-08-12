@@ -20,10 +20,9 @@ export default function PaymentHistoryTab() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchPayments()
-  }, [])
-
+  // Declared before the effect that calls it (deferred execution, so this
+  // was never an actual runtime hazard — but this ordering also satisfies
+  // static declaration-order analysis).
   const fetchPayments = async () => {
     setLoading(true)
     setError(null)
@@ -77,6 +76,15 @@ export default function PaymentHistoryTab() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchPayments()
+  }, [])
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -146,10 +154,15 @@ export default function PaymentHistoryTab() {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.07]">
-            {Array.isArray(payments) && payments.length > 0 && payments.map((payment) => {
+            {Array.isArray(payments) && payments.length > 0 && payments.map((payment, index) => {
               if (!payment) return null
               return (
-                <tr key={payment.paymentId || Math.random()}>
+                // Math.random() here previously regenerated the key on every
+                // render, defeating React's reconciliation (forces a full
+                // remount of the row instead of an update) whenever
+                // paymentId is missing. Falling back to the array index is
+                // stable across re-renders of the same list.
+                <tr key={payment.paymentId || index}>
                   <td className="py-4 text-white">
                     {payment.createdAt ? new Date(payment.createdAt).toLocaleDateString("en-US", {
                       year: "numeric",

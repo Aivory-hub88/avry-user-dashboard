@@ -1,5 +1,6 @@
 'use client';
 import { asset } from "@/lib/asset";
+import Image from 'next/image';
 
 import React, { memo, useState } from 'react';
 import { Handle, Position, useReactFlow, useNodeId } from '@xyflow/react';
@@ -200,7 +201,7 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
   const renderIcon = () => {
     if (iconPath) {
       return (
-        <img src={asset(iconPath)} alt={label}
+        <Image src={asset(iconPath)} alt={label} width={36} height={36}
           style={{ width: 36, height: 36, objectFit: 'contain' }}
           onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.removeAttribute('style'); }}
         />
@@ -208,7 +209,7 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
     }
     if (appIcon && (appIcon.startsWith('/') || appIcon.startsWith('http'))) {
       return (
-        <img src={appIcon.startsWith('http') ? appIcon : asset(appIcon)} alt={label}
+        <Image src={appIcon.startsWith('http') ? appIcon : asset(appIcon)} alt={label} width={36} height={36}
           style={{ width: 36, height: 36, objectFit: 'contain' }}
           onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.removeAttribute('style'); }}
         />
@@ -219,7 +220,7 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
     const svgPath = getAppSvgIcon(app || '') ?? getAppSvgIcon(typeof appIcon === 'string' ? appIcon : '') ?? (appIcon ? getAppSvgIcon(label) : null);
     if (svgPath) {
       return (
-        <img src={asset(svgPath)} alt={label}
+        <Image src={asset(svgPath)} alt={label} width={36} height={36}
           style={{ width: 36, height: 36, objectFit: 'contain' }}
           onError={(e) => { e.currentTarget.style.display = 'none'; }}
         />

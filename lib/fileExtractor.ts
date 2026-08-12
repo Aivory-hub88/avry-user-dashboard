@@ -54,7 +54,6 @@ async function extractFromPDF(file: File): Promise<string> {
 
   // Load pdfjs from CDN via webpackIgnore — prevents webpack from bundling the worker
   // which causes "Object.defineProperty called on non-object" in Next.js
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore — dynamic CDN import, no type definitions available
   const pdfjsLib = await import(/* webpackIgnore: true */ 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs')
   console.log('[fileExtractor] pdfjs loaded from CDN')
@@ -74,7 +73,6 @@ async function extractFromPDF(file: File): Promise<string> {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i)
     const textContent = await page.getTextContent()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pageText = textContent.items
       .filter((item: any) => 'str' in item)
       .map((item: any) => item.str ?? '')

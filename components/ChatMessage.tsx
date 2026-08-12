@@ -153,6 +153,21 @@ function CodeBlock({ inline, className, children, ...props }: CodeBlockProps) {
 
 const ListTypeContext = React.createContext<'ul' | 'ol'>('ul')
 
+// Named as a real component (not inline in the lowercase-keyed map below)
+// so the react-hooks lint rules recognize it as a component that's allowed
+// to call useContext — ReactMarkdown's `components` prop still requires the
+// map's *key* to be the lowercase tag name ("li"), only the value needs a
+// proper component name.
+function MarkdownListItem({ children }: any) {
+  const listType = React.useContext(ListTypeContext)
+  return (
+    <li className="mb-2 text-base text-[#f7f7f7] leading-[1.6] flex items-start gap-2.5">
+      {listType === 'ul' && <span className="text-[#a1a1aa] mt-[9px] shrink-0 text-[6px]">●</span>}
+      <span className="flex-1">{children}</span>
+    </li>
+  )
+}
+
 const markdownComponents = {
   code: CodeBlock as any,
 
@@ -212,15 +227,7 @@ const markdownComponents = {
       <ol className="my-4 ml-1 list-decimal list-inside">{children}</ol>
     </ListTypeContext.Provider>
   ),
-  li: ({ children }: any) => {
-    const listType = React.useContext(ListTypeContext)
-    return (
-      <li className="mb-2 text-base text-[#f7f7f7] leading-[1.6] flex items-start gap-2.5">
-        {listType === 'ul' && <span className="text-[#a1a1aa] mt-[9px] shrink-0 text-[6px]">●</span>}
-        <span className="flex-1">{children}</span>
-      </li>
-    )
-  },
+  li: MarkdownListItem,
 
   blockquote: ({ children }: any) => (
     <blockquote className="my-5 pl-4 border-l-2 border-[#b7cba6]/40 text-[#a1a1aa] italic">

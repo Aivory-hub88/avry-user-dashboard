@@ -2,6 +2,7 @@
 
 import { asset } from "@/lib/asset";
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Template } from "@/components/templates/template-data";
@@ -106,11 +107,28 @@ export default function TemplateDetailPage() {
                   <div className="text-[9px] font-semibold text-white/35 uppercase tracking-wider mb-1.5">Created By</div>
                   <div className="flex items-center gap-2">
                     {template.author.avatar ? (
-                      <img
-                        src={asset(template.author.avatar)}
-                        alt={template.author.name}
-                        className={template.author.name === "Aivory Tech Lab" ? "h-6 w-auto object-contain brightness-0 invert opacity-90" : "w-5 h-5 rounded-full ring-1 ring-white/10"}
-                      />
+                      template.author.name === "Aivory Tech Lab" ? (
+                        // Fixed wordmark asset — next/image needs a real
+                        // width/height, unlike the "w-auto" the <img> used;
+                        // 96x24 matches the SVG's own ~4.8:1 aspect ratio
+                        // (same rounding the console page already uses for
+                        // this exact asset).
+                        <Image
+                          src={asset(template.author.avatar)}
+                          alt={template.author.name}
+                          width={96}
+                          height={24}
+                          className="h-6 w-auto object-contain brightness-0 invert opacity-90"
+                        />
+                      ) : (
+                        <Image
+                          src={asset(template.author.avatar)}
+                          alt={template.author.name}
+                          width={20}
+                          height={20}
+                          className="w-5 h-5 rounded-full ring-1 ring-white/10"
+                        />
+                      )
                     ) : (
                       <div className="w-5 h-5 rounded-full bg-white/10" />
                     )}

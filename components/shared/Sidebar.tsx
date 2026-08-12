@@ -313,7 +313,7 @@ export default function Sidebar() {
         <UserProfile />
         <div className="px-2">
           <LanguagePill />
-          <a
+          <Link
             href="/"
             className={`flex items-center rounded-lg text-sm transition-colors cursor-pointer group
               ${collapsed
@@ -325,7 +325,7 @@ export default function Sidebar() {
           >
             <HomeIcon />
             {!collapsed && <span>{t("home")}</span>}
-          </a>
+          </Link>
         </div>
       </div>
     </aside>

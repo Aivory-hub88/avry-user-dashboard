@@ -37,10 +37,15 @@ export default function PhaseContent({
     }, 500)
   }, [onResponseChange])
 
-  // Cleanup timers on unmount
+  // Cleanup timers on unmount. `debounceTimers.current` is captured here
+  // (not re-read inside the cleanup) since the ref's underlying object is
+  // mutated in place by handleChange, never reassigned — the captured
+  // reference still points at the same, fully up-to-date dictionary by
+  // unmount time.
   useEffect(() => {
+    const timers = debounceTimers.current
     return () => {
-      Object.values(debounceTimers.current).forEach(timer => clearTimeout(timer))
+      Object.values(timers).forEach(timer => clearTimeout(timer))
     }
   }, [])
 

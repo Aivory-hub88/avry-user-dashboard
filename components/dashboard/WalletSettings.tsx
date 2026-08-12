@@ -39,29 +39,9 @@ export default function WalletSettings() {
     cvv: "",
   })
 
-  useEffect(() => {
-    fetchWalletData()
-  }, [])
-
-  const loadMidtransScript = () => {
-    return new Promise((resolve) => {
-      if (window.snap) {
-        resolve(true)
-        return
-      }
-
-      const script = document.createElement("script")
-      script.src = "https://app.sandbox.midtrans.com/snap/snap.js"
-      script.setAttribute(
-        "data-client-key",
-        process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || ""
-      )
-      script.onload = () => resolve(true)
-      script.onerror = () => resolve(false)
-      document.body.appendChild(script)
-    })
-  }
-
+  // Declared before the effect that calls it (deferred execution, so this
+  // was never an actual runtime hazard — but this ordering also satisfies
+  // static declaration-order analysis).
   const fetchWalletData = async () => {
     try {
       setLoading(true)
@@ -121,6 +101,34 @@ export default function WalletSettings() {
     } finally {
       setLoading(false)
     }
+  }
+
+  useEffect(() => {
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchWalletData()
+  }, [])
+
+  const loadMidtransScript = () => {
+    return new Promise((resolve) => {
+      if (window.snap) {
+        resolve(true)
+        return
+      }
+
+      const script = document.createElement("script")
+      script.src = "https://app.sandbox.midtrans.com/snap/snap.js"
+      script.setAttribute(
+        "data-client-key",
+        process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || ""
+      )
+      script.onload = () => resolve(true)
+      script.onerror = () => resolve(false)
+      document.body.appendChild(script)
+    })
   }
 
   const handleTopupClick = async () => {

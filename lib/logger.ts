@@ -32,7 +32,6 @@ function baseLog(level: LogLevel, message: string, data?: Record<string, any>) {
   };
 
   // Output as structured JSON for easy parsing
-  // eslint-disable-next-line no-console
   console.log(JSON.stringify(payload));
 }
 

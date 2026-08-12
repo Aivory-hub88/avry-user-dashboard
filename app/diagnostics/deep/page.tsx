@@ -53,6 +53,11 @@ export default function DeepDiagnosticPage() {
     try {
       const progress = DeepDiagnosticService.loadProgress()
       if (progress) {
+        // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+        // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+        // not restructuring this component's data flow to satisfy the newer
+        // React Compiler style rule; see other documented instances of this.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSavedProgress(progress)
       }
     } catch {

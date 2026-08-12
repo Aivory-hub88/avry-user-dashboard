@@ -49,6 +49,10 @@ export const WorkflowGenerationFlow: React.FC<WorkflowGenerationFlowProps> = ({
       }
       initializeWithPrompt()
     }
+  // Deliberately mount-only (see comment above) — including
+  // generateWorkflow/availableApps/initialPrompt would re-trigger
+  // generation on every reference change instead of exactly once.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Only run once when mounted
 
   const handleGenerate = useCallback(

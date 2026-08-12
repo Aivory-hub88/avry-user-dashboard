@@ -19,6 +19,21 @@ function normalizeMarkdown(text: string): string {
 
 const ListTypeContext = React.createContext<'ul' | 'ol'>('ul')
 
+// Named as a real component (see ChatMessage.tsx's MarkdownListItem for
+// why) so react-hooks recognizes it as allowed to call useContext —
+// ReactMarkdown's `components` map key still has to stay lowercase ("li").
+function MarkdownListItemCompact({ children }: any) {
+  const listType = React.useContext(ListTypeContext)
+  return (
+    <li className="text-[13px] text-[#f7f7f7] leading-[1.55] flex items-start gap-2">
+      {listType === 'ul' && (
+        <span className="text-[#a1a1aa] mt-[7px] shrink-0 text-[5px]">●</span>
+      )}
+      <span className="flex-1">{children}</span>
+    </li>
+  )
+}
+
 const compactMarkdownComponents = {
   p: ({ children }: any) => (
     <p className="text-[13px] leading-[1.55] mb-2.5 text-[#f7f7f7] last:mb-0">
@@ -55,17 +70,7 @@ const compactMarkdownComponents = {
       <ol className="my-2 ml-4 list-decimal space-y-1">{children}</ol>
     </ListTypeContext.Provider>
   ),
-  li: ({ children }: any) => {
-    const listType = React.useContext(ListTypeContext)
-    return (
-      <li className="text-[13px] text-[#f7f7f7] leading-[1.55] flex items-start gap-2">
-        {listType === 'ul' && (
-          <span className="text-[#a1a1aa] mt-[7px] shrink-0 text-[5px]">●</span>
-        )}
-        <span className="flex-1">{children}</span>
-      </li>
-    )
-  },
+  li: MarkdownListItemCompact,
   code: ({ inline, className, children }: any) => {
     if (inline) {
       return (

@@ -25,8 +25,13 @@ export default function SectionNavRail({ sections, locale = 'en' }: SectionNavRa
   const [activeId, setActiveId] = useState<string | null>(sections[0]?.id ?? null)
   // Sections list is effectively static per render of a loaded report, but
   // keep a ref so the observer effect below doesn't need it in its deps.
+  // Written in its own effect (runs after commit, in declaration order —
+  // guaranteed to run before the observer effect below on the same commit)
+  // rather than during render, which refs shouldn't be mutated in.
   const sectionsRef = useRef(sections)
-  sectionsRef.current = sections
+  useEffect(() => {
+    sectionsRef.current = sections
+  }, [sections])
 
   useEffect(() => {
     const targets = sectionsRef.current

@@ -74,10 +74,20 @@ export default function AivoryAssistant() {
 
   // Init session once
   useEffect(() => {
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSessionId(getSessionId())
   }, [])
 
   // Hydration guard
+  // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+  // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+  // not restructuring this component's data flow to satisfy the newer
+  // React Compiler style rule; see other documented instances of this.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMounted(true) }, [])
 
   // Listen for aivory-assistant:open events from other pages (e.g. Roadmap)
@@ -113,16 +123,30 @@ export default function AivoryAssistant() {
       // Clear prefill after panel opens so it doesn't persist on next open
       if (prefill) setTimeout(() => setPrefill(""), 200)
     }
+  // `prefill` is read only at the moment `open` flips true (the panel-open
+  // transition), not treated as reactive — adding it would also re-focus
+  // the close button and re-schedule the clear whenever prefill changes
+  // while the panel is already open, which isn't the intent here.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   // Escape key closes panel
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
+      // Safe: this only runs once the keydown listener actually fires,
+      // long after handleClose (declared further down) is initialized.
+      // eslint-disable-next-line react-hooks/immutability
       if (e.key === "Escape") handleClose()
     }
     document.addEventListener("keydown", handler)
     return () => document.removeEventListener("keydown", handler)
+  // `handleClose` is declared further down via useCallback([]) (stable —
+  // never changes), so omitting it doesn't cause staleness. It can't be
+  // added to this array either way: this effect is registered before that
+  // `const` initializes, so referencing it here (eagerly, as an array
+  // element) would throw a temporal-dead-zone error on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   // Focus trap inside panel
@@ -152,6 +176,16 @@ export default function AivoryAssistant() {
     return () => document.removeEventListener("keydown", trap)
   }, [open, messages])
 
+  // React Compiler can't preserve this useCallback's memoization (likely
+  // because it's referenced by the Escape-key effect above, which is
+  // declared before this — see that effect's own comment on why it can't
+  // list handleClose as a dependency either). This is a forward-looking
+  // compiler diagnostic only: this project doesn't have React Compiler's
+  // babel transform enabled (no experimental.reactCompiler in
+  // next.config.ts), so nothing breaks today; restructuring the closure
+  // ordering to satisfy it isn't worth the risk to working code for a
+  // currently-inert optimization.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const handleClose = useCallback(() => {
     setOpen(false)
     setActiveSourceTab("")
@@ -182,7 +216,11 @@ export default function AivoryAssistant() {
       }
     }
 
+    // Date.now() runs inside handleSend, an async event handler invoked on
+    // user action — not during render — so this isn't the render-purity
+    // violation the rule is designed to catch.
     const userMsg: Message = {
+      // eslint-disable-next-line react-hooks/purity
       id: Date.now().toString(),
       role: "user",
       content: trimmed || defaultMsg,
@@ -190,6 +228,7 @@ export default function AivoryAssistant() {
     setMessages(prev => [...prev, userMsg])
     setIsLoading(true)
 
+    // eslint-disable-next-line react-hooks/purity
     const assistantId = (Date.now() + 1).toString()
     setMessages(prev => [
       ...prev,
@@ -324,7 +363,7 @@ export default function AivoryAssistant() {
           aria-label="Aivory assistant"
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08] shrink-0">
-            <img src={asset("/Aivory_logo_2026.svg")} alt="Aivory" className="h-4 object-contain" />
+            <Image src={asset("/Aivory_logo_2026.svg")} alt="Aivory" width={64} height={16} className="h-4 object-contain" />
             <div className="flex items-center gap-2.5">
               {(activeSourceTab || pageContext) && (
                 <span className="text-white/40 text-xs font-light tracking-wide lowercase">

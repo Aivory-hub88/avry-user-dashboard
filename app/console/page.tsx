@@ -228,7 +228,7 @@ export default function ConsolePage() {
                 className="mb-8 flex items-center gap-4 [animation:fadeUp_0.55s_0s_cubic-bezier(0.22,1,0.36,1)_both]"
                 style={{ alignItems: 'center' }}
               >
-                <img
+                <Image
                   src={asset("/Aivory_Avatar.svg")}
                   alt="Aivory"
                   width={44}

@@ -1,4 +1,5 @@
 import { asset } from "@/lib/asset";
+import Image from "next/image";
 import React from "react";
 
 const ICON_MAP: Record<string, string> = {
@@ -17,10 +18,12 @@ export default function AppIcon({ app }: { app: string }) {
   
   if (iconUrl) {
     return (
-      <img 
-        src={asset(iconUrl)} 
-        alt={app} 
-        className="w-[22px] h-[22px] object-contain" 
+      <Image
+        src={asset(iconUrl)}
+        alt={app}
+        width={22}
+        height={22}
+        className="w-[22px] h-[22px] object-contain"
       />
     );
   }

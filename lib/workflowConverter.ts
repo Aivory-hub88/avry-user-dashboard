@@ -44,6 +44,16 @@ export interface WorkflowStep {
   /** Nested branch containers — only present for 'condition' | 'switch' | 'loop'. */
   branches?: { key: string; label?: string; steps: WorkflowStep[] }[]
   loopConfig?: { batchSize?: number }
+  /**
+   * Skip detectNodeIntent()'s text-based guess and use this intent directly.
+   * For callers that already KNOW the correct category from a structured
+   * source (e.g. the blueprint planner's `ai_processing`/`human_review`
+   * step type) rather than needing to re-derive it from free text — text
+   * classification is inherently lossy and can collide with an unrelated
+   * keyword (e.g. "extract line items" matching the `transform` pattern's
+   * "extract" even though the step is really an AI extraction/reasoning task).
+   */
+  forceIntent?: NodeIntent
 }
 
 interface AivoryWorkflow {
@@ -242,8 +252,8 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
         primary = mapIntentToN8nNode('filter', step, ctx)
         console.log(`[workflowConverter] Step ${ctx.stepIndex}: condition with ${step.branches!.length} branch(es)`)
       } else {
-        intent = detectNodeIntent(step.action, step.tool)
-        console.log(`[workflowConverter] Step ${globalStepCounter}: action="${step.action}" tool="${step.tool}" → intent="${intent}" isLast=${isLast}`)
+        intent = step.forceIntent ?? detectNodeIntent(step.action, step.tool)
+        console.log(`[workflowConverter] Step ${globalStepCounter}: action="${step.action}" tool="${step.tool}" → intent="${intent}"${step.forceIntent ? ' (forced)' : ''} isLast=${isLast}`)
         // Only override last step to respondToWebhook for webhook-triggered workflows.
         // Scheduled workflows have no webhook to respond to — keep the detected intent.
         if (isLast && !isSchedule && intent !== 'respond' && intent !== 'filter' && intent !== 'email' && intent !== 'messaging') {

@@ -33,6 +33,36 @@ export default function DashboardPage() {
   const [routingNotice, setRoutingNotice] = useState<string | null>(null)
   const [showLoginModal, setShowLoginModal] = useState(false)
 
+  // Declared before the effects that call it — called only inside a
+  // useEffect body (deferred), so this was never an actual runtime hazard,
+  // but ordering it this way satisfies static declaration-order analysis
+  // too (e.g. if React Compiler is ever enabled for this app).
+  const fetchDashboardData = async () => {
+    try {
+      // Fetch real wallet data for credit tab
+      const userId = AuthManager.getUserId()
+      if (userId) {
+        try {
+          const walletResponse = await fetch(
+            `${SERVICES.PAYMENTS}/api/v1/wallet/${userId}`
+          )
+          if (walletResponse.ok) {
+            const walletData = await walletResponse.json()
+            // Store wallet data in localStorage for the CreditPurchaseTab component
+            localStorage.setItem('aivory_wallet_data', JSON.stringify(walletData))
+          }
+        } catch (err) {
+          console.error("Failed to fetch wallet data:", err)
+        }
+      }
+    } catch (err) {
+      console.error("Error in fetchDashboardData:", err)
+    } finally {
+      setData(getPlaceholderData())
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!pendingContext) return
     
@@ -43,6 +73,11 @@ export default function DashboardPage() {
     }
     
     if (pendingContext.targetRoute !== 'dashboard') return
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRoutingNotice(pendingContext.aiReplySummary || pendingContext.triggerMessage)
     clearPendingContext()
   }, [pendingContext, clearPendingContext])
@@ -52,6 +87,11 @@ export default function DashboardPage() {
 
     const deepContext = localStorage.getItem('aivory_diagnostic_context')
     if (deepContext) {
+      // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+      // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+      // not restructuring this component's data flow to satisfy the newer
+      // React Compiler style rule; see other documented instances of this.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDeepDiagnosticCompleted(true)
     }
   }, [])
@@ -83,33 +123,6 @@ export default function DashboardPage() {
 
     checkAuth()
   }, [])
-
-  const fetchDashboardData = async () => {
-    try {
-      // Fetch real wallet data for credit tab
-      const userId = AuthManager.getUserId()
-      if (userId) {
-        try {
-          const walletResponse = await fetch(
-            `${SERVICES.PAYMENTS}/api/v1/wallet/${userId}`
-          )
-          if (walletResponse.ok) {
-            const walletData = await walletResponse.json()
-            // Store wallet data in localStorage for the CreditPurchaseTab component
-            localStorage.setItem('aivory_wallet_data', JSON.stringify(walletData))
-          }
-        } catch (err) {
-          console.error("Failed to fetch wallet data:", err)
-        }
-      }
-    } catch (err) {
-      console.error("Error in fetchDashboardData:", err)
-    } finally {
-      setData(getPlaceholderData())
-      setLoading(false)
-    }
-  }
-
 
   if (loading || authLoading) {
     return <LoadingState />

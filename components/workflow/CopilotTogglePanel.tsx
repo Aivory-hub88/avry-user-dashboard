@@ -12,6 +12,7 @@
  * - Text size matched to floating assistant: text-[13px]
  */
 import { asset } from "@/lib/asset";
+import Image from 'next/image'
 
 import { useRef, useState, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -38,9 +39,11 @@ function getFileIcon(name: string) {
 
 function AivoryLogo() {
   return (
-    <img
+    <Image
       src={asset("/Aivory_logo_2026.svg")}
       alt="Aivory"
+      width={96}
+      height={24}
       className="h-6 object-contain"
       aria-label="Aivory"
     />
@@ -118,7 +121,7 @@ function CopilotBarCollapsed({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       aria-label="Open Aivory Copilot"
     >
-      <img src={asset("/Aivory_logo_2026.svg")} alt="" className="h-4 object-contain" aria-hidden="true" />
+      <Image src={asset("/Aivory_logo_2026.svg")} alt="" width={64} height={16} className="h-4 object-contain" aria-hidden="true" />
       <span>Aivory Copilot</span>
       <span className="text-[11px] text-[#a1a1aa] ml-1">/ or &#8984;K</span>
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#a1a1aa] ml-0.5">
@@ -192,6 +195,11 @@ function CopilotPanelExpanded({
   }, [])
 
   useEffect(() => {
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAppliedToCanvas(false)
   }, [workflow?.workflowName, workflow?.steps.length])
 
@@ -321,7 +329,7 @@ function CopilotPanelExpanded({
           {loading && (
             <div className="flex items-start gap-2">
               <div className="shrink-0 mt-0.5">
-                <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" className="w-4 h-4" />
+                <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={16} height={16} className="w-4 h-4" />
               </div>
               <div className="flex flex-col gap-1.5 px-3 py-2 bg-white/[0.04] border border-white/5 rounded-[10px] rounded-bl-[2px]">
                 <ThinkingDots size={15} dotSize={2} />
@@ -588,7 +596,7 @@ function MessageRow({
     return (
       <div className="group flex items-start gap-2.5">
         <div className="shrink-0 mt-1">
-          <img src={asset("/Aivory_Avatar.svg")} alt="Aivory" className="w-[18px] h-[18px]" />
+          <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={18} height={18} className="w-[18px] h-[18px]" />
         </div>
         <div className="flex-1 min-w-0">
           <div className={`${MD_CLASSES} text-[#ecebe7]`}>

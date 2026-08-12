@@ -36,10 +36,10 @@ import AgentNode from './AgentNode';
 import { N8NAdaptiveEdge, AiSubConnectionEdge } from './WorkflowEdges';
 import NodeInspectorPanel from './inspector/NodeInspectorPanel';
 import { n8nToReactFlow, reactFlowToN8n } from '@/lib/n8nMapper';
-import { convertToN8nWorkflow } from '@/lib/workflowConverter';
+import { convertToN8nWorkflow, type WorkflowStep as ConverterWorkflowStep } from '@/lib/workflowConverter';
 import { loadCanvasState, fetchCanvasState, useCanvasAutosave } from '@/hooks/useCanvasPersistence';
 import type { WorkflowNodeData } from '@/types/workflow-node';
-import type { SavedWorkflow } from '@/hooks/useWorkflows';
+import type { SavedWorkflow, SavedWorkflowStep } from '@/hooks/useWorkflows';
 import type { WorkflowStep, AivoryWorkflowSpec } from '@/types/workflows';
 import { asset } from '@/lib/asset'
 import { authedFetch } from '@/lib/deployAuth'
@@ -48,7 +48,7 @@ type Props = {
   workflowId: string;
   isActive?: boolean;
   n8nWorkflowId?: string;
-  fallbackSteps?: Array<{ step: number; action: string; tool: string; output: string; type?: string }>;
+  fallbackSteps?: SavedWorkflowStep[];
   fallbackTrigger?: string;
   fallbackTitle?: string;
   // Which n8n instance this workflow was deployed to — see
@@ -102,9 +102,32 @@ const pillStyle = (active: boolean): React.CSSProperties => ({
  * Any caller building a fresh canvas from step text (blueprint import, the
  * Copilot refine modal) should go through this rather than hand-rolling
  * nodes with no rawN8n — that silently deploys as "Edit Fields" in n8n.
+ *
+ * `type`/`branches` are preserved recursively (mirrors handleCopilotApply's
+ * toConverterStep in app/workflows/page.tsx) — convertToN8nWorkflow() needs
+ * the FULL nested step tree for condition/switch/loop steps. A blueprint
+ * whose planner generated an exception/decision branch would otherwise have
+ * that branch silently flattened away right when the canvas opens.
  */
+type FallbackStep = SavedWorkflowStep
+
+function toConverterFallbackStep(step: FallbackStep): ConverterWorkflowStep {
+  return {
+    step: step.step,
+    action: step.action,
+    tool: step.tool || '',
+    output: step.output || '',
+    type: step.type,
+    branches: step.branches?.map((b) => ({
+      key: b.key,
+      label: b.label,
+      steps: b.steps.map(toConverterFallbackStep),
+    })),
+  }
+}
+
 function stepsToTypedReactFlow(
-  steps: Array<{ action: string; tool?: string; output?: string }>,
+  steps: FallbackStep[],
   trigger: string,
   title: string
 ): { nodes: Node<WorkflowNodeData>[]; edges: Edge[] } {
@@ -112,12 +135,7 @@ function stepsToTypedReactFlow(
     workflow_id: `wf-${Date.now()}`,
     title,
     trigger,
-    steps: steps.map((s, i) => ({
-      step: i + 1,
-      action: s.action,
-      tool: s.tool || '',
-      output: s.output || '',
-    })),
+    steps: steps.map(toConverterFallbackStep),
   })
   const { nodes, edges } = n8nToReactFlow(n8nWorkflow as unknown as import('@/lib/n8n').N8nWorkflow)
   return { nodes: nodes as Node<WorkflowNodeData>[], edges }
@@ -183,6 +201,21 @@ function rehydrateNodeCallbacks(
     },
   }));
 }
+
+// Map StandardNodePalette iconKeys to real n8n node types so dropped nodes
+// get a typed config (inspector forms + setup copilot checklist). Static
+// data — module-scoped so it's created once instead of every render.
+const STANDARD_ICON_TO_N8N: Record<string, string> = {
+  webhook: 'n8n-nodes-base.webhook',
+  schedule: 'n8n-nodes-base.scheduleTrigger',
+  manual: 'n8n-nodes-base.manualTrigger',
+  branch: 'n8n-nodes-base.if',
+  switch: 'n8n-nodes-base.switch',
+  edit: 'n8n-nodes-base.set',
+  code: 'n8n-nodes-base.code',
+  http: 'n8n-nodes-base.httpRequest',
+  respond: 'n8n-nodes-base.respondToWebhook',
+};
 
 export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fallbackSteps, fallbackTrigger, fallbackTitle, n8nInstanceHint, onInjectNodes, onHistoryChange, registerUndo }: Props) {
   const instanceQuery = n8nInstanceHint === 'aivory' ? '?instance=aivory' : '';
@@ -306,20 +339,6 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
 
   // ── Drag and drop support ────────────────────────────────
   const rfInstanceRef = useRef<ReactFlowInstance<Node<WorkflowNodeData>, Edge> | null>(null);
-
-  // Map StandardNodePalette iconKeys to real n8n node types so dropped nodes
-  // get a typed config (inspector forms + setup copilot checklist).
-  const STANDARD_ICON_TO_N8N: Record<string, string> = {
-    webhook: 'n8n-nodes-base.webhook',
-    schedule: 'n8n-nodes-base.scheduleTrigger',
-    manual: 'n8n-nodes-base.manualTrigger',
-    branch: 'n8n-nodes-base.if',
-    switch: 'n8n-nodes-base.switch',
-    edit: 'n8n-nodes-base.set',
-    code: 'n8n-nodes-base.code',
-    http: 'n8n-nodes-base.httpRequest',
-    respond: 'n8n-nodes-base.respondToWebhook',
-  };
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -525,7 +544,6 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       setIsEmpty(true);
     }
     setSyncState('idle');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setNodes, setEdges, rehydrate, fallbackTrigger, fallbackTitle]);
 
   useEffect(() => {
@@ -620,7 +638,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     } catch (err: any) {
       setErrorMsg(err?.message ?? 'Save failed'); setSyncState('error');
     }
-  }, [rawWorkflow, nodes, edges, workflowId]);
+  }, [rawWorkflow, nodes, edges, workflowId, isActive, n8nWorkflowId, instanceQuery]);
 
   const handleInspectorChange = useCallback(
     (nodeId: string, updates: Partial<WorkflowNodeData>) => {
@@ -654,7 +672,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     } finally {
       setExecLoading(false);
     }
-  }, [n8nWorkflowId, workflowId]);
+  }, [n8nWorkflowId, workflowId, n8nInstanceHint]);
 
   // Fixture capture — grabs this execution's full input/output data via the
   // user's own n8n instance and stores it as a named regression fixture
@@ -679,7 +697,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     } finally {
       setCapturingExecId(null);
     }
-  }, [n8nWorkflowId, workflowId]);
+  }, [workflowId, n8nInstanceHint]);
 
   // Regression compare — diffs this execution's run data against the newest
   // captured fixture for this workflow. This is a LIVE re-run comparison, not
@@ -702,7 +720,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     } finally {
       setComparingExecId(null);
     }
-  }, [n8nWorkflowId, workflowId]);
+  }, [workflowId, n8nInstanceHint]);
 
   // True offline replay for this ALREADY-DEPLOYED workflow — pins the newest
   // fixture's data onto the real n8n workflow definition. Unlike Stage 15/C4
@@ -735,7 +753,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     } finally {
       setReplayingExecId(null);
     }
-  }, [n8nWorkflowId, workflowId]);
+  }, [n8nWorkflowId, workflowId, n8nInstanceHint]);
 
   const handleClearReplayPin = useCallback(async () => {
     const fetchId = n8nWorkflowId || workflowId;
@@ -753,7 +771,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     } finally {
       setReplayingExecId(null);
     }
-  }, [n8nWorkflowId, workflowId]);
+  }, [n8nWorkflowId, workflowId, n8nInstanceHint]);
 
   const nodeTypes = useMemo(() => ({
     standardNode:  WorkflowNode as any,

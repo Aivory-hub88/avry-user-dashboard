@@ -23,6 +23,11 @@ export default function DiagnosticsPage() {
       return
     }
     if (pendingContext.targetRoute !== 'diagnostic') return
+    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+    // not restructuring this component's data flow to satisfy the newer
+    // React Compiler style rule; see other documented instances of this.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRoutingNotice(pendingContext.aiReplySummary || pendingContext.triggerMessage)
     clearPendingContext()
   }, [pendingContext, clearPendingContext])
@@ -31,6 +36,11 @@ export default function DiagnosticsPage() {
     // Deep diagnostic status — check for completed result context
     const deepContext = localStorage.getItem('aivory_diagnostic_context')
     if (deepContext) {
+      // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+      // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+      // not restructuring this component's data flow to satisfy the newer
+      // React Compiler style rule; see other documented instances of this.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDeepDiagnosticCompleted(true)
     } else {
       // Check if in-progress (has saved progress but no result yet)
