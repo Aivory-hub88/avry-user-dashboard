@@ -7,7 +7,7 @@ import {
 } from '@/lib/workflows/blueprintPlanner'
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
 import { validateWorkflow as validateN8nWorkflow } from '@/lib/workflows/n8nMcpClient'
-import { llmValidatePlan } from '@/lib/workflows/blueprintLlmValidator'
+import { llmSemanticReview } from '@/lib/workflows/blueprintLlmValidator'
 
 /**
  * POST /api/console/workflows/from-blueprint
@@ -116,13 +116,14 @@ export async function POST(req: NextRequest) {
       const graphValidation = validateN8nGraph(n8nWorkflow as unknown as Parameters<typeof validateN8nGraph>[0])
       warnings.push(...graphValidation.warnings, ...graphValidation.errors)
 
-      // ── Stage 8c/8d — schema-level + advisory checks ──────────────────────
+      // ── Stage 8c/8d — schema-level + LLM semantic review ──────────────────
       // Skipped when either validator above already found errors — an
       // already-broken plan doesn't need a paid LLM call or a network round
       // trip to the n8n-MCP server to tell us it's broken. Both fail open
       // internally when they DO run (network/config errors never throw, see
       // n8nMcpClient.ts / blueprintLlmValidator.ts) and run concurrently
       // since neither depends on the other's result.
+      const semanticFindings: import('@/lib/workflows/blueprintLlmValidator').SemanticFinding[] = []
       if (validation.valid && graphValidation.valid) {
         // Belt and suspenders: both validators already fail open internally
         // (see their own try/catch), but the core deterministic plan this
@@ -132,19 +133,26 @@ export async function POST(req: NextRequest) {
         try {
           const [mcpResult, llmResult] = await Promise.all([
             validateN8nWorkflow(n8nWorkflow as unknown as Record<string, unknown>),
-            llmValidatePlan(planned, title),
+            llmSemanticReview(planned, title),
           ])
 
           if (!mcpResult.valid) {
             warnings.push(...mcpResult.errors.map((e) => `n8n schema: ${e.node}: ${e.message}`))
           }
           warnings.push(...mcpResult.warnings.map((w) => `n8n schema: ${w.node}: ${w.message}`))
-          warnings.push(...llmResult.warnings)
+          // Structured semantic findings — surfaced as a report (below) and,
+          // for error-severity findings, as warnings so the user sees them.
+          semanticFindings.push(...llmResult.findings)
+          for (const f of llmResult.findings) {
+            warnings.push(`Semantic review (${f.severity})${f.step != null ? ` step ${f.step}` : ''}: ${f.issue}${f.suggestion ? ` — ${f.suggestion}` : ''}`)
+          }
         } catch (err) {
-          console.warn('[from-blueprint] schema/advisory validation pass failed, returning the plan without it:', (err as Error).message)
-          warnings.push('Schema/advisory validation was unavailable for this generation.')
+          console.warn('[from-blueprint] schema/semantic validation pass failed, returning the plan without it:', (err as Error).message)
+          warnings.push('Schema/semantic validation was unavailable for this generation.')
         }
       }
+
+      const hasSemanticErrors = semanticFindings.some((f) => f.severity === 'error')
 
       return NextResponse.json({
         workflow_id: workflowId,
@@ -155,6 +163,9 @@ export async function POST(req: NextRequest) {
         estimated_time: `${Math.max(1, Math.ceil(planned.steps.length / 2))}h setup`,
         assumptions: planned.assumptions,
         needsClarification: planned.needsClarification,
+        // Structured semantic review report — the "thinker" layer's verdict.
+        ...(semanticFindings.length > 0 ? { semanticReview: semanticFindings } : {}),
+        ...(hasSemanticErrors ? { requiresConfiguration: true } : {}),
         ...(warnings.length > 0 ? { warnings } : {}),
       })
     }
