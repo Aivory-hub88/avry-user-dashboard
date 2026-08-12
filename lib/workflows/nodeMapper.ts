@@ -141,6 +141,11 @@ interface WorkflowStep {
   conditionField?: string
   aiOutputSchema?: Record<string, any>
   unresolvedIntegration?: boolean
+  aiReasoning?: {
+    reasoning_required: true
+    reason: string
+    deterministic_alternative_available: boolean
+  }
 }
 
 interface N8nNode {
@@ -594,6 +599,9 @@ function buildAiAgentStep(step: WorkflowStep, ctx: MapContext): MappedStepResult
       options: {
         systemMessage,
       },
+      // AI governance metadata embedded in the node so it's visible in the
+      // exported n8n JSON and can be audited without the planner source.
+      ...(step.aiReasoning ? { aiReasoning: step.aiReasoning } : {}),
     },
   }
 

@@ -71,6 +71,12 @@ export interface WorkflowStep {
    *  blueprint planner for exception gates ('is_complete') and routing
    *  switches ('onboarding_route'). When absent, defaults to 'response'. */
   conditionField?: string
+  /** AI governance metadata — proves why the AI Agent is required. */
+  aiReasoning?: {
+    reasoning_required: true
+    reason: string
+    deterministic_alternative_available: boolean
+  }
 }
 
 interface AivoryWorkflow {

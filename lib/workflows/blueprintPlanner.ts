@@ -115,6 +115,18 @@ export interface PlannedStep {
    *  text. Set for validation steps ({is_complete, service_type, ...}) and
    *  classification steps ({onboarding_route, ...}). */
   aiOutputSchema?: Record<string, any>
+  /** NON-NEGOTIABLE governance metadata — every AI Agent node MUST carry
+   *  this, proving why a deterministic alternative cannot do the job. The
+   *  validator rejects any AI step missing this, or whose
+   *  `deterministic_alternative_available` is true. */
+  aiReasoning?: {
+    reasoning_required: true
+    reason: string
+    /** Set to false at planning time. Typed as `boolean` (not `false`) so
+     *  the validator can check for a buggy `true` value from future code
+     *  that shouldn't have created an AI Agent. */
+    deterministic_alternative_available: boolean
+  }
 }
 
 export interface PlannedWorkflow {
@@ -366,6 +378,15 @@ function forceIntentForOp(op: AtomicOp): NodeIntent | undefined {
   if (op.categories.includes('AUDIT')) return 'audit'
   if (op.categories.includes('SCHEDULING')) return 'calendar'
   if (op.isMerge) return 'transform'
+  // A pure BUSINESS_ACTION or DATA_RETRIEVAL step must NEVER fall through
+  // to detectNodeIntent()'s text-based AI guess — the planner has already
+  // classified it as deterministic. Without this guard, a word like
+  // "process" (in "Process the record") would match the AI regex and turn
+  // a deterministic action into an AI Agent node. COMMUNICATION stays
+  // text-detected so email/slack/whatsapp can be distinguished from HTTP.
+  if (op.categories.includes('BUSINESS_ACTION') || op.categories.includes('DATA_RETRIEVAL')) {
+    return 'http'
+  }
   return undefined
 }
 
@@ -434,6 +455,11 @@ function buildDecisionNodes(step: BlueprintStepInput, sourceStepIndex: number, c
     // Attach the structured-output schema so the AI Agent node's system
     // message includes it — the downstream switch checks $json.onboarding_route.
     out[out.length - 1].aiOutputSchema = { onboarding_route: 'route_a' }
+    out[out.length - 1].aiReasoning = {
+      reasoning_required: true,
+      reason: 'Open-ended profile-based routing requires reasoning over business criteria with no fixed numeric threshold — the blueprint does not name a deterministic comparison.',
+      deterministic_alternative_available: false,
+    }
   }
   out.push({
     step: nextNum(ctx),
@@ -570,6 +596,11 @@ function buildPlannedSteps(module: BlueprintModuleInput, ctx: BuildContext): Pla
       // "Data complete?" condition can inspect ($json.is_complete) rather than
       // relying on free-text $json.response which is nearly always non-empty.
       out[out.length - 1].aiOutputSchema = { is_complete: true, service_type: 'premium', missing_fields: [], confidence: 0.96 }
+      out[out.length - 1].aiReasoning = {
+        reasoning_required: true,
+        reason: 'Semantic validation of data completeness and classification of service type require interpretation of unstructured/form input — no deterministic rule can assess whether arbitrary free-text fields are present and consistent.',
+        deterministic_alternative_available: false,
+      }
     } else {
       const ops = decomposeStep(step, i, module.integrations_required, ctx.warnings)
       for (const op of ops) out.push(opToPlannedStep(op, nextNum(ctx), ctx.integrationsRequired))
@@ -700,6 +731,31 @@ export function validatePlannedWorkflow(planned: PlannedWorkflow): ValidationRes
     const intent = s.forceIntent ?? detectNodeIntent(s.action, s.tool)
     if (intent === 'ai' && s.category && !s.category.includes('AI_REASONING')) {
       warnings.push(`Step ${s.step} ("${s.action}") resolved to an AI Agent node without an AI_REASONING classification — verify this is intentional.`)
+    }
+
+    // NON-NEGOTIABLE governance — every AI Agent MUST carry reasoning
+    // metadata proving a deterministic alternative doesn't exist.
+    if (intent === 'ai') {
+      if (!s.aiReasoning) {
+        errors.push(`Step ${s.step} ("${s.action}"): AI Agent node has no aiReasoning metadata — every AI Agent must prove why a deterministic alternative cannot do the job.`)
+      } else if (s.aiReasoning.deterministic_alternative_available === true) {
+        errors.push(`Step ${s.step} ("${s.action}"): AI Agent node is marked deterministic_alternative_available=true — an AI Agent is forbidden when a deterministic alternative exists.`)
+      } else if (!s.aiReasoning.reason || !s.aiReasoning.reason.trim()) {
+        errors.push(`Step ${s.step} ("${s.action}"): AI Agent node's aiReasoning.reason is empty — must explain why reasoning is required.`)
+      }
+    }
+
+    // Prohibited-deterministic-tasks-must-not-be-AI guard: a step whose
+    // action text matches a deterministic verb (create, send, schedule,
+    // notify, get, fetch, merge, log, etc.) may NEVER resolve to an AI
+    // Agent, regardless of forceIntent or category — the action itself is
+    // a deterministic operation.
+    if (intent === 'ai') {
+      const determinableAction = /\b(create|send|schedule|notify|get|fetch|merge|log|update|delete|insert|call|post|put|assign|register|provision|membuat|mengirim|menjadwalkan|memberitahukan|mengambil|menggabung|mencatat|mengupdate|menghapus|memasukkan|memanggil|mendaftar|menyediakan)\b/i.test(s.action)
+      const isGenuineReasoning = s.category?.includes('AI_REASONING') && !determinableAction
+      if (determinableAction && !isGenuineReasoning) {
+        errors.push(`Step ${s.step} ("${s.action}"): a deterministic operation (create/send/schedule/notify/get/merge/log/etc.) is represented as an AI Agent — this MUST use a deterministic node (HTTP, email, calendar, database, transform, etc.) instead.`)
+      }
     }
 
     // Rule 8: AI steps tagged as validation/classification must carry a

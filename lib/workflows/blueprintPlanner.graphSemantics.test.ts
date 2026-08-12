@@ -23,6 +23,7 @@ import {
   type PlannedWorkflow,
 } from './blueprintPlanner'
 import { convertToN8nWorkflow } from '../workflowConverter'
+import { detectNodeIntent } from './nodeMapper'
 
 // ── The exact regression blueprint from the bug report ────────────────────
 
@@ -261,6 +262,144 @@ describe('regression: structured output, data flow, routing, integrations', () =
     const createRecord = httpNodes.find((n) => n.name.includes('Create'))
     expect(createRecord).toBeDefined()
     expect(String((createRecord!.parameters as any)?.url ?? '')).toContain('UNRESOLVED')
+  })
+})
+
+// ── NON-NEGOTIABLE: AI Agent governance regression ────────────────────────
+
+describe('NON-NEGOTIABLE: AI Agent must not be used for deterministic actions', () => {
+  const PROHIBITED_AI_ACTIONS = [
+    /get (registration|customer|crm)/i,
+    /get data from/i,
+    /create.*account|membuat akun/i,
+    /send.*material|mengirimkan materi/i,
+    /schedule.*session|menjadwalkan sesi/i,
+    /notify.*team|memberitahukan tim/i,
+    /notify.*customer|pelanggan mengenai/i,
+    /log.*result|log workflow/i,
+    /merge.*record|merge record/i,
+  ]
+
+  it('no prohibited deterministic task is represented as an AI Agent node in the n8n graph', () => {
+    const { n8n } = buildRegressionGraph()
+    const agentNodes = n8n.nodes.filter((n) => n.type === '@n8n/n8n-nodes-langchain.agent')
+    for (const agent of agentNodes) {
+      for (const prohibited of PROHIBITED_AI_ACTIONS) {
+        expect(agent.name).not.toMatch(prohibited)
+      }
+    }
+  })
+
+  it('AI Agents are ONLY present for validate+classify and determine route', () => {
+    const { planned } = buildRegressionGraph()
+    const allSteps = flattenBranchSteps(planned.steps)
+    const aiSteps = allSteps.filter((s) => (s.forceIntent ?? detectNodeIntent(s.action, s.tool)) === 'ai')
+    expect(aiSteps.length).toBe(2)
+    expect(aiSteps.some((s) => /validasi|validate/i.test(s.action))).toBe(true)
+    expect(aiSteps.some((s) => /tentukan|determine|jalur|route/i.test(s.action))).toBe(true)
+  })
+
+  it('every AI Agent carries aiReasoning metadata with deterministic_alternative_available === false', () => {
+    const { planned } = buildRegressionGraph()
+    const allSteps = flattenBranchSteps(planned.steps)
+    const aiSteps = allSteps.filter((s) => (s.forceIntent ?? detectNodeIntent(s.action, s.tool)) === 'ai')
+    for (const s of aiSteps) {
+      expect(s.aiReasoning).toBeDefined()
+      expect(s.aiReasoning!.reasoning_required).toBe(true)
+      expect(s.aiReasoning!.deterministic_alternative_available).toBe(false)
+      expect(s.aiReasoning!.reason.trim().length).toBeGreaterThan(0)
+    }
+  })
+
+  it('every AI Agent node in the n8n graph has aiReasoning metadata embedded in its parameters', () => {
+    const { n8n } = buildRegressionGraph()
+    const agentNodes = n8n.nodes.filter((n) => n.type === '@n8n/n8n-nodes-langchain.agent')
+    for (const agent of agentNodes) {
+      const meta = (agent.parameters as any)?.aiReasoning
+      expect(meta).toBeDefined()
+      expect(meta.deterministic_alternative_available).toBe(false)
+      expect(meta.reasoning_required).toBe(true)
+    }
+  })
+
+  it('the validator FAILS when a deterministic action (Membuat akun) is forced to be an AI Agent', () => {
+    const broken: PlannedStep = {
+      step: 1,
+      action: 'Membuat akun',
+      tool: 'Aivory AI',
+      output: '',
+      type: 'action',
+      category: ['BUSINESS_ACTION'],
+      forceIntent: 'ai',
+      aiReasoning: {
+        reasoning_required: true,
+        reason: 'test',
+        deterministic_alternative_available: false,
+      },
+    }
+    const result = validatePlannedWorkflow(wrap([broken]))
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => /deterministic operation.*AI Agent/i.test(e))).toBe(true)
+  })
+
+  it('the validator FAILS when an AI Agent is missing aiReasoning metadata', () => {
+    const noMetadata: PlannedStep = {
+      step: 1,
+      action: 'Classify customer sentiment from feedback text',
+      tool: 'Aivory AI',
+      output: '',
+      type: 'action',
+      category: ['AI_REASONING'],
+      forceIntent: 'ai',
+    }
+    const result = validatePlannedWorkflow(wrap([noMetadata]))
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => /no aiReasoning metadata/i.test(e))).toBe(true)
+  })
+
+  it('the validator FAILS when deterministic_alternative_available === true', () => {
+    const hasAlternative: PlannedStep = {
+      step: 1,
+      action: 'Classify customer sentiment',
+      tool: 'Aivory AI',
+      output: '',
+      type: 'action',
+      category: ['AI_REASONING'],
+      forceIntent: 'ai',
+      aiReasoning: {
+        reasoning_required: true,
+        reason: 'test',
+        deterministic_alternative_available: true,
+      },
+    }
+    const result = validatePlannedWorkflow(wrap([hasAlternative]))
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => /deterministic_alternative_available=true/i.test(e))).toBe(true)
+  })
+
+  it('the onboarding workflow graph matches the required target shape', () => {
+    const { n8n } = buildRegressionGraph()
+    const required = [
+      /Webhook Trigger/i,
+      /Get data from Registration Form/i,
+      /Get data from CRM/i,
+      /Merge records/i,
+      /Memvalidasi/i,
+      /Data complete\?/i,
+      /Menentukan jalur onboarding/i,
+      /Route:/i,
+      /Membuat akun/i,
+      /mengirimkan materi/i,
+      /menjadwalkan sesi/i,
+      /Memberitahukan tim/i,
+      /pelanggan mengenai/i,
+      /Log workflow result/i,
+    ]
+    for (const re of required) {
+      expect(n8n.nodes.some((n) => re.test(n.name))).toBe(true)
+    }
+    expect(n8n.nodes.some((n) => /Meninjau/i.test(n.name))).toBe(true)
+    expect(n8n.nodes.some((n) => n.type === 'n8n-nodes-base.wait')).toBe(true)
   })
 })
 
