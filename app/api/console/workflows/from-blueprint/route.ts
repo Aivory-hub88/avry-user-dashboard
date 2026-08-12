@@ -65,6 +65,30 @@ import { llmSemanticReview } from '@/lib/workflows/blueprintLlmValidator'
  */
 export const runtime = 'nodejs'
 
+/** Run a pre-built n8n workflow through n8n-as-code's real execution sandbox.
+ *  Fails open: no configured URL or any network error returns null rather than
+ *  blocking generation — the sandbox is a proof-of-execution, not a hard gate. */
+async function sandboxValidate(n8nWorkflow: Record<string, unknown>): Promise<Record<string, unknown> | null> {
+  const base = (process.env.N8N_AS_CODE_URL ?? '').replace(/\/$/, '')
+  if (!base) return null
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 90000)
+    const res = await fetch(`${base}/sandbox/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workflow: n8nWorkflow }),
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    if (!res.ok) return null
+    return (await res.json()) as Record<string, unknown>
+  } catch (err) {
+    console.warn('[from-blueprint] sandbox validation unavailable, skipping:', (err as Error).message)
+    return null
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
@@ -124,17 +148,21 @@ export async function POST(req: NextRequest) {
       // n8nMcpClient.ts / blueprintLlmValidator.ts) and run concurrently
       // since neither depends on the other's result.
       const semanticFindings: import('@/lib/workflows/blueprintLlmValidator').SemanticFinding[] = []
+      let sandboxResult: Record<string, unknown> | null = null
       if (validation.valid && graphValidation.valid) {
-        // Belt and suspenders: both validators already fail open internally
-        // (see their own try/catch), but the core deterministic plan this
-        // route exists to produce must NEVER be lost to an optional
-        // secondary check misbehaving in a way its own contract didn't
-        // anticipate — so this whole block is its own failure domain too.
+        // Belt and suspenders: all three validators already fail open
+        // internally (see their own try/catch), but the core deterministic
+        // plan this route exists to produce must NEVER be lost to an optional
+        // secondary check misbehaving — so this whole block is its own failure
+        // domain too. n8n schema (MCP) + LLM semantic review + real sandbox
+        // execution all run concurrently.
         try {
-          const [mcpResult, llmResult] = await Promise.all([
+          const [mcpResult, llmResult, sandbox] = await Promise.all([
             validateN8nWorkflow(n8nWorkflow as unknown as Record<string, unknown>),
             llmSemanticReview(planned, title),
+            sandboxValidate(n8nWorkflow as unknown as Record<string, unknown>),
           ])
+          sandboxResult = sandbox
 
           if (!mcpResult.valid) {
             warnings.push(...mcpResult.errors.map((e) => `n8n schema: ${e.node}: ${e.message}`))
@@ -146,9 +174,14 @@ export async function POST(req: NextRequest) {
           for (const f of llmResult.findings) {
             warnings.push(`Semantic review (${f.severity})${f.step != null ? ` step ${f.step}` : ''}: ${f.issue}${f.suggestion ? ` — ${f.suggestion}` : ''}`)
           }
+          // Sandbox execution proof — a non-passed run is a warning, never a
+          // silent pass (credential-stripped nodes are expected to pass logic).
+          if (sandbox && sandbox.status && sandbox.status !== 'passed') {
+            warnings.push(`Sandbox execution ${sandbox.status}: ${Array.isArray(sandbox.errors) ? sandbox.errors.join('; ') : ''}`.slice(0, 500))
+          }
         } catch (err) {
-          console.warn('[from-blueprint] schema/semantic validation pass failed, returning the plan without it:', (err as Error).message)
-          warnings.push('Schema/semantic validation was unavailable for this generation.')
+          console.warn('[from-blueprint] schema/semantic/sandbox validation pass failed, returning the plan without it:', (err as Error).message)
+          warnings.push('Schema/semantic/sandbox validation was unavailable for this generation.')
         }
       }
 
@@ -165,6 +198,8 @@ export async function POST(req: NextRequest) {
         needsClarification: planned.needsClarification,
         // Structured semantic review report — the "thinker" layer's verdict.
         ...(semanticFindings.length > 0 ? { semanticReview: semanticFindings } : {}),
+        // Real sandbox execution result — the "proof it runs" layer.
+        ...(sandboxResult ? { sandbox: sandboxResult } : {}),
         ...(hasSemanticErrors ? { requiresConfiguration: true } : {}),
         ...(warnings.length > 0 ? { warnings } : {}),
       })
