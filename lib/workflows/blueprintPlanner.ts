@@ -817,6 +817,15 @@ function buildPlannedSteps(module: BlueprintModuleInput, ctx: BuildContext): Pla
         reason: 'Semantic validation of data completeness and classification of service type require interpretation of unstructured/form input — no deterministic rule can assess whether arbitrary free-text fields are present and consistent.',
         deterministic_alternative_available: false,
       }
+
+      // Fix 7 — a "validate/check X" step must not be a pass/fail dead end.
+      // Add a recovery branch: incomplete data → request missing info → wait
+      // for resolution (the re-validation loop is not yet automated, so the
+      // branch ends honestly on the wait node). Skip when this step is already
+      // the gate for an explicit human_review step (handled below at gateIdx).
+      if (/validat|validasi|memvalidasi/i.test(step.action) && i !== gateIdx) {
+        out.push(buildExceptionGate([], step.action, i, ctx))
+      }
     } else {
       // Try semantic decomposition first — temporal/conditional/dependency
       // verbs ("track", "escalate delays", "based on", "assign to relevant",
