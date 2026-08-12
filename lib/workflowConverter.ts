@@ -80,6 +80,8 @@ export interface WorkflowStep {
   /** True when this step needed an integration but none was matched — drives
    *  nodeMapper.ts's UNRESOLVED_INTEGRATION placeholder URL. */
   unresolvedIntegration?: boolean
+  /** Concrete Set-node field mappings (data contract). */
+  assignments?: { name: string; value: string }[]
 }
 
 interface AivoryWorkflow {

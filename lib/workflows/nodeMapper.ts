@@ -141,6 +141,7 @@ interface WorkflowStep {
   conditionField?: string
   aiOutputSchema?: Record<string, any>
   unresolvedIntegration?: boolean
+  assignments?: { name: string; value: string }[]
   aiReasoning?: {
     reasoning_required: true
     reason: string
@@ -435,9 +436,9 @@ export function mapIntentToN8nNode(
         typeVersion: 3,
         parameters: {
           assignments: {
-            assignments: [
-              { name: 'result', value: '={{ $json.response }}', type: 'string' },
-            ],
+            assignments: (step.assignments && step.assignments.length > 0)
+              ? step.assignments.map((a) => ({ name: a.name, value: a.value, type: 'string' }))
+              : [{ name: 'result', value: '={{ $json.response }}', type: 'string' }],
           },
           options: {},
         },

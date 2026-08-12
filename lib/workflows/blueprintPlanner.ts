@@ -127,6 +127,10 @@ export interface PlannedStep {
      *  that shouldn't have created an AI Agent. */
     deterministic_alternative_available: boolean
   }
+  /** Concrete field mappings for a transform/Set node — establishes the data
+   *  contract that downstream conditions/switches read. A Set node without
+   *  these is a no-op stub (audit finding: "empty Set node"). */
+  assignments?: { name: string; value: string }[]
 }
 
 export interface PlannedWorkflow {
@@ -472,7 +476,11 @@ function buildDecisionNodes(step: BlueprintStepInput, sourceStepIndex: number, c
     type: 'switch',
     category: ['DECISION'],
     sourceStepIndex,
-    conditionField: 'onboarding_route',
+    // Only the AI-prefixed routing reads $json.onboarding_route (the AI step
+    // above produces it). A numeric-threshold decision has no AI producer, so
+    // it must NOT declare that field — leave it for the user to configure a
+    // deterministic comparison in the inspector.
+    conditionField: usesAiPrefix ? 'onboarding_route' : undefined,
     branches: [
       { key: 'route_a', label: 'Route A', steps: [] },
       { key: 'route_b', label: 'Route B', steps: [] },
@@ -611,6 +619,7 @@ function semanticAction(
   tool: string,
   categories: StepCategory[],
   forceIntent?: NodeIntent,
+  assignments?: { name: string; value: string }[],
 ): PlannedStep {
   const s: PlannedStep = {
     step: nextNum(ctx),
@@ -622,6 +631,7 @@ function semanticAction(
     sourceStepIndex,
   }
   if (forceIntent) s.forceIntent = forceIntent
+  if (assignments) s.assignments = assignments
   return s
 }
 
@@ -660,7 +670,11 @@ function semanticCondition(
 function buildTrackEscalateSemantic(step: BlueprintStepInput, sourceStepIndex: number, ctx: BuildContext): PlannedStep[] {
   const out: PlannedStep[] = []
   out.push(semanticAction(ctx, sourceStepIndex, 'Check current progress status', 'n8n', ['DATA_RETRIEVAL'], 'http'))
-  out.push(semanticAction(ctx, sourceStepIndex, 'Check deadline / SLA status', 'n8n', ['DATA_TRANSFORMATION'], 'transform'))
+  // The node that feeds the is_delayed condition — it must actually set the
+  // field the IF checks, not a generic `result` stub.
+  out.push(semanticAction(ctx, sourceStepIndex, 'Check deadline / SLA status', 'n8n', ['DATA_TRANSFORMATION'], 'transform', [
+    { name: 'is_delayed', value: '={{ $json.due_date ? ($now.toISO() > $json.due_date) : false }}' },
+  ]))
   const escalateSteps: PlannedStep[] = [
     // "escalat" text would match detectNodeIntent()'s humanReview pattern
     // (→ a Wait node), but escalation here is a NOTIFICATION to the team, not
@@ -690,9 +704,12 @@ function buildMonitorSemantic(step: BlueprintStepInput, sourceStepIndex: number,
 /** "Create X based on Y" → resolve Y → select/map on Y → perform X. */
 function buildBasedOnSemantic(step: BlueprintStepInput, sourceStepIndex: number, ctx: BuildContext): PlannedStep[] {
   const obj = extractBasedOnObject(step.action)
+  const field = obj.replace(/\s+/g, '_').toLowerCase()
   const out: PlannedStep[] = []
   out.push(semanticAction(ctx, sourceStepIndex, `Determine ${obj}`, 'n8n', ['DATA_RETRIEVAL'], 'http'))
-  out.push(semanticAction(ctx, sourceStepIndex, `Select appropriate option based on ${obj}`, 'n8n', ['DATA_TRANSFORMATION'], 'transform'))
+  out.push(semanticAction(ctx, sourceStepIndex, `Select appropriate option based on ${obj}`, 'n8n', ['DATA_TRANSFORMATION'], 'transform', [
+    { name: `selected_${field}`, value: `={{ $json.${field} }}` },
+  ]))
   out.push(semanticAction(ctx, sourceStepIndex, step.action, 'n8n', ['BUSINESS_ACTION'], 'http'))
   return out
 }
@@ -700,8 +717,12 @@ function buildBasedOnSemantic(step: BlueprintStepInput, sourceStepIndex: number,
 /** "Assign X to relevant/responsible team" → map team → resolve assignee → assign. */
 function buildAssignRelevantSemantic(step: BlueprintStepInput, sourceStepIndex: number, ctx: BuildContext): PlannedStep[] {
   const out: PlannedStep[] = []
-  out.push(semanticAction(ctx, sourceStepIndex, 'Determine responsible team', 'n8n', ['DATA_TRANSFORMATION'], 'transform'))
-  out.push(semanticAction(ctx, sourceStepIndex, 'Resolve assignee for each task', 'n8n', ['DATA_TRANSFORMATION'], 'transform'))
+  out.push(semanticAction(ctx, sourceStepIndex, 'Determine responsible team', 'n8n', ['DATA_TRANSFORMATION'], 'transform', [
+    { name: 'responsible_team', value: '={{ $json.service_type || $json.task_type }}' },
+  ]))
+  out.push(semanticAction(ctx, sourceStepIndex, 'Resolve assignee for each task', 'n8n', ['DATA_TRANSFORMATION'], 'transform', [
+    { name: 'assignee', value: '={{ $json.responsible_team }}' },
+  ]))
   out.push(semanticAction(ctx, sourceStepIndex, step.action, 'n8n', ['BUSINESS_ACTION'], 'http'))
   return out
 }
@@ -1005,6 +1026,29 @@ export function validatePlannedWorkflow(planned: PlannedWorkflow): ValidationRes
   const hasAssignRelevantAction = all.some((s) => s.type === 'action' && ASSIGN_RE.test(s.action) && RELEVANT_RE.test(s.action))
   if (hasAssignRelevantAction && !all.some((s) => s.type === 'action' && /determine responsible team|resolve assignee/i.test(s.action))) {
     warnings.push('A step assigns work to "relevant"/"responsible" members but no mapping node ("Determine responsible team"/"Resolve assignee") was generated — the assignment source is undefined.')
+  }
+
+  // Fix 4 — dead conditions: every condition/switch field must be produced by
+  // an upstream node (its `assignments` or an AI node's aiOutputSchema). A
+  // field nothing sets is a branch that can never be taken.
+  const producedFields = new Set<string>()
+  for (const s of all) {
+    for (const a of s.assignments ?? []) producedFields.add(a.name)
+    for (const k of Object.keys(s.aiOutputSchema ?? {})) producedFields.add(k)
+  }
+  for (const s of all) {
+    if ((s.type === 'condition' || s.type === 'switch') && s.conditionField && !producedFields.has(s.conditionField)) {
+      errors.push(`Step ${s.step} ("${s.action}"): condition references $json.${s.conditionField} but no upstream node sets that field — this branch is dead.`)
+    }
+  }
+
+  // Fix 3 — a transform/Set node with no concrete field mappings is a no-op
+  // stub; it either needs real assignments or the gap must be surfaced.
+  for (const s of all) {
+    const intent = s.forceIntent ?? detectNodeIntent(s.action, s.tool)
+    if (intent === 'transform' && !(s.assignments && s.assignments.length > 0) && !/merge/i.test(s.action)) {
+      warnings.push(`Step ${s.step} ("${s.action}") is a Set/transform node with no field mappings — it will run as a no-op unless configured.`)
+    }
   }
 
   // Exception reachability: a blueprint that mentions review/exception
