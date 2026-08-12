@@ -552,6 +552,201 @@ function buildExceptionGate(
   }
 }
 
+// ── Stage 5b: semantic decomposition ────────────────────────────────────────
+// Business verbs carry structure beyond their surface action. "Track progress
+// and escalate delays" is NOT [Track] → [Escalate]; it is [Observe] →
+// [Evaluate] → [IF delayed?] → {yes: escalate, no: continue}. "Create X based
+// on Y" requires Y to exist before X. "Assign to relevant team members"
+// requires a mapping source. Without this layer the planner reads verbs too
+// literally and emits a linear chain of stateless action nodes where a
+// condition, a wait, or a dependency lookup is what the blueprint actually
+// describes. This is reusable logic — future blueprints using track/monitor/
+// escalate/based-on/assign/wait/until are decomposed the same way, not by a
+// one-off special case.
+
+const TRACK_MONITOR_RE = /\b(track|monitor|mengawasi|memantau|melacak|memonitor|pantau)\b/i
+const ESCALATE_RE = /\bescalat|eskalasi/i
+const DELAY_OVERDUE_RE = /\bdelay|overdue|terlambat|tertunda|telat|keterlambatan|jatuh tempo/i
+const BASED_ON_RE = /\bbased on\b|\bbased upon\b|berdasarkan\b/i
+const ASSIGN_RE = /\b(assign|menugaskan|mendelegasikan)\b/i
+const RELEVANT_RE = /\b(relevant|responsible|terkait|relevan|bertanggung jawab|berwenang|yang tepat)\b/i
+const WAIT_UNTIL_RE = /\b(wait|menunggu|tunggu|until|sampai|hingga)\b/i
+const RETRY_RE = /\b(retry|retries|mengulang|coba ulang)\b/i
+
+interface StepSemantics {
+  trackMonitor: boolean
+  escalate: boolean
+  delayOverdue: boolean
+  basedOn: boolean
+  assignRelevant: boolean
+  waitUntil: boolean
+  retry: boolean
+}
+
+function analyzeStepSemantics(action: string): StepSemantics {
+  const text = action || ''
+  const assign = ASSIGN_RE.test(text)
+  return {
+    trackMonitor: TRACK_MONITOR_RE.test(text),
+    escalate: ESCALATE_RE.test(text),
+    delayOverdue: DELAY_OVERDUE_RE.test(text),
+    basedOn: BASED_ON_RE.test(text),
+    assignRelevant: assign && RELEVANT_RE.test(text),
+    waitUntil: WAIT_UNTIL_RE.test(text),
+    retry: RETRY_RE.test(text),
+  }
+}
+
+/** Extract the object of a "based on X" phrase (e.g. "service type"). */
+function extractBasedOnObject(action: string): string {
+  const m = action.match(/based on\s+(?:the\s+)?([^,.;]+)/i)
+  return m ? m[1].trim() : 'the required attribute'
+}
+
+/** Plain action node in the semantic layer. */
+function semanticAction(
+  ctx: BuildContext,
+  sourceStepIndex: number,
+  action: string,
+  tool: string,
+  categories: StepCategory[],
+  forceIntent?: NodeIntent,
+): PlannedStep {
+  const s: PlannedStep = {
+    step: nextNum(ctx),
+    action,
+    tool,
+    output: '',
+    type: 'action',
+    category: categories,
+    sourceStepIndex,
+  }
+  if (forceIntent) s.forceIntent = forceIntent
+  return s
+}
+
+/** Boolean condition node — branches[0]=TRUE, branches[1]=FALSE. */
+function semanticCondition(
+  ctx: BuildContext,
+  sourceStepIndex: number,
+  action: string,
+  conditionField: string,
+  trueSteps: PlannedStep[],
+  falseSteps: PlannedStep[],
+  falseTerminal = false,
+): PlannedStep {
+  return {
+    step: nextNum(ctx),
+    action,
+    tool: 'Condition',
+    output: '',
+    type: 'condition',
+    category: ['DECISION'],
+    sourceStepIndex,
+    conditionField,
+    branches: [
+      { key: 'true', label: 'Yes', steps: trueSteps },
+      { key: 'false', label: 'No', steps: falseSteps, ...(falseTerminal ? { terminal: true } : {}) },
+    ],
+  }
+}
+
+/**
+ * "Track progress and escalate delays" → observe state → evaluate deadline →
+ * IF delayed? → {yes: escalate + notify + log, no: continue}. Escalation is
+ * conditional by the very wording "escalate delays" — only delayed work is
+ * escalated; on-track work continues to the next step.
+ */
+function buildTrackEscalateSemantic(step: BlueprintStepInput, sourceStepIndex: number, ctx: BuildContext): PlannedStep[] {
+  const out: PlannedStep[] = []
+  out.push(semanticAction(ctx, sourceStepIndex, 'Check current progress status', 'n8n', ['DATA_RETRIEVAL'], 'http'))
+  out.push(semanticAction(ctx, sourceStepIndex, 'Check deadline / SLA status', 'n8n', ['DATA_TRANSFORMATION'], 'transform'))
+  const escalateSteps: PlannedStep[] = [
+    // "escalat" text would match detectNodeIntent()'s humanReview pattern
+    // (→ a Wait node), but escalation here is a NOTIFICATION to the team, not
+    // a human-in-the-loop pause — force a deterministic communication intent.
+    semanticAction(ctx, sourceStepIndex, 'Escalate delay to responsible team', 'Notification channel', ['COMMUNICATION'], 'http'),
+    semanticAction(ctx, sourceStepIndex, 'Log escalation to audit trail', 'Audit Log', ['AUDIT'], 'audit'),
+  ]
+  out.push(semanticCondition(ctx, sourceStepIndex, 'Is the work delayed or overdue?', 'is_delayed', escalateSteps, []))
+  return out
+}
+
+/**
+ * "Track"/"monitor" without escalation → observe → IF complete? → {no: wait
+ * and schedule next check}. Tracking is state observation + a completion
+ * condition, never a single stateless "track" request.
+ */
+function buildMonitorSemantic(step: BlueprintStepInput, sourceStepIndex: number, ctx: BuildContext): PlannedStep[] {
+  const out: PlannedStep[] = []
+  out.push(semanticAction(ctx, sourceStepIndex, 'Check current progress status', 'n8n', ['DATA_RETRIEVAL'], 'http'))
+  const notComplete: PlannedStep[] = [
+    semanticAction(ctx, sourceStepIndex, 'Wait and schedule next progress check', 'Human Review', ['SCHEDULING'], 'humanReview'),
+  ]
+  out.push(semanticCondition(ctx, sourceStepIndex, 'Is the work complete?', 'is_complete', [], notComplete))
+  return out
+}
+
+/** "Create X based on Y" → resolve Y → select/map on Y → perform X. */
+function buildBasedOnSemantic(step: BlueprintStepInput, sourceStepIndex: number, ctx: BuildContext): PlannedStep[] {
+  const obj = extractBasedOnObject(step.action)
+  const out: PlannedStep[] = []
+  out.push(semanticAction(ctx, sourceStepIndex, `Determine ${obj}`, 'n8n', ['DATA_RETRIEVAL'], 'http'))
+  out.push(semanticAction(ctx, sourceStepIndex, `Select appropriate option based on ${obj}`, 'n8n', ['DATA_TRANSFORMATION'], 'transform'))
+  out.push(semanticAction(ctx, sourceStepIndex, step.action, 'n8n', ['BUSINESS_ACTION'], 'http'))
+  return out
+}
+
+/** "Assign X to relevant/responsible team" → map team → resolve assignee → assign. */
+function buildAssignRelevantSemantic(step: BlueprintStepInput, sourceStepIndex: number, ctx: BuildContext): PlannedStep[] {
+  const out: PlannedStep[] = []
+  out.push(semanticAction(ctx, sourceStepIndex, 'Determine responsible team', 'n8n', ['DATA_TRANSFORMATION'], 'transform'))
+  out.push(semanticAction(ctx, sourceStepIndex, 'Resolve assignee for each task', 'n8n', ['DATA_TRANSFORMATION'], 'transform'))
+  out.push(semanticAction(ctx, sourceStepIndex, step.action, 'n8n', ['BUSINESS_ACTION'], 'http'))
+  return out
+}
+
+/** "Wait until X" → wait node → condition check. */
+function buildWaitUntilSemantic(step: BlueprintStepInput, sourceStepIndex: number, ctx: BuildContext): PlannedStep[] {
+  const out: PlannedStep[] = []
+  out.push(semanticAction(ctx, sourceStepIndex, 'Wait for the specified condition', 'Human Review', ['SCHEDULING'], 'humanReview'))
+  out.push(semanticCondition(ctx, sourceStepIndex, step.action, 'is_complete', [], []))
+  return out
+}
+
+/** "Retry until success" → attempt → IF succeeded? → {no: wait and retry}. */
+function buildRetrySemantic(step: BlueprintStepInput, sourceStepIndex: number, ctx: BuildContext): PlannedStep[] {
+  const out: PlannedStep[] = []
+  out.push(semanticAction(ctx, sourceStepIndex, 'Attempt the operation', 'n8n', ['BUSINESS_ACTION'], 'http'))
+  const notSucceeded: PlannedStep[] = [
+    semanticAction(ctx, sourceStepIndex, 'Wait and retry the operation', 'Human Review', ['SCHEDULING'], 'humanReview'),
+  ]
+  out.push(semanticCondition(ctx, sourceStepIndex, 'Did the operation succeed?', 'is_complete', [], notSucceeded))
+  return out
+}
+
+/**
+ * Stage 5b entry point — returns a structured step list when the action text
+ * carries temporal/conditional/dependency semantics, or null to fall back to
+ * the flat connector-split decomposition. Ordered so combined patterns
+ * ("track … and escalate delays") are caught before their parts.
+ */
+function buildSemanticSteps(step: BlueprintStepInput, sourceStepIndex: number, ctx: BuildContext): PlannedStep[] | null {
+  const sem = analyzeStepSemantics(step.action)
+
+  if (sem.trackMonitor || (sem.escalate && sem.delayOverdue)) {
+    return sem.escalate
+      ? buildTrackEscalateSemantic(step, sourceStepIndex, ctx)
+      : buildMonitorSemantic(step, sourceStepIndex, ctx)
+  }
+  if (sem.basedOn) return buildBasedOnSemantic(step, sourceStepIndex, ctx)
+  if (sem.assignRelevant) return buildAssignRelevantSemantic(step, sourceStepIndex, ctx)
+  if (sem.retry) return buildRetrySemantic(step, sourceStepIndex, ctx)
+  if (sem.waitUntil) return buildWaitUntilSemantic(step, sourceStepIndex, ctx)
+
+  return null
+}
+
 /**
  * Stage 1 + 5 + 6 orchestrator — walks the blueprint module's steps in
  * order, decomposing each into one or more PlannedStep nodes, and routes
@@ -602,8 +797,16 @@ function buildPlannedSteps(module: BlueprintModuleInput, ctx: BuildContext): Pla
         deterministic_alternative_available: false,
       }
     } else {
-      const ops = decomposeStep(step, i, module.integrations_required, ctx.warnings)
-      for (const op of ops) out.push(opToPlannedStep(op, nextNum(ctx), ctx.integrationsRequired))
+      // Try semantic decomposition first — temporal/conditional/dependency
+      // verbs ("track", "escalate delays", "based on", "assign to relevant",
+      // "wait until") produce a structured graph, not a flat action list.
+      const semanticSteps = buildSemanticSteps(step, i, ctx)
+      if (semanticSteps) {
+        out.push(...semanticSteps)
+      } else {
+        const ops = decomposeStep(step, i, module.integrations_required, ctx.warnings)
+        for (const op of ops) out.push(opToPlannedStep(op, nextNum(ctx), ctx.integrationsRequired))
+      }
     }
 
     if (i === gateIdx && reviewIndices.length > 0) {
@@ -774,6 +977,34 @@ export function validatePlannedWorkflow(planned: PlannedWorkflow): ValidationRes
     if ((s.type === 'switch' || s.type === 'condition') && s.conditionField === 'onboarding_route') {
       warnings.push(`Step ${s.step} ("${s.action}"): switch/condition references onboarding_route field — ensure a preceding AI classification step produces this structured output.`)
     }
+  }
+
+  // Semantic regression guards — these fire only when the Stage 5b semantic
+  // layer DID NOT decompose a temporal/conditional/dependency verb (the raw
+  // verb is still sitting in an action's text, and no condition/wait/
+  // dependency node exists). A correct decomposition replaces the raw verb
+  // with structured labels ("Check progress status", "Is delayed?") so these
+  // never trip on a healthy plan.
+
+  // Rule: "track"/"monitor"/"escalate delays" flattened into a plain action.
+  const rawSemanticVerb = all.some((s) =>
+    s.type === 'action' && (TRACK_MONITOR_RE.test(s.action) || (ESCALATE_RE.test(s.action) && DELAY_OVERDUE_RE.test(s.action))))
+  const hasConditionOrWait = all.some((s) =>
+    s.type === 'condition' || s.type === 'switch' || s.tool === 'Human Review' || s.forceIntent === 'humanReview')
+  if (rawSemanticVerb && !hasConditionOrWait) {
+    warnings.push('A step mentions "track"/"monitor"/"escalate delays" but no condition or wait node was generated — the planner linearized a temporal/conditional requirement into a plain action.')
+  }
+
+  // Rule: "based on X" flattened without resolving X first.
+  const hasBasedOnAction = all.some((s) => s.type === 'action' && BASED_ON_RE.test(s.action))
+  if (hasBasedOnAction && !all.some((s) => s.type === 'action' && /^determine\b/i.test(s.action))) {
+    warnings.push('A step contains "based on X" but no dependency-resolution node ("Determine X") was generated — X must be available before the dependent action runs.')
+  }
+
+  // Rule: "assign ... to relevant/responsible" flattened without a mapping source.
+  const hasAssignRelevantAction = all.some((s) => s.type === 'action' && ASSIGN_RE.test(s.action) && RELEVANT_RE.test(s.action))
+  if (hasAssignRelevantAction && !all.some((s) => s.type === 'action' && /determine responsible team|resolve assignee/i.test(s.action))) {
+    warnings.push('A step assigns work to "relevant"/"responsible" members but no mapping node ("Determine responsible team"/"Resolve assignee") was generated — the assignment source is undefined.')
   }
 
   // Exception reachability: a blueprint that mentions review/exception

@@ -225,7 +225,7 @@ export function mapIntentToN8nNode(
       }
 
     case 'filter': {
-      const isCompleteCheck = step.conditionField === 'is_complete'
+      const field = step.conditionField
       return {
         ...baseNode,
         type: 'n8n-nodes-base.if',
@@ -233,10 +233,13 @@ export function mapIntentToN8nNode(
         parameters: {
           conditions: {
             options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 1 },
-            conditions: isCompleteCheck
+            // Any planner-supplied conditionField (is_complete, is_delayed,
+            // onboarding_route, ...) becomes a boolean field check rather than
+            // the free-text $json.response isNotEmpty default.
+            conditions: field
               ? [
                   {
-                    leftValue: '={{ $json.is_complete }}',
+                    leftValue: `={{ $json.${field} }}`,
                     rightValue: true,
                     operator: { type: 'boolean', operation: 'equals' },
                   },
