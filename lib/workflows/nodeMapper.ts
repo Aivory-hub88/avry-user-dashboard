@@ -138,6 +138,9 @@ interface WorkflowStep {
   tool: string
   output: string
   inputs?: { url?: string; [key: string]: any }
+  conditionField?: string
+  aiOutputSchema?: Record<string, any>
+  unresolvedIntegration?: boolean
 }
 
 interface N8nNode {
@@ -216,25 +219,36 @@ export function mapIntentToN8nNode(
         },
       }
 
-    case 'filter':
+    case 'filter': {
+      const isCompleteCheck = step.conditionField === 'is_complete'
       return {
         ...baseNode,
         type: 'n8n-nodes-base.if',
         typeVersion: 2,
         parameters: {
           conditions: {
-            options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' },
-            conditions: [
-              {
-                leftValue: '={{ $json.response }}',
-                rightValue: '',
-                operator: { type: 'string', operation: 'isNotEmpty' },
-              },
-            ],
+            options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 1 },
+            conditions: isCompleteCheck
+              ? [
+                  {
+                    leftValue: '={{ $json.is_complete }}',
+                    rightValue: true,
+                    operator: { type: 'boolean', operation: 'equals' },
+                  },
+                ]
+              : [
+                  {
+                    leftValue: '={{ $json.response }}',
+                    rightValue: '',
+                    operator: { type: 'string', operation: 'isNotEmpty' },
+                  },
+                ],
             combinator: 'and',
           },
+          options: {},
         },
       }
+    }
 
     case 'switch':
       return {
@@ -355,7 +369,9 @@ export function mapIntentToN8nNode(
         typeVersion: 4,
         parameters: {
           method: 'POST',
-          url: step.inputs?.url || 'https://api.example.com/endpoint',
+          url: step.inputs?.url || (step.unresolvedIntegration
+            ? 'UNRESOLVED_INTEGRATION://configure-me'
+            : 'https://api.example.com/endpoint'),
           authentication: 'none',
           sendBody: true,
           specifyBody: 'json',
@@ -503,13 +519,9 @@ export function mapIntentToN8nNode(
 
     case 'ai':
     default: {
-      const inputExpr = aiNodeCount === 0
-        ? '={{ $("Webhook Trigger").item.json.body }}'
-        : '={{ $json.response }}'
+      // AI intent: consume previous node's output, not the webhook trigger.
+      const inputExpr = `={{ JSON.stringify($json) }}`
 
-      // Explicit "OpenAI" / "GPT" mentions get a real, deployable OpenAI
-      // node so the user can attach their own OpenAI credential — otherwise
-      // AI steps default to Aivory's Zeroclaw backend (no credential needed).
       const wantsOpenAi = /openai|open\s*ai|\bgpt-?\d/i.test(`${step.tool || ''} ${step.action || ''}`)
       if (wantsOpenAi) {
         return {
@@ -553,16 +565,22 @@ export function mapIntentToN8nNode(
  * to Anthropic. The user can change the provider later from the inspector.
  */
 function buildAiAgentStep(step: WorkflowStep, ctx: MapContext): MappedStepResult {
-  const { stepIndex, aiNodeCount } = ctx
+  const { stepIndex } = ctx
   const nodeName = `Step ${stepIndex + 1}: ${step.action.substring(0, 40)}`
   const position: [number, number] = [250 + ((stepIndex + 1) * 220), 300]
 
-  const inputExpr = aiNodeCount === 0
-    ? '={{ $("Webhook Trigger").item.json.body }}'
-    : '={{ $json.response }}'
+  // Always consume the previous node's output ($json), never a hardcoded
+  // reference to the Webhook Trigger — upstream ingestion/HTTP nodes exist
+  // precisely to fetch and normalize data that the AI step should read.
+  const inputExpr = `={{ JSON.stringify($json) }}`
 
   const isAnthropic = /claude|anthropic/i.test(`${step.tool || ''} ${step.action || ''}`)
   const modelNodeName = `${isAnthropic ? 'Anthropic' : 'OpenAI'} Chat Model${stepIndex > 0 ? ` ${stepIndex}` : ''}`
+
+  let systemMessage = step.action || ''
+  if (step.aiOutputSchema) {
+    systemMessage += `\n\nYou must respond with valid JSON in this exact format (no other text):\n${JSON.stringify(step.aiOutputSchema, null, 2)}`
+  }
 
   const agentNode: N8nNode = {
     id: generateNodeId(),
@@ -574,7 +592,7 @@ function buildAiAgentStep(step: WorkflowStep, ctx: MapContext): MappedStepResult
       promptType: 'define',
       text: inputExpr,
       options: {
-        systemMessage: step.action || '',
+        systemMessage,
       },
     },
   }

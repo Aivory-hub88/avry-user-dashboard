@@ -154,6 +154,116 @@ describe('regression: Otomasi Onboarding Pelanggan — exact bug-report blueprin
   })
 })
 
+// ── New: structural regression for bug 1-6 fixes ──────────────────────────
+
+describe('regression: structured output, data flow, routing, integrations', () => {
+  it('BUG 1+2: validation AI step carries aiOutputSchema with is_complete field', () => {
+    const { planned } = buildRegressionGraph()
+    const validationStep = planned.steps.find((s: PlannedStep) =>
+      s.category?.includes('AI_REASONING') && /validasi|validate/i.test(s.action)
+    )
+    expect(validationStep).toBeDefined()
+    expect(validationStep!.aiOutputSchema).toBeDefined()
+    expect(validationStep!.aiOutputSchema!.is_complete).toBeDefined()
+    expect(validationStep!.aiOutputSchema!.service_type).toBeDefined()
+    expect(validationStep!.aiOutputSchema!.missing_fields).toBeDefined()
+  })
+
+  it('BUG 1: "Data complete?" condition node uses conditionField "is_complete"', () => {
+    const { planned } = buildRegressionGraph()
+    const condition = planned.steps.find((s: PlannedStep) => s.type === 'condition')
+    expect(condition).toBeDefined()
+    expect(condition!.conditionField).toBe('is_complete')
+  })
+
+  it('BUG 4: routing AI step carries aiOutputSchema with onboarding_route', () => {
+    const { planned } = buildRegressionGraph()
+    const routeAi = planned.steps.find((s: PlannedStep) =>
+      s.category?.includes('AI_REASONING') && s.category?.includes('DECISION')
+    )
+    expect(routeAi).toBeDefined()
+    expect(routeAi!.aiOutputSchema).toBeDefined()
+    expect(routeAi!.aiOutputSchema!.onboarding_route).toBeDefined()
+  })
+
+  it('BUG 4: switch node uses conditionField "onboarding_route"', () => {
+    const { planned } = buildRegressionGraph()
+    const switchNode = planned.steps.find((s: PlannedStep) => s.type === 'switch')
+    expect(switchNode).toBeDefined()
+    expect(switchNode!.conditionField).toBe('onboarding_route')
+  })
+
+  it('BUG 3: wait node label does NOT claim "re-validation"', () => {
+    const { planned } = buildRegressionGraph()
+    const allSteps = flattenBranchSteps(planned.steps)
+    const waitStep = allSteps.find((s: PlannedStep) => /wait for human/i.test(s.action))
+    expect(waitStep).toBeDefined()
+    expect(waitStep!.action).not.toMatch(/re-validation/)
+    expect(waitStep!.action).toMatch(/branch ends here/)
+  })
+
+  it('BUG 1: generated IF condition uses $json.is_complete boolean, not $json.response isNotEmpty', () => {
+    const { n8n } = buildRegressionGraph()
+    const ifNode = n8n.nodes.find((n) => n.type === 'n8n-nodes-base.if' && /Data complete\?/.test(n.name))
+    expect(ifNode).toBeDefined()
+    const conds = (ifNode!.parameters as any)?.conditions?.conditions as Array<Record<string, any>>
+    expect(conds).toBeDefined()
+    expect(conds.some((c) => c.leftValue?.includes('$json.response') && c.operator?.operation === 'isNotEmpty')).toBe(false)
+    expect(conds.some((c) => c.leftValue?.includes('$json.is_complete') && c.operator?.operation === 'equals')).toBe(true)
+  })
+
+  it('BUG 2: AI agent node does NOT reference $("Webhook Trigger") — consumes previous node output', () => {
+    const { n8n } = buildRegressionGraph()
+    const agentNodes = n8n.nodes.filter((n) => n.type === '@n8n/n8n-nodes-langchain.agent')
+    for (const agent of agentNodes) {
+      const params = JSON.stringify(agent.parameters ?? {})
+      expect(params).not.toContain('$("Webhook Trigger")')
+    }
+  })
+
+  it('BUG 4: switch branches check $json.onboarding_route, not $json.response', () => {
+    const { n8n } = buildRegressionGraph()
+    const switchNode = n8n.nodes.find((n) => n.type === 'n8n-nodes-base.switch')
+    expect(switchNode).toBeDefined()
+    const rules = (switchNode!.parameters as any)?.rules?.values as Array<{ conditions?: { conditions?: Array<Record<string, any>> } }>
+    expect(rules).toBeDefined()
+    for (const rule of rules) {
+      const cond = rule?.conditions?.conditions?.[0]
+      expect(cond?.leftValue).toContain('$json.onboarding_route')
+    }
+  })
+
+  it('BUG 6: unresolved ingestion uses UNRESOLVED_INTEGRATION placeholder in generated HTTP node', () => {
+    // Use a step whose action text does NOT mention the integration name
+    // at all — the integration is declared in integrations_required but the
+    // ingestion text doesn't name it, so no integration label is matched
+    // and the step genuinely becomes unresolved.
+    const blueprint: BlueprintModuleInput = {
+      workflow_id: 'wf-unresolved',
+      name: 'Unresolved Test',
+      trigger: 'Manual',
+      steps: [
+        { type: 'execution', action: 'Create customer record' },
+      ],
+      integrations_required: [],
+    }
+    const planned = planWorkflowFromBlueprintModule(blueprint)
+    const n8n = convertToN8nWorkflow({
+      workflow_id: 'wf-unresolved',
+      title: blueprint.name,
+      trigger: planned.trigger,
+      steps: planned.steps,
+      skipAutoLimit: true,
+    })
+    const httpNodes = n8n.nodes.filter((n) => n.type === 'n8n-nodes-base.httpRequest')
+    // The unresolved business action without a specific integration
+    // should get the UNRESOLVED_INTEGRATION placeholder URL.
+    const createRecord = httpNodes.find((n) => n.name.includes('Create'))
+    expect(createRecord).toBeDefined()
+    expect(String((createRecord!.parameters as any)?.url ?? '')).toContain('UNRESOLVED')
+  })
+})
+
 // ── Validator regression tests — prove the rules themselves catch the bug ──
 
 function flattenBranchSteps(steps: PlannedStep[]): PlannedStep[] {
@@ -376,5 +486,109 @@ describe('validateN8nGraph — catches invented Limit nodes and disconnected nod
     }
     const result = validateN8nGraph(graph as any)
     expect(result.errors).toEqual([])
+  })
+})
+
+// ── New regression: validateN8nGraph catches the new bug classes ──────────
+
+describe('validateN8nGraph — bug 1-8 detection rules', () => {
+  it('Rule 1: flags a "Data complete?" IF node that checks $json.response isNotEmpty', () => {
+    const graph = {
+      nodes: [
+        { name: 'Trigger', type: 'n8n-nodes-base.webhook' },
+        { name: 'Step 3: Data complete? (validation)', type: 'n8n-nodes-base.if', parameters: { conditions: { conditions: [{ leftValue: '={{ $json.response }}', rightValue: '', operator: { type: 'string', operation: 'isNotEmpty' } }], combinator: 'and', options: {} }, options: {} } },
+        { name: 'Action', type: 'n8n-nodes-base.httpRequest' },
+      ],
+      connections: {
+        Trigger: { main: [[{ node: 'Step 3: Data complete? (validation)' }]] },
+        'Step 3: Data complete? (validation)': { main: [[{ node: 'Action' }], []] },
+      },
+    }
+    const result = validateN8nGraph(graph as any)
+    expect(result.errors.some((e) => /\$json\.response isNotEmpty/i.test(e))).toBe(true)
+  })
+
+  it('Rule 1: does NOT flag a "Data complete?" IF node that uses $json.is_complete', () => {
+    const graph = {
+      nodes: [
+        { name: 'Trigger', type: 'n8n-nodes-base.webhook' },
+        { name: 'Step 3: Data complete? (validation)', type: 'n8n-nodes-base.if', parameters: { conditions: { conditions: [{ leftValue: '={{ $json.is_complete }}', rightValue: true, operator: { type: 'boolean', operation: 'equals' } }], combinator: 'and', options: {} }, options: {} } },
+        { name: 'Action', type: 'n8n-nodes-base.httpRequest' },
+      ],
+      connections: {
+        Trigger: { main: [[{ node: 'Step 3: Data complete? (validation)' }]] },
+        'Step 3: Data complete? (validation)': { main: [[{ node: 'Action' }], []] },
+      },
+    }
+    const result = validateN8nGraph(graph as any)
+    expect(result.errors.some((e) => /\$json\.response isNotEmpty/i.test(e))).toBe(false)
+  })
+
+  it('Rule 2: flags a node referencing $("Webhook Trigger") directly (bypasses upstream data source)', () => {
+    const graph = {
+      nodes: [
+        { name: 'Webhook Trigger', type: 'n8n-nodes-base.webhook' },
+        { name: 'Step 1: Get CRM data', type: 'n8n-nodes-base.httpRequest' },
+        { name: 'Step 2: AI validation', type: '@n8n/n8n-nodes-langchain.agent', parameters: { text: '={{ $("Webhook Trigger").item.json.body }}' } },
+      ],
+      connections: {
+        'Webhook Trigger': { main: [[{ node: 'Step 1: Get CRM data' }]] },
+        'Step 1: Get CRM data': { main: [[{ node: 'Step 2: AI validation' }]] },
+      },
+    }
+    const result = validateN8nGraph(graph as any)
+    expect(result.errors.some((e) => /webhook trigger.*directly/i.test(e))).toBe(true)
+  })
+
+  it('Rule 4: warns about a "re-validation" node label without an actual re-validation loop', () => {
+    const graph = {
+      nodes: [
+        { name: 'Trigger', type: 'n8n-nodes-base.webhook' },
+        { name: 'Wait for human resolution — re-validation', type: 'n8n-nodes-base.wait' },
+      ],
+      connections: { Trigger: { main: [[{ node: 'Wait for human resolution — re-validation' }]] } },
+    }
+    const result = validateN8nGraph(graph as any)
+    expect(result.warnings.some((w) => /re-validation/i.test(w))).toBe(true)
+  })
+
+  it('Rule 6: warns about placeholder integration URLs (example.com)', () => {
+    const graph = {
+      nodes: [
+        { name: 'Trigger', type: 'n8n-nodes-base.webhook' },
+        { name: 'Step 1: Create account', type: 'n8n-nodes-base.httpRequest', parameters: { url: 'https://api.example.com/endpoint' } },
+      ],
+      connections: { Trigger: { main: [[{ node: 'Step 1: Create account' }]] } },
+    }
+    const result = validateN8nGraph(graph as any)
+    expect(result.warnings.some((w) => /placeholder URL/i.test(w))).toBe(true)
+  })
+
+  it('Rule 6: warns about UNRESOLVED_INTEGRATION placeholder URLs', () => {
+    const graph = {
+      nodes: [
+        { name: 'Trigger', type: 'n8n-nodes-base.webhook' },
+        { name: 'Step 1: Get CRM data', type: 'n8n-nodes-base.httpRequest', parameters: { url: 'UNRESOLVED_INTEGRATION://configure-me' } },
+      ],
+      connections: { Trigger: { main: [[{ node: 'Step 1: Get CRM data' }]] } },
+    }
+    const result = validateN8nGraph(graph as any)
+    expect(result.warnings.some((w) => /placeholder URL/i.test(w))).toBe(true)
+  })
+
+  it('Rule 7: warns about AI Agent nodes without structured-output schema for validation steps', () => {
+    const graph = {
+      nodes: [
+        { name: 'Trigger', type: 'n8n-nodes-base.webhook' },
+        { name: 'Step 2: Memvalidasi kelengkapan data', type: '@n8n/n8n-nodes-langchain.agent', parameters: { options: { systemMessage: 'Memvalidasi kelengkapan data dan mengklasifikasikan jenis layanan' } } },
+        { name: 'Action', type: 'n8n-nodes-base.httpRequest' },
+      ],
+      connections: {
+        Trigger: { main: [[{ node: 'Step 2: Memvalidasi kelengkapan data' }]] },
+        'Step 2: Memvalidasi kelengkapan data': { main: [[{ node: 'Action' }]] },
+      },
+    }
+    const result = validateN8nGraph(graph as any)
+    expect(result.warnings.some((w) => /no structured-output schema/i.test(w))).toBe(true)
   })
 })

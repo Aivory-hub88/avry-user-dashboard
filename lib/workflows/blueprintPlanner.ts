@@ -105,6 +105,16 @@ export interface PlannedStep {
    *  hold a neutral placeholder ('n8n') that looks unresolved even when it
    *  isn't (e.g. an audit step), or vice versa. */
   unresolvedIntegration?: boolean
+  /** Which $json field the downstream condition/switch node should inspect.
+   *  Set by buildExceptionGate ('is_complete') and buildDecisionNodes
+   *  ('onboarding_route'). When absent, the graph builder defaults to
+   *  '$json.response'. */
+  conditionField?: string
+  /** Expected output schema for AI/reasoning nodes — embedded in the LLM's
+   *  system message so it responds with structured JSON instead of free
+   *  text. Set for validation steps ({is_complete, service_type, ...}) and
+   *  classification steps ({onboarding_route, ...}). */
+  aiOutputSchema?: Record<string, any>
 }
 
 export interface PlannedWorkflow {
@@ -421,6 +431,9 @@ function buildDecisionNodes(step: BlueprintStepInput, sourceStepIndex: number, c
       nextNum(ctx),
       ctx.integrationsRequired,
     ))
+    // Attach the structured-output schema so the AI Agent node's system
+    // message includes it — the downstream switch checks $json.onboarding_route.
+    out[out.length - 1].aiOutputSchema = { onboarding_route: 'route_a' }
   }
   out.push({
     step: nextNum(ctx),
@@ -433,11 +446,7 @@ function buildDecisionNodes(step: BlueprintStepInput, sourceStepIndex: number, c
     type: 'switch',
     category: ['DECISION'],
     sourceStepIndex,
-    // Two generic placeholder routes — the blueprint doesn't name concrete
-    // route values, so branches are left empty (no-op outputs the graph
-    // builder already supports); the user fills in real rules/branch bodies
-    // in the inspector. Downstream steps resume from the shared join, same
-    // as every other branching step.
+    conditionField: 'onboarding_route',
     branches: [
       { key: 'route_a', label: 'Route A', steps: [] },
       { key: 'route_b', label: 'Route B', steps: [] },
@@ -492,7 +501,7 @@ function buildExceptionGate(
   })
   reviewSteps.push({
     step: nextNum(ctx),
-    action: 'Wait for human resolution — re-validation loop not yet supported, branch ends here',
+    action: 'Wait for human resolution — branch ends here, no automatic continuation',
     tool: 'Human Review',
     output: '',
     type: 'action',
@@ -509,6 +518,7 @@ function buildExceptionGate(
     type: 'condition',
     category: ['DECISION'],
     sourceStepIndex,
+    conditionField: 'is_complete',
     branches: [
       { key: 'complete', label: 'Complete', steps: [] },
       { key: 'incomplete', label: 'Incomplete / Exception', steps: reviewSteps, terminal: true },
@@ -556,6 +566,10 @@ function buildPlannedSteps(module: BlueprintModuleInput, ctx: BuildContext): Pla
       out.push(...buildDecisionNodes(step, i, ctx))
     } else if (step.type === 'ai_processing') {
       out.push(opToPlannedStep({ action: step.action, categories: ['AI_REASONING'], sourceStepIndex: i }, nextNum(ctx), ctx.integrationsRequired))
+      // Validation AI steps must produce structured output that the downstream
+      // "Data complete?" condition can inspect ($json.is_complete) rather than
+      // relying on free-text $json.response which is nearly always non-empty.
+      out[out.length - 1].aiOutputSchema = { is_complete: true, service_type: 'premium', missing_fields: [], confidence: 0.96 }
     } else {
       const ops = decomposeStep(step, i, module.integrations_required, ctx.warnings)
       for (const op of ops) out.push(opToPlannedStep(op, nextNum(ctx), ctx.integrationsRequired))
@@ -687,6 +701,23 @@ export function validatePlannedWorkflow(planned: PlannedWorkflow): ValidationRes
     if (intent === 'ai' && s.category && !s.category.includes('AI_REASONING')) {
       warnings.push(`Step ${s.step} ("${s.action}") resolved to an AI Agent node without an AI_REASONING classification — verify this is intentional.`)
     }
+
+    // Rule 8: AI steps tagged as validation/classification must carry a
+    // structured-output schema so downstream conditions can inspect fields
+    // like $json.is_complete instead of guessing from free text.
+    if (intent === 'ai' && s.category?.includes('AI_REASONING')) {
+      const action = (s.action || '').toLowerCase()
+      const isValidation = /validasi|validate|classification|classify/i.test(action)
+      if (isValidation && !s.aiOutputSchema) {
+        warnings.push(`Step ${s.step} ("${s.action}"): AI reasoning step for validation/classification has no aiOutputSchema — the downstream condition will have no structured field to inspect.`)
+      }
+    }
+
+    // Rule 9: switch/condition nodes with 'onboarding_route' or similar
+    // routing fields should have a preceding AI classification step.
+    if ((s.type === 'switch' || s.type === 'condition') && s.conditionField === 'onboarding_route') {
+      warnings.push(`Step ${s.step} ("${s.action}"): switch/condition references onboarding_route field — ensure a preceding AI classification step produces this structured output.`)
+    }
   }
 
   // Exception reachability: a blueprint that mentions review/exception
@@ -735,6 +766,8 @@ export interface GraphValidationResult {
  *  connection is expected, not a bug. */
 const TERMINAL_N8N_NODE_TYPES = new Set(['n8n-nodes-base.wait', 'n8n-nodes-base.respondToWebhook'])
 
+const PLACEHOLDER_URL_PATTERN = /example\.com\/endpoint|UNRESOLVED_INTEGRATION/i
+
 /**
  * Stage 8b — checks the ACTUAL n8n graph (nodes + connections) produced by
  * convertToN8nWorkflow(), not just the pre-conversion PlannedStep tree.
@@ -746,15 +779,112 @@ const TERMINAL_N8N_NODE_TYPES = new Set(['n8n-nodes-base.wait', 'n8n-nodes-base.
  * one place that heuristic could actually insert one.
  */
 export function validateN8nGraph(n8nWorkflow: {
-  nodes: Array<{ name: string; type: string }>
+  nodes: Array<{ name: string; type: string; parameters?: Record<string, any> }>
   connections: Record<string, Record<string, Array<Array<{ node: string }>>>>
 }): GraphValidationResult {
   const errors: string[] = []
   const warnings: string[] = []
 
   for (const n of n8nWorkflow.nodes) {
+    // Rule 0: no invented Limit node (pre-existing).
     if (n.type === 'n8n-nodes-base.limit') {
       errors.push(`Node "${n.name}": an n8n-nodes-base.limit node was inserted without the blueprint requesting any processing/batch/concurrency limit.`)
+    }
+
+    // Rule 1: "Data complete?" IF node must NOT check $json.response isNotEmpty.
+    if (n.type === 'n8n-nodes-base.if' && /data complete\?/i.test(n.name)) {
+      const conds = n.parameters?.conditions?.conditions as Array<Record<string, any>> | undefined
+      if (conds?.some((c: Record<string, any>) =>
+        String(c.leftValue ?? '').includes('$json.response') &&
+        c.operator?.operation === 'isNotEmpty'
+      )) {
+        errors.push(`Node "${n.name}": "Data complete?" condition checks $json.response isNotEmpty which is nearly always true — it must check a structured boolean field like $json.is_complete === true instead.`)
+      }
+    }
+
+    // Rule 2: no downstream node should reference $("Webhook Trigger") directly
+    // when there ARE ingestion/retrieval nodes upstream that it should consume.
+    if (n.type !== 'n8n-nodes-base.webhook' && n.type !== 'n8n-nodes-base.scheduleTrigger') {
+      // JSON.stringify escapes internal double-quotes, so check both the
+      // serialized form and the original parameter values directly.
+      const params = JSON.stringify(n.parameters ?? {})
+      const paramValues = Object.values(n.parameters ?? {}).map(String).join(' ')
+      if (params.includes('$("Webhook Trigger")') || params.includes('$(\\"Webhook Trigger\\")') || paramValues.includes('$("Webhook Trigger")')) {
+        errors.push(`Node "${n.name}": references $("Webhook Trigger") directly instead of consuming the normalized output from an upstream ingestion/retrieval node.`)
+      }
+    }
+
+    // Rule 3: wait nodes must either be terminal (no outgoing connection) OR
+    // have a clear continuation (checked below in connectivity loop).
+
+    // Rule 4: node labeled "re-validation" without a downstream validation.
+    if (/re-validation|re.validation/i.test(n.name)) {
+      warnings.push(`Node "${n.name}": labeled as "re-validation" but no actual re-validation loop exists — the branch terminates without a validation node downstream. Rename or implement the loop.`)
+    }
+
+    // Rule 5: switch nodes should have a preceding AI/classification source
+    // when the switch field is `onboarding_route` or similar (not a raw data field).
+    if (n.type === 'n8n-nodes-base.switch') {
+      const conds = n.parameters?.rules?.values as Array<{ conditions?: { conditions?: Array<Record<string, any>> } }> | undefined
+      const hasRouteCheck = conds?.some((v: any) =>
+        String(v?.conditions?.conditions?.[0]?.leftValue ?? '').includes('onboarding_route')
+      )
+      if (hasRouteCheck) {
+        const prevNodes = Object.values(n8nWorkflow.connections)
+          .flatMap((byType) => Object.values(byType).flatMap((arrs) => arrs.flat()))
+          .filter((t: any) => t.node === n.name)
+        const hasAiUpstream = prevNodes.some((t: any) => {
+          const src = n8nWorkflow.nodes.find((nn) => nn.name === t.node)
+          return false // We can't trace back easily — check via name proximity.
+        })
+        // Actually, a simpler heuristic: if the node just before the switch
+        // in the linear chain is NOT an AI Agent, warn.
+        const incomingNodes = new Set<string>()
+        for (const byType of Object.values(n8nWorkflow.connections)) {
+          for (const branches of Object.values(byType)) {
+            for (const arr of branches) {
+              for (const t of arr) {
+                if (t.node === n.name) incomingNodes.add(t.node)
+              }
+            }
+          }
+        }
+        // Find nodes that connect TO this switch.
+        const sourceNames: string[] = []
+        for (const [from, byType] of Object.entries(n8nWorkflow.connections)) {
+          for (const branches of Object.values(byType)) {
+            for (const arr of branches) {
+              if (arr.some((t: any) => t.node === n.name)) sourceNames.push(from)
+            }
+          }
+        }
+        const sources = n8nWorkflow.nodes.filter((nn) => sourceNames.includes(nn.name))
+        const hasAiSource = sources.some((nn) =>
+          nn.type === '@n8n/n8n-nodes-langchain.agent' ||
+          nn.type.includes('langchain') ||
+          nn.name.toLowerCase().includes('ai')
+        )
+        if (!hasAiSource) {
+          warnings.push(`Node "${n.name}": switch uses onboarding_route field but has no visible AI Agent/classification source upstream — the route determination needs a reasoning step.`)
+        }
+      }
+    }
+
+    // Rule 6: placeholder integrations (example.com or UNRESOLVED_INTEGRATION)
+    if (n.type === 'n8n-nodes-base.httpRequest') {
+      const url = String(n.parameters?.url ?? '')
+      if (PLACEHOLDER_URL_PATTERN.test(url)) {
+        warnings.push(`Node "${n.name}": uses placeholder URL "${url}" — this integration is unresolved and requires manual configuration before the workflow is executable.`)
+      }
+    }
+
+    // Rule 7: AI Agent nodes missing structured output schema (validation/classification steps)
+    if (n.type === '@n8n/n8n-nodes-langchain.agent') {
+      const systemMsg = String(n.parameters?.options?.systemMessage ?? '')
+      const hasSchema = /must respond with valid JSON|JSON in this exact format|is_complete|onboarding_route/i.test(systemMsg)
+      if (!hasSchema && /validasi|classify|classific|determine route|tentukan/i.test(n.name.toLowerCase())) {
+        warnings.push(`Node "${n.name}": AI Agent node appears to be a validation/classification step but has no structured-output schema in its system message — output may be free text that downstream conditions can't reliably inspect.`)
+      }
     }
   }
 
@@ -770,9 +900,6 @@ export function validateN8nGraph(n8nWorkflow: {
 
   for (const n of n8nWorkflow.nodes) {
     const isTrigger = n.type.toLowerCase().includes('trigger') || n.type === 'n8n-nodes-base.webhook'
-    // LangChain sub-nodes (Chat Model, etc.) connect via ai_languageModel —
-    // they're always a connection SOURCE, never a "main" target, so they
-    // legitimately have no incoming connection either.
     const isSubNode = n.type.startsWith('@n8n/n8n-nodes-langchain.lmChat')
 
     if (!isTrigger && !isSubNode && !hasIncoming.has(n.name)) {

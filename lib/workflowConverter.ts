@@ -64,6 +64,13 @@ export interface WorkflowStep {
    * "extract" even though the step is really an AI extraction/reasoning task).
    */
   forceIntent?: NodeIntent
+  /** Passed straight through to the n8n Agent node's system message — see
+   *  blueprintPlanner.ts's PlannedStep.aiOutputSchema. */
+  aiOutputSchema?: Record<string, any>
+  /** Which $json field the downstream condition/switch inspects. Set by the
+   *  blueprint planner for exception gates ('is_complete') and routing
+   *  switches ('onboarding_route'). When absent, defaults to 'response'. */
+  conditionField?: string
 }
 
 interface AivoryWorkflow {
@@ -243,6 +250,7 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
         // generic field. Placeholder condition, same spirit as every other
         // intent's default parameters (e.g. http's example.com URL) — the
         // user fills in the real field via the inspector's SwitchForm.
+        const routeField = step.conditionField || 'response'
         primary.parameters = {
           mode: 'rules',
           rules: {
@@ -250,7 +258,7 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
               conditions: {
                 options: { caseSensitive: true, leftValue: '', typeValidation: 'strict' },
                 conditions: [
-                  { leftValue: '={{ $json.response }}', rightValue: b.key, operator: { type: 'string', operation: 'equals' } },
+                  { leftValue: `={{ $json.${routeField} }}`, rightValue: b.key, operator: { type: 'string', operation: 'equals' } },
                 ],
                 combinator: 'and',
               },
