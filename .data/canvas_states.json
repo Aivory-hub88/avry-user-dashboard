@@ -1,0 +1,606 @@
+{
+  "eca08ba4-616b-43a7-8b29-b24794e0d473": {
+    "nodes": [
+      {
+        "id": "221cb5e4-ae41-4893-b5d9-fff0f0436243",
+        "data": {
+          "label": "Webhook Trigger",
+          "title": "Webhook Trigger",
+          "category": "trigger",
+          "rawN8n": {
+            "id": "221cb5e4-ae41-4893-b5d9-fff0f0436243",
+            "name": "Webhook Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+              250,
+              300
+            ],
+            "parameters": {
+              "httpMethod": "POST",
+              "path": "aivory-copilot-1784780185821",
+              "responseMode": "responseNode"
+            }
+          }
+        },
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "type": "standardNode",
+        "measured": {
+          "width": 260,
+          "height": 68
+        }
+      },
+      {
+        "id": "5594c627-e48c-4efb-b813-2a920fc69ab9",
+        "data": {
+          "label": "Step 1: Summarize with AI",
+          "title": "Step 1: Summarize with AI",
+          "category": "ai",
+          "rawN8n": {
+            "id": "5594c627-e48c-4efb-b813-2a920fc69ab9",
+            "name": "Step 1: Summarize with AI",
+            "type": "@n8n/n8n-nodes-langchain.agent",
+            "typeVersion": 1.7,
+            "position": [
+              470,
+              300
+            ],
+            "parameters": {
+              "promptType": "define",
+              "text": "={{ $(\"Webhook Trigger\").item.json.body }}",
+              "options": {
+                "systemMessage": "Summarize with AI"
+              }
+            },
+            "linkedModel": {
+              "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+              "parameters": {
+                "model": {
+                  "value": "gpt-4o",
+                  "mode": "list"
+                },
+                "options": {}
+              }
+            }
+          }
+        },
+        "position": {
+          "x": 100,
+          "y": 260
+        },
+        "type": "standardNode",
+        "measured": {
+          "width": 260,
+          "height": 68
+        },
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "3f44944b-ecc8-46b5-96cb-39d4327b6586",
+        "data": {
+          "label": "Step 2: Send Gmail Summary",
+          "title": "Step 2: Send Gmail Summary",
+          "category": "ai",
+          "rawN8n": {
+            "id": "3f44944b-ecc8-46b5-96cb-39d4327b6586",
+            "name": "Step 2: Send Gmail Summary",
+            "position": [
+              690,
+              300
+            ],
+            "type": "n8n-nodes-base.gmail",
+            "typeVersion": 2.1,
+            "parameters": {
+              "resource": "message",
+              "operation": "send",
+              "sendTo": "={{ $json.to || $json.user_email || $json.email }}",
+              "subject": "={{ 'Re: ' + ($json.subject || 'Aivory notification') }}",
+              "message": "={{ $json.reply_text || $json.aiResponse || $json.message }}"
+            }
+          }
+        },
+        "position": {
+          "x": 464,
+          "y": 166
+        },
+        "type": "standardNode",
+        "measured": {
+          "width": 260,
+          "height": 68
+        },
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "44103a6f-f689-4e16-bdc3-dcb7ba961a40",
+        "data": {
+          "label": "OpenAI Chat Model",
+          "title": "OpenAI Chat Model",
+          "category": "ai",
+          "rawN8n": {
+            "id": "44103a6f-f689-4e16-bdc3-dcb7ba961a40",
+            "name": "OpenAI Chat Model",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+            "typeVersion": 1,
+            "position": [
+              470,
+              500
+            ],
+            "parameters": {
+              "model": {
+                "value": "gpt-4o",
+                "mode": "list"
+              },
+              "options": {}
+            }
+          }
+        },
+        "position": {
+          "x": -248,
+          "y": 442.5
+        },
+        "type": "standardNode",
+        "measured": {
+          "width": 260,
+          "height": 68
+        },
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "std-1784782576153",
+        "type": "standardNode",
+        "position": {
+          "x": 400,
+          "y": 291
+        },
+        "data": {
+          "label": "Code",
+          "icon": "code",
+          "category": "transform",
+          "title": "Code",
+          "rawN8n": {
+            "type": "n8n-nodes-base.code",
+            "parameters": {}
+          }
+        },
+        "measured": {
+          "width": 260,
+          "height": 68
+        },
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "std-1784782599325",
+        "type": "standardNode",
+        "position": {
+          "x": 516,
+          "y": 155
+        },
+        "data": {
+          "label": "Code",
+          "icon": "code",
+          "category": "transform",
+          "title": "Code",
+          "rawN8n": {
+            "type": "n8n-nodes-base.code",
+            "parameters": {}
+          }
+        },
+        "measured": {
+          "width": 260,
+          "height": 68
+        },
+        "selected": false,
+        "dragging": false
+      },
+      {
+        "id": "std-1784782632253",
+        "type": "standardNode",
+        "position": {
+          "x": 340,
+          "y": 414.25
+        },
+        "data": {
+          "label": "Switch",
+          "icon": "switch",
+          "category": "logic",
+          "title": "Switch",
+          "rawN8n": {
+            "type": "n8n-nodes-base.switch",
+            "parameters": {}
+          }
+        },
+        "measured": {
+          "width": 260,
+          "height": 72
+        },
+        "selected": true,
+        "dragging": false
+      }
+    ],
+    "edges": [
+      {
+        "id": "221cb5e4-ae41-4893-b5d9-fff0f0436243-5594c627-e48c-4efb-b813-2a920fc69ab9-0",
+        "source": "221cb5e4-ae41-4893-b5d9-fff0f0436243",
+        "target": "5594c627-e48c-4efb-b813-2a920fc69ab9",
+        "animated": false,
+        "type": "n8nAdaptive",
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 12,
+          "height": 12,
+          "color": "#9ca3af"
+        }
+      },
+      {
+        "id": "44103a6f-f689-4e16-bdc3-dcb7ba961a40-5594c627-e48c-4efb-b813-2a920fc69ab9-ai_languageModel",
+        "source": "44103a6f-f689-4e16-bdc3-dcb7ba961a40",
+        "target": "5594c627-e48c-4efb-b813-2a920fc69ab9",
+        "animated": false,
+        "type": "aiSubConnection",
+        "data": {
+          "connectionType": "ai_languageModel"
+        }
+      },
+      {
+        "id": "5594c627-e48c-4efb-b813-2a920fc69ab9-3f44944b-ecc8-46b5-96cb-39d4327b6586-0",
+        "source": "5594c627-e48c-4efb-b813-2a920fc69ab9",
+        "target": "3f44944b-ecc8-46b5-96cb-39d4327b6586",
+        "animated": false,
+        "type": "n8nAdaptive",
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 12,
+          "height": 12,
+          "color": "#9ca3af"
+        }
+      }
+    ],
+    "savedAt": "2026-07-25T10:54:06.765Z"
+  },
+  "16e1889d-7f0d-43d8-a0a2-5482b88f758d": {
+    "nodes": [
+      {
+        "id": "457fa118-c4b7-4d84-a196-99e0b29b873e",
+        "data": {
+          "label": "Webhook Trigger",
+          "title": "Webhook Trigger",
+          "category": "trigger",
+          "rawN8n": {
+            "id": "457fa118-c4b7-4d84-a196-99e0b29b873e",
+            "name": "Webhook Trigger",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+              250,
+              300
+            ],
+            "parameters": {
+              "httpMethod": "POST",
+              "path": "aivory-copilot-1784976930911",
+              "responseMode": "responseNode"
+            }
+          }
+        },
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "type": "standardNode",
+        "measured": {
+          "width": 260,
+          "height": 68
+        }
+      },
+      {
+        "id": "db0d7b14-9396-4e07-ac00-ce4b39042ee0",
+        "data": {
+          "label": "Step 1: Route by order tier",
+          "title": "Step 1: Route by order tier",
+          "category": "condition",
+          "rawN8n": {
+            "id": "db0d7b14-9396-4e07-ac00-ce4b39042ee0",
+            "name": "Step 1: Route by order tier",
+            "position": [
+              470,
+              300
+            ],
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3,
+            "parameters": {
+              "mode": "rules",
+              "rules": {
+                "values": [
+                  {
+                    "conditions": {
+                      "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                      },
+                      "conditions": [
+                        {
+                          "leftValue": "={{ $json.response }}",
+                          "rightValue": "gold",
+                          "operator": {
+                            "type": "string",
+                            "operation": "equals"
+                          }
+                        }
+                      ],
+                      "combinator": "and"
+                    },
+                    "renameOutput": true,
+                    "outputKey": "Gold"
+                  },
+                  {
+                    "conditions": {
+                      "options": {
+                        "caseSensitive": true,
+                        "leftValue": "",
+                        "typeValidation": "strict"
+                      },
+                      "conditions": [
+                        {
+                          "leftValue": "={{ $json.response }}",
+                          "rightValue": "silver",
+                          "operator": {
+                            "type": "string",
+                            "operation": "equals"
+                          }
+                        }
+                      ],
+                      "combinator": "and"
+                    },
+                    "renameOutput": true,
+                    "outputKey": "Silver"
+                  }
+                ]
+              },
+              "options": {
+                "fallbackOutput": "none"
+              }
+            }
+          },
+          "outputs": [
+            {
+              "id": "out-0",
+              "label": "Gold"
+            },
+            {
+              "id": "out-1",
+              "label": "Silver"
+            }
+          ]
+        },
+        "position": {
+          "x": 320,
+          "y": 0
+        },
+        "type": "standardNode",
+        "measured": {
+          "width": 260,
+          "height": 68
+        }
+      },
+      {
+        "id": "b58cbd49-f88d-4f76-bec1-24566418842c",
+        "data": {
+          "label": "Step 1: Route by order tier · join",
+          "title": "Step 1: Route by order tier · join",
+          "category": "action",
+          "rawN8n": {
+            "id": "b58cbd49-f88d-4f76-bec1-24566418842c",
+            "name": "Step 1: Route by order tier · join",
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+              580,
+              560
+            ],
+            "parameters": {}
+          }
+        },
+        "position": {
+          "x": 960,
+          "y": 0
+        },
+        "type": "standardNode",
+        "measured": {
+          "width": 260,
+          "height": 68
+        }
+      },
+      {
+        "id": "f17fa30a-0add-4008-a74f-90c7172863f3",
+        "data": {
+          "label": "Step 2: Send gold email",
+          "title": "Step 2: Send gold email",
+          "category": "ai",
+          "rawN8n": {
+            "id": "f17fa30a-0add-4008-a74f-90c7172863f3",
+            "name": "Step 2: Send gold email",
+            "position": [
+              690,
+              300
+            ],
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2.1,
+            "parameters": {
+              "resource": "email",
+              "operation": "send",
+              "fromEmail": "support@example.com",
+              "toEmail": "={{ $json.to || $json.user_email || $json.email }}",
+              "subject": "={{ 'Re: ' + ($json.subject || 'Aivory notification') }}",
+              "message": "={{ $json.reply_text || $json.aiResponse || $json.message }}"
+            }
+          }
+        },
+        "position": {
+          "x": 640,
+          "y": 0
+        },
+        "type": "standardNode",
+        "measured": {
+          "width": 260,
+          "height": 68
+        }
+      },
+      {
+        "id": "7fbe1dc5-0e48-4c65-8e9a-b3fe33d04bf8",
+        "data": {
+          "label": "Step 3: Send silver email",
+          "title": "Step 3: Send silver email",
+          "category": "ai",
+          "rawN8n": {
+            "id": "7fbe1dc5-0e48-4c65-8e9a-b3fe33d04bf8",
+            "name": "Step 3: Send silver email",
+            "position": [
+              910,
+              300
+            ],
+            "type": "n8n-nodes-base.emailSend",
+            "typeVersion": 2.1,
+            "parameters": {
+              "resource": "email",
+              "operation": "send",
+              "fromEmail": "support@example.com",
+              "toEmail": "={{ $json.to || $json.user_email || $json.email }}",
+              "subject": "={{ 'Re: ' + ($json.subject || 'Aivory notification') }}",
+              "message": "={{ $json.reply_text || $json.aiResponse || $json.message }}"
+            }
+          }
+        },
+        "position": {
+          "x": 640,
+          "y": 180
+        },
+        "type": "standardNode",
+        "measured": {
+          "width": 260,
+          "height": 68
+        }
+      },
+      {
+        "id": "bf37c602-7324-4b6e-8579-b302533a96fe",
+        "data": {
+          "label": "Step 4: Respond with success",
+          "title": "Step 4: Respond with success",
+          "category": "trigger",
+          "rawN8n": {
+            "id": "bf37c602-7324-4b6e-8579-b302533a96fe",
+            "name": "Step 4: Respond with success",
+            "position": [
+              1130,
+              300
+            ],
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "parameters": {
+              "respondWith": "json",
+              "responseBody": "={{ JSON.stringify({ status: \"success\", result: $json.response || $json.body }) }}"
+            }
+          }
+        },
+        "position": {
+          "x": 1280,
+          "y": 0
+        },
+        "type": "standardNode",
+        "measured": {
+          "width": 260,
+          "height": 68
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "457fa118-c4b7-4d84-a196-99e0b29b873e-db0d7b14-9396-4e07-ac00-ce4b39042ee0-0",
+        "source": "457fa118-c4b7-4d84-a196-99e0b29b873e",
+        "target": "db0d7b14-9396-4e07-ac00-ce4b39042ee0",
+        "animated": false,
+        "type": "n8nAdaptive",
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 12,
+          "height": 12,
+          "color": "#9ca3af"
+        }
+      },
+      {
+        "id": "db0d7b14-9396-4e07-ac00-ce4b39042ee0-f17fa30a-0add-4008-a74f-90c7172863f3-0",
+        "source": "db0d7b14-9396-4e07-ac00-ce4b39042ee0",
+        "target": "f17fa30a-0add-4008-a74f-90c7172863f3",
+        "sourceHandle": "out-0",
+        "animated": false,
+        "type": "n8nAdaptive",
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 12,
+          "height": 12,
+          "color": "#9ca3af"
+        }
+      },
+      {
+        "id": "db0d7b14-9396-4e07-ac00-ce4b39042ee0-7fbe1dc5-0e48-4c65-8e9a-b3fe33d04bf8-1",
+        "source": "db0d7b14-9396-4e07-ac00-ce4b39042ee0",
+        "target": "7fbe1dc5-0e48-4c65-8e9a-b3fe33d04bf8",
+        "sourceHandle": "out-1",
+        "animated": false,
+        "type": "n8nAdaptive",
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 12,
+          "height": 12,
+          "color": "#9ca3af"
+        }
+      },
+      {
+        "id": "f17fa30a-0add-4008-a74f-90c7172863f3-b58cbd49-f88d-4f76-bec1-24566418842c-0",
+        "source": "f17fa30a-0add-4008-a74f-90c7172863f3",
+        "target": "b58cbd49-f88d-4f76-bec1-24566418842c",
+        "animated": false,
+        "type": "n8nAdaptive",
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 12,
+          "height": 12,
+          "color": "#9ca3af"
+        }
+      },
+      {
+        "id": "7fbe1dc5-0e48-4c65-8e9a-b3fe33d04bf8-b58cbd49-f88d-4f76-bec1-24566418842c-0",
+        "source": "7fbe1dc5-0e48-4c65-8e9a-b3fe33d04bf8",
+        "target": "b58cbd49-f88d-4f76-bec1-24566418842c",
+        "animated": false,
+        "type": "n8nAdaptive",
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 12,
+          "height": 12,
+          "color": "#9ca3af"
+        }
+      },
+      {
+        "id": "b58cbd49-f88d-4f76-bec1-24566418842c-bf37c602-7324-4b6e-8579-b302533a96fe-0",
+        "source": "b58cbd49-f88d-4f76-bec1-24566418842c",
+        "target": "bf37c602-7324-4b6e-8579-b302533a96fe",
+        "animated": false,
+        "type": "n8nAdaptive",
+        "markerEnd": {
+          "type": "arrowclosed",
+          "width": 12,
+          "height": 12,
+          "color": "#9ca3af"
+        }
+      }
+    ],
+    "savedAt": "2026-07-27T01:18:43.269Z"
+  }
+}

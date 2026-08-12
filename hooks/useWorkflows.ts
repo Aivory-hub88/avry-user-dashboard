@@ -6,6 +6,9 @@ export interface SavedWorkflowStepBranch {
   key: string
   label?: string
   steps: SavedWorkflowStep[]
+  /** This branch must not rejoin the shared join node after its steps run
+   *  (e.g. an exception/human-review path) — see lib/workflowConverter.ts. */
+  terminal?: boolean
 }
 
 export interface SavedWorkflowStep {

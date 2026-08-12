@@ -70,6 +70,12 @@ export interface PlannedStepBranch {
   key: string
   label?: string
   steps: PlannedStep[]
+  /** Stage 6 — this branch does NOT rejoin the shared join node after its
+   *  steps run (e.g. an exception/human-review path that must end in an
+   *  explicit "awaiting resolution" state, never silently fall through
+   *  into the normal/success continuation). See workflowConverter.ts's
+   *  branch-wiring code, which is the only place this is actually read. */
+  terminal?: boolean
 }
 
 /** Output shape — matches lib/workflowConverter.ts's WorkflowStep. */
@@ -440,25 +446,59 @@ function buildDecisionNodes(step: BlueprintStepInput, sourceStepIndex: number, c
   return out
 }
 
-/** Build the completeness-gate condition wrapping one or more human_review
- *  steps into an explicit NO-branch, per Stage 6 — never a bare trailing
- *  linear step. `gateLabel` names what's being checked (e.g. the preceding
- *  AI validation step's action) for a clearer node label. */
+/**
+ * Build the completeness-gate condition wrapping one or more human_review
+ * steps into an explicit exception branch, per Stage 6 — never a bare
+ * trailing linear step. `gateLabel` names what's being checked (e.g. the
+ * preceding AI validation step's action) for a clearer node label.
+ *
+ * Branch order matters: the graph builder (workflowConverter.ts) always
+ * wires branches[0] to a condition node's TRUE output and branches[1] to
+ * FALSE. "Data complete?" being TRUE must mean "continue" — so `complete`
+ * is branches[0], `incomplete` is branches[1]. Getting this backwards
+ * silently sends complete data down the exception path and vice versa.
+ *
+ * The exception branch is marked `terminal`: flag the case, ask the
+ * requester for what's missing, then pause on an explicit wait/resume
+ * node. It must NOT rejoin the success path — this planner doesn't
+ * implement a re-validation loop yet, so "wait for human resolution" is
+ * where the branch honestly ends, rather than silently falling through
+ * into account creation with incomplete data.
+ */
 function buildExceptionGate(
   reviewOps: AtomicOp[],
   gateLabel: string,
   sourceStepIndex: number,
   ctx: BuildContext,
 ): PlannedStep {
-  const reviewSteps: PlannedStep[] = reviewOps.map((op) => opToPlannedStep(op, nextNum(ctx), ctx.integrationsRequired))
+  const reviewSteps: PlannedStep[] = reviewOps.map((op) => ({
+    // The blueprint's own human_review text explains WHY this case needs
+    // attention — it's a record/flag, not itself the resumable wait point
+    // (that's the dedicated step appended below), so force it off the
+    // 'humanReview' (Wait node) intent its own wording would otherwise
+    // match.
+    ...opToPlannedStep(op, nextNum(ctx), ctx.integrationsRequired),
+    tool: 'Exception Queue',
+    forceIntent: 'audit' as const,
+  }))
   reviewSteps.push({
     step: nextNum(ctx),
-    action: 'Notify requester about missing or incomplete data',
+    action: 'Request missing information from requester',
     tool: 'Notification channel',
     output: '',
     type: 'action',
     category: ['COMMUNICATION', 'EXCEPTION_HANDLING'],
     sourceStepIndex,
+  })
+  reviewSteps.push({
+    step: nextNum(ctx),
+    action: 'Wait for human resolution — re-validation loop not yet supported, branch ends here',
+    tool: 'Human Review',
+    output: '',
+    type: 'action',
+    category: ['HUMAN_REVIEW', 'EXCEPTION_HANDLING'],
+    sourceStepIndex,
+    forceIntent: 'humanReview',
   })
 
   return {
@@ -467,11 +507,11 @@ function buildExceptionGate(
     tool: 'Condition',
     output: '',
     type: 'condition',
-    category: ['DECISION', 'EXCEPTION_HANDLING'],
+    category: ['DECISION'],
     sourceStepIndex,
     branches: [
-      { key: 'incomplete', label: 'Incomplete / Exception', steps: reviewSteps },
       { key: 'complete', label: 'Complete', steps: [] },
+      { key: 'incomplete', label: 'Incomplete / Exception', steps: reviewSteps, terminal: true },
     ],
   }
 }
@@ -568,13 +608,24 @@ function collectSteps(steps: PlannedStep[]): PlannedStep[] {
   return all
 }
 
+/** Normalizes action text for duplicate-condition comparison — case/
+ *  whitespace-insensitive, and strips the "Data complete? (...)" gate
+ *  wrapper so a duplicate is caught even if the inner label differs. */
+function normalizeForDuplicateCheck(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+const BUSINESS_ACTION_ONLY: ReadonlySet<StepCategory> = new Set(['BUSINESS_ACTION'])
+
 /**
  * Stage 8 — structural checks on a planned workflow before it's handed to
  * the graph builder. Not a full n8n-schema validator (that already exists
  * in lib/workflows/n8nMcpClient.ts, at deploy time) — this checks the
  * planner's own contract: trigger present, branches well-formed, no empty
- * action text, exception paths actually reachable, and no step silently
- * defaulted to an AI Agent outside an AI_REASONING/DECISION category.
+ * action text, exception paths actually reachable *and* terminal, no
+ * duplicate conditions, no business action stranded in a dead-end branch,
+ * and no step silently defaulted to an AI Agent outside an AI_REASONING/
+ * DECISION category.
  */
 export function validatePlannedWorkflow(planned: PlannedWorkflow): ValidationResult {
   const errors: string[] = []
@@ -584,8 +635,7 @@ export function validatePlannedWorkflow(planned: PlannedWorkflow): ValidationRes
   if (planned.steps.length === 0) errors.push('Workflow has no steps.')
 
   const all = collectSteps(planned.steps)
-  let hasExceptionRequirement = false
-  let hasReachableExceptionPath = false
+  const conditionTextSeen = new Map<string, number>()
 
   for (const s of all) {
     if (!s.action || !s.action.trim()) errors.push(`Step ${s.step}: empty action text.`)
@@ -597,9 +647,35 @@ export function validatePlannedWorkflow(planned: PlannedWorkflow): ValidationRes
       errors.push(`Step ${s.step} ("${s.action}"): condition node needs exactly 2 branches.`)
     }
 
-    if (s.category?.includes('EXCEPTION_HANDLING') || s.category?.includes('HUMAN_REVIEW')) {
-      hasExceptionRequirement = true
-      if ((s.branches?.length ?? 0) > 0) hasReachableExceptionPath = true
+    // Duplicate IF/switch conditions with identical semantics.
+    if (s.type === 'condition' || s.type === 'switch') {
+      const norm = normalizeForDuplicateCheck(s.action)
+      const priorStep = conditionTextSeen.get(norm)
+      if (priorStep !== undefined) {
+        errors.push(`Step ${s.step} ("${s.action}") duplicates the condition already built at step ${priorStep} — a validation decision should appear once, immediately after its validation step, not twice.`)
+      } else {
+        conditionTextSeen.set(norm, s.step)
+      }
+    }
+
+    // TRUE-branch / exception-branch inversion and auto-continue checks —
+    // only meaningful for 2-way conditions (branches[0]=TRUE, branches[1]
+    // =FALSE by the graph builder's convention; see workflowConverter.ts).
+    if (s.type === 'condition' && s.branches?.length === 2) {
+      const [trueBranch, falseBranch] = s.branches
+      const branchIsException = (b: PlannedStepBranch) =>
+        collectSteps(b.steps).some((step) => step.category?.includes('HUMAN_REVIEW') || step.category?.includes('EXCEPTION_HANDLING'))
+
+      if (branchIsException(trueBranch) && !branchIsException(falseBranch)) {
+        errors.push(`Step ${s.step} ("${s.action}"): the TRUE branch ("${trueBranch.label ?? trueBranch.key}") leads to exception/human-review handling while FALSE does not — this is almost always inverted. TRUE should mean the check passed (continue normally); FALSE should route to the exception path.`)
+      }
+
+      // Exception branch must not silently rejoin normal execution.
+      for (const branch of s.branches) {
+        if (branchIsException(branch) && !branch.terminal) {
+          errors.push(`Step ${s.step} ("${s.action}"): branch "${branch.label ?? branch.key}" contains exception/human-review handling but isn't marked terminal — it will automatically continue into the normal-execution path after running.`)
+        }
+      }
     }
 
     // No unnecessary AI: an 'ai' intent should only ever be resolved for a
@@ -613,12 +689,98 @@ export function validatePlannedWorkflow(planned: PlannedWorkflow): ValidationRes
     }
   }
 
-  if (hasExceptionRequirement && !hasReachableExceptionPath) {
-    errors.push('Blueprint mentions exception/review handling but no reachable exception branch was generated.')
+  // Exception reachability: a blueprint that mentions review/exception
+  // handling must produce at least one `terminal` branch containing that
+  // handling — not just any branch (an empty non-terminal placeholder, or
+  // a branch that isn't actually reachable, doesn't count).
+  const hasExceptionRequirement = all.some((s) => s.category?.includes('EXCEPTION_HANDLING') || s.category?.includes('HUMAN_REVIEW'))
+  const hasReachableTerminalException = all.some((s) =>
+    s.branches?.some((b) => b.terminal && collectSteps(b.steps).some((step) =>
+      step.category?.includes('HUMAN_REVIEW') || step.category?.includes('EXCEPTION_HANDLING'))))
+  if (hasExceptionRequirement && !hasReachableTerminalException) {
+    errors.push('Blueprint mentions exception/review handling but no reachable, terminal exception branch was generated.')
+  }
+
+  // Business actions stranded in a dead-end (terminal) branch are
+  // unreachable from the valid/success path — they'd only ever run as
+  // part of an exception that, by definition, ends there.
+  for (const s of all) {
+    for (const branch of s.branches ?? []) {
+      if (!branch.terminal) continue
+      for (const inner of collectSteps(branch.steps)) {
+        const cats = inner.category ?? []
+        if (cats.some((c) => BUSINESS_ACTION_ONLY.has(c)) && !cats.includes('EXCEPTION_HANDLING') && !cats.includes('HUMAN_REVIEW')) {
+          warnings.push(`Step ${inner.step} ("${inner.action}") is a business action placed inside the terminal branch "${branch.label ?? branch.key}" of step ${s.step} — it will never run as part of the normal/success path.`)
+        }
+      }
+    }
   }
 
   if (planned.unresolvedIntegrations.length > 0) {
     warnings.push(`Unresolved integrations (no matching node/credential): ${planned.unresolvedIntegrations.join(', ')}. These steps were kept as generic placeholders.`)
+  }
+
+  return { valid: errors.length === 0, errors, warnings }
+}
+
+// ── Stage 8b: graph-level validation (post n8n conversion) ───────────────────
+
+export interface GraphValidationResult {
+  valid: boolean
+  errors: string[]
+  warnings: string[]
+}
+
+/** Node types whose whole purpose is to end a path — having no outgoing
+ *  connection is expected, not a bug. */
+const TERMINAL_N8N_NODE_TYPES = new Set(['n8n-nodes-base.wait', 'n8n-nodes-base.respondToWebhook'])
+
+/**
+ * Stage 8b — checks the ACTUAL n8n graph (nodes + connections) produced by
+ * convertToN8nWorkflow(), not just the pre-conversion PlannedStep tree.
+ * This is the layer that catches connectivity bugs the tree-level
+ * validator structurally can't see — e.g. an empty (no extra steps) branch
+ * that the graph builder forgot to wire to the join node still LOOKS fine
+ * as a PlannedStep (branches: [{key, steps: []}]) but produces a real
+ * dead-end once converted. Also enforces "no invented Limit node" at the
+ * one place that heuristic could actually insert one.
+ */
+export function validateN8nGraph(n8nWorkflow: {
+  nodes: Array<{ name: string; type: string }>
+  connections: Record<string, Record<string, Array<Array<{ node: string }>>>>
+}): GraphValidationResult {
+  const errors: string[] = []
+  const warnings: string[] = []
+
+  for (const n of n8nWorkflow.nodes) {
+    if (n.type === 'n8n-nodes-base.limit') {
+      errors.push(`Node "${n.name}": an n8n-nodes-base.limit node was inserted without the blueprint requesting any processing/batch/concurrency limit.`)
+    }
+  }
+
+  const hasOutgoing = new Set(Object.keys(n8nWorkflow.connections))
+  const hasIncoming = new Set<string>()
+  for (const byType of Object.values(n8nWorkflow.connections)) {
+    for (const branches of Object.values(byType)) {
+      for (const arr of branches) {
+        for (const t of arr) hasIncoming.add(t.node)
+      }
+    }
+  }
+
+  for (const n of n8nWorkflow.nodes) {
+    const isTrigger = n.type.toLowerCase().includes('trigger') || n.type === 'n8n-nodes-base.webhook'
+    // LangChain sub-nodes (Chat Model, etc.) connect via ai_languageModel —
+    // they're always a connection SOURCE, never a "main" target, so they
+    // legitimately have no incoming connection either.
+    const isSubNode = n.type.startsWith('@n8n/n8n-nodes-langchain.lmChat')
+
+    if (!isTrigger && !isSubNode && !hasIncoming.has(n.name)) {
+      errors.push(`Node "${n.name}" (${n.type}) has no incoming connection — disconnected from the rest of the graph.`)
+    }
+    if (!isSubNode && !hasOutgoing.has(n.name) && !TERMINAL_N8N_NODE_TYPES.has(n.type)) {
+      warnings.push(`Node "${n.name}" (${n.type}) has no outgoing connection — this path dead-ends here; verify that's intentional.`)
+    }
   }
 
   return { valid: errors.length === 0, errors, warnings }

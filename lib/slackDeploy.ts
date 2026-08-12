@@ -43,3 +43,15 @@ export async function getSlackLinkStatus(
   if (!res.ok) return { status: 'not_found' }
   return res.json()
 }
+
+/**
+ * Deep link into an already-installed agent's chat in a specific Slack workspace.
+ * Unlike install_url (OAuth, admin-only, one-time), this needs no special permission —
+ * any workspace member can scan/open it once the app is installed. Opens the Slack
+ * desktop/mobile app if present, else slack.com in the browser.
+ */
+const SLACK_APP_ID = process.env.NEXT_PUBLIC_SLACK_APP_ID || ''
+
+export function buildSlackOpenUrl(teamId: string): string {
+  return `https://slack.com/app_redirect?app=${encodeURIComponent(SLACK_APP_ID)}&team=${encodeURIComponent(teamId)}`
+}

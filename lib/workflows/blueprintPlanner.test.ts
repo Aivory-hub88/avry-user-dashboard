@@ -315,12 +315,26 @@ describe('scenario: workflow with human approval', () => {
     integrations_required: ['Finance system'],
   }
 
-  it('produces a human review node using the wait-for-approval node type', () => {
+  it('flags the review case and ends the branch on a wait-for-approval node', () => {
     const planned = planWorkflowFromBlueprintModule(approvalFlow)
     const gate = planned.steps.find((s) => s.type === 'condition')
-    const reviewStep = gate?.branches?.flatMap((b) => b.steps).find((s) => /manager approval/i.test(s.action))
-    expect(reviewStep).toBeDefined()
-    expect(resolveIntent(reviewStep!)).toBe('humanReview')
+    const exceptionBranch = gate?.branches?.find((b) => b.terminal)
+    expect(exceptionBranch).toBeDefined()
+
+    const flagStep = exceptionBranch!.steps.find((s) => /manager approval/i.test(s.action))
+    expect(flagStep).toBeDefined()
+
+    // The branch must end on an actual wait/resume node — that's the part
+    // of the sequence that genuinely represents "pausing for a human."
+    const waitStep = exceptionBranch!.steps[exceptionBranch!.steps.length - 1]
+    expect(resolveIntent(waitStep)).toBe('humanReview')
+  })
+
+  it('marks the exception branch terminal (does not rejoin the approved-expense path)', () => {
+    const planned = planWorkflowFromBlueprintModule(approvalFlow)
+    const gate = planned.steps.find((s) => s.type === 'condition')
+    expect(gate?.branches?.find((b) => b.terminal)).toBeDefined()
+    expect(gate?.branches?.find((b) => !b.terminal)?.steps).toEqual([])
   })
 })
 

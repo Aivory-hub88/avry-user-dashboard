@@ -14,10 +14,12 @@ import {
 import {
   createSlackDeployLink,
   getSlackLinkStatus,
+  buildSlackOpenUrl,
   SlackDeployLink,
 } from '@/lib/slackDeploy';
 import { listAgentActions, AgentAction } from '@/lib/agentActions';
 import { listDeployments, deleteDeployment, AgentDeployment } from '@/lib/agentChat';
+import { createAgentApiKey, CreatedApiKey } from '@/lib/agentApiKeys';
 import { getCredits, CreditStatus } from '@/lib/agentProfiles';
 import CustomizeAgentModal from '@/components/agents/CustomizeAgentModal';
 
@@ -244,13 +246,18 @@ function IntegrationsRow() {
 }
 
 function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolean, onClose: () => void, agentName: string | null, agentType: TelegramAgentType | null }) {
-  const [view, setView] = useState<'channels' | 'telegram' | 'slack'>('channels');
+  const [view, setView] = useState<'channels' | 'telegram' | 'slack' | 'api'>('channels');
   const [deployLink, setDeployLink] = useState<DeployLink | null>(null);
   const [slackLink, setSlackLink] = useState<SlackDeployLink | null>(null);
+  const [slackTeamId, setSlackTeamId] = useState<string | null>(null);
   const [linkStatus, setLinkStatus] = useState<LinkStatus>('pending');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [apiKeyLabel, setApiKeyLabel] = useState('');
+  const [createdKey, setCreatedKey] = useState<CreatedApiKey | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -260,15 +267,38 @@ function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolea
   useEffect(() => {
     if (!isOpen) {
       stopPolling();
+      // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
+      // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
+      // not restructuring this component's data flow to satisfy the newer
+      // React Compiler style rule; see other documented instances of this.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setView('channels');
       setDeployLink(null);
       setSlackLink(null);
+      setSlackTeamId(null);
       setLinkStatus('pending');
       setError(null);
       setLoading(false);
+      setApiKeyLabel('');
+      setCreatedKey(null);
+      setCopied(false);
     }
     return stopPolling;
   }, [isOpen, stopPolling]);
+
+  const startApiKeyCreate = async () => {
+    if (!agentType || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const key = await createAgentApiKey(agentType, apiKeyLabel.trim() || undefined);
+      setCreatedKey(key);
+    } catch (e: any) {
+      setError(e?.message || 'Could not create the API key. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const startSlackDeploy = async () => {
     if (!agentType) return;
@@ -277,9 +307,13 @@ function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolea
     try {
       const link = await createSlackDeployLink(agentType);
       setSlackLink(link);
+      setSlackTeamId(null);
       setLinkStatus('pending');
       setView('slack');
-      // Open Slack's consent screen in a new tab; polling below picks up the result
+      // OAuth install is a one-time, admin-only, workspace-level action — it needs a real
+      // browser (Slack login, workspace picker), so it opens directly rather than via a QR scan.
+      // Once connected, a QR code appears instead (see below) — that one just deep-links into
+      // the already-installed agent's chat, which any team member can scan, no admin needed.
       window.open(link.install_url, '_blank', 'noopener,noreferrer');
       stopPolling();
       pollRef.current = setInterval(async () => {
@@ -287,6 +321,7 @@ function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolea
           const res = await getSlackLinkStatus(link.token);
           if (res.status === 'connected' || res.status === 'expired') {
             setLinkStatus(res.status);
+            if (res.team_id) setSlackTeamId(res.team_id);
             stopPolling();
           }
         } catch { /* keep polling */ }
@@ -396,6 +431,26 @@ function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolea
                 </div>
               </button>
 
+              {/* API Option */}
+              <button
+                onClick={() => { setError(null); setView('api'); }}
+                disabled={!agentType}
+                className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+                  <Image src={asset("/integrations/icons/http-api.svg")} alt="API" width={40} height={40} />
+                </div>
+                <div>
+                  <div className="text-white/90 font-medium text-[14px]">API</div>
+                  <div className="text-white/40 text-[12px] mt-0.5">Deploy to your own app or bot — Pro plan and above</div>
+                </div>
+                <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                </div>
+              </button>
+
               {/* WhatsApp Option */}
               <button className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
@@ -429,7 +484,7 @@ function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolea
             </h3>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 24px' }}>
               {linkStatus === 'connected'
-                ? <>Your <strong className="text-white font-medium">{slackLink.agent_name}</strong> is live in your Slack workspace. DM it or @mention it in a channel.</>
+                ? <>Your <strong className="text-white font-medium">{slackLink.agent_name}</strong> is live in your Slack workspace. Open the chat below, or DM/@mention it directly.</>
                 : linkStatus === 'expired'
                 ? 'This install link has expired. Generate a new one to continue.'
                 : <>Approve the install in the Slack tab that just opened to connect your <strong className="text-white font-medium">{slackLink.agent_name}</strong>.</>}
@@ -465,6 +520,17 @@ function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolea
                   </>
                 )}
               </div>
+
+              {linkStatus === 'connected' && slackTeamId && (
+                <a
+                  href={buildSlackOpenUrl(slackTeamId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 w-full py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 text-[13px] font-medium text-center transition-all border border-white/10"
+                >
+                  Open chat in Slack
+                </a>
+              )}
 
               {linkStatus === 'pending' && (
                 <>
@@ -570,6 +636,86 @@ function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolea
             </div>
           </>
         )}
+
+        {view === 'api' && (
+          <>
+            <button onClick={() => setView('channels')} className="flex items-center gap-1.5 text-white/40 hover:text-white text-[12px] transition-colors mb-4 -mt-2">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+              Back
+            </button>
+
+            <h3 style={{ fontSize: 20, fontWeight: 300, color: '#fff', margin: '0 0 8px', lineHeight: 1.3 }}>
+              {createdKey ? 'API key created' : 'Deploy via API'}
+            </h3>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 20px' }}>
+              {createdKey
+                ? 'Copy this key now — it will not be shown again.'
+                : <>Send messages to your <strong className="text-white font-medium">{agentName}</strong> from your own app, bot, or backend.</>}
+            </p>
+
+            {error && (
+              <div className="mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300/90 text-[12px]">
+                {error}
+              </div>
+            )}
+
+            {!createdKey ? (
+              <>
+                <label className="block text-white/70 text-[12px] font-medium mb-1.5">Label (optional)</label>
+                <input
+                  type="text"
+                  value={apiKeyLabel}
+                  onChange={(e) => setApiKeyLabel(e.target.value.slice(0, 200))}
+                  placeholder="e.g. Discord bot prod"
+                  className="w-full px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 text-white/90 text-[13px] placeholder-white/25 focus:outline-none focus:border-[#b7cba6]/40 transition-colors mb-4"
+                />
+                <button
+                  onClick={startApiKeyCreate}
+                  disabled={loading}
+                  className="w-full py-2.5 rounded-lg bg-[#b7cba6]/20 hover:bg-[#b7cba6]/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-[#b7cba6]/30 disabled:opacity-50"
+                >
+                  {loading ? 'Creating…' : 'Create API key'}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 mb-2">
+                  <code className="flex-1 text-[12px] text-[#dbe5d3] break-all">{createdKey.key}</code>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(createdKey.key);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className="shrink-0 px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/10 text-white/70 text-[11px] transition-colors"
+                  >
+                    {copied ? 'Copied ✓' : 'Copy'}
+                  </button>
+                </div>
+                <p className="text-white/35 text-[11px] mb-4">
+                  Store this somewhere safe — Aivory never stores or shows the plaintext key again.
+                </p>
+
+                <label className="block text-white/70 text-[12px] font-medium mb-1.5">Example request</label>
+                <pre className="w-full px-3.5 py-3 rounded-lg bg-black/30 border border-white/10 text-white/60 text-[10.5px] overflow-x-auto mb-5 whitespace-pre-wrap break-all">
+{`curl -X POST ${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'}/api/v1/agent-api/message \\
+  -H "X-Aivory-Api-Key: ${createdKey.key}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"text": "Hello!", "session_id": "your-own-thread-id"}'`}
+                </pre>
+
+                <button
+                  onClick={onClose}
+                  className="w-full py-2.5 rounded-lg bg-[#b7cba6]/20 hover:bg-[#b7cba6]/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-[#b7cba6]/30"
+                >
+                  Done
+                </button>
+              </>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
@@ -581,19 +727,35 @@ function DeploymentRow({ deployment, onDisconnect }: { deployment: AgentDeployme
     <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#b7cba6]/[0.05] border border-[#b7cba6]/[0.12]">
       <span className="w-1.5 h-1.5 rounded-full bg-[#b7cba6] shrink-0" />
       <Image
-        src={asset(`/integrations/icons/${deployment.kind}.svg`)}
+        src={asset(`/integrations/icons/${deployment.kind === 'api' ? 'http-api' : deployment.kind}.svg`)}
         alt={deployment.kind}
         width={12}
         height={12}
         className="shrink-0"
       />
-      <span className="text-[10.5px] text-white/65 truncate flex-1" title={deployment.label}>
-        {deployment.label}
-      </span>
+      {deployment.kind === 'slack' ? (
+        <a
+          href={buildSlackOpenUrl(deployment.id)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[10.5px] text-white/65 hover:text-[#b7cba6] truncate flex-1 transition-colors"
+          title={`Open chat with ${deployment.label} in Slack`}
+        >
+          {deployment.label}
+        </a>
+      ) : (
+        <span className="text-[10.5px] text-white/65 truncate flex-1" title={deployment.label}>
+          {deployment.label}
+        </span>
+      )}
       <button
         onClick={async () => {
           if (busy) return;
-          if (!window.confirm(`Disconnect this agent from ${deployment.kind === 'telegram' ? 'Telegram chat' : 'Slack workspace'} "${deployment.label}"?`)) return;
+          const confirmMsg =
+            deployment.kind === 'api'
+              ? `Revoke API key "${deployment.label}"? Any integration using it will stop working immediately.`
+              : `Disconnect this agent from ${deployment.kind === 'telegram' ? 'Telegram chat' : 'Slack workspace'} "${deployment.label}"?`;
+          if (!window.confirm(confirmMsg)) return;
           setBusy(true);
           try { await onDisconnect(deployment); } finally { setBusy(false); }
         }}

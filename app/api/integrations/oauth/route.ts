@@ -19,7 +19,16 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getComposioClient } from '@/lib/composio'
-import { resolveUserId } from '@/lib/integrations/resolveUserId'
+import { resolveIntegrationUser } from '@/lib/integration-auth'
+
+// Turns a failed resolveIntegrationUser() result into this route's own
+// error contract ({code, message}) — resolveUserId()'s unverified-header /
+// 'default'-fallback identity is gone, so every branch below that used to
+// be dead code (resolveUserId() never actually returned falsy) now really
+// runs.
+function authErrorResponse(status: 401 | 403, code: string, message: string): NextResponse {
+  return NextResponse.json({ error: { code, message } }, { status })
+}
 
 // ── GET handler ───────────────────────────────────────────────────────────────
 
@@ -28,19 +37,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // ── action=session ──────────────────────────────────────────────────────────
   if (action === 'session') {
-    // 1. Resolve user
-    const userId = resolveUserId(req)
-    if (!userId) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'UNAUTHENTICATED',
-            message: 'User is not authenticated',
-          },
-        },
-        { status: 401 }
-      )
+    // 1. Resolve + gate the caller (verified JWT-backed session, paid-tier
+    //    required, super-admin bypass) — see lib/integration-auth.ts.
+    const auth = resolveIntegrationUser(req)
+    if (!auth.ok) {
+      return authErrorResponse(auth.status, auth.code, auth.message)
     }
+    const userId = auth.userId
 
     // 2. Fetch connected accounts from Composio
     try {
@@ -106,18 +109,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // ── action=status ───────────────────────────────────────────────────────────
   if (action === 'status') {
-    const userId = resolveUserId(req)
-    if (!userId) {
-      return NextResponse.json(
-        {
-          error: {
-            code:    'UNAUTHENTICATED',
-            message: 'User is not authenticated',
-          },
-        },
-        { status: 401 }
-      )
+    const auth = resolveIntegrationUser(req)
+    if (!auth.ok) {
+      return authErrorResponse(auth.status, auth.code, auth.message)
     }
+    const userId = auth.userId
 
     try {
       const composio  = getComposioClient()
@@ -192,18 +188,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 // ── POST handler ──────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const userId = resolveUserId(req)
-  if (!userId) {
-    return NextResponse.json(
-      {
-        error: {
-          code:    'UNAUTHENTICATED',
-          message: 'User is not authenticated',
-        },
-      },
-      { status: 401 }
-    )
+  const auth = resolveIntegrationUser(req)
+  if (!auth.ok) {
+    return authErrorResponse(auth.status, auth.code, auth.message)
   }
+  const userId = auth.userId
 
   let body: { action?: string; appId?: string; connectedAccountId?: string }
   try {
@@ -232,6 +221,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     try {
       const composio = getComposioClient()
+      // Ownership check before delete: resolving `userId` above and then
+      // deleting whatever `connectedAccountId` the caller sent, without
+      // ever checking the two are related, would let any authenticated
+      // user revoke *any other* user's connection just by knowing or
+      // guessing its id. Reuses the same connectedAccounts.list({userIds})
+      // call this file already makes elsewhere, scoped to the resolved
+      // caller.
+      const { items } = await composio.connectedAccounts.list({ userIds: [userId] })
+      if (!items.some((c) => c.id === accountId)) {
+        return NextResponse.json(
+          {
+            error: {
+              code:    'FORBIDDEN',
+              message: 'This connection does not belong to the current user',
+            },
+          },
+          { status: 403 }
+        )
+      }
       await composio.connectedAccounts.delete(accountId)
       return NextResponse.json({ success: true })
     } catch (err: unknown) {

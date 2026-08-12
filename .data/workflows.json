@@ -1,7 +1,7 @@
 [
   {
     "title": "Blank Workflow",
-    "status": "draft",
+    "status": "active",
     "source": "n8n",
     "company_name": "",
     "trigger": "",
@@ -13,6 +13,39 @@
     "notes": "",
     "id": "eca08ba4-616b-43a7-8b29-b24794e0d473",
     "createdAt": "2026-06-14T04:05:02.867Z",
-    "updatedAt": "2026-06-14T04:05:02.867Z"
+    "updatedAt": "2026-07-23T05:11:36.894Z"
+  },
+  {
+    "title": "B5 Canvas Test (AI)",
+    "status": "active",
+    "source": "n8n",
+    "company_name": "",
+    "trigger": "Webhook trigger",
+    "steps": [
+      {
+        "step": 2,
+        "action": "Route by order tier",
+        "tool": "switch",
+        "output": "",
+        "type": "switch",
+        "config": {}
+      },
+      {
+        "step": 3,
+        "action": "Respond with success",
+        "tool": "action",
+        "output": "",
+        "type": "action",
+        "config": {}
+      }
+    ],
+    "integrations": [],
+    "estimated_time": "~1h estimated",
+    "automation_percentage": "80% automated",
+    "error_handling": "",
+    "notes": "Test workflow with branching",
+    "id": "16e1889d-7f0d-43d8-a0a2-5482b88f758d",
+    "createdAt": "2026-07-25T10:55:50.136Z",
+    "updatedAt": "2026-07-25T16:41:38.161Z"
   }
 ]

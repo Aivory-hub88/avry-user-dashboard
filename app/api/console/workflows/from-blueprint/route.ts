@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   planWorkflowFromBlueprintModule,
   validatePlannedWorkflow,
+  validateN8nGraph,
   sanitizeBlueprintModuleInput,
 } from '@/lib/workflows/blueprintPlanner'
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
@@ -94,27 +95,39 @@ export async function POST(req: NextRequest) {
       const validation = validatePlannedWorkflow(planned)
       const warnings = [...sanitized.warnings, ...validation.warnings, ...validation.errors]
 
-      // ── Stage 8b/8c — schema-level + advisory checks ─────────────────────
-      // Skipped when the deterministic structural validator already found
-      // errors — an already-broken plan doesn't need a paid LLM call or a
-      // network round trip to the n8n-MCP server to tell us it's broken.
-      // Both fail open internally when they DO run (network/config errors
-      // never throw, see n8nMcpClient.ts / blueprintLlmValidator.ts) and run
-      // concurrently since neither depends on the other's result.
-      if (validation.valid) {
+      // ── Stage 8b — graph-level connectivity check ─────────────────────────
+      // Runs unconditionally (fast, local, no network) even when the
+      // tree-level validator above already found errors — it catches a
+      // different class of bug: an empty/placeholder branch that LOOKS fine
+      // as a PlannedStep can still convert into a real dead end once
+      // wired into the actual n8n graph (disconnected outputs, an
+      // unexpectedly-inserted Limit node, etc.).
+      const n8nWorkflow = convertToN8nWorkflow({
+        workflow_id: workflowId,
+        title,
+        trigger: planned.trigger,
+        steps: planned.steps,
+        // The planner's decomposition is deliberate and bounded — never
+        // insert an unrequested Limit node for a blueprint-sourced graph.
+        skipAutoLimit: true,
+      })
+      const graphValidation = validateN8nGraph(n8nWorkflow as unknown as Parameters<typeof validateN8nGraph>[0])
+      warnings.push(...graphValidation.warnings, ...graphValidation.errors)
+
+      // ── Stage 8c/8d — schema-level + advisory checks ──────────────────────
+      // Skipped when either validator above already found errors — an
+      // already-broken plan doesn't need a paid LLM call or a network round
+      // trip to the n8n-MCP server to tell us it's broken. Both fail open
+      // internally when they DO run (network/config errors never throw, see
+      // n8nMcpClient.ts / blueprintLlmValidator.ts) and run concurrently
+      // since neither depends on the other's result.
+      if (validation.valid && graphValidation.valid) {
         // Belt and suspenders: both validators already fail open internally
         // (see their own try/catch), but the core deterministic plan this
         // route exists to produce must NEVER be lost to an optional
         // secondary check misbehaving in a way its own contract didn't
         // anticipate — so this whole block is its own failure domain too.
         try {
-          const n8nWorkflow = convertToN8nWorkflow({
-            workflow_id: workflowId,
-            title,
-            trigger: planned.trigger,
-            steps: planned.steps,
-          })
-
           const [mcpResult, llmResult] = await Promise.all([
             validateN8nWorkflow(n8nWorkflow as unknown as Record<string, unknown>),
             llmValidatePlan(planned, title),

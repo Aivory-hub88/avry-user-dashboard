@@ -42,7 +42,17 @@ export interface WorkflowStep {
    */
   type?: string
   /** Nested branch containers — only present for 'condition' | 'switch' | 'loop'. */
-  branches?: { key: string; label?: string; steps: WorkflowStep[] }[]
+  branches?: {
+    key: string
+    label?: string
+    steps: WorkflowStep[]
+    /** This branch must NOT connect back into the shared join node after
+     *  its steps run (or, if empty, must not connect directly to the join
+     *  either) — e.g. an exception/human-review path that ends in an
+     *  explicit "awaiting resolution" state rather than silently
+     *  continuing into the success path. */
+    terminal?: boolean
+  }[]
   loopConfig?: { batchSize?: number }
   /**
    * Skip detectNodeIntent()'s text-based guess and use this intent directly.
@@ -66,6 +76,17 @@ interface AivoryWorkflow {
   diagnostic_score?: number
   created_at?: string
   tags?: string[]
+  /**
+   * Skip the automatic Limit-node insertion (see MULTI_ITEM_INTENTS below).
+   * That heuristic exists for copilot-chat-generated steps, where an 'http'/
+   * 'rss'/'database' step's real shape is unknown and might return many
+   * items (an RSS feed, a bulk query). blueprintPlanner.ts's decomposition
+   * is deliberate and already knows exactly what each step fetches (a
+   * single CRM/form record) — inserting an uninstructed Limit node there
+   * would be exactly the kind of invented constraint the blueprint never
+   * asked for.
+   */
+  skipAutoLimit?: boolean
 }
 
 interface N8nNode {
@@ -275,7 +296,7 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
       // A multi-item producer feeding straight into an AI step gets a Limit
       // node in between, so the agent runs once per batch instead of once
       // per item (matches n8n's own recommended RSS -> Limit -> AI Agent shape).
-      if (intent === 'ai' && prevIntent && MULTI_ITEM_INTENTS.includes(prevIntent)) {
+      if (!workflow.skipAutoLimit && intent === 'ai' && prevIntent && MULTI_ITEM_INTENTS.includes(prevIntent)) {
         const limitNode: N8nNode = {
           id: generateNodeId(),
           name: `Limit ${globalStepCounter}`,
@@ -317,9 +338,21 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
           parameters: {},
         })
         step.branches!.forEach((branch, branchIdx) => {
-          if (!branch.steps.length) return // unconnected output — no-op branch
+          if (!branch.steps.length) {
+            // No extra steps on this output — but it must still connect
+            // SOMEWHERE, or n8n dead-ends there with no way to reach the
+            // rest of the workflow. Wire it straight to the join, unless
+            // this is a `terminal` branch (e.g. an exception path with
+            // nothing in it) that's supposed to dead-end.
+            if (!branch.terminal) addConnection(primary.name, joinName, 'main', branchIdx)
+            return
+          }
           const branchTail = convertSteps(branch.steps, primary.name, branchIdx, false)
-          addConnection(branchTail, joinName, 'main')
+          // `terminal` branches (e.g. exception/human-review paths) must
+          // NOT rejoin the shared join node — otherwise the outer chain
+          // silently resumes into the success path after them (e.g.
+          // incomplete data flowing straight into account creation).
+          if (!branch.terminal) addConnection(branchTail, joinName, 'main')
         })
         prevNodeName = joinName
       } else if (hasBranches && step.type === 'loop') {

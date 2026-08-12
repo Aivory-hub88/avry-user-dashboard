@@ -51,18 +51,19 @@ export async function sendAgentMessage(
 }
 
 export interface AgentDeployment {
-  kind: 'telegram' | 'slack'
-  /** binding_id (telegram) or team_id (slack) — used for disconnect */
+  kind: 'telegram' | 'slack' | 'api'
+  /** binding_id (telegram), team_id (slack), or key id (api) — used for disconnect */
   id: string
   agentType: string
-  /** Chat title / workspace name shown to the user */
+  /** Chat title / workspace name / key label shown to the user */
   label: string
 }
 
 export async function listDeployments(): Promise<AgentDeployment[]> {
-  const [tgRes, slackRes] = await Promise.allSettled([
+  const [tgRes, slackRes, apiRes] = await Promise.allSettled([
     authedFetch(`${BACKEND_URL}/api/v1/telegram/bindings`),
     authedFetch(`${BACKEND_URL}/api/v1/slack/installations`),
+    authedFetch(`${BACKEND_URL}/api/v1/agent-api-keys`),
   ])
 
   const out: AgentDeployment[] = []
@@ -101,6 +102,19 @@ export async function listDeployments(): Promise<AgentDeployment[]> {
     }
   }
 
+  if (apiRes.status === 'fulfilled' && apiRes.value.ok) {
+    const data = await apiRes.value.json().catch(() => null)
+    for (const k of data?.keys ?? []) {
+      if (k.status !== 'active') continue
+      out.push({
+        kind: 'api',
+        id: k.id,
+        agentType: k.agent_type,
+        label: k.label ? `${k.label} (${k.key_prefix}…)` : `API key (${k.key_prefix}…)`,
+      })
+    }
+  }
+
   return out
 }
 
@@ -108,7 +122,9 @@ export async function deleteDeployment(d: AgentDeployment): Promise<void> {
   const url =
     d.kind === 'telegram'
       ? `${BACKEND_URL}/api/v1/telegram/bindings/${encodeURIComponent(d.id)}`
-      : `${BACKEND_URL}/api/v1/slack/installations/${encodeURIComponent(d.id)}`
+      : d.kind === 'slack'
+        ? `${BACKEND_URL}/api/v1/slack/installations/${encodeURIComponent(d.id)}`
+        : `${BACKEND_URL}/api/v1/agent-api-keys/${encodeURIComponent(d.id)}`
   const res = await authedFetch(url, { method: 'DELETE' })
   if (!res.ok) {
     const detail = await res.json().then((x) => x?.detail).catch(() => null)

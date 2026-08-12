@@ -938,6 +938,9 @@ interface GeneratedWorkflowStepBranch {
   key: string
   label?: string
   steps: GeneratedWorkflowStepEntry[]
+  /** This branch must not rejoin the shared join node after its steps run
+   *  (e.g. an exception/human-review path) — see lib/workflowConverter.ts. */
+  terminal?: boolean
 }
 
 interface GeneratedWorkflowStepEntry {

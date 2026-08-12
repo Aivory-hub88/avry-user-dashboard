@@ -51,6 +51,11 @@ type Props = {
   fallbackSteps?: SavedWorkflowStep[];
   fallbackTrigger?: string;
   fallbackTitle?: string;
+  // True when fallbackSteps came from a blueprint-sourced workflow, whose
+  // decomposition is deliberate and bounded — never insert an uninstructed
+  // Limit node there. Leave unset for n8n-native/copilot-chat workflows,
+  // where that heuristic still legitimately applies.
+  fallbackSkipAutoLimit?: boolean;
   // Which n8n instance this workflow was deployed to — see
   // types/workflow.ts's AivoryWorkflowSpec.n8n_instance. Sent along on every
   // n8n-backed fetch so the server knows to resolve credentials from its own
@@ -122,6 +127,7 @@ function toConverterFallbackStep(step: FallbackStep): ConverterWorkflowStep {
       key: b.key,
       label: b.label,
       steps: b.steps.map(toConverterFallbackStep),
+      terminal: b.terminal,
     })),
   }
 }
@@ -129,13 +135,20 @@ function toConverterFallbackStep(step: FallbackStep): ConverterWorkflowStep {
 function stepsToTypedReactFlow(
   steps: FallbackStep[],
   trigger: string,
-  title: string
+  title: string,
+  /** True for blueprint-sourced steps, whose decomposition is deliberate
+   *  and bounded — never insert an uninstructed Limit node there. Left
+   *  false (default) for the Copilot refine modal, which shares this
+   *  function but generates steps of unknown shape, where the heuristic
+   *  still applies. */
+  skipAutoLimit = false
 ): { nodes: Node<WorkflowNodeData>[]; edges: Edge[] } {
   const n8nWorkflow = convertToN8nWorkflow({
     workflow_id: `wf-${Date.now()}`,
     title,
     trigger,
     steps: steps.map(toConverterFallbackStep),
+    skipAutoLimit,
   })
   const { nodes, edges } = n8nToReactFlow(n8nWorkflow as unknown as import('@/lib/n8n').N8nWorkflow)
   return { nodes: nodes as Node<WorkflowNodeData>[], edges }
@@ -217,7 +230,7 @@ const STANDARD_ICON_TO_N8N: Record<string, string> = {
   respond: 'n8n-nodes-base.respondToWebhook',
 };
 
-export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fallbackSteps, fallbackTrigger, fallbackTitle, n8nInstanceHint, onInjectNodes, onHistoryChange, registerUndo }: Props) {
+export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fallbackSteps, fallbackTrigger, fallbackTitle, fallbackSkipAutoLimit, n8nInstanceHint, onInjectNodes, onHistoryChange, registerUndo }: Props) {
   const instanceQuery = n8nInstanceHint === 'aivory' ? '?instance=aivory' : '';
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<WorkflowNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -535,7 +548,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       const { nodes: rfNodes, edges: rfEdges } = stepsToTypedReactFlow(
         steps,
         fallbackTrigger || 'Manual or scheduled start',
-        fallbackTitle || 'Workflow'
+        fallbackTitle || 'Workflow',
+        fallbackSkipAutoLimit
       );
       setNodes(rehydrate(rfNodes));
       setEdges(normalizeEdges(rfEdges, rfNodes));
@@ -544,7 +558,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       setIsEmpty(true);
     }
     setSyncState('idle');
-  }, [setNodes, setEdges, rehydrate, fallbackTrigger, fallbackTitle]);
+  }, [setNodes, setEdges, rehydrate, fallbackTrigger, fallbackTitle, fallbackSkipAutoLimit]);
 
   useEffect(() => {
     if (!isActive) {

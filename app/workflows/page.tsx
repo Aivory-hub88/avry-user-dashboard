@@ -967,19 +967,34 @@ function WorkflowsPageInner() {
 
   const handleExport = () => {
     if (!selected) return
-    
-    // Convert Aivory workflow to n8n format for import into n8n
+
+    // Convert Aivory workflow to n8n format for import into n8n.
+    // convertToN8nWorkflow() needs the FULL nested step tree — condition/
+    // switch steps' `branches` (and `terminal` exception-branch marking) —
+    // not a flattened {action, tool, output} list, or a blueprint's
+    // decision/exception branches would silently vanish on export (same
+    // class of bug toConverterStep below exists to avoid for Copilot-apply).
+    const toExportStep = (s: (typeof selected.steps)[number], i: number): ConverterWorkflowStep => ({
+      step: i + 1,
+      action: s.action,
+      tool: s.tool,
+      output: s.output,
+      type: s.type,
+      branches: s.branches?.map((b) => ({
+        key: b.key,
+        label: b.label,
+        steps: b.steps.map(toExportStep),
+        terminal: b.terminal,
+      })),
+    })
+
     const n8nWorkflow = convertToN8nWorkflow({
       workflow_id: selected.workflow_id,
       title: selected.title,
       trigger: selected.trigger,
-      steps: selected.steps.map((s, i) => ({
-        step: i + 1,
-        action: s.action,
-        tool: s.tool,
-        output: s.output,
-      })),
+      steps: selected.steps.map(toExportStep),
       company_name: selected.company_name,
+      skipAutoLimit: selected.source === 'blueprint',
     })
     
     const blob = new Blob([JSON.stringify(n8nWorkflow, null, 2)], { type: 'application/json' })
@@ -1917,6 +1932,7 @@ function WorkflowsPageInner() {
               fallbackSteps={selected.steps}
               fallbackTrigger={selected.trigger}
               fallbackTitle={selected.title}
+              fallbackSkipAutoLimit={selected.source === 'blueprint'}
               n8nInstanceHint={selected.n8n_instance}
               onInjectNodes={(fn) => {
                 canvasInjectRef.current = fn

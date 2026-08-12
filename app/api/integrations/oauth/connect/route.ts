@@ -7,9 +7,10 @@
  * Request body:
  *   { appId: string }
  *
- * The acting user is resolved server-side via resolveUserId() (same as
- * ?action=session/status on the sibling oauth route) — the client never
- * supplies its own userId.
+ * The acting user is resolved + gated server-side via resolveIntegrationUser()
+ * (same as ?action=session/status on the sibling oauth route, and the
+ * revoke path on that same route) — the client never supplies its own
+ * userId, and an unauthenticated or unpaid caller never reaches Composio.
  *
  * Success response (200):
  *   { redirectUrl: string }
@@ -20,9 +21,18 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getComposioClient, getComposioRedirectUrl, getOrCreateAuthConfigId } from '@/lib/composio'
-import { resolveUserId } from '@/lib/integrations/resolveUserId'
+import { resolveIntegrationUser } from '@/lib/integration-auth'
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const auth = resolveIntegrationUser(req)
+  if (!auth.ok) {
+    return NextResponse.json(
+      { error: { code: auth.code, message: auth.message } },
+      { status: auth.status }
+    )
+  }
+  const userId = auth.userId
+
   let body: { appId?: string }
   try {
     body = await req.json()
@@ -41,8 +51,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { status: 400 }
     )
   }
-
-  const userId = resolveUserId(req)
 
   try {
     const composio     = getComposioClient()
