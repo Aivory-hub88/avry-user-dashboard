@@ -105,6 +105,12 @@ interface AivoryWorkflow {
    * asked for.
    */
   skipAutoLimit?: boolean
+  /** Resolved integration assumptions (e.g. 'CRM system → HubSpot') — emitted
+   *  on the workflow's `meta.assumptions`. */
+  assumptions?: string[]
+  /** Integration slots that could not be resolved — forces active:false +
+   *  meta.requiresConfiguration on the output. */
+  needsClarification?: string[]
 }
 
 interface N8nNode {
@@ -124,6 +130,8 @@ interface N8nWorkflow {
   settings: Record<string, any>
   versionId?: string
   tags?: string[]
+  active?: boolean
+  meta?: Record<string, any>
 }
 
 /**
@@ -397,6 +405,18 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
 
   convertSteps(workflow.steps, triggerNode.name, 0, true)
 
+  // Fix 2 — a workflow with unresolved endpoints must never ship as active.
+  // Placeholder URLs (api.example.com / UNRESOLVED_INTEGRATION) mark nodes
+  // that need manual configuration before the workflow is executable.
+  const hasPlaceholderUrl = nodes.some((n) =>
+    /example\.com\/endpoint|UNRESOLVED_INTEGRATION/i.test(String(n.parameters?.url ?? '')))
+  const requiresConfiguration = hasPlaceholderUrl || (workflow.needsClarification?.length ?? 0) > 0
+
+  const meta: Record<string, any> = {}
+  if (workflow.assumptions?.length) meta.assumptions = workflow.assumptions
+  if (workflow.needsClarification?.length) meta.needsClarification = workflow.needsClarification
+  if (requiresConfiguration) meta.requiresConfiguration = true
+
   return {
     name: workflow.title,
     nodes,
@@ -404,6 +424,10 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
     settings: { executionOrder: 'v1' },
     versionId: generateNodeId(),
     tags: workflow.tags || [],
+    // active:false + meta.requiresConfiguration when anything is unresolved;
+    // otherwise leave `active` unset (n8n default) so the caller controls it.
+    ...(requiresConfiguration ? { active: false } : {}),
+    ...(Object.keys(meta).length ? { meta } : {}),
   }
 }
 

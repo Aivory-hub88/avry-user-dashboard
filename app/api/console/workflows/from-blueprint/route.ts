@@ -110,6 +110,8 @@ export async function POST(req: NextRequest) {
         // The planner's decomposition is deliberate and bounded — never
         // insert an unrequested Limit node for a blueprint-sourced graph.
         skipAutoLimit: true,
+        assumptions: planned.assumptions,
+        needsClarification: planned.needsClarification,
       })
       const graphValidation = validateN8nGraph(n8nWorkflow as unknown as Parameters<typeof validateN8nGraph>[0])
       warnings.push(...graphValidation.warnings, ...graphValidation.errors)
@@ -151,6 +153,8 @@ export async function POST(req: NextRequest) {
         steps: planned.steps,
         integrations: planned.integrations,
         estimated_time: `${Math.max(1, Math.ceil(planned.steps.length / 2))}h setup`,
+        assumptions: planned.assumptions,
+        needsClarification: planned.needsClarification,
         ...(warnings.length > 0 ? { warnings } : {}),
       })
     }

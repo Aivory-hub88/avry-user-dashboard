@@ -139,6 +139,33 @@ export interface PlannedWorkflow {
   integrations: string[]
   unresolvedIntegrations: string[]
   warnings: string[]
+  /** Resolved integration assumptions — e.g. 'CRM system → HubSpot'. */
+  assumptions?: string[]
+  /** Integration slots that could not be resolved to a platform (needs user
+   *  clarification before the workflow is executable). */
+  needsClarification?: string[]
+}
+
+// ── Default integration resolution (Fix 1) ──────────────────────────────────
+// Generic blueprint categories ("CRM system", "Communication channels") are
+// mapped to a fixed default platform so generation can proceed with a clearly
+// labelled assumption. A category not present here is left unresolved and
+// surfaced as `needsClarification` rather than silently becoming a placeholder.
+
+const DEFAULT_INTEGRATION_BY_CATEGORY: { pattern: RegExp; platform: string }[] = [
+  { pattern: /\bcrm\b/i, platform: 'HubSpot' },
+  { pattern: /\bcommunication|notify|messaging|channel\b/i, platform: 'Slack' },
+  { pattern: /\bhelpdesk|support|ticket|service desk\b/i, platform: 'Zendesk' },
+  { pattern: /\bemail|mail\b/i, platform: 'Gmail' },
+  { pattern: /\bcalendar|scheduling\b/i, platform: 'Google Calendar' },
+  { pattern: /\bpayment|finance|billing\b/i, platform: 'Stripe' },
+]
+
+export function resolveIntegrationCategory(integration: string): { platform: string; resolved: boolean } {
+  for (const { pattern, platform } of DEFAULT_INTEGRATION_BY_CATEGORY) {
+    if (pattern.test(integration)) return { platform, resolved: true }
+  }
+  return { platform: integration, resolved: false }
 }
 
 // ── Bilingual (EN + Indonesian) keyword tables ────────────────────────────────
@@ -632,6 +659,11 @@ function semanticAction(
   }
   if (forceIntent) s.forceIntent = forceIntent
   if (assignments) s.assignments = assignments
+  // A generic 'n8n' tool means no specific integration was matched — mark the
+  // step unresolved so nodeMapper emits UNRESOLVED_INTEGRATION://configure-me
+  // instead of the misleading api.example.com placeholder (mirrors
+  // opToPlannedStep's isUnresolvedIntegration for the flat path).
+  if (tool === 'n8n') s.unresolvedIntegration = true
   return s
 }
 
@@ -1267,12 +1299,26 @@ export function validateN8nGraph(n8nWorkflow: {
  */
 export function planWorkflowFromBlueprintModule(module: BlueprintModuleInput): PlannedWorkflow {
   if (!module || !Array.isArray(module.steps) || module.steps.length === 0) {
-    return { trigger: module?.trigger || 'Manual or scheduled start', steps: [], integrations: [], unresolvedIntegrations: [], warnings: [] }
+    return { trigger: module?.trigger || 'Manual or scheduled start', steps: [], integrations: [], unresolvedIntegrations: [], warnings: [], assumptions: [], needsClarification: [] }
   }
 
   const integrationsRequired = Array.isArray(module.integrations_required)
     ? module.integrations_required.filter((i): i is string => typeof i === 'string' && !!i)
     : []
+
+  // Fix 1 — resolve generic integration categories to default platforms and
+  // label each assumption; surface anything unresolvable as needing
+  // clarification instead of silently emitting a placeholder.
+  const assumptions: string[] = []
+  const needsClarification: string[] = []
+  for (const integ of integrationsRequired) {
+    const { platform, resolved } = resolveIntegrationCategory(integ)
+    if (resolved) {
+      assumptions.push(`${integ} → ${platform}`)
+    } else {
+      needsClarification.push(integ)
+    }
+  }
 
   const ctx: BuildContext = { integrationsRequired, warnings: [], stepCounter: { n: 0 } }
   const steps = buildPlannedSteps(module, ctx)
@@ -1295,6 +1341,8 @@ export function planWorkflowFromBlueprintModule(module: BlueprintModuleInput): P
     integrations: integrationsRequired,
     unresolvedIntegrations,
     warnings: ctx.warnings,
+    assumptions,
+    needsClarification,
   }
 }
 
