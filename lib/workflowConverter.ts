@@ -9,7 +9,7 @@
  * Trigger node always uses Webhook with auto-generated path.
  */
 
-import { detectNodeIntent, mapIntentToN8nNode, mapIntentToN8nNodes } from '@/lib/workflows/nodeMapper'
+import { detectNodeIntent, mapIntentToN8nNode, mapIntentToN8nNodes, buildNodeName } from '@/lib/workflows/nodeMapper'
 import type { NodeIntent, MapContext } from '@/lib/workflows/nodeMapper'
 
 // Intents whose n8n node can return multiple items — when immediately
@@ -112,6 +112,7 @@ interface N8nNode {
   position: [number, number]
   parameters: Record<string, any>
   id?: string
+  notes?: string
 }
 
 interface N8nWorkflow {
@@ -141,9 +142,11 @@ function generateNodeId(): string {
  * NodeIntent-keyed pattern table.
  */
 function buildLoopNode(step: WorkflowStep, ctx: MapContext): N8nNode {
+  const { name: nodeName, notes } = buildNodeName(ctx.stepIndex, step.action)
   return {
     id: generateNodeId(),
-    name: `Step ${ctx.stepIndex + 1}: ${step.action.substring(0, 40)}`,
+    name: nodeName,
+    ...(notes ? { notes } : {}),
     type: 'n8n-nodes-base.splitInBatches',
     typeVersion: 3,
     position: [250 + ((ctx.stepIndex + 1) * 220), 300],

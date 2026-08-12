@@ -155,6 +155,8 @@ interface N8nNode {
   position: [number, number]
   parameters: Record<string, any>
   id?: string
+  /** Full description when the display name was truncated — see buildNodeName(). */
+  notes?: string
   credentials?: Record<string, { id: string; name: string }>
   // Retry/error-handling — n8n keeps these as sibling fields on the node
   // object, not nested inside `parameters`.
@@ -162,6 +164,24 @@ interface N8nNode {
   maxTries?: number
   waitBetweenTries?: number
   onError?: 'stopWorkflow' | 'continueRegularOutput' | 'continueErrorOutput'
+}
+
+/**
+ * Build a node display name that never cuts a word in half. The full action
+ * text is preserved up to a generous limit; only past that is it truncated —
+ * at a word boundary, with an ellipsis — and the full text is kept in the
+ * node's `notes` so nothing is silently lost. (n8n node names have no hard
+ * 40-char limit; the old `substring(0, 40)` was an arbitrary mid-word cut.)
+ */
+export function buildNodeName(stepIndex: number, action: string): { name: string; notes?: string } {
+  const prefix = `Step ${stepIndex + 1}: `
+  const full = `${prefix}${action}`
+  const MAX = 160
+  if (full.length <= MAX) return { name: full }
+  const cut = action.slice(0, MAX - prefix.length - 1)
+  const lastSpace = cut.lastIndexOf(' ')
+  const truncated = lastSpace > 0 ? cut.slice(0, lastSpace) : cut
+  return { name: `${prefix}${truncated}…`, notes: full }
 }
 
 /**
@@ -206,11 +226,11 @@ export function mapIntentToN8nNode(
   ctx: MapContext
 ): N8nNode {
   const { stepIndex, aiNodeCount } = ctx
-  const nodeName = `Step ${stepIndex + 1}: ${step.action.substring(0, 40)}`
+  const { name: nodeName, notes } = buildNodeName(stepIndex, step.action)
   const position: [number, number] = [250 + ((stepIndex + 1) * 220), 300]
   const id = generateNodeId()
 
-  const baseNode = { id, name: nodeName, position }
+  const baseNode = { id, name: nodeName, position, ...(notes ? { notes } : {}) }
 
   switch (intent) {
     case 'respond':
@@ -574,7 +594,7 @@ export function mapIntentToN8nNode(
  */
 function buildAiAgentStep(step: WorkflowStep, ctx: MapContext): MappedStepResult {
   const { stepIndex } = ctx
-  const nodeName = `Step ${stepIndex + 1}: ${step.action.substring(0, 40)}`
+  const { name: nodeName, notes } = buildNodeName(stepIndex, step.action)
   const position: [number, number] = [250 + ((stepIndex + 1) * 220), 300]
 
   // Always consume the previous node's output ($json), never a hardcoded
@@ -596,6 +616,7 @@ function buildAiAgentStep(step: WorkflowStep, ctx: MapContext): MappedStepResult
     type: '@n8n/n8n-nodes-langchain.agent',
     typeVersion: 1.7,
     position,
+    ...(notes ? { notes } : {}),
     parameters: {
       promptType: 'define',
       text: inputExpr,
