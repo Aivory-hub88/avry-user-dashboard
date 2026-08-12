@@ -1,6 +1,8 @@
 export type WorkflowSource = 'n8n' | 'blueprint';
 export type WorkflowStatus = 'active' | 'draft' | 'archived';
 
+import type { NodeIntent } from '@/lib/workflows/nodeMapper';
+
 export interface ConsoleWorkflow {
   id: string;
   name: string;
@@ -21,6 +23,22 @@ export interface AivoryWorkflowStep {
   tool: string;
   output: string;
   type?: string;
+  /** Nested branch bodies — only present when `type` is 'condition' | 'switch'. */
+  branches?: AivoryWorkflowStepBranch[];
+  /** Skip detectNodeIntent()'s text-based guess and use this intent directly. */
+  forceIntent?: NodeIntent;
+  /** Which $json field the downstream condition/switch inspects. */
+  conditionField?: string;
+  /** Expected structured-output schema for AI/reasoning nodes. */
+  aiOutputSchema?: Record<string, unknown>;
+  /** AI governance metadata — proves why the AI Agent is required. */
+  aiReasoning?: {
+    reasoning_required: true;
+    reason: string;
+    deterministic_alternative_available: boolean;
+  };
+  /** True when this step needed an integration but none was matched. */
+  unresolvedIntegration?: boolean;
   appId?: string;          // links to AivoryApp.id
   connectionId?: string;   // links to AivoryConnection.id
   config?: {
@@ -33,6 +51,13 @@ export interface AivoryWorkflowStep {
   credentials?: {
     name?: string;
   };
+}
+
+export interface AivoryWorkflowStepBranch {
+  key: string;
+  label?: string;
+  steps: AivoryWorkflowStep[];
+  terminal?: boolean;
 }
 
 export interface AivoryWorkflowSpec {

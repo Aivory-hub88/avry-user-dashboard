@@ -401,6 +401,59 @@ describe('NON-NEGOTIABLE: AI Agent must not be used for deterministic actions', 
     expect(n8n.nodes.some((n) => /Meninjau/i.test(n.name))).toBe(true)
     expect(n8n.nodes.some((n) => n.type === 'n8n-nodes-base.wait')).toBe(true)
   })
+
+  // The export/re-render path (app/workflows/page.tsx toExportStep,
+  // components/workflow/WorkflowCanvas.tsx toConverterFallbackStep) used to
+  // rebuild each step from only {action, tool, output, type, branches},
+  // silently dropping forceIntent/conditionField/aiOutputSchema/aiReasoning/
+  // unresolvedIntegration — which re-introduced AI Agents for deterministic
+  // actions and re-lost the is_complete/onboarding_route fields. This test
+  // proves a JSON round-trip (localStorage/API serialization) + the fixed
+  // field-preserving mapping keeps the graph correct.
+  it('preserves planner fields through a save/load round-trip (no AI-Agent regression)', () => {
+    const { planned } = buildRegressionGraph()
+    const json = JSON.stringify(planned.steps)
+    const restored: PlannedStep[] = JSON.parse(json)
+
+    // The field-preserving mapping the export/canvas paths now use.
+    const remap = (steps: PlannedStep[]): any[] => steps.map((s, i) => ({
+      step: i + 1,
+      action: s.action,
+      tool: s.tool,
+      output: s.output,
+      type: s.type,
+      branches: s.branches?.map((b) => ({
+        key: b.key,
+        label: b.label,
+        steps: remap(b.steps),
+        terminal: b.terminal,
+      })),
+      forceIntent: s.forceIntent,
+      conditionField: s.conditionField,
+      aiOutputSchema: s.aiOutputSchema,
+      aiReasoning: s.aiReasoning,
+      unresolvedIntegration: s.unresolvedIntegration,
+    }))
+
+    const n8n = convertToN8nWorkflow({
+      workflow_id: 'wf-onboarding',
+      title: 'Otomasi Onboarding Pelanggan',
+      trigger: planned.trigger,
+      steps: remap(restored),
+      skipAutoLimit: true,
+    })
+
+    const agents = n8n.nodes.filter((n) => n.type === '@n8n/n8n-nodes-langchain.agent')
+    expect(agents.length).toBe(2)
+
+    const ifNode = n8n.nodes.find((n) => n.type === 'n8n-nodes-base.if' && /Data complete\?/.test(n.name))
+    const conds = (ifNode!.parameters as any)?.conditions?.conditions as Array<Record<string, any>>
+    expect(conds.some((c) => c.leftValue?.includes('$json.is_complete') && c.operator?.type === 'boolean')).toBe(true)
+
+    const sw = n8n.nodes.find((n) => n.type === 'n8n-nodes-base.switch')
+    const rules = (sw!.parameters as any)?.rules?.values as Array<{ conditions?: { conditions?: Array<Record<string, any>> } }>
+    expect(rules.every((r) => r.conditions?.conditions?.[0]?.leftValue?.includes('$json.onboarding_route'))).toBe(true)
+  })
 })
 
 // ── Validator regression tests — prove the rules themselves catch the bug ──

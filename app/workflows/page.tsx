@@ -986,6 +986,16 @@ function WorkflowsPageInner() {
         steps: b.steps.map(toExportStep),
         terminal: b.terminal,
       })),
+      // Preserve the planner's node-selection authority — without these,
+      // convertToN8nWorkflow() falls back to detectNodeIntent()'s text
+      // guess and re-introduces AI Agents for deterministic actions,
+      // re-loses the is_complete/onboarding_route condition fields, and
+      // re-loses the structured-output schema on validation steps.
+      forceIntent: s.forceIntent as ConverterWorkflowStep['forceIntent'],
+      conditionField: s.conditionField,
+      aiOutputSchema: s.aiOutputSchema,
+      aiReasoning: s.aiReasoning,
+      unresolvedIntegration: s.unresolvedIntegration,
     })
 
     const n8nWorkflow = convertToN8nWorkflow({

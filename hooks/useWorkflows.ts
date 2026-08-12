@@ -1,5 +1,7 @@
 'use client'
 
+import type { NodeIntent } from '@/lib/workflows/nodeMapper'
+
 const STORAGE_KEY = 'aivory_workflows'
 
 export interface SavedWorkflowStepBranch {
@@ -21,6 +23,23 @@ export interface SavedWorkflowStep {
   type?: string
   /** Nested branch bodies — only present when `type` is 'condition' | 'switch'. */
   branches?: SavedWorkflowStepBranch[]
+  /** Skip detectNodeIntent()'s text-based guess and use this intent directly
+   *  (e.g. 'ai', 'http', 'humanReview', 'calendar'). Set by blueprintPlanner.ts
+   *  for steps whose category is already authoritative. */
+  forceIntent?: NodeIntent
+  /** Which $json field the downstream condition/switch inspects ('is_complete',
+   *  'onboarding_route', ...). */
+  conditionField?: string
+  /** Expected structured-output schema for AI/reasoning nodes. */
+  aiOutputSchema?: Record<string, unknown>
+  /** AI governance metadata — proves why the AI Agent is required. */
+  aiReasoning?: {
+    reasoning_required: true
+    reason: string
+    deterministic_alternative_available: boolean
+  }
+  /** True when this step needed an integration but none was matched. */
+  unresolvedIntegration?: boolean
   appId?: string
   connectionId?: string
   config?: {

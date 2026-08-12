@@ -77,6 +77,9 @@ export interface WorkflowStep {
     reason: string
     deterministic_alternative_available: boolean
   }
+  /** True when this step needed an integration but none was matched — drives
+   *  nodeMapper.ts's UNRESOLVED_INTEGRATION placeholder URL. */
+  unresolvedIntegration?: boolean
 }
 
 interface AivoryWorkflow {

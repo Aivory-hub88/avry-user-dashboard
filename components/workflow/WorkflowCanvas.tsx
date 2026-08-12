@@ -129,6 +129,15 @@ function toConverterFallbackStep(step: FallbackStep): ConverterWorkflowStep {
       steps: b.steps.map(toConverterFallbackStep),
       terminal: b.terminal,
     })),
+    // Preserve the planner's node-selection authority (see the matching
+    // toExportStep in app/workflows/page.tsx — dropping these re-introduces
+    // AI Agents for deterministic actions and loses the is_complete /
+    // onboarding_route condition fields on re-render).
+    forceIntent: step.forceIntent as ConverterWorkflowStep['forceIntent'],
+    conditionField: step.conditionField,
+    aiOutputSchema: step.aiOutputSchema,
+    aiReasoning: step.aiReasoning,
+    unresolvedIntegration: step.unresolvedIntegration,
   }
 }
 
