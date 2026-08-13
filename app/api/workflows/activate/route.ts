@@ -58,9 +58,23 @@ function buildN8nWorkflow(wfData: any, workflowId: string) {
     // `active` and Aivory's `meta` are export/runtime metadata, not writable
     // fields on n8n's POST /workflows schema (`active` is read-only). Keep
     // them in downloaded JSON, but strip them from the create payload.
+    const requiresConfiguration = existing.meta?.requiresConfiguration === true
+    const assumptions = Array.isArray(existing.meta?.assumptions) ? existing.meta.assumptions : []
+    const unresolvedNote = requiresConfiguration
+      ? `Aivory requiresConfiguration=true${assumptions.length ? `; assumptions: ${assumptions.join('; ')}` : ''}`
+      : ''
     return {
-      name: existing.name || wfData?.name || `Aivory Workflow ${workflowId}`,
-      nodes: existing.nodes,
+      // n8n's create schema rejects workflow-level description/tags, so make
+      // the safety state visible in the UI through the name and node notes.
+      name: requiresConfiguration
+        ? `[CONFIG REQUIRED] ${existing.name || wfData?.name || `Aivory Workflow ${workflowId}`}`
+        : (existing.name || wfData?.name || `Aivory Workflow ${workflowId}`),
+      nodes: existing.nodes.map((node: any) => {
+        const isUnresolved = /example\.com\/endpoint|UNRESOLVED_INTEGRATION/i.test(String(node.parameters?.url ?? ''))
+        return requiresConfiguration && isUnresolved
+          ? { ...node, notes: [node.notes, unresolvedNote].filter(Boolean).join('\n') }
+          : node
+      }),
       connections: existing.connections || {},
       settings: existing.settings || {},
       ...(existing.tags ? { tags: existing.tags } : {}),
