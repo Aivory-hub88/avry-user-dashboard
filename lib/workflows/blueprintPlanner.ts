@@ -885,15 +885,20 @@ function buildOutcomeRoutingSemantic(
   ]
 }
 
-/** "Review and approve exceptions" is an approval outcome, not a linear
- * action. Wait for the human decision, then branch on the resume payload. */
+/**
+ * Safe fallback while the approval-resume callback is not wired end-to-end.
+ * Do NOT emit a Wait node here: n8n's resume:webhook URL is execution-specific
+ * and there is currently no Aivory callback/approval UI guaranteed to call it.
+ * Notify the reviewer through native Slack and persist a manual status instead.
+ */
 function buildApprovalOutcomeSemantic(sourceStepIndex: number, ctx: BuildContext): PlannedStep[] {
-  const rejected = [
-    semanticAction(ctx, sourceStepIndex, 'Notify responsible team about rejected exception', 'Notification channel', ['COMMUNICATION']),
+  return [
+    semanticAction(ctx, sourceStepIndex, 'Notify reviewer to manually review exception', 'Notification channel', ['COMMUNICATION']),
+    semanticAction(ctx, sourceStepIndex, 'Set exception status to awaiting_manual_approval', 'n8n', ['DATA_TRANSFORMATION'], 'transform', [
+      { name: 'exception_status', value: '="awaiting_manual_approval"' },
+      { name: 'approval_required', value: '={{ true }}' },
+    ]),
   ]
-  const wait = semanticAction(ctx, sourceStepIndex, 'Wait for human exception approval', 'Human Review', ['HUMAN_REVIEW'], 'humanReview')
-  wait.producesFields = ['is_approved']
-  return [wait, semanticCondition(ctx, sourceStepIndex, 'Is the exception approved?', 'is_approved', [], rejected)]
 }
 
 interface OutcomePair {
