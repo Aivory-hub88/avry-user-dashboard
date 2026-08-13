@@ -29,10 +29,14 @@ export async function GET(request: NextRequest) {
 
 /** Register a Wait execution once its execution-specific resume URL is known. */
 export async function POST(request: NextRequest) {
-  const user = auth(request)
-  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-
   const body = await request.json().catch(() => ({})) as Record<string, unknown>
+  const internalToken = request.headers.get('x-aivory-approval-token')
+  const configuredToken = process.env.APPROVAL_REGISTRATION_TOKEN
+  const internalRegistration = Boolean(configuredToken && internalToken && internalToken === configuredToken)
+  const user = internalRegistration
+    ? { user_id: typeof body.owner_user_id === 'string' ? body.owner_user_id : '' }
+    : auth(request)
+  if (!user?.user_id) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
   const workflowId = typeof body.workflow_id === 'string' ? body.workflow_id.trim() : ''
   const executionId = typeof body.execution_id === 'string' ? body.execution_id.trim() : ''
   const resumeUrl = typeof body.resume_url === 'string' ? body.resume_url.trim() : ''

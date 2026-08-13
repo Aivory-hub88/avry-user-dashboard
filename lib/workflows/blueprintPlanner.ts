@@ -61,6 +61,8 @@ export interface BlueprintStepInput {
 
 export interface BlueprintModuleInput {
   workflow_id?: string
+  owner_user_id?: string
+  approval_resume_enabled?: boolean
   name: string
   trigger: string
   steps: BlueprintStepInput[]
@@ -134,6 +136,8 @@ export interface PlannedStep {
   assignments?: { name: string; value: string }[]
   /** Fields supplied by a resume/event payload (e.g. Wait approval response). */
   producesFields?: string[]
+  /** Native HTTP fallback configuration for planner-owned control-plane nodes. */
+  inputs?: { url?: string; jsonBody?: string; headers?: { name: string; value: string }[] }
 }
 
 export interface PlannedWorkflow {
@@ -523,6 +527,8 @@ interface BuildContext {
   integrationsRequired: string[]
   warnings: string[]
   stepCounter: { n: number }
+  ownerUserId?: string
+  approvalResumeEnabled: boolean
 }
 
 function nextNum(ctx: BuildContext): number {
@@ -892,6 +898,18 @@ function buildOutcomeRoutingSemantic(
  * Notify the reviewer through native Slack and persist a manual status instead.
  */
 function buildApprovalOutcomeSemantic(sourceStepIndex: number, ctx: BuildContext): PlannedStep[] {
+  if (ctx.approvalResumeEnabled && ctx.ownerUserId) {
+    const register = semanticAction(ctx, sourceStepIndex, 'Register approval resume callback', 'n8n', ['COMMUNICATION'], 'http')
+    register.inputs = {
+      url: 'https://aivory.uk/dashboard/api/workflows/approvals',
+      jsonBody: `={{ JSON.stringify({ workflow_id: $workflow.id, execution_id: $execution.id, resume_url: $execution.resumeUrl, owner_user_id: "${ctx.ownerUserId}", context: $json }) }}`,
+      headers: [{ name: 'X-Aivory-Approval-Token', value: '={{ $env.AIVORY_APPROVAL_REGISTRATION_TOKEN }}' }],
+    }
+    const wait = semanticAction(ctx, sourceStepIndex, 'Wait for human exception approval', 'Human Review', ['HUMAN_REVIEW'], 'humanReview')
+    wait.producesFields = ['is_approved']
+    const rejected = [semanticAction(ctx, sourceStepIndex, 'Notify responsible team about rejected exception', 'Notification channel', ['COMMUNICATION'])]
+    return [register, wait, semanticCondition(ctx, sourceStepIndex, 'Is the exception approved?', 'is_approved', [], rejected)]
+  }
   return [
     semanticAction(ctx, sourceStepIndex, 'Notify reviewer to manually review exception', 'Notification channel', ['COMMUNICATION']),
     semanticAction(ctx, sourceStepIndex, 'Set exception status to awaiting_manual_approval', 'n8n', ['DATA_TRANSFORMATION'], 'transform', [
@@ -1486,7 +1504,13 @@ export function planWorkflowFromBlueprintModule(module: BlueprintModuleInput): P
     }
   }
 
-  const ctx: BuildContext = { integrationsRequired, warnings: [], stepCounter: { n: 0 } }
+  const ctx: BuildContext = {
+    integrationsRequired,
+    warnings: [],
+    stepCounter: { n: 0 },
+    ownerUserId: module.owner_user_id,
+    approvalResumeEnabled: module.approval_resume_enabled === true && Boolean(module.owner_user_id),
+  }
   const steps = buildPlannedSteps(module, ctx)
 
   // unresolvedIntegration is set once, at construction time, in
@@ -1547,6 +1571,8 @@ export interface SanitizeBlueprintInputResult {
  */
 export function sanitizeBlueprintModuleInput(raw: {
   workflow_id?: unknown
+  owner_user_id?: unknown
+  approval_resume_enabled?: unknown
   name?: unknown
   trigger?: unknown
   steps?: unknown
@@ -1605,6 +1631,8 @@ export function sanitizeBlueprintModuleInput(raw: {
   return {
     module: {
       workflow_id: typeof raw.workflow_id === 'string' && raw.workflow_id ? raw.workflow_id : undefined,
+      owner_user_id: typeof raw.owner_user_id === 'string' && raw.owner_user_id ? raw.owner_user_id : undefined,
+      approval_resume_enabled: raw.approval_resume_enabled === true,
       name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : 'Workflow from blueprint',
       trigger: typeof raw.trigger === 'string' ? raw.trigger : '',
       steps,

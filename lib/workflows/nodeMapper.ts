@@ -472,9 +472,12 @@ export function mapIntentToN8nNode(
             ? 'UNRESOLVED_INTEGRATION://configure-me'
             : 'https://api.example.com/endpoint'),
           authentication: 'none',
+          ...(step.inputs?.headers?.length
+            ? { sendHeaders: true, headerParameters: { parameters: step.inputs.headers.map((h: { name: string; value: string }) => ({ name: h.name, value: h.value })) } }
+            : {}),
           sendBody: true,
           specifyBody: 'json',
-          jsonBody: '={{ JSON.stringify($json) }}',
+          jsonBody: step.inputs?.jsonBody || '={{ JSON.stringify($json) }}',
           options: {},
         },
       }
