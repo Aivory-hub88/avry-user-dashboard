@@ -14,6 +14,7 @@
 import { describe, it, expect } from 'vitest'
 import { planWorkflowFromBlueprintModule, validatePlannedWorkflow } from './blueprintPlanner'
 import { convertToN8nWorkflow } from '../workflowConverter'
+import { n8nToReactFlow, reactFlowToN8n } from '../n8nMapper'
 
 const ONBOARDING = {
   workflow_id: 'wf',
@@ -147,5 +148,34 @@ describe('acceptance: native integrations and all-path metadata', () => {
     expect(n8n.nodes.some((node: any) => node.type === 'n8n-nodes-base.if' && /exception approved/i.test(node.name))).toBe(true)
     expect(n8n.active).toBe(false)
     expect(n8n.meta.requiresConfiguration).toBe(true)
+  })
+
+  it('preserves native types, branches, and metadata through canvas round-trip', () => {
+    const planned = planWorkflowFromBlueprintModule({
+      workflow_id: 'path-roundtrip',
+      name: 'Path Roundtrip',
+      trigger: 'New signup',
+      steps: [
+        { type: 'ingestion', action: 'Capture customer details from signup form' },
+        { type: 'execution', action: 'Create onboarding tasks' },
+        { type: 'notification', action: 'Notify the team' },
+      ],
+      integrations_required: ['CRM integration', 'Task management system', 'Communication channels'],
+    })
+    const generated = convertToN8nWorkflow({
+      workflow_id: 'path-roundtrip',
+      title: 'Path Roundtrip',
+      trigger: planned.trigger,
+      steps: planned.steps,
+      skipAutoLimit: true,
+      assumptions: planned.assumptions,
+      needsClarification: ['Unknown integration'],
+    }) as any
+    const flow = n8nToReactFlow(generated as any)
+    const roundTripped = reactFlowToN8n(flow.nodes as any, flow.edges as any, generated as any) as any
+    expect(roundTripped.nodes.some((n: any) => n.type === 'n8n-nodes-base.asana')).toBe(true)
+    expect(roundTripped.nodes.some((n: any) => n.type === 'n8n-nodes-base.slack')).toBe(true)
+    expect(roundTripped.meta?.requiresConfiguration).toBe(true)
+    expect(roundTripped.active).toBe(false)
   })
 })
