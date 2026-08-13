@@ -116,3 +116,36 @@ describe('acceptance: Customer Onboarding Automation', () => {
     expect(result.errors).toEqual([])
   })
 })
+
+describe('acceptance: native integrations and all-path metadata', () => {
+  it('uses Set capture, native Asana/Slack, and an approval outcome branch', () => {
+    const scenario = {
+      workflow_id: 'signup',
+      name: 'Customer Signup Onboarding',
+      trigger: 'New customer signup',
+      steps: [
+        { type: 'ingestion', action: 'Capture customer details from signup form' },
+        { type: 'ai_processing', action: 'Validate and enrich customer data' },
+        { type: 'execution', action: 'Create onboarding tasks and send welcome communications' },
+        { type: 'human_review', action: 'Review and approve exceptions' },
+      ],
+      integrations_required: ['CRM integration', 'Customer communication channels', 'Task management system'],
+    } as any
+    const planned = planWorkflowFromBlueprintModule(scenario)
+    const n8n = convertToN8nWorkflow({
+      workflow_id: scenario.workflow_id,
+      title: scenario.name,
+      trigger: planned.trigger,
+      steps: planned.steps,
+      skipAutoLimit: true,
+      assumptions: planned.assumptions,
+      needsClarification: planned.needsClarification,
+    }) as any
+    expect(n8n.nodes.some((node: any) => node.name.includes('Normalize captured signup fields') && node.type === 'n8n-nodes-base.set')).toBe(true)
+    expect(n8n.nodes.some((node: any) => node.name.includes('Create onboarding tasks') && node.type === 'n8n-nodes-base.asana')).toBe(true)
+    expect(n8n.nodes.some((node: any) => node.name.includes('send welcome communications') && node.type === 'n8n-nodes-base.slack')).toBe(true)
+    expect(n8n.nodes.some((node: any) => node.type === 'n8n-nodes-base.if' && /exception approved/i.test(node.name))).toBe(true)
+    expect(n8n.active).toBe(false)
+    expect(n8n.meta.requiresConfiguration).toBe(true)
+  })
+})

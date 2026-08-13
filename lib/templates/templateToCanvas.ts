@@ -17,6 +17,7 @@ const INTENT_TO_CATEGORY: Record<NodeIntent, string> = {
   messaging: "channel",
   hubspot: "http",
   zendesk: "http",
+  asana: "http",
   respond: "channel",
   filter: "condition",
   switch: "condition",

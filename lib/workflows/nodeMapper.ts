@@ -19,6 +19,7 @@ export type NodeIntent =
   | 'messaging'
   | 'hubspot'
   | 'zendesk'
+  | 'asana'
   | 'http'
   | 'database'
   | 'ftp'
@@ -80,6 +81,7 @@ const INTENT_PATTERNS: Record<NodeIntent, RegExp> = {
   email: /email|mail\b|smtp|inbox|surel|\be-mail\b/i,
   hubspot: /hubspot/i,
   zendesk: /zendesk/i,
+  asana: /asana/i,
   messaging: /slack|discord|telegram|whatsapp|\bsms\b|\bteams\b|pesan\b/i,
   // Recurring/cron trigger only — plain "jadwal"/"schedule" without a
   // calendar-event keyword above.
@@ -112,6 +114,7 @@ export function detectNodeIntent(action: string, tool?: string): NodeIntent {
   if (INTENT_PATTERNS.email.test(text)) return 'email'
   if (INTENT_PATTERNS.hubspot.test(text)) return 'hubspot'
   if (INTENT_PATTERNS.zendesk.test(text)) return 'zendesk'
+  if (INTENT_PATTERNS.asana.test(text)) return 'asana'
   if (INTENT_PATTERNS.messaging.test(text)) return 'messaging'
   if (INTENT_PATTERNS.respond.test(text)) return 'respond'
   // switch/code checked before filter — filter's "branch" wording would
@@ -399,6 +402,22 @@ export function mapIntentToN8nNode(
           operation: 'create',
           subject: '={{ $json.subject || $json.title || "Aivory support ticket" }}',
           comment: '={{ $json.message || $json.description || $json.body || "" }}',
+        },
+      }
+    }
+
+    case 'asana': {
+      return {
+        ...baseNode,
+        type: 'n8n-nodes-base.asana',
+        typeVersion: 1,
+        credentials: { asanaApi: { id: '', name: 'Asana account' } },
+        parameters: {
+          resource: 'task',
+          operation: 'create',
+          name: '={{ $json.task_name || $json.name || "Onboarding task" }}',
+          notes: '={{ $json.description || $json.message || "" }}',
+          workspace: '={{ $json.workspace_id || "" }}',
         },
       }
     }

@@ -1147,12 +1147,23 @@ function WorkflowsPageInner() {
       // Without this, the activate route falls back to a bare placeholder.
       const canvas = loadCanvasState(selected.workflow_id)
       const workflow_json = canvas && canvas.nodes.length > 0
-        ? {
-            ...reactFlowToN8n(canvas.nodes as any, canvas.edges as any, {
+        ? (() => {
+            const converted = reactFlowToN8n(canvas.nodes as any, canvas.edges as any, {
               name: selected.title, nodes: [], connections: {}, settings: {},
-            } as any),
-            name: selected.title,
-          }
+            } as any) as any
+            const hasPlaceholder = converted.nodes?.some((node: any) =>
+              /example\.com\/endpoint|UNRESOLVED_INTEGRATION/i.test(String(node.parameters?.url ?? '')))
+            return {
+              ...converted,
+              name: selected.title,
+              ...(hasPlaceholder
+                ? {
+                    active: false,
+                    meta: { ...(converted.meta || {}), requiresConfiguration: true },
+                  }
+                : {}),
+            }
+          })()
         : undefined
 
       // POST to activate route with user-provided n8n credentials

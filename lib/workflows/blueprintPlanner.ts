@@ -132,6 +132,8 @@ export interface PlannedStep {
    *  contract that downstream conditions/switches read. A Set node without
    *  these is a no-op stub (audit finding: "empty Set node"). */
   assignments?: { name: string; value: string }[]
+  /** Fields supplied by a resume/event payload (e.g. Wait approval response). */
+  producesFields?: string[]
 }
 
 export interface PlannedWorkflow {
@@ -159,10 +161,11 @@ const DEFAULT_INTEGRATION_BY_CATEGORY: { pattern: RegExp; platform: string }[] =
   { pattern: /\bhelpdesk|support|ticket|service desk\b/i, platform: 'Zendesk' },
   { pattern: /\bemail|mail\b/i, platform: 'Gmail' },
   { pattern: /\bcalendar|scheduling\b/i, platform: 'Google Calendar' },
+  { pattern: /\btask management|task system|project management|work management\b/i, platform: 'Asana' },
   { pattern: /\bpayment|finance|billing\b/i, platform: 'Stripe' },
 ]
 
-const KNOWN_NATIVE_INTEGRATIONS = /hubspot|salesforce|slack|zendesk|intercom|gmail|google calendar|outlook|google sheets/i
+const KNOWN_NATIVE_INTEGRATIONS = /hubspot|salesforce|slack|zendesk|intercom|gmail|google calendar|outlook|google sheets|asana/i
 
 export function resolveIntegrationCategory(integration: string): { platform: string; resolved: boolean } {
   if (KNOWN_NATIVE_INTEGRATIONS.test(integration)) return { platform: integration, resolved: true }
@@ -228,6 +231,9 @@ interface AtomicOp {
   /** Resolved integration/channel label, when known — becomes `tool`. */
   integration?: string
   isMerge?: boolean
+  /** Signup/form fields already arrive in the webhook payload; normalize them
+   *  locally instead of inventing an outbound integration request. */
+  isLocalCapture?: boolean
 }
 
 // Splits an imperative list ("create account, send materials, and schedule
@@ -269,6 +275,14 @@ function decomposeIngestion(
   warnings: string[],
 ): AtomicOp[] {
   const text = step.action
+  if (FORM_SOURCE_KEYWORDS.test(text) && /capture|collect|details|field|fields|normalize|normalise/i.test(text)) {
+    return [{
+      action: 'Normalize captured signup fields',
+      categories: ['DATA_TRANSFORMATION'],
+      sourceStepIndex,
+      isLocalCapture: true,
+    }]
+  }
   const matchedIntegrations = integrations.filter((i) => textMentions(text, i))
   const hasFormSource = FORM_SOURCE_KEYWORDS.test(text)
 
@@ -395,8 +409,12 @@ function toolForOp(op: AtomicOp, integrationsRequired: string[]): string {
     return communication ? resolveIntegrationCategory(communication).platform : 'Notification channel'
   }
   if (op.categories.includes('DATA_RETRIEVAL')) {
-    const dataSource = integrationsRequired.find((i) => /crm|helpdesk|support|ticket|database/i.test(i))
+    const dataSource = integrationsRequired.find((i) => /crm|helpdesk|support|ticket|database|task management/i.test(i))
     if (dataSource) return resolveIntegrationCategory(dataSource).platform
+  }
+  if (op.categories.includes('BUSINESS_ACTION')) {
+    const taskSystem = integrationsRequired.find((i) => /task management|task system|project management|work management/i.test(i))
+    if (taskSystem) return resolveIntegrationCategory(taskSystem).platform
   }
   // No specific match — Stage 7 says NOT to hallucinate an integration by
   // guessing one of the declared ones just because it's first in the list;
@@ -416,6 +434,7 @@ function toolForOp(op: AtomicOp, integrationsRequired: string[]): string {
  * (distinguishing email vs. Slack vs. generic HTTP, for example).
  */
 function forceIntentForOp(op: AtomicOp, integrationsRequired: string[]): NodeIntent | undefined {
+  if (op.isLocalCapture) return 'transform'
   if (op.categories.includes('HUMAN_REVIEW')) return 'humanReview'
   if (op.categories.includes('AI_REASONING') && !op.categories.includes('BUSINESS_ACTION')) return 'ai'
   if (op.categories.includes('AUDIT')) return 'audit'
@@ -424,6 +443,7 @@ function forceIntentForOp(op: AtomicOp, integrationsRequired: string[]): NodeInt
   const resolvedTool = toolForOp(op, integrationsRequired).toLowerCase()
   if (resolvedTool === 'hubspot') return 'hubspot'
   if (resolvedTool === 'zendesk') return 'zendesk'
+  if (resolvedTool === 'asana') return 'asana'
   if (resolvedTool === 'slack') return 'messaging'
   // A pure BUSINESS_ACTION or DATA_RETRIEVAL step must NEVER fall through
   // to detectNodeIntent()'s text-based AI guess — the planner has already
@@ -446,6 +466,7 @@ const BUILTIN_CHANNEL_KEYWORDS = /email|mail\b|slack|whatsapp|telegram|\bsms\b|g
  *  recognizable built-in channel was matched — i.e. Stage 7's "unresolved
  *  integration, expose it rather than hallucinate a node" case. */
 function isUnresolvedIntegration(op: AtomicOp): boolean {
+  if (op.isLocalCapture) return false
   const needsIntegration = op.categories.some((c) =>
     c === 'DATA_RETRIEVAL' || c === 'BUSINESS_ACTION' || c === 'COMMUNICATION')
   if (!needsIntegration) return false
@@ -467,6 +488,13 @@ function opToPlannedStep(op: AtomicOp, stepNumber: number, integrationsRequired:
     category: op.categories,
     sourceStepIndex: op.sourceStepIndex,
     forceIntent: forceIntentForOp(op, integrationsRequired),
+    assignments: op.isLocalCapture
+      ? [
+          { name: 'customer_name', value: '={{ $json.body?.customer_name || $json.body?.name || $json.customer_name || $json.name }}' },
+          { name: 'customer_email', value: '={{ $json.body?.email || $json.email }}' },
+          { name: 'customer_phone', value: '={{ $json.body?.phone || $json.phone }}' },
+        ]
+      : undefined,
     unresolvedIntegration: isUnresolvedIntegration(op) || undefined,
   }
 }
@@ -638,6 +666,7 @@ const WAIT_UNTIL_RE = /\b(wait|menunggu|tunggu|until|sampai|hingga)\b/i
 const RETRY_RE = /\b(retry|retries|mengulang|coba ulang)\b/i
 const AUTO_RESOLVE_OUTCOME_RE = /auto[- ]?resolve|routine cases?|standard cases?|kasus rutin|otomatis/i
 const COMPLEX_ESCALATION_OUTCOME_RE = /escalat.*complex|complex.*(human|manual)|kasus kompleks|manual review/i
+const REVIEW_APPROVE_RE = /\breview(?:ing)?\s+and\s+approv|\bapprov(?:e|al)\s+(?:the\s+)?exceptions?|meninjau.*persetujuan/i
 
 interface StepSemantics {
   trackMonitor: boolean
@@ -683,8 +712,8 @@ function semanticAction(
   if (tool === 'Notification channel') {
     const communication = ctx.integrationsRequired.find((i) => /communication|slack|mail|whatsapp|telegram|sms/i.test(i))
     if (communication) effectiveTool = resolveIntegrationCategory(communication).platform
-  } else if (tool === 'n8n' && categories.includes('DATA_RETRIEVAL')) {
-    const dataSource = ctx.integrationsRequired.find((i) => /crm|helpdesk|support|ticket|database/i.test(i))
+  } else if (tool === 'n8n' && (categories.includes('DATA_RETRIEVAL') || categories.includes('BUSINESS_ACTION'))) {
+    const dataSource = ctx.integrationsRequired.find((i) => /crm|helpdesk|support|ticket|database|task management|task system|project management|work management/i.test(i))
     if (dataSource) effectiveTool = resolveIntegrationCategory(dataSource).platform
   }
   const s: PlannedStep = {
@@ -697,6 +726,9 @@ function semanticAction(
     sourceStepIndex,
   }
   if (forceIntent) s.forceIntent = forceIntent
+  if (effectiveTool.toLowerCase() === 'asana' && forceIntent === 'http') s.forceIntent = 'asana'
+  if (effectiveTool.toLowerCase() === 'hubspot' && forceIntent === 'http') s.forceIntent = 'hubspot'
+  if (effectiveTool.toLowerCase() === 'zendesk' && forceIntent === 'http') s.forceIntent = 'zendesk'
   if (assignments) s.assignments = assignments
   // A generic 'n8n' tool means no specific integration was matched — mark the
   // step unresolved so nodeMapper emits UNRESOLVED_INTEGRATION://configure-me
@@ -853,6 +885,17 @@ function buildOutcomeRoutingSemantic(
   ]
 }
 
+/** "Review and approve exceptions" is an approval outcome, not a linear
+ * action. Wait for the human decision, then branch on the resume payload. */
+function buildApprovalOutcomeSemantic(sourceStepIndex: number, ctx: BuildContext): PlannedStep[] {
+  const rejected = [
+    semanticAction(ctx, sourceStepIndex, 'Notify responsible team about rejected exception', 'Notification channel', ['COMMUNICATION']),
+  ]
+  const wait = semanticAction(ctx, sourceStepIndex, 'Wait for human exception approval', 'Human Review', ['HUMAN_REVIEW'], 'humanReview')
+  wait.producesFields = ['is_approved']
+  return [wait, semanticCondition(ctx, sourceStepIndex, 'Is the exception approved?', 'is_approved', [], rejected)]
+}
+
 interface OutcomePair {
   reviewIndex: number
   notificationIndex?: number
@@ -892,6 +935,7 @@ function buildPlannedSteps(module: BlueprintModuleInput, ctx: BuildContext): Pla
   const reviewIndices = steps.map((s, i) => (s.type === 'human_review' ? i : -1)).filter((i) => i >= 0)
   const outcomePairs = new Map<number, OutcomePair>()
   const outcomeConsumed = new Set<number>()
+  const approvalReviewIndices = new Set<number>()
   for (let i = 0; i < steps.length - 1; i++) {
     const current = steps[i]
     const next = steps[i + 1]
@@ -905,8 +949,11 @@ function buildPlannedSteps(module: BlueprintModuleInput, ctx: BuildContext): Pla
     outcomeConsumed.add(i + 1)
     if (notificationIndex !== undefined) outcomeConsumed.add(notificationIndex)
   }
+  for (const index of reviewIndices) {
+    if (REVIEW_APPROVE_RE.test(steps[index].action)) approvalReviewIndices.add(index)
+  }
   const routedReviewIndices = new Set(Array.from(outcomePairs.values()).map((pair) => pair.reviewIndex))
-  const reviewIndicesForGates = reviewIndices.filter((index) => !routedReviewIndices.has(index))
+  const reviewIndicesForGates = reviewIndices.filter((index) => !routedReviewIndices.has(index) && !approvalReviewIndices.has(index))
   // Nearest ai_processing step BEFORE the first review step, if any — the
   // completeness/exception check belongs right after the step that actually
   // validated the data, not after a routing decision that may sit closer in
@@ -939,6 +986,10 @@ function buildPlannedSteps(module: BlueprintModuleInput, ctx: BuildContext): Pla
         i,
         ctx,
       ))
+      continue
+    }
+    if (approvalReviewIndices.has(i)) {
+      out.push(...buildApprovalOutcomeSemantic(i, ctx))
       continue
     }
     if (outcomeConsumed.has(i)) continue
@@ -1184,6 +1235,7 @@ export function validatePlannedWorkflow(planned: PlannedWorkflow): ValidationRes
   const producedFields = new Set<string>()
   for (const s of all) {
     for (const a of s.assignments ?? []) producedFields.add(a.name)
+    for (const field of s.producesFields ?? []) producedFields.add(field)
     for (const k of Object.keys(s.aiOutputSchema ?? {})) producedFields.add(k)
   }
   for (const s of all) {

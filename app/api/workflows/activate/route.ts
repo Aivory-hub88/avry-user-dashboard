@@ -60,6 +60,9 @@ function buildN8nWorkflow(wfData: any, workflowId: string) {
       nodes: existing.nodes,
       connections: existing.connections || {},
       settings: existing.settings || {},
+      ...(typeof existing.active === 'boolean' ? { active: existing.active } : {}),
+      ...(existing.meta ? { meta: existing.meta } : {}),
+      ...(existing.tags ? { tags: existing.tags } : {}),
     }
   }
   return {
