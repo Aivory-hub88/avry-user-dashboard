@@ -11,6 +11,99 @@
 import type { BlueprintV1, BlueprintV1DeploymentPlan } from '@/types/blueprint'
 import { formatLocalAmount, parseCurrencyCode } from '@/lib/resultFormatters'
 
+/**
+ * The diagnostic object contains duplicated EN/ID projections, score-driver
+ * explanations, and UI-only fields that can push the blueprint prompt above
+ * 40 KB. Keep the evidence the blueprint model needs, but do not send the
+ * entire browser storage object verbatim. This reduces latency and the chance
+ * of hitting provider context/output timeouts without changing the blueprint
+ * contract or the ROI source-of-truth.
+ */
+export function compactDiagnosticForBlueprint(diagnostic: any): Record<string, unknown> {
+  const scores = diagnostic?.scores ?? {}
+  const qualitative = diagnostic?.qualitative ?? {}
+  const quantitative = diagnostic?.quantitative ?? {}
+  const calculations = diagnostic?.calculations ?? {}
+  const risks = Array.isArray(diagnostic?.risks) ? diagnostic.risks : []
+  const opportunities = Array.isArray(diagnostic?.opportunities) ? diagnostic.opportunities : []
+  const improvements = Array.isArray(diagnostic?.roomForImprovement) ? diagnostic.roomForImprovement : []
+
+  return {
+    diagnostic_id: diagnostic?.diagnostic_id,
+    company: diagnostic?.company,
+    currency: diagnostic?.currency,
+    scores: {
+      composite: scores.composite,
+      maturityLevel: scores.maturityLevel,
+      strategy: scores.strategy,
+      data: scores.data,
+      process: scores.process,
+      people: scores.people,
+      governance: scores.governance,
+      security: scores.security,
+    },
+    qualitative: {
+      industry: qualitative.industry,
+      primaryObjective: qualitative.primaryObjective,
+      topPainPoints: qualitative.topPainPoints,
+      kpiBaseline: qualitative.kpiBaseline,
+      processOwnership: qualitative.processOwnership,
+      implementApproach: qualitative.implementApproach,
+      leadershipAlignment: qualitative.leadershipAlignment,
+    },
+    quantitative: {
+      timelineMonths: quantitative.timelineMonths,
+      fteCountInScope: quantitative.fteCountInScope,
+      currentAutomationPct: quantitative.currentAutomationPct,
+      targetAutomationPct: quantitative.targetAutomationPct,
+      totalManualHoursWeekly: quantitative.totalManualHoursWeekly,
+      budgetMidpointUSD: quantitative.budgetMidpointUSD,
+    },
+    calculations: {
+      paybackMonths: calculations.paybackMonths,
+      netPaybackMonths: calculations.netPaybackMonths,
+      totalAnnualSavingsLocal: calculations.totalAnnualSavingsLocal,
+      annualLaborSavingsLocal: calculations.annualLaborSavingsLocal,
+      threeYearROIPercent: calculations.threeYearROIPercent,
+      netThreeYearROIPercent: calculations.netThreeYearROIPercent,
+      missingInputs: calculations.missingInputs,
+    },
+    risks: risks.slice(0, 8).map((risk: any) => ({
+      title: risk?.title ?? risk?.risk ?? risk?.name,
+      severity: risk?.severity,
+      detected: risk?.detected,
+    })),
+    opportunities: opportunities.slice(0, 8).map((opportunity: any) => ({
+      id: opportunity?.id,
+      title: opportunity?.title ?? opportunity?.name,
+      impact: opportunity?.impact,
+      effort: opportunity?.effort,
+      priority: opportunity?.priority,
+      dataReadiness: opportunity?.dataReadiness,
+      prerequisites: opportunity?.prerequisites,
+    })),
+    roomForImprovement: improvements.slice(0, 8).map((item: any) => ({
+      area: item?.area,
+      title: item?.title,
+      priority: item?.priority,
+      currentState: item?.currentState,
+      recommendedAction: item?.recommendedAction,
+      operationalImpact: item?.operationalImpact,
+      before: item?.before,
+      after: item?.after,
+    })),
+    ai_analysis: diagnostic?.ai_analysis
+      ? {
+          summary: diagnostic.ai_analysis.summary,
+          strengths: diagnostic.ai_analysis.strengths,
+          constraints: diagnostic.ai_analysis.constraints,
+          automation_opportunities: diagnostic.ai_analysis.automation_opportunities,
+          recommended_next_step: diagnostic.ai_analysis.recommended_next_step,
+        }
+      : undefined,
+  }
+}
+
 export function buildBlueprintPrompt(diagnostic: any, locale: 'en' | 'id'): string {
   return `Generate a transformation blueprint from this diagnostic data. Return a complete blueprint in strict JSON format. Do not include markdown formatting or wrappers like \`\`\`json. The JSON MUST match this TypeScript interface exactly:
 interface BlueprintV1 {
@@ -41,7 +134,7 @@ ${locale === 'id' ? `
 LANGUAGE: Write every freeform narrative/text field VALUE in formal Bahasa Indonesia (business register) — this includes "organization.industry", "diagnostic_summary.maturity_level", "diagnostic_summary.primary_constraints", "strategic_objective.primary_goal", "strategic_objective.kpi_targets[].metric/current/target/expected_impact", "system_architecture.data_sources/processing_layers/decision_engine/memory_layer/execution_layer", "workflow_modules[].name/trigger/steps[].action/integrations_required", "risk_assessment.data_risks/operational_risks/mitigation_strategies", and "deployment_plan.phase/estimated_impact/waves[].name/notes". Do NOT translate fixed schema keys or literal enum values: "organization.size" ('micro'|'sme'|'mid-market'|'enterprise'), "status" ('draft'|'published'), "workflow_id" codes, and "steps[].type" ('ingestion'|'ai_processing'|'decision'|'execution'|'notification'|'human_review') must stay exactly as specified in the interface. Currency figures and dollar amounts stay as-is (do not convert currency).` : ''}
 
 Diagnostic Data:
-${JSON.stringify(diagnostic)}`
+${JSON.stringify(compactDiagnosticForBlueprint(diagnostic))}`
 }
 
 /**
