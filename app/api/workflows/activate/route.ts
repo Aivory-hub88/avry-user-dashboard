@@ -55,13 +55,14 @@ export async function GET(req: NextRequest) {
 function buildN8nWorkflow(wfData: any, workflowId: string) {
   const existing = wfData?.workflow_json || wfData?.n8n
   if (existing && Array.isArray(existing.nodes)) {
+    // `active` and Aivory's `meta` are export/runtime metadata, not writable
+    // fields on n8n's POST /workflows schema (`active` is read-only). Keep
+    // them in downloaded JSON, but strip them from the create payload.
     return {
       name: existing.name || wfData?.name || `Aivory Workflow ${workflowId}`,
       nodes: existing.nodes,
       connections: existing.connections || {},
       settings: existing.settings || {},
-      ...(typeof existing.active === 'boolean' ? { active: existing.active } : {}),
-      ...(existing.meta ? { meta: existing.meta } : {}),
       ...(existing.tags ? { tags: existing.tags } : {}),
     }
   }
