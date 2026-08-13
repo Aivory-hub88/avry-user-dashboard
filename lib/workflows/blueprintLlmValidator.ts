@@ -85,7 +85,7 @@ function tryParseFindings(text: string): SemanticFinding[] | null {
         return parsed
           .filter((f): f is Record<string, unknown> => !!f && typeof f === 'object')
           .map((f) => ({
-            severity: f.severity === 'warning' ? 'warning' : 'error',
+            severity: (f.severity === 'warning' ? 'warning' : 'error') as SemanticFinding['severity'],
             ...(typeof f.step === 'number' ? { step: f.step } : {}),
             issue: typeof f.issue === 'string' ? f.issue : String(f.issue ?? ''),
             ...(typeof f.suggestion === 'string' && f.suggestion ? { suggestion: f.suggestion } : {}),
@@ -96,7 +96,7 @@ function tryParseFindings(text: string): SemanticFinding[] | null {
         return (parsed as any).findings
           .filter((f: unknown): f is Record<string, unknown> => !!f && typeof f === 'object')
           .map((f: any) => ({
-            severity: f.severity === 'warning' ? 'warning' : 'error',
+            severity: (f.severity === 'warning' ? 'warning' : 'error') as SemanticFinding['severity'],
             ...(typeof f.step === 'number' ? { step: f.step } : {}),
             issue: typeof f.issue === 'string' ? f.issue : String(f.issue ?? ''),
             ...(typeof f.suggestion === 'string' && f.suggestion ? { suggestion: f.suggestion } : {}),

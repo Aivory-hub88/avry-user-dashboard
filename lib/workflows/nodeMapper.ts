@@ -17,6 +17,8 @@
 export type NodeIntent =
   | 'email'
   | 'messaging'
+  | 'hubspot'
+  | 'zendesk'
   | 'http'
   | 'database'
   | 'ftp'
@@ -58,7 +60,11 @@ const INTENT_PATTERNS: Record<NodeIntent, RegExp> = {
   // ("validate"/"check" would otherwise shadow it) and before `ai` (review
   // text often contains words like "assess"/"tinjau" that could be mistaken
   // for reasoning-only text).
-  humanReview: /human review|manual review|human.in.the.loop|needs? approval|require.*approval|escalat|\bapprov(e|al)\b|meninjau|peninjauan|tinjau\b|persetujuan|kasus (luar biasa|khusus|eksepsional)|exceptional case|tidak lengkap.*(review|tinjau)/i,
+  // Do not match bare "escalat" here: "Notify the team on escalations" is a
+  // communication action, not a Wait node. Explicit "escalate to a human
+  // reviewer" still matches through human/manual review wording or the
+  // planner's forced intent.
+  humanReview: /human review|manual review|human.in.the.loop|needs? approval|require.*approval|\bapprov(e|al)\b|meninjau|peninjauan|tinjau\b|persetujuan|kasus (luar biasa|khusus|eksepsional)|exceptional case|tidak lengkap.*(review|tinjau)/i,
   // Calendar/scheduling of a specific event (meeting, session, appointment)
   // — distinct from `schedule` below, which is a recurring/cron trigger.
   // Checked before `filter`/`ai` so "menjadwalkan sesi pengenalan" doesn't
@@ -72,6 +78,8 @@ const INTENT_PATTERNS: Record<NodeIntent, RegExp> = {
   // "determine the onboarding path" maps to a condition by default.
   filter: /condition|\bif\b|decision|\bcheck\b|\bflag\b|\bfilter\b|validate|validation|\bbranch\b|menentukan\b|tentukan\b|\bjalur\b|\brute\b/i,
   email: /email|mail\b|smtp|inbox|surel|\be-mail\b/i,
+  hubspot: /hubspot/i,
+  zendesk: /zendesk/i,
   messaging: /slack|discord|telegram|whatsapp|\bsms\b|\bteams\b|pesan\b/i,
   // Recurring/cron trigger only — plain "jadwal"/"schedule" without a
   // calendar-event keyword above.
@@ -102,6 +110,8 @@ export function detectNodeIntent(action: string, tool?: string): NodeIntent {
   // Check patterns in priority order
   // Email & messaging checked BEFORE respond — "Send Email Reply" must map to email, not respond
   if (INTENT_PATTERNS.email.test(text)) return 'email'
+  if (INTENT_PATTERNS.hubspot.test(text)) return 'hubspot'
+  if (INTENT_PATTERNS.zendesk.test(text)) return 'zendesk'
   if (INTENT_PATTERNS.messaging.test(text)) return 'messaging'
   if (INTENT_PATTERNS.respond.test(text)) return 'respond'
   // switch/code checked before filter — filter's "branch" wording would
@@ -353,6 +363,46 @@ export function mapIntentToN8nNode(
       }
     }
 
+    case 'hubspot': {
+      const reads = /get|fetch|pull|retrieve|read|ambil|mengambil|dapatkan/i.test(`${step.action} ${step.tool}`)
+      return {
+        ...baseNode,
+        type: 'n8n-nodes-base.hubspot',
+        typeVersion: 2,
+        credentials: { hubspotApi: { id: '', name: 'HubSpot account' } },
+        parameters: reads
+          ? {
+              resource: 'contact',
+              operation: 'get',
+              contactId: '={{ $json.customer_id || $json.contact_id || $json.id }}',
+            }
+          : {
+              resource: 'contact',
+              operation: 'create',
+              properties: {
+                email: '={{ $json.email || $json.customer_email }}',
+                firstname: '={{ $json.first_name || $json.name }}',
+                lastname: '={{ $json.last_name || "" }}',
+              },
+            },
+      }
+    }
+
+    case 'zendesk': {
+      return {
+        ...baseNode,
+        type: 'n8n-nodes-base.zendesk',
+        typeVersion: 1,
+        credentials: { zendeskApi: { id: '', name: 'Zendesk account' } },
+        parameters: {
+          resource: 'ticket',
+          operation: 'create',
+          subject: '={{ $json.subject || $json.title || "Aivory support ticket" }}',
+          comment: '={{ $json.message || $json.description || $json.body || "" }}',
+        },
+      }
+    }
+
     case 'messaging': {
       // Detect Slack specifically for native node
       const toolLower = (step.tool || '').toLowerCase()
@@ -364,6 +414,7 @@ export function mapIntentToN8nNode(
           ...baseNode,
           type: 'n8n-nodes-base.slack',
           typeVersion: 2,
+          credentials: { slackApi: { id: '', name: 'Slack account' } },
           parameters: {
             resource: 'message',
             operation: 'send',

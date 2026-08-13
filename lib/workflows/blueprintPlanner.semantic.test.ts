@@ -81,7 +81,7 @@ describe('semantic decomposition — Track progress and escalate delays', () => 
   it('escalation is a communication/notification node, not a Wait node', () => {
     const { n8n } = build(blueprint)
     const escalate = n8n.nodes.find((n) => /escalate delay/i.test(n.name))!
-    expect(escalate.type).toBe('n8n-nodes-base.httpRequest')
+    expect(escalate.type).toBe('n8n-nodes-base.slack')
   })
 
   it('adds a deadline/SLA check node before the condition', () => {
@@ -224,5 +224,64 @@ describe('semantic decomposition — validator catches linearization regressions
     const planned = planWorkflowFromBlueprintModule(blueprint)
     const result = validatePlannedWorkflow(planned)
     expect(result.warnings.some((w) => /linearized a temporal\/conditional requirement/i.test(w))).toBe(false)
+  })
+})
+
+describe('semantic decomposition — mutually exclusive support outcomes', () => {
+  it('creates an IF routine/complex branch instead of executing both outcomes linearly', () => {
+    const blueprint: BlueprintModuleInput = {
+      name: 'Customer Support Ticket Automation',
+      trigger: 'New support ticket received',
+      steps: [
+        { type: 'ai_processing', action: 'Categorise ticket by type' },
+        { type: 'ai_processing', action: 'Determine urgency' },
+        { type: 'ingestion', action: 'Gather customer context' },
+        { type: 'ingestion', action: 'Pull related customer record' },
+        { type: 'ingestion', action: 'Pull prior-ticket history from the data layer' },
+        { type: 'execution', action: 'Apply policy to route: auto-resolve routine cases' },
+        { type: 'human_review', action: 'Escalate complex ones to a human' },
+        { type: 'notification', action: 'Send resolution or acknowledgement' },
+        { type: 'notification', action: 'Notify the relevant team member on escalations' },
+        { type: 'audit', action: 'Log workflow result' },
+      ],
+      integrations_required: ['CRM system', 'Communication channels', 'Helpdesk system'],
+    }
+    const planned = planWorkflowFromBlueprintModule(blueprint)
+    const flat = flatten(planned.steps)
+    const route = flat.find((s) => s.type === 'condition' && /routine case/i.test(s.action))
+    expect(route).toBeDefined()
+    expect(route!.conditionField).toBe('is_routine')
+    expect(route!.branches?.[0].steps.some((s) => /auto-resolve/i.test(s.action))).toBe(true)
+    expect(route!.branches?.[1].steps.some((s) => /escalate complex/i.test(s.action))).toBe(true)
+  })
+
+  it('uses native integration nodes and never maps escalation notification to Wait', () => {
+    const blueprint: BlueprintModuleInput = {
+      name: 'Support',
+      trigger: 'New ticket received',
+      steps: [
+        { type: 'ingestion', action: 'Pull related customer record from CRM system' },
+        { type: 'execution', action: 'Apply policy to route: auto-resolve routine cases' },
+        { type: 'human_review', action: 'Escalate complex ones to a human' },
+        { type: 'notification', action: 'Notify the relevant team member on escalations' },
+      ],
+      integrations_required: ['CRM system', 'Communication channels', 'Helpdesk system'],
+    }
+    const planned = planWorkflowFromBlueprintModule(blueprint)
+    const n8n = convertToN8nWorkflow({
+      workflow_id: 'support',
+      title: blueprint.name,
+      trigger: planned.trigger,
+      steps: planned.steps,
+      skipAutoLimit: true,
+      assumptions: planned.assumptions,
+      needsClarification: planned.needsClarification,
+    })
+    expect(n8n.nodes.some((n) => n.type === 'n8n-nodes-base.hubspot')).toBe(true)
+    expect(n8n.nodes.some((n) => n.type === 'n8n-nodes-base.zendesk')).toBe(true)
+    expect(n8n.nodes.some((n) => n.type === 'n8n-nodes-base.slack')).toBe(true)
+    const escalationNotify = n8n.nodes.find((n) => /Notify the relevant team/i.test(n.name))
+    expect(escalationNotify?.type).toBe('n8n-nodes-base.slack')
+    expect(escalationNotify?.type).not.toBe('n8n-nodes-base.wait')
   })
 })

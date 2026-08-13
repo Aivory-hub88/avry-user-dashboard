@@ -52,6 +52,7 @@ export type BlueprintStepType =
   | 'execution'
   | 'notification'
   | 'human_review'
+  | 'audit'
 
 export interface BlueprintStepInput {
   type: BlueprintStepType
@@ -161,7 +162,10 @@ const DEFAULT_INTEGRATION_BY_CATEGORY: { pattern: RegExp; platform: string }[] =
   { pattern: /\bpayment|finance|billing\b/i, platform: 'Stripe' },
 ]
 
+const KNOWN_NATIVE_INTEGRATIONS = /hubspot|salesforce|slack|zendesk|intercom|gmail|google calendar|outlook|google sheets/i
+
 export function resolveIntegrationCategory(integration: string): { platform: string; resolved: boolean } {
+  if (KNOWN_NATIVE_INTEGRATIONS.test(integration)) return { platform: integration, resolved: true }
   for (const { pattern, platform } of DEFAULT_INTEGRATION_BY_CATEGORY) {
     if (pattern.test(integration)) return { platform, resolved: true }
   }
@@ -189,6 +193,7 @@ const CATEGORY_BY_BLUEPRINT_TYPE: Record<BlueprintStepType, StepCategory> = {
   execution: 'BUSINESS_ACTION',
   notification: 'COMMUNICATION',
   human_review: 'HUMAN_REVIEW',
+  audit: 'AUDIT',
 }
 
 /**
@@ -356,6 +361,8 @@ function decomposeStep(
     case 'execution':
     case 'notification':
       return decomposeActionList(step, sourceStepIndex, integrations, warnings)
+    case 'audit':
+      return [{ action: step.action, categories: ['AUDIT'], sourceStepIndex }]
     case 'decision':
       // Decision steps are handled specially by the orchestrator (Stage 5) —
       // they produce an AI-reasoning op + a switch/condition marker, not a
@@ -382,9 +389,14 @@ function toolForOp(op: AtomicOp, integrationsRequired: string[]): string {
   if (op.categories.includes('AI_REASONING') && !op.categories.includes('BUSINESS_ACTION')) return 'Aivory AI'
   if (op.categories.includes('AUDIT')) return 'Audit Log'
   if (op.categories.includes('SCHEDULING')) return 'Calendar'
-  if (op.integration) return op.integration
+  if (op.integration) return resolveIntegrationCategory(op.integration).platform
   if (op.categories.includes('COMMUNICATION')) {
-    return integrationsRequired.find((i) => /slack|mail|whatsapp|telegram|sms/i.test(i)) || 'Notification channel'
+    const communication = integrationsRequired.find((i) => /communication|slack|mail|whatsapp|telegram|sms/i.test(i))
+    return communication ? resolveIntegrationCategory(communication).platform : 'Notification channel'
+  }
+  if (op.categories.includes('DATA_RETRIEVAL')) {
+    const dataSource = integrationsRequired.find((i) => /crm|helpdesk|support|ticket|database/i.test(i))
+    if (dataSource) return resolveIntegrationCategory(dataSource).platform
   }
   // No specific match — Stage 7 says NOT to hallucinate an integration by
   // guessing one of the declared ones just because it's first in the list;
@@ -403,12 +415,16 @@ function toolForOp(op: AtomicOp, integrationsRequired: string[]): string {
  * which stay text-classified since that's genuinely more precise there
  * (distinguishing email vs. Slack vs. generic HTTP, for example).
  */
-function forceIntentForOp(op: AtomicOp): NodeIntent | undefined {
+function forceIntentForOp(op: AtomicOp, integrationsRequired: string[]): NodeIntent | undefined {
   if (op.categories.includes('HUMAN_REVIEW')) return 'humanReview'
   if (op.categories.includes('AI_REASONING') && !op.categories.includes('BUSINESS_ACTION')) return 'ai'
   if (op.categories.includes('AUDIT')) return 'audit'
   if (op.categories.includes('SCHEDULING')) return 'calendar'
   if (op.isMerge) return 'transform'
+  const resolvedTool = toolForOp(op, integrationsRequired).toLowerCase()
+  if (resolvedTool === 'hubspot') return 'hubspot'
+  if (resolvedTool === 'zendesk') return 'zendesk'
+  if (resolvedTool === 'slack') return 'messaging'
   // A pure BUSINESS_ACTION or DATA_RETRIEVAL step must NEVER fall through
   // to detectNodeIntent()'s text-based AI guess — the planner has already
   // classified it as deterministic. Without this guard, a word like
@@ -433,7 +449,7 @@ function isUnresolvedIntegration(op: AtomicOp): boolean {
   const needsIntegration = op.categories.some((c) =>
     c === 'DATA_RETRIEVAL' || c === 'BUSINESS_ACTION' || c === 'COMMUNICATION')
   if (!needsIntegration) return false
-  if (op.integration) return false
+  if (op.integration) return !resolveIntegrationCategory(op.integration).resolved
   if (op.isMerge) return false
   if (BUILTIN_CHANNEL_KEYWORDS.test(op.action)) return false
   return true
@@ -450,7 +466,7 @@ function opToPlannedStep(op: AtomicOp, stepNumber: number, integrationsRequired:
     type: 'action',
     category: op.categories,
     sourceStepIndex: op.sourceStepIndex,
-    forceIntent: forceIntentForOp(op),
+    forceIntent: forceIntentForOp(op, integrationsRequired),
     unresolvedIntegration: isUnresolvedIntegration(op) || undefined,
   }
 }
@@ -460,6 +476,19 @@ function opToPlannedStep(op: AtomicOp, stepNumber: number, integrationsRequired:
 function decisionNeedsAiReasoning(action: string): boolean {
   if (NUMERIC_DECISION_KEYWORDS.test(action)) return false
   return true
+}
+
+function aiSchemaForAction(action: string): Record<string, unknown> {
+  if (/validat|validasi|memvalidasi/i.test(action)) {
+    return { is_complete: true, service_type: 'premium', missing_fields: [], confidence: 0.96 }
+  }
+  if (/categor|classif|kategori|klasifik/i.test(action)) {
+    return { is_complete: true, ticket_category: 'routine', confidence: 0.96 }
+  }
+  if (/urgency|urgent|priority|prioritas|mendesak/i.test(action)) {
+    return { is_complete: true, urgency: 'low', confidence: 0.96 }
+  }
+  return { result: 'classified', confidence: 0.96 }
 }
 
 interface BuildContext {
@@ -607,6 +636,8 @@ const ASSIGN_RE = /\b(assign|menugaskan|mendelegasikan)\b/i
 const RELEVANT_RE = /\b(relevant|responsible|terkait|relevan|bertanggung jawab|berwenang|yang tepat)\b/i
 const WAIT_UNTIL_RE = /\b(wait|menunggu|tunggu|until|sampai|hingga)\b/i
 const RETRY_RE = /\b(retry|retries|mengulang|coba ulang)\b/i
+const AUTO_RESOLVE_OUTCOME_RE = /auto[- ]?resolve|routine cases?|standard cases?|kasus rutin|otomatis/i
+const COMPLEX_ESCALATION_OUTCOME_RE = /escalat.*complex|complex.*(human|manual)|kasus kompleks|manual review/i
 
 interface StepSemantics {
   trackMonitor: boolean
@@ -648,10 +679,18 @@ function semanticAction(
   forceIntent?: NodeIntent,
   assignments?: { name: string; value: string }[],
 ): PlannedStep {
+  let effectiveTool = tool
+  if (tool === 'Notification channel') {
+    const communication = ctx.integrationsRequired.find((i) => /communication|slack|mail|whatsapp|telegram|sms/i.test(i))
+    if (communication) effectiveTool = resolveIntegrationCategory(communication).platform
+  } else if (tool === 'n8n' && categories.includes('DATA_RETRIEVAL')) {
+    const dataSource = ctx.integrationsRequired.find((i) => /crm|helpdesk|support|ticket|database/i.test(i))
+    if (dataSource) effectiveTool = resolveIntegrationCategory(dataSource).platform
+  }
   const s: PlannedStep = {
     step: nextNum(ctx),
     action,
-    tool,
+    tool: effectiveTool,
     output: '',
     type: 'action',
     category: categories,
@@ -663,7 +702,7 @@ function semanticAction(
   // step unresolved so nodeMapper emits UNRESOLVED_INTEGRATION://configure-me
   // instead of the misleading api.example.com placeholder (mirrors
   // opToPlannedStep's isUnresolvedIntegration for the flat path).
-  if (tool === 'n8n') s.unresolvedIntegration = true
+  if (effectiveTool === 'n8n') s.unresolvedIntegration = true
   return s
 }
 
@@ -711,7 +750,7 @@ function buildTrackEscalateSemantic(step: BlueprintStepInput, sourceStepIndex: n
     // "escalat" text would match detectNodeIntent()'s humanReview pattern
     // (→ a Wait node), but escalation here is a NOTIFICATION to the team, not
     // a human-in-the-loop pause — force a deterministic communication intent.
-    semanticAction(ctx, sourceStepIndex, 'Escalate delay to responsible team', 'Notification channel', ['COMMUNICATION'], 'http'),
+    semanticAction(ctx, sourceStepIndex, 'Escalate delay to responsible team', 'Notification channel', ['COMMUNICATION']),
     semanticAction(ctx, sourceStepIndex, 'Log escalation to audit trail', 'Audit Log', ['AUDIT'], 'audit'),
   ]
   out.push(semanticCondition(ctx, sourceStepIndex, 'Is the work delayed or overdue?', 'is_delayed', escalateSteps, []))
@@ -779,6 +818,47 @@ function buildRetrySemantic(step: BlueprintStepInput, sourceStepIndex: number, c
 }
 
 /**
+ * Adjacent mutually-exclusive outcomes such as "auto-resolve routine cases"
+ * followed by "escalate complex ones" are one decision, not two linear
+ * actions. The policy Set node establishes the boolean data contract and the
+ * IF owns the two outcome branches.
+ */
+function buildOutcomeRoutingSemantic(
+  action: BlueprintStepInput,
+  escalation: BlueprintStepInput,
+  notification: BlueprintStepInput | undefined,
+  sourceStepIndex: number,
+  ctx: BuildContext,
+): PlannedStep[] {
+  const helpdesk = ctx.integrationsRequired.find((i) => /helpdesk|support|ticket|service desk/i.test(i))
+  const actionTool = helpdesk ? resolveIntegrationCategory(helpdesk).platform : 'n8n'
+  const actionIntent: NodeIntent = actionTool.toLowerCase() === 'zendesk' ? 'zendesk' : 'http'
+  const routineBranch = [
+    semanticAction(ctx, sourceStepIndex, action.action, actionTool, ['BUSINESS_ACTION'], actionIntent),
+  ]
+  const complexBranch = [
+    // Without a real human-resume trigger, escalation is a direct notification
+    // rather than an unresumable Wait node.
+    semanticAction(ctx, sourceStepIndex, escalation.action, 'Notification channel', ['COMMUNICATION']),
+  ]
+  if (notification) {
+    complexBranch.push(semanticAction(ctx, sourceStepIndex, notification.action, 'Notification channel', ['COMMUNICATION']))
+  }
+
+  return [
+    semanticAction(ctx, sourceStepIndex, 'Evaluate routine-case routing policy', 'n8n', ['DATA_TRANSFORMATION'], 'transform', [
+      { name: 'is_routine', value: '={{ $json.ticket_type === "routine" || $json.urgency === "low" }}' },
+    ]),
+    semanticCondition(ctx, sourceStepIndex, 'Is this a routine case?', 'is_routine', routineBranch, complexBranch),
+  ]
+}
+
+interface OutcomePair {
+  reviewIndex: number
+  notificationIndex?: number
+}
+
+/**
  * Stage 5b entry point — returns a structured step list when the action text
  * carries temporal/conditional/dependency semantics, or null to fall back to
  * the flat connector-split decomposition. Ordered so combined patterns
@@ -810,13 +890,30 @@ function buildSemanticSteps(step: BlueprintStepInput, sourceStepIndex: number, c
 function buildPlannedSteps(module: BlueprintModuleInput, ctx: BuildContext): PlannedStep[] {
   const steps = module.steps
   const reviewIndices = steps.map((s, i) => (s.type === 'human_review' ? i : -1)).filter((i) => i >= 0)
+  const outcomePairs = new Map<number, OutcomePair>()
+  const outcomeConsumed = new Set<number>()
+  for (let i = 0; i < steps.length - 1; i++) {
+    const current = steps[i]
+    const next = steps[i + 1]
+    if (current.type !== 'execution' || next.type !== 'human_review') continue
+    if (!AUTO_RESOLVE_OUTCOME_RE.test(current.action) || !COMPLEX_ESCALATION_OUTCOME_RE.test(next.action)) continue
+    const following = steps[i + 2]
+    const notificationIndex = following?.type === 'notification' && /relevant team|on escalations|escalation/i.test(following.action)
+      ? i + 2
+      : undefined
+    outcomePairs.set(i, { reviewIndex: i + 1, notificationIndex })
+    outcomeConsumed.add(i + 1)
+    if (notificationIndex !== undefined) outcomeConsumed.add(notificationIndex)
+  }
+  const routedReviewIndices = new Set(Array.from(outcomePairs.values()).map((pair) => pair.reviewIndex))
+  const reviewIndicesForGates = reviewIndices.filter((index) => !routedReviewIndices.has(index))
   // Nearest ai_processing step BEFORE the first review step, if any — the
   // completeness/exception check belongs right after the step that actually
   // validated the data, not after a routing decision that may sit closer in
   // the list but runs on the ASSUMPTION the data was already valid. Only
   // fall back to the nearest `decision` step when no ai_processing step
   // precedes the review at all.
-  const firstReviewIdx = reviewIndices[0]
+  const firstReviewIdx = reviewIndicesForGates[0]
   let gateIdx = -1
   if (firstReviewIdx !== undefined) {
     for (let i = firstReviewIdx - 1; i >= 0; i--) {
@@ -830,9 +927,21 @@ function buildPlannedSteps(module: BlueprintModuleInput, ctx: BuildContext): Pla
   }
 
   const out: PlannedStep[] = []
-  const reviewIndexSet = new Set(reviewIndices)
+  const reviewIndexSet = new Set(reviewIndicesForGates)
 
   for (let i = 0; i < steps.length; i++) {
+    const outcomePair = outcomePairs.get(i)
+    if (outcomePair) {
+      out.push(...buildOutcomeRoutingSemantic(
+        steps[i],
+        steps[outcomePair.reviewIndex],
+        outcomePair.notificationIndex === undefined ? undefined : steps[outcomePair.notificationIndex],
+        i,
+        ctx,
+      ))
+      continue
+    }
+    if (outcomeConsumed.has(i)) continue
     if (reviewIndexSet.has(i)) continue // consumed into the exception gate below
     const step = steps[i]
 
@@ -843,7 +952,7 @@ function buildPlannedSteps(module: BlueprintModuleInput, ctx: BuildContext): Pla
       // Validation AI steps must produce structured output that the downstream
       // "Data complete?" condition can inspect ($json.is_complete) rather than
       // relying on free-text $json.response which is nearly always non-empty.
-      out[out.length - 1].aiOutputSchema = { is_complete: true, service_type: 'premium', missing_fields: [], confidence: 0.96 }
+      out[out.length - 1].aiOutputSchema = aiSchemaForAction(step.action)
       out[out.length - 1].aiReasoning = {
         reasoning_required: true,
         reason: 'Semantic validation of data completeness and classification of service type require interpretation of unstructured/form input — no deterministic rule can assess whether arbitrary free-text fields are present and consistent.',
@@ -871,20 +980,20 @@ function buildPlannedSteps(module: BlueprintModuleInput, ctx: BuildContext): Pla
       }
     }
 
-    if (i === gateIdx && reviewIndices.length > 0) {
-      const reviewOps = reviewIndices.flatMap((ri) => decomposeHumanReview(steps[ri], ri))
+    if (i === gateIdx && reviewIndicesForGates.length > 0) {
+      const reviewOps = reviewIndicesForGates.flatMap((ri) => decomposeHumanReview(steps[ri], ri))
       out.push(buildExceptionGate(reviewOps, step.action, i, ctx))
     }
   }
 
   // No natural gate found before the (only) review step(s) — still don't
   // leave them as a bare trailing linear step; wrap in a generic gate.
-  if (reviewIndices.length > 0 && gateIdx === -1) {
+  if (reviewIndicesForGates.length > 0 && gateIdx === -1) {
     ctx.warnings.push(
       'No preceding ai_processing/decision step found for the human_review step(s) — wrapped in a generic completeness check; verify the gate condition manually.',
     )
-    const reviewOps = reviewIndices.flatMap((ri) => decomposeHumanReview(steps[ri], ri))
-    out.push(buildExceptionGate(reviewOps, 'review required', reviewIndices[0], ctx))
+    const reviewOps = reviewIndicesForGates.flatMap((ri) => decomposeHumanReview(steps[ri], ri))
+    out.push(buildExceptionGate(reviewOps, 'review required', reviewIndicesForGates[0], ctx))
   }
 
   // Stage 5's target end-to-end pattern is TRIGGER → DATA → AI REASONING →
@@ -1361,7 +1470,7 @@ export const MAX_ACTION_TEXT_LENGTH = 2000
 export const MAX_INTEGRATIONS = 50
 
 const VALID_BLUEPRINT_STEP_TYPES: ReadonlySet<BlueprintStepType> = new Set([
-  'ingestion', 'ai_processing', 'decision', 'execution', 'notification', 'human_review',
+  'ingestion', 'ai_processing', 'decision', 'execution', 'notification', 'human_review', 'audit',
 ])
 
 export interface SanitizeBlueprintInputResult {

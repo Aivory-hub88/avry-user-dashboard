@@ -15,6 +15,8 @@ import { detectNodeIntent, type NodeIntent } from "@/lib/workflows/nodeMapper";
 const INTENT_TO_CATEGORY: Record<NodeIntent, string> = {
   email: "email",
   messaging: "channel",
+  hubspot: "http",
+  zendesk: "http",
   respond: "channel",
   filter: "condition",
   switch: "condition",

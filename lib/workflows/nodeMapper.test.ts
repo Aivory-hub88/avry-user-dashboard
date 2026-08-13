@@ -44,6 +44,11 @@ describe('detectNodeIntent — new intents', () => {
     expect(detectNodeIntent('Mengambil data pelanggan dari sistem CRM')).toBe('http')
   })
 
+  it('detects native HubSpot and Zendesk integration names', () => {
+    expect(detectNodeIntent('Get customer record', 'HubSpot')).toBe('hubspot')
+    expect(detectNodeIntent('Create support ticket', 'Zendesk')).toBe('zendesk')
+  })
+
   it('detects audit/log phrasing', () => {
     expect(detectNodeIntent('Write an audit trail entry for this action')).toBe('audit')
   })
@@ -59,6 +64,18 @@ describe('mapIntentToN8nNode — new node builders', () => {
   it('builds a Google Calendar node for calendar', () => {
     const node = mapIntentToN8nNode('calendar', step('Schedule kickoff session'), ctx)
     expect(node.type).toBe('n8n-nodes-base.googleCalendar')
+  })
+
+  it('builds native credential-backed HubSpot, Zendesk, and Slack nodes', () => {
+    const hubspot = mapIntentToN8nNode('hubspot', step('Get customer record', 'HubSpot'), ctx)
+    const zendesk = mapIntentToN8nNode('zendesk', step('Create support ticket', 'Zendesk'), ctx)
+    const slack = mapIntentToN8nNode('messaging', step('Notify team', 'Slack'), ctx)
+    expect(hubspot.type).toBe('n8n-nodes-base.hubspot')
+    expect(hubspot.credentials?.hubspotApi?.name).toBe('HubSpot account')
+    expect(zendesk.type).toBe('n8n-nodes-base.zendesk')
+    expect(zendesk.credentials?.zendeskApi?.name).toBe('Zendesk account')
+    expect(slack.type).toBe('n8n-nodes-base.slack')
+    expect(slack.credentials?.slackApi?.name).toBe('Slack account')
   })
 
   it('builds a Set node for audit', () => {
