@@ -1,7 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useRef, useState } from 'react';
+import QRCode from 'react-qr-code';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AgentProfile,
   getAgentProfile,
@@ -25,6 +26,19 @@ import {
   registerTenantMcpServer,
   reverifyTenantMcpServer,
 } from '@/lib/tenantMcpServers';
+import {
+  createDeployLink,
+  getLinkStatus,
+  DeployLink,
+  LinkStatus,
+} from '@/lib/telegramDeploy';
+import {
+  createSlackDeployLink,
+  getSlackLinkStatus,
+  buildSlackOpenUrl,
+  SlackDeployLink,
+} from '@/lib/slackDeploy';
+import { createAgentApiKey, CreatedApiKey } from '@/lib/agentApiKeys';
 import { asset } from '@/lib/asset';
 
 /**
@@ -270,7 +284,7 @@ export default function CustomizeAgentModal({
   agentName: string | null;
   agentType: string | null;
 }) {
-  const [tab, setTab] = useState<'identity' | 'connections' | 'tools' | 'mcp'>('identity');
+  const [tab, setTab] = useState<'identity' | 'connections' | 'tools' | 'mcp' | 'deploy'>('identity');
   const [fields, setFields] = useState<Record<FieldKey, string>>(EMPTY);
   const [hasProfile, setHasProfile] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -301,6 +315,21 @@ export default function CustomizeAgentModal({
   const [mcpForm, setMcpForm] = useState({ name: '', url: '', transport: 'streamable-http' as 'streamable-http' | 'sse', authHeaderName: '', authHeaderValue: '' });
   const [mcpRegistering, setMcpRegistering] = useState(false);
   const [mcpFormError, setMcpFormError] = useState<string | null>(null);
+
+  // Deploy tab — was a separate modal (app/agents/page.tsx's DeployModal),
+  // merged in so identity/connections/tools/MCP are configured before a
+  // channel goes live, not as a competing entry point.
+  const [deployView, setDeployView] = useState<'channels' | 'telegram' | 'slack' | 'api'>('channels');
+  const [deployLink, setDeployLink] = useState<DeployLink | null>(null);
+  const [slackLink, setSlackLink] = useState<SlackDeployLink | null>(null);
+  const [slackTeamId, setSlackTeamId] = useState<string | null>(null);
+  const [linkStatus, setLinkStatus] = useState<LinkStatus>('pending');
+  const [deployLoading, setDeployLoading] = useState(false);
+  const [deployError, setDeployError] = useState<string | null>(null);
+  const deployPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [apiKeyLabel, setApiKeyLabel] = useState('');
+  const [createdKey, setCreatedKey] = useState<CreatedApiKey | null>(null);
+  const [apiKeyCopied, setApiKeyCopied] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !agentType) return;
@@ -341,7 +370,102 @@ export default function CustomizeAgentModal({
     setMcpListError(null);
     setMcpForm({ name: '', url: '', transport: 'streamable-http', authHeaderName: '', authHeaderValue: '' });
     setMcpFormError(null);
+    if (deployPollRef.current) { clearInterval(deployPollRef.current); deployPollRef.current = null; }
+    setDeployView('channels');
+    setDeployLink(null);
+    setSlackLink(null);
+    setSlackTeamId(null);
+    setLinkStatus('pending');
+    setDeployLoading(false);
+    setDeployError(null);
+    setApiKeyLabel('');
+    setCreatedKey(null);
+    setApiKeyCopied(false);
   }, [isOpen, agentType]);
+
+  // Stop deploy polling on unmount too, not just on modal-reopen.
+  useEffect(() => {
+    return () => { if (deployPollRef.current) clearInterval(deployPollRef.current); };
+  }, []);
+
+  const stopDeployPolling = useCallback(() => {
+    if (deployPollRef.current) { clearInterval(deployPollRef.current); deployPollRef.current = null; }
+  }, []);
+
+  const startApiKeyCreate = async () => {
+    if (!agentType || deployLoading) return;
+    setDeployLoading(true);
+    setDeployError(null);
+    try {
+      const key = await createAgentApiKey(agentType, apiKeyLabel.trim() || undefined);
+      setCreatedKey(key);
+    } catch (e: any) {
+      setDeployError(e?.message || 'Could not create the API key. Please try again.');
+    } finally {
+      setDeployLoading(false);
+    }
+  };
+
+  const startSlackDeploy = async () => {
+    if (!agentType) return;
+    setDeployLoading(true);
+    setDeployError(null);
+    try {
+      const link = await createSlackDeployLink(agentType as any);
+      setSlackLink(link);
+      setSlackTeamId(null);
+      setLinkStatus('pending');
+      setDeployView('slack');
+      // OAuth install is a one-time, admin-only, workspace-level action — it
+      // needs a real browser (Slack login, workspace picker), so it opens
+      // directly rather than via a QR scan. Once connected, a QR code
+      // appears instead — that one just deep-links into the already-
+      // installed agent's chat, which any team member can scan, no admin
+      // needed.
+      window.open(link.install_url, '_blank', 'noopener,noreferrer');
+      stopDeployPolling();
+      deployPollRef.current = setInterval(async () => {
+        try {
+          const res = await getSlackLinkStatus(link.token);
+          if (res.status === 'connected' || res.status === 'expired') {
+            setLinkStatus(res.status);
+            if (res.team_id) setSlackTeamId(res.team_id);
+            stopDeployPolling();
+          }
+        } catch { /* keep polling */ }
+      }, 2500);
+    } catch (e: any) {
+      setDeployError(e?.message || 'Could not start the Slack install. Please try again.');
+    } finally {
+      setDeployLoading(false);
+    }
+  };
+
+  const startTelegramDeploy = async () => {
+    if (!agentType) return;
+    setDeployLoading(true);
+    setDeployError(null);
+    try {
+      const link = await createDeployLink(agentType as any);
+      setDeployLink(link);
+      setLinkStatus('pending');
+      setDeployView('telegram');
+      stopDeployPolling();
+      deployPollRef.current = setInterval(async () => {
+        try {
+          const res = await getLinkStatus(link.token);
+          if (res.status === 'connected' || res.status === 'expired') {
+            setLinkStatus(res.status);
+            stopDeployPolling();
+          }
+        } catch { /* keep polling */ }
+      }, 2500);
+    } catch (e: any) {
+      setDeployError(e?.message || 'Could not create deploy link. Please try again.');
+    } finally {
+      setDeployLoading(false);
+    }
+  };
 
   // `connectionsFetched`/`toolsFetched` (not "is the data still null") gate
   // the retry — a failed fetch leaves `connections`/`toolScope` at their
@@ -635,9 +759,10 @@ export default function CustomizeAgentModal({
             {tab === 'connections' && 'Third-party apps this agent can use — connect or disconnect them right here.'}
             {tab === 'tools' && 'Turn off any external toolkit you don’t want this agent to use. Aivory’s built-in tools always stay on.'}
             {tab === 'mcp' && 'Connect this agent to your own systems by registering an MCP server you control. Pro plan and above, Aivory Cerveau agents only — every tool call requires your approval.'}
+            {tab === 'deploy' && 'Once this agent is set up the way you want, put it to work on a channel.'}
           </p>
           <div className="flex items-center gap-1 border-b border-white/[0.06] -mb-4">
-            {(['identity', 'connections', 'tools', 'mcp'] as const).map((t) => (
+            {(['identity', 'connections', 'tools', 'mcp', 'deploy'] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -1016,6 +1141,315 @@ export default function CustomizeAgentModal({
                 )}
               </div>
             )
+          )}
+
+          {tab === 'deploy' && (
+            deployView === 'channels' ? (
+              <>
+                {deployError && (
+                  <div className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300/90 text-[12px] mb-1">
+                    {deployError}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <button
+                    onClick={startSlackDeploy}
+                    disabled={!agentType || deployLoading}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden shrink-0">
+                      <Image src={asset('/integrations/icons/slack.svg')} alt="Slack" width={20} height={20} />
+                    </div>
+                    <div>
+                      <div className="text-white/90 font-medium text-[14px]">Slack</div>
+                      <div className="text-white/40 text-[12px] mt-0.5">{deployLoading ? 'Preparing install…' : 'Connect to a Slack workspace'}</div>
+                    </div>
+                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                      {deployLoading ? (
+                        <div className="w-5 h-5 border-2 border-[#b7cba6]/30 border-t-[#b7cba6] rounded-full animate-spin" />
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={startTelegramDeploy}
+                    disabled={!agentType || deployLoading}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+                      <Image src={asset('/integrations/icons/telegram.svg')} alt="Telegram" width={40} height={40} />
+                    </div>
+                    <div>
+                      <div className="text-white/90 font-medium text-[14px]">Telegram</div>
+                      <div className="text-white/40 text-[12px] mt-0.5">{deployLoading ? 'Generating QR code…' : 'Deploy as a Telegram bot — scan a QR code'}</div>
+                    </div>
+                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                      {deployLoading ? (
+                        <div className="w-5 h-5 border-2 border-[#b7cba6]/30 border-t-[#b7cba6] rounded-full animate-spin" />
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => { setDeployError(null); setDeployView('api'); }}
+                    disabled={!agentType}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+                      <Image src={asset('/integrations/icons/http-api.svg')} alt="API" width={40} height={40} />
+                    </div>
+                    <div>
+                      <div className="text-white/90 font-medium text-[14px]">API</div>
+                      <div className="text-white/40 text-[12px] mt-0.5">Deploy to your own app or bot — Pro plan and above</div>
+                    </div>
+                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                      </svg>
+                    </div>
+                  </button>
+
+                  <button className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+                      <Image src={asset('/integrations/icons/whatsapp.svg')} alt="WhatsApp" width={40} height={40} />
+                    </div>
+                    <div>
+                      <div className="text-white/90 font-medium text-[14px]">WhatsApp</div>
+                      <div className="text-white/40 text-[12px] mt-0.5">Deploy to WhatsApp Business</div>
+                    </div>
+                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                      </svg>
+                    </div>
+                  </button>
+                </div>
+              </>
+            ) : deployView === 'slack' && slackLink ? (
+              <>
+                <button onClick={() => { stopDeployPolling(); setDeployView('channels'); }} className="flex items-center gap-1.5 text-white/40 hover:text-white text-[12px] transition-colors mb-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                  </svg>
+                  Back
+                </button>
+
+                <h4 className="text-white text-[15px] font-normal mb-1.5">
+                  {linkStatus === 'connected' ? 'Agent connected' : 'Deploy to Slack'}
+                </h4>
+                <p className="text-white/60 text-[13px] leading-relaxed mb-5">
+                  {linkStatus === 'connected'
+                    ? <>Your <strong className="text-white font-medium">{slackLink.agent_name}</strong> is live in your Slack workspace. Open the chat below, or DM/@mention it directly.</>
+                    : linkStatus === 'expired'
+                    ? 'This install link has expired. Generate a new one to continue.'
+                    : <>Approve the install in the Slack tab that just opened to connect your <strong className="text-white font-medium">{slackLink.agent_name}</strong>.</>}
+                </p>
+
+                <div className="flex flex-col items-center">
+                  <div className={`w-[216px] h-[216px] rounded-2xl border flex flex-col items-center justify-center gap-3 ${linkStatus === 'connected' ? 'bg-[#b7cba6]/10 border-[#b7cba6]/30' : 'bg-white/[0.03] border-white/10'}`}>
+                    {linkStatus === 'connected' ? (
+                      <>
+                        <div className="w-14 h-14 rounded-full bg-[#b7cba6]/20 flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7 text-[#b7cba6]">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </div>
+                        <span className="text-[#b7cba6] text-[13px] font-medium">Connected</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center">
+                          <Image src={asset('/integrations/icons/slack.svg')} alt="Slack" width={28} height={28} />
+                        </div>
+                        {linkStatus === 'expired' ? (
+                          <button
+                            onClick={startSlackDeploy}
+                            disabled={deployLoading}
+                            className="px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-[#b7cba6]/50 transition-all"
+                          >
+                            {deployLoading ? 'Generating…' : 'Generate new link'}
+                          </button>
+                        ) : (
+                          <span className="text-white/50 text-[12px] px-6 text-center">Waiting for Slack authorization…</span>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {linkStatus === 'connected' && slackTeamId && (
+                    <a
+                      href={buildSlackOpenUrl(slackTeamId)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-4 w-full py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 text-[13px] font-medium text-center transition-all border border-white/10"
+                    >
+                      Open chat in Slack
+                    </a>
+                  )}
+
+                  {linkStatus === 'pending' && (
+                    <>
+                      <div className="flex items-center gap-2 mt-5 text-white/50 text-[12px]">
+                        <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-[#b7cba6] rounded-full animate-spin" />
+                        Waiting for approval…
+                      </div>
+                      <a
+                        href={slackLink.install_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 text-[#b7cba6]/80 hover:text-[#b7cba6] text-[12px] underline underline-offset-2 transition-colors"
+                      >
+                        Re-open the Slack authorization page
+                      </a>
+                    </>
+                  )}
+                </div>
+              </>
+            ) : deployView === 'telegram' && deployLink ? (
+              <>
+                <button onClick={() => { stopDeployPolling(); setDeployView('channels'); }} className="flex items-center gap-1.5 text-white/40 hover:text-white text-[12px] transition-colors mb-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                  </svg>
+                  Back
+                </button>
+
+                <h4 className="text-white text-[15px] font-normal mb-1.5">
+                  {linkStatus === 'connected' ? 'Agent connected' : 'Deploy to Telegram'}
+                </h4>
+                <p className="text-white/60 text-[13px] leading-relaxed mb-5">
+                  {linkStatus === 'connected'
+                    ? <>Your <strong className="text-white font-medium">{deployLink.agent_name}</strong> is live in Telegram. Say hi!</>
+                    : linkStatus === 'expired'
+                    ? 'This QR code has expired. Generate a new one to continue.'
+                    : <>Scan with your phone&apos;s camera or Telegram app to connect your <strong className="text-white font-medium">{deployLink.agent_name}</strong>.</>}
+                </p>
+
+                <div className="flex flex-col items-center">
+                  {linkStatus === 'connected' ? (
+                    <div className="w-[216px] h-[216px] rounded-2xl bg-[#b7cba6]/10 border border-[#b7cba6]/30 flex flex-col items-center justify-center gap-3">
+                      <div className="w-14 h-14 rounded-full bg-[#b7cba6]/20 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7 text-[#b7cba6]">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      </div>
+                      <span className="text-[#b7cba6] text-[13px] font-medium">Connected</span>
+                    </div>
+                  ) : (
+                    <div className={`relative p-4 bg-white rounded-2xl ${linkStatus === 'expired' ? 'opacity-30' : ''}`}>
+                      <QRCode value={deployLink.deep_link} size={184} level="M" />
+                      {linkStatus === 'expired' && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <button
+                            onClick={startTelegramDeploy}
+                            disabled={deployLoading}
+                            className="px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-[#b7cba6]/50 transition-all"
+                          >
+                            {deployLoading ? 'Generating…' : 'Generate new QR'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {linkStatus === 'pending' && (
+                    <>
+                      <div className="flex items-center gap-2 mt-5 text-white/50 text-[12px]">
+                        <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-[#b7cba6] rounded-full animate-spin" />
+                        Waiting for scan…
+                      </div>
+                      <a
+                        href={deployLink.deep_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 text-[#b7cba6]/80 hover:text-[#b7cba6] text-[12px] underline underline-offset-2 transition-colors"
+                      >
+                        Or open in Telegram on this device
+                      </a>
+                    </>
+                  )}
+                </div>
+              </>
+            ) : deployView === 'api' ? (
+              <>
+                <button onClick={() => setDeployView('channels')} className="flex items-center gap-1.5 text-white/40 hover:text-white text-[12px] transition-colors mb-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                  </svg>
+                  Back
+                </button>
+
+                <h4 className="text-white text-[15px] font-normal mb-1.5">
+                  {createdKey ? 'API key created' : 'Deploy via API'}
+                </h4>
+                <p className="text-white/60 text-[13px] leading-relaxed mb-4">
+                  {createdKey
+                    ? 'Copy this key now — it will not be shown again.'
+                    : <>Send messages to your <strong className="text-white font-medium">{agentName}</strong> from your own app, bot, or backend.</>}
+                </p>
+
+                {deployError && (
+                  <div className="mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300/90 text-[12px]">
+                    {deployError}
+                  </div>
+                )}
+
+                {!createdKey ? (
+                  <>
+                    <label className="block text-white/70 text-[12px] font-medium mb-1.5">Label (optional)</label>
+                    <input
+                      type="text"
+                      value={apiKeyLabel}
+                      onChange={(e) => setApiKeyLabel(e.target.value.slice(0, 200))}
+                      placeholder="e.g. Discord bot prod"
+                      className="w-full px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 text-white/90 text-[13px] placeholder-white/25 focus:outline-none focus:border-[#b7cba6]/40 transition-colors mb-4"
+                    />
+                    <button
+                      onClick={startApiKeyCreate}
+                      disabled={deployLoading}
+                      className="w-full py-2.5 rounded-lg bg-[#b7cba6]/20 hover:bg-[#b7cba6]/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-[#b7cba6]/30 disabled:opacity-50"
+                    >
+                      {deployLoading ? 'Creating…' : 'Create API key'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 mb-2">
+                      <code className="flex-1 text-[12px] text-[#dbe5d3] break-all">{createdKey.key}</code>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(createdKey.key);
+                          setApiKeyCopied(true);
+                          setTimeout(() => setApiKeyCopied(false), 2000);
+                        }}
+                        className="shrink-0 px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/10 text-white/70 text-[11px] transition-colors"
+                      >
+                        {apiKeyCopied ? 'Copied ✓' : 'Copy'}
+                      </button>
+                    </div>
+                    <p className="text-white/35 text-[11px] mb-4">
+                      Store this somewhere safe — Aivory never stores or shows the plaintext key again.
+                    </p>
+
+                    <label className="block text-white/70 text-[12px] font-medium mb-1.5">Example request</label>
+                    <pre className="w-full px-3.5 py-3 rounded-lg bg-black/30 border border-white/10 text-white/60 text-[10.5px] overflow-x-auto whitespace-pre-wrap break-all">
+{`curl -X POST ${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'}/api/v1/agent-api/message \\
+  -H "X-Aivory-Api-Key: ${createdKey.key}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"text": "Hello!", "session_id": "your-own-thread-id"}'`}
+                    </pre>
+                  </>
+                )}
+              </>
+            ) : null
           )}
         </div>
 

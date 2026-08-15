@@ -3,23 +3,10 @@ import { asset } from "@/lib/asset";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import QRCode from 'react-qr-code';
-import {
-  createDeployLink,
-  getLinkStatus,
-  DeployLink,
-  LinkStatus,
-  TelegramAgentType,
-} from '@/lib/telegramDeploy';
-import {
-  createSlackDeployLink,
-  getSlackLinkStatus,
-  buildSlackOpenUrl,
-  SlackDeployLink,
-} from '@/lib/slackDeploy';
+import { TelegramAgentType } from '@/lib/telegramDeploy';
+import { buildSlackOpenUrl } from '@/lib/slackDeploy';
 import { listAgentActions, AgentAction } from '@/lib/agentActions';
 import { listDeployments, deleteDeployment, AgentDeployment } from '@/lib/agentChat';
-import { createAgentApiKey, CreatedApiKey } from '@/lib/agentApiKeys';
 import { getCredits, CreditStatus } from '@/lib/agentProfiles';
 import CustomizeAgentModal from '@/components/agents/CustomizeAgentModal';
 
@@ -245,482 +232,6 @@ function IntegrationsRow() {
   );
 }
 
-function DeployModal({ isOpen, onClose, agentName, agentType }: { isOpen: boolean, onClose: () => void, agentName: string | null, agentType: TelegramAgentType | null }) {
-  const [view, setView] = useState<'channels' | 'telegram' | 'slack' | 'api'>('channels');
-  const [deployLink, setDeployLink] = useState<DeployLink | null>(null);
-  const [slackLink, setSlackLink] = useState<SlackDeployLink | null>(null);
-  const [slackTeamId, setSlackTeamId] = useState<string | null>(null);
-  const [linkStatus, setLinkStatus] = useState<LinkStatus>('pending');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const [apiKeyLabel, setApiKeyLabel] = useState('');
-  const [createdKey, setCreatedKey] = useState<CreatedApiKey | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-  }, []);
-
-  // Reset everything whenever the modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      stopPolling();
-      // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
-      // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
-      // not restructuring this component's data flow to satisfy the newer
-      // React Compiler style rule; see other documented instances of this.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setView('channels');
-      setDeployLink(null);
-      setSlackLink(null);
-      setSlackTeamId(null);
-      setLinkStatus('pending');
-      setError(null);
-      setLoading(false);
-      setApiKeyLabel('');
-      setCreatedKey(null);
-      setCopied(false);
-    }
-    return stopPolling;
-  }, [isOpen, stopPolling]);
-
-  const startApiKeyCreate = async () => {
-    if (!agentType || loading) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const key = await createAgentApiKey(agentType, apiKeyLabel.trim() || undefined);
-      setCreatedKey(key);
-    } catch (e: any) {
-      setError(e?.message || 'Could not create the API key. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const startSlackDeploy = async () => {
-    if (!agentType) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const link = await createSlackDeployLink(agentType);
-      setSlackLink(link);
-      setSlackTeamId(null);
-      setLinkStatus('pending');
-      setView('slack');
-      // OAuth install is a one-time, admin-only, workspace-level action — it needs a real
-      // browser (Slack login, workspace picker), so it opens directly rather than via a QR scan.
-      // Once connected, a QR code appears instead (see below) — that one just deep-links into
-      // the already-installed agent's chat, which any team member can scan, no admin needed.
-      window.open(link.install_url, '_blank', 'noopener,noreferrer');
-      stopPolling();
-      pollRef.current = setInterval(async () => {
-        try {
-          const res = await getSlackLinkStatus(link.token);
-          if (res.status === 'connected' || res.status === 'expired') {
-            setLinkStatus(res.status);
-            if (res.team_id) setSlackTeamId(res.team_id);
-            stopPolling();
-          }
-        } catch { /* keep polling */ }
-      }, 2500);
-    } catch (e: any) {
-      setError(e?.message || 'Could not start the Slack install. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const startTelegramDeploy = async () => {
-    if (!agentType) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const link = await createDeployLink(agentType);
-      setDeployLink(link);
-      setLinkStatus('pending');
-      setView('telegram');
-      stopPolling();
-      pollRef.current = setInterval(async () => {
-        try {
-          const res = await getLinkStatus(link.token);
-          if (res.status === 'connected' || res.status === 'expired') {
-            setLinkStatus(res.status);
-            stopPolling();
-          }
-        } catch { /* keep polling */ }
-      }, 2500);
-    } catch (e: any) {
-      setError(e?.message || 'Could not create deploy link. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-[#242424] border border-white/10 rounded-[24px] p-8 w-full max-w-md shadow-2xl relative" onClick={e => e.stopPropagation()}>
-        {/* Close Button */}
-        <button onClick={onClose} className="absolute top-6 right-6 text-white/40 hover:text-white transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        {view === 'channels' && (
-          <>
-            <h3 style={{ fontSize: 20, fontWeight: 300, color: '#fff', margin: '0 0 8px', lineHeight: 1.3 }}>Deploy Agent</h3>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 32px' }}>Select a communication channel to connect your <strong className="text-white font-medium">{agentName}</strong>.</p>
-
-            {error && (
-              <div className="mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300/90 text-[12px]">
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {/* Slack Option */}
-              <button
-                onClick={startSlackDeploy}
-                disabled={!agentType || loading}
-                className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden shrink-0">
-                  <Image src={asset("/integrations/icons/slack.svg")} alt="Slack" width={20} height={20} />
-                </div>
-                <div>
-                  <div className="text-white/90 font-medium text-[14px]">Slack</div>
-                  <div className="text-white/40 text-[12px] mt-0.5">{loading ? 'Preparing install…' : 'Connect to a Slack workspace'}</div>
-                </div>
-                <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                  {loading ? (
-                    <div className="w-5 h-5 border-2 border-[#b7cba6]/30 border-t-[#b7cba6] rounded-full animate-spin" />
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                    </svg>
-                  )}
-                </div>
-              </button>
-
-              {/* Telegram Option */}
-              <button
-                onClick={startTelegramDeploy}
-                disabled={!agentType || loading}
-                className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
-                  <Image src={asset("/integrations/icons/telegram.svg")} alt="Telegram" width={40} height={40} />
-                </div>
-                <div>
-                  <div className="text-white/90 font-medium text-[14px]">Telegram</div>
-                  <div className="text-white/40 text-[12px] mt-0.5">{loading ? 'Generating QR code…' : 'Deploy as a Telegram bot — scan a QR code'}</div>
-                </div>
-                <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                  {loading ? (
-                    <div className="w-5 h-5 border-2 border-[#b7cba6]/30 border-t-[#b7cba6] rounded-full animate-spin" />
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                    </svg>
-                  )}
-                </div>
-              </button>
-
-              {/* API Option */}
-              <button
-                onClick={() => { setError(null); setView('api'); }}
-                disabled={!agentType}
-                className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
-                  <Image src={asset("/integrations/icons/http-api.svg")} alt="API" width={40} height={40} />
-                </div>
-                <div>
-                  <div className="text-white/90 font-medium text-[14px]">API</div>
-                  <div className="text-white/40 text-[12px] mt-0.5">Deploy to your own app or bot — Pro plan and above</div>
-                </div>
-                <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                  </svg>
-                </div>
-              </button>
-
-              {/* WhatsApp Option */}
-              <button className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
-                  <Image src={asset("/integrations/icons/whatsapp.svg")} alt="WhatsApp" width={40} height={40} />
-                </div>
-                <div>
-                  <div className="text-white/90 font-medium text-[14px]">WhatsApp</div>
-                  <div className="text-white/40 text-[12px] mt-0.5">Deploy to WhatsApp Business</div>
-                </div>
-                <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                  </svg>
-                </div>
-              </button>
-            </div>
-          </>
-        )}
-
-        {view === 'slack' && slackLink && (
-          <>
-            <button onClick={() => { stopPolling(); setView('channels'); }} className="flex items-center gap-1.5 text-white/40 hover:text-white text-[12px] transition-colors mb-4 -mt-2">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-              </svg>
-              Back
-            </button>
-
-            <h3 style={{ fontSize: 20, fontWeight: 300, color: '#fff', margin: '0 0 8px', lineHeight: 1.3 }}>
-              {linkStatus === 'connected' ? 'Agent connected' : 'Deploy to Slack'}
-            </h3>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 24px' }}>
-              {linkStatus === 'connected'
-                ? <>Your <strong className="text-white font-medium">{slackLink.agent_name}</strong> is live in your Slack workspace. Open the chat below, or DM/@mention it directly.</>
-                : linkStatus === 'expired'
-                ? 'This install link has expired. Generate a new one to continue.'
-                : <>Approve the install in the Slack tab that just opened to connect your <strong className="text-white font-medium">{slackLink.agent_name}</strong>.</>}
-            </p>
-
-            <div className="flex flex-col items-center">
-              <div className={`w-[216px] h-[216px] rounded-2xl border flex flex-col items-center justify-center gap-3 ${linkStatus === 'connected' ? 'bg-[#b7cba6]/10 border-[#b7cba6]/30' : 'bg-white/[0.03] border-white/10'}`}>
-                {linkStatus === 'connected' ? (
-                  <>
-                    <div className="w-14 h-14 rounded-full bg-[#b7cba6]/20 flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7 text-[#b7cba6]">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                      </svg>
-                    </div>
-                    <span className="text-[#b7cba6] text-[13px] font-medium">Connected</span>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center">
-                      <Image src={asset("/integrations/icons/slack.svg")} alt="Slack" width={28} height={28} />
-                    </div>
-                    {linkStatus === 'expired' ? (
-                      <button
-                        onClick={startSlackDeploy}
-                        disabled={loading}
-                        className="px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-[#b7cba6]/50 transition-all"
-                      >
-                        {loading ? 'Generating…' : 'Generate new link'}
-                      </button>
-                    ) : (
-                      <span className="text-white/50 text-[12px] px-6 text-center">Waiting for Slack authorization…</span>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {linkStatus === 'connected' && slackTeamId && (
-                <a
-                  href={buildSlackOpenUrl(slackTeamId)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-4 w-full py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 text-[13px] font-medium text-center transition-all border border-white/10"
-                >
-                  Open chat in Slack
-                </a>
-              )}
-
-              {linkStatus === 'pending' && (
-                <>
-                  <div className="flex items-center gap-2 mt-5 text-white/50 text-[12px]">
-                    <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-[#b7cba6] rounded-full animate-spin" />
-                    Waiting for approval…
-                  </div>
-                  <a
-                    href={slackLink.install_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 text-[#b7cba6]/80 hover:text-[#b7cba6] text-[12px] underline underline-offset-2 transition-colors"
-                  >
-                    Re-open the Slack authorization page
-                  </a>
-                </>
-              )}
-
-              {linkStatus === 'connected' && (
-                <button
-                  onClick={onClose}
-                  className="mt-5 w-full py-2.5 rounded-lg bg-[#b7cba6]/20 hover:bg-[#b7cba6]/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-[#b7cba6]/30"
-                >
-                  Done
-                </button>
-              )}
-            </div>
-          </>
-        )}
-
-        {view === 'telegram' && deployLink && (
-          <>
-            <button onClick={() => { stopPolling(); setView('channels'); }} className="flex items-center gap-1.5 text-white/40 hover:text-white text-[12px] transition-colors mb-4 -mt-2">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-              </svg>
-              Back
-            </button>
-
-            <h3 style={{ fontSize: 20, fontWeight: 300, color: '#fff', margin: '0 0 8px', lineHeight: 1.3 }}>
-              {linkStatus === 'connected' ? 'Agent connected' : `Deploy to Telegram`}
-            </h3>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 24px' }}>
-              {linkStatus === 'connected'
-                ? <>Your <strong className="text-white font-medium">{deployLink.agent_name}</strong> is live in Telegram. Say hi!</>
-                : linkStatus === 'expired'
-                ? 'This QR code has expired. Generate a new one to continue.'
-                : <>Scan with your phone&apos;s camera or Telegram app to connect your <strong className="text-white font-medium">{deployLink.agent_name}</strong>.</>}
-            </p>
-
-            <div className="flex flex-col items-center">
-              {linkStatus === 'connected' ? (
-                <div className="w-[216px] h-[216px] rounded-2xl bg-[#b7cba6]/10 border border-[#b7cba6]/30 flex flex-col items-center justify-center gap-3">
-                  <div className="w-14 h-14 rounded-full bg-[#b7cba6]/20 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7 text-[#b7cba6]">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                  </div>
-                  <span className="text-[#b7cba6] text-[13px] font-medium">Connected</span>
-                </div>
-              ) : (
-                <div className={`relative p-4 bg-white rounded-2xl ${linkStatus === 'expired' ? 'opacity-30' : ''}`}>
-                  <QRCode value={deployLink.deep_link} size={184} level="M" />
-                  {linkStatus === 'expired' && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <button
-                        onClick={startTelegramDeploy}
-                        disabled={loading}
-                        className="px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-[#b7cba6]/50 transition-all"
-                      >
-                        {loading ? 'Generating…' : 'Generate new QR'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {linkStatus === 'pending' && (
-                <>
-                  <div className="flex items-center gap-2 mt-5 text-white/50 text-[12px]">
-                    <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-[#b7cba6] rounded-full animate-spin" />
-                    Waiting for scan…
-                  </div>
-                  <a
-                    href={deployLink.deep_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 text-[#b7cba6]/80 hover:text-[#b7cba6] text-[12px] underline underline-offset-2 transition-colors"
-                  >
-                    Or open in Telegram on this device
-                  </a>
-                </>
-              )}
-
-              {linkStatus === 'connected' && (
-                <button
-                  onClick={onClose}
-                  className="mt-5 w-full py-2.5 rounded-lg bg-[#b7cba6]/20 hover:bg-[#b7cba6]/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-[#b7cba6]/30"
-                >
-                  Done
-                </button>
-              )}
-            </div>
-          </>
-        )}
-
-        {view === 'api' && (
-          <>
-            <button onClick={() => setView('channels')} className="flex items-center gap-1.5 text-white/40 hover:text-white text-[12px] transition-colors mb-4 -mt-2">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-              </svg>
-              Back
-            </button>
-
-            <h3 style={{ fontSize: 20, fontWeight: 300, color: '#fff', margin: '0 0 8px', lineHeight: 1.3 }}>
-              {createdKey ? 'API key created' : 'Deploy via API'}
-            </h3>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 20px' }}>
-              {createdKey
-                ? 'Copy this key now — it will not be shown again.'
-                : <>Send messages to your <strong className="text-white font-medium">{agentName}</strong> from your own app, bot, or backend.</>}
-            </p>
-
-            {error && (
-              <div className="mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300/90 text-[12px]">
-                {error}
-              </div>
-            )}
-
-            {!createdKey ? (
-              <>
-                <label className="block text-white/70 text-[12px] font-medium mb-1.5">Label (optional)</label>
-                <input
-                  type="text"
-                  value={apiKeyLabel}
-                  onChange={(e) => setApiKeyLabel(e.target.value.slice(0, 200))}
-                  placeholder="e.g. Discord bot prod"
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 text-white/90 text-[13px] placeholder-white/25 focus:outline-none focus:border-[#b7cba6]/40 transition-colors mb-4"
-                />
-                <button
-                  onClick={startApiKeyCreate}
-                  disabled={loading}
-                  className="w-full py-2.5 rounded-lg bg-[#b7cba6]/20 hover:bg-[#b7cba6]/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-[#b7cba6]/30 disabled:opacity-50"
-                >
-                  {loading ? 'Creating…' : 'Create API key'}
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 mb-2">
-                  <code className="flex-1 text-[12px] text-[#dbe5d3] break-all">{createdKey.key}</code>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(createdKey.key);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    }}
-                    className="shrink-0 px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/10 text-white/70 text-[11px] transition-colors"
-                  >
-                    {copied ? 'Copied ✓' : 'Copy'}
-                  </button>
-                </div>
-                <p className="text-white/35 text-[11px] mb-4">
-                  Store this somewhere safe — Aivory never stores or shows the plaintext key again.
-                </p>
-
-                <label className="block text-white/70 text-[12px] font-medium mb-1.5">Example request</label>
-                <pre className="w-full px-3.5 py-3 rounded-lg bg-black/30 border border-white/10 text-white/60 text-[10.5px] overflow-x-auto mb-5 whitespace-pre-wrap break-all">
-{`curl -X POST ${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'}/api/v1/agent-api/message \\
-  -H "X-Aivory-Api-Key: ${createdKey.key}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"text": "Hello!", "session_id": "your-own-thread-id"}'`}
-                </pre>
-
-                <button
-                  onClick={onClose}
-                  className="w-full py-2.5 rounded-lg bg-[#b7cba6]/20 hover:bg-[#b7cba6]/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-[#b7cba6]/30"
-                >
-                  Done
-                </button>
-              </>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function DeploymentRow({ deployment, onDisconnect }: { deployment: AgentDeployment, onDisconnect: (d: AgentDeployment) => void }) {
   const [busy, setBusy] = useState(false);
   return (
@@ -775,7 +286,7 @@ function DeploymentRow({ deployment, onDisconnect }: { deployment: AgentDeployme
   );
 }
 
-function AgentCard({ agent, deployments, onDeploy, onCustomize, onDisconnect }: { agent: typeof AGENTS[0], deployments: AgentDeployment[], onDeploy: () => void, onCustomize?: () => void, onDisconnect: (d: AgentDeployment) => void }) {
+function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: typeof AGENTS[0], deployments: AgentDeployment[], onConfigure: () => void, onDisconnect: (d: AgentDeployment) => void }) {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -872,26 +383,14 @@ function AgentCard({ agent, deployments, onDeploy, onCustomize, onDisconnect }: 
 
         <div className="mt-auto pt-5 flex items-center gap-2">
           <button
-            onClick={onDeploy}
+            onClick={onConfigure}
             className="flex-1 py-2 rounded-lg bg-gradient-to-b from-white/[0.09] to-white/[0.03] hover:from-[#b7cba6]/25 hover:to-[#b7cba6]/10 text-white/95 hover:text-white text-[12.5px] font-medium transition-all border border-white/10 hover:border-[#b7cba6]/30 shadow-[0_1px_0_rgba(255,255,255,0.08)_inset,0_4px_12px_rgba(0,0,0,0.25)] flex items-center justify-center gap-2 group/btn"
           >
-            Deploy
+            Configure
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover/btn:opacity-100 group-hover/btn:translate-x-0 transition-all duration-200">
               <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
             </svg>
           </button>
-          {onCustomize && (
-            <button
-              onClick={onCustomize}
-              title="Customise this agent's identity"
-              className="shrink-0 px-3 py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.09] text-white/55 hover:text-white/90 text-[12.5px] font-medium transition-all border border-white/10 hover:border-white/20 flex items-center justify-center"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
-          )}
         </div>
       </div>
     </div>
@@ -1051,7 +550,6 @@ function CreditsPill() {
 }
 
 export default function AgentsPage() {
-  const [deployingAgent, setDeployingAgent] = useState<{ title: string, agentType: TelegramAgentType | null } | null>(null);
   const [customizingAgent, setCustomizingAgent] = useState<{ title: string, agentType: TelegramAgentType } | null>(null);
   const [dynamicAgents, setDynamicAgents] = useState<any[]>([]);
   const [deployments, setDeployments] = useState<AgentDeployment[]>([]);
@@ -1114,8 +612,7 @@ export default function AgentsPage() {
               key={idx}
               agent={agent}
               deployments={deployments.filter((d) => d.agentType === (agent as any).agentType)}
-              onDeploy={() => setDeployingAgent({ title: agent.title, agentType: (agent as any).agentType ?? null })}
-              onCustomize={(agent as any).agentType ? () => setCustomizingAgent({ title: agent.title, agentType: (agent as any).agentType }) : undefined}
+              onConfigure={() => setCustomizingAgent({ title: agent.title, agentType: (agent as any).agentType })}
               onDisconnect={handleDisconnect}
             />
           ))}
@@ -1126,18 +623,11 @@ export default function AgentsPage() {
 
       </div>
 
-      {/* Deploy Modal */}
-      <DeployModal
-        isOpen={!!deployingAgent}
-        onClose={() => { setDeployingAgent(null); refreshDeployments(); }}
-        agentName={deployingAgent?.title ?? null}
-        agentType={deployingAgent?.agentType ?? null}
-      />
-
-      {/* Customise identity modal */}
+      {/* Customise agent — identity, connections, tools, MCP, and deploy, in
+          one place: settings before deploy, not two competing entry points. */}
       <CustomizeAgentModal
         isOpen={!!customizingAgent}
-        onClose={() => setCustomizingAgent(null)}
+        onClose={() => { setCustomizingAgent(null); refreshDeployments(); }}
         agentName={customizingAgent?.title ?? null}
         agentType={customizingAgent?.agentType ?? null}
       />
