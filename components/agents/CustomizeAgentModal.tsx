@@ -519,7 +519,7 @@ export default function CustomizeAgentModal({
             {tab === 'identity' && 'Give this agent your business identity. It will introduce itself with your name, follow your tone, and answer from your business knowledge — on every channel it is deployed to.'}
             {tab === 'connections' && 'Third-party apps this agent can use, once connected on the Integrations page.'}
             {tab === 'tools' && 'Turn off any external toolkit you don’t want this agent to use. Aivory’s built-in tools always stay on.'}
-            {tab === 'mcp' && 'Connect this agent to your own systems by registering an MCP server you control. Enterprise plan, Aivory Cerveau agents only — every tool call requires your approval.'}
+            {tab === 'mcp' && 'Connect this agent to your own systems by registering an MCP server you control. Pro plan and above, Aivory Cerveau agents only — every tool call requires your approval.'}
           </p>
           <div className="flex items-center gap-1 border-b border-white/[0.06] -mb-4">
             {(['identity', 'connections', 'tools', 'mcp'] as const).map((t) => (

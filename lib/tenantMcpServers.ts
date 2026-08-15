@@ -1,6 +1,6 @@
 /**
- * Tenant custom MCP servers — lets an Enterprise operator register their own
- * MCP server (a thin shim over their internal systems) so their Cerveau
+ * Tenant custom MCP servers — lets a Pro/Enterprise operator register their
+ * own MCP server (a thin shim over their internal systems) so their Cerveau
  * agent can read/act on their own environment. See
  * docs/ADR-006-CERVEAU-CLIENT-DEPLOYMENT-API.md, Part B.
  *
