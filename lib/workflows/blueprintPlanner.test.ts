@@ -315,7 +315,7 @@ describe('scenario: workflow with human approval', () => {
     integrations_required: ['Finance system'],
   }
 
-  it('flags the review case and ends the branch on a wait-for-approval node', () => {
+  it('flags the review case and ends the branch on a manual-resolution status node, not an unresumable wait', () => {
     const planned = planWorkflowFromBlueprintModule(approvalFlow)
     const gate = planned.steps.find((s) => s.type === 'condition')
     const exceptionBranch = gate?.branches?.find((b) => b.terminal)
@@ -324,10 +324,15 @@ describe('scenario: workflow with human approval', () => {
     const flagStep = exceptionBranch!.steps.find((s) => /manager approval/i.test(s.action))
     expect(flagStep).toBeDefined()
 
-    // The branch must end on an actual wait/resume node — that's the part
-    // of the sequence that genuinely represents "pausing for a human."
-    const waitStep = exceptionBranch!.steps[exceptionBranch!.steps.length - 1]
-    expect(resolveIntent(waitStep)).toBe('humanReview')
+    // The branch must end on a step that honestly represents "pausing for a
+    // human" WITHOUT an n8n Wait node — Finding 5 (2026-08-15): a Wait node
+    // here (resume: webhook) would never actually be resumable since nothing
+    // captures/passes the resume URL on this path, so the safe fallback is a
+    // persisted manual-status field instead (see buildExceptionGate()).
+    const lastStep = exceptionBranch!.steps[exceptionBranch!.steps.length - 1]
+    expect(resolveIntent(lastStep)).toBe('transform')
+    expect(lastStep.action).toMatch(/awaiting_manual_resolution/)
+    expect(lastStep.assignments?.some((a) => a.name === 'case_status')).toBe(true)
   })
 
   it('marks the exception branch terminal (does not rejoin the approved-expense path)', () => {

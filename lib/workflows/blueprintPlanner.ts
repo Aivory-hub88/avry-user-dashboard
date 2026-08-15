@@ -193,6 +193,15 @@ const EXCEPTION_KEYWORDS = /luar biasa|khusus\b|tidak lengkap|incomplete\b|excep
 const AUDIT_KEYWORDS = /\baudit\b|\blogging\b|audit trail|catat riwayat|rekam (hasil|log)/i
 const FORM_SOURCE_KEYWORDS = /\bform(ulir)?\b|pendaftaran|registration|application\b|permohonan|sign.?up/i
 
+// Fix (Finding 3, 2026-08-15): a business-action step can clearly need
+// task/project-management tooling ("push tasks to the responsible team")
+// even when the upstream blueprint never declared a "Task management"
+// integration category at all — same class of blind spot as
+// isHumanReviewLike() below, but in tool resolution rather than branch
+// detection. Text is the fallback signal when the declared
+// integrations_required list has no matching category.
+const TASK_MANAGEMENT_TEXT_KEYWORDS = /\bpush(?:es|ing|ed)? (?:the )?tasks?\b|\bassign(?:s|ed|ing)? tasks?\b|\bcreate(?:s|d)? (?:a |the )?tasks?\b|\btask list\b|\bmilestones?\b|\bproject board\b/i
+
 /**
  * Whether a step needs human-review/exception routing — checked by TEXT
  * first, `type === 'human_review'` only as a fallback signal, not a gate.
@@ -464,6 +473,7 @@ function toolForOp(op: AtomicOp, integrationsRequired: string[]): string {
   if (op.categories.includes('BUSINESS_ACTION')) {
     const taskSystem = integrationsRequired.find((i) => /task management|task system|project management|work management/i.test(i))
     if (taskSystem) return resolveIntegrationCategory(taskSystem).platform
+    if (TASK_MANAGEMENT_TEXT_KEYWORDS.test(op.action)) return resolveIntegrationCategory('task management').platform
   }
   // No specific match — Stage 7 says NOT to hallucinate an integration by
   // guessing one of the declared ones just because it's first in the list;
@@ -522,6 +532,7 @@ function isUnresolvedIntegration(op: AtomicOp): boolean {
   if (op.integration) return !resolveIntegrationCategory(op.integration).resolved
   if (op.isMerge) return false
   if (BUILTIN_CHANNEL_KEYWORDS.test(op.action)) return false
+  if (op.categories.includes('BUSINESS_ACTION') && TASK_MANAGEMENT_TEXT_KEYWORDS.test(op.action)) return false
   return true
 }
 
@@ -596,6 +607,20 @@ function buildDecisionNodes(step: BlueprintStepInput, sourceStepIndex: number, c
     out[out.length - 1].aiOutputSchema = { onboarding_route: 'route_a' }
     out[out.length - 1].aiReasoning = {
       reasoning_required: true,
+      // Decision note (2026-08-15, Finding 1 of the graph-determinism audit):
+      // fields named in the blueprint text here (e.g. "customer tier",
+      // "product selection") COULD be structured enums already sitting in
+      // the source record rather than free text needing interpretation — the
+      // planner has no visibility into the actual data shape, only the
+      // step's own wording, and NUMERIC_DECISION_KEYWORDS only catches
+      // explicit numeric-threshold phrasing. Defaulting to an AI node here is
+      // deliberate, not a missed case: guessing a deterministic Switch wrong
+      // (the referenced field turns out to be free text) fails SILENTLY —
+      // wrong or no route, no error — while guessing AI wrong just costs one
+      // extra LLM call. Do not "fix" this to a Switch node without evidence
+      // the specific field is structured; that decision should be driven by
+      // production telemetry on how these fields actually arrive, not by
+      // widening this heuristic on suspicion.
       reason: 'Open-ended profile-based routing requires reasoning over business criteria with no fixed numeric threshold — the blueprint does not name a deterministic comparison.',
       deterministic_alternative_available: false,
     }
@@ -659,25 +684,27 @@ function buildExceptionGate(
     tool: 'Exception Queue',
     forceIntent: 'audit' as const,
   }))
-  reviewSteps.push({
-    step: nextNum(ctx),
-    action: 'Request missing information from requester',
-    tool: 'Notification channel',
-    output: '',
-    type: 'action',
-    category: ['COMMUNICATION', 'EXCEPTION_HANDLING'],
-    sourceStepIndex,
-  })
-  reviewSteps.push({
-    step: nextNum(ctx),
-    action: 'Wait for human resolution — branch ends here, no automatic continuation',
-    tool: 'Human Review',
-    output: '',
-    type: 'action',
-    category: ['HUMAN_REVIEW', 'EXCEPTION_HANDLING'],
-    sourceStepIndex,
-    forceIntent: 'humanReview',
-  })
+  reviewSteps.push(
+    semanticAction(ctx, sourceStepIndex, 'Request missing information from requester', 'Notification channel', ['COMMUNICATION', 'EXCEPTION_HANDLING']),
+  )
+  // Fix (Finding 5, 2026-08-15): this used to end on an unconditional
+  // n8n-nodes-base.wait node (resume: webhook) — same unresumable-Wait bug
+  // already fixed for the approval-outcome branch in
+  // buildApprovalOutcomeSemantic() above: no resumeUrl was ever captured,
+  // and the "Request missing information" notification above never referenced
+  // one either, so nothing could ever trigger the resume. Unlike approval
+  // (a reviewer's binary yes/no click naturally maps to a resume call),
+  // resuming this branch means accepting the requester's resubmitted data
+  // and re-running validation — a re-validation loop this planner doesn't
+  // implement yet — so there is no equivalent safe resume wiring to add
+  // here. Apply the same safe fallback instead: persist a manual status
+  // field, no Wait node, until a real re-validation/resume path exists.
+  reviewSteps.push(
+    semanticAction(ctx, sourceStepIndex, 'Set case status to awaiting_manual_resolution — branch ends here, no automatic continuation', 'n8n', ['DATA_TRANSFORMATION', 'EXCEPTION_HANDLING'], 'transform', [
+      { name: 'case_status', value: '="awaiting_manual_resolution"' },
+      { name: 'requires_manual_followup', value: '={{ true }}' },
+    ]),
+  )
 
   return {
     step: nextNum(ctx),
@@ -766,6 +793,7 @@ function semanticAction(
   } else if (tool === 'n8n' && (categories.includes('DATA_RETRIEVAL') || categories.includes('BUSINESS_ACTION'))) {
     const dataSource = ctx.integrationsRequired.find((i) => /crm|helpdesk|support|ticket|database|task management|task system|project management|work management/i.test(i))
     if (dataSource) effectiveTool = resolveIntegrationCategory(dataSource).platform
+    else if (categories.includes('BUSINESS_ACTION') && TASK_MANAGEMENT_TEXT_KEYWORDS.test(action)) effectiveTool = resolveIntegrationCategory('task management').platform
   }
   const s: PlannedStep = {
     step: nextNum(ctx),
@@ -1087,11 +1115,23 @@ function buildPlannedSteps(module: BlueprintModuleInput, ctx: BuildContext): Pla
       }
 
       // Fix 7 — a "validate/check X" step must not be a pass/fail dead end.
-      // Add a recovery branch: incomplete data → request missing info → wait
-      // for resolution (the re-validation loop is not yet automated, so the
-      // branch ends honestly on the wait node). Skip when this step is already
-      // the gate for an explicit human_review step (handled below at gateIdx).
-      if (/validat|validasi|memvalidasi/i.test(step.action) && i !== gateIdx) {
+      // Add a recovery branch: incomplete data → request missing info → set
+      // manual-resolution status (the re-validation loop is not yet
+      // automated, so the branch ends honestly there). Skip when this step
+      // is already the gate for an explicit human_review step (handled below
+      // at gateIdx) — AND skip when a real human-review-anchored gate is
+      // going to be built anywhere else in this blueprint at all (Finding 2,
+      // 2026-08-15): `gateIdx` only ever points at ONE step, chosen by
+      // nearest-preceding-ai_processing/decision search. If this blueprint
+      // has more than one ai_processing step (e.g. a "validate" step AND a
+      // separate "classify" step), gateIdx can pick the OTHER one, leaving
+      // this guard's `i !== gateIdx` alone insufficient — this validate step
+      // would still build its own opportunistic "Data complete?" gate here,
+      // producing a second, redundant exception gate alongside the real one
+      // built at gateIdx below. When reviewIndicesForGates is non-empty, the
+      // real gate is already covering this blueprint's exception path; don't
+      // duplicate it.
+      if (/validat|validasi|memvalidasi/i.test(step.action) && i !== gateIdx && reviewIndicesForGates.length === 0) {
         out.push(buildExceptionGate([], step.action, i, ctx))
       }
     } else {

@@ -109,11 +109,17 @@ describe('regression: Otomasi Onboarding Pelanggan — exact bug-report blueprin
     expect(afterSwitchJoin.some((t) => /Membuat akun/.test(t))).toBe(true)
   })
 
-  it('the exception branch ends on a wait node with no outgoing connection (does not auto-continue)', () => {
+  it('the exception branch ends on a terminal manual-status node with no outgoing connection (does not auto-continue)', () => {
+    // Finding 5 (2026-08-15): this branch used to end on an n8n Wait node
+    // (resume: webhook) that was never actually resumable — nothing
+    // captured/referenced the resume URL. Fixed to the same safe fallback
+    // already used for the approval-outcome branch: a manual-status Set
+    // node, no Wait node, still a genuine dead end (no outgoing connection).
     const { n8n } = buildRegressionGraph()
-    const waitNode = n8n.nodes.find((n) => n.type === 'n8n-nodes-base.wait')
-    expect(waitNode).toBeDefined()
-    expect(n8n.connections[waitNode!.name]).toBeUndefined()
+    expect(n8n.nodes.some((n) => n.type === 'n8n-nodes-base.wait')).toBe(false)
+    const statusNode = n8n.nodes.find((n) => n.type === 'n8n-nodes-base.set' && /awaiting_manual_resolution/i.test(JSON.stringify(n.parameters)))
+    expect(statusNode).toBeDefined()
+    expect(n8n.connections[statusNode!.name]).toBeUndefined()
   })
 
   it('exception-branch steps never connect back into the join node', () => {
@@ -149,9 +155,11 @@ describe('regression: Otomasi Onboarding Pelanggan — exact bug-report blueprin
     for (const label of ['Membuat akun', 'mengirimkan materi onboarding', 'menjadwalkan sesi pengenalan', 'Memberitahukan tim terkait']) {
       expect(n8n.nodes.some((n) => n.name.includes(label))).toBe(true)
     }
-    // None of them should be reachable FROM the exception branch's wait node.
-    const waitNode = n8n.nodes.find((n) => n.type === 'n8n-nodes-base.wait')!
-    expect(n8n.connections[waitNode.name]).toBeUndefined()
+    // None of them should be reachable FROM the exception branch's terminal
+    // manual-status node (see Finding 5 — no Wait node on this path anymore).
+    const statusNode = n8n.nodes.find((n) => n.type === 'n8n-nodes-base.set' && /awaiting_manual_resolution/i.test(JSON.stringify(n.parameters)))!
+    expect(statusNode).toBeDefined()
+    expect(n8n.connections[statusNode.name]).toBeUndefined()
   })
 })
 
@@ -194,13 +202,17 @@ describe('regression: structured output, data flow, routing, integrations', () =
     expect(switchNode!.conditionField).toBe('onboarding_route')
   })
 
-  it('BUG 3: wait node label does NOT claim "re-validation"', () => {
+  it('BUG 3 / Finding 5: terminal exception step does NOT claim "re-validation", and is not an unresumable wait', () => {
     const { planned } = buildRegressionGraph()
     const allSteps = flattenBranchSteps(planned.steps)
-    const waitStep = allSteps.find((s: PlannedStep) => /wait for human/i.test(s.action))
-    expect(waitStep).toBeDefined()
-    expect(waitStep!.action).not.toMatch(/re-validation/)
-    expect(waitStep!.action).toMatch(/branch ends here/)
+    // No step in this plan should represent itself as a Wait/resume point —
+    // see Finding 5 (2026-08-15): the old "Wait for human resolution" step
+    // implied resumability that was never actually wired up.
+    expect(allSteps.some((s: PlannedStep) => /wait for human/i.test(s.action))).toBe(false)
+    const terminalStep = allSteps.find((s: PlannedStep) => /awaiting_manual_resolution/i.test(s.action))
+    expect(terminalStep).toBeDefined()
+    expect(terminalStep!.action).not.toMatch(/re-validation/)
+    expect(terminalStep!.action).toMatch(/branch ends here/)
   })
 
   it('BUG 1: generated IF condition uses $json.is_complete boolean, not $json.response isNotEmpty', () => {
@@ -399,7 +411,10 @@ describe('NON-NEGOTIABLE: AI Agent must not be used for deterministic actions', 
       expect(n8n.nodes.some((n) => re.test(n.name))).toBe(true)
     }
     expect(n8n.nodes.some((n) => /Meninjau/i.test(n.name))).toBe(true)
-    expect(n8n.nodes.some((n) => n.type === 'n8n-nodes-base.wait')).toBe(true)
+    // Finding 5 (2026-08-15): no Wait node ships on this branch anymore —
+    // it was never actually resumable. The terminal step is a manual-status
+    // Set node instead (see the dedicated regression tests above).
+    expect(n8n.nodes.some((n) => n.type === 'n8n-nodes-base.wait')).toBe(false)
   })
 
   // The export/re-render path (app/workflows/page.tsx toExportStep,

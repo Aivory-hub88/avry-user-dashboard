@@ -52,13 +52,19 @@ describe('acceptance: Customer Onboarding Automation', () => {
     expect(planned.needsClarification).toEqual([])
   })
 
-  it('placeholder URLs never ship as active: workflow is active:false with requiresConfiguration', () => {
+  it('all steps resolve to native platforms — no placeholder URLs left for this fully-declared integration set', () => {
+    // Finding 5 (2026-08-15): "Request missing information from requester"
+    // used to be a hand-built step with a static, unresolved tool label and
+    // rendered as a generic HTTP placeholder (api.example.com) instead of an
+    // actual message. Routed through semanticAction() now, so it resolves to
+    // the declared Communication channel like every other notification step
+    // — this blueprint (CRM + Communication + Helpdesk, all declared) no
+    // longer has a genuinely-unresolved integration anywhere.
     const { n8n } = generate()
     const placeholders = n8n.nodes.filter((n: any) =>
       /example\.com\/endpoint|UNRESOLVED_INTEGRATION/i.test(String(n.parameters?.url ?? '')))
-    expect(placeholders.length).toBeGreaterThan(0) // still present, but…
-    expect((n8n as any).active).toBe(false)
-    expect((n8n as any).meta?.requiresConfiguration).toBe(true)
+    expect(placeholders.length).toBe(0)
+    expect((n8n as any).active).not.toBe(false)
     expect((n8n as any).meta?.assumptions).toEqual(expect.arrayContaining(['CRM system → HubSpot']))
   })
 
@@ -84,10 +90,13 @@ describe('acceptance: Customer Onboarding Automation', () => {
     expect(n8n.nodes.some((n: any) => /sign-\s*$/.test(n.name))).toBe(false)
   })
 
-  it('the validate step has a recovery branch (Data complete? → request → wait)', () => {
+  it('the validate step has a recovery branch (Data complete? → request → manual-status, no unresumable wait)', () => {
     const { n8n } = generate()
     expect(n8n.nodes.some((n: any) => n.type === 'n8n-nodes-base.if' && /Data complete/i.test(n.name))).toBe(true)
-    expect(n8n.nodes.some((n: any) => n.type === 'n8n-nodes-base.wait')).toBe(true)
+    // Finding 5 (2026-08-15): no n8n Wait node ships here anymore — it was
+    // never actually resumable. Terminal step is a manual-status Set node.
+    expect(n8n.nodes.some((n: any) => n.type === 'n8n-nodes-base.wait')).toBe(false)
+    expect(n8n.nodes.some((n: any) => n.type === 'n8n-nodes-base.set' && /awaiting_manual_resolution/i.test(JSON.stringify(n.parameters)))).toBe(true)
   })
 
   it('deterministic CRUD actions never route through an LLM/Chat Model node', () => {
@@ -148,8 +157,15 @@ describe('acceptance: native integrations and all-path metadata', () => {
     expect(n8n.nodes.some((node: any) => node.type === 'n8n-nodes-base.slack' && /Notify reviewer/i.test(node.name))).toBe(true)
     expect(n8n.nodes.some((node: any) => node.type === 'n8n-nodes-base.set' && /awaiting_manual_approval/i.test(JSON.stringify(node.parameters)))).toBe(true)
     expect(n8n.nodes.some((node: any) => node.type === 'n8n-nodes-base.wait' && /approval/i.test(node.name))).toBe(false)
-    expect(n8n.active).toBe(false)
-    expect(n8n.meta.requiresConfiguration).toBe(true)
+    // Finding 5 (2026-08-15): the "Request missing information" step on the
+    // validate step's own exception gate used to be an unresolved HTTP
+    // placeholder (hand-built step, no tool resolution) — that's what used
+    // to force active:false/requiresConfiguration here. Routed through
+    // semanticAction() now, it resolves to native Slack like everything
+    // else in this fully-declared-integration scenario, so nothing is left
+    // unresolved and the workflow no longer needs to be forced inactive.
+    expect(n8n.nodes.some((node: any) => node.type === 'n8n-nodes-base.wait')).toBe(false)
+    expect(n8n.active).not.toBe(false)
   })
 
   it('preserves native types, branches, and metadata through canvas round-trip', () => {
