@@ -573,9 +573,19 @@ export default function AgentsPage() {
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         if (!Array.isArray(data)) return;
+        // The 5 built-in agent types are seeded into this same catalog table
+        // (so e.g. the admin dashboard's publish toggle has something to
+        // act on) — they're already rendered from the hardcoded AGENTS
+        // array above, with richer UI (icons, deploy bindings, feature
+        // tags) than this generic catalog mapping gives them. Only agents
+        // NOT already in AGENTS are genuinely new (future custom/user-
+        // created types); without this filter every built-in type renders
+        // twice, once from each source.
+        const builtInTypes = new Set(AGENTS.map((a) => a.agentType));
+        const custom = data.filter((a: any) => a.category !== 'built-in' && !builtInTypes.has(a.id));
         const grads = Object.values(AGENT_GRADIENTS);
         setDynamicAgents(
-          data.map((a: any, i: number) => ({
+          custom.map((a: any, i: number) => ({
             title: a.name,
             description: a.description || '',
             gradient: grads[i % grads.length],

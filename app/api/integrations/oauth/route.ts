@@ -39,7 +39,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (action === 'session') {
     // 1. Resolve + gate the caller (verified JWT-backed session, paid-tier
     //    required, super-admin bypass) — see lib/integration-auth.ts.
-    const auth = resolveIntegrationUser(req)
+    const auth = await resolveIntegrationUser(req)
     if (!auth.ok) {
       return authErrorResponse(auth.status, auth.code, auth.message)
     }
@@ -109,7 +109,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // ── action=status ───────────────────────────────────────────────────────────
   if (action === 'status') {
-    const auth = resolveIntegrationUser(req)
+    const auth = await resolveIntegrationUser(req)
     if (!auth.ok) {
       return authErrorResponse(auth.status, auth.code, auth.message)
     }
@@ -188,7 +188,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 // ── POST handler ──────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const auth = resolveIntegrationUser(req)
+  const auth = await resolveIntegrationUser(req)
   if (!auth.ok) {
     return authErrorResponse(auth.status, auth.code, auth.message)
   }

@@ -112,7 +112,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   // 1. Gate the callback. On AuthError, redirect (do NOT return JSON) and
   //    perform no Composio work.
-  const auth = resolveIntegrationUser(req)
+  const auth = await resolveIntegrationUser(req)
   if (!auth.ok) {
     const result: CallbackResult = { status: 'error', reason: 'unauthorized' }
     return NextResponse.redirect(buildIntegrationsRedirect(result, base))

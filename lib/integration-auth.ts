@@ -34,6 +34,8 @@ import { isPaidTier, isSuperAdminAccount } from '@/lib/tiers'
  */
 export const SESSION_TOKEN_COOKIE = 'aivory_session_token'
 export const USER_COOKIE = 'aivory_user'
+/** Raw JWT, not JSON-wrapped — see `setAuthCookies` in the landing repo. */
+export const ACCESS_TOKEN_COOKIE = 'aivory_access_token'
 
 /**
  * Successful resolution: an authenticated, authorized principal.
@@ -101,20 +103,38 @@ export function parseAivoryUser(raw: string | undefined | null): User | null {
     }
   }
 
-  if (!isUserWithId(parsed)) return null
+  const userId = extractUserId(parsed)
+  if (!userId) return null
 
-  return parsed
+  // Normalize to `user_id` regardless of which field the cookie actually
+  // carried, so every downstream reader of `User.user_id` (this file's own
+  // decideIntegrationAccess included) sees a consistent shape.
+  return { ...(parsed as object), user_id: userId } as User
 }
 
 /**
- * Type guard: the parsed value is an object carrying a non-empty string
- * `user_id`. This is the minimum the gating logic relies on; the remaining
- * `User` fields (e.g. `tier`, `account_type`) are read defensively downstream.
+ * Extracts a non-empty string user id from the parsed cookie payload, or
+ * `null` if none is present. This is the minimum the gating logic relies
+ * on; the remaining `User` fields (e.g. `tier`, `account_type`) are read
+ * defensively downstream.
+ *
+ * Real bug found live: the shared `aivory_user` cookie is written by the
+ * landing repo's `auth.ts` (`setAuthCookies`) with the field named `id`,
+ * not `user_id` — the `User` type here (and every consumer of it) has
+ * always expected `user_id`. Checking `user_id` only meant this function
+ * silently rejected every real, correctly-authenticated session — the
+ * entire cookie-based Composio integration path (Connections tab) 401'd
+ * unconditionally regardless of login state, never actually verified end-
+ * to-end against a real cookie until now. Accepting `id` as a fallback
+ * fixes real traffic without needing to touch the cookie-writing side.
  */
-function isUserWithId(value: unknown): value is User {
-  if (typeof value !== 'object' || value === null) return false
-  const userId = (value as { user_id?: unknown }).user_id
-  return typeof userId === 'string' && userId.trim() !== ''
+function extractUserId(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null) return null
+  const withUserId = (value as { user_id?: unknown }).user_id
+  if (typeof withUserId === 'string' && withUserId.trim() !== '') return withUserId
+  const withId = (value as { id?: unknown }).id
+  if (typeof withId === 'string' && withId.trim() !== '') return withId
+  return null
 }
 
 /* ---- Pure gating decision (no I/O) ---- */
@@ -196,14 +216,58 @@ export function decideIntegrationAccess(input: {
 
 /* ---- Orchestrator (reads the request) ---- */
 
+/** Tier lookup must resolve within this bound, else the paid-tier gate fails
+ *  closed to `free` rather than hang the request — same bound and fail-
+ *  closed posture `useDashboardAccess.ts`'s (unused) tier lookup already
+ *  established as the right default for this class of call. */
+const TIER_LOOKUP_TIMEOUT_MS = 5000
+
+/**
+ * Fetches the caller's current tier fresh from the backend, given their raw
+ * access-token JWT. Real bug found live: the shared `aivory_user` cookie
+ * never carries a `tier` field at all (`setAuthCookies` in the landing
+ * repo's auth.ts only copies id/email/account_type/role/allowed_modules) —
+ * every paid-tier check here was silently reading `''`, so the Composio
+ * Connections gate 403'd for every account regardless of plan, the same
+ * class of bug (stale/missing tier claim checked directly instead of
+ * re-loaded) already found and fixed this session in agent_api_keys.py and
+ * tenant_mcp_servers.py on the backend side.
+ *
+ * `useDashboardAccess.ts` already has a `lookupTier()` for this shape of
+ * call, but its `TIER_LOOKUP_PATH` (`/api/v1/users/me`) 404s against the
+ * real backend and the function is dead code (never invoked) — confirmed
+ * live rather than assumed. The real, working endpoint is `GET /api/v1/
+ * auth/me` (`backend/avry-backend/app/routes/auth.py`), which returns a
+ * real `UserResponse` including a genuine, freshly-loaded `tier` field.
+ */
+async function fetchFreshTier(accessToken: string): Promise<string | null> {
+  const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), TIER_LOOKUP_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${base}/api/v1/auth/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    if (!res.ok) return null
+    const data = (await res.json().catch(() => null)) as { tier?: unknown } | null
+    return data && typeof data.tier === 'string' ? data.tier : null
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 /**
  * Resolve + gate the caller from the incoming `NextRequest` cookies.
  *
  * This is the thin I/O wrapper around the pure core: it reads the shared
  * cross-subdomain session cookies (`aivory_session_token`, `aivory_user`) off
- * `req.cookies`, parses the user via `parseAivoryUser`, and delegates the
- * authentication/paid-tier decision to `decideIntegrationAccess`. It performs
- * no network I/O and never throws.
+ * `req.cookies`, parses the user via `parseAivoryUser`, fetches a fresh tier
+ * (the cookie never carries one — see `fetchFreshTier`), and delegates the
+ * authentication/paid-tier decision to `decideIntegrationAccess`.
  *
  * This REPLACES the old `resolveUserId()` `'default'` fallback: a request is
  * either resolved to a real Aivory `user_id` (== Composio `Entity_Id`) or it is
@@ -212,9 +276,19 @@ export function decideIntegrationAccess(input: {
  *
  * Requirements: 1.1, 1.5, 2.1, 2.2, 2.3, 2.4, 2.5
  */
-export function resolveIntegrationUser(req: NextRequest): IntegrationAuthResult {
+export async function resolveIntegrationUser(req: NextRequest): Promise<IntegrationAuthResult> {
   const sessionToken = req.cookies.get(SESSION_TOKEN_COOKIE)?.value ?? null
   const user = parseAivoryUser(req.cookies.get(USER_COOKIE)?.value)
 
-  return decideIntegrationAccess({ sessionToken, user })
+  let tier = 'free'
+  if (user) {
+    const accessToken = req.cookies.get(ACCESS_TOKEN_COOKIE)?.value ?? null
+    tier = (accessToken ? await fetchFreshTier(accessToken) : null) ?? 'free'
+  }
+
+  // `User`'s other fields (is_subscribed, has_diagnostic, credits, ...) are
+  // never actually present on the shared cookie either — parseAivoryUser's
+  // own cast already accepts that mismatch; this spread keeps the same
+  // posture rather than pretending a fuller shape exists.
+  return decideIntegrationAccess({ sessionToken, user: user ? ({ ...user, tier } as User) : null })
 }

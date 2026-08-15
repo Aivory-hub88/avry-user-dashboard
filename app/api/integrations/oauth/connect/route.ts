@@ -24,7 +24,7 @@ import { getComposioClient, getComposioRedirectUrl, getOrCreateAuthConfigId } fr
 import { resolveIntegrationUser } from '@/lib/integration-auth'
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const auth = resolveIntegrationUser(req)
+  const auth = await resolveIntegrationUser(req)
   if (!auth.ok) {
     return NextResponse.json(
       { error: { code: auth.code, message: auth.message } },
