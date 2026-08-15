@@ -74,6 +74,9 @@ const TONES: Option[] = [
 // with avry-backend's agent_tool_scope.py TOGGLEABLE_TOOLKITS.
 const TOOLKIT_LABELS: Record<string, string> = {
   zendesk: 'Zendesk',
+  hubspot: 'HubSpot',
+  slack: 'Slack',
+  asana: 'Asana',
 };
 
 const CONNECTION_STATUS_STYLES: Record<ConnectedApp['status'], { label: string; className: string }> = {
