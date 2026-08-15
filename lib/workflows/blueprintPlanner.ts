@@ -193,6 +193,51 @@ const EXCEPTION_KEYWORDS = /luar biasa|khusus\b|tidak lengkap|incomplete\b|excep
 const AUDIT_KEYWORDS = /\baudit\b|\blogging\b|audit trail|catat riwayat|rekam (hasil|log)/i
 const FORM_SOURCE_KEYWORDS = /\bform(ulir)?\b|pendaftaran|registration|application\b|permohonan|sign.?up/i
 
+/**
+ * Whether a step needs human-review/exception routing — checked by TEXT
+ * first, `type === 'human_review'` only as a fallback signal, not a gate.
+ *
+ * The upstream blueprint-generation LLM (lib/blueprintGeneration.ts, a
+ * SEPARATE model call from anything in this file) assigns each step's
+ * `type` from a 6-value enum with only light guidance. It is a real but
+ * unreliable signal: "Escalate complex ones to a human" and "Approve
+ * exceptions" both read as ordinary `execution` steps just as easily as
+ * `human_review` ones, and empirically often get typed that way. Every
+ * branch/exception-detection gate in this file used to require
+ * `type === 'human_review'` outright — when the upstream label didn't
+ * match, ALL of it was skipped, and the step fell through to a flat,
+ * unbranched action node even though its own wording clearly asks for a
+ * review/escalation path. `type` is data worth trusting when it agrees,
+ * but the text is the blueprint's actual business intent and must not be
+ * gated behind another model's classification choice for a *different*
+ * step.
+ *
+ * Scoped to steps not already confidently typed as ingestion/ai_processing/
+ * decision — those categories are typically reliable, and a stray "review"/
+ * "escalate" substring inside a decision's routing description shouldn't
+ * be reinterpreted as its own review gate.
+ */
+function isHumanReviewLike(step: BlueprintStepInput): boolean {
+  if (step.type === 'human_review') return true
+  if (step.type === 'ingestion' || step.type === 'ai_processing' || step.type === 'decision') return false
+  const text = step.action
+  // review/approve/tinjau are unambiguous — a step phrased that way IS the
+  // review/approval action, full stop.
+  if (/\btinjau|meninjau|peninjauan|review\b|approv|persetujuan\b/i.test(text)) return true
+  // "escalat" alone is NOT unambiguous. Exclude two cases a more specific
+  // pattern already owns: (a) a plain communication step that mentions
+  // escalation as a noun ("notify the team about escalations"), not an
+  // escalation action itself; (b) a track/monitor+escalate-delay step,
+  // which Stage 5b's buildTrackEscalateSemantic() below decomposes with
+  // its own, more precise observe→evaluate→IF-delayed→escalate structure
+  // — that pattern must get first refusal, not be preempted into a bare
+  // exception gate here.
+  if (!/\bescalat/i.test(text)) return false
+  if (COMMUNICATION_KEYWORDS.test(text)) return false
+  if (TRACK_MONITOR_RE.test(text) || DELAY_OVERDUE_RE.test(text)) return false
+  return true
+}
+
 const CATEGORY_BY_BLUEPRINT_TYPE: Record<BlueprintStepType, StepCategory> = {
   ingestion: 'DATA_RETRIEVAL',
   ai_processing: 'AI_REASONING',
@@ -955,17 +1000,25 @@ function buildSemanticSteps(step: BlueprintStepInput, sourceStepIndex: number, c
  */
 function buildPlannedSteps(module: BlueprintModuleInput, ctx: BuildContext): PlannedStep[] {
   const steps = module.steps
-  const reviewIndices = steps.map((s, i) => (s.type === 'human_review' ? i : -1)).filter((i) => i >= 0)
+  // isHumanReviewLike() checks TEXT first, `type` only as a fallback — see
+  // its own doc comment for why the upstream blueprint's `type` label alone
+  // is not reliable enough to gate exception/escalation detection on.
+  const reviewIndices = steps.map((s, i) => (isHumanReviewLike(s) ? i : -1)).filter((i) => i >= 0)
   const outcomePairs = new Map<number, OutcomePair>()
   const outcomeConsumed = new Set<number>()
   const approvalReviewIndices = new Set<number>()
   for (let i = 0; i < steps.length - 1; i++) {
     const current = steps[i]
     const next = steps[i + 1]
-    if (current.type !== 'execution' || next.type !== 'human_review') continue
+    // `current` (the routine-case action) just needs to not already be a
+    // confidently-typed data/reasoning/review step; `next` (the escalation)
+    // is checked the same text-first way as reviewIndices above.
+    const currentCanBeRoutineAction = current.type !== 'ingestion' && current.type !== 'ai_processing' && !isHumanReviewLike(current)
+    if (!currentCanBeRoutineAction || !isHumanReviewLike(next)) continue
     if (!AUTO_RESOLVE_OUTCOME_RE.test(current.action) || !COMPLEX_ESCALATION_OUTCOME_RE.test(next.action)) continue
     const following = steps[i + 2]
-    const notificationIndex = following?.type === 'notification' && /relevant team|on escalations|escalation/i.test(following.action)
+    const followingCanBeNotification = following && following.type !== 'ingestion' && following.type !== 'ai_processing' && following.type !== 'decision' && !isHumanReviewLike(following)
+    const notificationIndex = followingCanBeNotification && /relevant team|on escalations|escalation/i.test(following.action)
       ? i + 2
       : undefined
     outcomePairs.set(i, { reviewIndex: i + 1, notificationIndex })

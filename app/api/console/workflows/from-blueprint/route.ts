@@ -8,6 +8,7 @@ import {
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
 import { validateWorkflow as validateN8nWorkflow } from '@/lib/workflows/n8nMcpClient'
 import { llmSemanticReview } from '@/lib/workflows/blueprintLlmValidator'
+import { getAuthUser } from '@/lib/serverAuth'
 
 /**
  * POST /api/console/workflows/from-blueprint
@@ -108,6 +109,8 @@ export async function POST(req: NextRequest) {
         // Accept both the correct field name (matches BlueprintV1WorkflowModule)
         // and the legacy `integrations` alias some older callers may still send.
         integrations_required: body?.integrations_required ?? body?.integrations,
+        owner_user_id: (() => { try { return getAuthUser(req)?.user_id } catch { return undefined } })(),
+        approval_resume_enabled: process.env.ENABLE_APPROVAL_RESUME === 'true',
       })
       if (!sanitized.module) {
         return NextResponse.json({ error: sanitized.errors.join(' ') }, { status: 400 })
