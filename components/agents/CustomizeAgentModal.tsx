@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import {
   AgentProfile,
@@ -8,7 +9,14 @@ import {
   saveAgentProfile,
 } from '@/lib/agentProfiles';
 import { ToolScope, getToolScope, saveToolScope } from '@/lib/agentToolScope';
-import { ConnectedApp, getConnectedApps } from '@/lib/integrationStatus';
+import {
+  ConnectableApp,
+  ConnectedApp,
+  getConnectableApps,
+  getConnectedApps,
+  revokeConnectedApp,
+  startOAuthConnect,
+} from '@/lib/integrationStatus';
 import {
   TenantMcpServer,
   TenantMcpServerError,
@@ -274,6 +282,10 @@ export default function CustomizeAgentModal({
   const [connectionsFetched, setConnectionsFetched] = useState(false);
   const [connectionsLoading, setConnectionsLoading] = useState(false);
   const [connectionsError, setConnectionsError] = useState<string | null>(null);
+  const [connectableApps, setConnectableApps] = useState<ConnectableApp[]>([]);
+  const [connectBusyId, setConnectBusyId] = useState<string | null>(null);
+  const [connectFeedback, setConnectFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const connectPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [toolScope, setToolScope] = useState<ToolScope | null | undefined>(undefined); // undefined = not yet fetched, null = no toggleable toolkits
   const [toolsFetched, setToolsFetched] = useState(false);
@@ -319,6 +331,8 @@ export default function CustomizeAgentModal({
     setConnections(null);
     setConnectionsFetched(false);
     setConnectionsError(null);
+    setConnectableApps([]);
+    setConnectFeedback(null);
     setToolScope(undefined);
     setToolsFetched(false);
     setToolsError(null);
@@ -340,14 +354,112 @@ export default function CustomizeAgentModal({
     if (!isOpen || tab !== 'connections' || connectionsFetched || connectionsLoading) return;
     setConnectionsLoading(true);
     setConnectionsError(null);
-    getConnectedApps()
-      .then(setConnections)
+    Promise.all([getConnectedApps(), getConnectableApps().catch(() => [])])
+      .then(([conns, apps]) => {
+        setConnections(conns);
+        setConnectableApps(apps);
+      })
       .catch(() => setConnectionsError('Could not load your connections.'))
       .finally(() => {
         setConnectionsLoading(false);
         setConnectionsFetched(true);
       });
   }, [isOpen, tab, connectionsFetched, connectionsLoading]);
+
+  // Stop polling if the modal closes or unmounts mid-connect.
+  useEffect(() => {
+    if (!isOpen && connectPollRef.current) {
+      clearInterval(connectPollRef.current);
+      connectPollRef.current = null;
+    }
+    return () => {
+      if (connectPollRef.current) clearInterval(connectPollRef.current);
+    };
+  }, [isOpen]);
+
+  const refetchConnections = () => {
+    getConnectedApps().then(setConnections).catch(() => {});
+  };
+
+  // After the OAuth popup opens, poll for the connection to appear rather
+  // than requiring the user to close the popup and manually refresh —
+  // same shape the full /integrations page's own polling uses.
+  const pollForConnection = (appId: string) => {
+    if (connectPollRef.current) clearInterval(connectPollRef.current);
+    const startedAt = Date.now();
+    connectPollRef.current = setInterval(async () => {
+      if (Date.now() - startedAt > 120000) {
+        if (connectPollRef.current) clearInterval(connectPollRef.current);
+        connectPollRef.current = null;
+        return;
+      }
+      try {
+        const conns = await getConnectedApps();
+        const found = conns.find((c) => c.appId === appId && c.status === 'connected');
+        if (found) {
+          if (connectPollRef.current) clearInterval(connectPollRef.current);
+          connectPollRef.current = null;
+          setConnections(conns);
+          setConnectFeedback({ type: 'success', message: `Connected ${found.appName}.` });
+          setConnectBusyId(null);
+        }
+      } catch {
+        // transient — keep polling until the 120s cap
+      }
+    }, 2000);
+  };
+
+  const handleConnect = async (app: ConnectableApp) => {
+    if (connectBusyId) return;
+    setConnectBusyId(app.id);
+    setConnectFeedback(null);
+    try {
+      const popup = await startOAuthConnect(app.id);
+      if (!popup) {
+        setConnectFeedback({ type: 'error', message: 'Pop-up blocked — allow pop-ups for this site and try again.' });
+        setConnectBusyId(null);
+        return;
+      }
+      pollForConnection(app.id);
+    } catch (e) {
+      setConnectFeedback({ type: 'error', message: e instanceof Error ? e.message : `Could not connect ${app.name}.` });
+      setConnectBusyId(null);
+    }
+  };
+
+  const handleReconnect = async (conn: ConnectedApp) => {
+    if (connectBusyId) return;
+    setConnectBusyId(conn.appId);
+    setConnectFeedback(null);
+    try {
+      const popup = await startOAuthConnect(conn.appId);
+      if (!popup) {
+        setConnectFeedback({ type: 'error', message: 'Pop-up blocked — allow pop-ups for this site and try again.' });
+        setConnectBusyId(null);
+        return;
+      }
+      pollForConnection(conn.appId);
+    } catch (e) {
+      setConnectFeedback({ type: 'error', message: e instanceof Error ? e.message : `Could not reconnect ${conn.appName}.` });
+      setConnectBusyId(null);
+    }
+  };
+
+  const handleRevoke = async (conn: ConnectedApp) => {
+    if (connectBusyId) return;
+    if (!confirm(`Revoke "${conn.displayName || conn.appName}"? This agent will lose access to it immediately.`)) return;
+    setConnectBusyId(conn.appId);
+    setConnectFeedback(null);
+    try {
+      await revokeConnectedApp(conn.id);
+      setConnectFeedback({ type: 'success', message: `Revoked ${conn.appName}.` });
+      refetchConnections();
+    } catch (e) {
+      setConnectFeedback({ type: 'error', message: e instanceof Error ? e.message : `Could not revoke ${conn.appName}.` });
+    } finally {
+      setConnectBusyId(null);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen || !agentType || tab !== 'tools' || toolsFetched || toolsLoading) return;
@@ -520,7 +632,7 @@ export default function CustomizeAgentModal({
           </h3>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 16px' }}>
             {tab === 'identity' && 'Give this agent your business identity. It will introduce itself with your name, follow your tone, and answer from your business knowledge — on every channel it is deployed to.'}
-            {tab === 'connections' && 'Third-party apps this agent can use, once connected on the Integrations page.'}
+            {tab === 'connections' && 'Third-party apps this agent can use — connect or disconnect them right here.'}
             {tab === 'tools' && 'Turn off any external toolkit you don’t want this agent to use. Aivory’s built-in tools always stay on.'}
             {tab === 'mcp' && 'Connect this agent to your own systems by registering an MCP server you control. Pro plan and above, Aivory Cerveau agents only — every tool call requires your approval.'}
           </p>
@@ -613,36 +725,125 @@ export default function CustomizeAgentModal({
               <div className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300/90 text-[12px]">
                 {connectionsError}
               </div>
-            ) : !connections || connections.length === 0 ? (
-              <div className="py-10 text-center text-white/40 text-[13px]">
-                No third-party apps connected yet.
-              </div>
             ) : (
-              <div className="space-y-2">
-                {connections.map((c) => {
-                  const style = CONNECTION_STATUS_STYLES[c.status];
-                  return (
-                    <div
-                      key={c.id}
-                      className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]"
+              <>
+                {connectFeedback && (
+                  <div
+                    className={`px-4 py-2.5 rounded-xl border text-[12px] flex items-center justify-between gap-3 ${
+                      connectFeedback.type === 'success'
+                        ? 'bg-[#b7cba6]/10 border-[#b7cba6]/25 text-[#dbe5d3]'
+                        : 'bg-red-500/10 border-red-500/20 text-red-300/90'
+                    }`}
+                  >
+                    <span>{connectFeedback.message}</span>
+                    <button
+                      type="button"
+                      onClick={() => setConnectFeedback(null)}
+                      className="text-current opacity-60 hover:opacity-100 shrink-0"
                     >
-                      <span className="text-white/80 text-[13px]">{c.displayName || c.appName}</span>
-                      <span className={`px-2.5 py-1 rounded-full border text-[11px] font-medium ${style.className}`}>
-                        {style.label}
-                      </span>
+                      ×
+                    </button>
+                  </div>
+                )}
+
+                {connections && connections.length > 0 && (
+                  <div className="space-y-2">
+                    {connections.map((c) => {
+                      const style = CONNECTION_STATUS_STYLES[c.status];
+                      const app = connectableApps.find((a) => a.id === c.appId);
+                      const busy = connectBusyId === c.appId;
+                      return (
+                        <div
+                          key={c.id}
+                          className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]"
+                        >
+                          <span className="flex items-center gap-2.5 text-white/80 text-[13px]">
+                            {app?.iconPath && (
+                              <Image src={asset(app.iconPath)} alt="" width={18} height={18} className="rounded-sm" />
+                            )}
+                            {c.displayName || c.appName}
+                          </span>
+                          <span className="flex items-center gap-2 shrink-0">
+                            <span className={`px-2.5 py-1 rounded-full border text-[11px] font-medium ${style.className}`}>
+                              {style.label}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => handleReconnect(c)}
+                              className="px-2.5 py-1 rounded-lg border border-white/10 text-white/60 hover:text-white/90 hover:border-white/20 text-[11px] font-medium disabled:opacity-40 transition-colors"
+                            >
+                              {busy ? '…' : c.status === 'needs_reauth' ? 'Re-authenticate' : 'Reconnect'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => handleRevoke(c)}
+                              className="px-2.5 py-1 rounded-lg border border-red-500/20 text-red-300/70 hover:text-red-300 hover:border-red-500/40 text-[11px] font-medium disabled:opacity-40 transition-colors"
+                            >
+                              Revoke
+                            </button>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {(() => {
+                  const connectedIds = new Set((connections || []).filter((c) => c.status === 'connected').map((c) => c.appId));
+                  const available = connectableApps.filter((a) => !connectedIds.has(a.id));
+                  if (available.length === 0 && connections && connections.length > 0) return null;
+                  return (
+                    <div className={connections && connections.length > 0 ? 'pt-1' : ''}>
+                      {available.length > 0 && (
+                        <p className="text-white/35 text-[11px] uppercase tracking-wide mb-2 px-0.5">
+                          {connections && connections.length > 0 ? 'Connect another app' : 'Available to connect'}
+                        </p>
+                      )}
+                      <div className="space-y-2">
+                        {available.map((app) => {
+                          const busy = connectBusyId === app.id;
+                          return (
+                            <div
+                              key={app.id}
+                              className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]"
+                            >
+                              <span className="flex items-center gap-2.5 text-white/80 text-[13px]">
+                                {app.iconPath && (
+                                  <Image src={asset(app.iconPath)} alt="" width={18} height={18} className="rounded-sm" />
+                                )}
+                                {app.name}
+                              </span>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => handleConnect(app)}
+                                className="px-3 py-1.5 rounded-lg bg-[#b7cba6]/15 border border-[#b7cba6]/25 text-[#dbe5d3] hover:bg-[#b7cba6]/25 text-[11.5px] font-medium disabled:opacity-40 transition-colors"
+                              >
+                                {busy ? 'Connecting…' : (app.connectLabel ?? `Connect ${app.name}`)}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {(!connections || connections.length === 0) && available.length === 0 && (
+                        <div className="py-10 text-center text-white/40 text-[13px]">
+                          No third-party apps available to connect right now.
+                        </div>
+                      )}
                     </div>
                   );
-                })}
-              </div>
+                })()}
+
+                <a
+                  href={asset('/integrations')}
+                  className="block text-center text-white/35 hover:text-white/60 text-[11.5px] mt-3"
+                >
+                  Need a custom or API-key connection instead? Manage all connections →
+                </a>
+              </>
             )
-          )}
-          {tab === 'connections' && (
-            <a
-              href={asset('/integrations')}
-              className="block text-center text-[#dbe5d3]/80 hover:text-[#dbe5d3] text-[12.5px] mt-2"
-            >
-              Manage connections on the Integrations page →
-            </a>
           )}
 
           {tab === 'tools' && (
