@@ -169,6 +169,8 @@ export interface WorkflowNodeData {
   appId?: string; appIcon?: string; iconPath?: string;
   /** Integration id from the generated workflow step (e.g. "gmail", "slack") — primary brand-icon signal */
   app?: string;
+  /** Labeled branch outputs (If/Switch/SplitInBatches) — each needs its own named Handle, or edges targeting that handle id silently fail to render. */
+  outputs?: { id: string; label: string }[];
   [key: string]: unknown;
 }
 
@@ -177,7 +179,7 @@ interface WorkflowNodeProps { data: WorkflowNodeData; selected: boolean; }
 export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
   const [expanded, setExpanded] = useState(false);
   const label = data.label || data.title || data.appName || data.agentName || 'Step';
-  const { description, category, icon, hideTarget = false, onAddStep, appIcon, iconPath, app } = data;
+  const { description, category, icon, hideTarget = false, onAddStep, appIcon, iconPath, app, outputs } = data;
   const { setNodes, setEdges } = useReactFlow();
   const nodeId = useNodeId();
 
@@ -254,9 +256,6 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
       {/* ── Connector dot LEFT ── */}
       <div className={styles.connectorDotLeft} />
 
-      {/* ── Connector dot RIGHT ── */}
-      <div className={styles.connectorDotRight} />
-
       {/* ── Upper bar (always visible) ── */}
       <div className={styles.upperBar}>
         <div className={styles.iconBox} style={hasBrandIcon ? undefined : { background: accentColor }}>
@@ -326,7 +325,34 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
 
       {/* ── ReactFlow handles ── */}
       {!hideTarget && <Handle type="target" position={Position.Left} className={styles.handle} />}
-      <Handle type="source" position={Position.Right} className={styles.handle} />
+
+      {/* Multi-output nodes (If/Switch/SplitInBatches) need one NAMED handle
+          per branch — edges carry a matching sourceHandle id (out-yes/out-0/…)
+          and @xyflow/react can't resolve an edge whose handle id doesn't
+          exist on the node, so it silently drops the connecting line. */}
+      {outputs && outputs.length > 1 ? (
+        outputs.map((output, i) => {
+          const topPct = ((i + 1) / (outputs.length + 1)) * 100;
+          return (
+            <React.Fragment key={output.id}>
+              <div className={styles.connectorDotRight} style={{ top: `${topPct}%` }} />
+              <span className={styles.outputLabel} style={{ top: `${topPct}%` }}>{output.label}</span>
+              <Handle
+                type="source"
+                id={output.id}
+                position={Position.Right}
+                className={styles.handle}
+                style={{ top: `${topPct}%` }}
+              />
+            </React.Fragment>
+          );
+        })
+      ) : (
+        <>
+          <div className={styles.connectorDotRight} />
+          <Handle type="source" position={Position.Right} className={styles.handle} />
+        </>
+      )}
     </div>
   );
 });
