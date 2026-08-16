@@ -1043,6 +1043,13 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                   onPaneClick={() => { setSelectedNodeId(null); setInspectorOpen(false); }}
                   onInit={(instance) => { rfInstanceRef.current = instance; }}
                   connectionLineType={ConnectionLineType.Bezier}
+                  // xyflow's default (20px) is tuned for one handle per side.
+                  // Multi-output nodes (If/Switch) now render several source
+                  // handles stacked ~15-25px apart (see WorkflowNode.tsx), so
+                  // the default radius let a drag "magnetically" snap to the
+                  // wrong branch. A tighter radius keeps snapping helpful
+                  // without bridging between adjacent branch handles.
+                  connectionRadius={8}
                   proOptions={{ hideAttribution: true }}
                   fitView
                   fitViewOptions={{ maxZoom: 1, padding: 0.2 }}

@@ -243,6 +243,12 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
     return <DefaultIcon category={category} />;
   };
 
+  // 3+ branch outputs (a wide Switch) packed into the default collapsed
+  // height leaves adjacent handles only a few px apart — even the tightened
+  // connectionRadius (see WorkflowCanvas.tsx) can't fully disambiguate that.
+  // Grow the node a bit so handle spacing scales with branch count.
+  const minHeight = outputs && outputs.length >= 3 ? 18 * (outputs.length + 1) : undefined;
+
   return (
     <div
       className={[
@@ -250,7 +256,7 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
         selected ? styles.selected : '',
         expanded ? styles.expanded : '',
       ].filter(Boolean).join(' ')}
-      style={{ '--accent-color': accentColor } as React.CSSProperties}
+      style={{ '--accent-color': accentColor, ...(minHeight ? { minHeight } : {}) } as React.CSSProperties}
     >
 
       {/* ── Connector dot LEFT ── */}
