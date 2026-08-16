@@ -166,7 +166,11 @@ const DEFAULT_INTEGRATION_BY_CATEGORY: { pattern: RegExp; platform: string }[] =
   { pattern: /\bemail|mail\b/i, platform: 'Gmail' },
   { pattern: /\bcalendar|scheduling\b/i, platform: 'Google Calendar' },
   { pattern: /\btask management|task system|project management|work management\b/i, platform: 'Asana' },
-  { pattern: /\bpayment|finance|billing\b/i, platform: 'Stripe' },
+  // Payment/finance/billing deliberately has no default: Stripe was retired
+  // from Composio wiring (2026-08-08 "agnostic tools" pivot, see
+  // agent_tool_scope.py's TOGGLEABLE_TOOLKITS) and no replacement platform
+  // is connectable today, so this category correctly falls through to
+  // `needsClarification` below instead of a default that can't resolve.
 ]
 
 const KNOWN_NATIVE_INTEGRATIONS = /hubspot|salesforce|slack|zendesk|intercom|gmail|google calendar|outlook|google sheets|asana/i
