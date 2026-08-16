@@ -711,11 +711,14 @@ function detectNodeCategory(n8nType: string): WorkflowNodeCategory {
     return 'channel'
   }
 
-  // System nodes
+  // System nodes (incl. the synthetic branch-merge noOp node — give it its
+  // own category so it doesn't visually inherit the router's "condition"
+  // yellow and get mistaken for a duplicate of the step beside it)
   if (
     lower.includes('function') ||
     lower.includes('code') ||
-    lower.includes('script')
+    lower.includes('script') ||
+    lower.includes('noop')
   ) {
     return 'system'
   }

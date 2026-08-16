@@ -197,6 +197,17 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
   const { short, rest } = splitLabel(label);
   const hasExpandedContent = rest || description;
   const bodyBgColor = getBodyBgColor(category);
+  const accentColor = getIconColor(category);
+  // Brand-icon nodes (Slack/Gmail/etc.) already carry their own recognizable
+  // color — only tint the icon box for the generic DefaultIcon fallback so a
+  // category accent never clashes with a real logo.
+  const hasBrandIcon = !!(
+    iconPath ||
+    (appIcon && (appIcon.startsWith('/') || appIcon.startsWith('http'))) ||
+    getAppSvgIcon(app || '') ||
+    getAppSvgIcon(typeof appIcon === 'string' ? appIcon : '') ||
+    (appIcon && getAppSvgIcon(label))
+  );
 
   const renderIcon = () => {
     if (iconPath) {
@@ -231,11 +242,14 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
   };
 
   return (
-    <div className={[
-      styles.nodeWrapper,
-      selected ? styles.selected : '',
-      expanded ? styles.expanded : '',
-    ].filter(Boolean).join(' ')}>
+    <div
+      className={[
+        styles.nodeWrapper,
+        selected ? styles.selected : '',
+        expanded ? styles.expanded : '',
+      ].filter(Boolean).join(' ')}
+      style={{ '--accent-color': accentColor } as React.CSSProperties}
+    >
 
       {/* ── Connector dot LEFT ── */}
       <div className={styles.connectorDotLeft} />
@@ -245,7 +259,7 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
 
       {/* ── Upper bar (always visible) ── */}
       <div className={styles.upperBar}>
-        <div className={styles.iconBox}>
+        <div className={styles.iconBox} style={hasBrandIcon ? undefined : { background: accentColor }}>
           {renderIcon()}
         </div>
 

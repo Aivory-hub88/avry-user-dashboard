@@ -358,7 +358,11 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
         // node (n8n-nodes-base.noOp) before the outer chain resumes, so a
         // step following this one in `steps` doesn't have to pick which
         // branch to attach to.
-        const joinName = `${primary.name} · join`
+        //
+        // Name it short and generic (not `${primary.name} · join`) — reusing
+        // the router's full descriptive title made the join node render as a
+        // near-duplicate of the router step right next to it on canvas.
+        const joinName = `Merge ${globalStepCounter}`
         nodes.push({
           id: generateNodeId(),
           name: joinName,
