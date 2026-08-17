@@ -74,7 +74,10 @@ export function validateConfig(): { valid: boolean; missingVars: string[] } {
  */
 export const DASHBOARD_URL_PROD = 'https://aivory.id/dashboard'
 export const DASHBOARD_URL_LOCAL = 'http://localhost:3000'
-export const MARKETING_URL_PROD = 'https://aivory.id'
+// aivory.uk is canonical; aivory.id only 301s here. This value now backs a
+// money path (the credit-purchase handoff to checkout), and a redirect hop
+// on a domain being retired is not something to leave in front of payments.
+export const MARKETING_URL_PROD = 'https://aivory.uk'
 export const MARKETING_URL_LOCAL = 'http://localhost:9000'
 
 /**
