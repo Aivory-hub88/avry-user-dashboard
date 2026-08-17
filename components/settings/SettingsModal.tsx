@@ -30,6 +30,11 @@ export function SettingsModal({ user }: SettingsModalProps) {
   
   // Credits State
   const [isAddingCredits, setIsAddingCredits] = useState(false)
+  // Must match CREDIT_PACKS_USD in avry-payments' app/services/pricing.py and
+  // CREDIT_PACK_DEFINITIONS in the landing site's src/lib/pricing.ts. The
+  // gateway prices every order from its own table and accepts no amount from
+  // the browser, so a figure advertised here that differs from the server's is
+  // simply a price we show and never collect.
   const creditPackages = [
     { amount: 50, price: 5 },
     { amount: 100, price: 9 },
@@ -249,7 +254,16 @@ export function SettingsModal({ user }: SettingsModalProps) {
                       <button 
                         key={pkg.amount}
                         onClick={() => {
-                          alert(`Purchasing ${pkg.amount} IC for $${pkg.price}. Payment integration coming soon!`)
+                          // Hand off to the marketing site's checkout rather than
+                          // rebuilding the gateway here: that page already carries
+                          // the Turnstile gate, the live Midtrans Snap flow and the
+                          // receipt email. One payment path to maintain, not two.
+                          // A new tab keeps the dashboard session untouched behind it.
+                          window.open(
+                            `${getMarketingUrl()}/checkout/credits_${pkg.amount}`,
+                            '_blank',
+                            'noopener,noreferrer'
+                          )
                           setIsAddingCredits(false)
                         }}
                         className={`relative flex flex-col items-center justify-center p-5 rounded-xl border transition-all text-center group ${
