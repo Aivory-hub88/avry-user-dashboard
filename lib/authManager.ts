@@ -193,8 +193,14 @@ export const AuthManager = {
       }
     }
     
-    // Check cookie fallback
-    return getSharedUser()?.user_id ?? null
+    // Last resort: ask getUser(), which resolves identity from every source this
+    // app understands -- including the `aivory_auth` localStorage blob the
+    // landing site writes at login. getUserId() used to stop at the cookie, so a
+    // session that only existed in `aivory_auth` produced the confusing state
+    // where the sidebar knew the user's name and role while every page calling
+    // getUserId() failed with "User ID not found". Delegating here keeps the two
+    // in agreement by construction rather than by duplicated fallback chains.
+    return getSharedUser()?.user_id ?? AuthManager.getUser()?.user_id ?? null
   },
 
   // Get the shared session access token (from the global manager or cookie or localStorage)
