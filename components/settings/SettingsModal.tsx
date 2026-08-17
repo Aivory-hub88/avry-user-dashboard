@@ -84,7 +84,8 @@ export function SettingsModal({ user }: SettingsModalProps) {
   // Helper variables for UI
   const displayEmail = user?.email || 'loading...'
   const displayUsername = user?.email?.split('@')[0] || 'User'
-  const displayTier = user?.account_type === 'superadmin' ? 'Admin' : 'Pro'
+  const isSuperAdmin = user?.account_type === 'superadmin'
+  const displayTier = isSuperAdmin ? 'Admin' : 'Pro'
 
   const sidebarSections = [
     {
@@ -197,14 +198,23 @@ export function SettingsModal({ user }: SettingsModalProps) {
                 <div className="bg-white/5 border border-white/10 rounded-xl p-5 flex items-center justify-between mb-6">
                   <div>
                     <h4 className="text-sm font-medium flex items-center mb-1">
-                      Thanks for subscribing to Aivory <span className="ml-2 px-2 py-0.5 rounded bg-[#b7cba6]/10 text-[#b7cba6] text-[11px] font-bold uppercase">{displayTier}</span>
+                      {isSuperAdmin ? 'Full platform access' : 'Thanks for subscribing to Aivory'} <span className="ml-2 px-2 py-0.5 rounded bg-[#b7cba6]/10 text-[#b7cba6] text-[11px] font-bold uppercase">{displayTier}</span>
                     </h4>
-                    <p className="text-[13px] text-white/60">Explore your new Pro features. <a href="#" className="underline hover:text-white">Learn more</a></p>
+                    <p className="text-[13px] text-white/60">
+                      {isSuperAdmin
+                        ? 'Every feature is enabled on this account.'
+                        : <>Explore your new Pro features. <a href="#" className="underline hover:text-white">Learn more</a></>}
+                    </p>
                   </div>
-                  <div className="flex gap-3">
-                    <button className="px-4 py-2 text-[13px] font-medium border border-white/10 rounded-md hover:bg-white/5 transition-colors">Manage</button>
-                    <button className="px-4 py-2 text-[13px] font-medium bg-white text-black rounded-md hover:bg-white/90 transition-colors">Upgrade plan</button>
-                  </div>
+                  {/* A superadmin already has everything, so there is no plan to
+                      manage and nothing above this to upgrade to. Offering both
+                      read as the account being under-provisioned. */}
+                  {!isSuperAdmin && (
+                    <div className="flex gap-3">
+                      <button className="px-4 py-2 text-[13px] font-medium border border-white/10 rounded-md hover:bg-white/5 transition-colors">Manage</button>
+                      <button className="px-4 py-2 text-[13px] font-medium bg-white text-black rounded-md hover:bg-white/90 transition-colors">Upgrade plan</button>
+                    </div>
+                  )}
                 </div>
               </div>
 
