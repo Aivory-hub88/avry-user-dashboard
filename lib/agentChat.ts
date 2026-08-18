@@ -23,7 +23,7 @@ export interface PrebuiltAgent {
 /** Must stay in sync with the AGENTS card list and backend AGENT_TYPES. */
 export const PREBUILT_AGENTS: PrebuiltAgent[] = [
   { type: 'autonomous', title: 'Autonomous Agent' },
-  { type: 'customer_service', title: 'Customer Service Agent' },
+  { type: 'customer_service', title: 'Ticket Ops Agent' },
   { type: 'leads_qualifier', title: 'Leads Qualifier Agent' },
   { type: 'finance_invoice_ops', title: 'Finance & Invoice Ops Agent' },
   { type: 'office_assistant', title: 'Office Assistant', enterprise: true },

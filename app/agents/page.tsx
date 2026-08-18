@@ -96,9 +96,9 @@ const AGENTS = [
   },
   {
     agentType: 'customer_service' as TelegramAgentType,
-    title: 'Customer Service Agent',
-    description: 'Handle inbound support 24/7. Automatically triage, resolve, and escalate to a human if necessary.',
-    tools: ['Support tickets', 'Human handoff', 'Web search', 'SLA workflows'],
+    title: 'Ticket Ops Agent',
+    description: 'Triage inbound support tickets 24/7 across your channels and hand your team everything they need to resolve them fast.',
+    tools: ['Ticket triage', 'Team handoff', 'Web search', 'SLA workflows'],
     gradient: AGENT_GRADIENTS.service,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
@@ -410,7 +410,7 @@ const ACTION_META: Record<string, { label: string; emoji: string }> = {
 
 const AGENT_TITLES: Record<string, string> = {
   autonomous: 'Autonomous Agent',
-  customer_service: 'Customer Service Agent',
+  customer_service: 'Ticket Ops Agent',
   leads_qualifier: 'Leads Qualifier Agent',
   finance_invoice_ops: 'Finance & Invoice Ops Agent',
   office_assistant: 'Office Assistant',
