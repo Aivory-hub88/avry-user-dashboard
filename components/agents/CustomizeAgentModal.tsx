@@ -99,6 +99,7 @@ const TOOLKIT_LABELS: Record<string, string> = {
   hubspot: 'HubSpot',
   slack: 'Slack',
   asana: 'Asana',
+  erpnext: 'ERPNext',
 };
 
 const CONNECTION_STATUS_STYLES: Record<ConnectedApp['status'], { label: string; className: string }> = {
