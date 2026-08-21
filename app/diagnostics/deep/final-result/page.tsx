@@ -1243,7 +1243,7 @@ export default function FinalResultPage() {
             >
               {isGeneratingBlueprint ? (locale === 'id' ? 'Membuat...' : 'Generating...') : (locale === 'id' ? 'Buat Blueprint' : 'Generate Blueprint')}
             </button>
-            <span className={styles.blueprintPrice}>{locale === 'id' ? '$85 Sekali bayar' : '$85 One time'}</span>
+            <span className={styles.blueprintPrice}>{locale === 'id' ? '$249 Sekali bayar' : '$249 One time'}</span>
             <button
               type="button"
               className={styles.advisoryLink}

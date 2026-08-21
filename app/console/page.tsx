@@ -157,8 +157,8 @@ export default function ConsolePage() {
     // A chip with exactly one redirect option has nothing to choose between —
     // skip the submenu and navigate straight there.
     if (chip.options.length === 1 && chip.options[0].action === "redirect" && chip.options[0].tab) {
-      // Deep Diagnostic is a one-time paid unlock ($29, or bundled into the
-      // $85 Blueprint+Roadmap purchase — see Activate Features in Settings).
+      // Deep Diagnostic is a one-time paid unlock ($79, or bundled into the
+      // $249 Blueprint+Roadmap purchase — see Activate Features in Settings).
       // A user with neither has nothing to see on the diagnostic page yet,
       // so open the purchase modal instead of an empty diagnostic screen.
       if (chip.id === "deep-diagnostic") {

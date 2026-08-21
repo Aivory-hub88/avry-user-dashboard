@@ -17,8 +17,8 @@
 /**
  * Tiers permitted to use the paid features (operational dashboard + Composio
  * integration):
- *   snapshot   — bought Deep Diagnostic ($29)
- *   blueprint  — bought Blueprint+Roadmap ($85) or Full Stack ($99)
+ *   snapshot   — bought Deep Diagnostic ($79)
+ *   blueprint  — bought Blueprint+Roadmap ($249) or Full Stack ($299)
  *   foundation — subscription $20/mo
  *   pro        — subscription $44/mo
  *   enterprise — subscription $499/mo
