@@ -39,6 +39,12 @@ import {
   buildSlackOpenUrl,
   SlackDeployLink,
 } from '@/lib/slackDeploy';
+import {
+  createDiscordDeployLink,
+  getDiscordLinkStatus,
+  DiscordDeployLink,
+  DiscordLinkStatus,
+} from '@/lib/discordDeploy';
 import { createAgentApiKey, CreatedApiKey } from '@/lib/agentApiKeys';
 import { asset } from '@/lib/asset';
 
@@ -340,6 +346,7 @@ export default function CustomizeAgentModal({
     }
   };
 
+
   const [toolScope, setToolScope] = useState<ToolScope | null | undefined>(undefined); // undefined = not yet fetched, null = no toggleable toolkits
   const [toolsFetched, setToolsFetched] = useState(false);
   const [toolsLoading, setToolsLoading] = useState(false);
@@ -358,10 +365,12 @@ export default function CustomizeAgentModal({
   // Deploy tab — was a separate modal (app/agents/page.tsx's DeployModal),
   // merged in so identity/connections/tools/MCP are configured before a
   // channel goes live, not as a competing entry point.
-  const [deployView, setDeployView] = useState<'channels' | 'telegram' | 'slack' | 'api'>('channels');
+  const [deployView, setDeployView] = useState<'channels' | 'telegram' | 'slack' | 'discord' | 'api'>('channels');
   const [deployLink, setDeployLink] = useState<DeployLink | null>(null);
   const [slackLink, setSlackLink] = useState<SlackDeployLink | null>(null);
   const [slackTeamId, setSlackTeamId] = useState<string | null>(null);
+  const [discordLink, setDiscordLink] = useState<DiscordDeployLink | null>(null);
+  const [discordLinkStatus, setDiscordLinkStatus] = useState<DiscordLinkStatus>('pending');
   const [linkStatus, setLinkStatus] = useState<LinkStatus>('pending');
   const [deployLoading, setDeployLoading] = useState(false);
   const [deployError, setDeployError] = useState<string | null>(null);
@@ -414,6 +423,8 @@ export default function CustomizeAgentModal({
     setDeployLink(null);
     setSlackLink(null);
     setSlackTeamId(null);
+    setDiscordLink(null);
+    setDiscordLinkStatus('pending');
     setLinkStatus('pending');
     setDeployLoading(false);
     setDeployError(null);
@@ -501,6 +512,32 @@ export default function CustomizeAgentModal({
       }, 2500);
     } catch (e: any) {
       setDeployError(e?.message || 'Could not create deploy link. Please try again.');
+    } finally {
+      setDeployLoading(false);
+    }
+  };
+
+  const startDiscordDeploy = async () => {
+    if (!agentType) return;
+    setDeployLoading(true);
+    setDeployError(null);
+    try {
+      const link = await createDiscordDeployLink(agentType as any);
+      setDiscordLink(link);
+      setDiscordLinkStatus('pending');
+      setDeployView('discord');
+      stopDeployPolling();
+      deployPollRef.current = setInterval(async () => {
+        try {
+          const res = await getDiscordLinkStatus(link.code);
+          if (res.status === 'connected' || res.status === 'expired') {
+            setDiscordLinkStatus(res.status);
+            stopDeployPolling();
+          }
+        } catch { /* keep polling */ }
+      }, 2500);
+    } catch (e: any) {
+      setDeployError(e?.message || 'Could not create a connect code. Please try again.');
     } finally {
       setDeployLoading(false);
     }
@@ -830,6 +867,9 @@ export default function CustomizeAgentModal({
                   <Field label="Agent name" value={fields.agent_name} limit={FIELD_LIMITS.agent_name} onChange={set('agent_name')} placeholder="e.g. Sari" />
                   <Field label="Business name" value={fields.business_name} limit={FIELD_LIMITS.business_name} onChange={set('business_name')} placeholder="e.g. Toko Baju Melati" />
                 </div>
+                <p className="text-white/60 text-[12px] leading-relaxed -mt-2">
+                  <strong className="text-white/90 font-semibold">This is how your agent introduces itself inside the conversation — it does not change the bot&apos;s own account name shown in Discord/WhatsApp/Telegram, which stays &quot;Aivory Agent&quot;.</strong>
+                </p>
                 <MultiSelect
                   label="Tone of voice"
                   placeholder="Default tone (warm & helpful)"
@@ -1293,6 +1333,29 @@ export default function CustomizeAgentModal({
                   </button>
 
                   <button
+                    onClick={startDiscordDeploy}
+                    disabled={!agentType || deployLoading}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+                      <Image src={asset('/integrations/icons/discord.svg')} alt="Discord" width={40} height={40} />
+                    </div>
+                    <div>
+                      <div className="text-white/90 font-medium text-[14px]">Discord</div>
+                      <div className="text-white/40 text-[12px] mt-0.5">{deployLoading ? 'Generating connect code…' : 'Deploy as a Discord bot — invite + connect code'}</div>
+                    </div>
+                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                      {deployLoading ? (
+                        <div className="w-5 h-5 border-2 border-[#b7cba6]/30 border-t-[#b7cba6] rounded-full animate-spin" />
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+
+                  <button
                     onClick={() => { setDeployError(null); setDeployView('api'); }}
                     disabled={!agentType}
                     className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1469,6 +1532,72 @@ export default function CustomizeAgentModal({
                         Or open in Telegram on this device
                       </a>
                     </>
+                  )}
+                </div>
+              </>
+            ) : deployView === 'discord' && discordLink ? (
+              <>
+                <button onClick={() => { stopDeployPolling(); setDeployView('channels'); }} className="flex items-center gap-1.5 text-white/40 hover:text-white text-[12px] transition-colors mb-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                  </svg>
+                  Back
+                </button>
+
+                <h4 className="text-white text-[15px] font-normal mb-1.5">
+                  {discordLinkStatus === 'connected' ? 'Agent connected' : 'Deploy to Discord'}
+                </h4>
+                <p className="text-white/60 text-[13px] leading-relaxed mb-5">
+                  {discordLinkStatus === 'connected'
+                    ? <>Your <strong className="text-white font-medium">{discordLink.agent_name}</strong> is live in that Discord channel. Say hi!</>
+                    : discordLinkStatus === 'expired'
+                    ? 'This connect code has expired. Generate a new one to continue.'
+                    : <>Invite the bot, then type <code className="text-white/90 bg-white/10 rounded px-1 py-0.5">/connect</code> with the code below in the channel you want your <strong className="text-white font-medium">{discordLink.agent_name}</strong> to live in.</>}
+                </p>
+
+                <div className="flex flex-col items-center">
+                  {discordLinkStatus === 'connected' ? (
+                    <div className="w-[216px] h-[216px] rounded-2xl bg-[#b7cba6]/10 border border-[#b7cba6]/30 flex flex-col items-center justify-center gap-3">
+                      <div className="w-14 h-14 rounded-full bg-[#b7cba6]/20 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7 text-[#b7cba6]">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      </div>
+                      <span className="text-[#b7cba6] text-[13px] font-medium">Connected</span>
+                    </div>
+                  ) : (
+                    <>
+                      <a
+                        href={discordLink.invite_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/90 text-[13px] font-medium transition-all mb-4"
+                      >
+                        <Image src={asset('/integrations/icons/discord.svg')} alt="Discord" width={18} height={18} />
+                        1. Invite bot to your server
+                      </a>
+
+                      <div className={`w-full rounded-2xl border p-5 text-center ${discordLinkStatus === 'expired' ? 'opacity-30 bg-white/[0.03] border-white/10' : 'bg-white/[0.03] border-white/10'}`}>
+                        <div className="text-white/40 text-[11px] uppercase tracking-wide mb-2">2. Type /connect with this code</div>
+                        <div className="text-white text-[22px] font-mono tracking-[0.15em]">{discordLink.code}</div>
+                      </div>
+                      {discordLinkStatus === 'expired' && (
+                        <button
+                          onClick={startDiscordDeploy}
+                          disabled={deployLoading}
+                          className="mt-3 px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-[#b7cba6]/50 transition-all"
+                        >
+                          {deployLoading ? 'Generating…' : 'Generate new code'}
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {discordLinkStatus === 'pending' && (
+                    <div className="flex items-center gap-2 mt-5 text-white/50 text-[12px]">
+                      <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-[#b7cba6] rounded-full animate-spin" />
+                      Waiting for /connect…
+                    </div>
                   )}
                 </div>
               </>
