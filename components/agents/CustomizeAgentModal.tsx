@@ -1138,8 +1138,8 @@ export default function CustomizeAgentModal({
                       }`}
                     >
                       <span
-                        className={`absolute top-[3px] w-4 h-4 rounded-full bg-white transition-transform ${
-                          enabled ? 'translate-x-[21px]' : 'translate-x-[3px]'
+                        className={`absolute left-[3px] top-[3px] w-4 h-4 rounded-full bg-white transition-transform ${
+                          enabled ? 'translate-x-[16px]' : 'translate-x-0'
                         }`}
                       />
                     </button>
