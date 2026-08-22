@@ -292,7 +292,7 @@ export default function CustomizeAgentModal({
   agentName: string | null;
   agentType: string | null;
 }) {
-  const [tab, setTab] = useState<'identity' | 'connections' | 'tools' | 'mcp' | 'deploy'>('identity');
+  const [tab, setTab] = useState<'identity' | 'integrations' | 'mcp' | 'deploy'>('identity');
   const [fields, setFields] = useState<Record<FieldKey, string>>(EMPTY);
   const [hasProfile, setHasProfile] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -551,7 +551,7 @@ export default function CustomizeAgentModal({
   // state. Caught live: without this, a 401 here rendered as a "Loading…"
   // spinner that never resolved.
   useEffect(() => {
-    if (!isOpen || tab !== 'connections' || connectionsFetched || connectionsLoading) return;
+    if (!isOpen || tab !== 'integrations' || connectionsFetched || connectionsLoading) return;
     setConnectionsLoading(true);
     setConnectionsError(null);
     Promise.all([getConnectedApps(), getConnectableApps().catch(() => [])])
@@ -662,7 +662,7 @@ export default function CustomizeAgentModal({
   };
 
   useEffect(() => {
-    if (!isOpen || !agentType || tab !== 'tools' || toolsFetched || toolsLoading) return;
+    if (!isOpen || !agentType || tab !== 'integrations' || toolsFetched || toolsLoading) return;
     setToolsLoading(true);
     setToolsError(null);
     getToolScope(agentType)
@@ -832,13 +832,12 @@ export default function CustomizeAgentModal({
           </h3>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 16px' }}>
             {tab === 'identity' && 'Give this agent your business identity. It will introduce itself with your name, follow your tone, and answer from your business knowledge — on every channel it is deployed to.'}
-            {tab === 'connections' && 'Third-party apps this agent can use — connect or disconnect them right here.'}
-            {tab === 'tools' && 'Turn off any external toolkit you don’t want this agent to use. Aivory’s built-in tools always stay on.'}
+            {tab === 'integrations' && 'Connect a toolkit once, then decide which agents may use it. Writes to your systems always ask for your approval first.'}
             {tab === 'mcp' && 'Connect this agent to your own systems by registering an MCP server you control. Pro plan and above, Aivory Cerveau agents only — every tool call requires your approval.'}
             {tab === 'deploy' && 'Once this agent is set up the way you want, put it to work on a channel.'}
           </p>
           <div className="flex items-center gap-1 border-b border-white/[0.06] -mb-4">
-            {(['identity', 'connections', 'tools', 'mcp', 'deploy'] as const).map((t) => (
+            {(['identity', 'integrations', 'mcp', 'deploy'] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -922,229 +921,126 @@ export default function CustomizeAgentModal({
             )
           )}
 
-          {tab === 'connections' && (
-            connectionsLoading ? (
-              <div className="py-10 text-center text-white/40 text-[13px]">Loading connections…</div>
-            ) : connectionsError ? (
-              <div className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300/90 text-[12px]">
-                {connectionsError}
-              </div>
+          {tab === 'integrations' && (
+            (connectionsLoading || toolsLoading) ? (
+              <div className="py-10 text-center text-white/40 text-[13px]">Loading integrations…</div>
             ) : (
-              <>
-                {connectFeedback && (
-                  <div
-                    className={`px-4 py-2.5 rounded-xl border text-[12px] flex items-center justify-between gap-3 ${
-                      connectFeedback.type === 'success'
-                        ? 'bg-[#b7cba6]/10 border-[#b7cba6]/25 text-[#dbe5d3]'
-                        : 'bg-red-500/10 border-red-500/20 text-red-300/90'
-                    }`}
-                  >
-                    <span>{connectFeedback.message}</span>
-                    <button
-                      type="button"
-                      onClick={() => setConnectFeedback(null)}
-                      className="text-current opacity-60 hover:opacity-100 shrink-0"
-                    >
-                      ×
-                    </button>
+              <div className="space-y-2">
+                {(toolScope === undefined ? [] : Object.keys(toolScope?.tools ?? {})).length === 0 &&
+                  toolScope !== null && (
+                  <div className="py-10 text-center text-white/40 text-[13px]">
+                    No external toolkits available — Aivory’s built-in tools always stay on.
                   </div>
                 )}
-
-                {connections && connections.length > 0 && (
-                  <div className="space-y-2">
-                    {connections.map((c) => {
-                      const style = CONNECTION_STATUS_STYLES[c.status];
-                      const app = connectableApps.find((a) => a.id === c.appId);
-                      const busy = connectBusyId === c.appId;
-                      return (
-                        <div
-                          key={c.id}
-                          className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]"
-                        >
-                          <span className="flex items-center gap-2.5 text-white/80 text-[13px]">
-                            {app?.iconPath && (
-                              <Image src={asset(app.iconPath)} alt="" width={18} height={18} className="rounded-sm" />
-                            )}
-                            {c.displayName || c.appName}
+                {Object.entries(toolScope?.tools ?? {}).map(([slug, enabled]) => {
+                  const conn = (connections || []).find((c) => c.appId === slug && c.status === 'connected');
+                  const style = CONNECTION_STATUS_STYLES[conn ? 'connected' : 'revoked'];
+                  const busy = connectBusyId === slug || savingToolkit === slug;
+                  const isApiKey = slug === 'erpnext';
+                  const app = connectableApps.find((a) => a.id === slug);
+                  return (
+                    <div key={slug} className="px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-2.5 text-white/80 text-[13px]">
+                          {TOOLKIT_LABELS[slug] || slug}
+                          <span className={`px-2 py-[2px] rounded-full border text-[10.5px] font-medium ${style.className}`}>
+                            {conn ? 'Connected' : 'Not connected'}
                           </span>
-                          <span className="flex items-center gap-2 shrink-0">
-                            <span className={`px-2.5 py-1 rounded-full border text-[11px] font-medium ${style.className}`}>
-                              {style.label}
-                            </span>
+                        </span>
+                        <span className="flex items-center gap-2 shrink-0">
+                          {!isApiKey && (
                             <button
                               type="button"
                               disabled={busy}
-                              onClick={() => handleReconnect(c)}
-                              className="px-2.5 py-1 rounded-lg border border-white/10 text-white/60 hover:text-white/90 hover:border-white/20 text-[11px] font-medium disabled:opacity-40 transition-colors"
+                              onClick={() => {
+                                if (app) handleConnect(app);
+                                else setConnectFeedback({ type: 'error', message: `Could not start ${TOOLKIT_LABELS[slug] || slug} connect.` });
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-[#b7cba6]/15 border border-[#b7cba6]/25 text-[#dbe5d3] hover:bg-[#b7cba6]/25 text-[11px] font-medium disabled:opacity-40 transition-colors"
                             >
-                              {busy ? '…' : c.status === 'needs_reauth' ? 'Re-authenticate' : 'Reconnect'}
+                              {busy ? '…' : 'Connect'}
                             </button>
+                          )}
+                          {isApiKey && (
                             <button
                               type="button"
-                              disabled={busy}
-                              onClick={() => handleRevoke(c)}
+                              onClick={() => { setApiKeyFormOpen((v) => !v); setApiKeyError(null); }}
+                              className="px-2.5 py-1 rounded-lg bg-[#b7cba6]/15 border border-[#b7cba6]/25 text-[#dbe5d3] hover:bg-[#b7cba6]/25 text-[11px] font-medium transition-colors"
+                            >
+                              {apiKeyFormOpen ? 'Close' : 'Connect'}
+                            </button>
+                          )}
+                          {conn && (
+                            <button
+                              type="button"
+                              disabled={connectBusyId === slug}
+                              onClick={() => handleRevoke({ id: (connections || []).find((c) => c.appId === slug)?.id ?? '', appId: slug, status: 'connected' } as ConnectedApp)}
                               className="px-2.5 py-1 rounded-lg border border-red-500/20 text-red-300/70 hover:text-red-300 hover:border-red-500/40 text-[11px] font-medium disabled:opacity-40 transition-colors"
                             >
                               Revoke
                             </button>
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {toolScope?.tools?.erpnext === true &&
-                  !(connections || []).some((c) => c.appId === 'erpnext' && c.status === 'connected') && (
-                  <div className="px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2.5 text-white/80 text-[13px]">ERPNext</span>
-                      <button
-                        type="button"
-                        onClick={() => { setApiKeyFormOpen((v) => !v); setApiKeyError(null); }}
-                        className="px-3 py-1.5 rounded-lg bg-[#b7cba6]/15 border border-[#b7cba6]/25 text-[#dbe5d3] hover:bg-[#b7cba6]/25 text-[11.5px] font-medium transition-colors"
-                      >
-                        {apiKeyFormOpen ? 'Cancel' : 'Connect ERPNext'}
-                      </button>
-                    </div>
-                    {apiKeyFormOpen && (
-                      <div className="mt-3 space-y-2">
-                        <p className="text-white/40 text-[11.5px] leading-relaxed">
-                          In your Frappe/ERPNext instance: User list → your user → Settings → API Access → Generate Keys.
-                        </p>
-                        <input
-                          type="text"
-                          value={erpnextBaseUrl}
-                          onChange={(e) => setErpNextBaseUrl(e.target.value)}
-                          placeholder="https://your-company.com (Frappe instance URL)"
-                          className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-[#b7cba6]/50"
-                        />
-                        <input
-                          type="password"
-                          value={erpnextApiKey}
-                          onChange={(e) => setErpNextApiKey(e.target.value)}
-                          placeholder="API Key"
-                          className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-[#b7cba6]/50"
-                        />
-                        <input
-                          type="password"
-                          value={erpnextApiSecret}
-                          onChange={(e) => setErpNextApiSecret(e.target.value)}
-                          placeholder="API Secret"
-                          className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-[#b7cba6]/50"
-                        />
-                        {apiKeyError && (
-                          <p className="text-red-300/80 text-[11.5px]">{apiKeyError}</p>
-                        )}
-                        <button
-                          type="button"
-                          disabled={apiKeyBusy}
-                          onClick={handleErpNextConnect}
-                          className="w-full px-3 py-2 rounded-lg bg-[#b7cba6]/15 border border-[#b7cba6]/25 text-[#dbe5d3] hover:bg-[#b7cba6]/25 text-[12px] font-medium disabled:opacity-40 transition-colors"
-                        >
-                          {apiKeyBusy ? 'Connecting…' : 'Save & connect'}
-                        </button>
+                          )}
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={enabled}
+                            disabled={!conn || savingToolkit === slug}
+                            title={conn ? undefined : 'Connect first'}
+                            onClick={() => toggleToolkit(slug, !enabled)}
+                            className={`relative w-10 h-[22px] rounded-full transition-colors disabled:opacity-30 ${
+                              enabled ? 'bg-[#b7cba6]/70' : 'bg-white/10'
+                            }`}
+                          >
+                            <span
+                              className={`absolute left-[3px] top-[3px] w-4 h-4 rounded-full bg-white transition-transform ${
+                                enabled ? 'translate-x-[16px]' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        </span>
                       </div>
-                    )}
-                  </div>
-                )}
-
-                {(() => {
-                  const connectedIds = new Set((connections || []).filter((c) => c.status === 'connected').map((c) => c.appId));
-                  const available = connectableApps.filter((a) => !connectedIds.has(a.id));
-                  if (available.length === 0 && connections && connections.length > 0) return null;
-                  return (
-                    <div className={connections && connections.length > 0 ? 'pt-1' : ''}>
-                      {available.length > 0 && (
-                        <p className="text-white/35 text-[11px] uppercase tracking-wide mb-2 px-0.5">
-                          {connections && connections.length > 0 ? 'Connect another app' : 'Available to connect'}
-                        </p>
-                      )}
-                      <div className="space-y-2">
-                        {available.map((app) => {
-                          const busy = connectBusyId === app.id;
-                          return (
-                            <div
-                              key={app.id}
-                              className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]"
-                            >
-                              <span className="flex items-center gap-2.5 text-white/80 text-[13px]">
-                                {app.iconPath && (
-                                  <Image src={asset(app.iconPath)} alt="" width={18} height={18} className="rounded-sm" />
-                                )}
-                                {app.name}
-                              </span>
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => handleConnect(app)}
-                                className="px-3 py-1.5 rounded-lg bg-[#b7cba6]/15 border border-[#b7cba6]/25 text-[#dbe5d3] hover:bg-[#b7cba6]/25 text-[11.5px] font-medium disabled:opacity-40 transition-colors"
-                              >
-                                {busy ? 'Connecting…' : (app.connectLabel ?? `Connect ${app.name}`)}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {(!connections || connections.length === 0) && available.length === 0 && (
-                        <div className="py-10 text-center text-white/40 text-[13px]">
-                          No third-party apps available to connect right now.
+                      {isApiKey && apiKeyFormOpen && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-white/40 text-[11.5px] leading-relaxed">
+                            In your Frappe/ERPNext instance: User list → your user → Settings → API Access → Generate Keys.
+                          </p>
+                          <input
+                            type="text"
+                            value={erpnextBaseUrl}
+                            onChange={(e) => setErpNextBaseUrl(e.target.value)}
+                            placeholder="https://your-company.com (Frappe instance URL)"
+                            className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-[#b7cba6]/50"
+                          />
+                          <input
+                            type="password"
+                            value={erpnextApiKey}
+                            onChange={(e) => setErpNextApiKey(e.target.value)}
+                            placeholder="API Key"
+                            className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-[#b7cba6]/50"
+                          />
+                          <input
+                            type="password"
+                            value={erpnextApiSecret}
+                            onChange={(e) => setErpNextApiSecret(e.target.value)}
+                            placeholder="API Secret"
+                            className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-[#b7cba6]/50"
+                          />
+                          {apiKeyError && (
+                            <p className="text-red-300/80 text-[11.5px]">{apiKeyError}</p>
+                          )}
+                          <button
+                            type="button"
+                            disabled={apiKeyBusy}
+                            onClick={handleErpNextConnect}
+                            className="w-full px-3 py-2 rounded-lg bg-[#b7cba6]/15 border border-[#b7cba6]/25 text-[#dbe5d3] hover:bg-[#b7cba6]/25 text-[12px] font-medium disabled:opacity-40 transition-colors"
+                          >
+                            {apiKeyBusy ? 'Connecting…' : 'Save & connect'}
+                          </button>
                         </div>
                       )}
                     </div>
                   );
-                })()}
-
-                <a
-                  href={asset('/integrations')}
-                  className="block text-center text-white/35 hover:text-white/60 text-[11.5px] mt-3"
-                >
-                  Need a custom or API-key connection instead? Manage all connections →
-                </a>
-              </>
-            )
-          )}
-
-          {tab === 'tools' && (
-            toolsLoading ? (
-              <div className="py-10 text-center text-white/40 text-[13px]">Loading tool settings…</div>
-            ) : toolScope === null ? (
-              <div className="py-10 text-center text-white/40 text-[13px]">
-                This agent has no external toolkits to configure yet — it always has access to Aivory’s built-in tools.
-              </div>
-            ) : !toolScope ? (
-              <div className="py-10 text-center text-white/40 text-[13px]">Could not load tool settings.</div>
-            ) : (
-              <div className="space-y-2">
-                {toolsError && (
-                  <div className="mb-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300/90 text-[12px]">
-                    {toolsError}
-                  </div>
-                )}
-                {Object.entries(toolScope.tools).map(([slug, enabled]) => (
-                  <div
-                    key={slug}
-                    className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]"
-                  >
-                    <span className="text-white/80 text-[13px]">{TOOLKIT_LABELS[slug] || slug}</span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={enabled}
-                      disabled={savingToolkit === slug}
-                      onClick={() => toggleToolkit(slug, !enabled)}
-                      className={`relative w-10 h-[22px] rounded-full transition-colors disabled:opacity-50 ${
-                        enabled ? 'bg-[#b7cba6]/70' : 'bg-white/10'
-                      }`}
-                    >
-                      <span
-                        className={`absolute left-[3px] top-[3px] w-4 h-4 rounded-full bg-white transition-transform ${
-                          enabled ? 'translate-x-[16px]' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                ))}
+                })}
               </div>
             )
           )}
