@@ -16,6 +16,7 @@ import {
   getConnectableApps,
   getConnectedApps,
   revokeConnectedApp,
+  startApiKeyConnect,
   startOAuthConnect,
 } from '@/lib/integrationStatus';
 import {
@@ -301,6 +302,43 @@ export default function CustomizeAgentModal({
   const [connectBusyId, setConnectBusyId] = useState<string | null>(null);
   const [connectFeedback, setConnectFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const connectPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // API-key toolkit connect (ERPNext) — no OAuth popup exists for that
+  // scheme, so the Connections tab renders an inline credential form and
+  // submits it to /api/integrations/apikey/connect instead.
+  const [apiKeyFormOpen, setApiKeyFormOpen] = useState(false);
+  const [apiKeyBusy, setApiKeyBusy] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
+  const [erpnextBaseUrl, setErpNextBaseUrl] = useState('');
+  const [erpnextApiKey, setErpNextApiKey] = useState('');
+  const [erpnextApiSecret, setErpNextApiSecret] = useState('');
+
+  const handleErpNextConnect = async () => {
+    if (apiKeyBusy) return;
+    setApiKeyError(null);
+    if (!erpnextBaseUrl.trim() || !erpnextApiKey.trim() || !erpnextApiSecret.trim()) {
+      setApiKeyError('Base URL, API Key, and API Secret are all required.');
+      return;
+    }
+    setApiKeyBusy(true);
+    try {
+      await startApiKeyConnect('erpnext', {
+        full: erpnextBaseUrl.trim(),
+        generic_api_key: erpnextApiKey.trim(),
+        generic_token: erpnextApiSecret.trim(),
+      });
+      setErpNextBaseUrl('');
+      setErpNextApiKey('');
+      setErpNextApiSecret('');
+      setApiKeyFormOpen(false);
+      setConnectFeedback({ type: 'success', message: 'ERPNext connected.' });
+      refetchConnections();
+    } catch (e: unknown) {
+      setApiKeyError(e instanceof Error ? e.message : 'Could not connect ERPNext. Please try again.');
+    } finally {
+      setApiKeyBusy(false);
+    }
+  };
 
   const [toolScope, setToolScope] = useState<ToolScope | null | undefined>(undefined); // undefined = not yet fetched, null = no toggleable toolkits
   const [toolsFetched, setToolsFetched] = useState(false);
@@ -913,6 +951,61 @@ export default function CustomizeAgentModal({
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {toolScope?.tools?.erpnext === true &&
+                  !(connections || []).some((c) => c.appId === 'erpnext' && c.status === 'connected') && (
+                  <div className="px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2.5 text-white/80 text-[13px]">ERPNext</span>
+                      <button
+                        type="button"
+                        onClick={() => { setApiKeyFormOpen((v) => !v); setApiKeyError(null); }}
+                        className="px-3 py-1.5 rounded-lg bg-[#b7cba6]/15 border border-[#b7cba6]/25 text-[#dbe5d3] hover:bg-[#b7cba6]/25 text-[11.5px] font-medium transition-colors"
+                      >
+                        {apiKeyFormOpen ? 'Cancel' : 'Connect ERPNext'}
+                      </button>
+                    </div>
+                    {apiKeyFormOpen && (
+                      <div className="mt-3 space-y-2">
+                        <p className="text-white/40 text-[11.5px] leading-relaxed">
+                          In your Frappe/ERPNext instance: User list → your user → Settings → API Access → Generate Keys.
+                        </p>
+                        <input
+                          type="text"
+                          value={erpnextBaseUrl}
+                          onChange={(e) => setErpNextBaseUrl(e.target.value)}
+                          placeholder="https://your-company.com (Frappe instance URL)"
+                          className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-[#b7cba6]/50"
+                        />
+                        <input
+                          type="password"
+                          value={erpnextApiKey}
+                          onChange={(e) => setErpNextApiKey(e.target.value)}
+                          placeholder="API Key"
+                          className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-[#b7cba6]/50"
+                        />
+                        <input
+                          type="password"
+                          value={erpnextApiSecret}
+                          onChange={(e) => setErpNextApiSecret(e.target.value)}
+                          placeholder="API Secret"
+                          className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-[#b7cba6]/50"
+                        />
+                        {apiKeyError && (
+                          <p className="text-red-300/80 text-[11.5px]">{apiKeyError}</p>
+                        )}
+                        <button
+                          type="button"
+                          disabled={apiKeyBusy}
+                          onClick={handleErpNextConnect}
+                          className="w-full px-3 py-2 rounded-lg bg-[#b7cba6]/15 border border-[#b7cba6]/25 text-[#dbe5d3] hover:bg-[#b7cba6]/25 text-[12px] font-medium disabled:opacity-40 transition-colors"
+                        >
+                          {apiKeyBusy ? 'Connecting…' : 'Save & connect'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 

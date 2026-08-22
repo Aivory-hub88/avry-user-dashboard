@@ -44,7 +44,7 @@ export async function getConnectableApps(): Promise<ConnectableApp[]> {
 
 /** Opens the provider's OAuth popup; caller polls `getConnectedApps()` to
  *  learn when it completes (same "session -> connect -> popup" shape the
- *  full /integrations page's ProviderButton/handleReconnect use). */
+ *  full /integrations page's own polling uses). */
 export async function startOAuthConnect(appId: string): Promise<Window | null> {
   const sessionRes = await fetch(asset('/api/integrations/oauth?action=session'))
   if (!sessionRes.ok) throw new Error('Failed to create session')
@@ -68,4 +68,31 @@ export async function revokeConnectedApp(connectedAccountId: string): Promise<vo
     body: JSON.stringify({ action: 'revoke', connectedAccountId }),
   })
   if (!res.ok) throw new Error('Failed to revoke connection')
+}
+
+/**
+ * Connect an API-key toolkit (no OAuth popup exists for that scheme) by
+ * submitting the toolkit's credential fields to the apikey/connect route,
+ * which creates the Composio connected account server-side for the current
+ * user. Caller polls `getConnectedApps()` afterwards, same as OAuth.
+ */
+export async function startApiKeyConnect(
+  toolkit: string,
+  fields: Record<string, string>,
+): Promise<void> {
+  const res = await fetch(asset('/api/integrations/apikey/connect'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ toolkit, fields }),
+  })
+  if (!res.ok) {
+    let message = 'Failed to connect'
+    try {
+      const parsed = await res.json()
+      if (parsed?.error?.message) message = String(parsed.error.message)
+    } catch {
+      /* keep generic */
+    }
+    throw new Error(message)
+  }
 }
