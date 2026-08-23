@@ -13,7 +13,7 @@ import CustomizeAgentModal from '@/components/agents/CustomizeAgentModal';
 const NoiseOverlay = () => (
   <>
     {/* Layer 1 — coarse grain, high visibility */}
-    <div 
+    <div
       className="absolute inset-0 pointer-events-none z-[2]"
       style={{
         opacity: 0.48,
@@ -22,7 +22,7 @@ const NoiseOverlay = () => (
       }}
     />
     {/* Layer 2 — fine grain for depth */}
-    <div 
+    <div
       className="absolute inset-0 pointer-events-none z-[2]"
       style={{
         opacity: 0.35,
@@ -31,7 +31,7 @@ const NoiseOverlay = () => (
       }}
     />
     {/* Layer 3 — ultra-fine specks */}
-    <div 
+    <div
       className="absolute inset-0 pointer-events-none z-[2]"
       style={{
         opacity: 0.18,
@@ -42,43 +42,14 @@ const NoiseOverlay = () => (
   </>
 );
 
-/* Premium multi-stop radial gradients — organic aurora-like blobs */
-const AGENT_GRADIENTS = {
-  autonomous: [
-    'radial-gradient(ellipse 120% 140% at 15% 10%, #6b21a8 0%, transparent 55%)',
-    'radial-gradient(ellipse 100% 120% at 85% 80%, #ea580c 0%, transparent 50%)',
-    'radial-gradient(ellipse 80% 100% at 50% 50%, #7c3aed 0%, transparent 60%)',
-    'radial-gradient(ellipse 60% 80% at 80% 20%, #2563eb 0%, transparent 50%)',
-    'linear-gradient(135deg, #1e1040 0%, #2d1060 50%, #1a0a30 100%)',
-  ].join(', '),
-  service: [
-    'radial-gradient(ellipse 110% 130% at 10% 20%, #0369a1 0%, transparent 55%)',
-    'radial-gradient(ellipse 90% 110% at 90% 70%, #f59e0b 0%, transparent 45%)',
-    'radial-gradient(ellipse 100% 100% at 50% 40%, #0ea5e9 0%, transparent 55%)',
-    'radial-gradient(ellipse 70% 90% at 75% 15%, #ec4899 0%, transparent 50%)',
-    'linear-gradient(135deg, #0c1a2e 0%, #0f2848 50%, #0a1628 100%)',
-  ].join(', '),
-  leads: [
-    'radial-gradient(ellipse 100% 130% at 20% 85%, #d97706 0%, transparent 50%)',
-    'radial-gradient(ellipse 120% 110% at 80% 15%, #065f46 0%, transparent 55%)',
-    'radial-gradient(ellipse 80% 100% at 50% 50%, #0f766e 0%, transparent 55%)',
-    'radial-gradient(ellipse 60% 70% at 15% 20%, #1d4ed8 0%, transparent 50%)',
-    'linear-gradient(135deg, #0a1a14 0%, #0c2420 50%, #091410 100%)',
-  ].join(', '),
-  finance: [
-    'radial-gradient(ellipse 120% 140% at 80% 90%, #ea580c 0%, transparent 50%)',
-    'radial-gradient(ellipse 100% 100% at 20% 20%, #b91c1c 0%, transparent 50%)',
-    'radial-gradient(ellipse 90% 120% at 60% 40%, #d97706 0%, transparent 55%)',
-    'radial-gradient(ellipse 70% 80% at 10% 80%, #7c2d12 0%, transparent 50%)',
-    'linear-gradient(135deg, #1a0e08 0%, #2a1408 50%, #140a04 100%)',
-  ].join(', '),
-  office: [
-    'radial-gradient(ellipse 110% 130% at 85% 10%, #4338ca 0%, transparent 55%)',
-    'radial-gradient(ellipse 90% 110% at 15% 85%, #b45309 0%, transparent 45%)',
-    'radial-gradient(ellipse 100% 100% at 40% 40%, #6d28d9 0%, transparent 55%)',
-    'radial-gradient(ellipse 60% 80% at 10% 15%, #0e7490 0%, transparent 50%)',
-    'linear-gradient(135deg, #14122e 0%, #1c1440 50%, #0e0a24 100%)',
-  ].join(', '),
+/* Aivory-branded card headers — solid colour field with the bleeding "X"
+   mark, one per agent family. Source design: public/agent-card-headers/. */
+const AGENT_HEADER_IMAGES = {
+  autonomous: '/agent-card-headers/pink.svg',
+  service: '/agent-card-headers/purple.svg',
+  leads: '/agent-card-headers/teal.svg',
+  finance: '/agent-card-headers/green.svg',
+  office: '/agent-card-headers/orange.svg',
 };
 
 const AGENTS = [
@@ -87,7 +58,7 @@ const AGENTS = [
     title: 'Autonomous Agent',
     description: 'Deploy autonomous agents inside your communication hubs. They triage, respond, and update your CRM 24/7.',
     tools: ['Web search', 'Leads & tickets', 'Invoices', 'Workflows', 'Integrations'],
-    gradient: AGENT_GRADIENTS.autonomous,
+    headerImage: AGENT_HEADER_IMAGES.autonomous,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
         <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
@@ -99,7 +70,7 @@ const AGENTS = [
     title: 'Ticket Ops Agent',
     description: 'Triage inbound support tickets 24/7 across your channels and hand your team everything they need to resolve them fast.',
     tools: ['Ticket triage', 'Team handoff', 'Web search', 'SLA workflows'],
-    gradient: AGENT_GRADIENTS.service,
+    headerImage: AGENT_HEADER_IMAGES.service,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z" />
@@ -111,7 +82,7 @@ const AGENTS = [
     title: 'Leads Qualifier Agent',
     description: 'Filter inbound leads using the BANT framework. Qualified leads are automatically routed to sales.',
     tools: ['BANT scoring', 'Lead capture', 'Sales routing', 'Web search'],
-    gradient: AGENT_GRADIENTS.leads,
+    headerImage: AGENT_HEADER_IMAGES.leads,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
@@ -123,7 +94,7 @@ const AGENTS = [
     title: 'Finance & Invoice Ops Agent',
     description: 'Automate invoice processing, anomaly detection, and multi-tier approval routing - end to end.',
     tools: ['Invoice ledger', 'Anomaly flags', 'Approval routing', 'Calculator'],
-    gradient: AGENT_GRADIENTS.finance,
+    headerImage: AGENT_HEADER_IMAGES.finance,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
         <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
@@ -136,7 +107,7 @@ const AGENTS = [
     description: 'Save 4 hours per week by automatically extracting action items and syncing decisions to your workspace.',
     tools: ['Meeting summaries', 'Action items', 'Notion sync', 'Slack alerts', 'Sheets log'],
     enterprise: true,
-    gradient: AGENT_GRADIENTS.office,
+    headerImage: AGENT_HEADER_IMAGES.office,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
@@ -316,23 +287,27 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
         }}
       />
       
-      {/* Top Half: Grainy Noise Gradient Header */}
-      <div className="relative h-[92px] shrink-0 flex flex-col items-start justify-start pt-4 px-5 gap-2" style={{ background: agent.gradient }}>
-        <NoiseOverlay />
-        <div className="relative z-10 w-full flex items-start justify-between">
-          <div className="w-8 h-8 rounded-full bg-white/15 backdrop-blur-md ring-1 ring-white/20 shadow-md flex items-center justify-center text-white/95">
-            {agent.icon}
-          </div>
-          {(agent as any).enterprise && (
-            <span className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-black/30 backdrop-blur-md border border-[#e8b96a]/30 text-[#e8b96a] text-[9px] font-semibold uppercase tracking-[0.1em]">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 shrink-0">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-              </svg>
-              Enterprise
-            </span>
-          )}
-        </div>
-        <div className="relative z-10 text-white font-medium text-[14px] leading-snug tracking-wide drop-shadow-sm" style={{ fontFamily: "'Manrope', sans-serif" }}>
+      {/* Top Half: Aivory-branded colour header */}
+      <div className="relative w-full aspect-[602.5/207.2] shrink-0 overflow-hidden bg-white/5">
+        <Image
+          src={asset((agent as any).headerImage)}
+          alt=""
+          fill
+          className="object-cover pointer-events-none select-none"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/0 to-black/0" />
+        {(agent as any).enterprise && (
+          <span className="absolute top-2.5 right-2.5 z-10 inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-black/35 backdrop-blur-md border border-white/25 text-white text-[9px] font-semibold uppercase tracking-[0.1em]">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 shrink-0">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+            Enterprise
+          </span>
+        )}
+        <div
+          className="absolute left-4 right-4 bottom-3 z-10 text-white font-semibold text-[15px] leading-snug tracking-wide drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
+          style={{ fontFamily: "'Manrope', sans-serif" }}
+        >
           {agent.title}
         </div>
       </div>
@@ -583,13 +558,12 @@ export default function AgentsPage() {
         // twice, once from each source.
         const builtInTypes = new Set(AGENTS.map((a) => a.agentType));
         const custom = data.filter((a: any) => a.category !== 'built-in' && !builtInTypes.has(a.id));
-        const grads = Object.values(AGENT_GRADIENTS);
+        const headerImages = Object.values(AGENT_HEADER_IMAGES);
         setDynamicAgents(
           custom.map((a: any, i: number) => ({
             title: a.name,
             description: a.description || '',
-            gradient: grads[i % grads.length],
-            icon: AGENTS[0].icon,
+            headerImage: headerImages[i % headerImages.length],
           }))
         );
       })
