@@ -107,6 +107,10 @@ const TOOLKIT_LABELS: Record<string, string> = {
   slack: 'Slack',
   asana: 'Asana',
   erpnext: 'ERPNext',
+  gmail: 'Gmail',
+  googlecalendar: 'Google Calendar',
+  trello: 'Trello',
+  linear: 'Linear',
 };
 
 const CONNECTION_STATUS_STYLES: Record<ConnectedApp['status'], { label: string; className: string }> = {
