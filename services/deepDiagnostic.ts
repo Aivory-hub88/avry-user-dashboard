@@ -369,6 +369,7 @@ import type {
   RankedOpportunity,
   RiskFlag,
   OpportunityQuadrant,
+  OpportunityTrainingTrack,
   ImprovementItem,
 } from '@/types/diagnostic'
 import { parseCurrencyCode, formatCurrency, type CurrencyCode } from '@/lib/resultFormatters'
@@ -491,6 +492,34 @@ function getHourlyRateIDR(industry: string | undefined): number {
   return Math.round(UMR_JAKARTA_HOURLY_IDR * industryMultiplier)
 }
 
+// EUR reports must not price EU labour off the US industry table either — the
+// same class of currency/labour-market mismatch the IDR fix above addresses.
+// Anchored to Eurostat's EU-27 average hourly labour cost (business economy,
+// all NACE activities) — most recently reported around €30/hr; treated here
+// as an approximate benchmark (EU-wide average masks large country variance,
+// e.g. ~€10/hr Bulgaria to ~€52/hr Luxembourg), not a client-specific figure,
+// same honesty standard as the IDR UMP anchor. Reuses the same industry
+// multiplier ratios as the US table so a Tech company still costs
+// proportionally more than Manufacturing, just at a EU-realistic magnitude.
+const EU_AVERAGE_HOURLY_RATE_EUR = 30
+
+function getHourlyRateEUR(industry: string | undefined): number {
+  const usdRate = getHourlyRateUSD(industry)
+  const industryMultiplier = usdRate / DEFAULT_HOURLY_RATE_USD
+  return Math.round(EU_AVERAGE_HOURLY_RATE_EUR * industryMultiplier)
+}
+
+/** Human-readable disclosure of which wage benchmark backs the hourly rate — surfaced in the report so the ROI figure's assumption is visible, not just its number. */
+function getRateBenchmarkLabel(currencyCode: CurrencyCode, locale: 'en' | 'id' = 'en'): string {
+  if (currencyCode === 'IDR') {
+    return locale === 'id' ? 'UMP DKI Jakarta 2026' : 'DKI Jakarta minimum wage (UMP) 2026'
+  }
+  if (currencyCode === 'EUR') {
+    return locale === 'id' ? 'rata-rata upah EU (estimasi Eurostat)' : 'EU average labour cost (Eurostat estimate)'
+  }
+  return locale === 'id' ? 'rate industri AS' : 'US industry benchmark'
+}
+
 // ---- ROI calculation ----
 
 export interface ROIProjectionInternal extends ROIProjection {
@@ -553,6 +582,14 @@ export function calculateROI(
     const idrRate = getHourlyRateIDR(industry)
     baseHourlyRateUSD = idrRate / rate
     hourlyRateUSD = (smallTeamRateApplied ? Math.round(idrRate * SMALL_TEAM_RATE_FACTOR) : idrRate) / rate
+  } else if (currencyCode === 'EUR') {
+    // Same local-currency-first rounding as the IDR branch above — round the
+    // EUR figure at EUR scale, then derive the USD figure backwards, so the
+    // report's displayed € number is the clean one, not a rounding artifact
+    // of converting a rounded USD number through the FX rate.
+    const eurRate = getHourlyRateEUR(industry)
+    baseHourlyRateUSD = eurRate / rate
+    hourlyRateUSD = (smallTeamRateApplied ? Math.round(eurRate * SMALL_TEAM_RATE_FACTOR) : eurRate) / rate
   } else {
     baseHourlyRateUSD = getHourlyRateUSD(industry)
     hourlyRateUSD = smallTeamRateApplied
@@ -701,6 +738,12 @@ export function calculateROI(
     fxRateUsed: rate,
     fxAsOf: getFxAsOfLabel(),
     fxAsOfId: getFxAsOfLabel('id'),
+    // Which wage benchmark backs assumedHourlyRate* — IDR uses UMP DKI
+    // Jakarta, EUR uses an EU average, everything else the US industry
+    // table. Surfaced so the report discloses the assumption, not just the
+    // number derived from it.
+    rateBenchmarkLabel: getRateBenchmarkLabel(currencyCode, 'en'),
+    rateBenchmarkLabelId: getRateBenchmarkLabel(currencyCode, 'id'),
     // Ongoing cost + net economics + scenario range
     ongoingCostRate: ONGOING_COST_RATE,
     annualOngoingCostUSD,
@@ -913,6 +956,13 @@ function scoreData(a: DiagnosticAnswers): number {
   if (a.data_infrastructure?.includes('Modern data platform')) s += 15
   else if (a.data_infrastructure?.includes('warehouse') || a.data_infrastructure?.includes('lake')) s += 10
   else if (a.data_infrastructure?.includes('Databases')) s += 5
+  // Field-level capture discipline — separate axis from data_infrastructure
+  // (tech stack). A company can have a proper database and still have staff
+  // scribbling on paper and texting photos before someone re-enters it.
+  if (a.data_capture_method?.includes('Directly into a digital system')) s += 10
+  else if (a.data_capture_method?.includes('Spreadsheet, filled in manually')) s += 5
+  else if (a.data_capture_method?.includes('photographed and sent via WhatsApp')) s -= 10
+  else if (a.data_capture_method?.includes('No systematic record')) s -= 15
   return Math.min(100, s)
 }
 
@@ -1180,12 +1230,12 @@ const GOVERNANCE_FACTORS: DriverFactor[] = [
   {
     answerKey: 'leadership_alignment', maxPoints: 30,
     evaluate: (a, locale) => a.leadership_alignment?.includes('Fully aligned')
-      ? { points: 30, label: locale === 'id' ? 'Kepemimpinan sepenuhnya selaras dan menjadi penggerak utama' : 'Leadership is fully aligned and championing this' }
+      ? { points: 30, label: locale === 'id' ? 'Executive sepenuhnya selaras dan menjadi penggerak utama' : 'Leadership is fully aligned and championing this' }
       : a.leadership_alignment?.includes('Supportive')
-        ? { points: 18, label: locale === 'id' ? 'Kepemimpinan mendukung namun tetap berhati-hati' : 'Leadership is supportive but cautious' }
+        ? { points: 18, label: locale === 'id' ? 'Executive mendukung namun tetap berhati-hati' : 'Leadership is supportive but cautious' }
         : a.leadership_alignment?.includes('Some interest')
-          ? { points: 8, label: locale === 'id' ? 'Kepemimpinan memiliki sedikit ketertarikan namun masih perlu diyakinkan' : 'Leadership has some interest but needs convincing' }
-          : { points: 0, label: locale === 'id' ? 'Kepemimpinan tidak menunjukkan keselarasan atau ketertarikan' : 'Leadership shows no alignment or interest' },
+          ? { points: 8, label: locale === 'id' ? 'Executive memiliki sedikit ketertarikan namun masih perlu diyakinkan' : 'Leadership has some interest but needs convincing' }
+          : { points: 0, label: locale === 'id' ? 'Executive tidak menunjukkan keselarasan atau ketertarikan' : 'Leadership shows no alignment or interest' },
   },
   {
     answerKey: 'risk_tolerance', maxPoints: 15,
@@ -1229,8 +1279,8 @@ const SECURITY_FACTORS: DriverFactor[] = [
     evaluate: (a, locale) => Array.isArray(a.compliance_requirements) &&
       a.compliance_requirements.length > 0 &&
       !a.compliance_requirements.includes('None')
-      ? { points: 10, label: locale === 'id' ? `Persyaratan kepatuhan dilacak (${a.compliance_requirements.join(', ')})` : `Compliance requirements are tracked (${a.compliance_requirements.join(', ')})` }
-      : { points: 0, label: locale === 'id' ? 'Tidak ada persyaratan kepatuhan yang tercatat' : 'No compliance requirements were captured' },
+      ? { points: 10, label: locale === 'id' ? `Persyaratan compliance dilacak (${a.compliance_requirements.join(', ')})` : `Compliance requirements are tracked (${a.compliance_requirements.join(', ')})` }
+      : { points: 0, label: locale === 'id' ? 'Tidak ada persyaratan compliance yang tercatat' : 'No compliance requirements were captured' },
   },
   {
     answerKey: 'data_residency', maxPoints: 6,
@@ -1358,7 +1408,144 @@ const OPP_CANDIDATES: OppCandidate[] = [
     dataScoreKey: 'data',
     trigger: () => true,
   },
+  {
+    id: 'opp-training',
+    title: 'Team & Leadership AI Capability Building',
+    titleId: 'Peningkatan Kapabilitas AI untuk Tim & Executive',
+    impact: 6, effort: 3, timeToValueWeeks: 4,
+    prerequisites: [],
+    prerequisitesId: [],
+    dataScoreKey: 'process',
+    // Broad, targeted trigger: any one of messy field-level data capture, thin
+    // process documentation, lukewarm leadership buy-in, change resistance, or
+    // no AI governance signals a people/skills gap, not just a tooling gap —
+    // the automation opportunities above will underperform without it.
+    trigger: (a) =>
+      a.data_capture_method?.includes('photographed and sent via WhatsApp') ||
+      a.data_capture_method?.includes('No systematic record') ||
+      a.process_documentation === '0-25%' ||
+      a.leadership_alignment?.includes('needs convincing') ||
+      a.leadership_alignment?.includes('No alignment') ||
+      a.change_readiness?.includes('Resistant') ||
+      a.ai_governance === 'No AI governance',
+  },
 ]
+
+// Maps an automation opportunity to the specific Aivory agent product that
+// delivers it — from app/agents/page.tsx's AGENTS catalog (5 agents:
+// Autonomous, Ticket Ops, Leads Qualifier, Finance & Invoice Ops, Office
+// Assistant). Keeps report copy ("deploy X") naming an actual product instead
+// of a generic "launch your first agent" — and gives the training track
+// builder below something concrete to onboard people onto. Agent product
+// names are proper nouns and stay in English in Indonesian copy too, same as
+// "Aivory™" / "Transformation Blueprint" elsewhere in the report.
+const AGENT_BY_OPP: Record<string, { title: string }> = {
+  'opp-cs-automation': { title: 'Ticket Ops Agent' },
+  'opp-sales-intelligence': { title: 'Leads Qualifier Agent' },
+  'opp-process-automation': { title: 'Autonomous Agent' },
+  'opp-reporting': { title: 'Autonomous Agent' },
+  'opp-cross-reporting': { title: 'Autonomous Agent' },
+}
+
+// Builds the capability-building opportunity's training tracks from the
+// SPECIFIC signals this diagnosis tripped, rather than a fixed generic list —
+// e.g. poor data quality pulls in a data-management + "what an Aivory agent
+// can do with clean data" track, not just "data-capture discipline". Also
+// names the actual Aivory agent tied to the top automation opportunity, so
+// the report doubles as a concrete product recommendation.
+function buildTrainingTracks(
+  a: DiagnosticAnswers,
+  topAutomationOpp: RankedOpportunity | null,
+  locale: Locale,
+): OpportunityTrainingTrack[] {
+  const id = locale === 'id'
+  const tracks: OpportunityTrainingTrack[] = []
+
+  const messyCapture =
+    !!a.data_capture_method?.includes('photographed and sent via WhatsApp') ||
+    !!a.data_capture_method?.includes('No systematic record')
+  const poorDataQuality = !!a.data_quality?.includes('Moderate') || !!a.data_quality?.includes('Poor')
+  if (messyCapture || poorDataQuality) {
+    tracks.push(id ? {
+      headline: 'Dasar manajemen & kerapihan data',
+      audience: 'Staff Operasional',
+      topics: [
+        'Disiplin pencatatan data digital di titik kerja',
+        "Pengenalan Agentic AI untuk manajemen data/ERP — bagaimana Autonomous Agent Aivory menjaga data tetap rapi & tersinkron otomatis",
+      ],
+      tools: ['Google Forms / Sheets', 'Autonomous Agent Aivory'],
+    } : {
+      headline: 'Data management & hygiene fundamentals',
+      audience: 'Operations Staff',
+      topics: [
+        'Digital data-capture discipline at the point of work',
+        "Introduction to Agentic AI for data/ERP management — how Aivory's Autonomous Agent keeps records clean and synced automatically",
+      ],
+      tools: ['Google Forms / Sheets', "Aivory's Autonomous Agent"],
+    })
+  }
+
+  const lowProcessDocs =
+    a.process_documentation === '0-25%' ||
+    !!a.workflow_standardization?.includes('mostly ad-hoc') ||
+    !!a.workflow_standardization?.includes('Completely ad-hoc')
+  if (lowProcessDocs) {
+    tracks.push(id ? {
+      headline: 'Dokumentasi proses & SOP',
+      audience: 'Manajemen Menengah',
+      topics: ['Membaca & menindaklanjuti dashboard otomasi/KPI'],
+      tools: ['Notion / Airtable', 'Aivory Workflow Builder'],
+    } : {
+      headline: 'Process documentation & SOPs',
+      audience: 'Middle Management',
+      topics: ['Reading & acting on automation/KPI dashboards'],
+      tools: ['Notion / Airtable', 'Aivory Workflow Builder'],
+    })
+  }
+
+  if (topAutomationOpp) {
+    const agent = AGENT_BY_OPP[topAutomationOpp.id]
+    if (agent) {
+      tracks.push(id ? {
+        headline: topAutomationOpp.title,
+        audience: 'Tim Implementasi',
+        topics: [
+          `Onboarding langsung: bagaimana ${agent.title} Aivory menjalankan alur kerja ini`,
+          'Menentukan aturan eskalasi & titik hand-off ke manusia',
+        ],
+        tools: [`${agent.title} Aivory`],
+      } : {
+        headline: topAutomationOpp.title,
+        audience: 'Implementation Team',
+        topics: [
+          `Hands-on onboarding: how Aivory's ${agent.title} runs this workflow`,
+          'Setting escalation rules and human hand-off points',
+        ],
+        tools: [`Aivory's ${agent.title}`],
+      })
+    }
+  }
+
+  const weakGovernance =
+    !!a.leadership_alignment?.includes('needs convincing') ||
+    !!a.leadership_alignment?.includes('No alignment') ||
+    a.ai_governance === 'No AI governance'
+  if (weakGovernance) {
+    tracks.push(id ? {
+      headline: 'Dasar tata kelola AI',
+      audience: 'Executive',
+      topics: ['Evaluasi ROI inisiatif AI'],
+      tools: ['Aivory Bastion'],
+    } : {
+      headline: 'AI governance basics',
+      audience: 'Executive',
+      topics: ['Evaluating AI initiative ROI'],
+      tools: ['Aivory Bastion'],
+    })
+  }
+
+  return tracks
+}
 
 function rankOpportunities(
   a: DiagnosticAnswers,
@@ -1380,11 +1567,18 @@ function rankOpportunities(
     triggered = triggered.filter(c => c.id !== 'opp-cross-reporting')
   }
 
-  // Use proportional weighting based on actual impact scores
-  const totalImpact = triggered.reduce((sum, c) => sum + c.impact, 0)
+  // Use proportional weighting based on actual impact scores. Training is
+  // a capability investment, not a $/yr automation saving — excluded from
+  // the pool so it doesn't dilute the other opportunities' dollar shares.
+  const totalImpact = triggered
+    .filter(c => c.id !== 'opp-training')
+    .reduce((sum, c) => sum + c.impact, 0)
   const rate = getRate(currencyCode)
 
-  const opps: RankedOpportunity[] = triggered.map(c => {
+  const byImpactThenEffort = (oppA: RankedOpportunity, oppB: RankedOpportunity) =>
+    (oppB.impact - oppA.impact) || (oppA.effort - oppB.effort)
+
+  const buildOpp = (c: OppCandidate): RankedOpportunity => {
     let projectedROINote: string
     let estimatedSavingsLocal: number | null = null // FIX #8: numeric field per-opportunity
 
@@ -1416,13 +1610,37 @@ function rankOpportunities(
       estimatedSavingsIDR: estimatedSavingsLocal, // @deprecated backward compat alias
       prerequisites: locale === 'id' ? c.prerequisitesId : c.prerequisites,
       dataReadiness: dataReadiness(relevantScore),
+      recommendedAgent: AGENT_BY_OPP[c.id] ?? null,
     }
-  })
+  }
+
+  // Automation opportunities are built and ranked first so the training
+  // opportunity's tracks can name the actual top opportunity/agent — the
+  // "hands-on onboarding" track below reads "the top opportunity" only once
+  // this ranking exists.
+  const automationOpps = triggered
+    .filter(c => c.id !== 'opp-training')
+    .map(buildOpp)
+    .sort(byImpactThenEffort)
+
+  const opps = [...automationOpps]
+  const trainingCandidate = triggered.find(c => c.id === 'opp-training')
+  if (trainingCandidate) {
+    opps.push({
+      ...buildOpp(trainingCandidate),
+      // Capability investment, not a direct $/yr saving — overrides buildOpp's
+      // generic ROI note regardless of whether a budget was supplied.
+      estimatedSavingsLocal: null,
+      estimatedSavingsIDR: null,
+      projectedROINote: locale === 'id'
+        ? 'Investasi kapabilitas — bukan penghematan langsung, tapi prasyarat agar opportunity otomasi lain di atas benar-benar berhasil'
+        : 'Capability investment — not a direct cost saving, but a prerequisite for the automation opportunities above to actually land',
+      trainingTracks: buildTrainingTracks(a, automationOpps[0] ?? null, locale),
+    })
+  }
 
   // FIX #9: Rename sort params to oppA/oppB to avoid shadowing outer `a: DiagnosticAnswers`
-  return opps.sort(
-    (oppA, oppB) => (oppB.impact - oppA.impact) || (oppA.effort - oppB.effort)
-  )
+  return opps.sort(byImpactThenEffort)
 }
 
 // ---- Risk classification ----
@@ -1437,7 +1655,7 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores, locale: Lo
   if (compliance.some(c => c !== 'None')) {
     risks.push({
       id: 'risk-compliance',
-      risk: id ? 'Persyaratan kepatuhan menambah beban implementasi' : 'Compliance requirements add implementation overhead',
+      risk: id ? 'Persyaratan compliance menambah beban implementasi' : 'Compliance requirements add implementation overhead',
       severity: 'MEDIUM',
       source: 'compliance_requirements',
       detected: true,
@@ -1460,7 +1678,7 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores, locale: Lo
   ) {
     risks.push({
       id: 'risk-leadership',
-      risk: id ? 'Keselarasan kepemimpinan yang kurang dapat menghambat pendanaan inisiatif dan adopsi' : 'Insufficient leadership alignment may stall initiative funding and adoption',
+      risk: id ? 'Keselarasan Executive yang kurang dapat menghambat pendanaan inisiatif dan adopsi' : 'Insufficient leadership alignment may stall initiative funding and adoption',
       severity: 'HIGH',
       source: 'leadership_alignment',
       detected: true,
@@ -1751,7 +1969,7 @@ function buildRoomForImprovement(
       priority: priorityFromScore(scores.governance),
       currentState: id
         ? (a.budget_allocated
-          ? `Posisi anggaran: ${humanizeAnswerId('budget_allocated', a.budget_allocated).toLowerCase()}; keselarasan kepemimpinan: ${(a.leadership_alignment ? humanizeAnswerId('leadership_alignment', a.leadership_alignment) : 'belum jelas').toLowerCase()}.`
+          ? `Posisi anggaran: ${humanizeAnswerId('budget_allocated', a.budget_allocated).toLowerCase()}; keselarasan Executive: ${(a.leadership_alignment ? humanizeAnswerId('leadership_alignment', a.leadership_alignment) : 'belum jelas').toLowerCase()}.`
           : 'Kepemilikan anggaran dan pengawasan untuk otomasi belum terformalisasi.')
         : (a.budget_allocated
           ? `Budget posture: ${String(a.budget_allocated).toLowerCase()}; leadership alignment: ${String(a.leadership_alignment || 'unclear').toLowerCase()}.`

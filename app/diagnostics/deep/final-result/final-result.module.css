@@ -232,6 +232,16 @@
   margin: 0;
 }
 
+/* Plain-language lead sentence — translates a dimension score pair into a
+   sentence a non-technical reader parses immediately, ahead of the 6-way
+   breakdown below it. */
+.plainLanguageLead {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #c8c8c4;
+  margin: 0 0 18px;
+}
+
 /* ─── Financial Case ─────────────────────────────────────────────────────── */
 .confidenceBanner {
   border-left: 3px solid #fbbf24;
@@ -259,6 +269,20 @@
   font-size: 12px;
   color: #a3a39c;
   margin: 0;
+}
+
+/* Bridges the gross/net ROI figures and explains NPV-negative-while-ROI-
+   positive — same visual grammar as .assumptionsNote (informational, not a
+   warning, so accent green rather than confidenceBanner's amber). */
+.financialTermsNote {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #c8c8c4;
+  margin: 14px 0 0;
+  padding: 12px 16px;
+  border-left: 3px solid #afd199;
+  background: rgba(175, 209, 153, 0.06);
+  border-radius: 0 6px 6px 0;
 }
 
 /* Borderless typographic metric grid — the PDF's Financial Case treatment
@@ -594,6 +618,7 @@
   border-radius: 6px;
 }
 .assumptionsTitle { margin: 0 0 10px; font-size: 14px; font-weight: 700; color: #e8e8e6; }
+.assumptionsIntro { margin: 0 0 14px; font-size: 13.5px; line-height: 1.6; color: #a3a39c; font-style: italic; }
 .assumptionsList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .stepRow {
   display: grid;
@@ -669,6 +694,15 @@
   font-size: 0.95rem;
   line-height: 1.7;
   color: var(--dd-text, #e5e7eb);
+  margin: 0 0 1.25rem;
+}
+/* Flowing-prose consequence narrative (ID locale) — replaces the chip-chain
+   UI below for locales where an arrow chain of noun phrases reads as
+   machine-translated rather than natural. */
+.consequenceNarrative {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: #a3a39c;
   margin: 0 0 1.25rem;
 }
 .verdictMoves {
@@ -797,6 +831,26 @@
   color: var(--dd-text, #e5e7eb);
   margin: 0;
 }
+
+/* Glossary — same visual grammar as .assumptionsNote (accent-green left
+   border, tinted background) so it reads as "reference note", not a warning. */
+.glossaryBox {
+  margin-top: 18px;
+  padding: 14px 18px;
+  border-left: 3px solid #afd199;
+  background: rgba(175, 209, 153, 0.06);
+  border-radius: 6px;
+}
+.glossaryTitle { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: #e8e8e6; }
+.glossaryList {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px 20px;
+}
+.glossaryItem { margin: 0; }
+.glossaryTerm { font-size: 12.5px; font-weight: 600; color: #c8e0bb; }
+.glossaryDefinition { margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; color: #a3a39c; }
 .executiveInsight {
   font-size: 0.92rem;
   line-height: 1.6;

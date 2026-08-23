@@ -63,7 +63,8 @@
 
 .metricLabel {
   font-size: 11px;
-  color: #a1a1aa;
+  font-weight: 700;
+  color: #e5e5e3;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -113,6 +114,12 @@
   background: rgba(248, 113, 113, 0.08);
 }
 
+.badgeAgent {
+  color: #93c5fd;
+  border-color: rgba(147, 197, 253, 0.3);
+  background: rgba(147, 197, 253, 0.08);
+}
+
 .whyLine {
   font-size: 12px;
   line-height: 1.5;
@@ -125,4 +132,29 @@
 .whyLabel {
   font-weight: 600;
   color: #d4d4d8;
+}
+
+.trainingBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.trainingTrack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.trainingAudience {
+  font-weight: 600;
+  color: #d4d4d8;
+}
+
+.trainingDetail {
+  color: #a1a1aa;
 }

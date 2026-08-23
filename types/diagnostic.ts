@@ -305,6 +305,10 @@ export interface ROIProjection {
   fxAsOf?: string
   /** Indonesian-locale rendering of fxAsOf (e.g. "18 Jul 2026 (live)" with Indonesian month). */
   fxAsOfId?: string
+  /** Which wage benchmark backs assumedHourlyRate* (e.g. "DKI Jakarta minimum wage (UMP) 2026", "EU average labour cost (Eurostat estimate)", "US industry benchmark") — keyed off currency, not locale. */
+  rateBenchmarkLabel?: string
+  /** Indonesian-locale rendering of rateBenchmarkLabel. */
+  rateBenchmarkLabelId?: string
   /** Assumed annual ongoing cost as a fraction of the initial investment. */
   ongoingCostRate?: number
   /** Annual ongoing run cost (licenses/maintenance/support), USD and local. */
@@ -395,6 +399,16 @@ export interface RiskFlag {
   detected: boolean
 }
 
+/** One audience's slice of a capability-building opportunity — who, on what, with which tools. */
+export interface OpportunityTrainingTrack {
+  /** Short, topic-first label — rendered as "{headline} for {audience}" so the training subject leads, not who attends. */
+  headline: string
+  audience: string
+  /** Supporting topics beyond the headline. */
+  topics: string[]
+  tools: string[]
+}
+
 export interface RankedOpportunity {
   id: string
   title: string
@@ -410,6 +424,10 @@ export interface RankedOpportunity {
   complexity: 'low' | 'medium' | 'high'
   /** @deprecated Use estimatedSavingsLocal — kept for backward compat with stored contexts */
   estimatedSavingsIDR?: number | null
+  /** Only present on capability-building/training opportunities. */
+  trainingTracks?: OpportunityTrainingTrack[]
+  /** The specific Aivory agent product that delivers this opportunity, if any. */
+  recommendedAgent?: { title: string } | null
 }
 
 /**

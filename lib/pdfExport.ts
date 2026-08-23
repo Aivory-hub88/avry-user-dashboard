@@ -9,7 +9,7 @@
  */
 
 import jsPDF from 'jspdf'
-import type { DiagnosticContext, ImprovementItem } from '@/types/diagnostic'
+import type { DiagnosticContext, ImprovementItem, OpportunityTrainingTrack } from '@/types/diagnostic'
 import { asset } from '@/lib/asset'
 import { COVER_FRONT_BG, COVER_BACK_BG, COVER_WORDMARK, COVER_MICROGRAPHIC, COVER_FOOTER_BADGE, SIGNATURE_WHITE, SIGNATURE_DARK } from '@/lib/pdfAssets'
 import {
@@ -33,6 +33,11 @@ import {
   buildEvidenceUsed,
   buildConfidenceReasoning,
   maturityLevelLabel,
+  buildOperationalHealthPlainLanguage,
+  GLOSSARY_TERMS,
+  buildMethodologyIntro,
+  buildFinancialTermsNote,
+  buildConsequenceNarrative,
 } from '@/lib/readinessNarrative'
 import { getIndustryBenchmark, formatVsMedian, BENCHMARK_DISCLAIMER } from '@/lib/industryBenchmarks'
 import { quantifyPainPoints, formatPainPointHours, displayPainPointCost } from '@/lib/bottleneckQuantification'
@@ -712,8 +717,9 @@ async function scoreArc(
   pdf.setFontSize(6.6)
   spacedText(pdf, label.toUpperCase(), cx, cy + 8.5, 0.3, { align: 'center' })
 
-  // COMPOSITE SCORE below ring — 9px #bbb
-  setC(pdf, LABEL, 'text')
+  // COMPOSITE SCORE below ring — eyebrow: bold + black, not muted
+  setC(pdf, INK, 'text')
+  pdf.setFont(FB(), 'bold')
   pdf.setFontSize(6.6)
   spacedText(pdf, 'COMPOSITE SCORE', cx, cy + r + 7, 0.25, { align: 'center' })
 }
@@ -867,7 +873,7 @@ function oppCard(
   const metrics = locale === 'id' ? [
     { l: 'DAMPAK', v: `${opp.impact}/10` },
     { l: 'USAHA', v: `${opp.effort}/10` },
-    { l: 'WAKTU KE NILAI', v: `${opp.timeToValueWeeks}mgg` },
+    { l: 'WAKTU KE VALUE', v: `${opp.timeToValueWeeks} minggu` },
     { l: 'EST. PENGHEMATAN', v: sav != null ? `${fmt(sav)}/thn` : '\u2014' },
   ] : [
     { l: 'IMPACT', v: `${opp.impact}/10` },
@@ -878,8 +884,8 @@ function oppCard(
   const mw = (CW - pad * 2) / 4
   metrics.forEach((m, i) => {
     const mx = ML + pad + i * mw
-    setC(pdf, LABEL, 'text')
-    pdf.setFont(F(), 'normal')
+    setC(pdf, INK, 'text')
+    pdf.setFont(FB(), 'bold')
     pdf.setFontSize(6) // 8px
     pdf.text(m.l, mx, mY)
     setC(pdf, INK, 'text')
@@ -909,8 +915,8 @@ function oppCard(
   const barY = y + cardH - padT - 4
   const barW = CW - pad * 2
   // Label left
-  setC(pdf, LABEL, 'text')
-  pdf.setFont(F(), 'normal')
+  setC(pdf, INK, 'text')
+  pdf.setFont(FB(), 'bold')
   pdf.setFontSize(6.4) // 8.5px
   pdf.text(locale === 'id' ? 'DAMPAK' : 'IMPACT', ML + pad, barY - 1.5)
   // Track + fill. impact is a 0-10 scale (classifyQuadrant's 5.5 threshold in
@@ -953,9 +959,9 @@ function nextStepRow(
   thinDiv(pdf, y)
   y += 7 // ~20px padding-top
 
-  // Step number — 10px #bbb, letter-spacing 0.12em
-  setC(pdf, LABEL, 'text')
-  pdf.setFont(F(), 'normal')
+  // Step number — eyebrow: bold + black, letter-spacing 0.12em
+  setC(pdf, INK, 'text')
+  pdf.setFont(FB(), 'bold')
   pdf.setFontSize(7.5) // 10px
   spacedText(pdf, stepNum, ML, y + 4, 0.3) // 0.12em
 
@@ -976,6 +982,80 @@ function nextStepRow(
   pdf.setLineHeightFactor(1.15)
 
   return y + 10 + bl.length * 5.2 + 7 // ~20px padding-bottom
+}
+
+/**
+ * One row of the Recommended Training Program section — audience heading +
+ * wrapped topics + a distinct "Tools" line. Unlike the compact opportunity
+ * card, this has no fixed height budget: training tracks vary a lot in
+ * length (an executive-governance track is one line, a data-management track
+ * with an Agentic AI callout can run three), so height is measured from the
+ * actual wrapped line counts and the whole row is kept off the page footer
+ * via ensureSpace, same convention as nextStepRow above.
+ */
+function trainingTrackRow(
+  pdf: jsPDF, y: number, track: OpportunityTrainingTrack, locale: Locale,
+): number {
+  const contentX = ML + 13
+  const bodyW = CW - 13
+
+  // Heading leads with the training subject, audience second — "{headline}
+  // untuk {audience}" reads as "here's what this covers", not "here's who
+  // attends" first.
+  const heading = locale === 'id' ? `${track.headline} untuk ${track.audience}` : `${track.headline} for ${track.audience}`
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(10.5)
+  pdf.setLineHeightFactor(1.3)
+  const headingLines = pdf.splitTextToSize(heading, bodyW)
+  pdf.setLineHeightFactor(1.15)
+  const headingH = headingLines.length * 5
+
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(8.5)
+  pdf.setLineHeightFactor(1.65)
+  const topicLines = track.topics.length > 0 ? pdf.splitTextToSize(track.topics.join(' · '), bodyW) : []
+  const toolsLabel = locale === 'id' ? 'Tool: ' : 'Tools: '
+  const toolsText = track.tools.length > 0 ? toolsLabel + track.tools.join(', ') : ''
+  const toolLines = toolsText ? pdf.splitTextToSize(toolsText, bodyW) : []
+  pdf.setLineHeightFactor(1.15)
+
+  const topicsH = topicLines.length * 5.2
+  const toolsH = toolLines.length > 0 ? toolLines.length * 5.2 + 2 : 0
+  y = ensureSpace(pdf, y, 7 + headingH + 4 + topicsH + toolsH + 7)
+
+  thinDiv(pdf, y)
+  y += 7
+
+  setC(pdf, INK, 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(10.5)
+  pdf.setLineHeightFactor(1.3)
+  pdf.text(headingLines, contentX, y + 4)
+  pdf.setLineHeightFactor(1.15)
+
+  let rowBottom = y + headingH + 2
+
+  if (topicLines.length > 0) {
+    setC(pdf, MUTED, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(8.5)
+    pdf.setLineHeightFactor(1.65)
+    pdf.text(topicLines, contentX, rowBottom + 4)
+    pdf.setLineHeightFactor(1.15)
+    rowBottom += topicsH + 2
+  }
+
+  if (toolLines.length > 0) {
+    setC(pdf, LABEL, 'text')
+    pdf.setFont(FB(), 'bold')
+    pdf.setFontSize(7.8)
+    pdf.setLineHeightFactor(1.55)
+    pdf.text(toolLines, contentX, rowBottom + 3)
+    pdf.setLineHeightFactor(1.15)
+    rowBottom += toolsH + 1
+  }
+
+  return rowBottom + 7
 }
 
 /**
@@ -1069,13 +1149,14 @@ function improvementBlock(
 
   let cy = y + 14
 
-  // CURRENT STATE
-  setC(pdf, LABEL, 'text')
-  pdf.setFont(F(), 'normal')
+  // CURRENT STATE — eyebrow: bold + black, not muted
+  setC(pdf, INK, 'text')
+  pdf.setFont(FB(), 'bold')
   pdf.setFontSize(6) // 8px
   pdf.text(locale === 'id' ? 'KONDISI SAAT INI' : 'CURRENT STATE', ML, cy)
   cy += 4
   setC(pdf, CONTENT_C, 'text')
+  pdf.setFont(F(), 'normal')
   pdf.setFontSize(8.5) // 11px
   pdf.setLineHeightFactor(1.65)
   pdf.text(cLines, ML, cy)
@@ -1083,11 +1164,13 @@ function improvementBlock(
   cy += cLines.length * 5 + 5
 
   // RECOMMENDED ACTION
-  setC(pdf, LABEL, 'text')
+  setC(pdf, INK, 'text')
+  pdf.setFont(FB(), 'bold')
   pdf.setFontSize(6)
   pdf.text(locale === 'id' ? 'YANG PERLU DIPERBAIKI' : 'RECOMMENDED ACTION', ML, cy)
   cy += 4
   setC(pdf, CONTENT_C, 'text')
+  pdf.setFont(F(), 'normal')
   pdf.setFontSize(8.5)
   pdf.setLineHeightFactor(1.65)
   pdf.text(aLines, ML, cy)
@@ -1095,11 +1178,13 @@ function improvementBlock(
   cy += aLines.length * 5 + 5
 
   // OPERATIONAL IMPACT
-  setC(pdf, LABEL, 'text')
+  setC(pdf, INK, 'text')
+  pdf.setFont(FB(), 'bold')
   pdf.setFontSize(6)
   pdf.text(locale === 'id' ? 'DAMPAK OPERASIONAL' : 'OPERATIONAL IMPACT', ML, cy)
   cy += 4
   setC(pdf, CONTENT_C, 'text')
+  pdf.setFont(F(), 'normal')
   pdf.setFontSize(8.5)
   pdf.setLineHeightFactor(1.65)
   pdf.text(iLines, ML, cy)
@@ -1111,12 +1196,13 @@ function improvementBlock(
     // above (label at current cy, no leading gap) — must match
     // measureImprovementBlockHeight's `eLines.length * 5 + 5 + 4` exactly,
     // or a long evidence line silently overlaps the before/after boxes below.
-    setC(pdf, LABEL, 'text')
-    pdf.setFont(F(), 'normal')
+    setC(pdf, INK, 'text')
+    pdf.setFont(FB(), 'bold')
     pdf.setFontSize(6)
     pdf.text(locale === 'id' ? 'BUKTI YANG DIGUNAKAN' : 'EVIDENCE USED', ML, cy)
     cy += 4
     setC(pdf, CONTENT_C, 'text')
+    pdf.setFont(F(), 'normal')
     pdf.setFontSize(8.5)
     pdf.setLineHeightFactor(1.65)
     pdf.text(eLines, ML, cy)
@@ -1316,7 +1402,7 @@ function editorialSpread(pdf: jsPDF, context: DiagnosticContext, locale: Locale 
 
   const p2 = locale === 'id'
     ? (topOppTitle
-      ? `Temuan ini menunjukkan titik awal yang jelas: ${topOppTitle.toLowerCase()}, bersama dengan kasus keuangan dan rencana bertahap untuk menindaklanjutinya. Setiap angka berikut ini merujuk kembali pada apa yang Anda sampaikan kepada kami.`
+      ? `Temuan ini menunjukkan titik awal yang jelas: ${topOppTitle.toLowerCase()}, bersama dengan analisis keuangan dan rencana bertahap untuk menindaklanjutinya. Setiap angka berikut ini merujuk kembali pada apa yang Anda sampaikan kepada kami.`
       : `Halaman berikut menguraikan skor kesehatan operasional komposit Anda, peluang dengan jalur tercepat ke ROI, dan rencana bertahap untuk menindaklanjutinya. Setiap angka berikut ini merujuk kembali pada apa yang Anda sampaikan kepada kami.`)
     : (topOppTitle
       ? `The findings point to a clear starting point: ${topOppTitle.toLowerCase()}, alongside the financial case and a sequenced plan to act on it. Every number that follows traces back to what you told us.`
@@ -1604,12 +1690,15 @@ function renderConfidenceBanner(pdf: jsPDF, y: number, confidence: string, missi
     en: { low: 'Low', medium: 'Medium', high: 'High' },
     id: { low: 'Rendah', medium: 'Sedang', high: 'Tinggi' },
   }
+  // The `missing` list is raw English field keys (e.g. 'manual hours/week') —
+  // never translated — so it used to render as a stray English clause inside
+  // Indonesian copy, on top of duplicating what `reasoning` already says in
+  // translated form ("Belum diberikan: ..."). Dropped rather than translated:
+  // saying the same thing twice reads as noise, not extra information.
   const msg = locale === 'id'
     ? `Proyeksi dengan keyakinan ${confidenceLbl.id[confidence] ?? confidence} — angka-angka ini didasarkan pada data input yang terbatas dan benchmark internal, dan mungkin tidak mencerminkan hasil sebenarnya.` +
-      (missing.length ? ` Input yang belum tersedia: ${missing.join(', ')}.` : '') +
       (reasoning.length ? ` ${reasoning.join(' · ')}.` : '')
     : `${cap(confidence)} confidence projection — these figures are based on limited input data and internal benchmarks, and may not reflect actual outcomes.` +
-      (missing.length ? ` Missing inputs: ${missing.join(', ')}.` : '') +
       (reasoning.length ? ` ${reasoning.join(' · ')}.` : '')
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(8.2)
@@ -1625,6 +1714,76 @@ function renderConfidenceBanner(pdf: jsPDF, y: number, confidence: string, missi
   setC(pdf, WARN_AMB, 'text')
   pdf.text(lines, ML + 7, y + 5.5)
   pdf.setLineHeightFactor(1.15)
+  return y + boxH + 6
+}
+
+/**
+ * Glossary box — defines the handful of English/finance terms (Quick Win,
+ * Transformation Blueprint, Hand-off, NPV, ROI, FTE, Payback Period) the
+ * report keeps in their original form, once, on the Executive Summary page,
+ * so they read without re-explaining every later occurrence. Green
+ * informational treatment (BADGE_G_*) rather than the amber confidence
+ * banner — this is reference material, not a caveat.
+ */
+function renderGlossaryBox(pdf: jsPDF, y: number, locale: Locale = 'en'): number {
+  const terms = GLOSSARY_TERMS[locale]
+  const title = locale === 'id' ? 'Istilah dalam laporan ini' : 'Terms used in this report'
+  const pad = 6
+  const colGap = 6
+  const colW = (CW - pad * 2 - colGap) / 2
+
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(7.5)
+  pdf.setLineHeightFactor(1.4)
+  // Pre-measure each entry's height so the two columns can be balanced and
+  // the whole box's height known before drawing the background rect.
+  const entries = terms.map((g) => {
+    const defLines = pdf.splitTextToSize(g.definition, colW)
+    return { ...g, h: 4.2 + defLines.length * 3.6 + 3, defLines }
+  })
+  // Simple greedy left/right balance rather than a full bin-pack — good
+  // enough for 7 short entries and avoids a lopsided single-column look.
+  const left: typeof entries = []
+  const right: typeof entries = []
+  let leftH = 0, rightH = 0
+  entries.forEach((e) => {
+    if (leftH <= rightH) { left.push(e); leftH += e.h } else { right.push(e); rightH += e.h }
+  })
+  const bodyH = Math.max(leftH, rightH)
+  const boxH = 6 + 6 + bodyH + pad
+  pdf.setLineHeightFactor(1.15)
+
+  y = ensureSpace(pdf, y, boxH + 6)
+  setC(pdf, BADGE_G_BG, 'fill')
+  pdf.roundedRect(ML, y, CW, boxH, 2, 2, 'F')
+  setC(pdf, BADGE_G_BD, 'draw')
+  pdf.setLineWidth(0.18)
+  pdf.roundedRect(ML, y, CW, boxH, 2, 2, 'S')
+
+  setC(pdf, ACCENT, 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(7.5)
+  pdf.text(title.toUpperCase(), ML + pad, y + 7)
+
+  const drawColumn = (col: typeof entries, x: number) => {
+    let cy = y + 13
+    col.forEach((e) => {
+      setC(pdf, INK, 'text')
+      pdf.setFont(FB(), 'bold')
+      pdf.setFontSize(7.5)
+      pdf.text(e.term, x, cy)
+      setC(pdf, MUTED, 'text')
+      pdf.setFont(F(), 'normal')
+      pdf.setFontSize(7.5)
+      pdf.setLineHeightFactor(1.4)
+      pdf.text(e.defLines, x, cy + 3.8)
+      pdf.setLineHeightFactor(1.15)
+      cy += e.h
+    })
+  }
+  drawColumn(left, ML + pad)
+  drawColumn(right, ML + pad + colW + colGap)
+
   return y + boxH + 6
 }
 
@@ -1655,10 +1814,26 @@ function renderMetricGrid(
     y = ensureSpace(pdf, y, rowH + 2)
     metrics.slice(i, i + cols).forEach((m, j) => {
       const x = ML + j * (w + gapX)
-      setC(pdf, LABEL_A, 'text')
+      setC(pdf, INK, 'text')
       pdf.setFont(FB(), 'bold')
-      pdf.setFontSize(5.6)
-      spacedText(pdf, m.l.toUpperCase(), x, y, 0.18)
+      // Shrink-to-fit, mirroring the value's loop below — Indonesian labels
+      // ("Value Tenaga Kerja yang Dipulihkan") run much longer than their
+      // English source ("Recovered Labor Value") and, at a fixed 5.6pt, spill
+      // into the next column with no wrapping to catch it.
+      const labelText = m.l.toUpperCase()
+      let lSize = 5.6
+      pdf.setFontSize(lSize)
+      const labelWidth = (size: number): number => {
+        pdf.setFontSize(size)
+        let tw = 0
+        for (const ch of labelText) tw += pdf.getTextWidth(ch)
+        return tw + Math.max(0, labelText.length - 1) * 0.18
+      }
+      while (lSize > 4.2 && labelWidth(lSize) > w - 1.5) {
+        lSize -= 0.2
+      }
+      pdf.setFontSize(lSize)
+      spacedText(pdf, labelText, x, y, 0.18)
       setC(pdf, INK, 'text')
       pdf.setFont(F(), 'normal')
       let vSize = 8
@@ -1699,7 +1874,7 @@ function renderScenarioRange(
     { l: 'OPTIMISTIC', v: roiFmt(sc.high), bg: '#f4f4f0', tx: MUTED },
   ]
   y = ensureSpace(pdf, y, 38)
-  setC(pdf, LABEL_A, 'text')
+  setC(pdf, INK, 'text')
   pdf.setFont(FB(), 'bold')
   pdf.setFontSize(6.4)
   spacedText(pdf, locale === 'id' ? 'KISARAN ROI 3 TAHUN' : '3-YEAR ROI RANGE', ML, y, 0.32)
@@ -1710,7 +1885,7 @@ function renderScenarioRange(
     const x = ML + i * (w + gapX)
     setC(pdf, c.bg, 'fill')
     pdf.roundedRect(x, y, w, 14, 1.5, 1.5, 'F')
-    setC(pdf, LABEL, 'text')
+    setC(pdf, INK, 'text')
     pdf.setFont(FB(), 'bold')
     pdf.setFontSize(5.6)
     spacedText(pdf, c.l, x + 4, y + 5, 0.25)
@@ -1957,6 +2132,8 @@ export async function exportReportToPdf(
     execBusinessValueLabel,
   ]))
 
+  y = renderGlossaryBox(pdf, y + 4, locale)
+
   // ════════════════════════════════════════════════════════════════════════════
   // OPERATIONAL HEALTH — continues directly beneath Executive Summary when
   // there's room instead of always forcing a fresh page, which previously
@@ -2004,6 +2181,23 @@ export async function exportReportToPdf(
       ? `${strongestPhrase} adalah fondasi terkuat untuk dikembangkan, sementara ${weakestPhrase} adalah kesenjangan paling jelas dan kendala pertama yang perlu diatasi. ${leadershipClause}${priorClause ? ' ' + priorClause : ''}`
       : `${strongestPhrase} is the strongest foundation to build on, while ${weakestPhrase} is the clearest gap and the first constraint to address. ${leadershipClause}${priorClause ? ' ' + priorClause : ''}`
     y = renderNarrativeSegments(pdf, y, boldSubstrings(scorecardText, [strongestPhrase, weakestPhrase]))
+
+    // Plain-language translation of the same strongest/weakest pair — the
+    // sentence above names dimensions and scores, this one says what that
+    // concretely means, for a non-finance/non-technical reader.
+    const plainLanguage = buildOperationalHealthPlainLanguage({
+      strongestKey, strongestScore: scoreOf(strongestKey), strongestLabel: DIM_LABELS[locale][strongestKey] ?? cap(strongestKey),
+      weakestKey, weakestScore: scoreOf(weakestKey), weakestLabel: DIM_LABELS[locale][weakestKey] ?? cap(weakestKey),
+    }, locale)
+    pdf.setFont(F(), 'italic')
+    pdf.setFontSize(8.5)
+    pdf.setLineHeightFactor(1.5)
+    setC(pdf, MUTED, 'text')
+    const plainLines = pdf.splitTextToSize(plainLanguage, CW)
+    y = ensureSpace(pdf, y + 2, plainLines.length * 4.5 + 4)
+    pdf.text(plainLines, ML, y + 3)
+    pdf.setLineHeightFactor(1.15)
+    y += plainLines.length * 4.5 + 4
   }
 
   // ── Two-column: score ring left · dimension bars right ──
@@ -2167,10 +2361,15 @@ export async function exportReportToPdf(
     y = nextStepRow(pdf, y, String(i + 1).padStart(2, '0'), move.title, move.body)
   })
 
-  // Cause → effect chain for the weakest dimension — one narrative line via
-  // the existing renderNarrative helper (same chain data the page renders as chips).
+  // Cause → effect chain for the weakest dimension. ID gets flowing prose
+  // (an arrow chain of noun phrases reads as machine-translated); EN keeps
+  // the existing chip-chain data, joined into one line.
+  const diagnosisNarrative = buildConsequenceNarrative(weakestKey, locale)
   const diagnosisChain = DIM_CONSEQUENCE_CHAINS[locale][weakestKey]
-  if (diagnosisChain) {
+  if (diagnosisNarrative) {
+    y = ensureSpace(pdf, y, 20)
+    y = renderNarrative(pdf, y, diagnosisNarrative)
+  } else if (diagnosisChain) {
     y = ensureSpace(pdf, y, 14)
     y = renderNarrative(pdf, y, formatConsequenceChain(diagnosisChain))
   }
@@ -2287,13 +2486,13 @@ export async function exportReportToPdf(
     ['Kendala Utama', topPainPointsDisplay],
     ['Kapabilitas AI / Teknis', humanizeAnswerId('internal_capability', qstr(qualitative.aiCapability)) || notProvided],
     ['Pendekatan Implementasi', humanizeAnswerId('preferred_approach', qstr(qualitative.implementApproach)) || notProvided],
-    ['Keselarasan Kepemimpinan', humanizeAnswerId('leadership_alignment', qstr(qualitative.leadershipAlignment)) || notProvided],
+    ['Keselarasan Executive', humanizeAnswerId('leadership_alignment', qstr(qualitative.leadershipAlignment)) || notProvided],
     ['Percobaan AI Sebelumnya', humanizeAnswerId('prior_ai_attempts', qstr(qualitative.priorAIAttempts)) || notProvided],
     ['Konsekuensi Keterlambatan', humanizeAnswerId('delay_consequence', qstr(qualitative.delayConsequence)) || notProvided],
     ['Toleransi Risiko / Kesalahan', humanizeAnswerId('risk_tolerance', qstr(qualitative.errorTolerance)) || notProvided],
     ['Sumber Resistensi', qstr(qualitative.resistanceSources) || 'Tidak ada yang dilaporkan'],
     ['Residensi Data', humanizeAnswerId('data_residency', qstr(qualitative.dataResidency)) || notProvided],
-    ['Persyaratan Kepatuhan', qstr(qualitative.compliance) || 'Tidak ada'],
+    ['Compliance', qstr(qualitative.compliance) || 'Tidak ada'],
   ] : [
     ['Primary Business Objective', qstr(qualitative.primaryObjective) || notProvided],
     ['Top Pain Points', topPainPointsDisplay],
@@ -2344,7 +2543,7 @@ export async function exportReportToPdf(
   // ════════════════════════════════════════════════════════════════════════════
   y = ensureSpace(pdf, y, SP.transitionGuard)
   y = renderTransition(pdf, y, locale === 'id'
-    ? 'Berdasarkan konteks tersebut, berikut adalah peluang dengan daya ungkit tertinggi untuk dikerjakan lebih dulu.'
+    ? 'Berdasarkan konteks tersebut, berikut adalah peluang paling strategis untuk dikerjakan lebih dulu.'
     : 'Against that context, these are the highest-leverage opportunities to pursue first.')
 
   y = ensureSpace(pdf, y, locale === 'id' ? 65 : 55)
@@ -2400,6 +2599,27 @@ export async function exportReportToPdf(
     }
   }
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // RECOMMENDED TRAINING PROGRAM — the capability-building opportunity card
+  // above only has room for a one-line teaser (fixed 52-59mm card height, same
+  // as every other opportunity), so the actual per-audience breakdown (topics
+  // + tools, tailored to this assessment's specific gaps) gets its own
+  // properly-wrapped, paginated section rather than being truncated mid-word.
+  // ════════════════════════════════════════════════════════════════════════════
+  {
+    const trainingOpp = opportunities.find(o => o.trainingTracks && o.trainingTracks.length > 0)
+    if (trainingOpp?.trainingTracks?.length) {
+      y = ensureSpace(pdf, y, locale === 'id' ? 40 : 35)
+      y = tocSection(y, locale === 'id' ? 'Program Pelatihan yang Direkomendasikan' : 'Recommended Training Program')
+      y = renderNarrative(pdf, y, locale === 'id'
+        ? `${trainingOpp.title} di atas terurai menjadi jalur pelatihan berikut, masing-masing disesuaikan dengan temuan spesifik asesmen ini.`
+        : `${trainingOpp.title} above breaks down into the following tracks, each tailored to this assessment's specific findings.`)
+      for (const track of trainingOpp.trainingTracks) {
+        y = trainingTrackRow(pdf, y, track, locale)
+      }
+    }
+  }
+
   {
     const oppTop = opportunities[0] ?? null
     y = renderNextStepCallout(pdf, y, buildExecutiveInsight('opportunities', {
@@ -2415,14 +2635,14 @@ export async function exportReportToPdf(
   y = ensureSpace(pdf, y, SP.transitionGuard)
   y = renderTransition(pdf, y, locale === 'id'
     ? (opportunities.length > 0
-      ? 'Berikut adalah kasus keuangan yang mendasari peluang-peluang tersebut.'
-      : 'Berikut adalah kasus keuangan yang dibangun dari beban kerja yang dilaporkan tim Anda.')
+      ? 'Berikut adalah analisis keuangan yang mendasari peluang-peluang tersebut.'
+      : 'Berikut adalah analisis keuangan yang dibangun dari beban kerja yang dilaporkan tim Anda.')
     : (opportunities.length > 0
       ? 'Here is the financial case underpinning those opportunities.'
       : 'Here is the financial case built from the workload your team reported.'))
 
   y = ensureSpace(pdf, y, locale === 'id' ? 82 : 70)
-  y = tocSection(y, locale === 'id' ? 'Kasus Keuangan' : 'Financial Case')
+  y = tocSection(y, locale === 'id' ? 'Analisis Keuangan' : 'Financial Case')
 
   // Mirror the on-screen low-confidence banner (incl. the missing inputs the
   // page shows) instead of burying confidence in a tile caption.
@@ -2476,7 +2696,7 @@ export async function exportReportToPdf(
   const roiW = (CW - roiGap * 2) / 3
   const roiMetrics = locale === 'id' ? [
     {
-      l: 'Nilai Bisnis yang Dihasilkan',
+      l: 'Value Bisnis yang Dihasilkan',
       v: fmt(calculations.totalAnnualSavingsLocal ?? calculations.totalAnnualSavingsUSD),
       n: 'tenaga kerja + penghematan proses',
     },
@@ -2529,7 +2749,11 @@ export async function exportReportToPdf(
     // absolute scale drops. Row height follows: 27mm → 21mm.
     const isHero = i === 0
 
-    setC(pdf, isHero ? ACCENT : LABEL_A, 'text')
+    // Eyebrow: bold + black for all three — the hero's dominance already
+    // comes from its larger value font size (TS.display vs TS.value) below,
+    // so the label itself doesn't need a separate accent color to read as
+    // primary.
+    setC(pdf, INK, 'text')
     pdf.setFont(FB(), 'bold')
     pdf.setFontSize(6.4)
     spacedText(pdf, m.l.toUpperCase(), rx, roiTop, 0.32)
@@ -2563,11 +2787,11 @@ export async function exportReportToPdf(
 
   // ── Secondary metrics — full parity with the on-screen ROI grid ──
   y = renderMetricGrid(pdf, y, locale === 'id' ? [
-    { l: 'Nilai Tenaga Kerja yang Dipulihkan', v: fmt(calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD) },
-    { l: 'Nilai Efisiensi Proses', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
+    { l: 'Value Tenaga Kerja yang Dipulihkan', v: fmt(calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD) },
+    { l: 'Value Efisiensi Proses', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
     { l: 'Periode Payback', v: fmtMonths(calculations.paybackMonths, locale) },
     { l: 'Biaya Keterlambatan Operasional (90h)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR) },
-    { l: 'NPV 3 Tahun', v: fmt(cAny.npv3YearLocal), n: 'nilai kini bersih @ diskonto 10%' },
+    { l: 'NPV 3 Tahun', v: fmt(cAny.npv3YearLocal), n: 'value kini bersih @ diskonto 10%' },
     { l: 'Biaya Berjalan Tahunan', v: fmt(cAny.annualOngoingCostLocal), n: 'lisensi, pemeliharaan & dukungan' },
     { l: 'Penghematan Bersih Tahunan', v: fmt(cAny.netAnnualSavingsLocal), n: 'setelah biaya berjalan' },
     { l: 'Payback Bersih', v: fmtMonths(cAny.netPaybackMonths, locale), n: 'berdasarkan penghematan bersih' },
@@ -2601,6 +2825,21 @@ export async function exportReportToPdf(
     }
   }
 
+  // Bridges the gross "3-Year ROI" tile above and the net "3-Year ROI range"
+  // below, and explains NPV-negative-while-ROI-positive — the two points
+  // most likely to read as contradictory without this note.
+  if (calculations.hasEnoughDataForProjection) {
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(7.5)
+    pdf.setLineHeightFactor(1.5)
+    setC(pdf, MUTED, 'text')
+    const financialNoteLines = pdf.splitTextToSize(buildFinancialTermsNote(locale), CW)
+    y = ensureSpace(pdf, y + 2, financialNoteLines.length * 3.8 + 5)
+    pdf.text(financialNoteLines, ML, y + 3)
+    pdf.setLineHeightFactor(1.15)
+    y += financialNoteLines.length * 3.8 + 5
+  }
+
   // ── Scenario range (Conservative / Base / Optimistic) — only when at least
   // one scenario value exists; an all-"—" row is noise, not information. ──
   const effPct = Math.round((calculations.efficiencyFactor ?? 0.75) * 100)
@@ -2626,7 +2865,7 @@ export async function exportReportToPdf(
       pdf.setFont(F(), 'normal')
       pdf.setFontSize(7.2)
       const sensitivityText = locale === 'id'
-        ? `Sensitivitas — Nilai Bisnis yang Dihasilkan berkisar dari ${fmt(lever.lowValueLocal)} pada efisiensi ${lever.lowBoundLabel} hingga ` +
+        ? `Sensitivitas — Value Bisnis yang Dihasilkan berkisar dari ${fmt(lever.lowValueLocal)} pada efisiensi ${lever.lowBoundLabel} hingga ` +
           `${fmt(lever.highValueLocal)} pada efisiensi ${lever.highBoundLabel} (skenario dasar ${effPct}%: ${fmt(calculations.totalAnnualSavingsLocal ?? cAny.totalAnnualSavingsUSD)}). ` +
           `Tarif per jam dan kesenjangan otomasi adalah input tetap untuk asesmen ini, tidak disimulasikan.`
         : `Sensitivity — Business Value Created ranges from ${fmt(lever.lowValueLocal)} at ${lever.lowBoundLabel} efficiency to ` +
@@ -2650,19 +2889,32 @@ export async function exportReportToPdf(
     tocMark(locale === 'id' ? 'Metodologi' : 'Methodology', true)
     y = sectionLabel(pdf, y, locale === 'id' ? 'Metodologi' : 'Methodology')
 
+    pdf.setFont(F(), 'italic')
+    pdf.setFontSize(8.5)
+    pdf.setLineHeightFactor(1.5)
+    setC(pdf, MUTED, 'text')
+    const methodologyIntroLines = pdf.splitTextToSize(buildMethodologyIntro(locale), CW)
+    y = ensureSpace(pdf, y + 2, methodologyIntroLines.length * 4.5 + 5)
+    pdf.text(methodologyIntroLines, ML, y + 3)
+    pdf.setLineHeightFactor(1.15)
+    y += methodologyIntroLines.length * 4.5 + 5
+
     const hrs = calculations.hoursReclaimedPerYear ?? 0
+    const rateBenchmark = locale === 'id'
+      ? (calculations.rateBenchmarkLabelId ?? 'industri')
+      : (calculations.rateBenchmarkLabel ?? 'industry')
     const rateNote = locale === 'id'
-      ? (calculations.smallTeamRateApplied ? ' (biaya peluang)' : ' (industri)')
-      : (calculations.smallTeamRateApplied ? ' (opp-cost)' : ' (industry)')
+      ? (calculations.smallTeamRateApplied ? ` (biaya peluang, benchmark ${rateBenchmark})` : ` (benchmark ${rateBenchmark})`)
+      : (calculations.smallTeamRateApplied ? ` (opp-cost, ${rateBenchmark})` : ` (${rateBenchmark})`)
 
     const stepsRaw: [string, string][] = locale === 'id' ? [
       ['Kapasitas tim yang dipulihkan per tahun',
-        `${hrs} jam = jam manual/mgg × 52 × kesenjangan × ${effPct}%`],
-      ['Nilai tenaga kerja yang dipulihkan',
+        `${hrs} jam = jam manual/minggu × 52 × kesenjangan × ${effPct}%`],
+      ['Value tenaga kerja yang dipulihkan',
         `${fmt(calculations.annualLaborSavingsLocal)} = ${hrs} jam × ${fmt(calculations.assumedHourlyRateLocal)}/jam${rateNote}`],
-      ['Nilai efisiensi proses',
+      ['Value efisiensi proses',
         `${fmt(calculations.annualProcessSavingsLocal)} = 20% dari penghematan tenaga kerja`],
-      ['Nilai bisnis yang dihasilkan',
+      ['Value bisnis yang dihasilkan',
         `${fmt(calculations.totalAnnualSavingsLocal)} = tenaga kerja + proses`],
     ] : [
       ['Recovered team capacity per year',
@@ -2692,17 +2944,24 @@ export async function exportReportToPdf(
     )
 
     steps.forEach(([num, desc, result]) => {
-      if (y > PAGE_H - 18) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
+      // 18 → 30: a single-line row is ~9mm tall and the footer divider sits
+      // at PAGE_H-12 — 18mm of headroom let a row start, then land its last
+      // line right on top of (or a hair above) the footer rule, with the
+      // steps section's own numbered rows the most likely to run 2-3 lines
+      // (a wrapped description) and blow well past that 18mm this check
+      // never accounted for.
+      if (y > PAGE_H - 30) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
 
       thinDiv(pdf, y)
       y += 3
 
-      setC(pdf, LABEL, 'text')
-      pdf.setFont(F(), 'normal')
+      setC(pdf, INK, 'text')
+      pdf.setFont(FB(), 'bold')
       pdf.setFontSize(7)
       pdf.text(num, ML, y + 3.5)
 
       setC(pdf, MUTED, 'text')
+      pdf.setFont(F(), 'normal')
       pdf.setFontSize(8.5)
       const dl = pdf.splitTextToSize(desc, 48)
       pdf.text(dl, ML + 12, y + 3.5)
@@ -2871,6 +3130,11 @@ export async function exportReportToPdf(
   y = tocSection(y, locale === 'id' ? 'Pemanfaatan AI' : 'AI Enablement')
 
   const topOpp = opportunities[0]
+  // "Deploy on Aivory™" (step 3 below) should name a real product agent, not
+  // whichever opportunity ranks #1 overall — the training opportunity can
+  // outrank automation opportunities on effort but has no agent of its own.
+  const deployOpp = opportunities.find(o => o.recommendedAgent) ?? null
+  const deployAgentTitle = deployOpp?.recommendedAgent?.title ?? (locale === 'id' ? 'agen pertama' : 'first agent')
   const nsCurrent = context.quantitative.currentAutomationPct ?? 0
   const nsTarget = context.quantitative.targetAutomationPct ?? 0
   const nsGap = nsTarget - nsCurrent
@@ -2909,8 +3173,8 @@ export async function exportReportToPdf(
       num: '1',
       title: 'Tinjau peluang Anda',
       body: topOpp
-        ? `Mulai dengan ${topOpp.title} — dampak tertinggi${topOpp.dataReadiness === 'ready' ? ', data sudah siap' : ''}, waktu ke nilai ${topOpp.timeToValueWeeks} minggu. Ini adalah jalur tercepat Anda menuju ROI yang terukur.`
-        : 'Jalankan ulang Diagnostik Mendalam untuk menghasilkan daftar peluang terprioritas, lalu prioritaskan berdasarkan dampak, kesiapan data, dan waktu ke nilai.',
+        ? `Mulai dengan ${topOpp.title} — dampak tertinggi${topOpp.dataReadiness === 'ready' ? ', data sudah siap' : ''}, waktu ke value ${topOpp.timeToValueWeeks} minggu. Ini adalah jalur tercepat Anda menuju ROI yang terukur.`
+        : 'Jalankan ulang Diagnostik Mendalam untuk menghasilkan daftar peluang terprioritas, lalu prioritaskan berdasarkan dampak, kesiapan data, dan waktu ke value.',
     },
     {
       num: '2',
@@ -2920,7 +3184,7 @@ export async function exportReportToPdf(
     {
       num: '3',
       title: 'Terapkan di Aivory™',
-      body: `Luncurkan agen pertama Anda, hubungkan kanal Anda, dan mulai menutup${nsGap > 0 ? ` kesenjangan otomasi ${fmtGap(nsGap, locale)}` : ' kesenjangan otomasi'} (dari ${fmtGap(nsCurrent, locale)} terotomasi hari ini ke target ${fmtGap(nsTarget, locale)} Anda).`,
+      body: `Luncurkan ${deployAgentTitle} Anda, hubungkan kanal Anda, dan mulai menutup${nsGap > 0 ? ` kesenjangan otomasi ${fmtGap(nsGap, locale)}` : ' kesenjangan otomasi'} (dari ${fmtGap(nsCurrent, locale)} terotomasi hari ini ke target ${fmtGap(nsTarget, locale)} Anda).`,
     },
     {
       num: '4',
@@ -2943,7 +3207,7 @@ export async function exportReportToPdf(
     {
       num: '3',
       title: 'Deploy on Aivory™',
-      body: `Launch your first agent, connect your channels, and start closing the${nsGap > 0 ? ` ${fmtGap(nsGap, locale)}` : ''} automation gap (from ${fmtGap(nsCurrent, locale)} automated today to your ${fmtGap(nsTarget, locale)} target).`,
+      body: `Launch your ${deployAgentTitle}, connect your channels, and start closing the${nsGap > 0 ? ` ${fmtGap(nsGap, locale)}` : ''} automation gap (from ${fmtGap(nsCurrent, locale)} automated today to your ${fmtGap(nsTarget, locale)} target).`,
     },
     {
       num: '4',

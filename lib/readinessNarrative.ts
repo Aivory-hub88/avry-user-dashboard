@@ -71,9 +71,9 @@ export const RISK_SOURCE_LABELS: Record<Locale, Record<string, string>> = {
     automation_current: 'Current automation level',
   },
   id: {
-    compliance_requirements: 'Persyaratan kepatuhan',
+    compliance_requirements: 'Persyaratan Compliance',
     data_quality: 'Kualitas data',
-    leadership_alignment: 'Keselarasan kepemimpinan',
+    leadership_alignment: 'Keselarasan Executive',
     change_readiness: 'Kesiapan menghadapi perubahan',
     budget_allocated: 'Alokasi anggaran',
     process_documentation: 'Dokumentasi proses',
@@ -130,12 +130,12 @@ export const DRIVER_ANSWER_LABELS: Record<Locale, Record<string, string>> = {
     internal_capability: 'Kapabilitas AI internal',
     change_readiness: 'Kesiapan menghadapi perubahan',
     decision_speed: 'Kecepatan pengambilan keputusan',
-    leadership_alignment: 'Keselarasan kepemimpinan',
+    leadership_alignment: 'Keselarasan Executive',
     risk_tolerance: 'Toleransi risiko',
     budget_allocated: 'Alokasi anggaran',
     ai_governance: 'Tata kelola AI',
     ai_data_privacy: 'Privasi data AI',
-    compliance_requirements: 'Persyaratan kepatuhan',
+    compliance_requirements: 'Persyaratan Compliance',
     data_residency: 'Residensi data',
   },
 }
@@ -209,13 +209,102 @@ export const DIM_CONSTRAINT_NOTES: Record<Locale, Record<string, string>> = {
     security: 'security and compliance guardrails need defining before sensitive data reaches AI systems',
   },
   id: {
-    strategy: 'tanpa KPI yang terukur, nilai peningkatan tetap tidak terlihat dan keputusan investasi tertahan',
+    strategy: 'tanpa KPI yang terukur, value peningkatan tetap tidak terlihat dan keputusan investasi tertahan',
     data: 'keputusan operasional yang tidak konsisten dan potensi otomasi yang terbatas akan terus terjadi hingga data inti dipusatkan dan dibersihkan',
     process: 'otomasi tetap rapuh selama alur kerja inti belum terdokumentasi dan terstandardisasi',
     people: 'adopsi terhambat tanpa peningkatan keterampilan dan kepemilikan internal yang jelas',
     governance: 'menskalakan otomasi tanpa struktur pengawasan akan melipatgandakan risiko operasional',
-    security: 'pagar pembatas keamanan dan kepatuhan perlu didefinisikan sebelum data sensitif masuk ke sistem AI',
+    security: 'aturan keamanan dan compliance perlu didefinisikan sebelum data sensitif masuk ke sistem AI',
   },
+}
+
+/** What a HIGH score in each dimension concretely means, in plain terms — the positive counterpart to DIM_CONSTRAINT_NOTES, used to translate the strongest dimension into something a non-finance reader immediately recognises. */
+export const DIM_STRENGTH_NOTES: Record<Locale, Record<string, string>> = {
+  en: {
+    strategy: 'your business goals are clearly defined and tracked with real metrics',
+    data: 'your operational data is clean and centralised, not scattered across tools',
+    process: 'the way your team works is documented and consistent, not tribal knowledge',
+    people: 'your team already has the skills and buy-in to adopt new tools',
+    governance: 'you already have clear rules for how AI gets used in the business',
+    security: 'your data-security rules are already well defined',
+  },
+  id: {
+    strategy: 'tujuan bisnis Anda sudah jelas dan terukur dengan metrik yang nyata',
+    data: 'data operasional Anda sudah rapi dan terpusat, tidak berserakan di berbagai tool',
+    process: 'cara kerja tim Anda sudah rapi dan terdokumentasi, bukan cuma pengetahuan segelintir orang',
+    people: 'tim Anda sudah punya keterampilan dan kesiapan untuk mengadopsi alat baru',
+    governance: 'perusahaan Anda sudah punya aturan main yang jelas soal penggunaan AI',
+    security: 'aturan keamanan data Anda sudah terdefinisi dengan baik',
+  },
+}
+
+/**
+ * Translates the strongest/weakest dimension pair into one plain-language
+ * sentence a non-finance, non-technical reader can immediately parse —
+ * e.g. "cara kerja tim Anda sudah rapi (skor Proses 93/100), tapi Anda
+ * belum punya aturan jelas soal keamanan data (skor Keamanan 30/100)".
+ * Sits above the 6-dimension breakdown so the reader gets the "so what"
+ * before the numbers, not only after.
+ */
+export function buildOperationalHealthPlainLanguage(
+  v: { strongestKey: string; strongestScore: number; strongestLabel: string; weakestKey: string; weakestScore: number; weakestLabel: string },
+  locale: Locale = 'en',
+): string {
+  const strongPhrase = DIM_STRENGTH_NOTES[locale][v.strongestKey] ?? DIM_STRENGTH_NOTES[locale].process
+  const weakPhrase = DIM_CONSTRAINT_NOTES[locale][v.weakestKey] ?? DIM_CONSTRAINT_NOTES[locale].security
+  if (locale === 'id') {
+    return `Artinya: ${strongPhrase} (skor ${v.strongestLabel} ${Math.round(v.strongestScore)}/100), tapi ${weakPhrase} (skor ${v.weakestLabel} ${Math.round(v.weakestScore)}/100).`
+  }
+  return `In plain terms: ${strongPhrase} (${v.strongestLabel} score ${Math.round(v.strongestScore)}/100), but ${weakPhrase} (${v.weakestLabel} score ${Math.round(v.weakestScore)}/100).`
+}
+
+/**
+ * Report-wide glossary — defines the handful of English/finance terms the
+ * report keeps in their original form (Quick Win, Transformation Blueprint,
+ * Hand-off, NPV, ROI, FTE, Payback Period) once, up front, so they can be
+ * used afterwards without re-explaining each time. Rendered as a small box
+ * on the Executive Summary section (web + PDF).
+ */
+export const GLOSSARY_TERMS: Record<Locale, Array<{ term: string; definition: string }>> = {
+  en: [
+    { term: 'ROI (Return on Investment)', definition: 'The percentage return you get back relative to what you invested.' },
+    { term: 'NPV (Net Present Value)', definition: "Future returns valued in today's money — can be negative even when ROI is positive (see Financial Case)." },
+    { term: 'Payback Period', definition: 'How long it takes for the investment to pay for itself.' },
+    { term: 'Quick Win', definition: 'A fast, low-effort step with results that show up quickly.' },
+    { term: 'Transformation Blueprint', definition: 'The technical plan for deploying AI in your business — data sources, agent structure, workflow sequencing.' },
+    { term: 'Hand-off', definition: 'The point where a task passes from an AI agent to a human, or back.' },
+    { term: 'FTE (Full-Time Equivalent)', definition: 'Headcount measured in full-time positions.' },
+  ],
+  id: [
+    { term: 'ROI (Return on Investment)', definition: 'Persentase keuntungan yang kembali dibandingkan biaya yang dikeluarkan.' },
+    { term: 'NPV (Net Present Value)', definition: 'Nilai keuntungan masa depan setelah dihitung ke nilai uang saat ini — bisa negatif meski ROI positif (lihat Analisis Keuangan).' },
+    { term: 'Payback Period (waktu balik modal)', definition: 'Waktu yang dibutuhkan investasi untuk kembali modal.' },
+    { term: 'Quick Win', definition: 'Langkah cepat dengan usaha rendah yang hasilnya cepat terlihat.' },
+    { term: 'Transformation Blueprint', definition: 'Rencana teknis penerapan AI di bisnis Anda — sumber data, struktur agen, urutan alur kerja.' },
+    { term: 'Hand-off', definition: 'Titik di mana suatu pekerjaan dialihkan dari agen AI ke manusia, atau sebaliknya.' },
+    { term: 'FTE (Full-Time Equivalent)', definition: 'Jumlah karyawan dihitung setara posisi penuh waktu.' },
+  ],
+}
+
+/** One plain-language sentence framing the ROI/NPV math before the formulas — "explain it like I'm not an accountant" per the Metodologi section. */
+export function buildMethodologyIntro(locale: Locale = 'en'): string {
+  if (locale === 'id') {
+    return 'Sederhananya: kami hitung berapa jam kerja manual yang bisa dihemat berkat otomasi, lalu kalikan dengan estimasi nilai gaji per jam untuk dapat value tenaga kerja. Setelah itu ditambah estimasi efisiensi proses, dibandingkan dengan investasi, dan hasilnya adalah waktu balik modal (payback period) serta ROI.'
+  }
+  return "In plain terms: we work out how many manual hours automation can free up, then multiply that by an hourly wage benchmark to get the labor value. We add an estimated process-efficiency gain, compare the total against your investment, and that gives the payback period and ROI below."
+}
+
+/**
+ * Explains why "ROI 3 Tahun" (gross, before ongoing cost) and the "Kisaran
+ * ROI 3 Tahun" range (net, after ongoing cost) show different numbers on
+ * the same page, and why NPV can read negative while ROI reads positive —
+ * the two points flagged as most confusing without this note.
+ */
+export function buildFinancialTermsNote(locale: Locale = 'en'): string {
+  if (locale === 'id') {
+    return 'ROI 3 Tahun di atas dihitung SEBELUM biaya operasional berjalan (lisensi, pemeliharaan, dukungan); Kisaran ROI 3 Tahun di bawah dihitung SETELAH biaya itu dikurangi — jadi keduanya wajar berbeda. NPV juga bisa tampak negatif meski ROI positif: NPV menghitung nilai waktu uang dan menjumlahkan untung-rugi dari tahun ke tahun, jadi di periode sebelum modal kembali (payback), angkanya normal masih minus.'
+  }
+  return 'The 3-Year ROI above is calculated BEFORE ongoing running costs (licenses, maintenance, support); the 3-Year ROI range below is calculated AFTER those costs are deducted — so the two numbers are expected to differ. NPV can also look negative even when ROI is positive: NPV accounts for the time value of money and nets cumulative gains against the investment, so it is normal for it to still read negative before the payback point is reached.'
 }
 
 /**
@@ -235,10 +324,10 @@ export const DIM_CONSEQUENCE_CHAINS: Record<Locale, Record<string, string[]>> = 
   id: {
     data: ['Kematangan data rendah', 'Keputusan operasional tidak konsisten', 'Potensi otomasi lebih rendah', 'Biaya operasional lebih tinggi'],
     process: ['Proses inti tidak terdokumentasi', 'Operasional rapuh dan bergantung pada individu', 'Otomasi gagal saat ada pengecualian', 'Penskalaan lebih lambat dan berisiko'],
-    strategy: ['Tidak ada KPI operasional terukur', 'Nilai peningkatan tidak terlihat', 'Keputusan investasi tertahan', 'Peluang efisiensi tidak terdanai'],
+    strategy: ['Tidak ada KPI operasional terukur', 'Value peningkatan tidak terlihat', 'Keputusan investasi tertahan', 'Peluang efisiensi tidak terdanai'],
     people: ['Keterampilan dan kepemilikan tidak jelas', 'Adopsi perubahan terhambat', 'Alat tidak digunakan', 'Pekerjaan manual terus berlanjut'],
     governance: ['Tidak ada struktur pengawasan', 'Kualitas eksekusi tidak konsisten', 'Risiko operasional berlipat ganda', 'Penskalaan melipatgandakan kesalahan'],
-    security: ['Pagar pembatas data tidak terdefinisi', 'Risiko eksposur data sensitif', 'Penghambat kepatuhan muncul terlambat', 'Inisiatif transformasi tertahan'],
+    security: ['Aturan keamanan data tidak terdefinisi', 'Risiko eksposur data sensitif', 'Penghambat compliance muncul terlambat', 'Inisiatif transformasi tertahan'],
   },
 }
 
@@ -247,16 +336,42 @@ export function formatConsequenceChain(chain: string[]): string {
   return chain.join(' → ')
 }
 
+/**
+ * Flowing-prose alternative to the "A → B → C → D" chip chain, for the
+ * weakest dimension's consequence chain — an arrow chain of noun phrases
+ * reads as machine-translated in Indonesian even though the same device
+ * works fine as an English business-writing convention. English callers
+ * should keep using formatConsequenceChain/DIM_CONSEQUENCE_CHAINS directly;
+ * this only covers 'id'. Same 4 conceptual beats as DIM_CONSEQUENCE_CHAINS,
+ * connected into one narrative sentence pair ("Karena X, ada risiko Y.
+ * Kalau ini dibiarkan, Z — dan pada akhirnya W.") instead of noun-phrase
+ * fragments joined by arrows.
+ */
+const DIM_CONSEQUENCE_NARRATIVE_ID: Record<string, string> = {
+  data: 'Karena kematangan data masih rendah, keputusan operasional jadi tidak konsisten. Kalau ini dibiarkan, potensi otomasi ikut terbatas — dan pada akhirnya biaya operasional jadi lebih tinggi dari seharusnya.',
+  process: 'Karena proses inti belum terdokumentasi, operasional jadi rapuh dan bergantung pada orang tertentu. Kalau ini dibiarkan, otomasi akan gagal begitu ada pengecualian — dan penskalaan jadi lebih lambat serta berisiko.',
+  strategy: 'Karena belum ada KPI operasional yang terukur, value dari setiap peningkatan jadi tidak terlihat. Kalau ini dibiarkan, keputusan investasi akan terus tertahan — dan peluang efisiensi yang ada jadi tidak terdanai.',
+  people: 'Karena keterampilan dan kepemilikan tim belum jelas, adopsi perubahan jadi terhambat. Kalau ini dibiarkan, alat yang sudah disiapkan akan tetap tidak terpakai — dan pekerjaan manual terus berlanjut seperti biasa.',
+  governance: 'Karena belum ada struktur pengawasan, kualitas eksekusi jadi tidak konsisten. Kalau ini dibiarkan, risiko operasional akan berlipat ganda — dan setiap upaya penskalaan justru melipatgandakan kesalahan.',
+  security: 'Karena aturan keamanan data belum jelas, ada risiko data sensitif bocor atau disalahgunakan. Kalau ini dibiarkan, masalah compliance biasanya baru ketahuan belakangan — saat itu sudah terlambat dan menghambat proyek transformasi yang sedang berjalan.',
+}
+
+/** Returns the flowing-prose consequence narrative for 'id', or null for 'en' (caller keeps using the chip-chain UI in that case). */
+export function buildConsequenceNarrative(key: string, locale: Locale = 'en'): string | null {
+  if (locale !== 'id') return null
+  return DIM_CONSEQUENCE_NARRATIVE_ID[key] ?? null
+}
+
 /** Mandate sentence derived from the leadership-alignment answer. */
 export function buildLeadershipClause(leadershipRaw: string, locale: Locale = 'en'): string {
   if (locale === 'id') {
     return leadershipRaw.includes('Fully aligned')
-      ? 'Kepemimpinan yang sepenuhnya selaras memberikan mandat yang kuat untuk penerapan skala penuh.'
+      ? 'Executive yang sepenuhnya selaras memberikan mandat yang kuat untuk penerapan skala penuh.'
       : leadershipRaw.includes('Supportive')
-        ? 'Kepemimpinan mendukung namun tetap berhati-hati, sehingga inisiatif awal sebaiknya berisiko rendah dan cepat terukur untuk membangun kepercayaan.'
+        ? 'Executive mendukung namun tetap berhati-hati, sehingga inisiatif awal sebaiknya berisiko rendah dan cepat terukur untuk membangun kepercayaan.'
         : leadershipRaw.includes('Some interest')
-          ? 'Ketertarikan kepemimpinan masih dalam tahap terbentuk, sehingga kemenangan awal perlu menunjukkan nilai bisnis secara jelas.'
-          : 'Mengamankan sponsor kepemimpinan secara eksplisit sebaiknya menyertai inisiatif pertama.'
+          ? 'Ketertarikan Executive masih dalam tahap terbentuk, sehingga kemenangan awal perlu menunjukkan value bisnis secara jelas.'
+          : 'Mengamankan sponsor Executive secara eksplisit sebaiknya menyertai inisiatif pertama.'
   }
   return leadershipRaw.includes('Fully aligned')
     ? 'Fully aligned leadership provides a strong mandate for scaled deployment.'
@@ -325,8 +440,8 @@ export function buildFirstMoves(m: FirstMovesInputs, locale: Locale = 'en'): Fir
     }
     if (m.topOpportunity) {
       moves.push({
-        title: `Buktikan nilai dengan cepat: ${m.topOpportunity.title}`,
-        body: `Peluang awal dengan dampak tertinggi — waktu ke nilai ${m.topOpportunity.timeToValueWeeks} minggu${m.topOpportunity.dataReadiness === 'ready' ? ', data sudah siap hari ini' : ''}.`,
+        title: `Buktikan value dengan cepat: ${m.topOpportunity.title}`,
+        body: `Peluang awal dengan dampak tertinggi — waktu ke value ${m.topOpportunity.timeToValueWeeks} minggu${m.topOpportunity.dataReadiness === 'ready' ? ', data sudah siap hari ini' : ''}.`,
       })
     }
     if (!m.hasBudgetInput) {
@@ -335,7 +450,7 @@ export function buildFirstMoves(m: FirstMovesInputs, locale: Locale = 'en'): Fir
         body: 'Tidak ada anggaran implementasi yang diberikan dalam asesmen. Memberikan kisaran anggaran akan melengkapi model payback dan ROI, serta mengubah estimasi ini menjadi kasus bisnis yang siap untuk keputusan.',
       })
     } else {
-      moves.push({ title: 'Amankan mandat', body: m.leadershipClause })
+      moves.push({ title: 'Dapatkan dukungan Executive', body: m.leadershipClause })
     }
     return moves
   }
@@ -417,9 +532,9 @@ export function buildExecutiveSummary(
 
     let valueSentence = ''
     if (v.businessValueLabel && v.topOpportunityTitle) {
-      valueSentence = ` Menindaklanjuti temuan dalam laporan ini diproyeksikan membuka nilai bisnis tahunan senilai ${v.businessValueLabel}, dengan ${v.topOpportunityTitle.toLowerCase()} sebagai langkah pertama tercepat.`
+      valueSentence = ` Menindaklanjuti temuan dalam laporan ini diproyeksikan membuka value bisnis tahunan senilai ${v.businessValueLabel}, dengan ${v.topOpportunityTitle.toLowerCase()} sebagai langkah pertama tercepat.`
     } else if (v.businessValueLabel) {
-      valueSentence = ` Menindaklanjuti temuan dalam laporan ini diproyeksikan membuka nilai bisnis tahunan senilai ${v.businessValueLabel}.`
+      valueSentence = ` Menindaklanjuti temuan dalam laporan ini diproyeksikan membuka value bisnis tahunan senilai ${v.businessValueLabel}.`
     } else if (v.topOpportunityTitle) {
       valueSentence = ` Langkah pertama tercepat adalah ${v.topOpportunityTitle.toLowerCase()}.`
     }
@@ -462,7 +577,7 @@ const DIM_INSIGHT_LABEL: Record<Locale, Record<string, string>> = {
     strategy: 'tidak adanya KPI operasional yang terukur',
     people: 'kesenjangan keterampilan dan kepemilikan yang jelas',
     governance: 'tidak adanya struktur pengawasan',
-    security: 'pagar pembatas keamanan data yang tidak terdefinisi',
+    security: 'aturan keamanan data yang tidak terdefinisi',
   },
 }
 
@@ -482,7 +597,7 @@ const DIM_INSIGHT_ACTION: Record<Locale, Record<string, string>> = {
     strategy: 'Mendefinisikan KPI terukur sebelum mendanai inisiatif baru',
     people: 'Berinvestasi pada peningkatan keterampilan dan kepemilikan yang jelas',
     governance: 'Membangun struktur pengawasan sebelum menskalakan otomasi',
-    security: 'Mendefinisikan pagar pembatas keamanan data sebelum data sensitif masuk ke sistem AI',
+    security: 'Mendefinisikan aturan keamanan data sebelum data sensitif masuk ke sistem AI',
   },
 }
 
@@ -528,20 +643,20 @@ export function buildExecutiveInsight(
         }
         const ttv = inputs.topOpportunityTimeToValueWeeks
         const readyClause = inputs.topOpportunityDataReadiness === 'ready' ? ', dengan data yang sudah siap hari ini' : ''
-        return `Jalur tercepat untuk membuktikan nilai adalah ${inputs.topOpportunityTitle.toLowerCase()}${ttv ? `, dapat direalisasikan hanya dalam ${ttv} minggu` : ''}${readyClause}. Memulai eksekusi dari sini membangun momentum dan mengurangi risiko pada sisa peta jalan transformasi.`
+        return `Jalur tercepat untuk membuktikan value adalah ${inputs.topOpportunityTitle.toLowerCase()}${ttv ? `, dapat direalisasikan hanya dalam ${ttv} minggu` : ''}${readyClause}. Memulai eksekusi dari sini membangun momentum dan mengurangi risiko pada sisa peta jalan transformasi.`
       }
       case 'financial': {
         if (inputs.hasBudgetInput && inputs.paybackMonths != null && inputs.threeYearROIPercent != null) {
-          return `Kasus keuangan ini sudah siap untuk keputusan: payback dalam ${Math.round(inputs.paybackMonths)} bulan dan ROI tiga tahun sebesar ${Math.round(inputs.threeYearROIPercent)}%. Menyetujui anggaran sekarang mengubah analisis ini menjadi penghematan yang terus berlipat — setiap kuartal keterlambatan adalah kuartal biaya yang bisa dihindari.`
+          return `Analisis keuangan ini sudah siap untuk keputusan: payback dalam ${Math.round(inputs.paybackMonths)} bulan dan ROI tiga tahun sebesar ${Math.round(inputs.threeYearROIPercent)}%. Menyetujui anggaran sekarang mengubah analisis ini menjadi penghematan yang terus berlipat — setiap kuartal keterlambatan adalah kuartal biaya yang bisa dihindari.`
         }
-        return 'Kasus keuangan ini belum dapat difinalisasi tanpa input anggaran. Memberikan kisaran anggaran minggu ini akan mengubah proyeksi ini menjadi kasus bisnis yang siap dibawa ke dewan, lengkap dengan periode payback dan ROI tiga tahun yang akurat.'
+        return 'Analisis keuangan ini belum dapat difinalisasi tanpa input anggaran. Memberikan kisaran anggaran minggu ini akan mengubah proyeksi ini menjadi kasus bisnis yang siap dibawa ke dewan, lengkap dengan periode payback dan ROI tiga tahun yang akurat.'
       }
       case 'improvements': {
         if (!inputs.topImprovementTitle) {
           return 'Belum ada prioritas peningkatan yang berhasil diidentifikasi. Menjalankan ulang Diagnostik Mendalam akan mengungkap kesenjangan operasional spesifik yang perlu ditutup lebih dulu.'
         }
         const actionClause = inputs.topImprovementAction ? ` ${inputs.topImprovementAction}` : ''
-        return `Perbaikan dengan prioritas tertinggi adalah ${inputs.topImprovementTitle}.${actionClause} Menutup kesenjangan ini lebih dulu menghilangkan penghambat terbesar untuk otomasi yang andal dan melindungi kasus keuangan di atas.`
+        return `Perbaikan dengan prioritas tertinggi adalah ${inputs.topImprovementTitle}.${actionClause} Menutup kesenjangan ini lebih dulu menghilangkan penghambat terbesar untuk otomasi yang andal dan melindungi analisis keuangan di atas.`
       }
     }
   }
@@ -703,12 +818,12 @@ export function buildRoiTilesCaption(
   const laborPct = Math.round((labor / total) * 100)
   if (locale === 'id') {
     if (laborPct >= 55) {
-      return `${laborPct}% dari nilai ini berasal dari tenaga kerja yang dipulihkan — keuntungan efisiensi proses bersifat sekunder.`
+      return `${laborPct}% dari value ini berasal dari tenaga kerja yang dipulihkan — keuntungan efisiensi proses bersifat sekunder.`
     }
     if (laborPct <= 45) {
-      return `${100 - laborPct}% dari nilai ini berasal dari keuntungan efisiensi proses, bukan hanya tenaga kerja.`
+      return `${100 - laborPct}% dari value ini berasal dari keuntungan efisiensi proses, bukan hanya tenaga kerja.`
     }
-    return 'Nilai terbagi rata antara tenaga kerja yang dipulihkan dan keuntungan efisiensi proses.'
+    return 'Value terbagi rata antara tenaga kerja yang dipulihkan dan keuntungan efisiensi proses.'
   }
   if (laborPct >= 55) {
     return `${laborPct}% of this value is recovered labor — process-efficiency gains are secondary.`
@@ -770,13 +885,17 @@ export function buildFoldedConstraintNote(
 ): string | null {
   if (!Array.isArray(risks) || risks.length !== 1) return null
   const r = risks[0]
+  // The "(sinyal/signal: X)" source-attribution clause used to render here,
+  // e.g. "Insufficient leadership alignment... (sinyal: keselarasan
+  // kepemimpinan)" — but r.risk almost always already names its own topic in
+  // plain words, so the parenthetical just repeats what the sentence already
+  // said. Reads as a leaked internal debug tag, not extra information for
+  // the reader — dropped rather than translated.
   const body = r.risk.trim().replace(/\.*$/, '')
   if (locale === 'id') {
-    const sourceClause = r.source ? ` (sinyal: ${humanizeRiskSource(r.source, 'id').toLowerCase()})` : ''
-    return `Kendala utama: ${body}${sourceClause}.`
+    return `Kendala utama: ${body}.`
   }
-  const sourceClause = r.source ? ` (signal: ${humanizeRiskSource(r.source, 'en').toLowerCase()})` : ''
-  return `Key constraint: ${body}${sourceClause}.`
+  return `Key constraint: ${body}.`
 }
 
 /**
@@ -927,7 +1046,7 @@ const ROI_INPUT_LABELS: Record<Locale, Record<string, string>> = {
   id: {
     'manual hours/week': 'Jam kerja manual tercatat',
     'budget': 'Kisaran anggaran diberikan',
-    'FTE count': 'Ukuran tim (FTE) diberikan',
+    'FTE count': 'Jumlah karyawan penuh waktu (FTE) diberikan',
   },
 }
 

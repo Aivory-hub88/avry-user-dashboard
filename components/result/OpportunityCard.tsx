@@ -97,8 +97,8 @@ export default function OpportunityCard({
           <span className={styles.metricValue}>{opportunity.effort}/10</span>
         </div>
         <div className={styles.metric}>
-          <span className={styles.metricLabel}>{locale === 'id' ? 'Waktu ke Nilai' : 'Time to Value'}</span>
-          <span className={styles.metricValue}>{opportunity.timeToValueWeeks}{locale === 'id' ? 'mgg' : 'w'}</span>
+          <span className={styles.metricLabel}>{locale === 'id' ? 'Waktu ke Value' : 'Time to Value'}</span>
+          <span className={styles.metricValue}>{opportunity.timeToValueWeeks}{locale === 'id' ? ' minggu' : 'w'}</span>
         </div>
         <div className={styles.metric}>
           <span className={styles.metricLabel}>{locale === 'id' ? 'Kompleksitas' : 'Complexity'}</span>
@@ -134,6 +134,11 @@ export default function OpportunityCard({
             {locale === 'id' ? 'Prasyarat: ' : 'Prereqs: '}{opportunity.prerequisites.join(', ')}
           </span>
         )}
+        {opportunity.recommendedAgent && (
+          <span className={`${styles.badge} ${styles.badgeAgent}`}>
+            {locale === 'id' ? 'Agen Aivory: ' : 'Aivory agent: '}{opportunity.recommendedAgent.title}
+          </span>
+        )}
       </div>
 
       {whyReasons.length > 0 && (
@@ -141,6 +146,29 @@ export default function OpportunityCard({
           <span className={styles.whyLabel}>{locale === 'id' ? 'Mengapa ini: ' : 'Why this: '}</span>
           {whyReasons.join(' · ')}
         </p>
+      )}
+
+      {opportunity.trainingTracks && opportunity.trainingTracks.length > 0 && (
+        <div className={styles.trainingBlock}>
+          {opportunity.trainingTracks.map((track) => (
+            <div key={track.audience} className={styles.trainingTrack}>
+              {/* Topic leads, audience second — "{headline} for {audience}"
+                  reads as "here's what this covers", not "here's who attends". */}
+              <span className={styles.trainingAudience}>
+                {locale === 'id' ? `${track.headline} untuk ${track.audience}` : `${track.headline} for ${track.audience}`}
+              </span>
+              {track.topics.length > 0 && (
+                <span className={styles.trainingDetail}>{track.topics.join(', ')}</span>
+              )}
+              {track.tools.length > 0 && (
+                <span className={styles.trainingDetail}>
+                  {locale === 'id' ? 'Tool: ' : 'Tools: '}
+                  {track.tools.join(', ')}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )

@@ -418,7 +418,7 @@ export function humanizeQuadrant(
       quick_win: 'Quick Win',
       major_project: 'Proyek Besar',
       fill_in: 'Selingan',
-      thankless_task: 'Nilai Rendah',
+      thankless_task: 'Value Rendah',
     },
   }
   return map[locale][quadrant] ?? '—'

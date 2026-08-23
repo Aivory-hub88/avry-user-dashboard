@@ -106,7 +106,7 @@ export default function EfficiencyWhatIfSlider({
 
       <div className={styles.tileGrid}>
         <div className={styles.tile}>
-          <span className={styles.tileLabel}>{locale === 'id' ? 'Nilai Bisnis yang Dihasilkan' : 'Business Value Created'}</span>
+          <span className={styles.tileLabel}>{locale === 'id' ? 'Value Bisnis yang Dihasilkan' : 'Business Value Created'}</span>
           <span className={styles.tileValue}>{fmtLocal(display.totalAnnualSavingsLocal)}</span>
         </div>
         <div className={styles.tile}>

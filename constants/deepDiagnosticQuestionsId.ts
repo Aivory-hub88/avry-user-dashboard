@@ -240,12 +240,23 @@ export const ID_QUESTION_COPY: Record<string, IdQuestionCopy> = {
   },
   data_infrastructure: {
     question: 'Mana yang paling menggambarkan infrastruktur data Anda saat ini?',
-    helperText: 'Platform data dengan kematangan lebih tinggi mempercepat waktu realisasi nilai dari otomasi',
+    helperText: 'Platform data dengan kematangan lebih tinggi mempercepat waktu realisasi value dari otomasi',
     options: [
       'Spreadsheet / berkas manual',
       'Basis data (SQL / NoSQL)',
       'Data warehouse atau data lake',
       'Platform data modern (streaming, katalog, tata kelola)',
+    ],
+  },
+  data_capture_method: {
+    question: 'Bagaimana data operasional harian Anda biasanya dicatat di titik terjadinya?',
+    helperText: 'Ini soal disiplin pencatatan data di lapangan sehari-hari, terpisah dari sistem apa yang Anda pakai untuk menyimpannya',
+    options: [
+      'Langsung masuk ke sistem digital (form/app/POS) saat itu juga',
+      'Spreadsheet, diisi manual secara rutin',
+      'Dicatat di kertas/buku, lalu di-entry ulang ke sistem kemudian',
+      'Catatan tulisan tangan difoto dan dikirim via WhatsApp/chat, tanpa entry ulang terstruktur',
+      'Tidak ada pencatatan sistematis — mengandalkan ingatan',
     ],
   },
 
@@ -271,7 +282,7 @@ export const ID_QUESTION_COPY: Record<string, IdQuestionCopy> = {
     ],
   },
   leadership_alignment: {
-    question: 'Seberapa selaras pimpinan Anda terhadap transformasi operasional?',
+    question: 'Seberapa selaras Executive Anda terhadap transformasi operasional?',
     options: [
       'Sepenuhnya selaras dan menjadi penggerak utama',
       'Mendukung tetapi berhati-hati',
@@ -289,7 +300,7 @@ export const ID_QUESTION_COPY: Record<string, IdQuestionCopy> = {
     ],
   },
   compliance_requirements: {
-    question: 'Apakah Anda memiliki persyaratan kepatuhan atau regulasi tertentu?',
+    question: 'Apakah Anda memiliki persyaratan compliance atau regulasi tertentu?',
     helperText: 'Pilih semua yang berlaku',
     options: [
       'GDPR',

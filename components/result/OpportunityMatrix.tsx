@@ -97,7 +97,7 @@ export default function OpportunityMatrix({ opportunities, highlightedId, onDotC
         <text className={`${styles.quadrantLabel} ${styles.labelQuickWin}`} x={PLOT_LEFT + 8} y={PLOT_TOP + 16}>{locale === 'id' ? 'Quick Win' : 'Quick Win'}</text>
         <text className={`${styles.quadrantLabel} ${styles.labelNeutral}`} x={MID_X + 8} y={PLOT_TOP + 16}>{locale === 'id' ? 'Proyek Besar' : 'Major Project'}</text>
         <text className={`${styles.quadrantLabel} ${styles.labelNeutral}`} x={PLOT_LEFT + 8} y={MID_Y + 16}>{locale === 'id' ? 'Selingan' : 'Fill In'}</text>
-        <text className={`${styles.quadrantLabel} ${styles.labelThankless}`} x={MID_X + 8} y={MID_Y + 16}>{locale === 'id' ? 'Nilai Rendah' : 'Thankless Task'}</text>
+        <text className={`${styles.quadrantLabel} ${styles.labelThankless}`} x={MID_X + 8} y={MID_Y + 16}>{locale === 'id' ? 'Value Rendah' : 'Thankless Task'}</text>
 
         {/* Dots — each opportunity gets a distinct color */}
         {opportunities.map((opp, idx) => {

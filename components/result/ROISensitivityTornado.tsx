@@ -74,7 +74,7 @@ export default function ROISensitivityTornado({
       </div>
       <p className={styles.disclaimer}>
         {locale === 'id'
-          ? <>Sensitivitas dihitung dengan mengevaluasi ulang rumus Nilai Bisnis yang Dihasilkan yang sama pada batas skenario faktor efisiensi ({sensitivity[0]?.lowBoundLabel}–{sensitivity[0]?.highBoundLabel}); input rumus lainnya (tarif per jam, kesenjangan otomasi) bersifat tetap untuk asesmen ini dan tidak disimulasikan, karena metodologi tidak mendefinisikan batas alternatif untuk keduanya.</>
+          ? <>Sensitivitas dihitung dengan mengevaluasi ulang rumus Value Bisnis yang Dihasilkan yang sama pada batas skenario faktor efisiensi ({sensitivity[0]?.lowBoundLabel}–{sensitivity[0]?.highBoundLabel}); input rumus lainnya (tarif per jam, kesenjangan otomasi) bersifat tetap untuk asesmen ini dan tidak disimulasikan, karena metodologi tidak mendefinisikan batas alternatif untuk keduanya.</>
           : <>Sensitivity is computed by re-evaluating the same Business Value Created formula at the efficiency
         factor&apos;s scenario bounds ({sensitivity[0]?.lowBoundLabel}–{sensitivity[0]?.highBoundLabel}); other
         formula inputs (hourly rate, automation gap) are fixed for this assessment and not swept, since the

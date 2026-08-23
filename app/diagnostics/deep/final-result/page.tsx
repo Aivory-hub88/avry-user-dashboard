@@ -52,6 +52,11 @@ import {
   maturityLevelLabel,
   DIM_CONSEQUENCE_CHAINS,
   DIM_LABELS,
+  buildOperationalHealthPlainLanguage,
+  GLOSSARY_TERMS,
+  buildMethodologyIntro,
+  buildFinancialTermsNote,
+  buildConsequenceNarrative,
 } from '@/lib/readinessNarrative'
 import { quantifyPainPoints, formatPainPointHours, displayPainPointCost } from '@/lib/bottleneckQuantification'
 import { useLocaleContext } from '@/hooks/useLocale'
@@ -357,6 +362,17 @@ export default function FinalResultPage() {
     strongestKey: scores.strongestDimension,
     strongestScore: dimScoreOf(scores.strongestDimension),
   }, locale)
+  // Plain-language translation of the strongest/weakest dimension pair —
+  // sits above the 6-dimension breakdown in Operational Health so a
+  // non-finance reader gets "so what" before the raw numbers.
+  const operationalHealthPlainLanguage = buildOperationalHealthPlainLanguage({
+    strongestKey: scores.strongestDimension,
+    strongestScore: dimScoreOf(scores.strongestDimension),
+    strongestLabel: DIM_LABELS[locale][scores.strongestDimension] ?? scores.strongestDimension,
+    weakestKey: scores.weakestDimension,
+    weakestScore: dimScoreOf(scores.weakestDimension),
+    weakestLabel: DIM_LABELS[locale][scores.weakestDimension] ?? scores.weakestDimension,
+  }, locale)
   const firstMoves = buildFirstMoves({
     firstImprovement: Array.isArray(roomForImprovement) && roomForImprovement.length > 0
       ? roomForImprovement[0] : null,
@@ -380,7 +396,11 @@ export default function FinalResultPage() {
     businessValueLabel,
     topOpportunityTitle,
   }, locale)
-  const weakestConsequenceChain = DIM_CONSEQUENCE_CHAINS[locale][scores.weakestDimension] ?? null
+  // ID: flowing prose (an arrow chain of noun phrases reads as machine-
+  // translated in Indonesian). EN: keep the existing chip-chain UI, which
+  // reads fine as an English business-writing convention.
+  const weakestConsequenceNarrative = buildConsequenceNarrative(scores.weakestDimension, locale)
+  const weakestConsequenceChain = weakestConsequenceNarrative ? null : (DIM_CONSEQUENCE_CHAINS[locale][scores.weakestDimension] ?? null)
   const diagnosisInsight = buildExecutiveInsight('diagnosis', { weakestKey: scores.weakestDimension }, locale)
   const topOpportunity = opportunities[0] ?? null
   const opportunitiesInsight = buildExecutiveInsight('opportunities', {
@@ -464,7 +484,7 @@ export default function FinalResultPage() {
     { id: 'section-operations-analysis', label: 'Analisis Operasional' },
     ...(hasStandaloneConstraints ? [{ id: 'section-operational-constraints', label: 'Kendala' }] : []),
     { id: 'section-transformation-opportunities', label: 'Peluang' },
-    { id: 'section-financial-case', label: 'Kasus Keuangan' },
+    { id: 'section-financial-case', label: 'Analisis Keuangan' },
     ...(hasImprovementPriorities ? [{ id: 'section-improvement-priorities', label: 'Prioritas' }] : []),
     { id: 'section-business-context', label: 'Konteks Bisnis' },
     { id: 'section-ai-enablement', label: 'Pemanfaatan AI' },
@@ -515,11 +535,27 @@ export default function FinalResultPage() {
         <div id="section-executive-summary" className={`${styles.card} ${styles.executiveSummaryCard}`}>
           <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Ringkasan Eksekutif' : 'Executive Summary'}</h2>
           <p className={styles.executiveSummaryText}>{executiveSummary}</p>
+
+          {/* Glossary — defines the handful of English/finance terms this
+              report keeps in their original form, once, up front, so they
+              read without re-explaining every time they appear later. */}
+          <div className={styles.glossaryBox}>
+            <p className={styles.glossaryTitle}>{locale === 'id' ? 'Istilah dalam laporan ini' : 'Terms used in this report'}</p>
+            <dl className={styles.glossaryList}>
+              {GLOSSARY_TERMS[locale].map((g) => (
+                <div key={g.term} className={styles.glossaryItem}>
+                  <dt className={styles.glossaryTerm}>{g.term}</dt>
+                  <dd className={styles.glossaryDefinition}>{g.definition}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </div>
 
         {/* ── Operational Health ── */}
         <div id="section-operational-health" className={styles.card}>
           <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Kesehatan Operasional' : 'Operational Health'}</h2>
+          <p className={styles.plainLanguageLead}>{operationalHealthPlainLanguage}</p>
 
           {/* Top row: ScoreRing | RadarChart */}
           <div className={styles.scorecardTopRow}>
@@ -579,6 +615,9 @@ export default function FinalResultPage() {
         <div id="section-executive-diagnosis" className={styles.card}>
           <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Diagnosis Operasional Eksekutif' : 'Executive Operational Diagnosis'}</h2>
           <p className={styles.verdictNarrative}>{verdictNarrative}</p>
+          {weakestConsequenceNarrative && (
+            <p className={styles.consequenceNarrative}>{weakestConsequenceNarrative}</p>
+          )}
           {weakestConsequenceChain && (
             <div className={styles.consequenceChain}>
               {weakestConsequenceChain.map((step, i) => (
@@ -731,7 +770,7 @@ export default function FinalResultPage() {
 
         {/* ── Financial Case ── */}
         <div id="section-financial-case" className={styles.card}>
-          <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Kasus Keuangan' : 'Financial Case'}</h2>
+          <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Analisis Keuangan' : 'Financial Case'}</h2>
 
           {!calculations.hasEnoughDataForProjection && (
             <div className={styles.confidenceBanner}>
@@ -745,13 +784,15 @@ export default function FinalResultPage() {
                   ? 'Proyeksi ini didasarkan pada data input yang terbatas dan mungkin tidak mencerminkan hasil sebenarnya.'
                   : 'These projections are based on limited input data and may not reflect actual outcomes.'}
               </p>
-              {calculations.missingInputs.length > 0 && (
-                <p className={styles.missingInputs}>
-                  {locale === 'id' ? 'Input yang belum tersedia: ' : 'Missing inputs: '}{calculations.missingInputs.join(', ')}
-                </p>
-              )}
-              {/* Phase 2.3 — Confidence display: inverts the same missingInputs
-                  list above into a "known vs not provided" reasoning line. */}
+              {/* Phase 2.3 — Confidence display: a "known vs not provided"
+                  reasoning line built from calculations.missingInputs. A
+                  separate raw "Missing inputs: manual hours/week, budget,
+                  FTE count" line used to render right above this — always in
+                  English regardless of locale (the field keys were never
+                  translated) and redundant with what this line already says
+                  in the "Belum diberikan: ..." clause. Removed rather than
+                  translated: two disclosures of the same fact read as
+                  noise, not extra information. */}
               {confidenceReasons.length > 0 && (
                 <p className={styles.missingInputs}>
                   {confidenceReasons.join(' · ')}
@@ -761,9 +802,9 @@ export default function FinalResultPage() {
           )}
 
           <div className={styles.roiGrid}>
-            <ROIMetricTile label={locale === 'id' ? 'Nilai Bisnis yang Dihasilkan' : 'Business Value Created'} value={totalAnnualSavingsLocal} formatter={fmtLocal} variant="hero" confidenceLevel={calculations.confidenceLevel} locale={locale} />
-            <ROIMetricTile label={locale === 'id' ? 'Nilai Tenaga Kerja yang Dipulihkan' : 'Recovered Labor Value'} value={annualLaborSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} locale={locale} />
-            <ROIMetricTile label={locale === 'id' ? 'Nilai Efisiensi Proses' : 'Process Efficiency Value'} value={annualProcessSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Value Bisnis yang Dihasilkan' : 'Business Value Created'} value={totalAnnualSavingsLocal} formatter={fmtLocal} variant="hero" confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Value Tenaga Kerja yang Dipulihkan' : 'Recovered Labor Value'} value={annualLaborSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Value Efisiensi Proses' : 'Process Efficiency Value'} value={annualProcessSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile
               label={locale === 'id' ? 'Kapasitas Tim yang Dipulihkan' : 'Recovered Team Capacity'}
               value={calculations.hoursReclaimedPerYear}
@@ -779,7 +820,7 @@ export default function FinalResultPage() {
               confidenceLevel={calculations.confidenceLevel}
               locale={locale}
             />
-            <ROIMetricTile label={locale === 'id' ? 'NPV 3 Tahun' : '3-Year NPV'} value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Nilai kini bersih @ diskonto 10%' : 'Net present value @ 10% discount'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'NPV 3 Tahun' : '3-Year NPV'} value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Value kini bersih @ diskonto 10%' : 'Net present value @ 10% discount'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Biaya Berjalan Tahunan' : 'Annual Ongoing Cost'} value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Estimasi lisensi, pemeliharaan & dukungan' : 'Est. licenses, maintenance & support'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Penghematan Bersih Tahunan' : 'Net Annual Savings'} value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Setelah biaya berjalan' : 'After ongoing cost'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Periode Payback Bersih' : 'Net Payback Period'} value={(calculations as any).netPaybackMonths ?? null} formatter={(v) => formatMonths(v, locale)} subtitle={locale === 'id' ? 'Berdasarkan penghematan bersih' : 'On net savings'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
@@ -801,6 +842,15 @@ export default function FinalResultPage() {
             />
           </div>
           {roiTilesCaption && <p className={styles.vizCaption}>{roiTilesCaption}</p>}
+
+          {/* Bridges "ROI 3 Tahun" above (gross) and "Kisaran ROI 3 Tahun"
+              below (net, after ongoing cost) — the two most-flagged-as-
+              confusing numbers on this page, since they read as
+              contradictory without this note (NPV negative + ROI positive;
+              two different ROI figures on the same screen). */}
+          {calculations.hasEnoughDataForProjection && (
+            <p className={styles.financialTermsNote}>{buildFinancialTermsNote(locale)}</p>
+          )}
 
           {(calculations as any).scenarioThreeYearROI && (
             <div className={styles.scenarioRow}>
@@ -851,6 +901,7 @@ export default function FinalResultPage() {
           {calculations.hasEnoughDataForProjection && (
             <div className={styles.assumptionsNote}>
               <p className={styles.assumptionsTitle}>{locale === 'id' ? 'Bagaimana angka-angka ini dihitung' : 'How these figures were calculated'}</p>
+              <p className={styles.assumptionsIntro}>{buildMethodologyIntro(locale)}</p>
               <ul className={styles.assumptionsList}>
                 <li className={styles.stepRow}>
                   <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 1 — Kapasitas tim yang dipulihkan/tahun' : 'Step 1 — Recovered team capacity/year'}</span>
@@ -869,27 +920,27 @@ export default function FinalResultPage() {
                   </span>
                 </li>
                 <li className={styles.stepRow}>
-                  <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 2 — Nilai tenaga kerja yang dipulihkan' : 'Step 2 — Recovered labor value'}</span>
+                  <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 2 — Value tenaga kerja yang dipulihkan' : 'Step 2 — Recovered labor value'}</span>
                   <span className={styles.stepValue}>
                     {locale === 'id' ? (
                       <>
                         {fmtLocal(calculations.annualLaborSavingsLocal)} = {calculations.hoursReclaimedPerYear} jam × <strong>{fmtLocal(calculations.assumedHourlyRateLocal)}/jam</strong>
                         {calculations.smallTeamRateApplied
-                          ? ' (tarif biaya peluang untuk tim 1–5 FTE — 50% dari tarif gabungan industri)'
-                          : ' (tarif gabungan industri)'}
+                          ? ` (tarif biaya peluang untuk tim 1–5 FTE — 50% dari benchmark ${calculations.rateBenchmarkLabelId ?? 'industri'})`
+                          : ` (benchmark ${calculations.rateBenchmarkLabelId ?? 'industri'})`}
                       </>
                     ) : (
                       <>
                         {fmtLocal(calculations.annualLaborSavingsLocal)} = {calculations.hoursReclaimedPerYear} hrs × <strong>{fmtLocal(calculations.assumedHourlyRateLocal)}/hr</strong>
                         {calculations.smallTeamRateApplied
-                          ? ' (opportunity-cost rate for teams of 1–5 FTEs — 50% of industry blended rate)'
-                          : ' (industry blended rate)'}
+                          ? ` (opportunity-cost rate for teams of 1–5 FTEs — 50% of ${calculations.rateBenchmarkLabel ?? 'industry'} benchmark)`
+                          : ` (${calculations.rateBenchmarkLabel ?? 'industry'} benchmark)`}
                       </>
                     )}
                   </span>
                 </li>
                 <li className={styles.stepRow}>
-                  <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 3 — Nilai efisiensi proses' : 'Step 3 — Process efficiency value'}</span>
+                  <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 3 — Value efisiensi proses' : 'Step 3 — Process efficiency value'}</span>
                   <span className={styles.stepValue}>
                     {locale === 'id'
                       ? `${fmtLocal(calculations.annualProcessSavingsLocal)} = 20% dari penghematan tenaga kerja (pengurangan overhead operasional — estimasi benchmark internal)`
@@ -913,7 +964,7 @@ export default function FinalResultPage() {
                   </span>
                 </li>
                 <li className={styles.stepRow}>
-                  <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 4 — Nilai bisnis yang dihasilkan' : 'Step 4 — Business value created'}</span>
+                  <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 4 — Value bisnis yang dihasilkan' : 'Step 4 — Business value created'}</span>
                   <span className={styles.stepValue}>
                     <strong>{fmtLocal(calculations.totalAnnualSavingsLocal)}</strong> {locale === 'id' ? '= tenaga kerja + penghematan proses' : '= labor + process savings'}
                   </span>
@@ -1089,7 +1140,7 @@ export default function FinalResultPage() {
                 </span>
               </div>
               <div className={styles.contextItem}>
-                <span className={styles.contextLabel}>{locale === 'id' ? 'Kepatuhan' : 'Compliance'}</span>
+                <span className={styles.contextLabel}>Compliance</span>
                 {qualitative.compliance && qualitative.compliance.length > 0 ? (
                   <span className={styles.contextValueBullet}>
                     <span className={styles.contextBulletIcon}>▶</span>
@@ -1182,7 +1233,7 @@ export default function FinalResultPage() {
                 </span>
               </div>
               <div className={styles.contextItem}>
-                <span className={styles.contextLabel}>{locale === 'id' ? 'Keselarasan Kepemimpinan' : 'Leadership Alignment'}</span>
+                <span className={styles.contextLabel}>{locale === 'id' ? 'Keselarasan Executive' : 'Leadership Alignment'}</span>
                 <span className={`${styles.contextValue} ${!qualitative.leadershipAlignment ? styles.notProvided : ''}`}>
                   {qualVal(qualitative.leadershipAlignment, 'leadership_alignment')}
                 </span>

@@ -312,6 +312,26 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
         ],
         helperText: 'Higher-maturity data platforms shorten automation time-to-value',
         required: false
+      },
+      {
+        // Separate axis from data_infrastructure (tech stack): this is about
+        // field-level data discipline — how data is captured at the point it
+        // happens, before it ever reaches a system. Options are ordered
+        // best-to-worst; scoreData() in services/deepDiagnostic.ts matches on
+        // the literal option text, so both the id and option strings are
+        // load-bearing once shipped.
+        id: 'data_capture_method',
+        question: 'How is your day-to-day operational data typically captured at the point it happens?',
+        type: 'radio',
+        options: [
+          'Directly into a digital system (form/app/POS) at the point of work',
+          'Spreadsheet, filled in manually on a regular basis',
+          'Written on paper/notebook, then re-entered into a system later',
+          'Written notes photographed and sent via WhatsApp/chat, with no structured re-entry',
+          'No systematic record — relies on memory'
+        ],
+        helperText: 'This is about day-to-day data discipline in the field, separate from what systems you use to store it',
+        required: false
       }
     ]
   },
