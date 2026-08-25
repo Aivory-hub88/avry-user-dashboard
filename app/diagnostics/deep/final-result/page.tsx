@@ -822,6 +822,7 @@ export default function FinalResultPage() {
                 : [],
               opportunityTitles: opportunities.map((o) => o.title),
               budgetMidpointUSD: calculations.assumedBudgetMidpointUSD ?? null,
+              fteCountInScope: context.quantitative?.fteCountInScope ?? null,
             })
             if (picks.length === 0) return null
             const rate = getRate(currencyCode)

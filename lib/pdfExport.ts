@@ -2637,6 +2637,7 @@ export async function exportReportToPdf(
       painPoints: Array.isArray(qualitative?.topPainPoints) ? qualitative.topPainPoints : [],
       opportunityTitles: opportunities.map((o) => o.title),
       budgetMidpointUSD: calculations.assumedBudgetMidpointUSD ?? null,
+      fteCountInScope: context.quantitative?.fteCountInScope ?? null,
     })
     if (picks.length > 0) {
       const rate = getRate(currency)

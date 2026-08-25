@@ -40,6 +40,12 @@ interface CatalogEntry extends SoftwareRecommendation {
   signals: string[]
   /** Higher sorts first when multiple categories compete for slots. */
   priority: number
+  /**
+   * Org-size gate: 'mid' requires ≥50 FTEs, 'enterprise' ≥100 FTEs
+   * (quantitative.fteCountInScope). SAP to a 5-person studio is noise, not
+   * a recommendation — the diagnostic knows the team size, so use it.
+   */
+  minFTE?: number
 }
 
 const CATALOG: CatalogEntry[] = [
@@ -219,12 +225,112 @@ const CATALOG: CatalogEntry[] = [
     },
     vendorUrl: 'https://cal.com',
   },
+  // ── ERP suite ────────────────────────────────────────────────────────────
+  // 2026-08-25: the catalog had no ERP tier at all — SMEs outgrowing
+  // spreadsheets were offered point tools forever. Ordered from lightest to
+  // heaviest; the minFTE gate keeps SAP/Dynamics away from small teams.
+  {
+    name: 'Odoo',
+    category: { en: 'ERP suite', id: 'Suite ERP' },
+    priceUSD: 25,
+    regions: ['global', 'id'],
+    signals: ['erp', 'inventory', 'inventori', 'stok', 'stock', 'warehouse', 'gudang', 'manufacturing', 'manufaktur', 'supply chain', 'rantai pasok', 'accounting', 'akuntansi', 'terputus', 'disconnected', 'fragmented'],
+    priority: 8,
+    reason: {
+      en: 'Modular open-source ERP (CRM, inventory, accounting, manufacturing in one) — the standard step up when point tools stop talking to each other.',
+      id: 'ERP open-source modular (CRM, inventory, akuntansi, manufaktur dalam satu) — langkah standar saat alat point-to-point tak saling terhubung.',
+    },
+    vendorUrl: 'https://www.odoo.com',
+  },
+  {
+    name: 'ERPNext (self-host)',
+    category: { en: 'ERP suite', id: 'Suite ERP' },
+    priceUSD: 0,
+    regions: ['global'],
+    signals: ['erp', 'inventory', 'inventori', 'manufacturing', 'manufaktur', 'accounting', 'akuntansi', 'disconnected', 'terputus'],
+    priority: 7,
+    reason: {
+      en: 'Full open-source ERP with no per-user fees — strongest fit when budget is tight but data must centralise.',
+      id: 'ERP open-source lengkap tanpa biaya per pengguna — paling cocok saat anggaran ketat tapi data harus terpusat.',
+    },
+    vendorUrl: 'https://erpnext.com',
+  },
+  {
+    name: 'SAP Business One',
+    category: { en: 'ERP suite', id: 'Suite ERP' },
+    priceUSD: 56,
+    regions: ['global', 'id'],
+    minFTE: 50,
+    signals: ['erp', 'manufacturing', 'manufaktur', 'supply chain', 'rantai pasok', 'inventory', 'inventori', 'finance', 'keuangan', 'compliance', 'kepatuhan'],
+    priority: 8,
+    reason: {
+      en: 'SAP\'s SME-grade ERP — for orgs past ~50 staff needing production, supply-chain and statutory reporting in one auditable system.',
+      id: 'ERP kelas UKM dari SAP — untuk organisasi ~50+ staf yang butuh produksi, rantai pasok, dan pelaporan statutori dalam satu sistem ter-audit.',
+    },
+    vendorUrl: 'https://www.sap.com/products/erp/business-one',
+  },
+  {
+    name: 'Microsoft Dynamics 365',
+    category: { en: 'ERP + CRM suite', id: 'Suite ERP + CRM' },
+    priceUSD: 65,
+    regions: ['global'],
+    minFTE: 50,
+    signals: ['erp', 'crm', 'sales', 'penjualan', 'finance', 'keuangan', 'supply chain', 'rantai pasok', 'excel', 'microsoft', 'office'],
+    priority: 7,
+    reason: {
+      en: 'Unified ERP+CRM on the Microsoft stack — natural when the team already lives in Excel/Outlook/Teams.',
+      id: 'ERP+CRM terpadu di ekosistem Microsoft — natural jika tim sudah kerja di Excel/Outlook/Teams.',
+    },
+    vendorUrl: 'https://dynamics.microsoft.com',
+  },
+  // ── CRM alternates (compete with Qontak/HubSpot within the CRM slot) ────
+  {
+    name: 'Zoho CRM',
+    category: { en: 'CRM', id: 'CRM' },
+    priceUSD: 14,
+    regions: ['global', 'id'],
+    signals: ['crm', 'lead', 'sales', 'penjualan', 'pipeline', 'customer', 'pelanggan'],
+    priority: 7,
+    reason: {
+      en: 'Budget-friendly CRM with the deepest feature list per dollar at SME tier.',
+      id: 'CRM hemat anggaran dengan fitur terlengkap per rupiah di tier UKM.',
+    },
+    vendorUrl: 'https://www.zoho.com/crm',
+  },
+  {
+    name: 'Pipedrive',
+    category: { en: 'CRM (sales pipeline)', id: 'CRM (pipeline penjualan)' },
+    priceUSD: 14,
+    regions: ['global'],
+    signals: ['pipeline', 'deal', 'sales', 'penjualan', 'follow-up', 'follow up'],
+    priority: 7,
+    reason: {
+      en: 'Pipeline-first CRM — the simplest visual deal tracker for sales-led teams.',
+      id: 'CRM berorientasi pipeline — pelacak deal visual paling sederhana untuk tim sales.',
+    },
+    vendorUrl: 'https://www.pipedrive.com',
+  },
+  {
+    name: 'Salesforce Sales Cloud',
+    category: { en: 'CRM (enterprise)', id: 'CRM (enterprise)' },
+    priceUSD: 80,
+    regions: ['global'],
+    minFTE: 100,
+    signals: ['crm', 'sales', 'penjualan', 'enterprise', 'scaling', 'skuala', 'forecast', 'proyeksi'],
+    priority: 6,
+    reason: {
+      en: 'Enterprise CRM platform — only worth its admin overhead at serious scale; consider Odoo/Dynamics below 100 staff.',
+      id: 'Platform CRM enterprise — layak di atas beban adminnya hanya di skala besar; pertimbangkan Odoo/Dynamics di bawah 100 staf.',
+    },
+    vendorUrl: 'https://www.salesforce.com',
+  },
 ]
 
 /**
  * Deterministic selector: match catalog signals against the diagnostic's own
- * words (pain points, opportunity titles, industry), respect region fit and
- * budget, and return a de-duplicated top-N across categories.
+ * words (pain points, opportunity titles, industry), respect region fit,
+ * org-size gates, and budget, and return a de-duplicated top-N across
+ * categories.
  */
 export function selectSoftwareRecommendations(input: {
   currency: CurrencyCode
@@ -232,9 +338,12 @@ export function selectSoftwareRecommendations(input: {
   painPoints?: string[]
   opportunityTitles?: string[]
   budgetMidpointUSD?: number | null
+  /** Team size in scope — gates mid/enterprise picks (SAP, Dynamics, Salesforce). */
+  fteCountInScope?: number | null
   max?: number
 }): SoftwarePick[] {
   const max = input.max ?? 5
+  const fte = input.fteCountInScope ?? null
   const haystackParts = [
     input.industry ?? '',
     ...(input.painPoints ?? []),
@@ -245,6 +354,8 @@ export function selectSoftwareRecommendations(input: {
   const isIDMarket = input.currency === 'IDR'
   const scored: Array<{ entry: CatalogEntry; signal: string }> = []
   for (const entry of CATALOG) {
+    // Org-size gate: SAP to a 5-person studio is noise, not a recommendation.
+    if (entry.minFTE && (fte === null || fte < entry.minFTE)) continue
     // Region fit: local-vendor entries only surface for IDR users; global
     // entries surface for everyone.
     const regionFit = entry.regions.includes('id') && isIDMarket

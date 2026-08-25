@@ -591,6 +591,19 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       fetchCanvasState(workflowId).then((remote) => {
         if (cancelled) return;
         if (remote && remote.nodes.length > 0) {
+          // 2026-08-25 anti-flicker: the optimistic localStorage render and
+          // the backend response are usually IDENTICAL — replacing the node
+          // arrays anyway remounted every node (visual "glitching" reported
+          // on the Workflows tab). Skip the swap when content is unchanged.
+          const sameAsLocal = (() => {
+            const persisted = loadCanvasState(workflowId);
+            if (!persisted) return false;
+            try {
+              return JSON.stringify(persisted.nodes) === JSON.stringify(remote.nodes)
+                && JSON.stringify(persisted.edges) === JSON.stringify(remote.edges);
+            } catch { return false }
+          })();
+          if (sameAsLocal) { setSyncState('idle'); return; }
           setNodes(rehydrate(remote.nodes) as Node<WorkflowNodeData>[]);
           setEdges(normalizeEdges(remote.edges, remote.nodes));
           setIsEmpty(false);
@@ -629,6 +642,26 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
         if (!wf.nodes || wf.nodes.length === 0) {
           setNodes([]); setEdges([]); setIsEmpty(true); setSyncState('idle'); return;
         }
+        // 2026-08-25: self-heal trigger-less workflows. n8n rejects them at
+        // activation ("No node to start the workflow from could be found" —
+        // 15 hits in 24h on prod) and the canvas rendered them as a blank
+        // grid. If the loaded graph has no trigger node, inject a Manual
+        // Trigger upstream so the workflow is startable and visible instead
+        // of silently broken.
+        const hasTrigger = wf.nodes.some((n: any) =>
+          typeof n?.type === 'string' && n.type.includes('Trigger'));
+        if (!hasTrigger) {
+          console.warn('[WorkflowCanvas] workflow has no trigger node — injecting Manual Trigger', fetchId);
+          wf.nodes = [
+            { id: `trigger-heal-${Date.now()}`, name: 'Manual Trigger', type: 'n8n-nodes-base.manualTrigger', typeVersion: 1, position: [250, 300], parameters: {} },
+            ...wf.nodes,
+          ];
+          const first = wf.nodes[1];
+          wf.connections = {
+            ...wf.connections,
+            [wf.nodes[0].name]: { main: [[{ node: first?.name, type: 'main', index: 0 }]] },
+          };
+        }
         const { nodes: rfNodes, edges: rfEdges } = n8nToReactFlow(wf);
         setNodes(rehydrate(rfNodes) as any); setEdges(normalizeEdges(rfEdges, rfNodes)); setIsEmpty(false); setSyncState('idle');
       } catch (err: any) {
@@ -647,6 +680,28 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     setSyncState('saving'); setErrorMsg(null);
     try {
       const payload = reactFlowToN8n(nodes, edges, rawWorkflow);
+      // 2026-08-25: never ship a trigger-less workflow to n8n — activation
+      // fails with "No node to start the workflow from could be found" and
+      // the retry loop that followed produced duplicate workflows on prod.
+      if (!payload.nodes?.some((n: any) => typeof n?.type === 'string' && n.type.includes('Trigger'))) {
+        const triggerNode = {
+          id: `trigger-save-${Date.now()}`,
+          name: 'Manual Trigger',
+          type: 'n8n-nodes-base.manualTrigger',
+          typeVersion: 1,
+          position: [250, 300],
+          parameters: {},
+        };
+        const first = payload.nodes?.[0];
+        payload.nodes = [triggerNode, ...(payload.nodes ?? [])];
+        if (first?.name) {
+          payload.connections = {
+            ...payload.connections,
+            [triggerNode.name]: { main: [[{ node: first.name, type: 'main', index: 0 }]] },
+          };
+        }
+        console.warn('[WorkflowCanvas] save payload had no trigger — prepended Manual Trigger', saveId);
+      }
       const res = await authedFetch(asset(`/api/n8n/workflow/${saveId}${instanceQuery}`), {
         method: 'PUT',
         body: JSON.stringify(payload),
