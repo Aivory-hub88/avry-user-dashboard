@@ -1025,9 +1025,7 @@ function WorkflowsPageInner() {
       source: 'n8n',
       company_name: '',
       trigger: 'Manual Trigger',
-      steps: [
-        { step: 1, action: 'Manual Trigger', tool: 'n8n-nodes-base.manualTrigger', output: '', type: 'trigger', config: {} },
-      ],
+      steps: [],
       integrations: [],
       estimated_time: '0',
       automation_percentage: '0',
