@@ -54,9 +54,16 @@ export async function POST(request: NextRequest) {
     // On follow-up messages currentState carries the full conversation →
     // machine resumes from wherever it left off (CLARIFYING, TESTING, etc.)
     // ------------------------------------------------------------------
+    // Optional tenant attribution sent by the frontend (validated format).
+    const ORG_PATTERN = /^[a-zA-Z0-9._-]{1,64}$/
+    const rawOrg = (body as Record<string, unknown>).organization_id
+    const organizationId =
+      typeof rawOrg === 'string' && ORG_PATTERN.test(rawOrg) ? rawOrg : undefined
+
     const stateMachine = new CopilotStateMachine(
       currentSessionId,
-      currentState as CopilotConversationState | undefined
+      currentState as CopilotConversationState | undefined,
+      organizationId
     )
 
     // ------------------------------------------------------------------
@@ -71,7 +78,24 @@ export async function POST(request: NextRequest) {
     // The route just hands the message to the state machine and returns
     // whatever state comes out. No manual intent switching needed here.
     // ------------------------------------------------------------------
-    const updatedState = await stateMachine.processMessage(userInput)
+    let updatedState = await stateMachine.processMessage(userInput)
+
+    // ------------------------------------------------------------------
+    // ENTERPRISE FIX: the old runTests() recursed repair->test up to 3x
+    // inside ONE request, which could exceed proxy/Next.js limits now that
+    // generation is agentic. The machine defers each re-test via
+    // pendingAutoAction and we drive it here within an explicit deadline.
+    // If the budget runs out mid-repair, the flag stays set and the next
+    // user message resumes testing seamlessly.
+    // ------------------------------------------------------------------
+    const AUTO_DRIVE_DEADLINE_MS = 95_000
+    const autoDriveT0 = Date.now()
+    while (
+      updatedState.pendingAutoAction === 'run_tests' &&
+      Date.now() - autoDriveT0 < AUTO_DRIVE_DEADLINE_MS
+    ) {
+      updatedState = await stateMachine.continuePending()
+    }
 
     return Response.json({
       sessionId: currentSessionId,

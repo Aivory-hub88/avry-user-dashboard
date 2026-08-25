@@ -1017,6 +1017,39 @@ function WorkflowsPageInner() {
     setShowMore(false)
   }
 
+  const handleDownloadGuide = async (fmt: string = 'md') => {
+    try {
+      const steps = (selected?.steps ?? []) as unknown[]
+      if (!steps.length) {
+        alert('Workflow belum memiliki steps untuk dibuatkan guide.')
+        return
+      }
+      const res = await fetch('/api/workflows/guide', {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          format: fmt,
+          workflowName: selected?.title ?? 'Workflow',
+          summary: (selected as { summary?: string } | null)?.summary ?? undefined,
+          steps,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed: ' + res.status)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = ((selected?.title ?? 'workflow').replace(/[^a-zA-Z0-9-_ ]/g, '"').trim().replace(/\s+/g, '-') || 'workflow') + '-setup-guide.' + fmt
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      console.error('[GuideDocs] download failed', e)
+      alert('Gagal membuat guide. Coba lagi.')
+    }
+  }
+
   const handleUndo = async () => {
     if (canvasCanUndo && undoCanvasRef.current) {
       undoCanvasRef.current()
@@ -1851,6 +1884,15 @@ function WorkflowsPageInner() {
                 </button>
                 {showMore && (
                   <div className={styles.moreDropdown}>
+                    <button className={styles.moreDropdownItem} onClick={() => handleDownloadGuide('pdf')} title="Panduan setup per node (PDF)">
+                      {Icons.download} Guide Docs (PDF)
+                    </button>
+                    <button className={styles.moreDropdownItem} onClick={() => handleDownloadGuide('txt')} title="Panduan setup per node (Teks)">
+                      {Icons.download} Guide Docs (TXT)
+                    </button>
+                    <button className={styles.moreDropdownItem} onClick={() => handleDownloadGuide('md')} title="Panduan setup per node (Markdown)">
+                      {Icons.download} Guide Docs (MD)
+                    </button>
                     <button className={styles.moreDropdownItem} onClick={handleExport}>
                       {Icons.download} {t('exportJson')}
                     </button>

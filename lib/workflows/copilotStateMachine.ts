@@ -193,6 +193,14 @@ export interface CopilotConversationState {
    * user in an endless question loop.
    */
   clarifyRounds?: number
+  /**
+   * Deferred automation: a sandbox re-test is due. The API route drives
+   * continuePending() within its time budget; if the budget runs out the
+   * flag persists and the next user message resumes testing.
+   */
+  pendingAutoAction?: 'run_tests' | null
+  /** Tenant/org attribution propagated to the bridge for audit trails. */
+  organizationId?: string
 }
 
 // ============================================================
@@ -263,6 +271,22 @@ function buildNodeConfigsFromSetupReport(report?: WorkflowSetupReport): NodeConf
           : `Fill in the ${field.label} field for ${node.nodeName}.`,
     })),
   }))
+}
+
+function matchNodeError(
+  errors: WorkflowDummyTest['errors'] | undefined,
+  node: { nodeId: string; nodeName: string; status: string }
+): string {
+  const norm = (Array.isArray(errors) ? errors : []).map((e) =>
+    typeof e === 'string' ? { message: e } : e
+  )
+  const byName = norm.find(
+    (e) => e.node && node.nodeName && String(e.node).toLowerCase().includes(node.nodeName.toLowerCase())
+  )
+  const byId = norm.find(
+    (e) => e.node && node.nodeId && String(e.node).toLowerCase().includes(node.nodeId.toLowerCase())
+  )
+  return byName?.message || byId?.message || norm[0]?.message || node.status
 }
 
 /**
@@ -445,11 +469,15 @@ export class CopilotStateMachine {
   private state: CopilotConversationState
   private bridge: BridgeClient
 
-  constructor(sessionId: string, initialState?: CopilotConversationState) {
+  constructor(
+    sessionId: string,
+    initialState?: CopilotConversationState,
+    organizationId?: string
+  ) {
     this.bridge = new BridgeClient()
 
     if (initialState) {
-      this.state = initialState
+      this.state = { ...initialState, organizationId: organizationId ?? initialState.organizationId }
     } else {
       this.state = {
         sessionId,
@@ -467,13 +495,43 @@ export class CopilotStateMachine {
         lastMessage: '',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        organizationId,
       }
     }
+  }
+
+  /**
+   * Enterprise hardening: a client-held state older than 24h must not resume
+   * blindly - adapter drafts may have been GC'd and workflowIds expired.
+   * Reset to a fresh IDLE conversation under the same sessionId.
+   */
+  private discardIfStale(): void {
+    const STALE_MS = 24 * 60 * 60 * 1000
+    const ageMs = Date.now() - new Date(this.state.updatedAt).getTime()
+    if (!this.state.updatedAt || ageMs <= STALE_MS) return
+    console.warn('[CopilotStateMachine] stale state discarded', {
+      session_id: this.state.sessionId,
+      ageHours: Math.round(ageMs / 3600000),
+      previousStage: this.state.stage,
+    })
+    this.state.generatedWorkflow = null
+    this.state.testResults = null
+    this.state.testAttempts = 0
+    this.state.clarifyRounds = 0
+    this.state.pendingAutoAction = null
+    this.state.userApprovals = {
+      confirmedWorkflow: false,
+      approvedTest: false,
+      appliedToCanvas: false,
+    }
+    this.state.stage = 'IDLE'
+    this.updateTimestamp()
   }
 
   // ---- MAIN ENTRY POINT ----
 
   async processMessage(userMessage: string): Promise<CopilotConversationState> {
+    this.discardIfStale()
     this.addMessage('user', userMessage)
 
     switch (this.state.stage) {
@@ -518,6 +576,17 @@ export class CopilotStateMachine {
       default:
         return this.state
     }
+  }
+
+  /**
+   * Drive one deferred test attempt (see pendingAutoAction). Called by the
+   * API route inside its time budget; safe to call when nothing is pending.
+   */
+  async continuePending(): Promise<CopilotConversationState> {
+    if (this.state.pendingAutoAction !== 'run_tests') return { ...this.state }
+    this.state.pendingAutoAction = null
+    this.updateTimestamp()
+    return this.runTests((this.state.testAttempts ?? 0) + 1)
   }
 
   // ---- STAGE HANDLERS ----
@@ -576,7 +645,7 @@ export class CopilotStateMachine {
     try {
       const result = await this.bridge.clarify({
         session_id: this.state.sessionId,
-        organization_id: 'copilot',
+        organization_id: this.state.organizationId || 'copilot',
         user_request: userMessage,
         conversation_history: this.state.conversationHistory,
       })
@@ -627,7 +696,7 @@ export class CopilotStateMachine {
     try {
       const result = await this.bridge.clarify({
         session_id: this.state.sessionId,
-        organization_id: 'copilot',
+        organization_id: this.state.organizationId || 'copilot',
         user_request: this.state.userRequest,
         conversation_history: this.state.conversationHistory,
       })
@@ -659,7 +728,7 @@ export class CopilotStateMachine {
     try {
       const result = await this.bridge.generate({
         session_id: this.state.sessionId,
-        organization_id: 'copilot',
+        organization_id: this.state.organizationId || 'copilot',
         user_request: this.state.userRequest,
         conversation_history: this.state.conversationHistory,
       })
@@ -800,7 +869,7 @@ export class CopilotStateMachine {
     try {
       const result = await this.bridge.clarify({
         session_id: this.state.sessionId,
-        organization_id: 'copilot',
+        organization_id: this.state.organizationId || 'copilot',
         user_request: userMessage,
         conversation_history: this.state.conversationHistory,
       })
@@ -829,7 +898,7 @@ export class CopilotStateMachine {
 
     try {
       const bridgeResult = await this.bridge.draftTest({
-        organization_id: 'copilot',
+        organization_id: this.state.organizationId || 'copilot',
         workflowId: this.state.generatedWorkflow.workflowId,
         description:
           this.state.generatedWorkflow.workflowName || this.state.userRequest,
@@ -865,7 +934,9 @@ export class CopilotStateMachine {
                   : `${node.nodeName} failed during sandbox testing.`,
               outputData: { validationMode: bridgeResult.dummyTest?.validationMode },
               errorDetail:
-                (node.status === 'success' || node.status === 'structure_validated') ? null : node.status,
+                (node.status === 'success' || node.status === 'structure_validated')
+                  ? null
+                  : matchNodeError(bridgeResult.dummyTest?.errors, node),
               timestamp: new Date().toISOString(),
             }))
           : this.state.generatedWorkflow.steps.map((step) => ({
@@ -876,7 +947,10 @@ export class CopilotStateMachine {
                 : `${step.title} failed sandbox validation.`,
               outputData: { validationMode: bridgeResult.dummyTest?.validationMode },
               errorDetail:
-                bridgeResult.dummyTest?.errors?.map((e) => e.message).join('; ') || null,
+                (bridgeResult.dummyTest?.errors || [])
+                  .map((e: unknown) => (typeof e === "string" ? e : (e as { message?: string }).message))
+                  .filter(Boolean)
+                  .join('; ') || null,
               timestamp: new Date().toISOString(),
             }))
 
@@ -915,7 +989,7 @@ export class CopilotStateMachine {
             this.setAssistantMessage(
               `⚠️ ${failedSteps.length} steps failed during testing (attempt ${attempt}/3):\n${failureList}\n\n🔧 Applying automatic structural fixes and retesting...`,
             )
-            return this.runTests(attempt + 1)
+            return this.deferTesting()
           }
         }
 
@@ -923,7 +997,7 @@ export class CopilotStateMachine {
           `⚠️ ${failedSteps.length} steps failed during testing (attempt ${attempt}/3):\n${failureList}\n\n🔧 Automatically repairing...`,
         )
         await this.repairWorkflow(failedSteps)
-        return this.runTests(attempt + 1)
+        return this.deferTesting()
       }
 
       const errorSummary = failedSteps
@@ -938,6 +1012,17 @@ export class CopilotStateMachine {
         error instanceof Error ? error.message : 'An error occurred during testing.'
       return this.handleError(`An error occurred during sandbox testing: ${message}`)
     }
+  }
+
+  /**
+   * End this request with a deferred re-test instead of recursing. Keeps a
+   * single HTTP request bounded regardless of LLM/sandbox latency.
+   */
+  private deferTesting(): CopilotConversationState {
+    this.state.stage = 'FIXING'
+    this.state.pendingAutoAction = 'run_tests'
+    this.updateTimestamp()
+    return { ...this.state }
   }
 
   /**
@@ -956,7 +1041,7 @@ export class CopilotStateMachine {
     try {
       const result = await this.bridge.repair({
         session_id: this.state.sessionId,
-        organization_id: 'copilot',
+        organization_id: this.state.organizationId || 'copilot',
         user_request: this.state.userRequest,
         current_workflow: this.state.generatedWorkflow,
         failed_steps: failedSteps.map((f) => ({
@@ -1004,7 +1089,7 @@ export class CopilotStateMachine {
     try {
       const result = await this.bridge.edit({
         session_id: this.state.sessionId,
-        organization_id: 'copilot',
+        organization_id: this.state.organizationId || 'copilot',
         user_request: this.state.userRequest,
         current_workflow: this.state.generatedWorkflow,
         edit_request: userMessage,
