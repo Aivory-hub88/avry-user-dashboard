@@ -187,6 +187,27 @@ function normalizeDeploymentPlan(raw: any): BlueprintV1DeploymentPlan {
   }
 }
 
+/**
+ * Structural validation — mirrors vps-bridge's lib/blueprintQueue.js
+ * isUsableBlueprint (same check, TypeScript side). parseBlueprintContent
+ * below only ever checked "did this parse as JSON at all" — syntactically
+ * valid-but-empty/garbage JSON (e.g. `workflow_modules: []`, or missing
+ * entirely) passed straight through as a normal completed result with no
+ * `fallback_generated` flag, indistinguishable from a real blueprint. This
+ * closes that gap: parsed-but-unusable now falls through to the same
+ * text-fallback path (and the same honest flag) as parse failure.
+ */
+export function isUsableBlueprint(bp: BlueprintV1 | null | undefined): boolean {
+  if (!bp || typeof bp !== 'object') return false
+  const modules = (bp as any).workflow_modules
+  if (!Array.isArray(modules) || modules.length === 0) return false
+  return modules.every(
+    (m: any) => m && typeof m === 'object' &&
+      typeof m.name === 'string' && m.name.trim() &&
+      Array.isArray(m.steps) && m.steps.length > 0
+  )
+}
+
 export function parseBlueprintContent(content: string): BlueprintV1 | null {
   const normalize = (bp: BlueprintV1): BlueprintV1 => {
     if (bp && bp.deployment_plan !== undefined) {

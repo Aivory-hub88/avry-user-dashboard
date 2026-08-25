@@ -143,7 +143,13 @@ export class DeepDiagnosticService {
 
     // 2) Poll for the result until complete (avoids the Cloudflare ~100s timeout
     //    that broke the old synchronous request).
-    const deadline = Date.now() + 180_000
+    // 300s: the backend now retries once on failure (diagnosticQueue.add
+    // attempts:2, 5s backoff — added 2026-08-25, see vps-bridge server.js)
+    // and each attempt has its own 115s OpenRouter timeout, so a genuine
+    // worst case is ~235s. The previous 180s deadline was already shorter
+    // than that before the retry even existed — same class of bug as the
+    // blueprint poll deadline (see that deadline's comment below).
+    const deadline = Date.now() + 300_000
     const POLL_INTERVAL_MS = 3_000
     while (Date.now() < deadline) {
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))

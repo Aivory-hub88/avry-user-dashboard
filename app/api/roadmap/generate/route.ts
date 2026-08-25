@@ -111,8 +111,17 @@ LANGUAGE: Write every freeform narrative/text field VALUE in formal Bahasa Indon
           message: prompt,
           session_id: `roadmap-${Date.now()}`,
           stream: false,
+          // Without this, the bridge's keyword classifier (consoleNeedsZeroclaw)
+          // misroutes roadmap requests to Zeroclaw's tool-loaded profile — the
+          // pretty-printed diagnostic/blueprint JSON embedded above routinely
+          // contains "trigger"/"deploy" by accident. See server.js's
+          // handleRoadmapGenerateDirect for the full explanation.
+          entrypoint: 'roadmap_generate',
         }),
-        signal: AbortSignal.timeout(60000),
+        // 95s: slightly more than handleRoadmapGenerateDirect's own 90s
+        // server-side timeout, so the server's timeout (which returns a
+        // clean SSE error event) fires before this abort would.
+        signal: AbortSignal.timeout(95000),
       });
 
       if (!aiRes.ok) {
@@ -136,18 +145,38 @@ LANGUAGE: Write every freeform narrative/text field VALUE in formal Bahasa Indon
 
       const parsed = JSON.parse(jsonMatch[0]) as Partial<AiryRoadmap>;
 
+      const phases = Array.isArray(parsed.phases) ? parsed.phases : [];
+      // The model can return syntactically valid JSON with nothing useful in
+      // it (e.g. "phases": []) — that parses fine and would otherwise reach
+      // the success return below with zero real content and no
+      // fallback_generated flag, indistinguishable from a real roadmap.
+      // Throwing here routes it through the same catch/fallback path as a
+      // genuine AI-call failure.
+      if (phases.length === 0) {
+        throw new Error('AI response parsed but contained no phases');
+      }
+
       roadmap = {
         id: parsed.id || `roadmap-${Date.now()}`,
         title: parsed.title || (locale === 'id' ? 'Roadmap Transformasi' : 'Transformation Roadmap'),
         createdAt: new Date().toISOString(),
         source: source as AiryRoadmap['source'],
         blueprintId,
-        phases: Array.isArray(parsed.phases) ? parsed.phases : [],
+        phases,
       };
     } catch (aiErr) {
-      // Fallback: generate a sensible default roadmap if AI call fails
+      // Fallback: generate a sensible default roadmap if AI call fails. This
+      // used to be silent — `success: true` either way, with no way for a
+      // caller (or a health check) to tell a real AI-generated roadmap from
+      // this generic substitute. Set the flag ON the roadmap object itself
+      // (not just alongside it in the response) — the object is what
+      // `setRoadmap`/`saveRoadmap` persist to localStorage/Postgres, so a
+      // sibling response field would silently vanish on the next reload.
+      // Same pattern the blueprint route already uses for the same reason.
       console.error('[roadmap/generate] AI call failed, using fallback:', aiErr);
       roadmap = buildFallbackRoadmap(source, blueprintId, diagnosticContext, locale);
+      roadmap.fallback_generated = true;
+      return NextResponse.json({ success: true, roadmap });
     }
 
     return NextResponse.json({ success: true, roadmap });

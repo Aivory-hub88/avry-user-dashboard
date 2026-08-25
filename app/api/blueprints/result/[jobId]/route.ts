@@ -11,7 +11,7 @@
 import { NextRequest } from 'next/server'
 import { getConfig } from '@/lib/config'
 import { createErrorResponse } from '@/types/errors'
-import { parseBlueprintContent, deriveEstimatedRoiMonths, buildBlueprintFromText } from '@/lib/blueprintGeneration'
+import { parseBlueprintContent, deriveEstimatedRoiMonths, buildBlueprintFromText, isUsableBlueprint } from '@/lib/blueprintGeneration'
 
 export const maxDuration = 30
 
@@ -75,7 +75,7 @@ export async function GET(
   }
 
   const parsed = parseBlueprintContent(content)
-  if (parsed) {
+  if (parsed && isUsableBlueprint(parsed)) {
     // Architecture Principle 2 ("the LLM never computes... must never be
     // the source of a number that reaches the page") — enforced here, not
     // just requested in the prompt, so it holds regardless of what the
@@ -87,9 +87,10 @@ export async function GET(
     return Response.json({ jobStatus: 'completed', ...parsed })
   }
 
-  // The model returned prose instead of JSON — salvage what we can, but mark
-  // the result so the UI can tell the user this is a simplified fallback
-  // rather than a full AI-generated blueprint.
+  // The model returned prose instead of JSON, or JSON that parsed but had no
+  // usable workflow_modules — salvage what we can, but mark the result so
+  // the UI can tell the user this is a simplified fallback rather than a
+  // full AI-generated blueprint.
   const fallback = buildBlueprintFromText(content, diagnostic)
   return Response.json({ jobStatus: 'completed', ...fallback, fallback_generated: true })
 }

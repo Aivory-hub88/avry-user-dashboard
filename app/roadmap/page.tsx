@@ -1157,6 +1157,23 @@ export default function RoadmapPage() {
       {routingNotice !== null && (
         <ContinuedFromConsole summary={routingNotice} onDismiss={() => setRoutingNotice(null)} />
       )}
+      {/* Fallback-generation notice: the AI call failed, so this roadmap was
+          assembled from a generic template — same warning pattern as
+          app/blueprint/page.tsx's fallback_generated banner, for the same
+          reason (a generic result must never look identical to a real one). */}
+      {roadmap?.fallback_generated && (
+        <div
+          role="alert"
+          style={{
+            position: 'sticky', top: 0, zIndex: 50,
+            background: '#78350f', color: '#fef3c7',
+            padding: '10px 16px', fontSize: '0.875rem',
+            borderBottom: '1px solid #92400e',
+          }}
+        >
+          <span>{t('fallbackGeneratedWarning')}</span>
+        </div>
+      )}
       <style>{`@keyframes rm-spin{to{transform:rotate(360deg)}}`}</style>
 
       {/* Feature 1: Overall progress sticky bar */}

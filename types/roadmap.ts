@@ -30,4 +30,6 @@ export type AiryRoadmap = {
   source?: 'diagnostic' | 'blueprint' | 'direct';
   blueprintId?: string;
   phases: AiryRoadmapPhase[];
+  /** True when the AI call failed and this was assembled from a generic template — see app/api/roadmap/generate/route.ts. */
+  fallback_generated?: boolean;
 };
