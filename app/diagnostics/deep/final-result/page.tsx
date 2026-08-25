@@ -31,7 +31,9 @@ import {
   parseCurrencyCode,
   type CurrencyCode,
 } from '@/lib/resultFormatters'
-import { ensureLiveRates, getFxAsOfLabel } from '@/lib/liveRates'
+import { ensureLiveRates, getFxAsOfLabel, getRate } from '@/lib/liveRates'
+import { selectSoftwareRecommendations, formatPickPrice } from '@/lib/softwareCatalog'
+import { getLabourBenchmark } from '@/lib/currencyBands'
 import { getIndustryBenchmark, formatVsMedian } from '@/lib/industryBenchmarks'
 import { computeDelta, compositeSeries } from '@/lib/diagnosticHistory'
 import type { DiagnosticHistoryEntry } from '@/types/diagnostic'
@@ -766,6 +768,98 @@ export default function FinalResultPage() {
             <span className={styles.executiveInsightLabel}>{locale === 'id' ? 'Wawasan Eksekutif' : 'Executive Insight'}</span>
             {opportunitiesInsight}
           </div>
+
+          {/* ── Recommended Training Program — PDF parity ──
+              The PDF has carried this section since the tracks were built
+              (pdfExport "Program Pelatihan yang Direkomendasikan") but the
+              dashboard never rendered it. Same data, same source of truth:
+              opportunities[].trainingTracks from the engine. */}
+          {(() => {
+            const trainingOpp = opportunities.find((o) => Array.isArray(o.trainingTracks) && o.trainingTracks.length > 0)
+            if (!trainingOpp) return null
+            return (
+              <div className={styles.executiveInsight}>
+                <span className={styles.executiveInsightLabel}>{locale === 'id' ? 'Program Pelatihan yang Direkomendasikan' : 'Recommended Training Program'}</span>
+                <p style={{ margin: '0 0 12px', opacity: 0.8, fontSize: '0.9rem' }}>
+                  {locale === 'id'
+                    ? `${trainingOpp.title} di atas terurai menjadi jalur pelatihan berikut.`
+                    : `${trainingOpp.title} above breaks down into the following tracks.`}
+                </p>
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {trainingOpp.trainingTracks!.map((track, i) => (
+                    <div key={i} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                        {locale === 'id'
+                          ? `${track.headline} untuk ${track.audience}`
+                          : `${track.headline} for ${track.audience}`}
+                      </div>
+                      <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: '0.88rem', opacity: 0.85 }}>
+                        {track.topics.map((t, j) => <li key={j}>{t}</li>)}
+                      </ul>
+                      {Array.isArray(track.tools) && track.tools.length > 0 && (
+                        <div style={{ marginTop: 8, fontSize: '0.82rem', opacity: 0.7 }}>
+                          {locale === 'id' ? 'Tool: ' : 'Tools: '}{track.tools.join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ── Recommended SDK & Software — catalog-backed ──
+              Deterministic keyword match over the user's own pain points,
+              opportunity titles, and industry (lib/softwareCatalog.ts) —
+              never LLM-invented. Region-aware (ID vendors for IDR users),
+              entry pricing shown in the report currency. */}
+          {(() => {
+            const picks = selectSoftwareRecommendations({
+              currency: currencyCode,
+              industry: context.qualitative?.industry,
+              painPoints: Array.isArray(context.qualitative?.topPainPoints)
+                ? context.qualitative.topPainPoints
+                : [],
+              opportunityTitles: opportunities.map((o) => o.title),
+              budgetMidpointUSD: calculations.assumedBudgetMidpointUSD ?? null,
+            })
+            if (picks.length === 0) return null
+            const rate = getRate(currencyCode)
+            return (
+              <div className={styles.executiveInsight}>
+                <span className={styles.executiveInsightLabel}>{locale === 'id' ? 'Rekomendasi SDK & Software' : 'Recommended SDK & Software'}</span>
+                <p style={{ margin: '0 0 12px', opacity: 0.8, fontSize: '0.9rem' }}>
+                  {locale === 'id'
+                    ? 'Dicocokkan dengan jawaban diagnostik Anda (harga entry-tier, pembanding saja — cek vendor untuk harga terkini).'
+                    : 'Matched to your diagnostic answers (entry-tier pricing, for comparison — check vendors for current pricing).'}
+                </p>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {picks.map((pick) => (
+                    <div key={pick.name} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{pick.name}</div>
+                        <div style={{ fontSize: '0.82rem', opacity: 0.75 }}>{formatPickPrice(pick.priceUSD, currencyCode, rate, locale)}</div>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: 2 }}>
+                        {locale === 'id' ? pick.category.id : pick.category.en}
+                      </div>
+                      <div style={{ fontSize: '0.88rem', opacity: 0.85, marginTop: 6 }}>
+                        {locale === 'id' ? pick.reason.id : pick.reason.en}
+                      </div>
+                      <a
+                        href={pick.vendorUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: '0.82rem', opacity: 0.7, display: 'inline-block', marginTop: 6 }}
+                      >
+                        {pick.vendorUrl.replace('https://', '')} ↗
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
         </div>
 
         {/* ── Financial Case ── */}
@@ -925,6 +1019,17 @@ export default function FinalResultPage() {
                     {locale === 'id' ? (
                       <>
                         {fmtLocal(calculations.annualLaborSavingsLocal)} = {calculations.hoursReclaimedPerYear} jam × <strong>{fmtLocal(calculations.assumedHourlyRateLocal)}/jam</strong>
+                        {(() => {
+                          const bench = getLabourBenchmark(currencyCode)
+                          if (!bench || !bench.floorLabelId) return null
+                          return (
+                            <span style={{ display: 'block', opacity: 0.65, fontSize: '0.82rem', marginTop: 4 }}>
+                              {locale === 'id'
+                                ? `Benchmark: ${bench.labelId} (Rp ${Math.round(bench.monthlyAnchorLocal).toLocaleString('id-ID')}/bln) · lantai legal: ${bench.floorLabelId} (Rp ${bench.floorMonthlyAnchor.toLocaleString('id-ID')}/bln)`
+                                : `Benchmark: ${bench.labelEn} (${bench.monthlyAnchorLocal.toLocaleString('en-US')}/mo) · legal floor: ${bench.floorLabelEn} (${bench.floorMonthlyAnchor.toLocaleString('en-US')}/mo)`}
+                            </span>
+                          )
+                        })()}
                         {calculations.smallTeamRateApplied
                           ? ` (tarif biaya peluang untuk tim 1–5 FTE — 50% dari benchmark ${calculations.rateBenchmarkLabelId ?? 'industri'})`
                           : ` (benchmark ${calculations.rateBenchmarkLabelId ?? 'industri'})`}
@@ -932,6 +1037,17 @@ export default function FinalResultPage() {
                     ) : (
                       <>
                         {fmtLocal(calculations.annualLaborSavingsLocal)} = {calculations.hoursReclaimedPerYear} hrs × <strong>{fmtLocal(calculations.assumedHourlyRateLocal)}/hr</strong>
+                        {(() => {
+                          const bench = getLabourBenchmark(currencyCode)
+                          if (!bench || !bench.floorLabelEn) return null
+                          return (
+                            <span style={{ display: 'block', opacity: 0.65, fontSize: '0.82rem', marginTop: 4 }}>
+                              {locale === 'id'
+                                ? `Benchmark: ${bench.labelId} (Rp ${Math.round(bench.monthlyAnchorLocal).toLocaleString('id-ID')}/bln) · lantai legal: ${bench.floorLabelId} (Rp ${bench.floorMonthlyAnchor.toLocaleString('id-ID')}/bln)`
+                                : `Benchmark: ${bench.labelEn} (${bench.monthlyAnchorLocal.toLocaleString('en-US')}/mo) · legal floor: ${bench.floorLabelEn} (${bench.floorMonthlyAnchor.toLocaleString('en-US')}/mo)`}
+                            </span>
+                          )
+                        })()}
                         {calculations.smallTeamRateApplied
                           ? ` (opportunity-cost rate for teams of 1–5 FTEs — 50% of ${calculations.rateBenchmarkLabel ?? 'industry'} benchmark)`
                           : ` (${calculations.rateBenchmarkLabel ?? 'industry'} benchmark)`}
@@ -973,7 +1089,7 @@ export default function FinalResultPage() {
                   <li className={styles.stepRow}>
                     <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 5 — Periode payback' : 'Step 5 — Payback period'}</span>
                     <span className={styles.stepValue}>
-                      {calculations.paybackMonths != null ? (locale === 'id' ? `${Math.round(calculations.paybackMonths)} bulan` : `${Math.round(calculations.paybackMonths)} months`) : '—'}{' '}
+                      {calculations.paybackMonths != null ? formatMonths(calculations.paybackMonths, locale) : '—'}{' '}
                       = <strong>{fmtLocal(calculations.assumedBudgetMidpointLocal)}</strong> {locale === 'id' ? 'investasi ÷' : 'investment ÷'} {fmtLocal(calculations.totalAnnualSavingsLocal)}/{locale === 'id' ? 'thn' : 'yr'} × 12
                       {' '}{locale === 'id' ? '(titik tengah kisaran anggaran yang Anda pilih)' : '(midpoint of your selected budget range)'}
                     </span>

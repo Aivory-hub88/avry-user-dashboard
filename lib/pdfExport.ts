@@ -42,6 +42,9 @@ import {
 import { getIndustryBenchmark, formatVsMedian, BENCHMARK_DISCLAIMER } from '@/lib/industryBenchmarks'
 import { quantifyPainPoints, formatPainPointHours, displayPainPointCost } from '@/lib/bottleneckQuantification'
 import { getROISensitivity, humanizeAnswerId } from '@/services/deepDiagnostic'
+import { selectSoftwareRecommendations, formatPickPrice } from '@/lib/softwareCatalog'
+import { getRate } from '@/lib/liveRates'
+import type { CurrencyCode } from '@/lib/resultFormatters'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
 export const INK       = '#0a1a0f'   // primary text, display values
@@ -2028,7 +2031,7 @@ export async function exportReportToPdf(
   const risks = (locale === 'id' && context.risksId) ? context.risksId : context.risks
   const roomForImprovement = (locale === 'id' && context.roomForImprovementId) ? context.roomForImprovementId : context.roomForImprovement
   const scoreDrivers = (locale === 'id' && context.scoreDriversId) ? context.scoreDriversId : context.scoreDrivers
-  const currency = (context.currency || 'USD') as 'USD' | 'EUR' | 'GBP' | 'IDR'
+  const currency = (context.currency || 'USD') as CurrencyCode
   const fmt = (v: number | null | undefined) => fmtCurrency(v, currency, locale)
   const cAny = calculations as any
   const company = context.company || (locale === 'id' ? 'Organisasi Anda' : 'Your organisation')
@@ -2616,6 +2619,53 @@ export async function exportReportToPdf(
         : `${trainingOpp.title} above breaks down into the following tracks, each tailored to this assessment's specific findings.`)
       for (const track of trainingOpp.trainingTracks) {
         y = trainingTrackRow(pdf, y, track, locale)
+      }
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // RECOMMENDED SDK & SOFTWARE — catalog-backed (lib/softwareCatalog.ts),
+  // deterministic keyword match over this assessment's own pain points,
+  // opportunity titles, and industry. Region-aware (Indonesian vendors for
+  // IDR reports). Dashboard parity: the same picks render on the final-result
+  // page, so the PDF and the screen can never disagree.
+  // ════════════════════════════════════════════════════════════════════════════
+  {
+    const picks = selectSoftwareRecommendations({
+      currency,
+      industry: qualitative?.industry,
+      painPoints: Array.isArray(qualitative?.topPainPoints) ? qualitative.topPainPoints : [],
+      opportunityTitles: opportunities.map((o) => o.title),
+      budgetMidpointUSD: calculations.assumedBudgetMidpointUSD ?? null,
+    })
+    if (picks.length > 0) {
+      const rate = getRate(currency)
+      y = ensureSpace(pdf, y, locale === 'id' ? 40 : 35)
+      y = tocSection(y, locale === 'id' ? 'Rekomendasi SDK & Software' : 'Recommended SDK & Software')
+      y = renderNarrative(pdf, y, locale === 'id'
+        ? 'Dicocokkan dengan jawaban diagnostik Anda. Harga entry-tier untuk pembanding — cek vendor untuk harga terkini.'
+        : 'Matched to your diagnostic answers. Entry-tier pricing for comparison — check vendors for current pricing.')
+      for (const pick of picks) {
+        const heading = `${pick.name} — ${pick.priceUSD === 0
+          ? (locale === 'id' ? 'gratis / self-host' : 'free / self-host')
+          : formatPickPrice(pick.priceUSD, currency, rate, locale)}`
+        const body = `${locale === 'id' ? pick.category.id : pick.category.en}. ${locale === 'id' ? pick.reason.id : pick.reason.en}`
+        y = ensureSpace(pdf, y, 24)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(10)
+        pdf.text(pdf.splitTextToSize(heading, CW)[0], ML, y)
+        y += 5
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(9)
+        for (const line of pdf.splitTextToSize(body, CW)) {
+          y = ensureSpace(pdf, y, 5.2)
+          pdf.text(line, ML, y)
+          y += 5.2
+        }
+        pdf.setTextColor(90, 110, 200)
+        pdf.text(pdf.splitTextToSize(pick.vendorUrl.replace('https://', ''), CW)[0], ML, y + 1)
+        pdf.setTextColor(40, 40, 40)
+        y += 9
       }
     }
   }

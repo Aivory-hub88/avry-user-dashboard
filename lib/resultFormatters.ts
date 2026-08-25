@@ -353,9 +353,18 @@ export function formatPercent(value: number | null | undefined, locale: ResultLo
 /**
  * Format a number of months: "1 month" / "N months" (id: "1 bulan" / "N
  * bulan" — Indonesian has no plural marking, so both cases share one form).
+ * 2026-08-25: ≥12 months renders as years ("2,9 tahun" / "2.9 years") with
+ * one decimal — matching the PDF's payback prose. The old months-only format
+ * showed "115 bulan" beside a PDF saying "9,6 tahun" for the same number.
+ * Threshold and rounding mirror lib/pdfExport.ts's fmtMonths exactly so a
+ * tile and its methodology line can never disagree.
  */
 export function formatMonths(value: number | null | undefined, locale: ResultLocale = 'en'): string {
   if (value === null || value === undefined || !isFinite(value) || isNaN(value)) return '—'
+  if (value >= 12) {
+    const years = (value / 12).toFixed(1)
+    return locale === 'id' ? `${years.replace('.', ',')} tahun` : `${years} years`
+  }
   const rounded = Math.round(value)
   if (locale === 'id') return `${rounded} bulan`
   return rounded === 1 ? '1 month' : `${rounded} months`

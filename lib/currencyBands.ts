@@ -29,12 +29,22 @@ export interface CurrencyBand {
 }
 
 export interface LabourBenchmark {
-  /** Anchor hourly rate in the LOCAL currency (fully-loaded, entry/formal floor). */
+  /**
+   * Anchor hourly rate in the LOCAL currency for ENTRY-LEVEL PROFESSIONAL /
+   * knowledge work (fully loaded) — NOT the legal minimum wage. Automation
+   * reclaims professional judgement time (reviewing, deciding, entering,
+   * following up), so pricing it at the blue-collar legal floor understates
+   * value by 3-5x and produced the "Rp 9 juta/yr" absurdity of 2026-08-25.
+   */
   hourlyLocal: number
   /** Monthly anchor the hourly rate derives from (for the report's methodology note). */
   monthlyAnchorLocal: number
   /** Statutory/standard monthly working hours divisor. */
   workHoursPerMonth: number
+  /** Legal minimum-wage floor, kept for the methodology footnote — the report discloses BOTH so the reader can audit the gap. */
+  floorMonthlyAnchor: number
+  floorLabelEn: string
+  floorLabelId: string
   /** Human-readable disclosure, surfaced in the report next to the ROI figure. */
   labelEn: string
   labelId: string
@@ -150,59 +160,86 @@ export const REVENUE_BANDS: Record<CurrencyCode, CurrencyBand[]> = {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LABOUR BENCHMARKS — per-country wage anchor for the ROI hourly rate.
-// null = no local anchor; the US industry table applies (existing behaviour
-// for USD and currencies without a defensible local benchmark yet).
+// LABOUR BENCHMARKS — per-country PROFESSIONAL wage anchor for the ROI hourly
+// rate. null = no local anchor; the US industry table applies (existing
+// behaviour for USD and currencies without a defensible local benchmark yet).
+//
+// 2026-08-25 REVISION — professional, not minimum-wage: the first version
+// anchored IDR at UMP DKI (legal minimum). Multiplied by the industry factor
+// and the small-team discount that priced a Jakarta tech professional at
+// ~Rp 35.000/hour (≈US$2) and produced absurd "Rp 9 juta/year" reports.
+// Automation reclaims PROFESSIONAL time, so the anchor is now an entry-level
+// knowledge-worker wage; the legal floor is kept alongside for the
+// methodology footnote.
 //
 // Sources:
-//  - IDR  : UMP DKI Jakarta 2026, Rp 5.729.876/month (Kepgub DKI; +6.17% on
-//           2025). Update when the next UMP is gazetted (~late November).
-//  - EUR  : Eurostat EU-27 average hourly labour cost, ≈€30/hr.
-//  - AED  : UAE has NO statutory private-sector minimum wage. Anchored to an
-//           estimated formal-sector entry wage of AED 5.000/month — a
-//           conservative, commonly cited floor for employed expat staff.
-//           Documented as an estimate in the label for that reason.
-//  - SAR  : Statutory minimum wage for Saudi nationals, SAR 4.000/month
-//           (MHRSD, Nitaqat programme, 2021). Expat floor differs; the label
-//           discloses the anchor.
-//  - OMR  : Oman statutory minimum wage for Omanis, OMR 325/month
-//           (Ministerial Decision 296/2008).
+//  - IDR  : ≈Rp 7.000.000/month gross — entry professional/knowledge worker
+//           Jakarta (≈2× BPS average formal wage ≈Rp 3,4 jt; junior analyst/
+//           engineer/administrator band Rp 5-9 jt). Floor: UMP DKI 2026
+//           Rp 5.729.876 (Kepgub DKI; update when the next UMP is gazetted).
+//           Tech ×2,17 industry factor lands at ≈Rp 15,2 jt/month — the real
+//           junior-mid Jakarta software salary band. ✓
+//  - EUR  : Eurostat EU-27 average hourly labour cost ≈€30/hr (already a
+//           professional-average figure, kept as-is).
+//  - AED  : AED 12.000/month — entry knowledge-worker, UAE private sector
+//           (Dubai/Abu Dhabi junior professional band AED 10-15k; UAE has no
+//           statutory private-sector minimum). Floor: estimated formal-sector
+//           entry wage AED 5.000.
+//  - SAR  : SAR 10.000/month — entry professional (Saudi junior graduate
+//           band SAR 8-12k). Floor: Nitaqat statutory minimum SAR 4.000.
+//  - OMR  : OMR 800/month — entry professional, private sector. Floor:
+//           statutory minimum OMR 325 (Ministerial Decision 296/2008).
 // ─────────────────────────────────────────────────────────────────────────────
 export const LABOUR_BENCHMARKS: Partial<Record<CurrencyCode, LabourBenchmark>> = {
   IDR: {
-    monthlyAnchorLocal: 5_729_876,
+    monthlyAnchorLocal: 7_000_000,
     workHoursPerMonth: 173,
-    hourlyLocal: 5_729_876 / 173, // ≈ Rp 33.121/hr
-    labelEn: 'DKI Jakarta minimum wage (UMP) 2026',
-    labelId: 'UMP DKI Jakarta 2026',
+    hourlyLocal: 7_000_000 / 173, // ≈ Rp 40.462/hr
+    floorMonthlyAnchor: 5_729_876,
+    floorLabelEn: 'UMP DKI Jakarta 2026 (legal floor)',
+    floorLabelId: 'UMP DKI Jakarta 2026 (lantai legal)',
+    labelEn: 'Jakarta entry-level professional wage estimate (≈2× BPS average formal wage)',
+    labelId: 'estimasi upah profesional entry-level Jakarta (≈2× upah rata-rata formal BPS)',
   },
   EUR: {
     monthlyAnchorLocal: 30 * 173,
     workHoursPerMonth: 173,
     hourlyLocal: 30,
+    floorMonthlyAnchor: 0,
+    floorLabelEn: '',
+    floorLabelId: '',
     labelEn: 'EU average labour cost (Eurostat estimate)',
     labelId: 'rata-rata upah EU (estimasi Eurostat)',
   },
   AED: {
-    monthlyAnchorLocal: 5_000,
+    monthlyAnchorLocal: 12_000,
     workHoursPerMonth: 173,
-    hourlyLocal: 5_000 / 173, // ≈ AED 28.90/hr
-    labelEn: 'UAE estimated formal-sector entry wage (no statutory minimum wage)',
-    labelId: 'Estimasi upah entry-level sektor formal UAE (tidak ada upah minimum statutori)',
+    hourlyLocal: 12_000 / 173, // ≈ AED 69.4/hr
+    floorMonthlyAnchor: 5_000,
+    floorLabelEn: 'estimated formal-sector entry wage (no statutory minimum)',
+    floorLabelId: 'estimasi upah entry sektor formal (tidak ada upah minimum statutori)',
+    labelEn: 'UAE entry-level professional wage estimate',
+    labelId: 'estimasi upah profesional entry-level UEA',
   },
   SAR: {
-    monthlyAnchorLocal: 4_000,
+    monthlyAnchorLocal: 10_000,
     workHoursPerMonth: 173,
-    hourlyLocal: 4_000 / 173, // ≈ SAR 23.12/hr
-    labelEn: 'Saudi Arabia statutory minimum wage (SAR 4,000/month, Nitaqat)',
-    labelId: 'Upah minimum statutori Arab Saudi (SAR 4.000/bulan, Nitaqat)',
+    hourlyLocal: 10_000 / 173, // ≈ SAR 57.8/hr
+    floorMonthlyAnchor: 4_000,
+    floorLabelEn: 'Nitaqat statutory minimum',
+    floorLabelId: 'upah minimum statutori Nitaqat',
+    labelEn: 'Saudi entry-level professional wage estimate',
+    labelId: 'estimasi upah profesional entry-level Arab Saudi',
   },
   OMR: {
-    monthlyAnchorLocal: 325,
+    monthlyAnchorLocal: 800,
     workHoursPerMonth: 173,
-    hourlyLocal: 325 / 173, // ≈ OMR 1.88/hr
-    labelEn: 'Oman statutory minimum wage (OMR 325/month)',
-    labelId: 'Upah minimum statutori Oman (OMR 325/bulan)',
+    hourlyLocal: 800 / 173, // ≈ OMR 4.62/hr
+    floorMonthlyAnchor: 325,
+    floorLabelEn: 'Oman statutory minimum (MD 296/2008)',
+    floorLabelId: 'upah minimum statutori Oman (MD 296/2008)',
+    labelEn: 'Oman entry-level professional wage estimate',
+    labelId: 'estimasi upah profesional entry-level Oman',
   },
 }
 

@@ -499,14 +499,33 @@ function parseFteCount(val: string | undefined): number | null {
 // CURRENCY_RATES + FX_AS_OF now sourced from @/lib/currencyConfig
 
 // FIX #3: Industry-aware labor hourly rate (USD).
-// Previously hardcoded at $15/hr which is unrealistic for Tech/Software.
+// 2026-08-25: keys MUST match the industry question's option strings EXACTLY
+// (constants/deepDiagnosticQuestions.ts). The old map carried invented keys
+// ('Finance / Banking', 'Retail / E-commerce', 'Healthcare') that match NO
+// actual answer — 8 of 14 options silently fell to the $30 default, and the
+// score-based Tech inference then mislabeled non-tech orgs (the Bastion
+// "consultancy priced as Tech" bug). Rates: fully-loaded professional hourly
+// cost, US market.
 const INDUSTRY_HOURLY_RATE_USD: Record<string, number> = {
   'Technology / Software': 65,
+  'E-commerce / Retail': 30,
+  'Financial Services / Fintech': 60,
+  'Healthcare / Medtech': 50,
+  'Manufacturing': 25,
+  'Food & Beverages': 25,
+  'Logistics / Supply Chain': 30,
+  'Education / Edtech': 35,
+  'Media / Entertainment': 35,
+  'Real Estate / Property': 35,
+  'Professional Services / Consulting': 55,
+  'Government / Public Sector': 30,
+  'Non-profit / NGO': 25,
+  'Other': 30,
+  // Legacy keys (pre-2026-08-25 contexts may hold these strings) — kept so
+  // old stored answers keep resolving instead of silently dropping to default.
   'Finance / Banking': 60,
   'Healthcare': 50,
   'Retail / E-commerce': 30,
-  'Manufacturing': 25,
-  'Other': 30,
 }
 const DEFAULT_HOURLY_RATE_USD = 30
 
@@ -585,24 +604,34 @@ export function calculateROI(
   // SMALL_TEAM_RATE_FACTOR (0.5) reflects that for small teams the saved time
   // converts to opportunity value (rework, growth, billable work) at roughly
   // half the fully-loaded employment cost. A Tech team at $65/hr → $32.5/hr.
+  // NOTE: applied ONLY on the US industry-table path — see the rate block
+  // below; locally-anchored currencies skip it (the anchor is already a
+  // market-rate professional wage, and halving it produced the US$2/hr bug).
   const SMALL_TEAM_RATE_FACTOR = 0.5
-  const smallTeamRateApplied = (q.fteCountInScope ?? 1) <= 5
+  const fteIsSmall = (q.fteCountInScope ?? 1) <= 5
 
   // Currency→rate state machine: currencies with a per-country labour
   // benchmark (see LABOUR_BENCHMARKS) round the LOCAL hourly figure first —
   // at Rupiah/Dirham/Riyal scale — then derive the "USD" rate backwards
   // (localRate / fxRate) so the report's displayed local number is the clean
   // one, not a rounding artifact of converting a rounded USD number through
-  // the FX rate. Rounding at the pseudo-USD scale instead (≈4.6 → 2) would
-  // throw away most of the precision. The pseudo-USD field is only ever
-  // consumed inside this same currency's calculation, never compared across
-  // currencies.
+  // the FX rate.
+  //
+  // 2026-08-25: the small-team 0.5 discount applies ONLY to the US
+  // industry-table path. The local benchmarks are already market-rate
+  // professional wages — halving them again priced a Jakarta tech
+  // professional at ≈US$2/hr and produced the "Rp 9 juta/year" report class
+  // of bugs. Opportunity-cost logic is already baked into the professional
+  // anchor (entry-level, not fully-loaded senior cost).
   let baseHourlyRateUSD: number
   let hourlyRateUSD: number
   const localRate = getHourlyRateLocal(currencyCode, industry)
+  // The flag reflects what was ACTUALLY applied — surfaced in the report's
+  // methodology note, so it must never claim a discount that didn't happen.
+  const smallTeamRateApplied = localRate !== null ? false : fteIsSmall
   if (localRate !== null) {
     baseHourlyRateUSD = localRate / rate
-    hourlyRateUSD = (smallTeamRateApplied ? Math.round(localRate * SMALL_TEAM_RATE_FACTOR) : localRate) / rate
+    hourlyRateUSD = localRate / rate
   } else {
     baseHourlyRateUSD = getHourlyRateUSD(industry)
     hourlyRateUSD = smallTeamRateApplied

@@ -197,12 +197,29 @@ describe('per-country labour benchmarks (currency → wage anchor state machine)
     expect(getLabourBenchmark('USD')).toBeNull() // US industry table path
   })
 
-  it('AED anchor ≈ AED 5.000/month ÷ 173 hrs, SAR ≈ SAR 4.000, OMR ≈ OMR 325', () => {
-    expect(getLabourBenchmark('AED')!.monthlyAnchorLocal).toBe(5_000)
-    expect(getLabourBenchmark('SAR')!.monthlyAnchorLocal).toBe(4_000)
-    expect(getLabourBenchmark('OMR')!.monthlyAnchorLocal).toBe(325)
-    expect(getLabourBenchmark('AED')!.hourlyLocal).toBeCloseTo(28.9, 1)
-    expect(getLabourBenchmark('OMR')!.hourlyLocal).toBeCloseTo(1.88, 2)
+  it('AED anchor ≈ AED 12.000/month ÷ 173 hrs, SAR ≈ SAR 10.000, OMR ≈ OMR 800 (professional entry)', () => {
+    expect(getLabourBenchmark('AED')!.monthlyAnchorLocal).toBe(12_000)
+    expect(getLabourBenchmark('SAR')!.monthlyAnchorLocal).toBe(10_000)
+    expect(getLabourBenchmark('OMR')!.monthlyAnchorLocal).toBe(800)
+    expect(getLabourBenchmark('AED')!.hourlyLocal).toBeCloseTo(69.4, 1)
+    expect(getLabourBenchmark('OMR')!.hourlyLocal).toBeCloseTo(4.62, 2)
+  })
+
+  it('IDR anchor is the PROFESSIONAL wage (Rp 7 jt), with UMP kept as the disclosed floor', () => {
+    const idr = getLabourBenchmark('IDR')!
+    expect(idr.monthlyAnchorLocal).toBe(7_000_000)
+    expect(idr.hourlyLocal).toBeCloseTo(40_462, 0)
+    expect(idr.floorMonthlyAnchor).toBe(5_729_876)
+    expect(idr.floorLabelEn).toContain('UMP')
+  })
+
+  it('small-team 0.5 discount does NOT halve locally-anchored rates (the 2026-08-25 US$2/hr bug)', () => {
+    // 3-hour/week solo team, IDR Tech: hourly rate must equal the anchored
+    // professional rate × industry multiplier — NOT half of it.
+    // round((7_000_000/173) × 65/30) = 87_669 Rp/hr.
+    const r = calculateROI(CASES[4].q, 'IDR', 'Technology / Software')
+    expect(r.assumedHourlyRateLocal).toBeCloseTo(87_669, 0)
+    expect(r.smallTeamRateApplied).toBe(false)
   })
 
   it('3-Year ROI is rate-invariant in the new currencies too', () => {
