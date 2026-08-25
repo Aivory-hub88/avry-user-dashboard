@@ -75,9 +75,29 @@ export function isAdmin(): boolean {
   return u?.account_type === "superadmin";
 }
 
+/**
+ * Every other module in this app treats localStorage as a write-through
+ * cache keyed globally (not per-account) — deep diagnostic/blueprint/roadmap
+ * results, console session id, chat sessions, conversation history, workflow
+ * drafts. Logout used to remove only STORAGE_KEY, so on a shared device
+ * (demo accounts handed between prospects, most of all) the next login saw
+ * the previous account's cached content. Sweeping every "aivory_"-prefixed
+ * key catches current and future caches without hand-listing each one;
+ * console_session_id is the one exception without that prefix.
+ */
+function clearLocalCaches() {
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith("aivory_")) keysToRemove.push(key);
+  }
+  keysToRemove.forEach((key) => localStorage.removeItem(key));
+  localStorage.removeItem("console_session_id");
+}
+
 export function logout() {
   if (typeof window !== "undefined") {
-    localStorage.removeItem(STORAGE_KEY);
+    clearLocalCaches();
     window.dispatchEvent(new Event("authManager:logout"));
     window.location.href = "/";
   }

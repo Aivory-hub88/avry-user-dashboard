@@ -13,9 +13,11 @@
  * - save*: writes localStorage + POSTs when signed in; throws only when BOTH
  *   writes fail.
  * - load*: GETs when signed in; a server value wins and refreshes the cache.
- *   An empty server row combined with a non-empty localStorage copy is
- *   migrated up (fire-and-forget POST) so pre-existing local reports survive
- *   the storage cutover. Signed-out or server failure → localStorage.
+ *   An empty server row means the account has nothing yet — the local cache
+ *   is NOT migrated up onto it (a device/browser can be reused across
+ *   accounts, e.g. demo accounts handed between prospects, and pushing a
+ *   stale local copy into a different account's own row would be a
+ *   cross-account data leak). Signed-out or server failure → localStorage.
  */
 import { getToken } from '@/lib/auth'
 import { authedFetch } from '@/lib/deployAuth'
@@ -135,12 +137,21 @@ async function loadEntity<T>(entity: Entity): Promise<T | null> {
     lsWrite(LS_KEYS[entity], value)
     return value
   }
-  const local = lsRead<T>(LS_KEYS[entity])
-  if (ok && value == null && local != null) {
-    // Authed, server row empty, local copy exists → migrate it up.
-    void remoteSave(entity, local)
+  // Authed with an empty server row: this used to fall through to
+  // localStorage and silently push it up to the account's own server row
+  // ("migrate old local reports up"). That was fine for the one-time
+  // Supabase-to-Postgres cutover it was written for, but on a shared device
+  // (demo accounts handed between prospects) it means account B's dashboard
+  // gets seeded with account A's leftover browser cache — a real
+  // cross-account data leak, not just a display glitch. An authed, empty
+  // server row now means "this account genuinely has nothing yet".
+  if (ok) {
+    lsWrite(LS_KEYS[entity], null)
+    return null
   }
-  return local
+  // Signed out or the server was unreachable: localStorage is the only
+  // source of truth available, same as before.
+  return lsRead<T>(LS_KEYS[entity])
 }
 
 // ── Diagnostic context ────────────────────────────────────────────────────────
