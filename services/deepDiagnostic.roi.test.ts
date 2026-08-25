@@ -16,7 +16,7 @@
  * and reconciles exactly — that is what this test locks in.
  */
 import { describe, it, expect } from 'vitest'
-import { calculateROI, dampConfidenceByEstimateBasis } from './deepDiagnostic'
+import { calculateROI, dampConfidenceByEstimateBasis, parseBudgetMidpointUSD } from './deepDiagnostic'
 import type { DiagnosticContext } from '@/types/diagnostic'
 
 type Q = DiagnosticContext['quantitative']
@@ -127,5 +127,27 @@ describe('D2 — dampConfidenceByEstimateBasis (confidence-source signal)', () =
     expect(damped.paybackMonths).toBe(base.paybackMonths)
     expect(damped.threeYearROIPercent).toBe(base.threeYearROIPercent)
     expect(damped.confidenceLevel).toBe('low')
+  })
+})
+
+describe('parseBudgetMidpointUSD — EN and ID option labels must resolve to the same midpoint', () => {
+  const PAIRS: Array<[string, string, number]> = [
+    ['Under $10k', 'Di bawah $10K', 5_000],
+    ['$10k - $50k', '$10K - $50K', 30_000],
+    ['$50k - $100k', '$50K - $100K', 75_000],
+    ['$100k - $500k', '$100K - $500K', 300_000],
+    ['Over $500k', 'Di atas $500K', 750_000],
+  ]
+
+  for (const [en, id, expected] of PAIRS) {
+    it(`"${en}" and "${id}" both resolve to ${expected}`, () => {
+      expect(parseBudgetMidpointUSD(en)).toBe(expected)
+      expect(parseBudgetMidpointUSD(id)).toBe(expected)
+    })
+  }
+
+  it('"Tidak berlaku" / "Not applicable" (no $Nk figure) is null, not a crash', () => {
+    expect(parseBudgetMidpointUSD('Tidak berlaku')).toBeNull()
+    expect(parseBudgetMidpointUSD(undefined)).toBeNull()
   })
 })

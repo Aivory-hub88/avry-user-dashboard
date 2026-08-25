@@ -780,9 +780,41 @@ export class CopilotStateMachine {
         this.state.stage = 'IDLE'
         return this.setAssistantMessage('Workflow canceled. Is there anything else I can help you with?')
 
+      case 'question':
+        // A plain question ("do you know where the data source is?") is not
+        // an instruction to change the workflow — answer it in prose and
+        // stay in AWAITING_CONFIRMATION so the pending workflow/summary is
+        // untouched. Previously this fell through to the `default` case
+        // below, which forced the model into JSON-workflow-output mode
+        // (via handleEditing → WORKFLOW_JSON_HINT) — slow, and it just
+        // re-emitted the same workflow instead of answering.
+        return this.handleQuestion(userMessage)
+
       default:
         this.state.stage = 'EDITING'
         return this.handleEditing(userMessage)
+    }
+  }
+
+  private async handleQuestion(userMessage: string): Promise<CopilotConversationState> {
+    try {
+      const result = await this.bridge.clarify({
+        session_id: this.state.sessionId,
+        organization_id: 'copilot',
+        user_request: userMessage,
+        conversation_history: this.state.conversationHistory,
+      })
+      const answer =
+        chatSafeMessage(result.message) ??
+        "I don't have a definite answer for that — can you tell me, or would you like me to proceed as-is?"
+      return this.setAssistantMessage(answer)
+    } catch (error: unknown) {
+      console.error('[Copilot] handleQuestion error:', error)
+      // Stay in AWAITING_CONFIRMATION rather than moving to ERROR — a failed
+      // answer to a side question shouldn't lose the pending workflow.
+      return this.setAssistantMessage(
+        "Sorry, I couldn't get an answer to that just now. You can still reply **yes** to continue, **edit** to change something, or ask again.",
+      )
     }
   }
 
@@ -1118,7 +1150,8 @@ export class CopilotStateMachine {
       `${testSummary}\n\n` +
       `---\n📌 **Workflow Summary:**\n${wf.summary}` +
       nodeDetails +
-      `\n\n---\n🚀 **The workflow "${wf.workflowName}" is ready to be applied. Click the Apply to canvas button to place it onto the canvas.**`
+      `\n\n---\n🚀 **The workflow "${wf.workflowName}" is ready to be applied. Click the Apply to canvas button to place it onto the canvas.**` +
+      `\n\n_Note: once deployed to n8n, you can open any node there and adjust its exact configuration — credentials, field mappings, the precise data source — yourself; I set up the workflow's structure, but node-level details are easiest to finish directly in n8n._`
     )
   }
 
@@ -1177,7 +1210,7 @@ export function chatSafeMessage(raw: unknown): string | null {
 
 export function detectUserIntent(
   message: string,
-): 'confirm' | 'reject' | 'edit' | 'test' | 'apply' | 'cancel' | 'unknown' {
+): 'confirm' | 'reject' | 'edit' | 'test' | 'apply' | 'cancel' | 'question' | 'unknown' {
   const lower = message.toLowerCase().trim()
 
   if (
@@ -1210,6 +1243,18 @@ export function detectUserIntent(
     return 'apply'
 
   if (/cancel|batal|batalkan|keluar|reset/i.test(lower)) return 'cancel'
+
+  // Pure question / clarification about the already-generated workflow (e.g.
+  // "lo tahu gak sumber data nya dimana?") — checked last so a message that
+  // is ALSO actionable (e.g. "bisa tambah step approval?") still resolves to
+  // the more specific intent above instead of being treated as a question.
+  if (
+    /\?\s*$/.test(message.trim()) ||
+    /^(apa|apakah|gimana|bagaimana|kenapa|mengapa|kapan|kok|memang(nya)?|kamu tahu|lo tahu|elu tahu|what|how|why|when|where|who|which|do you|does it|is it|is this|can you|could you)\b/i.test(
+      lower,
+    )
+  )
+    return 'question'
 
   return 'unknown'
 }

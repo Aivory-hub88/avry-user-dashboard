@@ -280,7 +280,14 @@ export class DeepDiagnosticService {
     if (!jobId) throw new Error('Invalid response format from server')
 
     // 2) Poll for the result until complete.
-    const deadline = Date.now() + 480_000
+    // 900s: must comfortably exceed the backend's true worst case, not just
+    // typical. BullMQ retries a failed job once (attempts:2, 5s backoff), and
+    // each attempt can spend up to 90s (fast, no-reasoning) + 300s (fallback,
+    // reasoning-on) before giving up — worst case ~785s. The previous 480s
+    // deadline was shorter than that, so the frontend could time out and show
+    // "please try again" for a job the backend's own retry would have
+    // completed seconds later.
+    const deadline = Date.now() + 900_000
     const POLL_INTERVAL_MS = 5_000
     let blueprint: BlueprintV1 | null = null
     while (Date.now() < deadline) {
@@ -401,16 +408,24 @@ function parsePct(val: string | undefined): number | null {
   return single ? parseInt(single[1], 10) : null
 }
 
-function parseBudgetMidpointUSD(val: string | undefined): number | null {
+// FIX #3: locale-agnostic — was a literal-string map keyed only to the English
+// option labels ('Under $10k'), so every Indonesian submission ('Di bawah $10K')
+// silently missed and returned null, nulling out all budget-dependent ROI fields
+// (payback, 3-year ROI, NPV) for ID-locale users. Now extracts the $Nk figures
+// directly instead of matching the surrounding phrase.
+export function parseBudgetMidpointUSD(val: string | undefined): number | null {
   if (!val) return null
-  const map: Record<string, number> = {
-    'Under $10k': 5_000,
-    '$10k - $50k': 30_000,
-    '$50k - $100k': 75_000,
-    '$100k - $500k': 300_000,
-    'Over $500k': 750_000,
+  const norm = normalizeStr(val)
+  const nums = [...norm.matchAll(/\$?(\d+(?:\.\d+)?)\s*[kK]/g)].map(
+    (m) => parseFloat(m[1]) * 1_000
+  )
+  if (nums.length === 0) return null
+  if (nums.length === 1) {
+    if (/under|di bawah/i.test(norm)) return nums[0] / 2
+    if (/over|di atas/i.test(norm)) return nums[0] * 1.5
+    return nums[0]
   }
-  return map[val] ?? null
+  return (nums[0] + nums[1]) / 2
 }
 
 function parseTimelineMonths(val: string | undefined): number | null {
