@@ -120,6 +120,16 @@
   background: rgba(147, 197, 253, 0.08);
 }
 
+.agentDetail {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a1a1aa;
+  margin-top: 4px;
+}
+
 .whyLine {
   font-size: 12px;
   line-height: 1.5;

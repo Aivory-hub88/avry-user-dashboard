@@ -280,14 +280,15 @@ export class DeepDiagnosticService {
     if (!jobId) throw new Error('Invalid response format from server')
 
     // 2) Poll for the result until complete.
-    // 900s: must comfortably exceed the backend's true worst case, not just
+    // 1000s: must comfortably exceed the backend's true worst case, not just
     // typical. BullMQ retries a failed job once (attempts:2, 5s backoff), and
-    // each attempt can spend up to 90s (fast, no-reasoning) + 300s (fallback,
-    // reasoning-on) before giving up — worst case ~785s. The previous 480s
-    // deadline was shorter than that, so the frontend could time out and show
+    // each attempt now runs up to 3 tiers before giving up: 90s (fast) +
+    // 300s (fallback, reasoning-on) + 60s (failover model, if configured) —
+    // worst case ~905s. The previous 480s deadline was shorter than even the
+    // pre-tiering worst case, so the frontend could time out and show
     // "please try again" for a job the backend's own retry would have
     // completed seconds later.
-    const deadline = Date.now() + 900_000
+    const deadline = Date.now() + 1_000_000
     const POLL_INTERVAL_MS = 5_000
     let blueprint: BlueprintV1 | null = null
     while (Date.now() < deadline) {
@@ -1454,12 +1455,59 @@ const OPP_CANDIDATES: OppCandidate[] = [
 // builder below something concrete to onboard people onto. Agent product
 // names are proper nouns and stay in English in Indonesian copy too, same as
 // "Aivory™" / "Transformation Blueprint" elsewhere in the report.
-const AGENT_BY_OPP: Record<string, { title: string }> = {
-  'opp-cs-automation': { title: 'Ticket Ops Agent' },
-  'opp-sales-intelligence': { title: 'Leads Qualifier Agent' },
-  'opp-process-automation': { title: 'Autonomous Agent' },
-  'opp-reporting': { title: 'Autonomous Agent' },
-  'opp-cross-reporting': { title: 'Autonomous Agent' },
+// description/integrations adapted from the real product copy in
+// app/agents/page.tsx's AGENTS catalog — this is what actually gets
+// deployed, so the report should say what it does and what it plugs into
+// instead of naming it and leaving "does what, connects to what" unanswered.
+const AGENT_BY_OPP: Record<string, {
+  title: string
+  description: string
+  descriptionId: string
+  integrations: string[]
+}> = {
+  'opp-cs-automation': {
+    title: 'Ticket Ops Agent',
+    description: 'Triages inbound support tickets 24/7 across your channels and hands your team everything they need to resolve them fast.',
+    descriptionId: 'Men-triase tiket dukungan yang masuk 24/7 di semua kanal Anda dan menyiapkan semua yang dibutuhkan tim untuk menyelesaikannya dengan cepat.',
+    integrations: ['WhatsApp', 'Telegram', 'Slack', 'Helpdesk/CRM'],
+  },
+  'opp-sales-intelligence': {
+    title: 'Leads Qualifier Agent',
+    description: 'Filters inbound leads with the BANT framework and automatically routes qualified leads to your sales team.',
+    descriptionId: 'Menyaring leads yang masuk dengan kerangka BANT dan otomatis merutekan leads yang memenuhi syarat ke tim sales Anda.',
+    integrations: ['CRM', 'WhatsApp', 'Web forms'],
+  },
+  'opp-process-automation': {
+    title: 'Autonomous Agent',
+    description: 'Runs inside your communication hubs to triage requests, execute the workflow steps for this process, and update your CRM/ERP records automatically.',
+    descriptionId: 'Berjalan di dalam kanal komunikasi Anda untuk men-triase permintaan, menjalankan langkah-langkah workflow proses ini, dan memperbarui data CRM/ERP secara otomatis.',
+    integrations: ['CRM/ERP', 'Aivory Workflow Builder', 'Slack / Telegram / WhatsApp'],
+  },
+  'opp-reporting': {
+    title: 'Autonomous Agent',
+    description: 'Pulls data from your existing systems on a schedule and assembles the report automatically, so no one copies numbers by hand.',
+    descriptionId: 'Mengambil data dari sistem yang sudah ada sesuai jadwal dan menyusun laporan secara otomatis, jadi tidak ada lagi salin-tempel angka manual.',
+    integrations: ['Spreadsheets', 'CRM/ERP', 'Dashboards'],
+  },
+  'opp-cross-reporting': {
+    title: 'Autonomous Agent',
+    description: 'Connects to each of your separate systems and reconciles their data into one unified report automatically.',
+    descriptionId: 'Terhubung ke setiap sistem terpisah Anda dan merekonsiliasi datanya menjadi satu laporan terpadu secara otomatis.',
+    integrations: ['Multiple systems (CRM, ERP, spreadsheets)', 'Dashboards'],
+  },
+}
+
+function buildRecommendedAgent(
+  oppId: string,
+  locale: Locale,
+): { title: string; description: string; integrations: string[] } | null {
+  const agent = AGENT_BY_OPP[oppId]
+  if (!agent) return null
+  return {
+    title: agent.title,
+    description: locale === 'id' ? agent.descriptionId : agent.description,
+    integrations: agent.integrations,
+  }
 }
 
 // Builds the capability-building opportunity's training tracks from the
@@ -1625,7 +1673,7 @@ function rankOpportunities(
       estimatedSavingsIDR: estimatedSavingsLocal, // @deprecated backward compat alias
       prerequisites: locale === 'id' ? c.prerequisitesId : c.prerequisites,
       dataReadiness: dataReadiness(relevantScore),
-      recommendedAgent: AGENT_BY_OPP[c.id] ?? null,
+      recommendedAgent: buildRecommendedAgent(c.id, locale),
     }
   }
 

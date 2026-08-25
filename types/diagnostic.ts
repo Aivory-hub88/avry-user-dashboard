@@ -427,7 +427,13 @@ export interface RankedOpportunity {
   /** Only present on capability-building/training opportunities. */
   trainingTracks?: OpportunityTrainingTrack[]
   /** The specific Aivory agent product that delivers this opportunity, if any. */
-  recommendedAgent?: { title: string } | null
+  recommendedAgent?: {
+    title: string
+    /** What the agent actually does — shown so "deploy X" isn't just a bare name. */
+    description: string
+    /** Systems/channels it connects to for this opportunity (e.g. CRM, ERP, Slack). */
+    integrations: string[]
+  } | null
 }
 
 /**

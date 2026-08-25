@@ -3135,6 +3135,14 @@ export async function exportReportToPdf(
   // outrank automation opportunities on effort but has no agent of its own.
   const deployOpp = opportunities.find(o => o.recommendedAgent) ?? null
   const deployAgentTitle = deployOpp?.recommendedAgent?.title ?? (locale === 'id' ? 'agen pertama' : 'first agent')
+  // "Deploy on Aivory™" used to just say "launch your X" with no explanation
+  // of what X does or what it connects to — a bare product name reads as a
+  // black box. Say what it does (its own report copy, not invented here —
+  // see AGENT_BY_OPP in services/deepDiagnostic.ts) and what systems/channels
+  // it plugs into for this specific opportunity.
+  const deployAgentDescription = deployOpp?.recommendedAgent?.description ?? null
+  const deployAgentIntegrations = deployOpp?.recommendedAgent?.integrations ?? []
+  const lowerFirst = (s: string) => s.length > 0 ? s[0].toLowerCase() + s.slice(1) : s
   const nsCurrent = context.quantitative.currentAutomationPct ?? 0
   const nsTarget = context.quantitative.targetAutomationPct ?? 0
   const nsGap = nsTarget - nsCurrent
@@ -3184,7 +3192,7 @@ export async function exportReportToPdf(
     {
       num: '3',
       title: 'Terapkan di Aivory™',
-      body: `Luncurkan ${deployAgentTitle} Anda, hubungkan kanal Anda, dan mulai menutup${nsGap > 0 ? ` kesenjangan otomasi ${fmtGap(nsGap, locale)}` : ' kesenjangan otomasi'} (dari ${fmtGap(nsCurrent, locale)} terotomasi hari ini ke target ${fmtGap(nsTarget, locale)} Anda).`,
+      body: `Luncurkan ${deployAgentTitle} Anda.${deployAgentDescription ? ` Agen ini ${lowerFirst(deployAgentDescription)}` : ''}${deployAgentIntegrations.length > 0 ? ` Terhubung ke: ${deployAgentIntegrations.join(', ')}.` : ''} Hubungkan kanal Anda dan mulai menutup${nsGap > 0 ? ` kesenjangan otomasi ${fmtGap(nsGap, locale)}` : ' kesenjangan otomasi'} (dari ${fmtGap(nsCurrent, locale)} terotomasi hari ini ke target ${fmtGap(nsTarget, locale)} Anda).`,
     },
     {
       num: '4',
@@ -3207,7 +3215,7 @@ export async function exportReportToPdf(
     {
       num: '3',
       title: 'Deploy on Aivory™',
-      body: `Launch your ${deployAgentTitle}, connect your channels, and start closing the${nsGap > 0 ? ` ${fmtGap(nsGap, locale)}` : ''} automation gap (from ${fmtGap(nsCurrent, locale)} automated today to your ${fmtGap(nsTarget, locale)} target).`,
+      body: `Launch your ${deployAgentTitle}.${deployAgentDescription ? ` It ${lowerFirst(deployAgentDescription)}` : ''}${deployAgentIntegrations.length > 0 ? ` Connects to: ${deployAgentIntegrations.join(', ')}.` : ''} Connect your channels and start closing the${nsGap > 0 ? ` ${fmtGap(nsGap, locale)}` : ''} automation gap (from ${fmtGap(nsCurrent, locale)} automated today to your ${fmtGap(nsTarget, locale)} target).`,
     },
     {
       num: '4',

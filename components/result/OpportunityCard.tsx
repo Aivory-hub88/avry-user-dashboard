@@ -141,6 +141,20 @@ export default function OpportunityCard({
         )}
       </div>
 
+      {/* What the badge above actually does and connects to — a bare agent
+          name doesn't tell the reader what it runs or what it plugs into. */}
+      {opportunity.recommendedAgent && (
+        <div className={styles.agentDetail}>
+          <span>{opportunity.recommendedAgent.description}</span>
+          {opportunity.recommendedAgent.integrations.length > 0 && (
+            <span>
+              {locale === 'id' ? 'Terhubung ke: ' : 'Connects to: '}
+              {opportunity.recommendedAgent.integrations.join(', ')}
+            </span>
+          )}
+        </div>
+      )}
+
       {whyReasons.length > 0 && (
         <p className={styles.whyLine}>
           <span className={styles.whyLabel}>{locale === 'id' ? 'Mengapa ini: ' : 'Why this: '}</span>
