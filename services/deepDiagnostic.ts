@@ -286,15 +286,15 @@ export class DeepDiagnosticService {
     if (!jobId) throw new Error('Invalid response format from server')
 
     // 2) Poll for the result until complete.
-    // 1000s: must comfortably exceed the backend's true worst case, not just
+    // 1200s: must comfortably exceed the backend's true worst case, not just
     // typical. BullMQ retries a failed job once (attempts:2, 5s backoff), and
-    // each attempt now runs up to 3 tiers before giving up: 90s (fast) +
-    // 300s (fallback, reasoning-on) + 60s (failover model, if configured) —
-    // worst case ~905s. The previous 480s deadline was shorter than even the
-    // pre-tiering worst case, so the frontend could time out and show
-    // "please try again" for a job the backend's own retry would have
-    // completed seconds later.
-    const deadline = Date.now() + 1_000_000
+    // each attempt now runs up to 4 tiers before giving up: 90s (fast) +
+    // 300s (fallback, reasoning-on) + 60s + 60s (two failover models,
+    // qwen3-235b-a22b then qwen3.6-plus) — worst case ~1025s. The previous
+    // 480s deadline was shorter than even the pre-tiering worst case, so the
+    // frontend could time out and show "please try again" for a job the
+    // backend's own retry would have completed seconds later.
+    const deadline = Date.now() + 1_200_000
     const POLL_INTERVAL_MS = 5_000
     let blueprint: BlueprintV1 | null = null
     while (Date.now() < deadline) {
