@@ -16,6 +16,7 @@ import { useTranslations } from 'next-intl'
 import { useLocaleContext } from '@/hooks/useLocale'
 import { saveRoadmap } from '@/hooks/useRoadmap'
 import { asset } from '@/lib/asset'
+import { generateRoadmapAsync } from '@/lib/roadmapGeneration'
 
 // ── Lucide-style inline SVG icons ────────────────────────────────────────────
 function IconDatabase() {
@@ -1150,19 +1151,15 @@ export default function BlueprintPage() {
       const diagnosticContext = (() => {
         try { return JSON.parse(localStorage.getItem('aivory_deep_result') || '{}') } catch { return {} }
       })()
-      const res = await fetch(asset('/api/roadmap/generate'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          source: 'blueprint',
-          blueprintContext: blueprint,
-          diagnosticContext,
-          locale,
-        }),
+      // 2026-08-25: enqueue + poll — same pattern as the roadmap page; the
+      // old held request died at the edge timeout on slow generations.
+      const { roadmap } = await generateRoadmapAsync({
+        source: 'blueprint',
+        blueprintContext: blueprint,
+        diagnosticContext,
+        locale,
       })
-      const data = await res.json()
-      if (!res.ok || !data.success) throw new Error(data.error || t("roadmapGenerationFailed"))
-      saveRoadmap(data.roadmap)
+      saveRoadmap(roadmap)
       showToast(t("roadmapGeneratedRedirecting"))
       setTimeout(() => router.push('/roadmap'), 800)
     } catch (err) {

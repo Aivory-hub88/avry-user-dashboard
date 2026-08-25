@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { PhaseConfig, DeepDiagnosticQuestion } from '@/types/deepDiagnostic'
 import { useLocaleContext } from '@/hooks/useLocale'
 import { ID_PHASE_COPY, ID_QUESTION_COPY } from '@/constants/deepDiagnosticQuestionsId'
+import { parseCurrencyCode } from '@/lib/resultFormatters'
+import { getBudgetBands, getRevenueBands } from '@/lib/currencyBands'
 import styles from './PhaseContent.module.css'
 
 interface PhaseContentProps {
@@ -23,6 +25,23 @@ export default function PhaseContent({
 
   // Debounce timers for each question
   const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({})
+
+  // Auto-scroll to the first unfilled (errored) question when phase
+  // validation fails — the error text alone is easy to miss above the fold
+  // in long phases. Re-runs whenever the error set changes; a clean error
+  // set scrolls nowhere.
+  useEffect(() => {
+    const firstErrorId = phase.questions.find((q) => validationErrors[q.id])?.id
+    if (!firstErrorId) return
+    // rAF: the error class/styles render in the same commit — wait one frame
+    // so the anchor position is final before scrolling.
+    const raf = requestAnimationFrame(() => {
+      document
+        .getElementById(`question-${firstErrorId}-anchor`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [validationErrors, phase.questions])
 
   // Handle response change with debouncing
   const handleChange = useCallback((questionId: string, value: any) => {
@@ -61,7 +80,24 @@ export default function PhaseContent({
     // translated label — so the scorer and stored answers are unaffected.
     const t = locale === 'id' ? ID_QUESTION_COPY[question.id] : undefined
     const displayPlaceholder = t?.placeholder ?? question.placeholder
-    const displayOptions = question.options?.map((option, i) => t?.options?.[i] ?? option)
+    let displayOptions = question.options?.map((option, i) => t?.options?.[i] ?? option)
+
+    // Currency-aware band questions (annual_revenue, budget_range): options
+    // come from the per-currency band tables (lib/currencyBands.ts), not the
+    // static USD list. The stored value is the band's canonical EN label;
+    // the displayed label is the band's locale-specific one. ID_QUESTION_COPY
+    // index-translation is deliberately bypassed for these two ids — their
+    // option lists are dynamic, so a fixed index map can't track them.
+    const isBandQuestion = question.id === 'annual_revenue' || question.id === 'budget_range'
+    let effectiveOptions = question.options
+    if (isBandQuestion && question.options) {
+      const currencyCode = parseCurrencyCode(responses['currency'])
+      const bands = question.id === 'annual_revenue'
+        ? getRevenueBands(currencyCode)
+        : getBudgetBands(currencyCode)
+      effectiveOptions = bands.map((b) => b.en)
+      displayOptions = bands.map((b) => (locale === 'id' ? b.id : b.en))
+    }
 
     switch (question.type) {
       case 'text':
@@ -105,7 +141,7 @@ export default function PhaseContent({
             aria-describedby={error ? `${inputId}-error` : question.helperText ? `${inputId}-helper` : undefined}
           >
             <option value="">{locale === 'id' ? 'Pilih salah satu...' : 'Select an option...'}</option>
-            {question.options?.map((option, i) => (
+            {effectiveOptions?.map((option, i) => (
               <option key={option} value={option}>
                 {displayOptions?.[i] ?? option}
               </option>
@@ -116,7 +152,7 @@ export default function PhaseContent({
       case 'radio':
         return (
           <div className={styles.radioGroup} role="radiogroup" aria-labelledby={inputId}>
-            {question.options?.map((option, i) => {
+            {effectiveOptions?.map((option, i) => {
               const optionId = `${inputId}-${option.replace(/\s+/g, '-').toLowerCase()}`
               const isSelected = value === option
               // Selecting a radio is a discrete choice — commit immediately and
@@ -159,7 +195,7 @@ export default function PhaseContent({
       case 'multiselect':
         return (
           <div className={styles.multiselectGroup} role="group" aria-labelledby={inputId}>
-            {question.options?.map((option, i) => {
+            {effectiveOptions?.map((option, i) => {
               const optionId = `${inputId}-${option.replace(/\s+/g, '-').toLowerCase()}`
               const selectedValues = Array.isArray(value) ? value : []
               const isChecked = selectedValues.includes(option)
@@ -226,7 +262,12 @@ export default function PhaseContent({
           const t = locale === 'id' ? ID_QUESTION_COPY[question.id] : undefined
 
           return (
-            <div key={question.id} className={styles.questionItem}>
+            <div
+              key={question.id}
+              id={`${inputId}-anchor`}
+              className={`${styles.questionItem} ${error ? styles.questionItemError ?? '' : ''}`}
+              data-unfilled={error ? 'true' : undefined}
+            >
               <label htmlFor={inputId} className={styles.questionLabel}>
                 <span className={styles.questionNumber}>{index + 1}.</span>
                 <span className={styles.questionText}>
@@ -234,6 +275,25 @@ export default function PhaseContent({
                   {question.required && (
                     <span className={styles.requiredIndicator} aria-label="required">
                       *
+                    </span>
+                  )}
+                  {error && (
+                    <span
+                      className={styles.unfilledBadge ?? ''}
+                      style={{
+                        display: 'inline-block',
+                        marginLeft: '8px',
+                        padding: '2px 8px',
+                        borderRadius: '999px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        background: 'rgba(220, 38, 38, 0.12)',
+                        color: '#f87171',
+                        border: '1px solid rgba(220, 38, 38, 0.35)',
+                        verticalAlign: 'middle',
+                      }}
+                    >
+                      {locale === 'id' ? 'Belum diisi' : 'Not filled in'}
                     </span>
                   )}
                 </span>
@@ -256,7 +316,14 @@ export default function PhaseContent({
                   role="alert"
                   aria-live="polite"
                 >
-                  {error}
+                  {/* validatePhase emits canonical English messages; surface
+                      the required-field one in the UI locale. Other messages
+                      (min/max length) pass through as-is. */}
+                  {error === 'This field is required'
+                    ? (locale === 'id' ? 'Bagian ini belum diisi' : error)
+                    : error === 'Please select at least one option'
+                      ? (locale === 'id' ? 'Pilih minimal satu opsi' : error)
+                      : error}
                 </p>
               )}
             </div>

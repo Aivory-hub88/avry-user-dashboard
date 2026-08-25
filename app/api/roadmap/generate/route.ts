@@ -1,249 +1,84 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { SERVICES } from '@/config/services';
-import type { AiryRoadmap } from '@/types/roadmap';
-import { formatLocalAmount, parseCurrencyCode } from '@/lib/resultFormatters';
-
 /**
- * The fallback roadmap's KPI targets used to be hardcoded placeholders
- * ("3x investment", "40%", "10+ hours") that read to a user exactly like
- * computed figures even though this path only runs when the AI call
- * failed. Ground them in the diagnostic engine's own fields when present;
- * fall back to qualitative language (never an invented number) otherwise.
- * See §1.6 row 11 of DEEP-DIAGNOSTIC-EXPERIENCE-V2-PLANNING.md.
+ * API Route: POST /api/roadmap/generate
+ *
+ * Enqueues a roadmap generation job on the VPS bridge and returns a job_id
+ * immediately. The frontend polls /api/roadmap/result/[jobId] for the result.
+ *
+ * 2026-08-25: this route used to hold the HTTP request open through the
+ * bridge's /console/stream while the model generated (70s+ measured live,
+ * hard 90/95s timeouts) and silently swapped in a generic template whenever
+ * the timeouts fired under load. Now it's the same enqueue+poll pattern
+ * blueprints use — see AVRY/vps-bridge/lib/roadmapQueue.js for the
+ * generation ladder and lib/roadmapGeneration.ts for the shared prompt/
+ * parsing/fallback logic. This route does no LLM work and stays fast.
  */
-function deriveFallbackKpiTargets(diagnosticContext: Record<string, any>, locale: 'en' | 'id' = 'en') {
-  const calc = diagnosticContext?.calculations;
-  const quant = diagnosticContext?.quantitative;
-  const currencyCode = parseCurrencyCode(diagnosticContext?.currency);
-  const tr = (en: string, id: string) => locale === 'id' ? id : en
 
-  const hoursSavedPerWeek = typeof calc?.hoursReclaimedPerYear === 'number'
-    ? `${Math.max(1, Math.round(calc.hoursReclaimedPerYear / 52))}+ ${tr('hours', 'jam')}`
-    : tr('Meaningful reduction in manual hours', 'Pengurangan berarti pada jam kerja manual')
+import { NextRequest } from 'next/server'
+import { SERVICES } from '@/config/services'
+import { buildRoadmapPrompt } from '@/lib/roadmapGeneration'
 
-  const automationCoverage = typeof quant?.targetAutomationPct === 'number'
-    ? `${quant.targetAutomationPct}%`
-    : tr('Increased automation coverage', 'Peningkatan cakupan otomasi')
+export const maxDuration = 30
 
-  const roiOutcome = typeof calc?.netThreeYearROIPercent === 'number'
-    ? `${Math.max(0, Math.round(calc.netThreeYearROIPercent))}% ${tr('3-yr ROI', 'ROI 3 tahun')}`
-    : typeof calc?.totalAnnualSavingsLocal === 'number'
-      ? `${formatLocalAmount(calc.totalAnnualSavingsLocal, currencyCode)}${tr('/yr savings', '/thn penghematan')}`
-      : tr('Positive return on automation investment', 'Imbal hasil positif atas investasi otomasi')
-
-  return { hoursSavedPerWeek, automationCoverage, roiOutcome };
-}
-
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const source: string = body.source ?? 'direct';
-    const blueprintId: string | undefined = body.blueprintId;
-    const diagnosticContext: Record<string, any> = body.diagnosticContext ?? {};
-    const blueprintContext: Record<string, any> = body.blueprintContext ?? {};
-    const locale: 'en' | 'id' = body.locale === 'id' ? 'id' : 'en';
+    const body = await request.json().catch(() => ({}))
+    const source: string = body.source ?? 'direct'
+    const blueprintId: string | undefined = body.blueprintId
+    const diagnosticContext: Record<string, any> = body.diagnosticContext ?? {}
+    const blueprintContext: Record<string, any> = body.blueprintContext ?? {}
+    const locale: 'en' | 'id' = body.locale === 'id' ? 'id' : 'en'
 
-    // Build a prompt for Aivory to generate a structured roadmap
-    const contextParts: string[] = [];
+    const prompt = buildRoadmapPrompt(diagnosticContext, blueprintContext, locale)
 
-    if (diagnosticContext && Object.keys(diagnosticContext).length > 0) {
-      contextParts.push(`DIAGNOSTIC RESULTS:\n${JSON.stringify(diagnosticContext, null, 2)}`);
-    }
+    // Enqueue on the VPS Bridge (returns a job_id immediately, no long wait).
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 15_000)
 
-    if (blueprintContext && Object.keys(blueprintContext).length > 0) {
-      contextParts.push(`BLUEPRINT DATA:\n${JSON.stringify(blueprintContext, null, 2)}`);
-    }
-
-    if (contextParts.length === 0) {
-      contextParts.push('No diagnostic or blueprint data provided. Generate a generic business operations transformation roadmap for an SME.');
-    }
-
-    const prompt = `You are a business operations transformation consultant. Based on the following context, generate a phased transformation roadmap, with AI positioned as the execution layer where it accelerates the plan.
-
-${contextParts.join('\n\n')}
-
-Return ONLY valid JSON matching this exact schema (no markdown, no explanation):
-{
-  "id": "<uuid>",
-  "title": "<roadmap title>",
-  "createdAt": "<ISO timestamp>",
-  "phases": [
-    {
-      "id": "phase-1",
-      "name": "<phase name>",
-      "timeframe": "<e.g. Month 1-3>",
-      "description": "<brief description>",
-      "milestones": [
-        {
-          "id": "m-1-1",
-          "title": "<milestone title>",
-          "description": "<optional detail>",
-          "linkedWorkflowIds": []
-        }
-      ],
-      "kpis": [
-        {
-          "id": "kpi-1-1",
-          "label": "<metric name>",
-          "target": "<target value>"
-        }
-      ]
-    }
-  ]
-}
-
-Generate 3-4 phases. Each phase should have 2-4 milestones and 2-3 KPIs. Be specific and actionable.
-
-GROUNDING RULES (do not violate): every KPI "target" value must trace back to a field that is actually present in the DIAGNOSTIC RESULTS or BLUEPRINT DATA above — do not invent a number. Prefer these pre-computed fields verbatim, never recompute or approximate them: "calculations.totalAnnualSavingsLocal", "calculations.paybackMonths"/"netPaybackMonths", "calculations.threeYearROIPercent"/"netThreeYearROIPercent", "calculations.hoursReclaimedPerYear", and "quantitative.targetAutomationPct"/"currentAutomationPct" (the user's own answers). If none of these fields are present in the context above for a given KPI, use qualitative language (e.g. "meaningful reduction in manual hours") instead of a specific invented number.${locale === 'id' ? `
-
-LANGUAGE: Write every freeform narrative/text field VALUE in formal Bahasa Indonesia (business register) — this includes "title", "phases[].name", "phases[].timeframe", "phases[].description", "phases[].milestones[].title/description", and "phases[].kpis[].label/target". Do NOT translate the fixed "id" slug fields ("phases[].id", "milestones[].id", "kpis[].id") — keep those exactly as specified in the schema. Currency figures and dollar amounts stay as-is (do not convert currency).` : ''}`;
-
-    // Call Zeroclaw/VPS Bridge
-    let roadmap: AiryRoadmap;
-
+    let response: Response
     try {
-      const aiRes = await fetch(`${SERVICES.VPS_BRIDGE}/console/stream`, {
+      response = await fetch(`${SERVICES.VPS_BRIDGE}/roadmap/generate/async`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: prompt,
-          session_id: `roadmap-${Date.now()}`,
-          stream: false,
-          // Without this, the bridge's keyword classifier (consoleNeedsZeroclaw)
-          // misroutes roadmap requests to Zeroclaw's tool-loaded profile — the
-          // pretty-printed diagnostic/blueprint JSON embedded above routinely
-          // contains "trigger"/"deploy" by accident. See server.js's
-          // handleRoadmapGenerateDirect for the full explanation.
-          entrypoint: 'roadmap_generate',
+          messages: [{ role: 'user', content: prompt }],
+          context: { source, blueprintId, diagnosticContext, blueprintContext, locale },
         }),
-        // 95s: slightly more than handleRoadmapGenerateDirect's own 90s
-        // server-side timeout, so the server's timeout (which returns a
-        // clean SSE error event) fires before this abort would.
-        signal: AbortSignal.timeout(95000),
-      });
-
-      if (!aiRes.ok) {
-        throw new Error(`AI service returned ${aiRes.status}`);
+        signal: controller.signal,
+      })
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        return Response.json(
+          { success: false, error: 'Could not reach the roadmap service. Please try again.' },
+          { status: 504 },
+        )
       }
-
-      // Bridge /console/stream returns SSE (data: {type:'chunk',content}) — accumulate it
-      const sseText = await aiRes.text();
-      let rawText = '';
-      for (const line of sseText.split('\n')) {
-        if (!line.startsWith('data: ')) continue;
-        try {
-          const evt = JSON.parse(line.slice(6));
-          if (evt && typeof evt.content === 'string') rawText += evt.content;
-        } catch { /* ignore non-JSON SSE lines */ }
-      }
-
-      // Extract JSON from the response
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('No JSON found in AI response');
-
-      const parsed = JSON.parse(jsonMatch[0]) as Partial<AiryRoadmap>;
-
-      const phases = Array.isArray(parsed.phases) ? parsed.phases : [];
-      // The model can return syntactically valid JSON with nothing useful in
-      // it (e.g. "phases": []) — that parses fine and would otherwise reach
-      // the success return below with zero real content and no
-      // fallback_generated flag, indistinguishable from a real roadmap.
-      // Throwing here routes it through the same catch/fallback path as a
-      // genuine AI-call failure.
-      if (phases.length === 0) {
-        throw new Error('AI response parsed but contained no phases');
-      }
-
-      roadmap = {
-        id: parsed.id || `roadmap-${Date.now()}`,
-        title: parsed.title || (locale === 'id' ? 'Roadmap Transformasi' : 'Transformation Roadmap'),
-        createdAt: new Date().toISOString(),
-        source: source as AiryRoadmap['source'],
-        blueprintId,
-        phases,
-      };
-    } catch (aiErr) {
-      // Fallback: generate a sensible default roadmap if AI call fails. This
-      // used to be silent — `success: true` either way, with no way for a
-      // caller (or a health check) to tell a real AI-generated roadmap from
-      // this generic substitute. Set the flag ON the roadmap object itself
-      // (not just alongside it in the response) — the object is what
-      // `setRoadmap`/`saveRoadmap` persist to localStorage/Postgres, so a
-      // sibling response field would silently vanish on the next reload.
-      // Same pattern the blueprint route already uses for the same reason.
-      console.error('[roadmap/generate] AI call failed, using fallback:', aiErr);
-      roadmap = buildFallbackRoadmap(source, blueprintId, diagnosticContext, locale);
-      roadmap.fallback_generated = true;
-      return NextResponse.json({ success: true, roadmap });
+      throw err
+    } finally {
+      clearTimeout(timeoutId)
     }
 
-    return NextResponse.json({ success: true, roadmap });
-  } catch (err: any) {
-    console.error('[roadmap/generate]', err);
-    return NextResponse.json(
-      { success: false, error: err?.message ?? 'Failed to generate roadmap' },
-      { status: 500 }
-    );
-  }
-}
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'VPS bridge request failed' }))
+      return Response.json(
+        { success: false, error: errorData.message || 'VPS bridge request failed' },
+        { status: response.status },
+      )
+    }
 
-function buildFallbackRoadmap(source: string, blueprintId?: string, diagnosticContext: Record<string, any> = {}, locale: 'en' | 'id' = 'en'): AiryRoadmap {
-  const kpiTargets = deriveFallbackKpiTargets(diagnosticContext, locale);
-  const tr = (en: string, id: string) => locale === 'id' ? id : en
-  return {
-    id: `roadmap-${Date.now()}`,
-    title: tr('Transformation Roadmap', 'Roadmap Transformasi'),
-    createdAt: new Date().toISOString(),
-    source: source as AiryRoadmap['source'],
-    blueprintId,
-    phases: [
-      {
-        id: 'phase-1',
-        name: tr('Foundation & Quick Wins', 'Fondasi & Kemenangan Cepat'),
-        timeframe: tr('Month 1–3', 'Bulan 1–3'),
-        description: tr('Establish data infrastructure and deploy first automation workflows.', 'Membangun infrastruktur data dan menerapkan alur kerja otomasi pertama.'),
-        milestones: [
-          { id: 'm-1-1', title: tr('Audit existing data sources and integrations', 'Audit sumber data dan integrasi yang ada'), linkedWorkflowIds: [] },
-          { id: 'm-1-2', title: tr('Deploy first automated workflow (highest ROI)', 'Terapkan alur kerja terotomasi pertama (ROI tertinggi)'), linkedWorkflowIds: [] },
-          { id: 'm-1-3', title: tr('Train team on AI tools and processes', 'Latih tim mengenai alat dan proses AI'), linkedWorkflowIds: [] },
-        ],
-        kpis: [
-          { id: 'kpi-1-1', label: tr('Manual tasks automated', 'Tugas manual terotomasi'), target: '3+' },
-          { id: 'kpi-1-2', label: tr('Time saved per week', 'Waktu yang dihemat per minggu'), target: kpiTargets.hoursSavedPerWeek },
-        ],
-      },
-      {
-        id: 'phase-2',
-        name: tr('Scale & Integrate', 'Skalakan & Integrasikan'),
-        timeframe: tr('Month 4–6', 'Bulan 4–6'),
-        description: tr('Expand automation coverage and integrate AI into core business processes.', 'Perluas cakupan otomasi dan integrasikan AI ke proses bisnis inti.'),
-        milestones: [
-          { id: 'm-2-1', title: tr('Connect CRM and communication tools', 'Hubungkan CRM dan alat komunikasi'), linkedWorkflowIds: [] },
-          { id: 'm-2-2', title: tr('Deploy AI-assisted decision workflows', 'Terapkan alur kerja keputusan berbantuan AI'), linkedWorkflowIds: [] },
-          { id: 'm-2-3', title: tr('Establish monitoring and alerting', 'Bangun pemantauan dan pemberitahuan'), linkedWorkflowIds: [] },
-        ],
-        kpis: [
-          { id: 'kpi-2-1', label: tr('Workflows in production', 'Alur kerja di produksi'), target: '5+' },
-          { id: 'kpi-2-2', label: tr('Automation coverage', 'Cakupan otomasi'), target: kpiTargets.automationCoverage },
-        ],
-      },
-      {
-        id: 'phase-3',
-        name: tr('Optimise & Measure', 'Optimalkan & Ukur'),
-        timeframe: tr('Month 7–12', 'Bulan 7–12'),
-        description: tr('Refine workflows based on data, measure ROI, and plan next expansion.', 'Sempurnakan alur kerja berdasarkan data, ukur ROI, dan rencanakan ekspansi berikutnya.'),
-        milestones: [
-          { id: 'm-3-1', title: tr('Review KPI performance and optimise workflows', 'Tinjau kinerja KPI dan optimalkan alur kerja'), linkedWorkflowIds: [] },
-          { id: 'm-3-2', title: tr('Identify next automation opportunities', 'Identifikasi peluang otomasi berikutnya'), linkedWorkflowIds: [] },
-          { id: 'm-3-3', title: tr('Document learnings and update roadmap', 'Dokumentasikan pembelajaran dan perbarui roadmap'), linkedWorkflowIds: [] },
-        ],
-        kpis: [
-          { id: 'kpi-3-1', label: tr('ROI achieved', 'ROI tercapai'), target: kpiTargets.roiOutcome },
-          { id: 'kpi-3-2', label: tr('Team AI adoption rate', 'Tingkat adopsi AI tim'), target: '80%' },
-        ],
-      },
-    ],
-  };
+    const data = await response.json().catch(() => null)
+    if (!data || !data.job_id) {
+      return Response.json(
+        { success: false, error: 'The roadmap service did not return a job id. Please try again.' },
+        { status: 502 },
+      )
+    }
+
+    return Response.json({ success: true, status: 'queued', job_id: data.job_id }, { status: 202 })
+  } catch (err: any) {
+    console.error('[roadmap/generate] enqueue error:', err)
+    return Response.json(
+      { success: false, error: err?.message ?? 'Failed to generate roadmap' },
+      { status: 500 },
+    )
+  }
 }

@@ -34,6 +34,9 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
           'AUD — Australian Dollar (A$)',
           'JPY — Japanese Yen (¥)',
           'INR — Indian Rupee (₹)',
+          'AED — UAE Dirham (AED)',
+          'SAR — Saudi Riyal (SAR)',
+          'OMR — Omani Rial (OMR)',
           'Other'
         ],
         required: true
@@ -303,7 +306,12 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
       {
         id: 'data_infrastructure',
         question: 'What best describes your current data infrastructure?',
-        type: 'radio',
+        // 2026-08-25: radio → multiselect. Real stacks mix tiers (spreadsheets
+        // AND a database), and forcing one pick under-captured the truth.
+        // Consumers in services/deepDiagnostic.ts use substring matching via
+        // answerIncludes(), which handles both string (old saved answers) and
+        // string[] (new) — scoring takes the highest-maturity tier selected.
+        type: 'multiselect',
         options: [
           'Spreadsheets / manual files',
           'Databases (SQL / NoSQL)',
@@ -322,7 +330,11 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
         // load-bearing once shipped.
         id: 'data_capture_method',
         question: 'How is your day-to-day operational data typically captured at the point it happens?',
-        type: 'radio',
+        // 2026-08-25: radio → multiselect — field reality is mixed (POS at
+        // the till, WhatsApp photos from the warehouse). scoreData() matches
+        // via answerIncludes(); the best/worst scoring below picks the
+        // single best and single worst signal across selections.
+        type: 'multiselect',
         options: [
           'Directly into a digital system (form/app/POS) at the point of work',
           'Spreadsheet, filled in manually on a regular basis',
@@ -578,7 +590,9 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
       {
         id: 'delay_consequence',
         question: 'What is the consequence of delaying these operational improvements by 6-12 months?',
-        type: 'radio',
+        // 2026-08-25: radio → multiselect — delay consequences compound
+        // (efficiency AND revenue AND competitive position), not either/or.
+        type: 'multiselect',
         options: [
           'Significant competitive disadvantage',
           'Continued operational inefficiency and cost',

@@ -15,4 +15,7 @@ export const CURRENCY_RATES: Record<string, number> = {
   AUD: 1.53,
   JPY: 149,
   INR: 83,
+  AED: 3.67,
+  SAR: 3.75,
+  OMR: 0.385,
 }

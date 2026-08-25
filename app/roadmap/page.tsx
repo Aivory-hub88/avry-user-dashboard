@@ -9,6 +9,7 @@ import type { AiryRoadmap, AiryRoadmapPhase, AiryRoadmapKpi, AiryRoadmapMileston
 import { useRouterContext } from '@/contexts/RouterContext';
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole';
 import { asset } from '@/lib/asset'
+import { generateRoadmapAsync } from '@/lib/roadmapGeneration'
 
 // ─── colour tokens ────────────────────────────────────────────
 const T = {
@@ -1101,20 +1102,23 @@ export default function RoadmapPage() {
     try {
       const diagCtx = (() => { try { return JSON.parse(localStorage.getItem('aivory_deep_result') || '{}'); } catch { return {}; } })();
       const bpCtx   = (() => { try { return JSON.parse(localStorage.getItem('aivory_blueprint') || '{}'); } catch { return {}; } })();
-      const res = await fetch(asset('/api/roadmap/generate'), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: 'direct', diagnosticContext: diagCtx, blueprintContext: bpCtx, locale }),
+      // 2026-08-25: enqueue + poll (lib/roadmapGeneration.ts) — the old held
+      // request through /api/roadmap/generate died at the ~100s edge timeout
+      // whenever the model ran long, surfacing as "generation failed".
+      const { roadmap: rm } = await generateRoadmapAsync({
+        source: 'direct',
+        diagnosticContext: diagCtx,
+        blueprintContext: bpCtx,
+        locale,
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Generation failed');
-      saveRoadmap(data.roadmap);
-      setRoadmap(data.roadmap);
-      setOpenPhases({ [data.roadmap.phases[0]?.id ?? '']: true });
-      phaseRefs.current = data.roadmap.phases.map(() => ({ current: null }));
+      saveRoadmap(rm);
+      setRoadmap(rm);
+      setOpenPhases({ [rm.phases[0]?.id ?? '']: true });
+      phaseRefs.current = rm.phases.map(() => ({ current: null }));
       setActiveIdx(0);
       // Init checked state for new roadmap
       const newChecked: Record<string, Record<string, boolean>> = {};
-      for (const phase of data.roadmap.phases) { newChecked[phase.id] = {}; }
+      for (const phase of rm.phases) { newChecked[phase.id] = {}; }
       setAllChecked(newChecked);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to generate roadmap');

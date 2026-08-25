@@ -17,6 +17,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { calculateROI, dampConfidenceByEstimateBasis, parseBudgetMidpointUSD } from './deepDiagnostic'
+import { getLabourBenchmark } from '@/lib/currencyBands'
 import type { DiagnosticContext } from '@/types/diagnostic'
 
 type Q = DiagnosticContext['quantitative']
@@ -149,5 +150,67 @@ describe('parseBudgetMidpointUSD — EN and ID option labels must resolve to the
   it('"Tidak berlaku" / "Not applicable" (no $Nk figure) is null, not a crash', () => {
     expect(parseBudgetMidpointUSD('Tidak berlaku')).toBeNull()
     expect(parseBudgetMidpointUSD(undefined)).toBeNull()
+  })
+})
+
+describe('parseBudgetMidpointUSD — currency-aware band tables (2026-08-25)', () => {
+  it('IDR juta/miliar bands resolve to USD midpoints (EN canonical + ID display)', () => {
+    expect(parseBudgetMidpointUSD('Under Rp 100 juta', 'IDR')).toBe(3_125)
+    expect(parseBudgetMidpointUSD('Di bawah Rp 100 juta', 'IDR')).toBe(3_125)
+    expect(parseBudgetMidpointUSD('Rp 100 – 500 juta', 'IDR')).toBe(18_750)
+    expect(parseBudgetMidpointUSD('Rp 500 juta – Rp 1 miliar', 'IDR')).toBe(46_875)
+    expect(parseBudgetMidpointUSD('Rp 1 – 10 miliar', 'IDR')).toBe(343_750)
+    expect(parseBudgetMidpointUSD('Rp 10 – 100 miliar', 'IDR')).toBe(3_437_500)
+    expect(parseBudgetMidpointUSD('Di atas Rp 100 miliar', 'IDR')).toBe(9_375_000)
+  })
+
+  it('AED / SAR / OMR bands resolve to USD midpoints in both labels', () => {
+    expect(parseBudgetMidpointUSD('AED 25,000 – 100,000', 'AED')).toBe(17_000)
+    expect(parseBudgetMidpointUSD('AED 25.000 – 100.000', 'AED')).toBe(17_000)
+    expect(parseBudgetMidpointUSD('SAR 250,000 – 1,000,000', 'SAR')).toBe(166_667)
+    expect(parseBudgetMidpointUSD('OMR 2,500 – 10,000', 'OMR')).toBe(16_250)
+    expect(parseBudgetMidpointUSD('Di bawah OMR 2.500', 'OMR')).toBe(3_250)
+  })
+
+  it('"Tidak berlaku" band resolves to null in every new currency (no legacy fallthrough)', () => {
+    expect(parseBudgetMidpointUSD('Tidak berlaku', 'IDR')).toBeNull()
+    expect(parseBudgetMidpointUSD('Not applicable', 'AED')).toBeNull()
+    expect(parseBudgetMidpointUSD('Tidak berlaku', 'SAR')).toBeNull()
+    expect(parseBudgetMidpointUSD('Tidak berlaku', 'OMR')).toBeNull()
+  })
+
+  it('legacy $Nk answers still parse when the band table misses (old saved answers)', () => {
+    expect(parseBudgetMidpointUSD('$10k - $50k', 'IDR')).toBe(30_000)
+    expect(parseBudgetMidpointUSD('Di bawah $10K', 'AED')).toBe(5_000)
+  })
+
+  it('unrecognised free text stays null (no invented midpoints)', () => {
+    expect(parseBudgetMidpointUSD('anggaran saya rahasia', 'IDR')).toBeNull()
+  })
+})
+
+describe('per-country labour benchmarks (currency → wage anchor state machine)', () => {
+  it('every anchored currency reports its country benchmark label', () => {
+    for (const code of ['IDR', 'EUR', 'AED', 'SAR', 'OMR'] as const) {
+      expect(getLabourBenchmark(code)).not.toBeNull()
+    }
+    expect(getLabourBenchmark('USD')).toBeNull() // US industry table path
+  })
+
+  it('AED anchor ≈ AED 5.000/month ÷ 173 hrs, SAR ≈ SAR 4.000, OMR ≈ OMR 325', () => {
+    expect(getLabourBenchmark('AED')!.monthlyAnchorLocal).toBe(5_000)
+    expect(getLabourBenchmark('SAR')!.monthlyAnchorLocal).toBe(4_000)
+    expect(getLabourBenchmark('OMR')!.monthlyAnchorLocal).toBe(325)
+    expect(getLabourBenchmark('AED')!.hourlyLocal).toBeCloseTo(28.9, 1)
+    expect(getLabourBenchmark('OMR')!.hourlyLocal).toBeCloseTo(1.88, 2)
+  })
+
+  it('3-Year ROI is rate-invariant in the new currencies too', () => {
+    for (const code of ['AED', 'SAR', 'OMR'] as const) {
+      const r = calculateROI(CASES[1].q, code)
+      if (r.totalAnnualSavingsLocal == null || r.assumedBudgetMidpointLocal == null) return
+      const localFormula = ((r.totalAnnualSavingsLocal * 3 - r.assumedBudgetMidpointLocal) / r.assumedBudgetMidpointLocal) * 100
+      expect(Math.min(localFormula, 999)).toBeCloseTo(r.threeYearROIPercent!, 4)
+    }
   })
 })

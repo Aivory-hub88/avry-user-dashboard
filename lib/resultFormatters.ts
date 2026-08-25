@@ -13,6 +13,7 @@ import { getRate } from '@/lib/liveRates'
 export type CurrencyCode =
   | 'USD' | 'EUR' | 'GBP' | 'IDR'
   | 'SGD' | 'MYR' | 'AUD' | 'JPY' | 'INR'
+  | 'AED' | 'SAR' | 'OMR'
 
 interface CurrencyConfig {
   symbol: string
@@ -31,6 +32,9 @@ const CURRENCY_MAP: Record<CurrencyCode, CurrencyConfig> = {
   AUD: { symbol: 'A$',  thousands: ',', rateFromUSD: 1.53 },
   JPY: { symbol: '¥',   thousands: ',', rateFromUSD: 149 },
   INR: { symbol: '₹',   thousands: ',', rateFromUSD: 83 },
+  AED: { symbol: 'AED ', thousands: ',', rateFromUSD: 3.67 },
+  SAR: { symbol: 'SAR ', thousands: ',', rateFromUSD: 3.75 },
+  OMR: { symbol: 'OMR ', thousands: ',', rateFromUSD: 0.385 },
 }
 
 /**

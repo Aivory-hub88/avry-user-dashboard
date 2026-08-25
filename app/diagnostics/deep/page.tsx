@@ -116,16 +116,28 @@ export default function DeepDiagnosticPage() {
   }, [locale])
 
   const handleResponseChange = useCallback((questionId: string, value: any) => {
-    setPhaseData(prev => ({
-      ...prev,
-      [currentPhase]: {
-        ...prev[currentPhase],
-        responses: {
-          ...prev[currentPhase].responses,
-          [questionId]: value,
+    setPhaseData(prev => {
+      const nextResponses = {
+        ...prev[currentPhase].responses,
+        [questionId]: value,
+      }
+      // Currency switch invalidates band answers: annual_revenue/budget_range
+      // store the band label of the currency that was selected when they were
+      // answered — keeping them after a switch would silently mix scales
+      // (e.g. an IDR juta label scored as a USD $k band). Clear both so the
+      // user re-answers against the new currency's bands.
+      if (questionId === 'currency') {
+        delete nextResponses.annual_revenue
+        delete nextResponses.budget_range
+      }
+      return {
+        ...prev,
+        [currentPhase]: {
+          ...prev[currentPhase],
+          responses: nextResponses,
         },
-      },
-    }))
+      }
+    })
     // Clear validation error for this field on change
     setValidationErrors(prev => {
       if (!prev[questionId]) return prev

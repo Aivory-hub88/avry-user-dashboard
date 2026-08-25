@@ -387,6 +387,7 @@ import type {
   ImprovementItem,
 } from '@/types/diagnostic'
 import { parseCurrencyCode, formatCurrency, type CurrencyCode } from '@/lib/resultFormatters'
+import { getBudgetBands, getLabourBenchmark, resolveBandMidpointUSD } from '@/lib/currencyBands'
 
 // ---- String normalization helper ----
 // FIX #1: Normalize em-dash / en-dash / non-breaking spaces to regular hyphen+space
@@ -397,6 +398,20 @@ function normalizeStr(s: string | undefined): string {
     .replace(/[–—]/g, '-')       // em/en dash → hyphen
     .replace(/\u00A0/g, ' ')     // non-breaking space → space
     .trim()
+}
+
+/**
+ * Substring match against an answer that may be a single string (radio,
+ * legacy saved answers) or a string[] (multiselect — data_infrastructure,
+ * data_capture_method, delay_consequence went multi-pick 2026-08-25).
+ * String path = legacy substring semantics; array path = true if ANY chosen
+ * option contains the needle. Null-safe.
+ */
+function answerIncludes(answer: string | string[] | undefined | null, needle: string): boolean {
+  if (!answer) return false
+  if (typeof answer === 'string') return answer.includes(needle)
+  if (Array.isArray(answer)) return answer.some((v) => typeof v === 'string' && v.includes(needle))
+  return false
 }
 
 // ---- Numeric extraction helpers ----
@@ -415,13 +430,22 @@ function parsePct(val: string | undefined): number | null {
   return single ? parseInt(single[1], 10) : null
 }
 
-// FIX #3: locale-agnostic — was a literal-string map keyed only to the English
-// option labels ('Under $10k'), so every Indonesian submission ('Di bawah $10K')
-// silently missed and returned null, nulling out all budget-dependent ROI fields
-// (payback, 3-year ROI, NPV) for ID-locale users. Now extracts the $Nk figures
-// directly instead of matching the surrounding phrase.
-export function parseBudgetMidpointUSD(val: string | undefined): number | null {
+// FIX #3: locale-agnostic — extracts $Nk figures directly instead of matching
+// the surrounding phrase, so every locale's submission resolves.
+// 2026-08-25: currency-aware. When the caller knows the answer's currency,
+// the per-currency band tables (lib/currencyBands.ts) are matched FIRST —
+// this is what makes IDR juta/miliar bands, AED/SAR/OMR rial bands etc.
+// resolve to real USD midpoints. The legacy $Nk parser stays as the fallback
+// for old saved answers and for currencies still on the USD band set.
+export function parseBudgetMidpointUSD(val: string | undefined, currencyCode: CurrencyCode = 'USD'): number | null {
   if (!val) return null
+  const fromBand = resolveBandMidpointUSD('budget', currencyCode, val)
+  if (fromBand !== null) return fromBand
+  // Bands that exist but carry no figure ('Not applicable'/'Tidak berlaku')
+  // must NOT fall through to legacy parsing — they'd otherwise hit the
+  // $Nk regex and return null anyway, but being explicit keeps intent clear.
+  const bands = getBudgetBands(currencyCode)
+  if (bands.some((b) => b.en === val || b.id === val)) return null
   const norm = normalizeStr(val)
   const nums = [...norm.matchAll(/\$?(\d+(?:\.\d+)?)\s*[kK]/g)].map(
     (m) => parseFloat(m[1]) * 1_000
@@ -494,51 +518,25 @@ function getHourlyRateUSD(industry: string | undefined): number {
 // FIX: IDR reports must not price labour by running a US-centric industry
 // rate through the market FX rate — a $65/hr Tech/Software assumption at a
 // ~16,600 IDR/USD rate prices Indonesian labour at ~Rp 1,000,000/hour, ~30x
-// the real Jakarta wage floor. Anchor the IDR rate to the DKI Jakarta UMP
-// (Upah Minimum Provinsi) instead, keeping the same industry-relative
-// multipliers so a Tech company still costs proportionally more than
-// Manufacturing, just at a realistic absolute magnitude.
-//
+// the real Jakarta wage floor. Anchored per-country benchmarks (IDR → UMP DKI
+// Jakarta, EUR → Eurostat, AED/SAR/OMR → their own national anchors) live in
+// lib/currencyBands.ts — the table IS the currency→labour state machine; this
+// side only applies the industry multiplier on top of the local anchor.
 // UMP DKI Jakarta 2026 = Rp 5,729,876/month (Kepgub DKI Jakarta, +6.17% on
-// 2025's Rp 5,396,791, effective 1 Jan 2026). Update this constant when a
-// new UMP is announced (usually late November for the following year).
-const UMP_JAKARTA_MONTHLY_IDR = 5_729_876
-// Statutory monthly working-hour divisor for a 40-hour/5-day week
-// (Kepmenaker No. 102/MEN/VI/2004).
-const IDR_MONTHLY_WORK_HOURS = 173
-const UMR_JAKARTA_HOURLY_IDR = UMP_JAKARTA_MONTHLY_IDR / IDR_MONTHLY_WORK_HOURS // ≈ Rp 33,121/hr
-
-function getHourlyRateIDR(industry: string | undefined): number {
+// 2025's Rp 5,396,791, effective 1 Jan 2026). Update in LABOUR_BENCHMARKS
+// when a new UMP is announced (usually late November for the following year).
+function getHourlyRateLocal(currencyCode: CurrencyCode, industry: string | undefined): number | null {
+  const benchmark = getLabourBenchmark(currencyCode)
+  if (!benchmark) return null
   const usdRate = getHourlyRateUSD(industry)
   const industryMultiplier = usdRate / DEFAULT_HOURLY_RATE_USD // e.g. Tech 65/30 ≈ 2.17x
-  return Math.round(UMR_JAKARTA_HOURLY_IDR * industryMultiplier)
-}
-
-// EUR reports must not price EU labour off the US industry table either — the
-// same class of currency/labour-market mismatch the IDR fix above addresses.
-// Anchored to Eurostat's EU-27 average hourly labour cost (business economy,
-// all NACE activities) — most recently reported around €30/hr; treated here
-// as an approximate benchmark (EU-wide average masks large country variance,
-// e.g. ~€10/hr Bulgaria to ~€52/hr Luxembourg), not a client-specific figure,
-// same honesty standard as the IDR UMP anchor. Reuses the same industry
-// multiplier ratios as the US table so a Tech company still costs
-// proportionally more than Manufacturing, just at a EU-realistic magnitude.
-const EU_AVERAGE_HOURLY_RATE_EUR = 30
-
-function getHourlyRateEUR(industry: string | undefined): number {
-  const usdRate = getHourlyRateUSD(industry)
-  const industryMultiplier = usdRate / DEFAULT_HOURLY_RATE_USD
-  return Math.round(EU_AVERAGE_HOURLY_RATE_EUR * industryMultiplier)
+  return Math.round(benchmark.hourlyLocal * industryMultiplier)
 }
 
 /** Human-readable disclosure of which wage benchmark backs the hourly rate — surfaced in the report so the ROI figure's assumption is visible, not just its number. */
 function getRateBenchmarkLabel(currencyCode: CurrencyCode, locale: 'en' | 'id' = 'en'): string {
-  if (currencyCode === 'IDR') {
-    return locale === 'id' ? 'UMP DKI Jakarta 2026' : 'DKI Jakarta minimum wage (UMP) 2026'
-  }
-  if (currencyCode === 'EUR') {
-    return locale === 'id' ? 'rata-rata upah EU (estimasi Eurostat)' : 'EU average labour cost (Eurostat estimate)'
-  }
+  const benchmark = getLabourBenchmark(currencyCode)
+  if (benchmark) return locale === 'id' ? benchmark.labelId : benchmark.labelEn
   return locale === 'id' ? 'rate industri AS' : 'US industry benchmark'
 }
 
@@ -590,28 +588,21 @@ export function calculateROI(
   const SMALL_TEAM_RATE_FACTOR = 0.5
   const smallTeamRateApplied = (q.fteCountInScope ?? 1) <= 5
 
-  // For IDR, apply the small-team factor to the UMP-anchored Rupiah figure
-  // (rounds cleanly at Rupiah scale, e.g. 71,763 → 35,882) and only then
-  // derive the "USD" rate backwards (localRate / fxRate) so the existing
-  // *rate conversion below reproduces that exact Jakarta-realistic figure.
-  // Rounding at the pseudo-USD scale instead (≈4.6 → 2) would have thrown
-  // away most of the precision. This field stops being a literal USD number
-  // for IDR contexts, but it's only ever consumed inside this same
-  // currency's calculation, never compared across currencies.
+  // Currency→rate state machine: currencies with a per-country labour
+  // benchmark (see LABOUR_BENCHMARKS) round the LOCAL hourly figure first —
+  // at Rupiah/Dirham/Riyal scale — then derive the "USD" rate backwards
+  // (localRate / fxRate) so the report's displayed local number is the clean
+  // one, not a rounding artifact of converting a rounded USD number through
+  // the FX rate. Rounding at the pseudo-USD scale instead (≈4.6 → 2) would
+  // throw away most of the precision. The pseudo-USD field is only ever
+  // consumed inside this same currency's calculation, never compared across
+  // currencies.
   let baseHourlyRateUSD: number
   let hourlyRateUSD: number
-  if (currencyCode === 'IDR') {
-    const idrRate = getHourlyRateIDR(industry)
-    baseHourlyRateUSD = idrRate / rate
-    hourlyRateUSD = (smallTeamRateApplied ? Math.round(idrRate * SMALL_TEAM_RATE_FACTOR) : idrRate) / rate
-  } else if (currencyCode === 'EUR') {
-    // Same local-currency-first rounding as the IDR branch above — round the
-    // EUR figure at EUR scale, then derive the USD figure backwards, so the
-    // report's displayed € number is the clean one, not a rounding artifact
-    // of converting a rounded USD number through the FX rate.
-    const eurRate = getHourlyRateEUR(industry)
-    baseHourlyRateUSD = eurRate / rate
-    hourlyRateUSD = (smallTeamRateApplied ? Math.round(eurRate * SMALL_TEAM_RATE_FACTOR) : eurRate) / rate
+  const localRate = getHourlyRateLocal(currencyCode, industry)
+  if (localRate !== null) {
+    baseHourlyRateUSD = localRate / rate
+    hourlyRateUSD = (smallTeamRateApplied ? Math.round(localRate * SMALL_TEAM_RATE_FACTOR) : localRate) / rate
   } else {
     baseHourlyRateUSD = getHourlyRateUSD(industry)
     hourlyRateUSD = smallTeamRateApplied
@@ -975,16 +966,30 @@ function scoreData(a: DiagnosticAnswers): number {
   else if (a.data_quality?.includes('Moderate')) s += 5
   if (a.system_integration?.includes('Fully integrated')) s += 15
   else if (a.system_integration?.includes('Some integration')) s += 7
-  if (a.data_infrastructure?.includes('Modern data platform')) s += 15
-  else if (a.data_infrastructure?.includes('warehouse') || a.data_infrastructure?.includes('lake')) s += 10
-  else if (a.data_infrastructure?.includes('Databases')) s += 5
+  // data_infrastructure is multi-pick (2026-08-25): score the HIGHEST-maturity
+  // tier the user actually has, not the first match — claiming "spreadsheets
+  // AND a modern platform" is a modern-platform shop with a shadow-spreadsheet
+  // problem, worth the platform points.
+  if (answerIncludes(a.data_infrastructure, 'Modern data platform')) s += 15
+  else if (answerIncludes(a.data_infrastructure, 'warehouse') || answerIncludes(a.data_infrastructure, 'lake')) s += 10
+  else if (answerIncludes(a.data_infrastructure, 'Databases')) s += 5
   // Field-level capture discipline — separate axis from data_infrastructure
   // (tech stack). A company can have a proper database and still have staff
   // scribbling on paper and texting photos before someone re-enters it.
-  if (a.data_capture_method?.includes('Directly into a digital system')) s += 10
-  else if (a.data_capture_method?.includes('Spreadsheet, filled in manually')) s += 5
-  else if (a.data_capture_method?.includes('photographed and sent via WhatsApp')) s -= 10
-  else if (a.data_capture_method?.includes('No systematic record')) s -= 15
+  // Multi-pick: best signal scores up, worst signal still penalises — the
+  // else-if chain below intentionally takes the FIRST matching tier in
+  // best→worst order, but with multiple picks both the +10 and the −15 can
+  // legitimately coexist, so apply best-tier credit and worst-tier penalty
+  // independently.
+  const captureBest =
+    answerIncludes(a.data_capture_method, 'Directly into a digital system') ? 10
+    : answerIncludes(a.data_capture_method, 'Spreadsheet, filled in manually') ? 5
+    : 0
+  const captureWorst =
+    answerIncludes(a.data_capture_method, 'No systematic record') ? -15
+    : answerIncludes(a.data_capture_method, 'photographed and sent via WhatsApp') ? -10
+    : 0
+  s += captureBest + captureWorst
   return Math.min(100, s)
 }
 
@@ -1173,11 +1178,11 @@ const DATA_FACTORS: DriverFactor[] = [
   },
   {
     answerKey: 'data_infrastructure', maxPoints: 15,
-    evaluate: (a, locale) => a.data_infrastructure?.includes('Modern data platform')
+    evaluate: (a, locale) => answerIncludes(a.data_infrastructure, 'Modern data platform')
       ? { points: 15, label: locale === 'id' ? 'Platform data modern (streaming, katalog, tata kelola) telah tersedia' : 'A modern data platform (streaming, catalog, governance) is in place' }
-      : (a.data_infrastructure?.includes('warehouse') || a.data_infrastructure?.includes('lake'))
+      : (answerIncludes(a.data_infrastructure, 'warehouse') || answerIncludes(a.data_infrastructure, 'lake'))
         ? { points: 10, label: locale === 'id' ? 'Data warehouse atau data lake telah tersedia' : 'A data warehouse or data lake is in place' }
-        : a.data_infrastructure?.includes('Databases')
+        : answerIncludes(a.data_infrastructure, 'Databases')
           ? { points: 5, label: locale === 'id' ? 'Data berada dalam basis data tanpa warehouse/lake' : 'Data lives in databases without a warehouse/lake' }
           : { points: 0, label: locale === 'id' ? 'Infrastruktur data berupa spreadsheet/berkas manual' : 'Data infrastructure is spreadsheets/manual files' },
   },
@@ -1443,8 +1448,8 @@ const OPP_CANDIDATES: OppCandidate[] = [
     // no AI governance signals a people/skills gap, not just a tooling gap —
     // the automation opportunities above will underperform without it.
     trigger: (a) =>
-      a.data_capture_method?.includes('photographed and sent via WhatsApp') ||
-      a.data_capture_method?.includes('No systematic record') ||
+      answerIncludes(a.data_capture_method, 'photographed and sent via WhatsApp') ||
+      answerIncludes(a.data_capture_method, 'No systematic record') ||
       a.process_documentation === '0-25%' ||
       a.leadership_alignment?.includes('needs convincing') ||
       a.leadership_alignment?.includes('No alignment') ||
@@ -1531,8 +1536,8 @@ function buildTrainingTracks(
   const tracks: OpportunityTrainingTrack[] = []
 
   const messyCapture =
-    !!a.data_capture_method?.includes('photographed and sent via WhatsApp') ||
-    !!a.data_capture_method?.includes('No systematic record')
+    answerIncludes(a.data_capture_method, 'photographed and sent via WhatsApp') ||
+    answerIncludes(a.data_capture_method, 'No systematic record')
   const poorDataQuality = !!a.data_quality?.includes('Moderate') || !!a.data_quality?.includes('Poor')
   if (messyCapture || poorDataQuality) {
     tracks.push(id ? {
@@ -1787,8 +1792,9 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores, locale: Lo
   // FIX #10: Previously missing risk rules — caused 0 risks for cases that
   // clearly have constraint mismatches (confirmed under-detection in QA).
 
-  // Budget vs Ambition
-  const budgetMid = parseBudgetMidpointUSD(a.budget_range)
+  // Budget vs Ambition — currency-aware: an IDR "Rp 100 – 500 juta" answer
+  // and a USD "$10k - $50k" answer must hit the same rule threshold.
+  const budgetMid = parseBudgetMidpointUSD(a.budget_range, parseCurrencyCode(a.currency))
   const targetAuto = parsePct(a.target_automation)
   if (budgetMid !== null && budgetMid <= 5_000 && targetAuto !== null && targetAuto >= 75) {
     risks.push({
@@ -2067,7 +2073,7 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
 
   const currentAutoPct = parsePct(answers.automation_current)
   const targetAutoPct = answers.target_automation ? parsePct(answers.target_automation) : 70
-  const budgetMidpointUSD = parseBudgetMidpointUSD(answers.budget_range)
+  const budgetMidpointUSD = parseBudgetMidpointUSD(answers.budget_range, currencyCode)
   const timelineMonths = parseTimelineMonths(answers.success_timeline)
   const totalManualHoursWeekly = parseManualHoursWeekly(answers.manual_hours_weekly)
   const fteCountInScope = parseFteCount(answers.fte_count)
@@ -2129,7 +2135,11 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     leadershipAlignment: answers.leadership_alignment || '',
     priorAIAttempts: answers.prior_ai_attempts || '',
     resistanceSources: [],
-    delayConsequence: answers.delay_consequence || '',
+    // delay_consequence is multi-pick since 2026-08-25 — join for the
+    // qualitative context so the AI reads prose, not a serialized array.
+    delayConsequence: Array.isArray(answers.delay_consequence)
+      ? answers.delay_consequence.join('; ')
+      : answers.delay_consequence || '',
     errorTolerance: answers.risk_tolerance || '',
     dataResidency: answers.data_residency || '',
     annualRevenue: answers.annual_revenue || '',
