@@ -1017,6 +1017,35 @@ function WorkflowsPageInner() {
     setShowMore(false)
   }
 
+  const handleNewBlankWorkflow = async () => {
+    const wf: SavedWorkflow = {
+      workflow_id: `workflow_${Date.now()}`,
+      title: 'Blank Workflow',
+      status: 'draft',
+      source: 'n8n',
+      company_name: '',
+      trigger: 'Manual Trigger',
+      steps: [
+        { step: 1, action: 'Manual Trigger', tool: 'n8n-nodes-base.manualTrigger', output: '', type: 'trigger', config: {} },
+      ],
+      integrations: [],
+      estimated_time: '0',
+      automation_percentage: '0',
+      error_handling: '',
+      notes: '',
+      created_at: new Date().toISOString(),
+    }
+    try {
+      const created = await createWorkflow(savedToSpec(wf))
+      await refreshWorkflows()
+      setSelectedId(created.id)
+    } catch {
+      saveWorkflow(wf)
+      setLocalWorkflows(loadWorkflows())
+      setSelectedId(wf.workflow_id)
+    }
+  }
+
   const handleDownloadGuide = async (fmt: string = 'md') => {
     try {
       const steps = (selected?.steps ?? []) as unknown[]
@@ -1698,6 +1727,15 @@ function WorkflowsPageInner() {
             <div className={styles.workflowListHeader}>
               <span className={styles.workflowListTitle}>{t('title')}</span>
               <span className={styles.workflowListCount}>{workflows.length}</span>
+              <button
+                className={styles.workflowListCollapseBtn}
+                onClick={handleNewBlankWorkflow}
+                aria-label="New blank workflow"
+                title="New blank canvas"
+                style={{ fontSize: 15, lineHeight: 1, paddingBottom: 2 }}
+              >
+                +
+              </button>
               <button
                 className={styles.workflowListCollapseBtn}
                 onClick={() => setIsWorkflowListCollapsed(true)}
