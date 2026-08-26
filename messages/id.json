@@ -290,7 +290,11 @@
     "fallbackStrategyLabel": "Strategi Cadangan",
     "estimatedImpactLabel": "Dampak Estimasi",
     "expectedRoiLabel": "ROI yang Diharapkan",
-    "monthsUnit": "bulan"
+    "monthsUnit": "bulan",
+    "roadmapCtaEyebrow": "Langkah Berikutnya",
+    "roadmapCtaTitle": "Roadmap Transformasi",
+    "roadmapCtaDesc": "Ubah blueprint ini menjadi rencana eksekusi bertahap — gelombang terurut, penanggung jawab, dan target KPI yang bisa dipantau tim Anda dari kickoff hingga ROI.",
+    "roadmapProgressEstimate": "estimasi ~1 mnt"
   },
   "diagnostics": {
     "title": "Diagnostik",

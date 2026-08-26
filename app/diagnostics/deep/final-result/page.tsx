@@ -741,7 +741,7 @@ export default function FinalResultPage() {
             <p className={styles.emptyMessage}>{locale === 'id' ? 'Belum ada peluang yang teridentifikasi.' : 'No opportunities identified.'}</p>
           ) : (
             <div className={styles.matrixLayout}>
-              <div>
+              <div className={styles.matrixCol}>
                 <OpportunityMatrix
                   opportunities={opportunities}
                   highlightedId={highlightedId}

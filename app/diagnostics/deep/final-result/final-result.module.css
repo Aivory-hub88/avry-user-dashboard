@@ -354,7 +354,7 @@
 .matrixLayout {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 32px;
+  gap: 24px;
   align-items: start;
 }
 
@@ -364,10 +364,33 @@
   }
 }
 
+/* Matrix column stays in view while the cards scroll beside it — the scatter
+   IS the map of the cards, so losing it on scroll breaks the pairing. */
+.matrixCol {
+  position: sticky;
+  top: 24px;
+}
+
+@media (max-width: 767px) {
+  .matrixCol {
+    position: static;
+  }
+}
+
+/* Cards flow side by side (2-up beside the matrix on desktop, collapsing to
+   one column on narrow viewports) instead of one long stack — the section
+   height drops from N stacked cards to ⌈N/2⌉ rows. */
 .opportunityList {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 767px) {
+  .opportunityList {
+    grid-template-columns: 1fr;
+  }
 }
 
 .emptyMessage {

@@ -235,6 +235,24 @@ function isCorruptedString(s: any): boolean {
   return s === '[object Object]' || s.trim() === '[object Object]'
 }
 
+function formatElapsed(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60)
+  const s = totalSeconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+// Same time-based ease as the diagnostic result's Generate Blueprint bar
+// (services/deepDiagnostic.ts estimateBlueprintProgress): eases toward 95%
+// and never reaches 100 on its own — the real completion supplies the final
+// jump, so the bar never lies about being done before the server confirms.
+// Roadmap jobs are a single completion (no blueprint's generation ladder),
+// hence the shorter 60s expected duration.
+const EXPECTED_ROADMAP_DURATION_MS = 60_000
+
+function estimateRoadmapProgress(elapsedMs: number): number {
+  return Math.round(95 * (1 - Math.exp(-elapsedMs / EXPECTED_ROADMAP_DURATION_MS)))
+}
+
 function coerceToString(value: any, fallback = ''): string {
   if (value === null || value === undefined) return fallback
   if (typeof value === 'string') {
@@ -539,6 +557,10 @@ interface InsightsSectionProps {
   workflowErrors: Record<string, string>
   onGenerateWorkflow: (wf: BlueprintV1WorkflowModule) => void
   onViewWorkflows: () => void
+  generatingRoadmap?: boolean
+  roadmapPercent?: number
+  roadmapElapsedSec?: number
+  onGenerateRoadmap?: () => void
 }
 
 function BlueprintInsightsSection({
@@ -551,6 +573,10 @@ function BlueprintInsightsSection({
   workflowErrors,
   onGenerateWorkflow,
   onViewWorkflows,
+  generatingRoadmap = false,
+  roadmapPercent = 0,
+  roadmapElapsedSec = 0,
+  onGenerateRoadmap,
 }: InsightsSectionProps & { blueprint?: any }) {
   const t = useTranslations("blueprint")
   const tCommon = useTranslations("common")
@@ -915,6 +941,47 @@ function BlueprintInsightsSection({
           </div>
         </div>
       </div>
+
+      {/* Card 10 — Generate Roadmap CTA. Bottom placement: the primary next
+          action stays reachable at the end of the report instead of only in
+          the header, so the user never scrolls back up to act. Progress bar
+          mirrors the diagnostic result's Generate Blueprint bar (same
+          time-based ease, same label layout). */}
+      <div className={styles.roadmapCta}>
+        <div className={styles.roadmapCtaLeft}>
+          <span className={styles.roadmapCtaEyebrow}>{t("roadmapCtaEyebrow")}</span>
+          <h3 className={styles.roadmapCtaTitle}>{t("roadmapCtaTitle")}</h3>
+          <p className={styles.roadmapCtaDesc}>{t("roadmapCtaDesc")}</p>
+        </div>
+        <div className={styles.roadmapCtaRight}>
+          {generatingRoadmap && (
+            <div className={styles.roadmapProgress} role="progressbar" aria-valuenow={roadmapPercent} aria-valuemin={0} aria-valuemax={100}>
+              <div className={styles.roadmapProgressTrack}>
+                <div className={styles.roadmapProgressFill} style={{ width: `${roadmapPercent}%` }} />
+              </div>
+              <div className={styles.roadmapProgressLabel}>
+                <span>{roadmapPercent}%</span>
+                <span>
+                  {formatElapsed(roadmapElapsedSec)}
+                  {' · '}
+                  {t("roadmapProgressEstimate")}
+                </span>
+              </div>
+            </div>
+          )}
+          <button
+            className={styles.roadmapCtaButton}
+            onClick={onGenerateRoadmap}
+            disabled={generatingRoadmap || !onGenerateRoadmap}
+            aria-busy={generatingRoadmap}
+          >
+            <span>{generatingRoadmap ? t("generatingRoadmap") : t("generateRoadmap")}</span>
+            <svg className={styles.roadmapCtaArrow} width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 8h10M9 3.5 13.5 8 9 12.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+      </div>
     </section>
   )
 }
@@ -1053,6 +1120,9 @@ export default function BlueprintPage() {
 
   // Roadmap generation state
   const [generatingRoadmap, setGeneratingRoadmap] = useState(false)
+  const [roadmapPercent, setRoadmapPercent] = useState(0)
+  const [roadmapElapsedSec, setRoadmapElapsedSec] = useState(0)
+  const roadmapTickRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     // Load blueprint: try the per-user Postgres row first, fall back to localStorage
@@ -1106,6 +1176,11 @@ export default function BlueprintPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  // Stop the roadmap progress timer if the user leaves mid-generation
+  useEffect(() => () => {
+    if (roadmapTickRef.current) clearInterval(roadmapTickRef.current)
+  }, [])
+
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(''), 3000)
@@ -1147,6 +1222,10 @@ export default function BlueprintPage() {
   const handleGenerateRoadmap = async () => {
     if (!blueprint || generatingRoadmap) return
     setGeneratingRoadmap(true)
+    setRoadmapPercent(0)
+    setRoadmapElapsedSec(0)
+    if (roadmapTickRef.current) clearInterval(roadmapTickRef.current)
+    roadmapTickRef.current = setInterval(() => setRoadmapElapsedSec((s) => s + 1), 1000)
     try {
       const diagnosticContext = (() => {
         try { return JSON.parse(localStorage.getItem('aivory_deep_result') || '{}') } catch { return {} }
@@ -1158,13 +1237,19 @@ export default function BlueprintPage() {
         blueprintContext: blueprint,
         diagnosticContext,
         locale,
+        onProgress: (elapsedMs) => setRoadmapPercent(estimateRoadmapProgress(elapsedMs)),
       })
+      setRoadmapPercent(100)
       saveRoadmap(roadmap)
       showToast(t("roadmapGeneratedRedirecting"))
       setTimeout(() => router.push('/roadmap'), 800)
     } catch (err) {
       showToast(err instanceof Error ? err.message : t("roadmapGenerationFailed"))
+      setRoadmapPercent(0)
       setGeneratingRoadmap(false)
+    } finally {
+      if (roadmapTickRef.current) clearInterval(roadmapTickRef.current)
+      roadmapTickRef.current = null
     }
   }
 
@@ -1470,6 +1555,10 @@ export default function BlueprintPage() {
           workflowErrors={workflowErrors}
           onGenerateWorkflow={handleGenerateWorkflow}
           onViewWorkflows={() => router.push('/workflows')}
+          generatingRoadmap={generatingRoadmap}
+          roadmapPercent={roadmapPercent}
+          roadmapElapsedSec={roadmapElapsedSec}
+          onGenerateRoadmap={handleGenerateRoadmap}
         />
 
       </div>

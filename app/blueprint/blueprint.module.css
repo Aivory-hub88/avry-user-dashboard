@@ -2048,6 +2048,160 @@
   font-weight: 600;
 }
 
+/* ── Generate Roadmap CTA (bottom) ─────────────────────────
+   Sister surface of the diagnostic result's Generate Blueprint CTA: same
+   accent-tinted gradient, hairline accent border, one solid primary action
+   with real press feedback, and a time-based progress bar while generating. */
+.roadmapCta {
+  background:
+    radial-gradient(120% 160% at 100% 0%, rgba(183, 203, 166, 0.09) 0%, rgba(183, 203, 166, 0) 55%),
+    linear-gradient(180deg, #3d3d39 0%, #383834 100%);
+  border: 1px solid rgba(183, 203, 166, 0.22);
+  border-radius: 14px;
+  padding: 28px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 28px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.roadmapCtaLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.roadmapCtaEyebrow {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: #b7cba6;
+}
+
+.roadmapCtaTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: #f4f4f2;
+  margin: 0;
+}
+
+.roadmapCtaDesc {
+  font-size: 0.875rem;
+  color: #98988f;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 540px;
+}
+
+.roadmapCtaRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.roadmapCtaButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #b7cba6;
+  color: #26301f;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 22px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  font-family: 'Manrope', sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.roadmapCtaButton:hover:not(:disabled) {
+  background-color: #c6d8b5;
+}
+
+.roadmapCtaButton:active:not(:disabled) {
+  transform: scale(0.98);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.roadmapCtaButton:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.roadmapCtaArrow {
+  flex-shrink: 0;
+  transition: transform 150ms ease;
+}
+
+.roadmapCtaButton:hover:not(:disabled) .roadmapCtaArrow {
+  transform: translateX(2px);
+}
+
+.roadmapProgress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 220px;
+  margin-bottom: 2px;
+}
+
+.roadmapProgressTrack {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.roadmapProgressFill {
+  height: 100%;
+  border-radius: 2px;
+  background: #b7cba6;
+  transition: width 5s linear;
+}
+
+.roadmapProgressLabel {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: #98988f;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 768px) {
+  .roadmapCta {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 24px 22px;
+  }
+
+  .roadmapCtaRight {
+    width: 100%;
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roadmapCtaButton:active:not(:disabled) {
+    transform: none;
+  }
+
+  .roadmapCtaButton:hover:not(:disabled) .roadmapCtaArrow {
+    transform: none;
+  }
+}
+
 /* Responsive */
 @media (max-width: 1023px) {
   .heroLevers {

@@ -290,7 +290,11 @@
     "fallbackStrategyLabel": "Fallback Strategy",
     "estimatedImpactLabel": "Estimated Impact",
     "expectedRoiLabel": "Expected ROI",
-    "monthsUnit": "months"
+    "monthsUnit": "months",
+    "roadmapCtaEyebrow": "Next Step",
+    "roadmapCtaTitle": "Transformation Roadmap",
+    "roadmapCtaDesc": "Turn this blueprint into a phased, milestone-driven execution plan — sequenced waves, owners, and KPI targets your team can track from kickoff to ROI.",
+    "roadmapProgressEstimate": "estimated ~1 min"
   },
   "diagnostics": {
     "title": "Diagnostics",
