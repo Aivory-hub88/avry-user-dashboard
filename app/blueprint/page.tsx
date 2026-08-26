@@ -17,6 +17,8 @@ import { useLocaleContext } from '@/hooks/useLocale'
 import { saveRoadmap } from '@/hooks/useRoadmap'
 import { asset } from '@/lib/asset'
 import { generateRoadmapAsync } from '@/lib/roadmapGeneration'
+import { selectSoftwareRecommendations, formatPickPrice } from '@/lib/softwareCatalog'
+import { getRate } from '@/lib/liveRates'
 
 // ── Lucide-style inline SVG icons ────────────────────────────────────────────
 function IconDatabase() {
@@ -561,6 +563,7 @@ interface InsightsSectionProps {
   roadmapPercent?: number
   roadmapElapsedSec?: number
   onGenerateRoadmap?: () => void
+  locale?: 'en' | 'id'
 }
 
 function BlueprintInsightsSection({
@@ -577,10 +580,27 @@ function BlueprintInsightsSection({
   roadmapPercent = 0,
   roadmapElapsedSec = 0,
   onGenerateRoadmap,
+  locale = 'en',
 }: InsightsSectionProps & { blueprint?: any }) {
   const t = useTranslations("blueprint")
   const tCommon = useTranslations("common")
   const s = mapBlueprintToInsights(blueprint)
+
+  // Diagnostic context — the same source of truth the final-result page uses
+  // for its Training/SDK sections. Loaded post-mount (client-only) so SSR and
+  // hydration always agree; the cards simply render after it arrives.
+  const [diagCtx, setDiagCtx] = useState<any>(null)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('aivory_diagnostic_context')
+      // Same fetch-on-mount/set-state pattern the final-result page documents —
+      // not restructuring this component for the React Compiler style rule.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDiagCtx(raw ? JSON.parse(raw) : null)
+    } catch {
+      setDiagCtx(null)
+    }
+  }, [])
 
   function ArchIcon({ type }: { type: string }) {
     if (type === 'database') return <IconDatabase />
@@ -703,6 +723,110 @@ function BlueprintInsightsSection({
           </p>
         </div>
       </div>
+
+      {/* Card 5b — Recommended Training Program — parity with the final-result
+          page and the PDF: same opportunities[].trainingTracks from the
+          diagnostic engine, so the blueprint never invents a different
+          curriculum. */}
+      {(() => {
+        const opps = (locale === 'id' && Array.isArray(diagCtx?.opportunitiesId) && diagCtx.opportunitiesId.length > 0)
+          ? diagCtx.opportunitiesId
+          : (Array.isArray(diagCtx?.opportunities) ? diagCtx.opportunities : [])
+        const trainingOpp = opps.find((o: any) => Array.isArray(o?.trainingTracks) && o.trainingTracks.length > 0)
+        if (!trainingOpp) return null
+        return (
+          <div className={styles.insightCard}>
+            <h3 className={styles.insightCardTitle}>{locale === 'id' ? 'Program Pelatihan yang Direkomendasikan' : 'Recommended Training Program'}</h3>
+            <div className={styles.insightCardBody}>
+              <p className={styles.insightParagraph}>
+                {locale === 'id'
+                  ? `Sejalan dengan hasil diagnostik: ${trainingOpp.title} diurai menjadi jalur pelatihan berikut — keterampilan dulu, tool kemudian.`
+                  : `Aligned with your diagnostic result: ${trainingOpp.title} breaks down into the following tracks — skills first, tools second.`}
+              </p>
+              <div style={{ display: 'grid', gap: 12 }}>
+                {trainingOpp.trainingTracks!.map((track: any, i: number) => (
+                  <div key={i} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#f0f0f0' }}>
+                      {locale === 'id' ? `${track.headline} untuk ${track.audience}` : `${track.headline} for ${track.audience}`}
+                    </div>
+                    <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: '0.88rem', color: '#c6c6bf' }}>
+                      {(track.topics || []).map((tp: string, j: number) => <li key={j}>{tp}</li>)}
+                    </ul>
+                    {Array.isArray(track.tools) && track.tools.length > 0 && (
+                      <div style={{ marginTop: 8, fontSize: '0.82rem', color: '#9a9a92' }}>
+                        {locale === 'id' ? 'Tool: ' : 'Tools: '}{track.tools.join(', ')}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Card 5c — Recommended SDK & Software — parity with the final-result
+          page and the PDF: the same deterministic catalog match over this
+          assessment's own answers (lib/softwareCatalog.ts), never LLM-invented,
+          so every surface recommends the same stack. */}
+      {(() => {
+        if (!diagCtx) return null
+        const currencyCode = (diagCtx.currency || 'USD') as any
+        const opps = (locale === 'id' && Array.isArray(diagCtx.opportunitiesId) && diagCtx.opportunitiesId.length > 0)
+          ? diagCtx.opportunitiesId
+          : (Array.isArray(diagCtx.opportunities) ? diagCtx.opportunities : [])
+        const picks = selectSoftwareRecommendations({
+          currency: currencyCode,
+          industry: diagCtx.qualitative?.industry,
+          painPoints: Array.isArray(diagCtx.qualitative?.topPainPoints) ? diagCtx.qualitative.topPainPoints : [],
+          opportunityTitles: opps.map((o: any) => o.title).filter(Boolean),
+          budgetMidpointUSD: diagCtx.calculations?.assumedBudgetMidpointUSD ?? null,
+          fteCountInScope: diagCtx.quantitative?.fteCountInScope ?? null,
+        })
+        if (picks.length === 0) return null
+        const rate = getRate(currencyCode)
+        return (
+          <div className={styles.insightCard}>
+            <h3 className={styles.insightCardTitle}>{locale === 'id' ? 'Rekomendasi SDK & Software' : 'Recommended SDK & Software'}</h3>
+            <div className={styles.insightCardBody}>
+              <p className={styles.insightParagraph}>
+                {locale === 'id'
+                  ? 'Dicocokkan dengan jawaban diagnostik Anda — dipilih agar transformasi bisa dimulai dari implementasi yang paling simpel dulu, baru ditingkatkan sesuai kebutuhan.'
+                  : 'Matched to your diagnostic answers — chosen so your transformation can start with the simplest possible implementation first, then scale as needed.'}
+              </p>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {picks.map((pick) => (
+                  <div key={pick.name} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#f0f0f0' }}>{pick.name}</div>
+                      <div style={{ fontSize: '0.82rem', color: '#9a9a92' }}>{formatPickPrice(pick.priceUSD, currencyCode, rate, locale)}<span> *</span></div>
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#9a9a92', marginTop: 2 }}>
+                      {locale === 'id' ? pick.category.id : pick.category.en}
+                    </div>
+                    <div style={{ fontSize: '0.88rem', color: '#c6c6bf', marginTop: 6 }}>
+                      {locale === 'id' ? pick.reason.id : pick.reason.en}
+                    </div>
+                    <a
+                      href={pick.vendorUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: '0.82rem', color: '#8fa683', display: 'inline-block', marginTop: 6 }}
+                    >
+                      {pick.vendorUrl.replace('https://', '')} ↗
+                    </a>
+                  </div>
+                ))}
+              </div>
+              <p style={{ margin: '10px 0 0', fontSize: '0.8rem', fontWeight: 600, color: '#9a9a92' }}>
+                {locale === 'id'
+                  ? '* Harga entry-tier publik, dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
+                  : '* Public entry-tier prices, subject to change at any time — always verify with the official vendor before purchasing.'}
+              </p>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Card 6 — Workflow Modules */}
       <div className={styles.insightCard}>
@@ -1559,6 +1683,7 @@ export default function BlueprintPage() {
           roadmapPercent={roadmapPercent}
           roadmapElapsedSec={roadmapElapsedSec}
           onGenerateRoadmap={handleGenerateRoadmap}
+          locale={locale}
         />
 
       </div>
