@@ -198,11 +198,38 @@ export function spacedText(
 // asset() is required here because these are plain fetch() calls, which,
 // unlike next/image or next/link, do NOT get the Next.js basePath ("/dashboard")
 // auto-prepended. Without it these 404 in production (see cover image bug).
+//
+// HARDENING (2026-08-26, after a field report of garbled/overlapping glyphs in
+// a customer PDF that could not be reproduced from the same code + data):
+//  1. Every fetched TTF is validated (TrueType/OTTO magic bytes + minimum
+//     size) BEFORE embedding — a truncated or HTML-error-page response can
+//     never reach jsPDF's font parser, which would silently produce a
+//     corrupt embedded font (exactly the garbled-glyph class).
+//  2. Font URLs carry a version query (?v=FONT_ASSET_VERSION) so a stale
+//     cached copy from a previous deploy can never be served after the font
+//     files change.
+//  3. jsPDF's TTF SUBSETTING is disabled (subset.encode patched to return the
+//     full original font). The subsetter rewrites glyph tables and glyph IDs
+//     — the one component that has historically produced environment-
+//     dependent glyph corruption on long/multi-page documents. Full fonts
+//     cost ~350KB extra PDF size; correct glyphs are worth it.
+const FONT_ASSET_VERSION = '20260826'
+
+/** TrueType magic: 0x00010000, 'OTTO', 'true', or 'ttcf'. 64KB floor sanity. */
+function isValidTtf(buf: ArrayBuffer): boolean {
+  if (buf.byteLength < 65536) return false
+  const b = new Uint8Array(buf, 0, 4)
+  const magic = String.fromCharCode(b[0], b[1], b[2], b[3])
+  return b[0] === 0x00 && b[1] === 0x01 && b[2] === 0x00 && b[3] === 0x00
+    || magic === 'OTTO' || magic === 'true' || magic === 'ttcf'
+}
+
 async function fetchAsBase64(url: string): Promise<string | null> {
   try {
     const r = await fetch(url)
     if (!r.ok) return null
     const buf = await r.arrayBuffer()
+    if (!isValidTtf(buf)) return null
     const bytes = new Uint8Array(buf)
     let binary = ''
     const chunk = 0x8000
@@ -215,11 +242,30 @@ async function fetchAsBase64(url: string): Promise<string | null> {
   }
 }
 
+/**
+ * Embeds the FULL original font instead of jsPDF's glyph-table-rewriting
+ * subset. Content streams, /W widths and ToUnicode all reference ORIGINAL
+ * glyph IDs, so the untouched original font is always self-consistent.
+ * No-op when the font entry/metadata shape ever changes upstream.
+ */
+function disableFontSubsetting(pdf: jsPDF, fontName: string, styles: string[]): void {
+  for (const style of styles) {
+    try {
+      const entry = (pdf as any).getFont(fontName, style)
+      const metadata = entry?.metadata
+      if (metadata?.subset?.encode && metadata?.rawData) {
+        const full = metadata.rawData
+        metadata.subset.encode = () => full
+      }
+    } catch { /* font not registered — nothing to harden */ }
+  }
+}
+
 export async function loadManrope(pdf: jsPDF): Promise<void> {
   try {
     const [regular, bold] = await Promise.all([
-      fetchAsBase64(asset('/fonts/Manrope-Regular.ttf')),
-      fetchAsBase64(asset('/fonts/Manrope-Bold.ttf')),
+      fetchAsBase64(asset(`/fonts/Manrope-Regular.ttf?v=${FONT_ASSET_VERSION}`)),
+      fetchAsBase64(asset(`/fonts/Manrope-Bold.ttf?v=${FONT_ASSET_VERSION}`)),
     ])
 
     if (regular) {
@@ -231,16 +277,18 @@ export async function loadManrope(pdf: jsPDF): Promise<void> {
       pdf.addFont('Manrope-Bold.ttf', 'Manrope', 'bold')
     }
     FONT_LOADED = !!(regular && bold)
+    if (FONT_LOADED) disableFontSubsetting(pdf, 'Manrope', ['normal', 'bold'])
   } catch {
     FONT_LOADED = false
   }
 
   try {
-    const doto = await fetchAsBase64(asset('/fonts/Doto-Regular.ttf'))
+    const doto = await fetchAsBase64(asset(`/fonts/Doto-Regular.ttf?v=${FONT_ASSET_VERSION}`))
     if (doto) {
       pdf.addFileToVFS('Doto-Regular.ttf', doto)
       pdf.addFont('Doto-Regular.ttf', 'Doto', 'normal')
       DOTO_LOADED = true
+      disableFontSubsetting(pdf, 'Doto', ['normal'])
     }
   } catch {
     DOTO_LOADED = false
