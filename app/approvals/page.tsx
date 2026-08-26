@@ -5,8 +5,8 @@ import {
   listPendingApprovals,
   resolveApproval,
   describeTool,
-  type PendingApproval,
 } from "@/lib/agentApprovals"
+import type { PendingApproval } from "@/lib/agentApprovals"
 
 function relativeTime(iso: string): string {
   const then = new Date(iso).getTime()
