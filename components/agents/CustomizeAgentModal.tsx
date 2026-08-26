@@ -796,6 +796,10 @@ export default function CustomizeAgentModal({
       for (const key of Object.keys(EMPTY) as FieldKey[]) {
         payload[key as keyof AgentProfile] = fields[key].trim() || null;
       }
+      // Agent name is no longer operator-editable (locked to "Aivory" so
+      // nobody's misled into thinking the agent's own branding can change)
+      // -- every save now normalises any old custom value back to default.
+      payload.agent_name = null;
       await saveAgentProfile(agentType, payload);
       setHasProfile(true);
       setSaved(true);
@@ -895,11 +899,18 @@ export default function CustomizeAgentModal({
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Agent name" value={fields.agent_name} limit={FIELD_LIMITS.agent_name} onChange={set('agent_name')} placeholder="e.g. Sari" />
+                  <div>
+                    <div className="flex items-baseline justify-between mb-1.5">
+                      <label className="text-white/70 text-[12px] font-medium">Agent name</label>
+                    </div>
+                    <div className={`${inputClass} flex items-center text-white/45 cursor-not-allowed`}>
+                      Aivory
+                    </div>
+                  </div>
                   <Field label="Business name" value={fields.business_name} limit={FIELD_LIMITS.business_name} onChange={set('business_name')} placeholder="e.g. Toko Baju Melati" />
                 </div>
                 <p className="text-white/60 text-[12px] leading-relaxed -mt-2">
-                  <strong className="text-white/90 font-semibold">This is how your agent introduces itself inside the conversation — it does not change the bot&apos;s own account name shown in Discord/WhatsApp/Telegram, which stays &quot;Aivory Agent&quot;.</strong>
+                  <strong className="text-white/90 font-semibold">Your agent is always introduced as Aivory — that stays fixed. Business name, knowledge, and everything below is what you customise.</strong>
                 </p>
                 <MultiSelect
                   label="Tone of voice"
