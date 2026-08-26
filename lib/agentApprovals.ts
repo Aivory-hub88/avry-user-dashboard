@@ -56,3 +56,17 @@ export async function resolveApproval(
   if (!res.ok) throw new Error(`Failed to resolve approval (${res.status})`)
   return res.json()
 }
+
+export function describeTool(toolName: string): string {
+  const [server, action] = toolName.includes('__') ? toolName.split('__') : [null, toolName]
+  const toolkit = server
+    ?.replace(/^composio-/, '')
+    .replace(/-[a-z]+$/, '')
+    .replace(/^\w/, (c) => c.toUpperCase()) ?? null
+  const readable = action
+    .replace(/^[A-Z]+_/, '')
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/^\w/, (c) => c.toUpperCase())
+  return toolkit ? `${toolkit} — ${readable}` : readable
+}
