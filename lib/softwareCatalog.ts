@@ -382,7 +382,7 @@ export function selectSoftwareRecommendations(input: {
 }
 
 /**
- * Entry price rendered in the report's display currency, e.g. "≈ Rp 300 rb/bln".
+ * Entry price rendered in the report's display currency, e.g. "~ Rp 300 rb/bln".
  * `rate` is the USD→local FX rate the report already uses for its ROI figures
  * (getRate() after ensureLiveRates()) — passing it in keeps this module pure
  * and the price consistent with every other number on the page.
@@ -390,5 +390,7 @@ export function selectSoftwareRecommendations(input: {
 export function formatPickPrice(priceUSD: number, currency: CurrencyCode, rate: number, locale: 'en' | 'id'): string {
   if (priceUSD === 0) return locale === 'id' ? 'Gratis / self-host' : 'Free / self-host'
   const label = formatCompactLocal(Math.round(priceUSD * rate), currency)
-  return locale === 'id' ? `≈ ${label}/bln` : `≈ ${label}/mo`
+  // "~" not "≈": the PDF SDK section draws with base-14 Helvetica (WinAnsi),
+  // which has no ≈ glyph — it rendered as garbage ("H). Tilde is safe everywhere.
+  return locale === 'id' ? `~ ${label}/bln` : `~ ${label}/mo`
 }

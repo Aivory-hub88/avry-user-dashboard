@@ -370,6 +370,19 @@ export function formatMonths(value: number | null | undefined, locale: ResultLoc
   return rounded === 1 ? '1 month' : `${rounded} months`
 }
 
+/**
+ * Payback display cap. Beyond 60 months a precise figure reads as false
+ * precision — "18.0 years" on net savings is arithmetic, not a forecast
+ * anyone should act on. Past 5 years the honest display is "> 5 tahun":
+ * the exact value stays in the data, the UI stops presenting absurdity
+ * as a plan.
+ */
+export function formatPaybackCapped(value: number | null | undefined, locale: ResultLocale = 'en'): string {
+  if (value === null || value === undefined || !isFinite(value) || isNaN(value)) return '—'
+  if (value > 60) return locale === 'id' ? '> 5 tahun' : '> 5 yrs'
+  return formatMonths(value, locale)
+}
+
 /** Format an ISO date string as "15 Jun 2025" (id: "15 Jun 2025" with Indonesian month names). */
 export function formatDate(isoString: string | null | undefined, locale: ResultLocale = 'en'): string {
   if (!isoString) return '—'

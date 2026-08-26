@@ -27,6 +27,7 @@ import {
   formatLocalAmount,
   formatPercent,
   formatMonths,
+  formatPaybackCapped,
   humanizeDimensionKey,
   parseCurrencyCode,
   type CurrencyCode,
@@ -831,15 +832,15 @@ export default function FinalResultPage() {
                 <span className={styles.executiveInsightLabel}>{locale === 'id' ? 'Rekomendasi SDK & Software' : 'Recommended SDK & Software'}</span>
                 <p style={{ margin: '0 0 12px', opacity: 0.8, fontSize: '0.9rem' }}>
                   {locale === 'id'
-                    ? 'Dicocokkan dengan jawaban diagnostik Anda (harga entry-tier, pembanding saja — cek vendor untuk harga terkini).'
-                    : 'Matched to your diagnostic answers (entry-tier pricing, for comparison — check vendors for current pricing).'}
+                    ? 'Dicocokkan dengan jawaban diagnostik Anda — dipilih agar transformasi bisa dimulai dari implementasi yang paling simpel dulu, baru ditingkatkan sesuai kebutuhan.'
+                    : 'Matched to your diagnostic answers — chosen so your transformation can start with the simplest possible implementation first, then scale as needed.'}
                 </p>
                 <div style={{ display: 'grid', gap: 10 }}>
                   {picks.map((pick) => (
                     <div key={pick.name} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                         <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{pick.name}</div>
-                        <div style={{ fontSize: '0.82rem', opacity: 0.75 }}>{formatPickPrice(pick.priceUSD, currencyCode, rate, locale)}</div>
+                        <div style={{ fontSize: '0.82rem', opacity: 0.75 }}>{formatPickPrice(pick.priceUSD, currencyCode, rate, locale)}<span title={locale === 'id' ? 'Harga entry-tier publik, dapat berubah' : 'Public entry-tier price, subject to change'}> *</span></div>
                       </div>
                       <div style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: 2 }}>
                         {locale === 'id' ? pick.category.id : pick.category.en}
@@ -858,6 +859,11 @@ export default function FinalResultPage() {
                     </div>
                   ))}
                 </div>
+                <p style={{ margin: '10px 0 0', opacity: 0.55, fontSize: '0.75rem' }}>
+                  {locale === 'id'
+                    ? '* Harga entry-tier publik, dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
+                    : '* Public entry-tier prices, subject to change at any time — always verify with the official vendor before purchasing.'}
+                </p>
               </div>
             )
           })()}
@@ -907,18 +913,29 @@ export default function FinalResultPage() {
               confidenceLevel={calculations.confidenceLevel}
               locale={locale}
             />
-            <ROIMetricTile label={locale === 'id' ? 'Periode Payback' : 'Payback Period'} value={calculations.paybackMonths} formatter={(v) => formatMonths(v, locale)} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Periode Payback' : 'Payback Period'} value={calculations.paybackMonths} formatter={(v) => formatPaybackCapped(v, locale)} subtitle={locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile
               label={locale === 'id' ? 'ROI 3 Tahun' : '3-Year ROI'}
               value={calculations.threeYearROIPercent}
               formatter={(v) => v >= 999 ? '>999%' : formatPercent(v, locale)}
+              subtitle={locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget'}
               confidenceLevel={calculations.confidenceLevel}
               locale={locale}
             />
             <ROIMetricTile label={locale === 'id' ? 'NPV 3 Tahun' : '3-Year NPV'} value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Value kini bersih @ diskonto 10%' : 'Net present value @ 10% discount'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Biaya Berjalan Tahunan' : 'Annual Ongoing Cost'} value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Estimasi lisensi, pemeliharaan & dukungan' : 'Est. licenses, maintenance & support'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Penghematan Bersih Tahunan' : 'Net Annual Savings'} value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Setelah biaya berjalan' : 'After ongoing cost'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
-            <ROIMetricTile label={locale === 'id' ? 'Periode Payback Bersih' : 'Net Payback Period'} value={(calculations as any).netPaybackMonths ?? null} formatter={(v) => formatMonths(v, locale)} subtitle={locale === 'id' ? 'Berdasarkan penghematan bersih' : 'On net savings'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Periode Payback Bersih' : 'Net Payback Period'} value={(calculations as any).netPaybackMonths ?? null} formatter={(v) => formatPaybackCapped(v, locale)} subtitle={locale === 'id' ? 'Berdasarkan penghematan bersih' : 'On net savings'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            {totalAnnualSavingsLocal != null && totalAnnualSavingsLocal > 0 && (
+              <ROIMetricTile
+                label={locale === 'id' ? 'Batas Investasi Impas' : 'Break-even Investment'}
+                value={totalAnnualSavingsLocal * 2}
+                formatter={fmtLocal}
+                subtitle={locale === 'id' ? 'Investasi maksimal agar payback ≤ 24 bulan — di atas angka ini, kasus bisnis 3 tahun menjadi negatif' : 'Max investment for a ≤ 24-month payback — above this, the 3-year case turns negative'}
+                confidenceLevel={calculations.confidenceLevel}
+                locale={locale}
+              />
+            )}
             <ROIMetricTile
               label={locale === 'id' ? 'Biaya Keterlambatan Operasional (90 hari)' : 'Operational Cost of Delay (90 days)'}
               value={costOfInaction90DaysLocal}
@@ -1090,7 +1107,7 @@ export default function FinalResultPage() {
                   <li className={styles.stepRow}>
                     <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 5 — Periode payback' : 'Step 5 — Payback period'}</span>
                     <span className={styles.stepValue}>
-                      {calculations.paybackMonths != null ? formatMonths(calculations.paybackMonths, locale) : '—'}{' '}
+                      {calculations.paybackMonths != null ? formatPaybackCapped(calculations.paybackMonths, locale) : '—'}{' '}
                       = <strong>{fmtLocal(calculations.assumedBudgetMidpointLocal)}</strong> {locale === 'id' ? 'investasi ÷' : 'investment ÷'} {fmtLocal(calculations.totalAnnualSavingsLocal)}/{locale === 'id' ? 'thn' : 'yr'} × 12
                       {' '}{locale === 'id' ? '(titik tengah kisaran anggaran yang Anda pilih)' : '(midpoint of your selected budget range)'}
                     </span>

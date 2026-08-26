@@ -2692,12 +2692,12 @@ export async function exportReportToPdf(
       y = ensureSpace(pdf, y, locale === 'id' ? 40 : 35)
       y = tocSection(y, locale === 'id' ? 'Rekomendasi SDK & Software' : 'Recommended SDK & Software')
       y = renderNarrative(pdf, y, locale === 'id'
-        ? 'Dicocokkan dengan jawaban diagnostik Anda. Harga entry-tier untuk pembanding — cek vendor untuk harga terkini.'
-        : 'Matched to your diagnostic answers. Entry-tier pricing for comparison — check vendors for current pricing.')
+        ? 'Dicocokkan dengan jawaban diagnostik Anda — dipilih agar transformasi bisa dimulai dari implementasi yang paling simpel dulu, baru ditingkatkan sesuai kebutuhan. Harga bertanda * adalah entry-tier publik untuk pembanding.'
+        : 'Matched to your diagnostic answers — chosen so your transformation can start with the simplest possible implementation first, then scale as needed. Prices marked * are public entry-tier figures for comparison.')
       for (const pick of picks) {
         const heading = `${pick.name} — ${pick.priceUSD === 0
           ? (locale === 'id' ? 'gratis / self-host' : 'free / self-host')
-          : formatPickPrice(pick.priceUSD, currency, rate, locale)}`
+          : `${formatPickPrice(pick.priceUSD, currency, rate, locale)} *`}`
         const body = `${locale === 'id' ? pick.category.id : pick.category.en}. ${locale === 'id' ? pick.reason.id : pick.reason.en}`
         y = ensureSpace(pdf, y, 24)
         pdf.setFont('helvetica', 'bold')
@@ -2716,6 +2716,19 @@ export async function exportReportToPdf(
         pdf.setTextColor(40, 40, 40)
         y += 9
       }
+      // Price disclaimer footnote — pairs with the "*" on every paid pick
+      // above; public catalog prices drift, so the report must never present
+      // them as quotes. Same small-caption treatment as the ROI grid caption.
+      y = ensureSpace(pdf, y, 10)
+      pdf.setFont(F(), 'normal')
+      pdf.setFontSize(6.8)
+      setC(pdf, LABEL, 'text')
+      const disclaimer = locale === 'id'
+        ? '* Harga entry-tier publik, dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
+        : '* Public entry-tier prices, subject to change at any time — always verify with the official vendor before purchasing.'
+      const dLines = pdf.splitTextToSize(disclaimer, CW)
+      pdf.text(dLines, ML, y)
+      y += dLines.length * 3.2 + 3
     }
   }
 
@@ -2771,16 +2784,18 @@ export async function exportReportToPdf(
   // "(months/12).toFixed(1) years", rendering a 9-month payback as "0.8
   // years" (0.8×12 = 9.6 ≠ 9) beside a card reading "9 mo".
   const roiPaybackStr = calculations.paybackMonths != null
-    ? ((calculations.paybackMonths as number) >= 12
-        ? (locale === 'id' ? `${((calculations.paybackMonths as number) / 12).toFixed(1).replace('.', ',')} tahun` : `${((calculations.paybackMonths as number) / 12).toFixed(1)} years`)
-        : (locale === 'id' ? `${Math.round(calculations.paybackMonths as number)} bulan` : `${Math.round(calculations.paybackMonths as number)} months`))
+    ? ((calculations.paybackMonths as number) > 60
+        ? (locale === 'id' ? '> 5 tahun' : '> 5 years')
+        : (calculations.paybackMonths as number) >= 12
+          ? (locale === 'id' ? `${((calculations.paybackMonths as number) / 12).toFixed(1).replace('.', ',')} tahun` : `${((calculations.paybackMonths as number) / 12).toFixed(1)} years`)
+          : (locale === 'id' ? `${Math.round(calculations.paybackMonths as number)} bulan` : `${Math.round(calculations.paybackMonths as number)} months`))
     : null
   const roiNarrative = locale === 'id'
     ? (roiComplete
-      ? `Investasi transformasi awal sebesar ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} diproyeksikan menghasilkan ROI tiga tahun sebesar ${fmtPct(calculations.threeYearROIPercent, locale)} dan memulihkan ${roiHoursStr} jam kapasitas tim setiap tahun. Model keuangan menunjukkan payback penuh dalam ${roiPaybackStr}, didorong oleh penghematan tahunan berkelanjutan sebesar ${roiSavingsStr}. Yang terpenting, menunda transformasi ini menimbulkan "biaya keterlambatan operasional" langsung yang totalnya ${roiInactionStr} setiap 90 hari. Berkomitmen untuk eksekusi sekarang menghentikan pendarahan modal yang terus berlangsung ini dan dengan cepat mengalihkan sumber daya manusia ke pekerjaan strategis yang lebih bernilai.`
+      ? `Investasi transformasi awal sebesar ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} — seluruh anggaran yang Anda masukkan, diasumsikan sebagai biaya implementasi — diproyeksikan menghasilkan ROI tiga tahun sebesar ${fmtPct(calculations.threeYearROIPercent, locale)} dan memulihkan ${roiHoursStr} jam kapasitas tim setiap tahun. Model keuangan menunjukkan payback penuh dalam ${roiPaybackStr}, didorong oleh penghematan tahunan berkelanjutan sebesar ${roiSavingsStr}${calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0 ? ` — agar payback terjadi dalam 24 bulan, investasi implementasi idealnya tidak melebihi ${fmt(calculations.totalAnnualSavingsLocal * 2)}` : ''}. Yang terpenting, menunda transformasi ini menimbulkan "biaya keterlambatan operasional" langsung yang totalnya ${roiInactionStr} setiap 90 hari. Berkomitmen untuk eksekusi sekarang menghentikan pendarahan modal yang terus berlangsung ini dan dengan cepat mengalihkan sumber daya manusia ke pekerjaan strategis yang lebih bernilai.`
       : `Berdasarkan beban kerja manual yang dilaporkan tim Anda, otomasi diproyeksikan memulihkan ${roiHoursStr} jam kapasitas tim setiap tahun${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, senilai estimasi ${roiSavingsStr} dalam penghematan tahunan berkelanjutan` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Menunda transformasi ini membawa estimasi "biaya keterlambatan operasional" sebesar ${roiInactionStr} setiap 90 hari.` : ''} Karena tidak ada anggaran implementasi yang diberikan dalam asesmen, periode payback dan ROI tiga tahun tidak diproyeksikan — memberikan kisaran anggaran akan melengkapi model keuangan ini. Estimasi ini memiliki tingkat keyakinan ${calculations.confidenceLevel === 'low' ? 'rendah' : calculations.confidenceLevel === 'medium' ? 'sedang' : (calculations.confidenceLevel ?? 'rendah')} dan didasarkan pada asumsi benchmark internal, bukan angka spesifik klien.`)
     : (roiComplete
-      ? `An initial transformation investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} is projected to generate a ${fmtPct(calculations.threeYearROIPercent, locale)} three-year ROI and reclaim ${roiHoursStr} hours of team capacity annually. The financial model indicates full payback in ${roiPaybackStr}, driven by ${roiSavingsStr} in continuous annual savings. Crucially, delaying this transformation incurs a direct "operational cost of delay" totaling ${roiInactionStr} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`
+      ? `An initial transformation investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} — your full stated budget, assumed to be the implementation cost — is projected to generate a ${fmtPct(calculations.threeYearROIPercent, locale)} three-year ROI and reclaim ${roiHoursStr} hours of team capacity annually. The financial model indicates full payback in ${roiPaybackStr}, driven by ${roiSavingsStr} in continuous annual savings${calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0 ? ` — for payback within 24 months, the implementation investment should stay at or under ${fmt(calculations.totalAnnualSavingsLocal * 2)}` : ''}. Crucially, delaying this transformation incurs a direct "operational cost of delay" totaling ${roiInactionStr} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`
       : `Based on the manual workload your team reported, automation is projected to reclaim ${roiHoursStr} hours of team capacity annually${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, worth an estimated ${roiSavingsStr} in continuous annual savings` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Delaying this transformation carries an estimated "operational cost of delay" of ${roiInactionStr} every 90 days.` : ''} Because no implementation budget was provided in the assessment, payback period and three-year ROI are not projected — supplying a budget range completes the financial model. These estimates carry ${calculations.confidenceLevel ?? 'low'} confidence and are based on internal benchmark assumptions rather than client-specific figures.`)
   // Bold the figures the financial case hinges on: investment, 3-year ROI,
   // payback, savings, and cost-of-delay — the "so what" of the paragraph.
@@ -2885,24 +2900,39 @@ export async function exportReportToPdf(
   y += 6
 
   // ── Secondary metrics — full parity with the on-screen ROI grid ──
+  // Payback figures use a capped display (> 5 yrs): past 60 months a precise
+  // number ("18.0 years" on net savings) is arithmetic, not an actionable
+  // forecast. Break-even investment = 2× annual savings (the max outlay that
+  // still pays back within 24 months) — the single most actionable number
+  // when the user's stated budget exceeds what the scoped savings support.
+  const fmtPaybackCappedPdf = (v: number | null | undefined): string => {
+    if (v == null || !isFinite(v)) return '\u2014'
+    if (v > 60) return locale === 'id' ? '> 5 thn' : '> 5 yrs'
+    return fmtMonths(v, locale)
+  }
+  const breakEvenInvestmentLocal = calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0
+    ? calculations.totalAnnualSavingsLocal * 2
+    : null
   y = renderMetricGrid(pdf, y, locale === 'id' ? [
     { l: 'Value Tenaga Kerja yang Dipulihkan', v: fmt(calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD) },
     { l: 'Value Efisiensi Proses', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
-    { l: 'Periode Payback', v: fmtMonths(calculations.paybackMonths, locale) },
+    { l: 'Periode Payback', v: fmtPaybackCappedPdf(calculations.paybackMonths), n: 'dengan investasi = anggaran yang Anda masukkan' },
     { l: 'Biaya Keterlambatan Operasional (90h)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR) },
     { l: 'NPV 3 Tahun', v: fmt(cAny.npv3YearLocal), n: 'value kini bersih @ diskonto 10%' },
     { l: 'Biaya Berjalan Tahunan', v: fmt(cAny.annualOngoingCostLocal), n: 'lisensi, pemeliharaan & dukungan' },
     { l: 'Penghematan Bersih Tahunan', v: fmt(cAny.netAnnualSavingsLocal), n: 'setelah biaya berjalan' },
-    { l: 'Payback Bersih', v: fmtMonths(cAny.netPaybackMonths, locale), n: 'berdasarkan penghematan bersih' },
+    { l: 'Payback Bersih', v: fmtPaybackCappedPdf(cAny.netPaybackMonths), n: 'berdasarkan penghematan bersih' },
+    { l: 'Batas Investasi Impas', v: breakEvenInvestmentLocal != null ? fmt(breakEvenInvestmentLocal) : '\u2014', n: 'investasi maksimal agar payback ≤ 24 bulan' },
   ] : [
     { l: 'Recovered Labor Value', v: fmt(calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD) },
     { l: 'Process Efficiency Value', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
-    { l: 'Payback Period', v: fmtMonths(calculations.paybackMonths, locale) },
+    { l: 'Payback Period', v: fmtPaybackCappedPdf(calculations.paybackMonths), n: 'assumes investment = your full stated budget' },
     { l: 'Operational Cost of Delay (90d)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR) },
     { l: '3-Year NPV', v: fmt(cAny.npv3YearLocal), n: 'net present value @ 10% discount' },
     { l: 'Annual Ongoing Cost', v: fmt(cAny.annualOngoingCostLocal), n: 'licenses, maintenance & support' },
     { l: 'Net Annual Savings', v: fmt(cAny.netAnnualSavingsLocal), n: 'after ongoing cost' },
-    { l: 'Net Payback', v: fmtMonths(cAny.netPaybackMonths, locale), n: 'on net savings' },
+    { l: 'Net Payback', v: fmtPaybackCappedPdf(cAny.netPaybackMonths), n: 'on net savings' },
+    { l: 'Break-even Investment', v: breakEvenInvestmentLocal != null ? fmt(breakEvenInvestmentLocal) : '\u2014', n: 'max outlay for a ≤ 24-month payback' },
   ])
 
   // Phase E2.6 — same builder as the on-screen ROI tile grid caption, so
