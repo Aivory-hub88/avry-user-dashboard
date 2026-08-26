@@ -2718,17 +2718,18 @@ export async function exportReportToPdf(
       }
       // Price disclaimer footnote — pairs with the "*" on every paid pick
       // above; public catalog prices drift, so the report must never present
-      // them as quotes. Same small-caption treatment as the ROI grid caption.
+      // them as quotes. Bold + slightly larger than a caption: this is a
+      // notice the reader is meant to actually see, not fine print.
       y = ensureSpace(pdf, y, 10)
-      pdf.setFont(F(), 'normal')
-      pdf.setFontSize(6.8)
-      setC(pdf, LABEL, 'text')
+      pdf.setFont(FB(), 'bold')
+      pdf.setFontSize(8)
+      setC(pdf, MUTED, 'text')
       const disclaimer = locale === 'id'
         ? '* Harga entry-tier publik, dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
         : '* Public entry-tier prices, subject to change at any time — always verify with the official vendor before purchasing.'
       const dLines = pdf.splitTextToSize(disclaimer, CW)
       pdf.text(dLines, ML, y)
-      y += dLines.length * 3.2 + 3
+      y += dLines.length * 3.8 + 3
     }
   }
 

@@ -859,7 +859,7 @@ export default function FinalResultPage() {
                     </div>
                   ))}
                 </div>
-                <p style={{ margin: '10px 0 0', opacity: 0.55, fontSize: '0.75rem' }}>
+                <p style={{ margin: '10px 0 0', opacity: 0.8, fontSize: '0.88rem', fontWeight: 600 }}>
                   {locale === 'id'
                     ? '* Harga entry-tier publik, dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
                     : '* Public entry-tier prices, subject to change at any time — always verify with the official vendor before purchasing.'}
