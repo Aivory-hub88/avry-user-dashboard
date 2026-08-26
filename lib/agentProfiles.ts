@@ -47,6 +47,31 @@ export async function resetAgentProfile(agentType: string): Promise<void> {
   if (!res.ok) throw new Error(`Failed to reset profile (${res.status})`)
 }
 
+export interface KnowledgeDocumentResult {
+  knowledge: string
+  truncated: boolean
+  extracted_chars: number
+}
+
+/** Extracts text from a document and returns it merged into the current
+ *  knowledge field -- doesn't save by itself, saveAgentProfile still does. */
+export async function uploadKnowledgeDocument(
+  agentType: string,
+  file: File,
+): Promise<KnowledgeDocumentResult> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await authedFetch(`${BACKEND_URL}/api/v1/agent-profiles/${agentType}/knowledge/document`, {
+    method: 'POST',
+    body: formData,
+  })
+  if (!res.ok) {
+    const detail = await res.json().then((d) => d?.detail).catch(() => null)
+    throw new Error(detail || `Failed to process document (${res.status})`)
+  }
+  return res.json()
+}
+
 export interface CreditStatus {
   unlimited: boolean
   tier: string

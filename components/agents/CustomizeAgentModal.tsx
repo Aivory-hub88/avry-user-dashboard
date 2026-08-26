@@ -8,6 +8,7 @@ import {
   getAgentProfile,
   resetAgentProfile,
   saveAgentProfile,
+  uploadKnowledgeDocument,
 } from '@/lib/agentProfiles';
 import { ToolScope, getToolScope, saveToolScope } from '@/lib/agentToolScope';
 import {
@@ -60,7 +61,7 @@ const FIELD_LIMITS = {
   tone: 200,
   language_pref: 200,
   business_description: 1500,
-  knowledge: 4000,
+  knowledge: 12000,
   custom_instructions: 1500,
   greeting: 300,
 } as const;
@@ -303,6 +304,9 @@ export default function CustomizeAgentModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [knowledgeUploadBusy, setKnowledgeUploadBusy] = useState(false);
+  const [knowledgeUploadNotice, setKnowledgeUploadNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const knowledgeFileInputRef = useRef<HTMLInputElement>(null);
 
   const [connections, setConnections] = useState<ConnectedApp[] | null>(null);
   const [connectionsFetched, setConnectionsFetched] = useState(false);
@@ -802,6 +806,30 @@ export default function CustomizeAgentModal({
     }
   };
 
+  const handleKnowledgeFile = async (file: File | undefined) => {
+    if (!file || !agentType || knowledgeUploadBusy) return;
+    setKnowledgeUploadBusy(true);
+    setKnowledgeUploadNotice(null);
+    try {
+      const result = await uploadKnowledgeDocument(agentType, file);
+      set('knowledge')(result.knowledge);
+      setKnowledgeUploadNotice({
+        type: 'success',
+        message: result.truncated
+          ? `Added from ${file.name} — trimmed to fit the knowledge limit.`
+          : `Added from ${file.name}.`,
+      });
+    } catch (e: unknown) {
+      setKnowledgeUploadNotice({
+        type: 'error',
+        message: e instanceof Error ? e.message : 'Could not read that file.',
+      });
+    } finally {
+      setKnowledgeUploadBusy(false);
+      if (knowledgeFileInputRef.current) knowledgeFileInputRef.current.value = '';
+    }
+  };
+
   const handleReset = async () => {
     if (!agentType || saving) return;
     if (!window.confirm('Reset this agent to its default Aivory identity? Your saved customisation will be removed.')) return;
@@ -896,16 +924,41 @@ export default function CustomizeAgentModal({
                   textarea
                   placeholder="What you sell, who your customers are, what makes you different…"
                 />
-                <Field
-                  label="Business knowledge / FAQ"
-                  hint="Opening hours, shipping, returns, pricing, common questions — the agent answers from this first."
-                  value={fields.knowledge}
-                  limit={FIELD_LIMITS.knowledge}
-                  onChange={set('knowledge')}
-                  textarea
-                  rows={6}
-                  placeholder={'Q: What are your opening hours?\nA: 09.00–21.00 WIB, every day.'}
-                />
+                <div>
+                  <Field
+                    label="Business knowledge / FAQ"
+                    hint="Opening hours, shipping, returns, pricing, common questions — the agent answers from this first."
+                    value={fields.knowledge}
+                    limit={FIELD_LIMITS.knowledge}
+                    onChange={set('knowledge')}
+                    textarea
+                    rows={6}
+                    placeholder={'Q: What are your opening hours?\nA: 09.00–21.00 WIB, every day.'}
+                  />
+                  <input
+                    ref={knowledgeFileInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.xlsx,.xlsm,.csv,.txt,.md"
+                    className="hidden"
+                    onChange={(e) => handleKnowledgeFile(e.target.files?.[0])}
+                  />
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={knowledgeUploadBusy}
+                      onClick={() => knowledgeFileInputRef.current?.click()}
+                      className="px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/10 text-white/60 hover:text-white/90 hover:border-white/20 text-[11.5px] font-medium disabled:opacity-40 transition-colors"
+                    >
+                      {knowledgeUploadBusy ? 'Reading document…' : 'Upload a document'}
+                    </button>
+                    <span className="text-white/30 text-[11px]">PDF, Word, Excel, CSV, or text — added to the field above.</span>
+                  </div>
+                  {knowledgeUploadNotice && (
+                    <p className={`mt-1 text-[11.5px] ${knowledgeUploadNotice.type === 'success' ? 'text-[#b7cba6]' : 'text-red-300/80'}`}>
+                      {knowledgeUploadNotice.message}
+                    </p>
+                  )}
+                </div>
                 <Field
                   label="Extra style notes"
                   value={fields.custom_instructions}

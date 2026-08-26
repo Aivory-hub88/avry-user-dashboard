@@ -56,11 +56,14 @@ export async function authedFetch(
   input: string,
   init: RequestInit = {}
 ): Promise<Response> {
+  // A FormData body needs the browser's own multipart boundary in
+  // Content-Type — forcing application/json here would break the upload.
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
   const doFetch = (token: string | null) =>
     fetch(input, {
       ...init,
       headers: {
-        'Content-Type': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...(init.headers || {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
