@@ -55,7 +55,10 @@ export interface LabourBenchmark {
 // USD entry reproduces the legacy option set + parseBudgetMidpointUSD midpoints
 // exactly, so old stored answers keep resolving identically.
 // ─────────────────────────────────────────────────────────────────────────────
-export const BUDGET_BANDS: Record<CurrencyCode, CurrencyBand[]> = {
+// Partial on purpose: only currencies with a dedicated band table have an
+// entry; getBudgetBands()/getRevenueBands() fall back to USD for the rest
+// (same shape as LABOUR_BENCHMARKS below).
+export const BUDGET_BANDS: Partial<Record<CurrencyCode, CurrencyBand[]>> = {
   USD: [
     { en: 'Under $10k', id: 'Di bawah $10K', midpointUSD: 5_000 },
     { en: '$10k - $50k', id: '$10K - $50K', midpointUSD: 30_000 },
@@ -106,7 +109,7 @@ export const BUDGET_BANDS: Record<CurrencyCode, CurrencyBand[]> = {
 // 'Pre-revenue / Startup' label is load-bearing (risk rule matches it
 // case-insensitively) — kept verbatim in every currency.
 // ─────────────────────────────────────────────────────────────────────────────
-export const REVENUE_BANDS: Record<CurrencyCode, CurrencyBand[]> = {
+export const REVENUE_BANDS: Partial<Record<CurrencyCode, CurrencyBand[]>> = {
   USD: [
     { en: 'Pre-revenue / Startup', id: 'Belum Berpendapatan / Startup', midpointUSD: null },
     { en: 'Under $100k', id: 'Di bawah $100K', midpointUSD: 50_000 },
@@ -249,12 +252,12 @@ export const LABOUR_BENCHMARKS: Partial<Record<CurrencyCode, LabourBenchmark>> =
 
 /** Budget bands for a currency; currencies without a dedicated table fall back to USD. */
 export function getBudgetBands(currency: CurrencyCode): CurrencyBand[] {
-  return BUDGET_BANDS[currency] ?? BUDGET_BANDS.USD
+  return BUDGET_BANDS[currency] ?? BUDGET_BANDS.USD ?? []
 }
 
 /** Revenue bands for a currency; currencies without a dedicated table fall back to USD. */
 export function getRevenueBands(currency: CurrencyCode): CurrencyBand[] {
-  return REVENUE_BANDS[currency] ?? REVENUE_BANDS.USD
+  return REVENUE_BANDS[currency] ?? REVENUE_BANDS.USD ?? []
 }
 
 /** Labour benchmark for a currency; null → US industry-table path. */

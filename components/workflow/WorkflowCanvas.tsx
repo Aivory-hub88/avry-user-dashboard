@@ -689,7 +689,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
           name: 'Manual Trigger',
           type: 'n8n-nodes-base.manualTrigger',
           typeVersion: 1,
-          position: [250, 300],
+          position: [250, 300] as [number, number],
           parameters: {},
         };
         const first = payload.nodes?.[0];

@@ -33,7 +33,7 @@ import {
  * Starts from the pure {@link classifyCallbackParams} classification. When a
  * `connectedAccountId` param is present AND the param-based classification is
  * `connected`, it **reconciles** against Composio by reading the actual account
- * (`entity(userId).getConnection({ connectedAccountId })`) and downgrades to
+ * (`connectedAccounts.get(connectedAccountId)`) and downgrades to
  * `{ status: 'error', reason: 'not_active', app }` when the account's lifecycle
  * status is not `ACTIVE`.
  *
@@ -44,8 +44,7 @@ import {
  * Requirements: 5.2, 5.3, 5.5, 6.2
  */
 async function resolveCallbackOutcome(
-  params: URLSearchParams,
-  userId: string
+  params: URLSearchParams
 ): Promise<CallbackResult> {
   const classified = classifyCallbackParams(params)
 
@@ -58,10 +57,11 @@ async function resolveCallbackOutcome(
 
   try {
     const composio = getComposioClient()
-    const entity = composio.getEntity(userId)
-    const account = await entity.getConnection({
-      connectedAccountId: connectedAccountId.trim(),
-    })
+    // `@composio/core` v0.13 exposes connected accounts via
+    // `composio.connectedAccounts.get(id)` — the old `getEntity().getConnection()`
+    // shape no longer exists (it threw a TypeError on every call, silently
+    // disabling this reconciliation).
+    const account = await composio.connectedAccounts.get(connectedAccountId.trim())
 
     const status = String(
       (account as { status?: unknown } | null | undefined)?.status ?? ''
@@ -119,7 +119,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   // 2. Classify the callback params and best-effort reconcile against Composio.
-  const outcome = await resolveCallbackOutcome(req.nextUrl.searchParams, auth.userId)
+  const outcome = await resolveCallbackOutcome(req.nextUrl.searchParams)
 
   // 3. Exactly one redirect back to the integrations page.
   return NextResponse.redirect(buildIntegrationsRedirect(outcome, base))

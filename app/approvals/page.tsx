@@ -4,23 +4,9 @@ import { useCallback, useEffect, useState } from "react"
 import {
   listPendingApprovals,
   resolveApproval,
+  describeTool,
   type PendingApproval,
 } from "@/lib/agentApprovals"
-
-/** "composio-erpnext-erp__ERPNEXT_MAKE_SALES_INVOICE" -> "ERPNext — Make Sales Invoice" */
-function describeTool(toolName: string): string {
-  const [server, action] = toolName.includes("__") ? toolName.split("__") : [null, toolName]
-  const toolkit = server
-    ?.replace(/^composio-/, "")
-    .replace(/-[a-z]+$/, "")
-    .replace(/^\w/, (c) => c.toUpperCase()) ?? null
-  const readable = action
-    .replace(/^[A-Z]+_/, "")
-    .toLowerCase()
-    .replace(/_/g, " ")
-    .replace(/^\w/, (c) => c.toUpperCase())
-  return toolkit ? `${toolkit} — ${readable}` : readable
-}
 
 function relativeTime(iso: string): string {
   const then = new Date(iso).getTime()
@@ -56,9 +42,11 @@ export default function ApprovalsPage() {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null)
 
   const refetch = useCallback(() => {
-    setError(null)
     listPendingApprovals()
-      .then(setApprovals)
+      .then((rows) => {
+        setApprovals(rows)
+        setError(null)
+      })
       .catch(() => setError("Could not load pending approvals."))
   }, [])
 

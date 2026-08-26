@@ -1099,9 +1099,7 @@ export default function FinalResultPage() {
                           if (!bench || !bench.floorLabelEn) return null
                           return (
                             <span style={{ display: 'block', opacity: 0.65, fontSize: '0.82rem', marginTop: 4 }}>
-                              {locale === 'id'
-                                ? `Benchmark: ${bench.labelId} (Rp ${Math.round(bench.monthlyAnchorLocal).toLocaleString('id-ID')}/bln) · lantai legal: ${bench.floorLabelId} (Rp ${bench.floorMonthlyAnchor.toLocaleString('id-ID')}/bln)`
-                                : `Benchmark: ${bench.labelEn} (${bench.monthlyAnchorLocal.toLocaleString('en-US')}/mo) · legal floor: ${bench.floorLabelEn} (${bench.floorMonthlyAnchor.toLocaleString('en-US')}/mo)`}
+                              {`Benchmark: ${bench.labelEn} (${bench.monthlyAnchorLocal.toLocaleString('en-US')}/mo) · legal floor: ${bench.floorLabelEn} (${bench.floorMonthlyAnchor.toLocaleString('en-US')}/mo)`}
                             </span>
                           )
                         })()}

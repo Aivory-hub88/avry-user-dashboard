@@ -47,6 +47,19 @@ function findConnections(n8n: ReturnType<typeof convertToN8nWorkflow>, from: str
   return byType?.main ?? []
 }
 
+/**
+ * Resolve the synthetic branch-merge join node a router's given output feeds
+ * into. The converter names these joins `Merge N` (short + generic, commit
+ * e78b36d — the old `${router.name} · join` title rendered as a near-
+ * duplicate of the router step on canvas), so the join is found structurally
+ * by node type, not by name pattern.
+ */
+function joinTargetOf(n8n: ReturnType<typeof convertToN8nWorkflow>, from: string, output = 0): string | null {
+  const targets = findConnections(n8n, from)[output]?.map((t) => t.node) ?? []
+  const join = targets.find((t) => n8n.nodes.some((n) => n.name === t && n.type === 'n8n-nodes-base.noOp' && /^Merge \d+$/.test(n.name)))
+  return join ?? null
+}
+
 function buildRegressionGraph() {
   const planned = planWorkflowFromBlueprintModule(ONBOARDING_BLUEPRINT)
   const n8n = convertToN8nWorkflow({
@@ -79,9 +92,10 @@ describe('regression: Otomasi Onboarding Pelanggan — exact bug-report blueprin
     const trueTargets = findConnections(n8n, gateNode.name)[0]?.map((t) => t.node) ?? []
     // TRUE (output 0) must NOT go to the human-review/exception node.
     expect(trueTargets.some((t) => /Meninjau|Wait for human resolution/i.test(t))).toBe(false)
-    // It goes to the join, which is what "continue toward routing" looks
-    // like structurally (see the next assertion for the full chain).
-    expect(trueTargets.some((t) => t.includes('· join'))).toBe(true)
+    // It goes to the branch-merge join node, which is what "continue toward
+    // routing" looks like structurally (see the next assertion for the full
+    // chain).
+    expect(joinTargetOf(n8n, gateNode.name, 0)).not.toBeNull()
   })
 
   it('FALSE output of "Data complete?" goes to exception handling', () => {
@@ -94,7 +108,8 @@ describe('regression: Otomasi Onboarding Pelanggan — exact bug-report blueprin
   it('the join reached from TRUE eventually leads to Determine Onboarding Route, then account creation', () => {
     const { n8n } = buildRegressionGraph()
     const gateNode = n8n.nodes.find((n) => /Data complete\?/.test(n.name))!
-    const joinName = `${gateNode.name} · join`
+    const joinName = joinTargetOf(n8n, gateNode.name, 0)!
+    expect(joinName).not.toBeNull()
     const afterJoin = findConnections(n8n, joinName)[0]?.map((t) => t.node) ?? []
     expect(afterJoin.some((t) => /Menentukan jalur onboarding/.test(t))).toBe(true)
 
@@ -104,7 +119,8 @@ describe('regression: Otomasi Onboarding Pelanggan — exact bug-report blueprin
     const switchNode = n8n.nodes.find((n) => toSwitch.includes(n.name))!
     expect(switchNode.type).toBe('n8n-nodes-base.switch')
 
-    const switchJoin = `${switchNode.name} · join`
+    const switchJoin = joinTargetOf(n8n, switchNode.name, 0)!
+    expect(switchJoin).not.toBeNull()
     const afterSwitchJoin = findConnections(n8n, switchJoin)[0]?.map((t) => t.node) ?? []
     expect(afterSwitchJoin.some((t) => /Membuat akun/.test(t))).toBe(true)
   })
@@ -125,7 +141,8 @@ describe('regression: Otomasi Onboarding Pelanggan — exact bug-report blueprin
   it('exception-branch steps never connect back into the join node', () => {
     const { n8n } = buildRegressionGraph()
     const gateNode = n8n.nodes.find((n) => /Data complete\?/.test(n.name))!
-    const joinName = `${gateNode.name} · join`
+    const joinName = joinTargetOf(n8n, gateNode.name, 0)!
+    expect(joinName).not.toBeNull()
     // Nothing in the connections table should target the join except the
     // gate's own TRUE output.
     const targetsOfJoin: string[] = []
