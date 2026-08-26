@@ -471,53 +471,72 @@
   font-size: 13px;
 }
 
-/* ─── Generate Blueprint CTA ─────────────────────────────────────────────────── */
+/* ─── Generate Blueprint CTA ───────────────────────────────────────────────────
+   The one surface on the page allowed to raise its voice: accent-tinted
+   gradient derived from the page system (not a foreign color), hairline
+   accent border, one primary action with real press feedback. */
 .blueprintCta {
-  background: #073d34;
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 16px;
-  padding: 32px 28px;
+  position: relative;
+  background:
+    radial-gradient(120% 160% at 100% 0%, rgba(175, 209, 153, 0.09) 0%, rgba(175, 209, 153, 0) 55%),
+    linear-gradient(180deg, #3d3d39 0%, #37372f 100%);
+  border: 1px solid rgba(175, 209, 153, 0.22);
+  border-radius: 14px;
+  padding: 30px 32px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 24px;
+  gap: 32px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.16);
+  overflow: hidden;
 }
 
 @media (max-width: 768px) {
   .blueprintCta {
     flex-direction: column;
     align-items: flex-start;
+    padding: 24px 22px;
   }
 }
 
 .blueprintCtaLeft {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   flex: 1;
+  min-width: 0;
+}
+
+.blueprintCtaEyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: #afd199;
 }
 
 .blueprintCtaTitle {
-  font-size: 1.375rem;
-  font-weight: 300;
-  color: #f0f0f0;
+  font-size: 1.3125rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: #f4f4f2;
   margin: 0;
 }
 
 .blueprintCtaText {
-  font-size: 0.9375rem;
+  font-size: 0.9rem;
   color: #a3a39c;
-  line-height: 1.6;
+  line-height: 1.65;
   margin: 0;
-  max-width: 600px;
+  max-width: 580px;
 }
 
 .blueprintCtaRight {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 768px) {
@@ -527,26 +546,41 @@
   }
 }
 
+.blueprintCtaActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+@media (max-width: 480px) {
+  .blueprintCtaActions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+}
+
 .blueprintProgress {
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: 100%;
   min-width: 220px;
+  margin-bottom: 2px;
 }
 
 .blueprintProgressTrack {
   width: 100%;
-  height: 6px;
-  border-radius: 3px;
+  height: 4px;
+  border-radius: 2px;
   background: rgba(255, 255, 255, 0.1);
   overflow: hidden;
 }
 
 .blueprintProgressFill {
   height: 100%;
-  border-radius: 3px;
-  background: #d0e0af;
+  border-radius: 2px;
+  background: #afd199;
   transition: width 5s linear;
 }
 
@@ -560,26 +594,61 @@
 }
 
 .generateBlueprintButton {
-  background-color: #d0e0af;
-  color: #073d34;
-  border: 1px solid #d0e0af;
-  border-radius: 20px;
-  padding: 13px 28px;
-  font-size: 1rem;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #afd199;
+  color: #202b17;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 22px;
+  font-size: 0.9375rem;
+  font-weight: 600;
   font-family: var(--font-manrope), sans-serif;
   cursor: pointer;
-  transition: background-color 0.15s ease, opacity 0.15s ease;
   white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
 }
 
-.generateBlueprintButton:hover {
-  background-color: #bad08c;
+.generateBlueprintButton:hover:not(:disabled) {
+  background-color: #bdd8a4;
+}
+
+.generateBlueprintButton:active:not(:disabled) {
+  transform: scale(0.98);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.generateBlueprintButton:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.generateBlueprintArrow {
+  flex-shrink: 0;
+  transition: transform 150ms ease;
+}
+
+.generateBlueprintButton:hover:not(:disabled) .generateBlueprintArrow {
+  transform: translateX(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .generateBlueprintButton:active:not(:disabled) {
+    transform: none;
+  }
+
+  .generateBlueprintButton:hover:not(:disabled) .generateBlueprintArrow {
+    transform: none;
+  }
 }
 
 .blueprintPrice {
   font-size: 0.8125rem;
   color: #a3a39c;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .advisoryLink {
@@ -589,17 +658,17 @@
   font-family: inherit;
   cursor: pointer;
   font-size: 0.8125rem;
-  color: #d0e0af;
+  color: #a3a39c;
   text-decoration: none;
-  text-align: center;
+  text-align: right;
   white-space: nowrap;
-  opacity: 0.85;
-  transition: opacity 0.15s ease;
+  transition: color 150ms ease;
 }
 
 .advisoryLink:hover {
-  opacity: 1;
+  color: #d0e0af;
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 @media (max-width: 768px) {

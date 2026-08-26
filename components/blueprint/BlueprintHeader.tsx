@@ -90,7 +90,7 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
             ) : (
               <span className={styles.versionText}>{t("versionLabel", { version })}</span>
             )}
-            <span className={styles.separator}>•</span>
+            <span className={styles.versionDot} aria-hidden="true" />
             <span className={styles.draftPill}>{status}</span>
           </div>
 
@@ -106,37 +106,43 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
           </div>
         </div>
 
-        {/* RIGHT: actions */}
+        {/* RIGHT: actions — one primary (Generate Roadmap), the rest quiet */}
         <div className={styles.rightColumn}>
           <div className={styles.actionRow}>
-            <span className={styles.draftBadge}>{status}</span>
+            {onGenerateRoadmap && (
+              <button
+                onClick={onGenerateRoadmap}
+                className={styles.generateRoadmapBtn}
+                disabled={generatingRoadmap}
+                aria-busy={generatingRoadmap}
+                title={t("generateRoadmapTooltip")}
+              >
+                <span>{generatingRoadmap ? t("generatingRoadmap") : t("generateRoadmap")}</span>
+                <svg className={styles.generateRoadmapArrow} width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M3 8h10M9 3.5 13.5 8 9 12.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            )}
             {onSaveVersion && (
-              <button onClick={onSaveVersion} className={`${styles.saveVersionBtn} btn-style-a`} title={t("saveThisVersionTooltip")}>
+              <button onClick={onSaveVersion} className={styles.headerActionBtn} title={t("saveThisVersionTooltip")}>
                 {t("saveVersion")}
               </button>
             )}
             {onDownloadPDF || onDownloadDOCX ? (
-              <button onClick={onDownloadPDF} className={`${styles.downloadBtn} btn-style-b`} title={t("downloadBlueprintTooltip")}>
-                {t("download")} ↓
+              <button onClick={onDownloadPDF} className={styles.headerActionBtn} disabled={downloadLoading} title={t("downloadBlueprintTooltip")}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M8 2v8m0 0 3-3m-3 3L5 7" />
+                  <path d="M2.5 11.5v1a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-1" />
+                </svg>
+                {t("download")}
               </button>
             ) : null}
             {onShowHistory && (
-              <button onClick={onShowHistory} className={`${styles.historyBtn} btn-style-a`} title={t("viewVersionHistoryTooltip")}>
+              <button onClick={onShowHistory} className={styles.headerActionBtn} title={t("viewVersionHistoryTooltip")}>
                 {t("history")} ({versionsCount})
               </button>
             )}
           </div>
-
-          {onGenerateRoadmap && (
-            <button
-              onClick={onGenerateRoadmap}
-              className={`${styles.generateRoadmapBtn} btn-style-b`}
-              disabled={generatingRoadmap}
-              title={t("generateRoadmapTooltip")}
-            >
-              {generatingRoadmap ? t("generatingRoadmap") : t("generateRoadmap")}
-            </button>
-          )}
         </div>
       </div>
     </div>

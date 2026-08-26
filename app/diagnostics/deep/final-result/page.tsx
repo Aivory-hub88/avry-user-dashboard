@@ -1381,11 +1381,12 @@ export default function FinalResultPage() {
         {/* ── Generate Blueprint CTA ── */}
         <div className={styles.blueprintCta}>
           <div className={styles.blueprintCtaLeft}>
-            <h2 className={styles.blueprintCtaTitle}>{locale === 'id' ? 'Langkah berikutnya: Transformation Blueprint' : 'Next steps: Transformation Blueprint'}</h2>
+            <span className={styles.blueprintCtaEyebrow}>{locale === 'id' ? 'Langkah Berikutnya' : 'Next Step'}</span>
+            <h2 className={styles.blueprintCtaTitle}>{locale === 'id' ? 'Transformation Blueprint' : 'Transformation Blueprint'}</h2>
             <p className={styles.blueprintCtaText}>
               {locale === 'id'
-                ? 'Dengan hasil diagnostik ini, Transformation Blueprint Anda siap untuk dibuat. Beli Blueprint + Transformation Roadmap untuk mengubah wawasan ini menjadi arsitektur yang siap diterapkan dan rencana eksekusi yang dapat ditindaklanjuti.'
-                : 'With this diagnostic result, your Transformation Blueprint is ready to generate. Purchase the Blueprint + Transformation Roadmap to transform these insights into a deployment-ready architecture and actionable execution plan.'}
+                ? 'Dengan hasil diagnostik ini, Transformation Blueprint Anda siap untuk dibuat. Blueprint + Transformation Roadmap mengubah wawasan ini menjadi arsitektur yang siap diterapkan dan rencana eksekusi yang dapat ditindaklanjuti.'
+                : 'With this diagnostic result, your Transformation Blueprint is ready to generate. The Blueprint + Transformation Roadmap turn these insights into a deployment-ready architecture and an actionable execution plan.'}
             </p>
           </div>
           <div className={styles.blueprintCtaRight}>
@@ -1404,20 +1405,25 @@ export default function FinalResultPage() {
                 </div>
               </div>
             )}
-            <button
-              className={styles.generateBlueprintButton}
-              onClick={handleGenerateBlueprint}
-              disabled={isGeneratingBlueprint}
-            >
-              {isGeneratingBlueprint ? (locale === 'id' ? 'Membuat...' : 'Generating...') : (locale === 'id' ? 'Buat Blueprint' : 'Generate Blueprint')}
-            </button>
-            <span className={styles.blueprintPrice}>{locale === 'id' ? '$249 Sekali bayar' : '$249 One time'}</span>
+            <div className={styles.blueprintCtaActions}>
+              <button
+                className={styles.generateBlueprintButton}
+                onClick={handleGenerateBlueprint}
+                disabled={isGeneratingBlueprint}
+              >
+                <span>{isGeneratingBlueprint ? (locale === 'id' ? 'Membuat…' : 'Generating…') : (locale === 'id' ? 'Buat Blueprint' : 'Generate Blueprint')}</span>
+                <svg className={styles.generateBlueprintArrow} width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M3 8h10M9 3.5 13.5 8 9 12.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <span className={styles.blueprintPrice}>{locale === 'id' ? '$249 sekali bayar' : '$249 one-time'}</span>
+            </div>
             <button
               type="button"
               className={styles.advisoryLink}
               onClick={() => setIsAdvisoryModalOpen(true)}
             >
-              {locale === 'id' ? 'Ingin penjelasan langsung? Bicara dengan tim advisory kami →' : 'Prefer a guided walkthrough? Talk to our advisory team →'}
+              {locale === 'id' ? 'Ingin penjelasan langsung? Bicara dengan tim advisory kami' : 'Prefer a guided walkthrough? Talk to our advisory team'}
             </button>
           </div>
         </div>
