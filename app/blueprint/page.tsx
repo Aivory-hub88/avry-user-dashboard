@@ -799,7 +799,7 @@ function BlueprintInsightsSection({
                   <div key={pick.name} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                       <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#f0f0f0' }}>{pick.name}</div>
-                      <div style={{ fontSize: '0.82rem', color: '#9a9a92' }}>{formatPickPrice(pick.priceUSD, currencyCode, rate, locale)}<span> *</span></div>
+                      <div style={{ fontSize: '0.82rem', color: '#9a9a92' }}>{formatPickPrice(pick.priceUSD, currencyCode, rate, locale, pick.priceBasis)}<span> *</span></div>
                     </div>
                     <div style={{ fontSize: '0.8rem', color: '#9a9a92', marginTop: 2 }}>
                       {locale === 'id' ? pick.category.id : pick.category.en}
@@ -820,8 +820,8 @@ function BlueprintInsightsSection({
               </div>
               <p style={{ margin: '10px 0 0', fontSize: '0.8rem', fontWeight: 600, color: '#9a9a92' }}>
                 {locale === 'id'
-                  ? '* Harga entry-tier publik, dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
-                  : '* Public entry-tier prices, subject to change at any time — always verify with the official vendor before purchasing.'}
+                  ? '* Harga entry-tier publik dan belum termasuk biaya implementasi. Satuannya tertera pada tiap harga: /pengguna/bln dihitung per satu pengguna (kalikan jumlah pengguna Anda), /karyawan/bln per satu karyawan, dan (paket tim) sudah mencakup satu tim. Harga dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
+                  : '* Public entry-tier prices, implementation cost not included. The unit is stated on each price: /user/mo is per single user (multiply by your user count), /employee/mo is per employee, and (team plan) already covers a team. Prices change at any time — always verify with the official vendor before purchasing.'}
               </p>
             </div>
           </div>

@@ -64,6 +64,11 @@ export function compactDiagnosticForBlueprint(diagnostic: any): Record<string, u
       netPaybackMonths: calculations.netPaybackMonths,
       totalAnnualSavingsLocal: calculations.totalAnnualSavingsLocal,
       annualLaborSavingsLocal: calculations.annualLaborSavingsLocal,
+      // The ROI window is adaptive — pass it so the LLM never writes
+      // "3-year ROI" over a figure computed on a 5- or 7-year window.
+      roiHorizonYears: (calculations as any).roiHorizonYears ?? 3,
+      horizonROIPercent: calculations.threeYearROIPercent,
+      netHorizonROIPercent: calculations.netThreeYearROIPercent,
       threeYearROIPercent: calculations.threeYearROIPercent,
       netThreeYearROIPercent: calculations.netThreeYearROIPercent,
       missingInputs: calculations.missingInputs,
@@ -121,7 +126,7 @@ interface BlueprintV1 {
 
 IMPORTANT: The diagnostic includes a "roomForImprovement" array — each item has the area, the recommended action, its operational impact, and a concrete before/after. Use these improvement items to shape the blueprint's workflows, deployment phases, and expected operational outcomes (map each high-priority improvement to at least one workflow or phase). If the diagnostic includes an "ai_analysis" object (summary, strengths, constraints, automation_opportunities, recommended_next_step), treat it as prior analysis of this organisation and keep the blueprint consistent with it. Make sure to map the exact "composite" score and "maturityLevel" from the diagnostic data to "ai_readiness_score" and "maturity_level".
 
-KPI TARGETS: Every kpi_targets entry must be grounded in a field that actually exists in the Diagnostic Data below — never invent a number. Prefer these pre-computed fields verbatim, do not recalculate or approximate them: "calculations.totalAnnualSavingsLocal", "calculations.annualLaborSavingsLocal", "calculations.paybackMonths"/"netPaybackMonths", "calculations.threeYearROIPercent"/"netThreeYearROIPercent". Where the user answered a concrete quantitative field directly (e.g. "quantitative.costCurrentPerTicket"/"costTargetPerTicket", "quantitative.currentAutomationPct"/"targetAutomationPct"), use those verbatim too. "current" is the real baseline value, "target" is the goal state, and "expected_impact" is the business outcome in plain language, citing the engine's own savings/ROI figures where relevant — expected_impact must NEVER be a copy of the target value. If none of the fields above are present for a given metric, use qualitative language (e.g. "meaningful reduction in manual cost") instead of a specific invented figure.
+KPI TARGETS: Every kpi_targets entry must be grounded in a field that actually exists in the Diagnostic Data below — never invent a number. Prefer these pre-computed fields verbatim, do not recalculate or approximate them: "calculations.totalAnnualSavingsLocal", "calculations.annualLaborSavingsLocal", "calculations.paybackMonths"/"netPaybackMonths", "calculations.horizonROIPercent"/"netHorizonROIPercent" (an ROI figure over "calculations.roiHorizonYears" years — always state that window, never call it a three-year ROI unless roiHorizonYears is 3). Where the user answered a concrete quantitative field directly (e.g. "quantitative.costCurrentPerTicket"/"costTargetPerTicket", "quantitative.currentAutomationPct"/"targetAutomationPct"), use those verbatim too. "current" is the real baseline value, "target" is the goal state, and "expected_impact" is the business outcome in plain language, citing the engine's own savings/ROI figures where relevant — expected_impact must NEVER be a copy of the target value. If none of the fields above are present for a given metric, use qualitative language (e.g. "meaningful reduction in manual cost") instead of a specific invented figure.
 
 NOTE: "deployment_plan.estimated_roi_months" is overwritten server-side from "calculations.paybackMonths" after generation — estimate it for internal narrative consistency if you like, but it is not the number that reaches the user.
 

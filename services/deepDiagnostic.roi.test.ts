@@ -71,9 +71,22 @@ describe('calculateROI — card ↔ methodology reconciliation (USD, rate = 1)',
         expect(r.paybackMonths).toBeCloseTo(expected, 4)
       })
 
-      it('3-Year ROI card = its printed Step-6 formula (savings×3 − budget) ÷ budget × 100, capped 999', () => {
-        const raw = ((r.totalAnnualSavingsUSD! * 3 - r.assumedBudgetMidpointUSD!) / r.assumedBudgetMidpointUSD!) * 100
+      it('ROI card = its printed Step-6 formula (savings×horizon − budget) ÷ budget × 100, capped 999', () => {
+        const h = r.roiHorizonYears!
+        const raw = ((r.totalAnnualSavingsUSD! * h - r.assumedBudgetMidpointUSD!) / r.assumedBudgetMidpointUSD!) * 100
         expect(r.threeYearROIPercent).toBeCloseTo(Math.min(raw, 999), 4)
+        expect(r.horizonROIPercent).toBe(r.threeYearROIPercent)
+      })
+
+      it('the ROI window contains the break-even point (or is capped at 7)', () => {
+        const h = r.roiHorizonYears!
+        expect(h).toBeGreaterThanOrEqual(3)
+        expect(h).toBeLessThanOrEqual(7)
+        // The whole point of the adaptive window: a case that pays back
+        // inside the window must never print a negative headline ROI.
+        if (r.netBreakEvenYears != null && r.netBreakEvenYears <= h) {
+          expect(r.threeYearROIPercent!).toBeGreaterThanOrEqual(0)
+        }
       })
     })
   }
@@ -84,10 +97,10 @@ describe('calculateROI — methodology reconciles in the displayed (local) curre
   // the cards; the ×rate factor must cancel so the local-currency formula
   // yields the same percentage as the USD-computed threeYearROIPercent.
   for (const code of ['IDR', 'EUR', 'SGD'] as const) {
-    it(`3-Year ROI is rate-invariant (${code})`, () => {
+    it(`horizon ROI is rate-invariant (${code})`, () => {
       const r = calculateROI(CASES[1].q, code)
       if (r.totalAnnualSavingsLocal == null || r.assumedBudgetMidpointLocal == null) return
-      const localFormula = ((r.totalAnnualSavingsLocal * 3 - r.assumedBudgetMidpointLocal) / r.assumedBudgetMidpointLocal) * 100
+      const localFormula = ((r.totalAnnualSavingsLocal * r.roiHorizonYears! - r.assumedBudgetMidpointLocal) / r.assumedBudgetMidpointLocal) * 100
       expect(Math.min(localFormula, 999)).toBeCloseTo(r.threeYearROIPercent!, 4)
     })
   }
@@ -223,11 +236,11 @@ describe('per-country labour benchmarks (currency → wage anchor state machine)
     expect(r.smallTeamRateApplied).toBe(false)
   })
 
-  it('3-Year ROI is rate-invariant in the new currencies too', () => {
+  it('horizon ROI is rate-invariant in the new currencies too', () => {
     for (const code of ['AED', 'SAR', 'OMR'] as const) {
       const r = calculateROI(CASES[1].q, code)
       if (r.totalAnnualSavingsLocal == null || r.assumedBudgetMidpointLocal == null) return
-      const localFormula = ((r.totalAnnualSavingsLocal * 3 - r.assumedBudgetMidpointLocal) / r.assumedBudgetMidpointLocal) * 100
+      const localFormula = ((r.totalAnnualSavingsLocal * r.roiHorizonYears! - r.assumedBudgetMidpointLocal) / r.assumedBudgetMidpointLocal) * 100
       expect(Math.min(localFormula, 999)).toBeCloseTo(r.threeYearROIPercent!, 4)
     }
   })
@@ -296,5 +309,77 @@ describe('net & scenario 3-Year ROI clamp at −100%', () => {
     for (const v of [range.low, range.base, range.high]) {
       if (v != null) expect(v).toBeGreaterThanOrEqual(-100)
     }
+  })
+})
+
+
+// ============================================================================
+// Adaptive ROI window + ongoing-cost profile (2026-08-26)
+// ============================================================================
+//
+// The window used to be a hard-coded 3 years, so a case breaking even in year
+// 3.9 published "−23.4% 3-Year ROI" — arithmetically true, read as broken.
+// The window now follows the case (ceil(net break-even) + 1, clamped 3..7),
+// and the ongoing run cost is 12% of the investment from YEAR 2 (it was 20%
+// from year 1, which ate ~78% of annual savings on ordinary SMB profiles).
+describe('adaptive ROI horizon', () => {
+  it('a healthy case keeps the familiar 3-year window (no regression)', () => {
+    // Payback well under 2 years → ceil(be)+1 ≤ 3 → floor applies.
+    const r = calculateROI(q({ totalManualHoursWeekly: 120, fteCountInScope: 40, currentAutomationPct: 15, targetAutomationPct: 90, budgetMidpointUSD: 40000 }), 'USD')
+    expect(r.roiHorizonYears).toBe(3)
+    expect(r.threeYearROIPercent!).toBeGreaterThan(0)
+  })
+
+  it('a case breaking even past year 3 extends the window instead of printing a negative ROI', () => {
+    // The screenshot profile: budget far larger than the scoped savings.
+    const r = calculateROI(q({ totalManualHoursWeekly: 20, fteCountInScope: 6, currentAutomationPct: 20, targetAutomationPct: 60, budgetMidpointUSD: 60000 }), 'USD')
+    expect(r.roiHorizonYears!).toBeGreaterThan(3)
+    expect(r.roiHorizonYears).toBe(Math.min(7, Math.ceil(r.netBreakEvenYears!) + 1))
+  })
+
+  it('the window is capped at 7 years — hopeless cases stay honestly negative', () => {
+    const r = calculateROI(q({ totalManualHoursWeekly: 5, fteCountInScope: 2, currentAutomationPct: 40, targetAutomationPct: 50, budgetMidpointUSD: 300000 }), 'USD')
+    expect(r.roiHorizonYears).toBe(7)
+    expect(r.threeYearROIPercent!).toBeLessThan(0)
+  })
+
+  it('legacy field names alias the horizon values exactly (stored readers keep working)', () => {
+    const r = calculateROI(CASES[1].q, 'USD')
+    expect(r.threeYearROIPercent).toBe(r.horizonROIPercent)
+    expect(r.netThreeYearROIPercent).toBe(r.netHorizonROIPercent)
+    expect(r.npv3YearUSD).toBe(r.npvHorizonUSD)
+    expect(r.scenarioThreeYearROI).toEqual(r.scenarioHorizonROI)
+  })
+})
+
+describe('ongoing run cost — 12% of investment, from year 2', () => {
+  const r = calculateROI(CASES[1].q, 'USD')
+
+  it('is 12% of the stated investment per year', () => {
+    expect(r.ongoingCostRate).toBe(0.12)
+    expect(r.annualOngoingCostUSD).toBe(Math.round(r.assumedBudgetMidpointUSD! * 0.12))
+    expect(r.ongoingCostStartYear).toBe(2)
+  })
+
+  it('net ROI charges the ongoing cost for horizon−1 years, not all of them', () => {
+    const h = r.roiHorizonYears!
+    const gross = r.totalAnnualSavingsUSD! * h
+    const ongoing = r.annualOngoingCostUSD! * (h - 1)
+    const expected = ((gross - ongoing - r.assumedBudgetMidpointUSD!) / r.assumedBudgetMidpointUSD!) * 100
+    expect(r.netHorizonROIPercent).toBe(Math.max(-100, Math.min(Math.round(expected), 999)))
+  })
+
+  it('net payback leaves year 1 uncharged', () => {
+    const S = r.totalAnnualSavingsUSD!, I = r.assumedBudgetMidpointUSD!, O = r.annualOngoingCostUSD!
+    const expectedYears = S >= I ? I / S : 1 + (I - S) / (S - O)
+    expect(r.netBreakEvenYears).toBeCloseTo(expectedYears, 6)
+    expect(r.netPaybackMonths).toBeCloseTo(Math.round(expectedYears * 12 * 10) / 10, 6)
+  })
+
+  it('NPV discounts year 1 gross and years 2..N net, over the same window', () => {
+    const S = r.totalAnnualSavingsUSD!, I = r.assumedBudgetMidpointUSD!, N = r.netAnnualSavingsUSD!
+    let pv = 0
+    for (let t = 1; t <= r.roiHorizonYears!; t++) pv += (t === 1 ? S : N) / Math.pow(1.1, t)
+    expect(r.npvHorizonUSD).toBe(Math.round(pv - I))
   })
 })

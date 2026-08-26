@@ -44,6 +44,14 @@ import { quantifyPainPoints, formatPainPointHours, displayPainPointCost } from '
 import { getROISensitivity, humanizeAnswerId } from '@/services/deepDiagnostic'
 import { selectSoftwareRecommendations, formatPickPrice } from '@/lib/softwareCatalog'
 import { getRate } from '@/lib/liveRates'
+import { getRoiHorizonYears, roiLabel, npvLabel, horizonNote } from '@/lib/roiHorizon'
+import {
+  getInvestmentThresholds,
+  thresholdTestLabel,
+  THRESHOLD_WINDOW_YEARS,
+  TARGET_PAYBACK_MONTHS,
+  type InvestmentThreshold,
+} from '@/lib/investmentThresholds'
 import type { CurrencyCode } from '@/lib/resultFormatters'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
@@ -1906,12 +1914,116 @@ function renderMetricGrid(
   return y
 }
 
-/** Conservative / Base / Optimistic 3-Year ROI range row. */
+/**
+ * Investment thresholds table — the prescriptive close of the Financial Case.
+ * For each financial test: the largest investment that still clears it, and
+ * the annual saving the programme must reach if the budget is held as stated.
+ * Same figures as the on-screen block (one shared pure helper), so a client
+ * reading the PDF and a client reading the page quote the same numbers.
+ */
+function renderInvestmentThresholds(
+  pdf: jsPDF, y: number,
+  rows: InvestmentThreshold[],
+  fmt: (v: number | null | undefined) => string,
+  savingsStr: string,
+  budgetStr: string,
+  discountPct: number,
+  locale: Locale = 'en',
+): number {
+  if (rows.length === 0) return y
+  y = ensureSpace(pdf, y, 30)
+  setC(pdf, INK, 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(6.4)
+  spacedText(pdf, locale === 'id' ? 'AMBANG INVESTASI — APA YANG DIBUTUHKAN' : 'INVESTMENT THRESHOLDS — WHAT IT WOULD TAKE', ML, y, 0.32)
+  y += 4.5
+
+  setC(pdf, MUTED, 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(7)
+  const intro = locale === 'id'
+    ? `Dinilai pada jendela standar ${THRESHOLD_WINDOW_YEARS} tahun — sengaja lebih ketat daripada jendela pelaporan di atas, karena pertanyaannya di sini adalah bagaimana mencapai imbal hasil lebih cepat — dengan penghematan ${savingsStr}/thn dan anggaran ${budgetStr}. Kolom tengah: investasi maksimal yang masih lolos uji. Kolom kanan: penghematan tahunan yang harus dicapai bila anggaran dipertahankan.`
+    : `Appraised over a standard ${THRESHOLD_WINDOW_YEARS}-year window — deliberately stricter than the reporting window above, because the question here is how to reach a return faster — at ${savingsStr}/yr savings and a ${budgetStr} budget. Middle column: the largest investment that still clears the test. Right column: the annual saving required if the budget is held as stated.`
+  const introLines = pdf.splitTextToSize(intro, CW)
+  pdf.text(introLines, ML, y)
+  y += introLines.length * 3.2 + 3
+
+  const colTest = ML
+  const colMax = ML + CW * 0.60
+  const colNeed = ML + CW * 0.82
+  setC(pdf, LABEL, 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(5.6)
+  spacedText(pdf, locale === 'id' ? 'UJI KEUANGAN' : 'FINANCIAL TEST', colTest, y, 0.25)
+  spacedText(pdf, locale === 'id' ? 'INVESTASI MAKS.' : 'MAX INVESTMENT', colMax, y, 0.25)
+  spacedText(pdf, locale === 'id' ? 'ATAU PENGHEMATAN/THN' : 'OR SAVINGS/YR', colNeed, y, 0.25)
+  y += 2
+  setC(pdf, TRACK, 'draw')
+  pdf.setLineWidth(0.15)
+  pdf.line(ML, y, ML + CW, y)
+  y += 4.5
+
+  rows.forEach((r) => {
+    y = ensureSpace(pdf, y, 10)
+    setC(pdf, INK, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(7.5)
+    const testLabel = thresholdTestLabel(r.key, locale)
+    pdf.text(testLabel, colTest, y)
+    // Measure the label BEFORE switching to the small badge font — getTextWidth
+    // reports at the ACTIVE size, so measuring after the switch under-reports
+    // the width and lands the badge on top of the label.
+    const testLabelWidth = pdf.getTextWidth(testLabel)
+    const statusLabel = r.clearedToday
+      ? (locale === 'id' ? '\u2713 TERPENUHI' : '\u2713 CLEARED')
+      : (locale === 'id' ? 'BELUM' : 'NOT YET')
+    setC(pdf, r.clearedToday ? ACCENT : WARN_AMB, 'text')
+    pdf.setFont(FB(), 'bold')
+    pdf.setFontSize(5.6)
+    pdf.text(statusLabel, colTest + testLabelWidth + 3, y)
+
+    setC(pdf, INK, 'text')
+    pdf.setFont(FB(), 'bold')
+    pdf.setFontSize(7.5)
+    pdf.text(fmt(r.maxInvestmentLocal), colMax, y)
+    pdf.text(fmt(r.requiredAnnualSavingsLocal), colNeed, y)
+
+    if (!r.clearedToday) {
+      setC(pdf, WARN_AMB, 'text')
+      pdf.setFont(F(), 'normal')
+      pdf.setFontSize(5.6)
+      if (r.investmentOvershootLocal) {
+        pdf.text(locale === 'id' ? `${fmt(r.investmentOvershootLocal)} di atas` : `${fmt(r.investmentOvershootLocal)} over`, colMax, y + 3.2)
+      }
+      if (r.savingsShortfallLocal) {
+        pdf.text(locale === 'id' ? `+${fmt(r.savingsShortfallLocal)} lagi` : `+${fmt(r.savingsShortfallLocal)} more`, colNeed, y + 3.2)
+      }
+      y += 3.2
+    }
+    y += 3
+    setC(pdf, TRACK, 'draw')
+    pdf.line(ML, y, ML + CW, y)
+    y += 4.5
+  })
+
+  setC(pdf, LABEL, 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(6.4)
+  const foot = locale === 'id'
+    ? `Memenuhi uji teratas otomatis memenuhi uji di bawahnya. Payback \u2264 ${TARGET_PAYBACK_MONTHS} bulan adalah yang paling ketat; NPV positif menuntut lebih dari ROI positif karena NPV memperhitungkan nilai waktu uang pada diskonto ${discountPct}%. Dua tuasnya sama di setiap baris: fasekan implementasi ke dalam kolom investasi maksimal, atau perluas cakupan otomasi sampai penghematan mencapai kolom kanan.`
+    : `Clearing the top test clears everything below it. Payback within ${TARGET_PAYBACK_MONTHS} months is the strictest; a positive NPV demands more than a positive ROI because NPV prices in the time value of money at a ${discountPct}% discount rate. The two levers are the same in every row: phase the implementation down into the max-investment column, or widen automation scope until savings reach the right-hand column.`
+  const footLines = pdf.splitTextToSize(foot, CW)
+  pdf.text(footLines, ML, y)
+  return y + footLines.length * 3.2 + 3
+}
+
+/** Conservative / Base / Optimistic net ROI range row, over the adaptive window. */
 function renderScenarioRange(
   pdf: jsPDF, y: number,
   sc: { low?: number | null; base?: number | null; high?: number | null },
   effPct: number,
   locale: Locale = 'en',
+  horizonYears: number = 3,
 ): number {
   const roiFmt = (v: number | null | undefined): string =>
     v == null || !isFinite(v) ? '—' : v >= 999 ? '>999%' : `${Math.round(v)}%`
@@ -1928,7 +2040,7 @@ function renderScenarioRange(
   setC(pdf, INK, 'text')
   pdf.setFont(FB(), 'bold')
   pdf.setFontSize(6.4)
-  spacedText(pdf, locale === 'id' ? 'KISARAN ROI 3 TAHUN' : '3-YEAR ROI RANGE', ML, y, 0.32)
+  spacedText(pdf, locale === 'id' ? `KISARAN ROI ${horizonYears} TAHUN` : `${horizonYears}-YEAR ROI RANGE`, ML, y, 0.32)
   y += 4
   const gapX = 4
   const w = (CW - gapX * 2) / 3
@@ -1950,8 +2062,8 @@ function renderScenarioRange(
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(6.4)
   const scenarioCaption = locale === 'id'
-    ? `Kisaran mencerminkan efisiensi otomasi 50%–90%; skenario dasar menggunakan ${effPct}%. Angka ini sudah dikurangi biaya operasional berjalan — berbeda dari ROI 3 Tahun di atas, yang belum dikurangi biaya tersebut.`
-    : `Range reflects 50%–90% automation efficiency; base case uses ${effPct}%. These figures are net of ongoing operating costs — different from the 3-Year ROI above, which is not.`
+    ? `Kisaran mencerminkan efisiensi otomasi 50%–90%; skenario dasar menggunakan ${effPct}%. Angka ini sudah dikurangi biaya operasional berjalan — berbeda dari ROI ${horizonYears} Tahun di atas, yang belum dikurangi biaya tersebut.`
+    : `Range reflects 50%–90% automation efficiency; base case uses ${effPct}%. These figures are net of ongoing operating costs — different from the ${horizonYears}-Year ROI above, which is not.`
   const scenarioCapLines = pdf.splitTextToSize(scenarioCaption, CW)
   pdf.text(scenarioCapLines, ML, y)
   return y + scenarioCapLines.length * 3.2 + 3
@@ -2082,6 +2194,10 @@ export async function exportReportToPdf(
   const currency = (context.currency || 'USD') as CurrencyCode
   const fmt = (v: number | null | undefined) => fmtCurrency(v, currency, locale)
   const cAny = calculations as any
+  // Adaptive ROI window — every "N-Year ROI/NPV" label below reads this.
+  // Reports stored before 2026-08-26 have no roiHorizonYears → 3 (the window
+  // they were actually computed on).
+  const roiYears = getRoiHorizonYears(calculations)
   const company = context.company || (locale === 'id' ? 'Organisasi Anda' : 'Your organisation')
 
   const pdf = new jsPDF('p', 'mm', 'a4')
@@ -2660,7 +2776,12 @@ export async function exportReportToPdf(
   {
     const trainingOpp = opportunities.find(o => o.trainingTracks && o.trainingTracks.length > 0)
     if (trainingOpp?.trainingTracks?.length) {
-      y = ensureSpace(pdf, y, locale === 'id' ? 40 : 35)
+      // +12mm before the heading: sectionLabel draws its 13pt headline on the
+      // BASELINE at y, so its glyphs rise ~3mm above it. The preceding element
+      // here is an opportunity CARD (oppCard returns cardBottom + 3.5mm), so
+      // without this gap the headline's caps print inside the card's bottom
+      // border. Sections that follow flowing paragraphs don't need it.
+      y = ensureSpace(pdf, y + 12, locale === 'id' ? 40 : 35)
       y = tocSection(y, locale === 'id' ? 'Program Pelatihan yang Direkomendasikan' : 'Recommended Training Program')
       y = renderNarrative(pdf, y, locale === 'id'
         ? `${trainingOpp.title} di atas terurai menjadi jalur pelatihan berikut, masing-masing disesuaikan dengan temuan spesifik asesmen ini.`
@@ -2697,7 +2818,7 @@ export async function exportReportToPdf(
       for (const pick of picks) {
         const heading = `${pick.name} — ${pick.priceUSD === 0
           ? (locale === 'id' ? 'gratis / self-host' : 'free / self-host')
-          : `${formatPickPrice(pick.priceUSD, currency, rate, locale)} *`}`
+          : `${formatPickPrice(pick.priceUSD, currency, rate, locale, pick.priceBasis)} *`}`
         const body = `${locale === 'id' ? pick.category.id : pick.category.en}. ${locale === 'id' ? pick.reason.id : pick.reason.en}`
         y = ensureSpace(pdf, y, 24)
         pdf.setFont('helvetica', 'bold')
@@ -2725,8 +2846,8 @@ export async function exportReportToPdf(
       pdf.setFontSize(8)
       setC(pdf, MUTED, 'text')
       const disclaimer = locale === 'id'
-        ? '* Harga entry-tier publik, dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
-        : '* Public entry-tier prices, subject to change at any time — always verify with the official vendor before purchasing.'
+        ? '* Harga entry-tier publik dan belum termasuk biaya implementasi. Satuannya tertera pada tiap harga: /pengguna/bln dihitung per satu pengguna (kalikan jumlah pengguna Anda), /karyawan/bln per satu karyawan, dan (paket tim) sudah mencakup satu tim. Harga dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
+        : '* Public entry-tier prices, implementation cost not included. The unit is stated on each price: /user/mo is per single user (multiply by your user count), /employee/mo is per employee, and (team plan) already covers a team. Prices change at any time — always verify with the official vendor before purchasing.'
       const dLines = pdf.splitTextToSize(disclaimer, CW)
       pdf.text(dLines, ML, y)
       y += dLines.length * 3.8 + 3
@@ -2793,11 +2914,11 @@ export async function exportReportToPdf(
     : null
   const roiNarrative = locale === 'id'
     ? (roiComplete
-      ? `Investasi transformasi awal sebesar ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} — seluruh anggaran yang Anda masukkan, diasumsikan sebagai biaya implementasi — diproyeksikan menghasilkan ROI tiga tahun sebesar ${fmtPct(calculations.threeYearROIPercent, locale)} dan memulihkan ${roiHoursStr} jam kapasitas tim setiap tahun. Model keuangan menunjukkan payback penuh dalam ${roiPaybackStr}, didorong oleh penghematan tahunan berkelanjutan sebesar ${roiSavingsStr}${calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0 ? ` — agar payback terjadi dalam 24 bulan, investasi implementasi idealnya tidak melebihi ${fmt(calculations.totalAnnualSavingsLocal * 2)}` : ''}. Yang terpenting, menunda transformasi ini menimbulkan "biaya keterlambatan operasional" langsung yang totalnya ${roiInactionStr} setiap 90 hari. Berkomitmen untuk eksekusi sekarang menghentikan pendarahan modal yang terus berlangsung ini dan dengan cepat mengalihkan sumber daya manusia ke pekerjaan strategis yang lebih bernilai.`
-      : `Berdasarkan beban kerja manual yang dilaporkan tim Anda, otomasi diproyeksikan memulihkan ${roiHoursStr} jam kapasitas tim setiap tahun${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, senilai estimasi ${roiSavingsStr} dalam penghematan tahunan berkelanjutan` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Menunda transformasi ini membawa estimasi "biaya keterlambatan operasional" sebesar ${roiInactionStr} setiap 90 hari.` : ''} Karena tidak ada anggaran implementasi yang diberikan dalam asesmen, periode payback dan ROI tiga tahun tidak diproyeksikan — memberikan kisaran anggaran akan melengkapi model keuangan ini. Estimasi ini memiliki tingkat keyakinan ${calculations.confidenceLevel === 'low' ? 'rendah' : calculations.confidenceLevel === 'medium' ? 'sedang' : (calculations.confidenceLevel ?? 'rendah')} dan didasarkan pada asumsi benchmark internal, bukan angka spesifik klien.`)
+      ? `Investasi transformasi awal sebesar ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} — seluruh anggaran yang Anda masukkan, diasumsikan sebagai biaya implementasi — diproyeksikan menghasilkan ROI ${roiYears} tahun sebesar ${fmtPct(calculations.threeYearROIPercent, locale)} dan memulihkan ${roiHoursStr} jam kapasitas tim setiap tahun. Model keuangan menunjukkan payback penuh dalam ${roiPaybackStr}, didorong oleh penghematan tahunan berkelanjutan sebesar ${roiSavingsStr}${calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0 ? ` — agar payback terjadi dalam 24 bulan, investasi implementasi idealnya tidak melebihi ${fmt(calculations.totalAnnualSavingsLocal * 2)}` : ''}. Yang terpenting, menunda transformasi ini menimbulkan "biaya keterlambatan operasional" langsung yang totalnya ${roiInactionStr} setiap 90 hari. Memulai eksekusi sekarang menghentikan kebocoran biaya yang terus berjalan ini dan dengan cepat mengalihkan tenaga tim ke pekerjaan strategis yang lebih bernilai.`
+      : `Berdasarkan beban kerja manual yang dilaporkan tim Anda, otomasi diproyeksikan memulihkan ${roiHoursStr} jam kapasitas tim setiap tahun${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, senilai estimasi ${roiSavingsStr} dalam penghematan tahunan berkelanjutan` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Menunda transformasi ini membawa estimasi "biaya keterlambatan operasional" sebesar ${roiInactionStr} setiap 90 hari.` : ''} Karena tidak ada anggaran implementasi yang diberikan dalam asesmen, periode payback dan ROI multi-tahun tidak diproyeksikan — memberikan kisaran anggaran akan melengkapi model keuangan ini. Estimasi ini memiliki tingkat keyakinan ${calculations.confidenceLevel === 'low' ? 'rendah' : calculations.confidenceLevel === 'medium' ? 'sedang' : (calculations.confidenceLevel ?? 'rendah')} dan didasarkan pada asumsi benchmark internal, bukan angka spesifik klien.`)
     : (roiComplete
-      ? `An initial transformation investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} — your full stated budget, assumed to be the implementation cost — is projected to generate a ${fmtPct(calculations.threeYearROIPercent, locale)} three-year ROI and reclaim ${roiHoursStr} hours of team capacity annually. The financial model indicates full payback in ${roiPaybackStr}, driven by ${roiSavingsStr} in continuous annual savings${calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0 ? ` — for payback within 24 months, the implementation investment should stay at or under ${fmt(calculations.totalAnnualSavingsLocal * 2)}` : ''}. Crucially, delaying this transformation incurs a direct "operational cost of delay" totaling ${roiInactionStr} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`
-      : `Based on the manual workload your team reported, automation is projected to reclaim ${roiHoursStr} hours of team capacity annually${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, worth an estimated ${roiSavingsStr} in continuous annual savings` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Delaying this transformation carries an estimated "operational cost of delay" of ${roiInactionStr} every 90 days.` : ''} Because no implementation budget was provided in the assessment, payback period and three-year ROI are not projected — supplying a budget range completes the financial model. These estimates carry ${calculations.confidenceLevel ?? 'low'} confidence and are based on internal benchmark assumptions rather than client-specific figures.`)
+      ? `An initial transformation investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} — your full stated budget, assumed to be the implementation cost — is projected to generate a ${fmtPct(calculations.threeYearROIPercent, locale)} ${roiYears}-year ROI and reclaim ${roiHoursStr} hours of team capacity annually. The financial model indicates full payback in ${roiPaybackStr}, driven by ${roiSavingsStr} in continuous annual savings${calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0 ? ` — for payback within 24 months, the implementation investment should stay at or under ${fmt(calculations.totalAnnualSavingsLocal * 2)}` : ''}. Crucially, delaying this transformation incurs a direct "operational cost of delay" totaling ${roiInactionStr} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`
+      : `Based on the manual workload your team reported, automation is projected to reclaim ${roiHoursStr} hours of team capacity annually${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, worth an estimated ${roiSavingsStr} in continuous annual savings` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Delaying this transformation carries an estimated "operational cost of delay" of ${roiInactionStr} every 90 days.` : ''} Because no implementation budget was provided in the assessment, payback period and multi-year ROI are not projected — supplying a budget range completes the financial model. These estimates carry ${calculations.confidenceLevel ?? 'low'} confidence and are based on internal benchmark assumptions rather than client-specific figures.`)
   // Bold the figures the financial case hinges on: investment, 3-year ROI,
   // payback, savings, and cost-of-delay — the "so what" of the paragraph.
   const roiInvestmentStr = fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)
@@ -2822,7 +2943,7 @@ export async function exportReportToPdf(
       n: 'per tahun, disesuaikan efisiensi',
     },
     {
-      l: 'ROI 3 Tahun',
+      l: roiLabel(roiYears, 'id'),
       v: fmtPct(calculations.threeYearROIPercent, locale),
       n: 'sebelum biaya operasional berjalan',
     },
@@ -2839,7 +2960,7 @@ export async function exportReportToPdf(
       n: 'per year, efficiency adjusted',
     },
     {
-      l: '3-Year ROI',
+      l: roiLabel(roiYears, 'en'),
       v: fmtPct(calculations.threeYearROIPercent, locale),
       n: 'before ongoing operating costs',
     },
@@ -2908,7 +3029,9 @@ export async function exportReportToPdf(
   // when the user's stated budget exceeds what the scoped savings support.
   const fmtPaybackCappedPdf = (v: number | null | undefined): string => {
     if (v == null || !isFinite(v)) return '\u2014'
-    if (v > 60) return locale === 'id' ? '> 5 thn' : '> 5 yrs'
+    // Cap follows the ROI window, so a payback inside the window is never
+    // hidden behind "> N yrs" next to an ROI tile that spans that same window.
+    if (v > roiYears * 12) return locale === 'id' ? `> ${roiYears} thn` : `> ${roiYears} yrs`
     return fmtMonths(v, locale)
   }
   const breakEvenInvestmentLocal = calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0
@@ -2919,7 +3042,7 @@ export async function exportReportToPdf(
     { l: 'Value Efisiensi Proses', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
     { l: 'Periode Payback', v: fmtPaybackCappedPdf(calculations.paybackMonths), n: 'dengan investasi = anggaran yang Anda masukkan' },
     { l: 'Biaya Keterlambatan Operasional (90h)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR) },
-    { l: 'NPV 3 Tahun', v: fmt(cAny.npv3YearLocal), n: 'value kini bersih @ diskonto 10%' },
+    { l: npvLabel(roiYears, 'id'), v: fmt(cAny.npv3YearLocal), n: 'value kini bersih @ diskonto 10%' },
     { l: 'Biaya Berjalan Tahunan', v: fmt(cAny.annualOngoingCostLocal), n: 'lisensi, pemeliharaan & dukungan' },
     { l: 'Penghematan Bersih Tahunan', v: fmt(cAny.netAnnualSavingsLocal), n: 'setelah biaya berjalan' },
     { l: 'Payback Bersih', v: fmtPaybackCappedPdf(cAny.netPaybackMonths), n: 'berdasarkan penghematan bersih' },
@@ -2929,7 +3052,7 @@ export async function exportReportToPdf(
     { l: 'Process Efficiency Value', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
     { l: 'Payback Period', v: fmtPaybackCappedPdf(calculations.paybackMonths), n: 'assumes investment = your full stated budget' },
     { l: 'Operational Cost of Delay (90d)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR) },
-    { l: '3-Year NPV', v: fmt(cAny.npv3YearLocal), n: 'net present value @ 10% discount' },
+    { l: npvLabel(roiYears, 'en'), v: fmt(cAny.npv3YearLocal), n: 'net present value @ 10% discount' },
     { l: 'Annual Ongoing Cost', v: fmt(cAny.annualOngoingCostLocal), n: 'licenses, maintenance & support' },
     { l: 'Net Annual Savings', v: fmt(cAny.netAnnualSavingsLocal), n: 'after ongoing cost' },
     { l: 'Net Payback', v: fmtPaybackCappedPdf(cAny.netPaybackMonths), n: 'on net savings' },
@@ -2963,7 +3086,11 @@ export async function exportReportToPdf(
     pdf.setFontSize(7.5)
     pdf.setLineHeightFactor(1.5)
     setC(pdf, MUTED, 'text')
-    const financialNoteLines = pdf.splitTextToSize(buildFinancialTermsNote(locale), CW)
+    const windowNote = horizonNote(roiYears, cAny.netBreakEvenYears, locale)
+    const financialNoteLines = pdf.splitTextToSize(
+      [windowNote, buildFinancialTermsNote(locale, roiYears)].filter(Boolean).join(' '),
+      CW,
+    )
     y = ensureSpace(pdf, y + 2, financialNoteLines.length * 3.8 + 5)
     pdf.text(financialNoteLines, ML, y + 3)
     pdf.setLineHeightFactor(1.15)
@@ -2976,7 +3103,22 @@ export async function exportReportToPdf(
   const scenario = cAny.scenarioThreeYearROI
   if (scenario && [scenario.low, scenario.base, scenario.high].some((v: unknown) => v != null)) {
     y += 2
-    y = renderScenarioRange(pdf, y, scenario, effPct, locale)
+    y = renderScenarioRange(pdf, y, scenario, effPct, locale, roiYears)
+  }
+
+  // ── Investment thresholds — the "so what do we do about it" table ──
+  if (calculations.hasEnoughDataForProjection) {
+    const thresholds = getInvestmentThresholds(calculations as never)
+    if (thresholds.length > 0) {
+      y += 2
+      y = renderInvestmentThresholds(
+        pdf, y, thresholds, fmt,
+        fmt(calculations.totalAnnualSavingsLocal),
+        fmt(calculations.assumedBudgetMidpointLocal),
+        Math.round((cAny.discountRate ?? 0.1) * 100),
+        locale,
+      )
+    }
   }
 
   // ── ROI sensitivity summary (Phase E1.4) — static equivalent of the
@@ -3061,13 +3203,13 @@ export async function exportReportToPdf(
         ? ['Periode payback', `${fmtMonths(calculations.paybackMonths, locale)} = investasi ÷ penghematan/thn × 12`]
         : ['Payback period', `${fmtMonths(calculations.paybackMonths, locale)} = investment ÷ savings/yr × 12`])
       stepsRaw.push(locale === 'id'
-        ? ['ROI 3 Tahun', `${fmtPct(calculations.threeYearROIPercent, locale)} = (penghematan×3 − investasi) ÷ investasi × 100`]
-        : ['3-Year ROI', `${fmtPct(calculations.threeYearROIPercent, locale)} = (savings×3 − investment) ÷ investment × 100`])
+        ? [roiLabel(roiYears, 'id'), `${fmtPct(calculations.threeYearROIPercent, locale)} = (penghematan×${roiYears} − investasi) ÷ investasi × 100`]
+        : [roiLabel(roiYears, 'en'), `${fmtPct(calculations.threeYearROIPercent, locale)} = (savings×${roiYears} − investment) ÷ investment × 100`])
     }
     if (cAny.annualOngoingCostLocal != null) {
       stepsRaw.push(locale === 'id'
-        ? ['Biaya operasional berjalan', `${fmt(cAny.annualOngoingCostLocal)}/thn = ${Math.round((cAny.ongoingCostRate ?? 0.2) * 100)}% dari investasi awal`]
-        : ['Ongoing run cost', `${fmt(cAny.annualOngoingCostLocal)}/yr = ${Math.round((cAny.ongoingCostRate ?? 0.2) * 100)}% of initial investment`])
+        ? ['Biaya operasional berjalan', `${fmt(cAny.annualOngoingCostLocal)}/thn = ${Math.round((cAny.ongoingCostRate ?? 0.2) * 100)}% dari investasi awal, mulai tahun ke-${cAny.ongoingCostStartYear ?? 1}`]
+        : ['Ongoing run cost', `${fmt(cAny.annualOngoingCostLocal)}/yr = ${Math.round((cAny.ongoingCostRate ?? 0.2) * 100)}% of initial investment, from year ${cAny.ongoingCostStartYear ?? 1}`])
     }
     const steps: [string, string, string][] = stepsRaw.map(
       ([desc, result], i) => [String(i + 1).padStart(2, '0'), desc, result],
@@ -3110,10 +3252,10 @@ export async function exportReportToPdf(
       if (y > PAGE_H - 45) { pdf.addPage(); pageBg(pdf); pageFooter(pdf); y = 16 }
       y += 4
 
-      const sav3 = calculations.totalAnnualSavingsLocal * 3
+      const sav3 = calculations.totalAnnualSavingsLocal * roiYears
       const budget = calculations.assumedBudgetMidpointLocal
       const bey = (budget / calculations.totalAnnualSavingsLocal).toFixed(1)
-      const need = budget / 3
+      const need = budget / roiYears
 
       setC(pdf, '#fef3e2', 'fill')
       const wH = 34
@@ -3125,15 +3267,15 @@ export async function exportReportToPdf(
       setC(pdf, WARN_AMB, 'text')
       pdf.setFont(FB(), 'bold')
       pdf.setFontSize(8)
-      pdf.text(locale === 'id' ? 'Mengapa ROI 3 Tahun negatif?' : 'Why is 3-Year ROI negative?', ML + 7, y + 7)
+      pdf.text(locale === 'id' ? `Mengapa ${roiLabel(roiYears, 'id')} negatif?` : `Why is ${roiLabel(roiYears, 'en')} negative?`, ML + 7, y + 7)
 
       setC(pdf, MUTED, 'text')
       pdf.setFont(F(), 'normal')
       pdf.setFontSize(7.5)
       const wl = pdf.splitTextToSize(
         locale === 'id'
-          ? `Penghematan 3 tahun (${fmt(sav3)}) kurang ${fmt(budget - sav3)} dari investasi (${fmt(budget)}). Titik impas ~${bey.replace('.', ',')} thn.`
-          : `3-year savings (${fmt(sav3)}) fall ${fmt(budget - sav3)} short of investment (${fmt(budget)}). Break-even ~${bey} yrs.`,
+          ? `Penghematan ${roiYears} tahun (${fmt(sav3)}) kurang ${fmt(budget - sav3)} dari investasi (${fmt(budget)}). Titik impas ~${bey.replace('.', ',')} thn — di luar batas jendela ${roiYears} tahun.`
+          : `${roiYears}-year savings (${fmt(sav3)}) fall ${fmt(budget - sav3)} short of investment (${fmt(budget)}). Break-even ~${bey} yrs — beyond the ${roiYears}-year window cap.`,
         CW - 14,
       )
       pdf.text(wl, ML + 7, y + 13)
@@ -3169,7 +3311,7 @@ export async function exportReportToPdf(
       setC(pdf, ACCENT, 'text')
       pdf.setFont(FB(), 'bold')
       pdf.setFontSize(7.5)
-      pdf.text(locale === 'id' ? '✓  Investasi sepenuhnya kembali dalam 3 tahun.' : '✓  Investment fully recovered within 3 years.', ML + 7, y + 5.5)
+      pdf.text(locale === 'id' ? `✓  Investasi sepenuhnya kembali dalam ${roiYears} tahun.` : `✓  Investment fully recovered within ${roiYears} years.`, ML + 7, y + 5.5)
       y += 13
     }
 
@@ -3192,6 +3334,7 @@ export async function exportReportToPdf(
     hasBudgetInput: (calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD) != null,
     paybackMonths: calculations.paybackMonths,
     threeYearROIPercent: calculations.threeYearROIPercent,
+    roiHorizonYears: roiYears,
   }, locale), locale === 'id' ? 'WAWASAN EKSEKUTIF' : 'EXECUTIVE INSIGHT', locale)
 
   // ════════════════════════════════════════════════════════════════════════════

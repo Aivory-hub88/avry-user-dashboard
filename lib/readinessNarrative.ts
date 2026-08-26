@@ -295,16 +295,16 @@ export function buildMethodologyIntro(locale: Locale = 'en'): string {
 }
 
 /**
- * Explains why "ROI 3 Tahun" (gross, before ongoing cost) and the "Kisaran
- * ROI 3 Tahun" range (net, after ongoing cost) show different numbers on
+ * Explains why the gross "ROI N Tahun" tile (before ongoing cost) and the
+ * "Kisaran ROI N Tahun" range (net, after ongoing cost) show different numbers on
  * the same page, and why NPV can read negative while ROI reads positive —
  * the two points flagged as most confusing without this note.
  */
-export function buildFinancialTermsNote(locale: Locale = 'en'): string {
+export function buildFinancialTermsNote(locale: Locale = 'en', horizonYears: number = 3): string {
   if (locale === 'id') {
-    return 'ROI 3 Tahun di atas dihitung SEBELUM biaya operasional berjalan (lisensi, pemeliharaan, dukungan); Kisaran ROI 3 Tahun di bawah dihitung SETELAH biaya itu dikurangi — jadi keduanya wajar berbeda. NPV juga bisa tampak negatif meski ROI positif: NPV menghitung nilai waktu uang dan menjumlahkan untung-rugi dari tahun ke tahun, jadi di periode sebelum modal kembali (payback), angkanya normal masih minus.'
+    return `ROI ${horizonYears} Tahun di atas dihitung SEBELUM biaya operasional berjalan (lisensi, pemeliharaan, dukungan); Kisaran ROI ${horizonYears} Tahun di bawah dihitung SETELAH biaya itu dikurangi — jadi keduanya wajar berbeda. NPV juga bisa tampak negatif meski ROI positif: NPV menghitung nilai waktu uang dan menjumlahkan untung-rugi dari tahun ke tahun, jadi di periode sebelum modal kembali (payback), angkanya normal masih minus.`
   }
-  return 'The 3-Year ROI above is calculated BEFORE ongoing running costs (licenses, maintenance, support); the 3-Year ROI range below is calculated AFTER those costs are deducted — so the two numbers are expected to differ. NPV can also look negative even when ROI is positive: NPV accounts for the time value of money and nets cumulative gains against the investment, so it is normal for it to still read negative before the payback point is reached.'
+  return `The ${horizonYears}-Year ROI above is calculated BEFORE ongoing running costs (licenses, maintenance, support); the ${horizonYears}-Year ROI range below is calculated AFTER those costs are deducted — so the two numbers are expected to differ. NPV can also look negative even when ROI is positive: NPV accounts for the time value of money and nets cumulative gains against the investment, so it is normal for it to still read negative before the payback point is reached.`
 }
 
 /**
@@ -607,6 +607,8 @@ export interface ExecutiveInsightInputs {
   /** financial */
   paybackMonths?: number | null
   threeYearROIPercent?: number | null
+  /** Adaptive ROI window backing threeYearROIPercent (defaults to 3 for pre-2026-08-26 reports). */
+  roiHorizonYears?: number | null
   hasBudgetInput?: boolean
   /** opportunities */
   topOpportunityTitle?: string | null
@@ -647,9 +649,9 @@ export function buildExecutiveInsight(
       }
       case 'financial': {
         if (inputs.hasBudgetInput && inputs.paybackMonths != null && inputs.threeYearROIPercent != null) {
-          return `Analisis keuangan ini sudah siap untuk keputusan: payback dalam ${Math.round(inputs.paybackMonths)} bulan dan ROI tiga tahun sebesar ${Math.round(inputs.threeYearROIPercent)}%. Menyetujui anggaran sekarang mengubah analisis ini menjadi penghematan yang terus berlipat — setiap kuartal keterlambatan adalah kuartal biaya yang bisa dihindari.`
+          return `Analisis keuangan ini sudah siap untuk keputusan: payback dalam ${Math.round(inputs.paybackMonths)} bulan dan ROI ${inputs.roiHorizonYears ?? 3} tahun sebesar ${Math.round(inputs.threeYearROIPercent)}%. Menyetujui anggaran sekarang mengubah analisis ini menjadi penghematan yang terus berlipat — setiap kuartal keterlambatan adalah kuartal biaya yang bisa dihindari.`
         }
-        return 'Analisis keuangan ini belum dapat difinalisasi tanpa input anggaran. Memberikan kisaran anggaran minggu ini akan mengubah proyeksi ini menjadi kasus bisnis yang siap dibawa ke dewan, lengkap dengan periode payback dan ROI tiga tahun yang akurat.'
+        return 'Analisis keuangan ini belum dapat difinalisasi tanpa input anggaran. Memberikan kisaran anggaran minggu ini akan mengubah proyeksi ini menjadi kasus bisnis yang siap dibawa ke dewan, lengkap dengan periode payback dan ROI multi-tahun yang akurat.'
       }
       case 'improvements': {
         if (!inputs.topImprovementTitle) {
@@ -678,9 +680,9 @@ export function buildExecutiveInsight(
     }
     case 'financial': {
       if (inputs.hasBudgetInput && inputs.paybackMonths != null && inputs.threeYearROIPercent != null) {
-        return `The financial case is decision-ready: payback in ${Math.round(inputs.paybackMonths)} months and a ${Math.round(inputs.threeYearROIPercent)}% three-year ROI. Approving budget now converts this analysis into compounding savings — every quarter of delay is a quarter of avoidable cost.`
+        return `The financial case is decision-ready: payback in ${Math.round(inputs.paybackMonths)} months and a ${Math.round(inputs.threeYearROIPercent)}% ${inputs.roiHorizonYears ?? 3}-year ROI. Approving budget now converts this analysis into compounding savings — every quarter of delay is a quarter of avoidable cost.`
       }
-      return 'The financial case cannot be finalized without a budget input. Supplying a budget range this week turns these projections into a board-ready business case with an accurate payback period and three-year ROI.'
+      return 'The financial case cannot be finalized without a budget input. Supplying a budget range this week turns these projections into a board-ready business case with an accurate payback period and multi-year ROI.'
     }
     case 'improvements': {
       if (!inputs.topImprovementTitle) {

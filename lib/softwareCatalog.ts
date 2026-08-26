@@ -23,6 +23,14 @@ export interface SoftwareRecommendation {
   category: { en: string; id: string }
   /** Rough entry-tier list price, USD/month (0 = free tier / self-host). */
   priceUSD: number
+  /**
+   * What that price actually buys — the single most misleading omission in a
+   * software table. "~ Rp 390.000/bln" beside Odoo reads as the cost of
+   * running Odoo; it is the cost of ONE seat. A 20-person team reading the
+   * flat number under-budgets by 20×, and the whole financial case built on
+   * top of it stops being credible. Every entry must declare its basis.
+   */
+  priceBasis: 'per_user' | 'per_employee' | 'flat' | 'self_host'
   /** Which markets this vendor is particularly right for. */
   regions: Array<'id' | 'global'>
   /** Why THIS diagnostic triggered this pick — references the user's signal. */
@@ -54,6 +62,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'n8n (self-host)',
     category: { en: 'Workflow automation', id: 'Otomasi alur kerja' },
     priceUSD: 0,
+    priceBasis: 'self_host',
     regions: ['global', 'id'],
     signals: ['manual', 'repetitive', 'handoff', 'koordinasi', 'coordination', 'onboarding', 'follow-up', 'follow up', 'data entry', 'entry ulang'],
     priority: 10,
@@ -67,6 +76,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Make',
     category: { en: 'Workflow automation', id: 'Otomasi alur kerja' },
     priceUSD: 9,
+    priceBasis: 'flat',
     regions: ['global'],
     signals: ['manual', 'repetitive', 'spreadsheet', 'sync', 'sinkron'],
     priority: 8,
@@ -81,6 +91,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Mekari Qontak',
     category: { en: 'CRM & WhatsApp pipeline', id: 'CRM & pipeline WhatsApp' },
     priceUSD: 17,
+    priceBasis: 'per_user',
     regions: ['id'],
     signals: ['lead', 'customer', 'pelanggan', 'whatsapp', 'follow-up', 'follow up', 'sales', 'penjualan', 'crm'],
     priority: 9,
@@ -94,6 +105,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'HubSpot CRM',
     category: { en: 'CRM', id: 'CRM' },
     priceUSD: 0,
+    priceBasis: 'per_user',
     regions: ['global'],
     signals: ['lead', 'customer', 'pelanggan', 'sales', 'penjualan', 'crm', 'pipeline'],
     priority: 8,
@@ -108,6 +120,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Zoho Desk',
     category: { en: 'Support ticketing', id: 'Ticketing layanan pelanggan' },
     priceUSD: 14,
+    priceBasis: 'per_user',
     regions: ['global', 'id'],
     signals: ['ticket', 'tiket', 'support', 'layanan pelanggan', 'complaint', 'keluhan', 'customer service'],
     priority: 9,
@@ -121,6 +134,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Freshdesk',
     category: { en: 'Support ticketing', id: 'Ticketing layanan pelanggan' },
     priceUSD: 15,
+    priceBasis: 'per_user',
     regions: ['global'],
     signals: ['ticket', 'tiket', 'support', 'layanan pelanggan', 'customer service'],
     priority: 8,
@@ -135,6 +149,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Google Looker Studio',
     category: { en: 'Reporting & dashboard', id: 'Pelaporan & dashboard' },
     priceUSD: 0,
+    priceBasis: 'self_host',
     regions: ['global', 'id'],
     signals: ['report', 'laporan', 'manual report', 'spreadsheet', 'visibility', 'visibilitas', 'tracking', 'monitoring'],
     priority: 9,
@@ -148,6 +163,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Metabase (self-host)',
     category: { en: 'Reporting & dashboard', id: 'Pelaporan & dashboard' },
     priceUSD: 0,
+    priceBasis: 'self_host',
     regions: ['global'],
     signals: ['report', 'laporan', 'database', 'basis data', 'warehouse', 'analytics', 'analitik'],
     priority: 7,
@@ -162,6 +178,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Notion',
     category: { en: 'Docs & SOP', id: 'Dokumen & SOP' },
     priceUSD: 10,
+    priceBasis: 'per_user',
     regions: ['global', 'id'],
     signals: ['document', 'dokumentasi', 'sop', 'process', 'proses', 'standardisasi', 'standardisation', 'ad-hoc'],
     priority: 8,
@@ -175,6 +192,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Scribe',
     category: { en: 'Process capture', id: 'Dokumentasi proses otomatis' },
     priceUSD: 23,
+    priceBasis: 'per_user',
     regions: ['global'],
     signals: ['document', 'dokumentasi', 'sop', 'standardisasi', 'training', 'pelatihan'],
     priority: 7,
@@ -189,6 +207,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Mekari Jurnal',
     category: { en: 'Accounting', id: 'Akuntansi' },
     priceUSD: 20,
+    priceBasis: 'flat',
     regions: ['id'],
     signals: ['invoice', 'faktur', 'finance', 'keuangan', 'accounting', 'akuntansi', 'tax', 'pajak', 'bookkeeping'],
     priority: 8,
@@ -202,6 +221,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Mekari Talenta',
     category: { en: 'HR & payroll', id: 'HR & penggajian' },
     priceUSD: 25,
+    priceBasis: 'per_employee',
     regions: ['id'],
     signals: ['payroll', 'gaji', 'hr', 'absensi', 'attendance', 'karyawan', 'employee'],
     priority: 8,
@@ -216,6 +236,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Cal.com (self-host)',
     category: { en: 'Scheduling', id: 'Penjadwalan' },
     priceUSD: 0,
+    priceBasis: 'self_host',
     regions: ['global'],
     signals: ['scheduling', 'jadwal', 'meeting', 'appointment', 'koordinasi'],
     priority: 6,
@@ -233,6 +254,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Odoo',
     category: { en: 'ERP suite', id: 'Suite ERP' },
     priceUSD: 25,
+    priceBasis: 'per_user',
     regions: ['global', 'id'],
     signals: ['erp', 'inventory', 'inventori', 'stok', 'stock', 'warehouse', 'gudang', 'manufacturing', 'manufaktur', 'supply chain', 'rantai pasok', 'accounting', 'akuntansi', 'terputus', 'disconnected', 'fragmented'],
     priority: 8,
@@ -246,6 +268,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'ERPNext (self-host)',
     category: { en: 'ERP suite', id: 'Suite ERP' },
     priceUSD: 0,
+    priceBasis: 'self_host',
     regions: ['global'],
     signals: ['erp', 'inventory', 'inventori', 'manufacturing', 'manufaktur', 'accounting', 'akuntansi', 'disconnected', 'terputus'],
     priority: 7,
@@ -259,6 +282,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'SAP Business One',
     category: { en: 'ERP suite', id: 'Suite ERP' },
     priceUSD: 56,
+    priceBasis: 'per_user',
     regions: ['global', 'id'],
     minFTE: 50,
     signals: ['erp', 'manufacturing', 'manufaktur', 'supply chain', 'rantai pasok', 'inventory', 'inventori', 'finance', 'keuangan', 'compliance', 'kepatuhan'],
@@ -273,6 +297,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Microsoft Dynamics 365',
     category: { en: 'ERP + CRM suite', id: 'Suite ERP + CRM' },
     priceUSD: 65,
+    priceBasis: 'per_user',
     regions: ['global'],
     minFTE: 50,
     signals: ['erp', 'crm', 'sales', 'penjualan', 'finance', 'keuangan', 'supply chain', 'rantai pasok', 'excel', 'microsoft', 'office'],
@@ -288,6 +313,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Zoho CRM',
     category: { en: 'CRM', id: 'CRM' },
     priceUSD: 14,
+    priceBasis: 'per_user',
     regions: ['global', 'id'],
     signals: ['crm', 'lead', 'sales', 'penjualan', 'pipeline', 'customer', 'pelanggan'],
     priority: 7,
@@ -301,6 +327,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Pipedrive',
     category: { en: 'CRM (sales pipeline)', id: 'CRM (pipeline penjualan)' },
     priceUSD: 14,
+    priceBasis: 'per_user',
     regions: ['global'],
     signals: ['pipeline', 'deal', 'sales', 'penjualan', 'follow-up', 'follow up'],
     priority: 7,
@@ -314,6 +341,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Salesforce Sales Cloud',
     category: { en: 'CRM (enterprise)', id: 'CRM (enterprise)' },
     priceUSD: 80,
+    priceBasis: 'per_user',
     regions: ['global'],
     minFTE: 100,
     signals: ['crm', 'sales', 'penjualan', 'enterprise', 'scaling', 'skuala', 'forecast', 'proyeksi'],
@@ -387,10 +415,21 @@ export function selectSoftwareRecommendations(input: {
  * (getRate() after ensureLiveRates()) — passing it in keeps this module pure
  * and the price consistent with every other number on the page.
  */
-export function formatPickPrice(priceUSD: number, currency: CurrencyCode, rate: number, locale: 'en' | 'id'): string {
+export function formatPickPrice(
+  priceUSD: number,
+  currency: CurrencyCode,
+  rate: number,
+  locale: 'en' | 'id',
+  basis: SoftwareRecommendation['priceBasis'] = 'flat',
+): string {
   if (priceUSD === 0) return locale === 'id' ? 'Gratis / self-host' : 'Free / self-host'
   const label = formatCompactLocal(Math.round(priceUSD * rate), currency)
   // "~" not "≈": the PDF SDK section draws with base-14 Helvetica (WinAnsi),
   // which has no ≈ glyph — it rendered as garbage ("H). Tilde is safe everywhere.
-  return locale === 'id' ? `~ ${label}/bln` : `~ ${label}/mo`
+  // The basis rides INSIDE the price string so it can never be separated from
+  // the number by a layout change (see priceBasis on SoftwareRecommendation).
+  const per = locale === 'id'
+    ? { per_user: '/pengguna/bln', per_employee: '/karyawan/bln', flat: '/bln (paket tim)', self_host: '/bln' }
+    : { per_user: '/user/mo', per_employee: '/employee/mo', flat: '/mo (team plan)', self_host: '/mo' }
+  return `~ ${label}${per[basis]}`
 }

@@ -11,6 +11,7 @@ import {
 } from '@/lib/resultFormatters'
 import { maturityFromScore } from '@/services/deepDiagnostic'
 import styles from './PrintableReport.module.css'
+import { getRoiHorizonYears, roiLabel, npvLabel } from '@/lib/roiHorizon'
 
 interface PrintableReportProps {
   context: DiagnosticContext
@@ -28,6 +29,7 @@ export default function PrintableReport({ context, llmResult }: PrintableReportP
   const annualLaborSavings = calculations.annualLaborSavingsLocal ?? calculations.annualLaborSavingsIDR ?? null
   const annualProcessSavings = calculations.annualProcessSavingsLocal ?? calculations.annualProcessSavingsIDR ?? null
   const costOfInaction90Days = calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR ?? null
+  const roiYears = getRoiHorizonYears(calculations)
 
   const _llmScore =
     typeof llmResult?.score === 'number' ? llmResult.score
@@ -142,11 +144,11 @@ export default function PrintableReport({ context, llmResult }: PrintableReportP
             <div className={styles.tileValue} style={calculations.paybackMonths && calculations.paybackMonths < 0 ? { color: '#dc2626' } : undefined}>{formatMonths(calculations.paybackMonths)}</div>
           </div>
           <div className={styles.tile}>
-            <div className={styles.tileLabel}>3-Year ROI</div>
+            <div className={styles.tileLabel}>{roiLabel(roiYears)}</div>
             <div className={styles.tileValue} style={(calculations.threeYearROIPercent ?? 0) < 0 ? { color: '#dc2626' } : undefined}>{(calculations.threeYearROIPercent ?? 0) >= 999 ? '>999%' : formatPercent(calculations.threeYearROIPercent ?? 0)}</div>
           </div>
           <div className={styles.tile}>
-            <div className={styles.tileLabel}>3-Year NPV (10% discount)</div>
+            <div className={styles.tileLabel}>{npvLabel(roiYears)} (10% discount)</div>
             <div className={styles.tileValue}>{fmtCurrency(((calculations as any).npv3YearLocal) ?? null)}</div>
           </div>
           <div className={styles.tile}>

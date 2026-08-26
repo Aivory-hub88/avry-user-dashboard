@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import type { DiagnosticContext, ROIProjection } from '@/types/diagnostic'
 import { recomputeROIAtEfficiency, EFFICIENCY_SCENARIO_BOUNDS } from '@/services/deepDiagnostic'
 import styles from './EfficiencyWhatIfSlider.module.css'
+import { getRoiHorizonYears, roiLabel } from '@/lib/roiHorizon'
 
 interface EfficiencyWhatIfSliderProps {
   /** Only the fields the ROI formula needs — never the whole page context, to make the read-only contract obvious at the call site. */
@@ -122,7 +123,7 @@ export default function EfficiencyWhatIfSlider({
           <span className={styles.tileValue}>{formatMonths(display.paybackMonths)}</span>
         </div>
         <div className={styles.tile}>
-          <span className={styles.tileLabel}>{locale === 'id' ? 'ROI 3 Tahun' : '3-Year ROI'}</span>
+          <span className={styles.tileLabel}>{roiLabel(getRoiHorizonYears(display), locale)}</span>
           <span className={styles.tileValue}>
             {display.threeYearROIPercent != null
               ? (display.threeYearROIPercent >= 999 ? '>999%' : formatPercent(display.threeYearROIPercent))

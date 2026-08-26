@@ -377,9 +377,23 @@ export function formatMonths(value: number | null | undefined, locale: ResultLoc
  * the exact value stays in the data, the UI stops presenting absurdity
  * as a plan.
  */
-export function formatPaybackCapped(value: number | null | undefined, locale: ResultLocale = 'en'): string {
+export function formatPaybackCapped(
+  value: number | null | undefined,
+  locale: ResultLocale = 'en',
+  /**
+   * Months beyond which the figure stops reading as a precise forecast.
+   * Defaults to 60 (5 years). Callers that render alongside an adaptive ROI
+   * window pass `roiHorizonYears * 12` so the payback tile and the ROI window
+   * can never contradict each other (a 6.5-year payback shown as "> 5 yrs"
+   * next to a "7-Year ROI" tile reads as two different models).
+   */
+  capMonths: number = 60
+): string {
   if (value === null || value === undefined || !isFinite(value) || isNaN(value)) return '—'
-  if (value > 60) return locale === 'id' ? '> 5 tahun' : '> 5 yrs'
+  if (value > capMonths) {
+    const capYears = Math.round(capMonths / 12)
+    return locale === 'id' ? `> ${capYears} tahun` : `> ${capYears} yrs`
+  }
   return formatMonths(value, locale)
 }
 

@@ -279,6 +279,23 @@ export interface ROIProjection {
   totalAnnualSavingsUSD: number | null
   hoursReclaimedPerYear: number | null
   paybackMonths: number | null
+  /**
+   * Adaptive ROI window (years, 3–7). Every "N-Year ROI/NPV" label in the
+   * report and PDF must read this rather than hard-coding 3: the window
+   * follows the case (first whole year after net break-even, +1 headroom),
+   * so a programme that pays back in year 4 no longer reports a negative
+   * ROI purely because the window was frozen at 3 years.
+   * Optional: contexts stored before 2026-08-26 do not carry it — fall back to 3.
+   */
+  roiHorizonYears?: number
+  /** Net break-even in years (year 1 carries no ongoing cost). */
+  netBreakEvenYears?: number | null
+  /** ROI over `roiHorizonYears`, BEFORE ongoing running costs (%). */
+  horizonROIPercent?: number | null
+  /** Cumulative gross savings over `roiHorizonYears` (USD / local). */
+  cumulativeSavingsHorizonUSD?: number | null
+  cumulativeSavingsHorizonLocal?: number | null
+  /** @deprecated Legacy name for `horizonROIPercent` — same value, window is `roiHorizonYears`, not necessarily 3. */
   threeYearROIPercent: number | null
   hasEnoughDataForProjection: boolean
   confidenceLevel: 'high' | 'medium' | 'low'
@@ -311,6 +328,8 @@ export interface ROIProjection {
   rateBenchmarkLabelId?: string
   /** Assumed annual ongoing cost as a fraction of the initial investment. */
   ongoingCostRate?: number
+  /** First year the ongoing cost is charged (year 1 is covered by the implementation budget). */
+  ongoingCostStartYear?: number
   /** Annual ongoing run cost (licenses/maintenance/support), USD and local. */
   annualOngoingCostUSD?: number | null
   annualOngoingCostLocal?: number | null
@@ -319,13 +338,20 @@ export interface ROIProjection {
   netAnnualSavingsLocal?: number | null
   /** Payback on net savings (months). */
   netPaybackMonths?: number | null
-  /** 3-year ROI computed on net savings (%). */
+  /** ROI over `roiHorizonYears` computed on net savings, after ongoing cost (%). */
+  netHorizonROIPercent?: number | null
+  /** Conservative / base / optimistic net ROI range over `roiHorizonYears` (%). */
+  scenarioHorizonROI?: { low: number | null; base: number | null; high: number | null }
+  /** @deprecated Legacy name for `netHorizonROIPercent` — same value. */
   netThreeYearROIPercent?: number | null
-  /** Conservative / base / optimistic 3-year ROI range (%). */
+  /** @deprecated Legacy name for `scenarioHorizonROI` — same value. */
   scenarioThreeYearROI?: { low: number | null; base: number | null; high: number | null }
   /** Annual discount rate used for NPV. */
   discountRate?: number
-  /** Net present value of 3-year net cash flows minus investment (USD, local). */
+  /** Net present value of the horizon's net cash flows minus investment (USD, local). */
+  npvHorizonUSD?: number | null
+  npvHorizonLocal?: number | null
+  /** @deprecated Legacy names for `npvHorizon*` — same values. */
   npv3YearUSD?: number | null
   npv3YearLocal?: number | null
   /** @deprecated Use annualLaborSavingsLocal — kept for backward compat with stored contexts */

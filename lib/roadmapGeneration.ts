@@ -14,6 +14,7 @@
 import type { AiryRoadmap } from '@/types/roadmap'
 import { asset } from '@/lib/asset'
 import { formatLocalAmount, parseCurrencyCode, type CurrencyCode } from '@/lib/resultFormatters'
+import { getRoiHorizonYears } from '@/lib/roiHorizon'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Prompt building (server-side)
@@ -74,7 +75,7 @@ Return ONLY valid JSON matching this exact schema (no markdown, no explanation):
 
 Generate 3-4 phases. Each phase should have 2-4 milestones and 2-3 KPIs. Be specific and actionable.
 
-GROUNDING RULES (do not violate): every KPI "target" value must trace back to a field that is actually present in the DIAGNOSTIC RESULTS or BLUEPRINT DATA above — do not invent a number. Prefer these pre-computed fields verbatim, never recompute or approximate them: "calculations.totalAnnualSavingsLocal", "calculations.paybackMonths"/"netPaybackMonths", "calculations.threeYearROIPercent"/"netThreeYearROIPercent", "calculations.hoursReclaimedPerYear", and "quantitative.targetAutomationPct"/"currentAutomationPct" (the user's own answers). If none of these fields are present in the context above for a given KPI, use qualitative language (e.g. "meaningful reduction in manual hours") instead of a specific invented number.${locale === 'id' ? `
+GROUNDING RULES (do not violate): every KPI "target" value must trace back to a field that is actually present in the DIAGNOSTIC RESULTS or BLUEPRINT DATA above — do not invent a number. Prefer these pre-computed fields verbatim, never recompute or approximate them: "calculations.totalAnnualSavingsLocal", "calculations.paybackMonths"/"netPaybackMonths", "calculations.horizonROIPercent"/"netHorizonROIPercent" (an ROI over "calculations.roiHorizonYears" years — always name that window, never assume three), "calculations.hoursReclaimedPerYear", and "quantitative.targetAutomationPct"/"currentAutomationPct" (the user's own answers). If none of these fields are present in the context above for a given KPI, use qualitative language (e.g. "meaningful reduction in manual hours") instead of a specific invented number.${locale === 'id' ? `
 
 LANGUAGE: Write every freeform narrative/text field VALUE in formal Bahasa Indonesia (business register) — this includes "title", "phases[].name", "phases[].timeframe", "phases[].description", "phases[].milestones[].title/description", and "phases[].kpis[].label/target". Do NOT translate the fixed "id" slug fields ("phases[].id", "milestones[].id", "kpis[].id") — keep those exactly as specified in the schema. Currency figures and dollar amounts stay as-is (do not convert currency).` : ''}`;
 }
@@ -143,8 +144,10 @@ function deriveFallbackKpiTargets(diagnosticContext: Record<string, any>, locale
     ? `${quant.targetAutomationPct}%`
     : tr('Increased automation coverage', 'Peningkatan cakupan otomasi')
 
+  // Window is adaptive (calc.roiHorizonYears, 3–7) — never label it "3-yr".
+  const roiWindowYears = getRoiHorizonYears(calc)
   const roiOutcome = typeof calc?.netThreeYearROIPercent === 'number'
-    ? `${Math.max(0, Math.round(calc.netThreeYearROIPercent))}% ${tr('3-yr ROI', 'ROI 3 tahun')}`
+    ? `${Math.max(0, Math.round(calc.netThreeYearROIPercent))}% ${tr(`${roiWindowYears}-yr ROI`, `ROI ${roiWindowYears} tahun`)}`
     : typeof calc?.totalAnnualSavingsLocal === 'number'
       ? `${formatLocalAmount(calc.totalAnnualSavingsLocal, currencyCode)}${tr('/yr savings', '/thn penghematan')}`
       : tr('Positive return on automation investment', 'Imbal hasil positif atas investasi otomasi')

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { DiagnosticContext } from '@/types/diagnostic'
@@ -32,6 +32,8 @@ import {
   parseCurrencyCode,
   type CurrencyCode,
 } from '@/lib/resultFormatters'
+import { getRoiHorizonYears, roiLabel, npvLabel, horizonNote } from '@/lib/roiHorizon'
+import { getInvestmentThresholds, thresholdTestLabel, THRESHOLD_WINDOW_YEARS, TARGET_PAYBACK_MONTHS } from '@/lib/investmentThresholds'
 import { ensureLiveRates, getFxAsOfLabel, getRate } from '@/lib/liveRates'
 import { selectSoftwareRecommendations, formatPickPrice } from '@/lib/softwareCatalog'
 import { getLabourBenchmark } from '@/lib/currencyBands'
@@ -411,10 +413,18 @@ export default function FinalResultPage() {
     topOpportunityTimeToValueWeeks: topOpportunity?.timeToValueWeeks ?? null,
     topOpportunityDataReadiness: topOpportunity?.dataReadiness ?? null,
   }, locale)
+  // Adaptive ROI window (see lib/roiHorizon.ts). Older stored reports have no
+  // roiHorizonYears and were computed on the fixed 3-year window → 3.
+  const roiYears = getRoiHorizonYears(calculations)
+  const roiWindowNote = horizonNote(roiYears, (calculations as any).netBreakEvenYears, locale)
+  // Prescriptive close of the Financial Case: the investment ceilings and
+  // savings floors that turn each red figure green (see lib/investmentThresholds.ts).
+  const investmentThresholds = getInvestmentThresholds(calculations as never)
   const financialInsight = buildExecutiveInsight('financial', {
     hasBudgetInput: (calculations.assumedBudgetMidpointLocal ?? (calculations as any).assumedBudgetMidpointUSD) != null,
     paybackMonths: calculations.paybackMonths,
     threeYearROIPercent: calculations.threeYearROIPercent,
+    roiHorizonYears: roiYears,
   }, locale)
   const topImprovement = Array.isArray(roomForImprovement) && roomForImprovement.length > 0
     ? roomForImprovement[0] : null
@@ -840,7 +850,7 @@ export default function FinalResultPage() {
                     <div key={pick.name} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                         <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{pick.name}</div>
-                        <div style={{ fontSize: '0.82rem', opacity: 0.75 }}>{formatPickPrice(pick.priceUSD, currencyCode, rate, locale)}<span title={locale === 'id' ? 'Harga entry-tier publik, dapat berubah' : 'Public entry-tier price, subject to change'}> *</span></div>
+                        <div style={{ fontSize: '0.82rem', opacity: 0.75 }}>{formatPickPrice(pick.priceUSD, currencyCode, rate, locale, pick.priceBasis)}<span title={locale === 'id' ? 'Harga entry-tier publik, dapat berubah' : 'Public entry-tier price, subject to change'}> *</span></div>
                       </div>
                       <div style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: 2 }}>
                         {locale === 'id' ? pick.category.id : pick.category.en}
@@ -861,8 +871,8 @@ export default function FinalResultPage() {
                 </div>
                 <p style={{ margin: '10px 0 0', opacity: 0.8, fontSize: '0.88rem', fontWeight: 600 }}>
                   {locale === 'id'
-                    ? '* Harga entry-tier publik, dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
-                    : '* Public entry-tier prices, subject to change at any time — always verify with the official vendor before purchasing.'}
+                    ? '* Harga entry-tier publik dan belum termasuk biaya implementasi. Satuannya tertera pada tiap harga: /pengguna/bln dihitung per satu pengguna (kalikan jumlah pengguna Anda), /karyawan/bln per satu karyawan, dan (paket tim) sudah mencakup satu tim. Harga dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
+                    : '* Public entry-tier prices, implementation cost not included. The unit is stated on each price: /user/mo is per single user (multiply by your user count), /employee/mo is per employee, and (team plan) already covers a team. Prices change at any time — always verify with the official vendor before purchasing.'}
                 </p>
               </div>
             )
@@ -915,23 +925,23 @@ export default function FinalResultPage() {
             />
             <ROIMetricTile label={locale === 'id' ? 'Periode Payback' : 'Payback Period'} value={calculations.paybackMonths} formatter={(v) => formatPaybackCapped(v, locale)} subtitle={locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile
-              label={locale === 'id' ? 'ROI 3 Tahun' : '3-Year ROI'}
+              label={roiLabel(roiYears, locale)}
               value={calculations.threeYearROIPercent}
               formatter={(v) => v >= 999 ? '>999%' : formatPercent(v, locale)}
               subtitle={locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget'}
               confidenceLevel={calculations.confidenceLevel}
               locale={locale}
             />
-            <ROIMetricTile label={locale === 'id' ? 'NPV 3 Tahun' : '3-Year NPV'} value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Value kini bersih @ diskonto 10%' : 'Net present value @ 10% discount'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={npvLabel(roiYears, locale)} value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Value kini bersih @ diskonto 10%' : 'Net present value @ 10% discount'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Biaya Berjalan Tahunan' : 'Annual Ongoing Cost'} value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Estimasi lisensi, pemeliharaan & dukungan' : 'Est. licenses, maintenance & support'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Penghematan Bersih Tahunan' : 'Net Annual Savings'} value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Setelah biaya berjalan' : 'After ongoing cost'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
-            <ROIMetricTile label={locale === 'id' ? 'Periode Payback Bersih' : 'Net Payback Period'} value={(calculations as any).netPaybackMonths ?? null} formatter={(v) => formatPaybackCapped(v, locale)} subtitle={locale === 'id' ? 'Berdasarkan penghematan bersih' : 'On net savings'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Periode Payback Bersih' : 'Net Payback Period'} value={(calculations as any).netPaybackMonths ?? null} formatter={(v) => formatPaybackCapped(v, locale, roiYears * 12)} subtitle={locale === 'id' ? 'Berdasarkan penghematan bersih' : 'On net savings'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             {totalAnnualSavingsLocal != null && totalAnnualSavingsLocal > 0 && (
               <ROIMetricTile
                 label={locale === 'id' ? 'Batas Investasi Impas' : 'Break-even Investment'}
                 value={totalAnnualSavingsLocal * 2}
                 formatter={fmtLocal}
-                subtitle={locale === 'id' ? 'Investasi maksimal agar payback ≤ 24 bulan — di atas angka ini, kasus bisnis 3 tahun menjadi negatif' : 'Max investment for a ≤ 24-month payback — above this, the 3-year case turns negative'}
+                subtitle={locale === 'id' ? `Investasi maksimal agar payback ≤ 24 bulan — di atas angka ini, kasus bisnis ${roiYears} tahun menjadi lebih tipis` : `Max investment for a ≤ 24-month payback — above this, the ${roiYears}-year case thins out`}
                 confidenceLevel={calculations.confidenceLevel}
                 locale={locale}
               />
@@ -961,8 +971,13 @@ export default function FinalResultPage() {
               contradictory without this note (NPV negative + ROI positive;
               two different ROI figures on the same screen). */}
           {calculations.hasEnoughDataForProjection && (
-            <p className={styles.financialTermsNote}>{buildFinancialTermsNote(locale)}</p>
+            <p className={styles.financialTermsNote}>{buildFinancialTermsNote(locale, roiYears)}</p>
           )}
+
+          {/* Window disclosure — only when the horizon is NOT the familiar 3
+              years, so an extended window reads as a stated assumption rather
+              than a moved goalpost. */}
+          {roiWindowNote && <p className={styles.financialTermsNote}>{roiWindowNote}</p>}
 
           {/* Negative-case interpretation — the dashboard counterpart of the
               PDF's "Mengapa ROI 3 Tahun negatif?" box. A negative ROI at the
@@ -970,20 +985,20 @@ export default function FinalResultPage() {
               without this box it reads as a broken calculation. Names the
               shortfall and the two concrete paths back to a positive case. */}
           {calculations.hasEnoughDataForProjection && calculations.threeYearROIPercent != null && calculations.threeYearROIPercent < 0 && calculations.totalAnnualSavingsLocal != null && calculations.assumedBudgetMidpointLocal != null && (() => {
-            const sav3 = calculations.totalAnnualSavingsLocal * 3
+            const sav3 = calculations.totalAnnualSavingsLocal * roiYears
             const budget = calculations.assumedBudgetMidpointLocal
             const shortfall = budget - sav3
             const beyYears = (budget / calculations.totalAnnualSavingsLocal).toFixed(1).replace('.', ',')
-            const needPerYear = budget / 3
+            const needPerYear = budget / roiYears
             return (
               <div className={styles.executiveInsight}>
                 <span className={styles.executiveInsightLabel} style={{ color: '#d97706' }}>
-                  {locale === 'id' ? 'Mengapa ROI 3 Tahun negatif?' : 'Why is the 3-Year ROI negative?'}
+                  {locale === 'id' ? `Mengapa ${roiLabel(roiYears, 'id')} negatif?` : `Why is the ${roiLabel(roiYears, 'en')} negative?`}
                 </span>
                 <p style={{ margin: '8px 0 10px', opacity: 0.85, fontSize: '0.9rem', lineHeight: 1.55 }}>
                   {locale === 'id'
-                    ? <>Penghematan 3 tahun ({fmtLocal(sav3)}) masih kurang <strong>{fmtLocal(shortfall)}</strong> dari investasi ({fmtLocal(budget)}) — titik impas ±{beyYears} tahun dengan asumsi investasi = seluruh anggaran yang Anda masukkan. Angka ini bukan kesalahan hitung: pada budget sebesar itu, kasus 3 tahun memang belum positif. Dua jalan membuatnya positif:</>
-                    : <>Three-year savings ({fmtLocal(sav3)}) fall <strong>{fmtLocal(shortfall)}</strong> short of the investment ({fmtLocal(budget)}) — break-even at ±{beyYears} years, assuming investment = your full stated budget. This is not a calculation error: at that budget size, the 3-year case is genuinely negative. Two paths make it positive:</>}
+                    ? <>Penghematan {roiYears} tahun ({fmtLocal(sav3)}) masih kurang <strong>{fmtLocal(shortfall)}</strong> dari investasi ({fmtLocal(budget)}) — titik impas ±{beyYears} tahun dengan asumsi investasi = seluruh anggaran yang Anda masukkan. Angka ini bukan kesalahan hitung: jendela penilaian sudah diperpanjang sampai batas {roiYears} tahun dan pada budget sebesar itu kasusnya memang belum positif. Dua jalan membuatnya positif:</>
+                    : <>{roiYears}-year savings ({fmtLocal(sav3)}) fall <strong>{fmtLocal(shortfall)}</strong> short of the investment ({fmtLocal(budget)}) — break-even at ±{beyYears} years, assuming investment = your full stated budget. This is not a calculation error: the appraisal window is already extended to its {roiYears}-year cap, and at that budget size the case is genuinely negative. Two paths make it positive:</>}
                 </p>
                 <div style={{ display: 'grid', gap: 6, fontSize: '0.88rem' }}>
                   <div>
@@ -1003,9 +1018,66 @@ export default function FinalResultPage() {
             )
           })()}
 
+          {/* Investment thresholds — what it would actually take. A report that
+              only states the verdict leaves the client with a number they
+              cannot act on; these two columns turn "your budget is too large"
+              into "phase it at X, or widen scope until savings reach Y". */}
+          {calculations.hasEnoughDataForProjection && investmentThresholds.length > 0 && (
+            <div className={styles.thresholdBlock}>
+              <span className={styles.thresholdLabel}>
+                {locale === 'id' ? 'Ambang Investasi — Apa yang Dibutuhkan' : 'Investment Thresholds — What It Would Take'}
+              </span>
+              <p className={styles.thresholdIntro}>
+                {locale === 'id'
+                  ? <>Setiap uji keuangan di bawah dinilai pada jendela standar {THRESHOLD_WINDOW_YEARS} tahun — sengaja lebih ketat daripada jendela pelaporan di atas, karena pertanyaannya di sini adalah bagaimana mencapai imbal hasil lebih CEPAT — pada tingkat penghematan Anda saat ini ({fmtLocal(calculations.totalAnnualSavingsLocal)}/tahun) dan anggaran yang Anda masukkan ({fmtLocal(calculations.assumedBudgetMidpointLocal)}). Kolom kedua adalah investasi maksimal yang masih lolos uji itu; kolom ketiga adalah penghematan tahunan yang harus dicapai bila anggaran dipertahankan apa adanya.</>
+                  : <>Each test below is appraised over a standard {THRESHOLD_WINDOW_YEARS}-year window — deliberately stricter than the reporting window above, because the question here is how to reach a return FASTER — at your current saving rate ({fmtLocal(calculations.totalAnnualSavingsLocal)}/yr) and your stated budget ({fmtLocal(calculations.assumedBudgetMidpointLocal)}). The second column is the largest investment that still clears the test; the third is the annual saving the programme must reach if the budget is held as stated.</>}
+              </p>
+              <div className={styles.thresholdTable}>
+                <span className={styles.thresholdHead}>{locale === 'id' ? 'Uji keuangan' : 'Financial test'}</span>
+                <span className={`${styles.thresholdHead} ${styles.thresholdHeadNum}`}>{locale === 'id' ? 'Investasi maksimal' : 'Max investment'}</span>
+                <span className={`${styles.thresholdHead} ${styles.thresholdHeadNum}`}>{locale === 'id' ? 'Atau penghematan/tahun' : 'Or annual savings'}</span>
+                {investmentThresholds.map((t) => (
+                  <Fragment key={t.key}>
+                    <span className={styles.thresholdCell}>
+                      <span className={styles.thresholdTest}>
+                        {thresholdTestLabel(t.key, locale)}
+                        <span className={`${styles.thresholdStatus} ${t.clearedToday ? styles.thresholdStatusPass : styles.thresholdStatusFail}`}>
+                          {t.clearedToday
+                            ? (locale === 'id' ? '✓ TERPENUHI' : '✓ CLEARED')
+                            : (locale === 'id' ? 'BELUM' : 'NOT YET')}
+                        </span>
+                      </span>
+                    </span>
+                    <span className={`${styles.thresholdCell} ${styles.thresholdCellNum}`}>
+                      {fmtLocal(t.maxInvestmentLocal)}
+                      {!t.clearedToday && t.investmentOvershootLocal ? (
+                        <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 400, color: '#fbbf24' }}>
+                          {locale === 'id' ? `${fmtLocal(t.investmentOvershootLocal)} di atas` : `${fmtLocal(t.investmentOvershootLocal)} over`}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className={`${styles.thresholdCell} ${styles.thresholdCellNum}`}>
+                      {fmtLocal(t.requiredAnnualSavingsLocal)}
+                      {!t.clearedToday && t.savingsShortfallLocal ? (
+                        <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 400, color: '#fbbf24' }}>
+                          {locale === 'id' ? `+${fmtLocal(t.savingsShortfallLocal)} lagi` : `+${fmtLocal(t.savingsShortfallLocal)} more`}
+                        </span>
+                      ) : null}
+                    </span>
+                  </Fragment>
+                ))}
+              </div>
+              <p className={styles.thresholdFootnote}>
+                {locale === 'id'
+                  ? `Setiap baris berdiri sendiri: memenuhi uji teratas otomatis memenuhi uji di bawahnya. Payback ≤ ${TARGET_PAYBACK_MONTHS} bulan adalah uji paling ketat; NPV positif menuntut lebih dari ROI positif karena NPV memperhitungkan nilai waktu uang pada diskonto ${Math.round(((calculations as any).discountRate ?? 0.1) * 100)}%. Dua tuas praktisnya sama: fasekan implementasi agar masuk ke kolom "investasi maksimal", atau perluas cakupan otomasi sampai penghematan mencapai kolom "penghematan/tahun".`
+                  : `Each row stands alone: clearing the top test clears everything below it. Payback within ${TARGET_PAYBACK_MONTHS} months is the strictest; a positive NPV demands more than a positive ROI because NPV prices in the time value of money at a ${Math.round(((calculations as any).discountRate ?? 0.1) * 100)}% discount rate. The two practical levers are the same in every row: phase the implementation down into the "max investment" column, or widen automation scope until savings reach the "annual savings" column.`}
+              </p>
+            </div>
+          )}
+
           {(calculations as any).scenarioThreeYearROI && (
             <div className={styles.scenarioRow}>
-              <span className={styles.scenarioLabel}>{locale === 'id' ? 'Kisaran ROI 3 Tahun' : '3-Year ROI range'}</span>
+              <span className={styles.scenarioLabel}>{locale === 'id' ? `Kisaran ${roiLabel(roiYears, 'id')}` : `${roiLabel(roiYears, 'en')} range`}</span>
               <div className={styles.scenarioGrid}>
                 <div className={`${styles.scenarioCell} ${styles.scenarioCellLow}`}>
                   <span className={styles.scenarioCellLabel}>{locale === 'id' ? 'Konservatif' : 'Conservative'}</span>
@@ -1152,33 +1224,33 @@ export default function FinalResultPage() {
                 )}
                 {calculations.assumedBudgetMidpointLocal != null && (
                   <li className={styles.stepRow}>
-                    <span className={styles.stepLabel}>{locale === 'id' ? 'Langkah 6 — ROI 3 Tahun' : 'Step 6 — 3-Year ROI'}</span>
+                    <span className={styles.stepLabel}>{locale === 'id' ? `Langkah 6 — ${roiLabel(roiYears, 'id')}` : `Step 6 — ${roiLabel(roiYears, 'en')}`}</span>
                     <span className={styles.stepValue}>
                     <strong style={{ color: calculations.threeYearROIPercent != null && calculations.threeYearROIPercent < 0 ? '#f87171' : '#4ade80' }}>
                       {calculations.threeYearROIPercent != null ? `${formatPercent(calculations.threeYearROIPercent, locale)}` : '—'}
                     </strong>
-                    {' = '}({fmtLocal(calculations.totalAnnualSavingsLocal)}/{locale === 'id' ? 'thn' : 'yr'} × 3 − {fmtLocal(calculations.assumedBudgetMidpointLocal)}) ÷ {fmtLocal(calculations.assumedBudgetMidpointLocal)} × 100
+                    {' = '}({fmtLocal(calculations.totalAnnualSavingsLocal)}/{locale === 'id' ? 'thn' : 'yr'} × {roiYears} − {fmtLocal(calculations.assumedBudgetMidpointLocal)}) ÷ {fmtLocal(calculations.assumedBudgetMidpointLocal)} × 100
                     </span>
 
                     {calculations.threeYearROIPercent != null && calculations.threeYearROIPercent < 0 && calculations.totalAnnualSavingsLocal != null && calculations.assumedBudgetMidpointLocal != null && (() => {
-                      const savings3yr = calculations.totalAnnualSavingsLocal! * 3
+                      const savings3yr = calculations.totalAnnualSavingsLocal! * roiYears
                       const budget = calculations.assumedBudgetMidpointLocal!
                       const shortfall = budget - savings3yr
                       const breakEvenYears = budget / calculations.totalAnnualSavingsLocal!
-                      const savingsNeededPerYear = budget / 3
+                      const savingsNeededPerYear = budget / roiYears
                       return locale === 'id' ? (
                         <ul className={styles.roiNegativeList}>
                           <li className={styles.roiNegativeReason}>
                             <span className={styles.roiNegativeLabel}>⚠ Mengapa negatif?</span>
-                            Penghematan kumulatif 3 tahun Anda (<strong>{fmtLocal(savings3yr)}</strong>) kurang{' '}
+                            Penghematan kumulatif {roiYears} tahun Anda (<strong>{fmtLocal(savings3yr)}</strong>) kurang{' '}
                             <strong style={{ color: '#f87171' }}>{fmtLocal(shortfall)}</strong>{' '}
                             dari total investasi ({fmtLocal(budget)}). Titik impas berada pada{' '}
-                            <strong>~{breakEvenYears.toFixed(1).replace('.', ',')} tahun</strong>, bukan 3 tahun.
+                            <strong>~{breakEvenYears.toFixed(1).replace('.', ',')} tahun</strong>, di luar jendela {roiYears} tahun.
                           </li>
                           <li className={styles.roiFixItem}>
                             <span className={styles.roiFixLabel}>Solusi A — Kurangi ruang lingkup anggaran awal</span>
                             Mulai dengan anggaran <strong>{fmtLocal(savings3yr)}</strong> atau lebih kecil.
-                            Jumlah tersebut sepenuhnya kembali pada tahun ke-3 dengan tingkat penghematan Anda saat ini.
+                            Jumlah tersebut sepenuhnya kembali pada tahun ke-{roiYears} dengan tingkat penghematan Anda saat ini.
                           </li>
                           <li className={styles.roiFixItem}>
                             <span className={styles.roiFixLabel}>Solusi B — Tingkatkan kedalaman otomasi</span>
@@ -1190,15 +1262,15 @@ export default function FinalResultPage() {
                         <ul className={styles.roiNegativeList}>
                           <li className={styles.roiNegativeReason}>
                             <span className={styles.roiNegativeLabel}>⚠ Why negative?</span>
-                            Your 3-year cumulative savings (<strong>{fmtLocal(savings3yr)}</strong>) fall{' '}
+                            Your {roiYears}-year cumulative savings (<strong>{fmtLocal(savings3yr)}</strong>) fall{' '}
                             <strong style={{ color: '#f87171' }}>{fmtLocal(shortfall)} short</strong>{' '}
                             of the full investment ({fmtLocal(budget)}). Break-even is at{' '}
-                            <strong>~{breakEvenYears.toFixed(1)} years</strong>, not 3.
+                            <strong>~{breakEvenYears.toFixed(1)} years</strong>, outside the {roiYears}-year window.
                           </li>
                           <li className={styles.roiFixItem}>
                             <span className={styles.roiFixLabel}>Fix A — Reduce initial budget scope</span>
                             Start with a budget of <strong>{fmtLocal(savings3yr)}</strong> or less.
-                            That amount is fully recovered by year 3 at your current saving rate.
+                            That amount is fully recovered by year {roiYears} at your current saving rate.
                           </li>
                           <li className={styles.roiFixItem}>
                             <span className={styles.roiFixLabel}>Fix B — Increase automation depth</span>
@@ -1210,7 +1282,7 @@ export default function FinalResultPage() {
                     })()}
 
                     {calculations.threeYearROIPercent != null && calculations.threeYearROIPercent >= 0 &&
-                      <span style={{ color: '#86efac', gridColumn: '2' }}>{locale === 'id' ? '✓ Sepenuhnya kembali dalam 3 tahun.' : '✓ Fully recovered within 3 years.'}</span>
+                      <span style={{ color: '#86efac', gridColumn: '2' }}>{locale === 'id' ? `✓ Sepenuhnya kembali dalam ${roiYears} tahun.` : `✓ Fully recovered within ${roiYears} years.`}</span>
                     }
                   </li>
                 )}

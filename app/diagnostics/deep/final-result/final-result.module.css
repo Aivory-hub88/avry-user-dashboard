@@ -996,3 +996,66 @@
   color: var(--dd-text, #e5e7eb);
   margin: 0;
 }
+
+/* ── Investment thresholds ──────────────────────────────────────────────────
+   The prescriptive close of the Financial Case: for each financial test, the
+   largest investment that still clears it and — holding the stated budget —
+   the annual saving the programme must reach. Deliberately static: this is a
+   table a client reads and quotes in a board pack, not something they poke at,
+   so it carries no motion of its own. Structure comes from hairline rules in
+   the gutters, matching .roiGrid / the PDF's Financial Case treatment rather
+   than introducing a second table language. */
+.thresholdBlock {
+  margin: 1rem 0 0;
+  padding: 0.9rem 1rem 1rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.024) 0%, rgba(255, 255, 255, 0) 60%), rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+.thresholdLabel {
+  display: block;
+  font-size: .75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--dd-muted, #9ca3af);
+}
+.thresholdIntro {
+  margin: 8px 0 12px;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: #c8c8c4;
+}
+.thresholdTable { display: grid; grid-template-columns: 1.5fr 1fr 1fr; }
+.thresholdHead {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--dd-muted, #9ca3af);
+  padding: 0 0 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.thresholdHeadNum { text-align: right; }
+.thresholdCell {
+  padding: 11px 0;
+  font-size: 0.9rem;
+  color: var(--dd-text, #e5e7eb);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.thresholdCellNum {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  padding-left: 12px;
+}
+.thresholdTest { display: flex; align-items: baseline; gap: 8px; }
+.thresholdStatus { font-size: 0.72rem; font-weight: 700; letter-spacing: .03em; }
+.thresholdStatusPass { color: #86efac; }
+.thresholdStatusFail { color: #fbbf24; }
+.thresholdFootnote {
+  margin: 12px 0 0;
+  font-size: .75rem;
+  line-height: 1.6;
+  color: var(--dd-muted, #9ca3af);
+}

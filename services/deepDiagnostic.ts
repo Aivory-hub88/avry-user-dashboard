@@ -682,70 +682,123 @@ export function calculateROI(
       ? (budgetUSD / totalAnnualSavingsUSD) * 12
       : null
 
-  const rawThreeYearROI =
-    totalAnnualSavingsUSD && budgetUSD && budgetUSD > 0
-      ? ((totalAnnualSavingsUSD * 3 - budgetUSD) / budgetUSD) * 100
-      : null
-  const threeYearROIPercent =
-    rawThreeYearROI !== null ? Math.min(rawThreeYearROI, 999) : null
-
-  const costOfInaction90DaysUSD = totalAnnualSavingsUSD
-    ? totalAnnualSavingsUSD * (90 / 365)
-    : null
-
-  // ── Ongoing run cost + net economics (enterprise credibility) ───────────
-  // Year-1 investment (budget) alone overstates ROI; real programs carry an
-  // annual run cost (licenses, maintenance, support, monitoring). Assume it is
-  // a fraction of the initial investment per year.
-  const ONGOING_COST_RATE = 0.20
+  // ── Ongoing run cost ────────────────────────────────────────────────────
+  // Real programmes carry an annual run cost (licences, maintenance, support,
+  // monitoring), assumed to be a fraction of the initial investment.
+  //
+  // 2026-08-26: rate lowered 20% → 12% and shifted to start in YEAR 2.
+  // The 15–20% maintenance benchmark applies to recurring LICENCE spend, not
+  // to a one-off transformation/implementation budget; charging 20% of the
+  // FULL budget from day one ate ~78% of annual savings on ordinary SMB
+  // profiles (net payback 18 years, NPV structurally unreachable). Year 1 is
+  // charge-free because implementation/warranty cover is already inside the
+  // stated budget — billing it twice in the same year double-counted.
+  const ONGOING_COST_RATE = 0.12
+  const ONGOING_COST_START_YEAR = 2
   const annualOngoingCostUSD = budgetUSD !== null ? Math.round(budgetUSD * ONGOING_COST_RATE) : null
   const netAnnualSavingsUSD =
     totalAnnualSavingsUSD !== null && annualOngoingCostUSD !== null
       ? totalAnnualSavingsUSD - annualOngoingCostUSD
       : totalAnnualSavingsUSD
+
+  /** Cumulative NET cash over `years`: year 1 carries no ongoing cost, years 2..N do. */
+  const cumulativeNet = (annualSavings: number, ongoing: number, years: number): number =>
+    annualSavings * years - ongoing * Math.max(0, years - (ONGOING_COST_START_YEAR - 1))
+
+  // Net break-even, in years, on the same year-1-free cash profile.
+  const netBreakEvenYears = (() => {
+    if (!totalAnnualSavingsUSD || !budgetUSD || budgetUSD <= 0) return null
+    if (totalAnnualSavingsUSD >= budgetUSD) return budgetUSD / totalAnnualSavingsUSD
+    const steady = netAnnualSavingsUSD
+    if (steady === null || steady <= 0) return null
+    return 1 + (budgetUSD - totalAnnualSavingsUSD) / steady
+  })()
+
+  // ── Adaptive ROI horizon ────────────────────────────────────────────────
+  // The window used to be a hard-coded 3 years, so any programme whose
+  // break-even landed past year 3 reported a NEGATIVE ROI — arithmetically
+  // true, but it read as a broken calculation rather than as "this pays back
+  // in year 4". The horizon now follows the case: the first whole year after
+  // break-even, plus one year of headroom so the figure isn't a fragile
+  // ~+2%. Floored at 3 (healthy cases keep the familiar 3-year window, so
+  // nothing regresses for them) and capped at 7 (beyond that an ROI window
+  // stops being credible for an operations programme — such cases stay
+  // negative on purpose, and the "why is this negative" note explains it).
+  const ROI_HORIZON_MIN_YEARS = 3
+  const ROI_HORIZON_MAX_YEARS = 7
+  const roiHorizonYears = (() => {
+    const breakEven = netBreakEvenYears ?? (totalAnnualSavingsUSD && budgetUSD ? budgetUSD / totalAnnualSavingsUSD : null)
+    if (breakEven === null || !isFinite(breakEven) || breakEven <= 0) return ROI_HORIZON_MIN_YEARS
+    return Math.max(ROI_HORIZON_MIN_YEARS, Math.min(ROI_HORIZON_MAX_YEARS, Math.ceil(breakEven) + 1))
+  })()
+
+  // Gross ROI over the horizon — before ongoing running costs.
+  const rawHorizonROI =
+    totalAnnualSavingsUSD && budgetUSD && budgetUSD > 0
+      ? ((totalAnnualSavingsUSD * roiHorizonYears - budgetUSD) / budgetUSD) * 100
+      : null
+  const horizonROIPercent =
+    rawHorizonROI !== null ? Math.min(rawHorizonROI, 999) : null
+
+  const cumulativeSavingsHorizonUSD =
+    totalAnnualSavingsUSD !== null ? totalAnnualSavingsUSD * roiHorizonYears : null
+
+  const costOfInaction90DaysUSD = totalAnnualSavingsUSD
+    ? totalAnnualSavingsUSD * (90 / 365)
+    : null
+
+  // ── Net economics over the same horizon ─────────────────────────────────
   const netPaybackMonths =
-    netAnnualSavingsUSD && netAnnualSavingsUSD > 0 && budgetUSD
-      ? Math.round((budgetUSD / netAnnualSavingsUSD) * 12 * 10) / 10
+    netBreakEvenYears !== null ? Math.round(netBreakEvenYears * 12 * 10) / 10 : null
+  const netHorizonROIRaw =
+    totalAnnualSavingsUSD !== null && annualOngoingCostUSD !== null && budgetUSD && budgetUSD > 0
+      ? ((cumulativeNet(totalAnnualSavingsUSD, annualOngoingCostUSD, roiHorizonYears) - budgetUSD) / budgetUSD) * 100
       : null
-  const netThreeYearROIRaw =
-    netAnnualSavingsUSD !== null && budgetUSD && budgetUSD > 0
-      ? ((netAnnualSavingsUSD * 3 - budgetUSD) / budgetUSD) * 100
-      : null
-  // Floor at −100%: with non-negative savings, simple 3-year ROI cannot lose
-  // more than the outlay. Values below −100% arise only when the ongoing cost
+  // Floor at −100%: with non-negative savings the simple ROI cannot lose more
+  // than the outlay. Values below that arise only when the ongoing cost
   // exceeds annual savings (net cash-flow negative) — real information, but
   // "−109%" reads as a broken calculation; the Net Annual Savings tile and
   // the negative-case note carry that story instead.
-  const netThreeYearROIPercent =
-    netThreeYearROIRaw !== null ? Math.max(-100, Math.min(Math.round(netThreeYearROIRaw), 999)) : null
+  const netHorizonROIPercent =
+    netHorizonROIRaw !== null ? Math.max(-100, Math.min(Math.round(netHorizonROIRaw), 999)) : null
 
-  // Scenario range: vary the efficiency factor conservative..optimistic.
+  // Scenario range: vary the efficiency factor conservative..optimistic,
+  // on the same horizon and the same year-1-free cost profile.
   const scenarioNetRoi = (eff: number): number | null => {
     if (!q.totalManualHoursWeekly || annualOngoingCostUSD === null || !budgetUSD || budgetUSD <= 0) return null
     const reclaimed = hoursPerYear * incrementalAutoPct * eff
     const labor = reclaimed * hourlyRateUSD
     const total = labor + labor * 0.2
-    const net = total - annualOngoingCostUSD
-    // Same −100% floor as netThreeYearROIPercent above.
-    return Math.max(-100, Math.min(Math.round(((net * 3 - budgetUSD) / budgetUSD) * 100), 999))
+    const net = cumulativeNet(total, annualOngoingCostUSD, roiHorizonYears)
+    // Same −100% floor as netHorizonROIPercent above.
+    return Math.max(-100, Math.min(Math.round(((net - budgetUSD) / budgetUSD) * 100), 999))
   }
-  const scenarioThreeYearROI = {
+  const scenarioHorizonROI = {
     low: scenarioNetRoi(0.5),
-    base: netThreeYearROIPercent,
+    base: netHorizonROIPercent,
     high: scenarioNetRoi(0.9),
   }
 
-  // NPV of 3-year net cash flows (discounted) — enterprise cash-flow view.
+  // NPV of the horizon's net cash flows (discounted) — enterprise cash-flow
+  // view. Year 1 is the full savings figure (no ongoing charge yet), years
+  // 2..N are net of the annual run cost.
   const DISCOUNT_RATE = 0.10
-  const npv3YearUSD =
-    netAnnualSavingsUSD !== null && budgetUSD !== null
+  const npvHorizonUSD =
+    totalAnnualSavingsUSD !== null && netAnnualSavingsUSD !== null && budgetUSD !== null
       ? Math.round(
-          [1, 2, 3].reduce((acc, t) => acc + (netAnnualSavingsUSD as number) / Math.pow(1 + DISCOUNT_RATE, t), 0) - budgetUSD
+          Array.from({ length: roiHorizonYears }, (_, i) => i + 1).reduce(
+            (acc, t) =>
+              acc +
+              (t < ONGOING_COST_START_YEAR ? (totalAnnualSavingsUSD as number) : (netAnnualSavingsUSD as number)) /
+                Math.pow(1 + DISCOUNT_RATE, t),
+            0
+          ) - budgetUSD
         )
       : null
 
   // Bug 3 — Audit log: always log budgetMidpointUSD alongside the ROI result
-  // so the formula is auditable: ((totalAnnualSavingsUSD × 3 − investment) / investment) × 100
+  // so the formula is auditable:
+  // ((totalAnnualSavingsUSD × roiHorizonYears − investment) / investment) × 100
   if (process.env.NODE_ENV !== 'test') {
     console.log('[ROI Audit]', {
       industry: industry ?? 'unknown',
@@ -760,9 +813,15 @@ export function calculateROI(
       budgetMidpointUSD: budgetUSD,
       totalAnnualSavingsUSD,
       paybackMonths: paybackMonths !== null ? Math.round(paybackMonths * 10) / 10 : null,
-      rawThreeYearROI: rawThreeYearROI !== null ? Math.round(rawThreeYearROI * 10) / 10 : null,
-      threeYearROIPercent,
-      capped: rawThreeYearROI !== null && rawThreeYearROI > 999,
+      netBreakEvenYears: netBreakEvenYears !== null ? Math.round(netBreakEvenYears * 10) / 10 : null,
+      roiHorizonYears,
+      ongoingCostRate: ONGOING_COST_RATE,
+      annualOngoingCostUSD,
+      rawHorizonROI: rawHorizonROI !== null ? Math.round(rawHorizonROI * 10) / 10 : null,
+      horizonROIPercent,
+      netHorizonROIPercent,
+      npvHorizonUSD,
+      capped: rawHorizonROI !== null && rawHorizonROI > 999,
     })
   }
 
@@ -776,7 +835,15 @@ export function calculateROI(
     totalAnnualSavingsUSD,
     hoursReclaimedPerYear,
     paybackMonths,
-    threeYearROIPercent,
+    // Adaptive ROI window — drives every "N-Year ROI/NPV" label in the report.
+    roiHorizonYears,
+    netBreakEvenYears,
+    horizonROIPercent,
+    cumulativeSavingsHorizonUSD,
+    cumulativeSavingsHorizonLocal: cumulativeSavingsHorizonUSD !== null ? cumulativeSavingsHorizonUSD * rate : null,
+    // Legacy name, same value — kept so contexts/readers written against the
+    // old fixed-3-year field keep working. The window is roiHorizonYears.
+    threeYearROIPercent: horizonROIPercent,
     hasEnoughDataForProjection: hasEnough,
     confidenceLevel: confidence,
     missingInputs: missing,
@@ -799,16 +866,22 @@ export function calculateROI(
     rateBenchmarkLabelId: getRateBenchmarkLabel(currencyCode, 'id'),
     // Ongoing cost + net economics + scenario range
     ongoingCostRate: ONGOING_COST_RATE,
+    ongoingCostStartYear: ONGOING_COST_START_YEAR,
     annualOngoingCostUSD,
     annualOngoingCostLocal: annualOngoingCostUSD !== null ? annualOngoingCostUSD * rate : null,
     netAnnualSavingsUSD,
     netAnnualSavingsLocal: netAnnualSavingsUSD !== null ? netAnnualSavingsUSD * rate : null,
     netPaybackMonths,
-    netThreeYearROIPercent,
-    scenarioThreeYearROI,
+    netHorizonROIPercent,
+    scenarioHorizonROI,
     discountRate: DISCOUNT_RATE,
-    npv3YearUSD,
-    npv3YearLocal: npv3YearUSD !== null ? npv3YearUSD * rate : null,
+    npvHorizonUSD,
+    npvHorizonLocal: npvHorizonUSD !== null ? npvHorizonUSD * rate : null,
+    // Legacy names, same values (see threeYearROIPercent above).
+    netThreeYearROIPercent: netHorizonROIPercent,
+    scenarioThreeYearROI: scenarioHorizonROI,
+    npv3YearUSD: npvHorizonUSD,
+    npv3YearLocal: npvHorizonUSD !== null ? npvHorizonUSD * rate : null,
     // Backward-compat aliases for any stored DiagnosticContext that still uses *IDR names
     annualLaborSavingsIDR: annualLaborSavingsUSD ? annualLaborSavingsUSD * rate : null,
     annualProcessSavingsIDR: annualProcessSavingsUSD ? annualProcessSavingsUSD * rate : null,
@@ -1176,7 +1249,7 @@ const STRATEGY_FACTORS: DriverFactor[] = [
   {
     answerKey: 'kpi_tracking', maxPoints: 15,
     evaluate: (a, locale) => a.kpi_tracking === 'Automated dashboards'
-      ? { points: 15, label: locale === 'id' ? 'KPI dilacak melalui dasbor otomatis' : 'KPIs are tracked via automated dashboards' }
+      ? { points: 15, label: locale === 'id' ? 'KPI dilacak melalui dashboard otomatis' : 'KPIs are tracked via automated dashboards' }
       : a.kpi_tracking === 'Manual reports'
         ? { points: 5, label: locale === 'id' ? 'KPI dilacak melalui laporan manual' : 'KPIs are tracked via manual reports' }
         : { points: 0, label: locale === 'id' ? 'KPI tidak dilacak secara sistematis' : 'KPIs are not tracked systematically' },
@@ -2040,13 +2113,13 @@ function buildRoomForImprovement(
           ? `Success is tracked via ${String(a.kpi_tracking).toLowerCase()}; objectives are not yet fully quantified.`
           : 'Goals are not yet tied to specific, tracked metrics.'),
       recommendedAction: id
-        ? 'Tetapkan 2–3 KPI terukur per otomasi (misalnya jam yang dihemat/minggu, waktu siklus, tingkat kesalahan) dan hubungkan ke dasbor otomatis sejak hari pertama.'
+        ? 'Tetapkan 2–3 KPI terukur per otomasi (misalnya jam yang dihemat/minggu, waktu siklus, tingkat kesalahan) dan hubungkan ke dashboard otomatis sejak hari pertama.'
         : 'Define 2–3 quantified KPIs per automation (e.g. hours saved/week, cycle time, error rate) and wire them into an automated dashboard from day one.',
       operationalImpact: id
-        ? 'KPI yang terukur memungkinkan Anda membuktikan ROI lebih awal, memprioritaskan otomasi berikutnya, dan menangkap kemunduran sebelum membesar.'
+        ? 'KPI yang terukur memungkinkan Anda membuktikan ROI lebih awal, memprioritaskan otomasi berikutnya, dan mendeteksi penurunan performa sebelum membesar.'
         : 'Measurable KPIs let you prove ROI early, prioritise the next automation, and catch regressions before they compound.',
       before: id ? 'Dampak otomasi dirasakan secara anekdotal namun tidak terukur.' : 'Impact of automation is felt anecdotally but not measured.',
-      after: id ? 'Setiap otomasi melaporkan metrik secara langsung, sehingga ROI dan prioritas berikutnya menjadi jelas.' : 'Every automation reports live metrics, making ROI and next priorities obvious.',
+      after: id ? 'Setiap otomasi melaporkan metriknya secara real-time, sehingga ROI dan prioritas berikutnya menjadi jelas.' : 'Every automation reports live metrics, making ROI and next priorities obvious.',
     })
   }
 
@@ -2065,7 +2138,7 @@ function buildRoomForImprovement(
           ? `Internal capability: ${String(a.internal_capability).toLowerCase()}.`
           : 'Limited internal capability to own and extend automations.'),
       recommendedAction: id
-        ? 'Tetapkan seorang "juru bicara otomasi" internal, libatkan mereka dalam implementasi, dan dokumentasikan runbook agar tim dapat memelihara alur kerja tanpa bantuan eksternal.'
+        ? 'Tunjuk satu "automation champion" internal — penanggung jawab otomasi di dalam tim — libatkan dia sejak implementasi, dan dokumentasikan runbook agar tim bisa memelihara alur kerja tanpa bantuan eksternal.'
         : 'Designate an internal "automation champion", pair them with the implementation, and document runbooks so the team can maintain workflows without external help.',
       operationalImpact: id
         ? 'Kepemilikan internal mencegah otomasi menjadi usang dan mengurangi ketergantungan pada vendor eksternal untuk setiap perubahan.'
@@ -2080,7 +2153,11 @@ function buildRoomForImprovement(
     items.push({
       id: 'rfi-governance',
       area: 'Governance',
-      title: id ? 'Bangun pagar pembatas anggaran & pengawasan' : 'Establish budget & oversight guardrails',
+      // "Guardrail" stays in English: the literal Indonesian ("pagar
+      // pembatas") means a roadside crash barrier and read as nonsense in a
+      // governance section. The term is already current in Indonesian
+      // business usage, so borrowing it is clearer than translating it.
+      title: id ? 'Tetapkan guardrail anggaran & pengawasan' : 'Establish budget & oversight guardrails',
       priority: priorityFromScore(scores.governance),
       currentState: id
         ? (a.budget_allocated
@@ -2090,10 +2167,10 @@ function buildRoomForImprovement(
           ? `Budget posture: ${String(a.budget_allocated).toLowerCase()}; leadership alignment: ${String(a.leadership_alignment || 'unclear').toLowerCase()}.`
           : 'Budget ownership and oversight for automation are not yet formalized.'),
       recommendedAction: id
-        ? 'Amankan alokasi anggaran khusus untuk otomasi, tetapkan alur persetujuan dan tinjauan yang sederhana, serta tetapkan akuntabilitas yang jelas atas hasilnya.'
+        ? 'Sisihkan pos anggaran khusus untuk otomasi, tetapkan alur persetujuan dan siklus tinjauan yang sederhana, serta tunjuk penanggung jawab yang jelas atas hasilnya.'
         : 'Secure a ring-fenced budget line for automation, define a simple approval and review cadence, and assign clear accountability for outcomes.',
       operationalImpact: id
-        ? 'Pagar pembatas yang jelas mencegah proyek terhenti di tengah jalan dan memastikan otomasi tetap terdanai, ditinjau, dan sejalan dengan prioritas.'
+        ? 'Guardrail yang jelas mencegah proyek terhenti di tengah jalan dan memastikan otomasi tetap terdanai, ditinjau, dan sejalan dengan prioritas.'
         : 'Clear guardrails prevent mid-project stalls and ensure automations stay funded, reviewed, and aligned with priorities.',
       before: id ? 'Pekerjaan otomasi bersaing secara ad-hoc untuk mendapatkan pendanaan dan perhatian.' : 'Automation work competes ad-hoc for funding and attention.',
       after: id ? 'Anggaran khusus dan alur tinjauan rutin menjaga program tetap pada jalurnya.' : 'A dedicated budget and review cadence keep the program on track.',

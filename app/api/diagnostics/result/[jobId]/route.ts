@@ -11,6 +11,7 @@ const ROI_FIELDS_TO_STRIP = [
   'totalAnnualSavings', 'totalAnnualSavingsIDR', 'totalAnnualSavingsLocal', 'totalAnnualSavingsUSD',
   'costOfInaction90Days', 'costOfInaction90DaysIDR', 'costOfInaction90DaysLocal',
   'paybackMonths', 'threeYearROI', 'threeYearROIPercent',
+  'roiHorizonYears', 'horizonROIPercent', 'netHorizonROIPercent', 'netBreakEvenYears',
   'hoursReclaimedPerYear', 'roiProjection', 'calculations',
 ]
 
