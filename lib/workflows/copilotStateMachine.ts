@@ -592,6 +592,20 @@ export class CopilotStateMachine {
   // ---- STAGE HANDLERS ----
 
   private async handleIdle(userMessage: string): Promise<CopilotConversationState> {
+    // Small-talk fast-path — greetings/thanks/bye/capability questions get an
+    // instant deterministic reply with ZERO bridge/LLM round trips. Measured
+    // bridge clarify latency is 10-60s per turn (reasoning model + observed
+    // timeout-retry chains); a greeting must never pay that. Stage stays IDLE
+    // and userRequest is untouched, so a real request sent next is processed
+    // exactly as if this message never happened.
+    const smallTalk = matchSmallTalk(userMessage)
+    if (smallTalk) {
+      console.log('[CopilotStateMachine] small-talk fast-path', {
+        session_id: this.state.sessionId,
+      })
+      return this.setAssistantMessage(smallTalk)
+    }
+
     this.state.userRequest = userMessage
     this.state.clarifyRounds = 0
     this.updateTimestamp()
@@ -673,6 +687,20 @@ export class CopilotStateMachine {
     if (intent === 'cancel') {
       this.state.stage = 'IDLE'
       return this.setAssistantMessage('Okay, canceled. Is there anything else I can help you with?')
+    }
+
+    // Small-talk during clarification — never spend an LLM round (and never
+    // burn one of the 2 clarify rounds) on it.
+    const smallTalk = matchSmallTalk(userMessage)
+    if (smallTalk && intent === 'unknown') {
+      console.log('[CopilotStateMachine] small-talk during CLARIFYING', {
+        session_id: this.state.sessionId,
+      })
+      const isIndonesian = /selamat|siang|pagi|sore|malam|terima|kasih|makasih|sampai|jumpa|kamu|anda|bisa|apa/i.test(userMessage)
+      const nudge = isIndonesian
+        ? 'Kembali ke pertanyaan saya sebelumnya ya — jawaban Anda menentukan susunan workflow-nya.'
+        : "Back to my earlier question — your answer determines how the workflow gets built."
+      return this.setAssistantMessage(`${smallTalk} ${nudge}`)
     }
 
     const rounds = this.state.clarifyRounds ?? 1
@@ -1292,6 +1320,73 @@ export function chatSafeMessage(raw: unknown): string | null {
 // ============================================================
 // INTENT DETECTION
 // ============================================================
+
+// ============================================================
+// SMALL-TALK FAST-PATH
+// ============================================================
+
+/**
+ * Deterministic small-talk detector — greetings, thanks, goodbyes and
+ * "what can you do" questions answered locally with ZERO LLM calls.
+ *
+ * Why this exists: every other message pays a full bridge→OpenRouter round
+ * trip (a reasoning model measured at 10-60s per turn, with observed
+ * timeouts + retries totalling ~40s) — unacceptable for "halo selamat
+ * siang". The matcher is deliberately CONSERVATIVE: the whole message must
+ * be made of greeting/politeness tokens only, so "halo, buatkan workflow
+ * invoice" (greeting + real request) still goes down the normal path.
+ *
+ * Returns the reply text (locale-matched to the message) or null when the
+ * message is not small talk.
+ */
+export function matchSmallTalk(message: string): string | null {
+  const cleaned = message.toLowerCase().trim().replace(/[!.,?✨😊\s]+/g, ' ').trim()
+  if (!cleaned || cleaned.length > 40) return null
+
+  const tokens = cleaned.split(' ')
+  const isIndonesian = tokens.some((t) => ['selamat', 'siang', 'pagi', 'sore', 'malam', 'terima', 'kasih', 'makasih', 'mkasih', 'sampai', 'jumpa', 'kamu', 'anda', 'bisa', 'apa', 'kak', 'min', 'assalamualaikum'].includes(t))
+
+  // Core tokens TRIGGER a category; every token in the message (core + filler)
+  // must belong to that category's vocabulary — one unknown token (a noun, a
+  // verb, an app name) means it's a real request, not small talk.
+  const GREETING_CORE = new Set(['halo', 'hallo', 'helo', 'hai', 'hi', 'hello', 'hey', 'hei', 'yo', 'oi', 'haiya', 'assalamualaikum', 'salam', 'greetings', 'morning', 'afternoon', 'evening', 'pagi', 'siang', 'sore', 'malam', 'selamat', 'good'])
+  const FILLER = new Set(['kak', 'min', 'bro', 'sis', 'pak', 'bu', 'aivory', 'ya', 'gih', 'yuk', 'dulu', 'dah', 'banget', 'banyak', 'there'])
+  const THANKS_CORE = new Set(['terima', 'kasih', 'makasih', 'mkasih', 'thanks', 'thank', 'thx', 'tengkyu', 'manyu'])
+  const THANKS_FILLER = new Set(['you'])
+  const BYE_CORE = new Set(['bye', 'byebye', 'dadah', 'dada', 'goodbye', 'sampai', 'jumpa'])
+  const BYE_FILLER = new Set(['see', 'you', 'later'])
+  const CAP_CORE = new Set(['bisa', 'apa', 'apakah', 'what', 'who', 'fitur'])
+  const CAP_FILLER = new Set(['aja', 'saja', 'can', 'you', 'u', 'do', 'does', 'kamu', 'anda', 'siapa', 'help', 'bantu', 'bantuan', 'yang', 'lakukan', 'dapat', 'are'])
+
+  const has = (set: Set<string>) => tokens.some((t) => set.has(t))
+  const allIn = (...sets: Set<string>[]) => {
+    const vocab = new Set<string>()
+    for (const s of sets) for (const t of s) vocab.add(t)
+    return tokens.every((t) => vocab.has(t))
+  }
+
+  if (has(GREETING_CORE) && allIn(GREETING_CORE, FILLER)) {
+    return isIndonesian
+      ? 'Halo! Saya copilot otomasi Aivory. Ceritakan proses yang ingin Anda otomatisasi — pemicunya (trigger), aplikasi yang terlibat, dan data yang mengalir di antaranya — nanti saya susun workflow-nya.'
+      : "Hello! I'm the Aivory workflow copilot. Tell me the process you'd like to automate — the trigger, the apps involved, and the data that should flow between them — and I'll build the workflow."
+  }
+  if (has(THANKS_CORE) && allIn(THANKS_CORE, THANKS_FILLER, GREETING_CORE, FILLER)) {
+    return isIndonesian
+      ? 'Sama-sama! Ada proses lain yang ingin diotomatisasi?'
+      : "You're welcome! Anything else you'd like to automate?"
+  }
+  if (has(BYE_CORE) && allIn(BYE_CORE, BYE_FILLER, THANKS_CORE, GREETING_CORE, FILLER)) {
+    return isIndonesian
+      ? 'Sampai jumpa! Kapan pun butuh otomasi, saya siap.'
+      : "See you around! Whenever you need an automation, I'm here."
+  }
+  if (has(CAP_CORE) && allIn(CAP_CORE, CAP_FILLER)) {
+    return isIndonesian
+      ? 'Saya membantu menyusun workflow otomasi: jelaskan proses bisnis Anda (trigger → aplikasi → data), saya buatkan workflow-nya, uji di sandbox, lalu terapkan ke canvas setelah Anda setujui.'
+      : 'I help you build automation workflows: describe your business process (trigger → apps → data), I draft the workflow, test it in the sandbox, and apply it to the canvas once you approve.'
+  }
+  return null
+}
 
 export function detectUserIntent(
   message: string,
