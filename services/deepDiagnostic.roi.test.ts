@@ -18,6 +18,7 @@
 import { describe, it, expect } from 'vitest'
 import { calculateROI, dampConfidenceByEstimateBasis, parseBudgetMidpointUSD } from './deepDiagnostic'
 import { getLabourBenchmark } from '@/lib/currencyBands'
+import { getIndustryBenchmark } from '@/lib/industryBenchmarks'
 import type { DiagnosticContext } from '@/types/diagnostic'
 
 type Q = DiagnosticContext['quantitative']
@@ -229,5 +230,41 @@ describe('per-country labour benchmarks (currency → wage anchor state machine)
       const localFormula = ((r.totalAnnualSavingsLocal * 3 - r.assumedBudgetMidpointLocal) / r.assumedBudgetMidpointLocal) * 100
       expect(Math.min(localFormula, 999)).toBeCloseTo(r.threeYearROIPercent!, 4)
     }
+  })
+})
+
+describe('ID-locale industry answers resolve to the same rates as their EN twins', () => {
+  // The industry question is localized (deepDiagnosticQuestionsId.ts), so an
+  // Indonesian submission stores e.g. 'Jasa Profesional / Konsultasi' in
+  // qualitative.industry. Before the alias table, every ID string missed the
+  // rate table and silently fell to the $30 default — the industry signal
+  // existed only for English-language answers.
+  const PAIRS: Array<[string, string]> = [
+    ['Technology / Software', 'Teknologi / Perangkat Lunak'],
+    ['Professional Services / Consulting', 'Jasa Profesional / Konsultasi'],
+    ['Financial Services / Fintech', 'Jasa Keuangan / Fintech'],
+    ['Manufacturing', 'Manufaktur'],
+    ['Non-profit / NGO', 'Nirlaba / LSM'],
+  ]
+
+  for (const [en, id] of PAIRS) {
+    it(`'${id}' prices identically to '${en}'`, () => {
+      const enRate = calculateROI(CASES[1].q, 'IDR', en).assumedHourlyRateLocal
+      const idRate = calculateROI(CASES[1].q, 'IDR', id).assumedHourlyRateLocal
+      expect(enRate).not.toBeNull()
+      expect(idRate).toBe(enRate)
+    })
+  }
+
+  it('ID answer for professional services is priced ABOVE the generic default (industry signal preserved)', () => {
+    const prof = calculateROI(CASES[1].q, 'IDR', 'Jasa Profesional / Konsultasi').assumedHourlyRateLocal
+    const generic = calculateROI(CASES[1].q, 'IDR', 'Lainnya').assumedHourlyRateLocal
+    expect(prof!).toBeGreaterThan(generic!)
+  })
+
+  it('benchmark overlay resolves for ID-locale industry strings too', () => {
+    expect(getIndustryBenchmark('Jasa Profesional / Konsultasi')).not.toBeNull()
+    expect(getIndustryBenchmark('Teknologi / Perangkat Lunak')).not.toBeNull()
+    expect(getIndustryBenchmark('Jasa Profesional / Konsultasi')).toEqual(getIndustryBenchmark('Professional Services / Consulting'))
   })
 })

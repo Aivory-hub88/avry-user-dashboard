@@ -50,6 +50,43 @@ function pt(median: number, p75Delta = 12): BenchmarkPoint {
 }
 
 /**
+ * Bahasa-Indonesia answer strings → the canonical EN keys above. The industry
+ * question is localized (constants/deepDiagnosticQuestionsId.ts), so an
+ * ID-locale submission stores e.g. 'Jasa Profesional / Konsultasi' in
+ * `qualitative.industry` — without this alias table that answer misses every
+ * keyed lookup (rate table, benchmark overlay) and silently falls to the
+ * generic default, which is exactly how a consultancy got priced as an
+ * unrecognised industry. Keys MUST match the ID option strings EXACTLY.
+ */
+export const INDUSTRY_KEY_ALIASES: Record<string, string> = {
+  'Teknologi / Perangkat Lunak': 'Technology / Software',
+  'E-commerce / Ritel': 'E-commerce / Retail',
+  'Jasa Keuangan / Fintech': 'Financial Services / Fintech',
+  'Kesehatan / Medtech': 'Healthcare / Medtech',
+  'Manufaktur': 'Manufacturing',
+  'Makanan & Minuman': 'Food & Beverages',
+  'Logistik / Rantai Pasok': 'Logistics / Supply Chain',
+  'Pendidikan / Edtech': 'Education / Edtech',
+  'Media / Hiburan': 'Media / Entertainment',
+  'Real Estat / Properti': 'Real Estate / Property',
+  'Jasa Profesional / Konsultasi': 'Professional Services / Consulting',
+  'Pemerintahan / Sektor Publik': 'Government / Public Sector',
+  'Nirlaba / LSM': 'Non-profit / NGO',
+  'Lainnya': 'Other',
+}
+
+/**
+ * Resolves any stored `industry` value to a canonical EN table key: exact EN
+ * key → itself; ID-locale option → its EN twin; anything else (free text,
+ * legacy strings) → returned unchanged so per-table legacy keys still hit.
+ */
+export function normalizeIndustryKey(industry: string | null | undefined): string | undefined {
+  if (!industry) return undefined
+  if (INDUSTRY_BENCHMARKS[industry]) return industry
+  return INDUSTRY_KEY_ALIASES[industry] ?? industry
+}
+
+/**
  * Seeded per-industry medians. Archetypes lean on plausible, defensible
  * skews (e.g. manufacturing/logistics score higher on process maturity,
  * professional services lower on data maturity, regulated industries higher
@@ -126,8 +163,9 @@ export const INDUSTRY_BENCHMARKS: Record<string, IndustryBenchmark> = {
  * that case, not fall back silently to a guessed bucket.
  */
 export function getIndustryBenchmark(industry: string | null | undefined): IndustryBenchmark | null {
-  if (!industry) return null
-  return INDUSTRY_BENCHMARKS[industry] ?? null
+  const key = normalizeIndustryKey(industry)
+  if (!key) return null
+  return INDUSTRY_BENCHMARKS[key] ?? null
 }
 
 /** "58 vs industry median 52" — shared formatter so page/PDF never diverge. */

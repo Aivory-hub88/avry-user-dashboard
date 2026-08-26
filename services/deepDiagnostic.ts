@@ -388,6 +388,7 @@ import type {
 } from '@/types/diagnostic'
 import { parseCurrencyCode, formatCurrency, type CurrencyCode } from '@/lib/resultFormatters'
 import { getBudgetBands, getLabourBenchmark, resolveBandMidpointUSD } from '@/lib/currencyBands'
+import { normalizeIndustryKey } from '@/lib/industryBenchmarks'
 
 // ---- String normalization helper ----
 // FIX #1: Normalize em-dash / en-dash / non-breaking spaces to regular hyphen+space
@@ -530,8 +531,12 @@ const INDUSTRY_HOURLY_RATE_USD: Record<string, number> = {
 const DEFAULT_HOURLY_RATE_USD = 30
 
 function getHourlyRateUSD(industry: string | undefined): number {
-  if (!industry) return DEFAULT_HOURLY_RATE_USD
-  return INDUSTRY_HOURLY_RATE_USD[industry] ?? DEFAULT_HOURLY_RATE_USD
+  // normalizeIndustryKey maps ID-locale option strings ('Jasa Profesional /
+  // Konsultasi' …) onto the EN keys above — without it, an Indonesian-language
+  // submission silently loses its industry signal and falls to the $30 default.
+  const key = normalizeIndustryKey(industry)
+  if (!key) return DEFAULT_HOURLY_RATE_USD
+  return INDUSTRY_HOURLY_RATE_USD[key] ?? DEFAULT_HOURLY_RATE_USD
 }
 
 // FIX: IDR reports must not price labour by running a US-centric industry
