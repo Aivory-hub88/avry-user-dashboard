@@ -268,3 +268,33 @@ describe('ID-locale industry answers resolve to the same rates as their EN twins
     expect(getIndustryBenchmark('Jasa Profesional / Konsultasi')).toEqual(getIndustryBenchmark('Professional Services / Consulting'))
   })
 })
+
+describe('net & scenario 3-Year ROI clamp at −100%', () => {
+  // When the ongoing cost (20%/yr of budget) exceeds annual savings, the net
+  // cash-flow is negative and raw simple ROI can read below −100% (e.g.
+  // "−109%") — arithmetically true (losses accumulate), visually a broken
+  // calculation. The engine floors the displayed figure at −100%; the Net
+  // Annual Savings tile carries the cash-flow-negative story instead.
+  const tinySavingsHugeBudget = q({
+    totalManualHoursWeekly: 5,
+    fteCountInScope: 2,
+    currentAutomationPct: 10,
+    targetAutomationPct: 30,
+    budgetMidpointUSD: 250_000,
+  })
+
+  it('netThreeYearROIPercent never drops below −100', () => {
+    const r = calculateROI(tinySavingsHugeBudget, 'USD')
+    expect(r.netThreeYearROIPercent).not.toBeNull()
+    expect(r.netThreeYearROIPercent!).toBeGreaterThanOrEqual(-100)
+  })
+
+  it('scenario range (low/base/high) never drops below −100', () => {
+    const r = calculateROI(tinySavingsHugeBudget, 'USD')
+    const range = r.scenarioThreeYearROI
+    if (!range) return
+    for (const v of [range.low, range.base, range.high]) {
+      if (v != null) expect(v).toBeGreaterThanOrEqual(-100)
+    }
+  })
+})

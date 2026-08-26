@@ -711,8 +711,13 @@ export function calculateROI(
     netAnnualSavingsUSD !== null && budgetUSD && budgetUSD > 0
       ? ((netAnnualSavingsUSD * 3 - budgetUSD) / budgetUSD) * 100
       : null
+  // Floor at −100%: with non-negative savings, simple 3-year ROI cannot lose
+  // more than the outlay. Values below −100% arise only when the ongoing cost
+  // exceeds annual savings (net cash-flow negative) — real information, but
+  // "−109%" reads as a broken calculation; the Net Annual Savings tile and
+  // the negative-case note carry that story instead.
   const netThreeYearROIPercent =
-    netThreeYearROIRaw !== null ? Math.min(Math.round(netThreeYearROIRaw), 999) : null
+    netThreeYearROIRaw !== null ? Math.max(-100, Math.min(Math.round(netThreeYearROIRaw), 999)) : null
 
   // Scenario range: vary the efficiency factor conservative..optimistic.
   const scenarioNetRoi = (eff: number): number | null => {
@@ -721,7 +726,8 @@ export function calculateROI(
     const labor = reclaimed * hourlyRateUSD
     const total = labor + labor * 0.2
     const net = total - annualOngoingCostUSD
-    return Math.min(Math.round(((net * 3 - budgetUSD) / budgetUSD) * 100), 999)
+    // Same −100% floor as netThreeYearROIPercent above.
+    return Math.max(-100, Math.min(Math.round(((net * 3 - budgetUSD) / budgetUSD) * 100), 999))
   }
   const scenarioThreeYearROI = {
     low: scenarioNetRoi(0.5),

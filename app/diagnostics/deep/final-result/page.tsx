@@ -964,6 +964,45 @@ export default function FinalResultPage() {
             <p className={styles.financialTermsNote}>{buildFinancialTermsNote(locale)}</p>
           )}
 
+          {/* Negative-case interpretation — the dashboard counterpart of the
+              PDF's "Mengapa ROI 3 Tahun negatif?" box. A negative ROI at the
+              user's full stated budget is honest arithmetic, not an error;
+              without this box it reads as a broken calculation. Names the
+              shortfall and the two concrete paths back to a positive case. */}
+          {calculations.hasEnoughDataForProjection && calculations.threeYearROIPercent != null && calculations.threeYearROIPercent < 0 && calculations.totalAnnualSavingsLocal != null && calculations.assumedBudgetMidpointLocal != null && (() => {
+            const sav3 = calculations.totalAnnualSavingsLocal * 3
+            const budget = calculations.assumedBudgetMidpointLocal
+            const shortfall = budget - sav3
+            const beyYears = (budget / calculations.totalAnnualSavingsLocal).toFixed(1).replace('.', ',')
+            const needPerYear = budget / 3
+            return (
+              <div className={styles.executiveInsight}>
+                <span className={styles.executiveInsightLabel} style={{ color: '#d97706' }}>
+                  {locale === 'id' ? 'Mengapa ROI 3 Tahun negatif?' : 'Why is the 3-Year ROI negative?'}
+                </span>
+                <p style={{ margin: '8px 0 10px', opacity: 0.85, fontSize: '0.9rem', lineHeight: 1.55 }}>
+                  {locale === 'id'
+                    ? <>Penghematan 3 tahun ({fmtLocal(sav3)}) masih kurang <strong>{fmtLocal(shortfall)}</strong> dari investasi ({fmtLocal(budget)}) — titik impas ±{beyYears} tahun dengan asumsi investasi = seluruh anggaran yang Anda masukkan. Angka ini bukan kesalahan hitung: pada budget sebesar itu, kasus 3 tahun memang belum positif. Dua jalan membuatnya positif:</>
+                    : <>Three-year savings ({fmtLocal(sav3)}) fall <strong>{fmtLocal(shortfall)}</strong> short of the investment ({fmtLocal(budget)}) — break-even at ±{beyYears} years, assuming investment = your full stated budget. This is not a calculation error: at that budget size, the 3-year case is genuinely negative. Two paths make it positive:</>}
+                </p>
+                <div style={{ display: 'grid', gap: 6, fontSize: '0.88rem' }}>
+                  <div>
+                    <strong style={{ color: '#4ade80' }}>{locale === 'id' ? 'Solusi A: ' : 'Path A: '}</strong>
+                    {locale === 'id'
+                      ? <>Mulai dengan investasi ≤ <strong>{fmtLocal(calculations.totalAnnualSavingsLocal * 2)}</strong> (batas impas payback 24 bulan — lihat tile Batas Investasi Impas): fasingkan implementasi, mulai dari otomasi berdampak tertinggi.</>
+                      : <>Start with an investment ≤ <strong>{fmtLocal(calculations.totalAnnualSavingsLocal * 2)}</strong> (the 24-month break-even cap — see the Break-even Investment tile): phase the implementation, highest-impact automation first.</>}
+                  </div>
+                  <div>
+                    <strong style={{ color: '#4ade80' }}>{locale === 'id' ? 'Solusi B: ' : 'Path B: '}</strong>
+                    {locale === 'id'
+                      ? <>Perluas cakupan otomasi hingga penghematan ≥ <strong>{fmtLocal(needPerYear)}</strong>/tahun.</>
+                      : <>Broaden automation coverage until savings reach <strong>{fmtLocal(needPerYear)}</strong>/yr or more.</>}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
           {(calculations as any).scenarioThreeYearROI && (
             <div className={styles.scenarioRow}>
               <span className={styles.scenarioLabel}>{locale === 'id' ? 'Kisaran ROI 3 Tahun' : '3-Year ROI range'}</span>
