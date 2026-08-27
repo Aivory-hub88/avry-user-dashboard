@@ -369,6 +369,11 @@ export default function CustomizeAgentModal({
   const [mcpForm, setMcpForm] = useState({ name: '', url: '', transport: 'streamable-http' as 'streamable-http' | 'sse', authHeaderName: '', authHeaderValue: '' });
   const [mcpRegistering, setMcpRegistering] = useState(false);
   const [mcpFormError, setMcpFormError] = useState<string | null>(null);
+  // The registration form is hidden once a server exists (the list takes
+  // over), but must be re-openable — without this toggle a user who already
+  // registered one server sees the MCP tab as if it were locked to that
+  // single server, with no way to add another after removing it.
+  const [mcpFormOpen, setMcpFormOpen] = useState(false);
 
   // Deploy tab — was a separate modal (app/agents/page.tsx's DeployModal),
   // merged in so identity/connections/tools/MCP are configured before a
@@ -426,6 +431,7 @@ export default function CustomizeAgentModal({
     setMcpListError(null);
     setMcpForm({ name: '', url: '', transport: 'streamable-http', authHeaderName: '', authHeaderValue: '' });
     setMcpFormError(null);
+    setMcpFormOpen(false);
     if (deployPollRef.current) { clearInterval(deployPollRef.current); deployPollRef.current = null; }
     setDeployView('channels');
     setDeployLink(null);
@@ -734,6 +740,7 @@ export default function CustomizeAgentModal({
       });
       setMcpServers((prev) => [result, ...prev]);
       setMcpForm({ name: '', url: '', transport: 'streamable-http', authHeaderName: '', authHeaderValue: '' });
+      setMcpFormOpen(false);
     } catch (e) {
       if (e instanceof TenantMcpServerError && e.server) {
         // Verification failed, but the row WAS persisted — show it in the
@@ -869,7 +876,7 @@ export default function CustomizeAgentModal({
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 16px' }}>
             {tab === 'identity' && 'Give this agent your business identity. It will introduce itself with your name, follow your tone, and answer from your business knowledge — on every channel it is deployed to.'}
             {tab === 'integrations' && 'Connect a toolkit once, then decide which agents may use it. Writes to your systems always ask for your approval first.'}
-            {tab === 'mcp' && 'Connect this agent to your own systems by registering an MCP server you control. Pro plan and above, Aivory Cerveau agents only — every tool call requires your approval.'}
+            {tab === 'mcp' && 'Connect this agent to your own systems by registering an MCP server you control. Available on all paid plans (Operational, Business, Enterprise), Aivory Cerveau agents only — every tool call requires your approval.'}
             {tab === 'deploy' && 'Once this agent is set up the way you want, put it to work on a channel.'}
           </p>
           <div className="flex items-center gap-1 border-b border-white/[0.06] -mb-4">
@@ -1171,7 +1178,17 @@ export default function CustomizeAgentModal({
                   </div>
                 )}
 
-                {mcpServers.length === 0 && (
+                {mcpServers.length > 0 && !mcpFormOpen && (
+                  <button
+                    type="button"
+                    onClick={() => { setMcpFormError(null); setMcpFormOpen(true); }}
+                    className="w-full py-2.5 rounded-lg bg-white/[0.05] hover:bg-white/10 border border-white/10 text-white/70 hover:text-white/90 text-[13px] font-medium transition-colors"
+                  >
+                    + Add MCP server
+                  </button>
+                )}
+
+                {(mcpServers.length === 0 || mcpFormOpen) && (
                   <>
                     {mcpFormError && (
                       <div className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300/90 text-[12px]">
