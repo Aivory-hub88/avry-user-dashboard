@@ -19,6 +19,68 @@ import { SERVICES } from '@/config/services'
 import { getMarketingUrl } from '@/lib/config'
 import { usePayment } from '@/hooks/usePayment'
 import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
+import {
+  TIER_CREDIT_ALLOWANCE,
+  TIER_DISPLAY_NAMES,
+  TIER_MONTHLY_PRICE_USD,
+  toSubscriptionTier,
+  type SubscriptionTier,
+} from '@/lib/tiers'
+
+/**
+ * Plan-card copy. Names, prices and credit allowances are NOT restated here —
+ * they come from `lib/tiers.ts`, which mirrors the marketing site's pricing
+ * catalogue and the backend's allowance table. Only the per-plan prose and
+ * feature bullets live here.
+ */
+const SUBSCRIPTION_PLAN_CARDS: ReadonlyArray<{
+  tier: SubscriptionTier
+  blurb: string
+  features: string[]
+  /** Sold through sales, not self-serve checkout: no published price. */
+  salesAssisted?: boolean
+}> = [
+  {
+    tier: 'operational',
+    blurb: 'For individuals and solo professionals starting their AI journey.',
+    features: [
+      'Aivory Agentic on-demand consultation',
+      '3 active workflows',
+      '5 JSON exports/month',
+      'Deploy to n8n (optional)',
+      '1 active agent',
+      'Telegram or Slack',
+    ],
+  },
+  {
+    tier: 'business',
+    blurb: 'For SMEs and founders running AI operations daily.',
+    features: [
+      'Aivory Agentic response',
+      '10 active workflows',
+      'Unlimited JSON exports',
+      'Conditional logic & branching',
+      '3 active agents',
+      'Telegram & Slack',
+      'Multi-step agent flows',
+    ],
+  },
+  {
+    tier: 'enterprise',
+    blurb: 'For large organisations with advanced AI operations.',
+    salesAssisted: true,
+    features: [
+      'Dedicated account manager',
+      'Unlimited workflows',
+      'Unlimited exports',
+      'Advanced orchestration',
+      'Unlimited agents',
+      'Custom integrations',
+      'SLA guarantee',
+      'Multi-team workspace',
+    ],
+  },
+]
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
@@ -27,6 +89,7 @@ export default function DashboardPage() {
   const [deepDiagnosticCompleted, setDeepDiagnosticCompleted] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
   const { handlePayment, paymentLoading, paymentError } = usePayment()
+  const CONTACT_SALES_URL = `${getMarketingUrl()}/contact`
   const t = useTranslations("dashboard")
 
   const { pendingContext, clearPendingContext } = useRouterContext()
@@ -307,83 +370,66 @@ export default function DashboardPage() {
               <h3 className="text-lg font-medium text-white mb-2">Subscription Plans</h3>
               <p className="text-sm text-gray-400 mb-6">Choose your plan for ongoing credits and features</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Foundation */}
-                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.tier === 'foundation' ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-medium text-white">Foundation</h3>
-                    {AuthManager.getUser()?.tier === 'foundation' && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
-                  </div>
-                  <p className="text-sm text-gray-400 mb-4">For individuals and solo professionals starting their AI journey.</p>
-                  <div className="mb-6">
-                    <span className="text-3xl font-bold text-white">$20</span>
-                    <span className="text-sm text-gray-400">/month</span>
-                  </div>
-                  <ul className="space-y-2 text-sm text-gray-300 mb-6 flex-grow">
-                    <li>✓ 50 IC/month</li>
-                    <li>✓ Aivory Agentic on-demand consultation</li>
-                    <li>✓ 3 active workflows</li>
-                    <li>✓ 5 JSON exports/month</li>
-                    <li>✓ Deploy to n8n (optional)</li>
-                    <li>✓ 1 active agent</li>
-                    <li>✓ Telegram or Slack</li>
-                  </ul>
-                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.tier === 'foundation' ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`} onClick={() => AuthManager.getUser()?.tier !== 'foundation' && handlePayment('foundation', 20, 'Foundation Plan')} disabled={paymentLoading || AuthManager.getUser()?.tier === 'foundation'}>
-                    {paymentLoading ? 'Processing...' : AuthManager.getUser()?.tier === 'foundation' ? 'Current Plan' : 'Start With Foundation'}
-                  </button>
-                </div>
-
-                {/* Pro */}
-                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.tier === 'acceleration' ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-medium text-white">Pro</h3>
-                    {AuthManager.getUser()?.tier === 'acceleration' && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
-                  </div>
-                  <p className="text-sm text-gray-400 mb-4">For SMEs and founders running AI operations daily.</p>
-                  <div className="mb-6">
-                    <span className="text-3xl font-bold text-white">$44</span>
-                    <span className="text-sm text-gray-400">/month</span>
-                  </div>
-                  <ul className="space-y-2 text-sm text-gray-300 mb-6 flex-grow">
-                    <li>✓ 300 IC/month</li>
-                    <li>✓ Aivory Agentic response</li>
-                    <li>✓ 10 active workflows</li>
-                    <li>✓ Unlimited JSON exports</li>
-                    <li>✓ Conditional logic & branching</li>
-                    <li>✓ 3 active agents</li>
-                    <li>✓ Telegram & Slack</li>
-                    <li>✓ Multi-step agent flows</li>
-                  </ul>
-                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.tier === 'acceleration' ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`} onClick={() => AuthManager.getUser()?.tier !== 'acceleration' && handlePayment('acceleration', 44, 'Pro Plan')} disabled={paymentLoading || AuthManager.getUser()?.tier === 'acceleration'}>
-                    {paymentLoading ? 'Processing...' : AuthManager.getUser()?.tier === 'acceleration' ? 'Current Plan' : 'Start With Pro'}
-                  </button>
-                </div>
-
-                {/* Enterprise */}
-                <div className={`rounded-lg border p-6 transition-all flex flex-col ${AuthManager.getUser()?.tier === 'intelligence' ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}>
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-medium text-white">Enterprise</h3>
-                    {AuthManager.getUser()?.tier === 'intelligence' && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
-                  </div>
-                  <p className="text-sm text-gray-400 mb-4">For large organisations with advanced AI operations.</p>
-                  <div className="mb-6">
-                    <span className="text-3xl font-bold text-white">$499</span>
-                    <span className="text-sm text-gray-400">/month</span>
-                  </div>
-                  <ul className="space-y-2 text-sm text-gray-300 mb-6 flex-grow">
-                    <li>✓ 2,000 IC/month</li>
-                    <li>✓ Dedicated account manager</li>
-                    <li>✓ Unlimited workflows</li>
-                    <li>✓ Unlimited exports</li>
-                    <li>✓ Advanced orchestration</li>
-                    <li>✓ Unlimited agents</li>
-                    <li>✓ Custom integrations</li>
-                    <li>✓ SLA guarantee</li>
-                    <li>✓ Multi-team workspace</li>
-                  </ul>
-                  <button className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${AuthManager.getUser()?.tier === 'intelligence' ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`} onClick={() => AuthManager.getUser()?.tier !== 'intelligence' && handlePayment('intelligence', 499, 'Enterprise Plan')} disabled={paymentLoading || AuthManager.getUser()?.tier === 'intelligence'}>
-                    {paymentLoading ? 'Processing...' : AuthManager.getUser()?.tier === 'intelligence' ? 'Current Plan' : 'Contact Sales'}
-                  </button>
-                </div>
+                {/*
+                  Cards are rendered from SUBSCRIPTION_PLAN_CARDS rather than
+                  hand-written three times over. The hand-written versions had
+                  drifted badly: they advertised $20 and $44 for plans the
+                  gateway charges $39 and $99 for (the amount posted from here
+                  is discarded server-side, so the customer saw one figure and
+                  was billed another), quoted credit allowances of 50/300/2,000
+                  against a backend that grants 80/220/3,000, and the Enterprise
+                  card's "Contact Sales" button in fact opened a $499 checkout.
+                */}
+                {SUBSCRIPTION_PLAN_CARDS.map((card) => {
+                  const isCurrent = toSubscriptionTier(AuthManager.getUser()?.tier) === card.tier
+                  const price = TIER_MONTHLY_PRICE_USD[card.tier] ?? null
+                  return (
+                    <div
+                      key={card.tier}
+                      className={`rounded-lg border p-6 transition-all flex flex-col ${isCurrent ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                        <h3 className="text-lg font-medium text-white">{TIER_DISPLAY_NAMES[card.tier]}</h3>
+                        {isCurrent && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
+                      </div>
+                      <p className="text-sm text-gray-400 mb-4">{card.blurb}</p>
+                      <div className="mb-6">
+                        {price === null ? (
+                          <span className="text-3xl font-bold text-white">Custom</span>
+                        ) : (
+                          <>
+                            <span className="text-3xl font-bold text-white">${price}</span>
+                            <span className="text-sm text-gray-400">/month</span>
+                          </>
+                        )}
+                      </div>
+                      <ul className="space-y-2 text-sm text-gray-300 mb-6 flex-grow">
+                        <li>✓ {TIER_CREDIT_ALLOWANCE[card.tier].toLocaleString('en-GB')} IC/month</li>
+                        {card.features.map((feature) => (
+                          <li key={feature}>✓ {feature}</li>
+                        ))}
+                      </ul>
+                      {card.salesAssisted ? (
+                        <a
+                          href={CONTACT_SALES_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-3 rounded-lg font-medium transition-colors mt-auto bg-[#b7cba6] text-black hover:bg-[#00d489] text-center"
+                        >
+                          Contact Sales
+                        </a>
+                      ) : (
+                        <button
+                          className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${isCurrent ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`}
+                          onClick={() => !isCurrent && handlePayment(card.tier, price ?? 0, `${TIER_DISPLAY_NAMES[card.tier]} Plan`)}
+                          disabled={paymentLoading || isCurrent}
+                        >
+                          {paymentLoading ? 'Processing...' : isCurrent ? 'Current Plan' : `Start With ${TIER_DISPLAY_NAMES[card.tier]}`}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
               {/* Custom Plan Section */}
               <div className="mt-8 pt-8 border-t border-white/[0.07]">

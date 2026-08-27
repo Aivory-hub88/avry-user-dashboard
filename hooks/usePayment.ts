@@ -6,8 +6,8 @@ import { SERVICES } from '@/config/services'
 
 /**
  * Shared Midtrans purchase flow — one-time feature unlocks (ai_diagnostic/
- * ai_blueprint/ai_fullstack) and subscription tiers (foundation/acceleration/
- * intelligence) both go through this. In dev, the backend returns a
+ * ai_blueprint/ai_fullstack) and subscription tiers (operational/business)
+ * both go through this. In dev, the backend returns a
  * mock_token_ and the purchase is confirmed immediately with no real charge;
  * in prod it opens the real Midtrans Snap modal.
  */
@@ -79,7 +79,9 @@ export function usePayment() {
       const userId = AuthManager.getUserId()
       if (!userId) throw new Error('User not authenticated')
 
-      const isSubscription = ['foundation', 'acceleration', 'intelligence'].includes(product)
+      // Canonical 2026 tier ids. The pre-rebrand ids are still accepted so a
+      // stale client bundle keeps working; avry-payments aliases them too.
+      const isSubscription = ['operational', 'business', 'foundation', 'pro', 'acceleration'].includes(product)
       const isOneTimePurchase = product.startsWith('ai_')
       const isCreditTopUp = product.startsWith('credits_')
 

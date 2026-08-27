@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
 import { AuthManager } from "@/lib/authManager"
-import { PLANS, getPlanDetails } from "@/lib/subscriptionPlans"
+import { PLANS, getPlanDetails, deriveSubscriptionStatus } from "@/lib/subscriptionPlans"
+import { toSubscriptionTier } from "@/lib/tiers"
 import LoadingState from "@/components/dashboard/LoadingState"
 import ErrorState from "@/components/dashboard/ErrorState"
 import styles from "@/app/dashboard/dashboard.module.css"
@@ -71,6 +72,9 @@ export default function SubscriptionsPage() {
 
   const userTier = user?.tier || "free"
   const currentPlan = getPlanDetails(userTier)
+  // Canonical form of the user's tier, so an older `foundation`/`pro` row is
+  // recognised as the plan it actually is when filtering the upgrade list.
+  const currentTier = toSubscriptionTier(userTier)
 
   return (
     <div className={`${styles.dashboardContainer} bg-bg-primary`}>
@@ -89,11 +93,15 @@ export default function SubscriptionsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-gray-500 uppercase tracking-wider">Price</p>
-              <p className="text-2xl font-bold text-white">${currentPlan.price}/month</p>
+              <p className="text-2xl font-bold text-white">{currentPlan.priceLabel}</p>
             </div>
             <div>
               <p className="text-xs text-gray-500 uppercase tracking-wider">Status</p>
-              <p className="text-lg font-medium text-white">Active</p>
+              {/* Was hardcoded "Active", which reported a subscription even for
+                  an account that has never held one. */}
+              <p className="text-lg font-medium text-white">
+                {deriveSubscriptionStatus(Boolean(currentTier) && user?.is_subscribed !== false)}
+              </p>
             </div>
           </div>
 
@@ -115,7 +123,7 @@ export default function SubscriptionsPage() {
           <h2 className="text-lg font-medium text-white mb-4">Upgrade Options</h2>
 
           <div className="grid gap-4">
-            {Object.entries(PLANS).filter(([key]) => key !== userTier).map(([key, plan]) => (
+            {Object.entries(PLANS).filter(([key]) => key !== currentTier).map(([key, plan]) => (
               <div
                 key={key}
                 className="rounded-lg border border-white/[0.07] bg-[#353531]/50 p-4 hover:bg-[#353531] transition-colors"
@@ -123,7 +131,7 @@ export default function SubscriptionsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-base font-medium text-white">{plan.name}</h3>
-                    <p className="text-sm text-gray-400 mt-1">${plan.price}/month</p>
+                    <p className="text-sm text-gray-400 mt-1">{plan.priceLabel}</p>
                   </div>
                   <button
                     onClick={() => alert(`Upgrade to ${plan.name} - coming soon`)}

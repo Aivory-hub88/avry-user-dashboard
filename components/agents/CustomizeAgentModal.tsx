@@ -1346,7 +1346,7 @@ export default function CustomizeAgentModal({
                     </div>
                     <div>
                       <div className="text-white/90 font-medium text-[14px]">API</div>
-                      <div className="text-white/40 text-[12px] mt-0.5">Deploy to your own app or bot — Pro plan and above</div>
+                      <div className="text-white/40 text-[12px] mt-0.5">Deploy to your own app or bot — Business plan and above</div>
                     </div>
                     <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">

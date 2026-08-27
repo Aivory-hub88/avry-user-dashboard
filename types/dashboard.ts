@@ -40,7 +40,22 @@ export interface DashboardData {
 export interface User {
   id: string
   email: string
-  tier: 'free' | 'builder' | 'operator' | 'enterprise'
+  /**
+   * Canonical subscription tiers plus the pre-rebrand aliases still found
+   * on older rows. The previous union named 'builder' and 'operator',
+   * which are not tiers this product has ever granted or charged for —
+   * they appeared only in this type and in the wallet page's placeholder
+   * usage data.
+   */
+  tier:
+    | 'free'
+    | 'snapshot'
+    | 'blueprint'
+    | 'operational'
+    | 'business'
+    | 'enterprise'
+    | 'foundation'
+    | 'pro'
   credits: number
 }
 

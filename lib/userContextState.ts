@@ -99,7 +99,13 @@ export function buildUserContextState(): UserContextState {
     const tierRaw = localStorage.getItem('aivory_tier') || localStorage.getItem('user_tier')
     if (tierRaw) {
       state.tier = tierRaw
-      if (['pro', 'enterprise', 'premium', 'active'].includes(tierRaw.toLowerCase())) {
+      // Canonical subscription tiers, the pre-rebrand aliases, and the two
+      // loose values this has always accepted from local storage.
+      if (
+        ['operational', 'business', 'enterprise', 'foundation', 'pro', 'acceleration', 'intelligence', 'premium', 'active'].includes(
+          tierRaw.toLowerCase(),
+        )
+      ) {
         state.is_subscription_member = true
       }
     }

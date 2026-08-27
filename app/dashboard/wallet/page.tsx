@@ -113,12 +113,15 @@ export default function WalletPage() {
           executions: { used: 12000, max: 15000, percentage: 80 },
           storage: { used: 100, max: 1000, percentage: 10 },
         },
-        builder: {
+        // Keyed by canonical tier id. These were 'builder' and 'operator',
+        // tiers this product does not sell, so a real Operational or Business
+        // subscriber matched neither and fell through to the default.
+        operational: {
           workflows: { used: 3, max: 3, percentage: 100 },
           executions: { used: 1500, max: 2500, percentage: 60 },
           storage: { used: 50, max: 500, percentage: 10 },
         },
-        operator: {
+        business: {
           workflows: { used: 8, max: 10, percentage: 80 },
           executions: { used: 8000, max: 10000, percentage: 80 },
           storage: { used: 200, max: 2000, percentage: 10 },
