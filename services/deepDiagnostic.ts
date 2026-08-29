@@ -1602,19 +1602,19 @@ const AGENT_BY_OPP: Record<string, {
     integrations: ['CRM', 'WhatsApp', 'Web forms'],
   },
   'opp-process-automation': {
-    title: 'Autonomous Agent',
+    title: 'Generalist Agent',
     description: 'Runs inside your communication hubs to triage requests, execute the workflow steps for this process, and update your CRM/ERP records automatically.',
     descriptionId: 'Berjalan di dalam kanal komunikasi Anda untuk men-triase permintaan, menjalankan langkah-langkah workflow proses ini, dan memperbarui data CRM/ERP secara otomatis.',
     integrations: ['CRM/ERP', 'Aivory Workflow Builder', 'Slack / Telegram / WhatsApp'],
   },
   'opp-reporting': {
-    title: 'Autonomous Agent',
+    title: 'Generalist Agent',
     description: 'Pulls data from your existing systems on a schedule and assembles the report automatically, so no one copies numbers by hand.',
     descriptionId: 'Mengambil data dari sistem yang sudah ada sesuai jadwal dan menyusun laporan secara otomatis, jadi tidak ada lagi salin-tempel angka manual.',
     integrations: ['Spreadsheets', 'CRM/ERP', 'Dashboards'],
   },
   'opp-cross-reporting': {
-    title: 'Autonomous Agent',
+    title: 'Generalist Agent',
     description: 'Connects to each of your separate systems and reconciles their data into one unified report automatically.',
     descriptionId: 'Terhubung ke setiap sistem terpisah Anda dan merekonsiliasi datanya menjadi satu laporan terpadu secara otomatis.',
     integrations: ['Multiple systems (CRM, ERP, spreadsheets)', 'Dashboards'],
@@ -1658,17 +1658,17 @@ function buildTrainingTracks(
       audience: 'Staff Operasional',
       topics: [
         'Disiplin pencatatan data digital di titik kerja',
-        "Pengenalan Agentic AI untuk manajemen data/ERP — bagaimana Autonomous Agent Aivory menjaga data tetap rapi & tersinkron otomatis",
+        "Pengenalan Agentic AI untuk manajemen data/ERP — bagaimana Generalist Agent Aivory menjaga data tetap rapi & tersinkron otomatis",
       ],
-      tools: ['Google Forms / Sheets', 'Autonomous Agent Aivory'],
+      tools: ['Google Forms / Sheets', 'Generalist Agent Aivory'],
     } : {
       headline: 'Data management & hygiene fundamentals',
       audience: 'Operations Staff',
       topics: [
         'Digital data-capture discipline at the point of work',
-        "Introduction to Agentic AI for data/ERP management — how Aivory's Autonomous Agent keeps records clean and synced automatically",
+        "Introduction to Agentic AI for data/ERP management — how Aivory's Generalist Agent keeps records clean and synced automatically",
       ],
-      tools: ['Google Forms / Sheets', "Aivory's Autonomous Agent"],
+      tools: ['Google Forms / Sheets', "Aivory's Generalist Agent"],
     })
   }
 

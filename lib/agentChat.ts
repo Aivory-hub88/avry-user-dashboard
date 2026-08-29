@@ -22,18 +22,33 @@ export interface PrebuiltAgent {
 
 /** Must stay in sync with the AGENTS card list and backend AGENT_TYPES. */
 export const PREBUILT_AGENTS: PrebuiltAgent[] = [
-  { type: 'autonomous', title: 'Autonomous Agent' },
+  { type: 'autonomous', title: 'Generalist Agent' },
   { type: 'customer_service', title: 'Ticket Ops Agent' },
   { type: 'leads_qualifier', title: 'Leads Qualifier Agent' },
   { type: 'finance_invoice_ops', title: 'Finance & Invoice Ops Agent' },
   { type: 'office_assistant', title: 'Office Assistant', enterprise: true },
 ]
 
+/** Minimal shape Cerveau's own /webhook response carries — no `arguments`,
+ *  unlike the dashboard Approvals page's richer PendingApproval (that one
+ *  comes from a list endpoint that reads the full stored row; this one is
+ *  relayed live through vps-bridge from the turn that just parked it). */
+export interface ConsolePendingApproval {
+  id: string
+  tool_name: string
+  risk_tier: string
+}
+
+export interface AgentChatResult {
+  reply: string
+  pendingApproval: ConsolePendingApproval | null
+}
+
 export async function sendAgentMessage(
   agentType: TelegramAgentType,
   text: string,
   conversationId?: string
-): Promise<string> {
+): Promise<AgentChatResult> {
   const res = await authedFetch(`${BACKEND_URL}/api/v1/telegram/agent-chat`, {
     method: 'POST',
     body: JSON.stringify({
@@ -47,7 +62,10 @@ export async function sendAgentMessage(
     throw new Error(detail || `Agent chat failed (${res.status})`)
   }
   const data = await res.json()
-  return data.reply as string
+  return {
+    reply: data.reply as string,
+    pendingApproval: data.pending_approval ?? null,
+  }
 }
 
 export interface AgentDeployment {

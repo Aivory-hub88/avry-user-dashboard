@@ -55,8 +55,8 @@ const AGENT_HEADER_IMAGES = {
 const AGENTS = [
   {
     agentType: 'autonomous' as TelegramAgentType,
-    title: 'Autonomous Agent',
-    description: 'Deploy autonomous agents inside your communication hubs. They triage, respond, and update your CRM 24/7.',
+    title: 'Generalist Agent',
+    description: 'One agent carrying every toolkit, deployed inside your communication hubs. It triages, responds, and updates your CRM 24/7.',
     tools: ['Web search', 'Leads & tickets', 'Invoices', 'Workflows', 'Integrations'],
     headerImage: AGENT_HEADER_IMAGES.autonomous,
     icon: (
@@ -384,7 +384,7 @@ const ACTION_META: Record<string, { label: string; emoji: string }> = {
 };
 
 const AGENT_TITLES: Record<string, string> = {
-  autonomous: 'Autonomous Agent',
+  autonomous: 'Generalist Agent',
   customer_service: 'Ticket Ops Agent',
   leads_qualifier: 'Leads Qualifier Agent',
   finance_invoice_ops: 'Finance & Invoice Ops Agent',
