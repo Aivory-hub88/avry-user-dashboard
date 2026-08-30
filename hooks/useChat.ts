@@ -6,13 +6,24 @@ import { saveSessionMessages, loadSessionMessages, listSessions, ChatStorageErro
 import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
-import { sendAgentMessage } from '@/lib/agentChat'
+import { sendAgentMessage, type ConsolePendingApproval } from '@/lib/agentChat'
+import { resolveApproval } from '@/lib/agentApprovals'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
 import { useMode } from '@/contexts/ModeContext'
 import { useSession } from './useSession'
 import type { Attachment } from '@/components/UploadMenu'
 
-interface Message { id: string; role: "user" | "assistant"; content: string; isStreaming?: boolean; attachments?: Attachment[] }
+interface Message {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  isStreaming?: boolean
+  attachments?: Attachment[]
+  pendingApproval?: ConsolePendingApproval | null
+  /** Set once the user acts on pendingApproval — hides the buttons, no re-resolve. */
+  approvalOutcome?: 'approved' | 'denied' | null
+  approvalBusy?: boolean
+}
 interface ChatSession { id: string; title: string; messages: Message[]; createdAt: number; pinned?: boolean }
 
 const DEFAULT_SUGGESTIONS = [
@@ -105,13 +116,16 @@ export function useChat({
     // Deployable-agent chat: single JSON reply (the agent may run tools
     // before answering), no SSE stream — the placeholder keeps the typing UI.
     if (agentTarget) {
+      let pendingApproval: ConsolePendingApproval | null = null
       try {
-        finalContent = await sendAgentMessage(
+        const result = await sendAgentMessage(
           agentTarget as TelegramAgentType,
           userContent,
           currentSessionId
         )
-        setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent, isStreaming: false } : m))
+        finalContent = result.reply
+        pendingApproval = result.pendingApproval
+        setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, pendingApproval } : m))
       } catch (error) {
         addToast("error", error instanceof Error ? error.message : "Agent is unavailable right now.")
         setMessages(p => p.filter(m => m.id !== assistantId))
@@ -122,7 +136,7 @@ export function useChat({
           try {
             setMessages(prev => {
               const updated = prev.map(m =>
-                m.id === assistantId ? { ...m, content: finalContent, isStreaming: false } : m
+                m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, pendingApproval } : m
               )
               saveSessionMessages(currentSessionId, updated)
               setSessions(listSessions())
@@ -193,6 +207,45 @@ export function useChat({
     }
   }, [currentSessionId, agentTarget, addToast, processEvent, triggerClassification, clearAttachments])
 
+  // Resolves a pending F-1 approval surfaced inline in the console, reusing
+  // the same /api/v1/agent-approvals endpoint the dashboard Approvals page
+  // calls. On success, Cerveau's durable-resume continuation (if any) is
+  // appended as a new assistant message — same as approving from the
+  // dashboard resumes the original conversation there.
+  const resolveConsoleApproval = useCallback(async (messageId: string, decision: 'approve' | 'deny') => {
+    const target = messagesRef.current.find(m => m.id === messageId)
+    const approval = target?.pendingApproval
+    if (!approval) return
+
+    setMessages(p => p.map(m => m.id === messageId ? { ...m, approvalBusy: true } : m))
+    try {
+      const result = await resolveApproval(
+        { id: approval.id, _agent_type: agentTarget ?? undefined },
+        decision,
+      )
+      const outcome: 'approved' | 'denied' = decision === 'approve' ? 'approved' : 'denied'
+      setMessages(prev => {
+        let updated = prev.map(m =>
+          m.id === messageId
+            ? { ...m, approvalBusy: false, approvalOutcome: outcome }
+            : m
+        )
+        if (result.reply) {
+          updated = [
+            ...updated,
+            { id: (Date.now() + 2).toString(), role: 'assistant' as const, content: result.reply },
+          ]
+        }
+        saveSessionMessages(currentSessionId, updated)
+        setSessions(listSessions())
+        return updated
+      })
+    } catch (error) {
+      setMessages(p => p.map(m => m.id === messageId ? { ...m, approvalBusy: false } : m))
+      addToast("error", error instanceof Error ? error.message : "Failed to resolve approval.")
+    }
+  }, [agentTarget, currentSessionId, addToast])
+
   const handleNewChat = useCallback(() => {
     if (messages.length > 0) {
       session.save(currentSessionId, messages)
@@ -227,6 +280,7 @@ export function useChat({
     setFollowUpSuggestions,
     isClarification,
     handleSend,
+    resolveConsoleApproval,
     handleNewChat,
     switchSession,
   }
