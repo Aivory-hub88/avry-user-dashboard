@@ -1,0 +1,51 @@
+name: dashboard-ci
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: https://api.example.com
+          NEXT_PUBLIC_BACKEND_URL: https://api.example.com
+          NEXT_PUBLIC_DIAGNOSTICS_URL: https://api.example.com/diagnostics
+          NEXT_PUBLIC_BLUEPRINT_URL: https://api.example.com/blueprint
+          NEXT_PUBLIC_ADMIN_DASHBOARD_URL: https://example.com/admin
+          NEXT_PUBLIC_WORKFLOWS_URL: https://api.example.com/workflows
+          NEXT_PUBLIC_PAYMENTS_URL: https://api.example.com/payments
+          NEXT_PUBLIC_ROADMAP_URL: https://api.example.com/roadmap
+          NEXT_PUBLIC_SLACK_APP_ID: A0BF382BKB9
