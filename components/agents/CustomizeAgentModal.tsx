@@ -823,13 +823,27 @@ export default function CustomizeAgentModal({
     setKnowledgeUploadNotice(null);
     try {
       const result = await uploadKnowledgeDocument(agentType, file);
-      set('knowledge')(result.knowledge);
-      setKnowledgeUploadNotice({
-        type: 'success',
-        message: result.truncated
-          ? `Added from ${file.name} — trimmed to fit the knowledge limit.`
-          : `Added from ${file.name}.`,
-      });
+      if (result.ingested) {
+        // Cerveau: the document is already in the agent's memory, searchable
+        // by relevance. Deliberately does NOT touch the knowledge field --
+        // the text never went there, and writing to it would both overwrite
+        // the operator's own edits and re-inject the whole document into
+        // every prompt, which is exactly what this path exists to avoid.
+        setKnowledgeUploadNotice({
+          type: 'success',
+          message: result.truncated
+            ? `Added ${file.name} to this agent's memory (${result.chunks} sections, trimmed — the document is very long). No need to save.`
+            : `Added ${file.name} to this agent's memory (${result.chunks} sections). No need to save.`,
+        });
+      } else {
+        set('knowledge')(result.knowledge);
+        setKnowledgeUploadNotice({
+          type: 'success',
+          message: result.truncated
+            ? `Added from ${file.name} — trimmed to fit the knowledge limit.`
+            : `Added from ${file.name}.`,
+        });
+      }
     } catch (e: unknown) {
       setKnowledgeUploadNotice({
         type: 'error',

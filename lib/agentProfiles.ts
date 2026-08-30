@@ -48,13 +48,22 @@ export async function resetAgentProfile(agentType: string): Promise<void> {
 }
 
 export interface KnowledgeDocumentResult {
+  /** Cerveau path: the document was chunked into the agent's own memory and
+   *  is already persisted. Legacy path: false, and `knowledge` carries the
+   *  merged text the caller still has to save. */
+  ingested: boolean
+  /** Number of memory chunks stored. Cerveau path only. */
+  chunks?: number
+  filename?: string
   knowledge: string
   truncated: boolean
   extracted_chars: number
 }
 
-/** Extracts text from a document and returns it merged into the current
- *  knowledge field -- doesn't save by itself, saveAgentProfile still does. */
+/** Takes a document into the agent's knowledge. On Cerveau it is stored in the
+ *  agent's memory immediately (`ingested: true`, nothing left to save); on the
+ *  legacy engine it comes back merged into the knowledge field and
+ *  saveAgentProfile still has to persist it. */
 export async function uploadKnowledgeDocument(
   agentType: string,
   file: File,
