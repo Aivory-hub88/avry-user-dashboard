@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
-import { Terminal, Bot, ChevronRight, Lock, Plus } from "lucide-react"
+import { Terminal, Bot, ChevronRight, Lock, Plus, Trash2 } from "lucide-react"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, listDeployments, type AgentDeployment } from "@/lib/agentChat"
 import type { ChatSession } from "@/hooks/useChat"
@@ -29,6 +29,7 @@ interface AgentColumnProps {
   setAgentTarget: (agent: string | null) => void
   switchSession: (sessionId: string) => void
   handleNewChat: () => void
+  deleteThread: (sessionId: string) => void
 }
 
 interface Row {
@@ -53,6 +54,7 @@ export default function AgentColumn({
   setAgentTarget,
   switchSession,
   handleNewChat,
+  deleteThread,
 }: AgentColumnProps) {
   const [expanded, setExpanded] = useState<string>(agentTarget ?? "null")
   const [deployments, setDeployments] = useState<AgentDeployment[]>([])
@@ -208,15 +210,33 @@ export default function AgentColumn({
                       const active = t.id === currentSessionId
                       const chans = channelsFor(row.type)
                       return (
-                        <button
+                        <div
                           key={t.id}
-                          onClick={() => switchSession(t.id)}
-                          className={`truncate rounded-[8px] px-[10px] py-[5px] text-left text-[12.5px] font-light transition-colors ${
-                            active ? "bg-white/[0.05] text-white" : "text-white/40 hover:bg-white/[0.035] hover:text-white/65"
+                          className={`group/thread flex items-center gap-[4px] rounded-[8px] pr-[6px] transition-colors ${
+                            active ? "bg-white/[0.05]" : "hover:bg-white/[0.035]"
                           }`}
                         >
-                          {t.title || "New chat"}
-                        </button>
+                          <button
+                            onClick={() => switchSession(t.id)}
+                            className={`min-w-0 flex-1 truncate px-[10px] py-[5px] text-left text-[12.5px] font-light ${
+                              active ? "text-white" : "text-white/40 group-hover/thread:text-white/65"
+                            }`}
+                          >
+                            {t.title || "New chat"}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (confirm(`Delete "${t.title || "New chat"}"? This cannot be undone.`)) {
+                                deleteThread(t.id)
+                              }
+                            }}
+                            aria-label={`Delete ${t.title || "thread"}`}
+                            className="grid h-[20px] w-[20px] shrink-0 place-items-center rounded-[6px] text-white/25 opacity-0 transition-opacity hover:bg-white/[0.1] hover:text-white/80 group-hover/thread:opacity-100"
+                          >
+                            <Trash2 className="h-[11px] w-[11px]" />
+                          </button>
+                        </div>
                       )
                     })
                   )}

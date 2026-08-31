@@ -124,6 +124,7 @@ export default function ConsolePage() {
     resolveConsoleApproval,
     handleNewChat,
     switchSession,
+    deleteThread,
   } = useChat({
     attachments,
     clearAttachments: () => setAttachments([]),
@@ -250,6 +251,7 @@ export default function ConsolePage() {
           streamingAgentType={streamingAgentType}
           setAgentTarget={setAgentTarget}
           switchSession={switchSession}
+          deleteThread={deleteThread}
           handleNewChat={handleNewChat}
         />
       }

@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { getSessionId, clearSession, generateSessionId, saveSession } from '@/lib/session'
 import { streamConsoleResponse, typewriterStream } from '@/lib/streaming'
-import { saveSessionMessages, loadSessionMessages, listSessions, getSession, ChatStorageError } from '@/lib/chatPersistence'
+import { saveSessionMessages, loadSessionMessages, listSessions, getSession, deleteSession, ChatStorageError } from '@/lib/chatPersistence'
 import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
@@ -335,6 +335,22 @@ export function useChat({
     setSessions(listSessions())
   }, [currentSessionId, messages, session, agentTarget, setAgentTarget])
 
+  // Deletes a thread outright. If it's the one currently open, start a
+  // fresh empty thread under the same agent rather than leaving the view
+  // pointed at a session that no longer exists.
+  const deleteThread = useCallback((sessionId: string) => {
+    deleteSession(sessionId)
+    if (sessionId === currentSessionId) {
+      clearSession()
+      const sid = generateSessionId()
+      saveSession(sid)
+      setCurrentSessionId(sid)
+      setMessages([])
+      resetAgentic()
+    }
+    setSessions(listSessions())
+  }, [currentSessionId, resetAgentic])
+
   // Threads nested under the agent that held them — one entry per agentType,
   // 'null' (Aivory Console) included. Sessions are already updatedAt-desc
   // from listSessions(), so each group stays most-recent-first too.
@@ -358,5 +374,6 @@ export function useChat({
     resolveConsoleApproval,
     handleNewChat,
     switchSession,
+    deleteThread,
   }
 }
