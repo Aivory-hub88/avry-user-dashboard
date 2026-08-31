@@ -7,12 +7,14 @@
  */
 import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
-import { Terminal, Bot, ChevronRight, Lock, Plus, Trash2 } from "lucide-react"
+import { ChevronRight, ChevronLeft, Lock, Plus, Trash2 } from "lucide-react"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, listDeployments, type AgentDeployment } from "@/lib/agentChat"
 import type { ChatSession } from "@/hooks/useChat"
 import type { PendingApproval } from "@/lib/agentApprovals"
 import { ThinkingDots } from "@/components/ui/ThinkingDots"
+import { AgentAvatar } from "@/components/office/AgentAvatar"
+import { useAgentColumnCollapse } from "@/hooks/useAgentColumnCollapse"
 
 const CHANNEL_ICON: Record<string, string> = {
   telegram: "/integrations/telegram.svg",
@@ -44,6 +46,23 @@ const ROWS: Row[] = [
   ...PREBUILT_AGENTS.map((a) => ({ key: a.type, type: a.type, title: a.title, enterprise: a.enterprise })),
 ]
 
+function relativeTime(ts: number): string {
+  const diffMs = Date.now() - ts
+  const mins = Math.round(diffMs / 60_000)
+  if (mins < 1) return "now"
+  if (mins < 60) return `${mins}m`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h`
+  return `${Math.round(hours / 24)}d`
+}
+
+function lastPreview(session: ChatSession | undefined): string {
+  if (!session || session.messages.length === 0) return "No messages yet"
+  const last = session.messages[session.messages.length - 1]
+  const text = last.content.replace(/\s+/g, " ").trim()
+  return text.length > 44 ? `${text.slice(0, 44)}…` : text || "New chat"
+}
+
 export default function AgentColumn({
   sessionsByAgent,
   approvalsByAgent,
@@ -60,6 +79,7 @@ export default function AgentColumn({
   const [deployments, setDeployments] = useState<AgentDeployment[]>([])
   const [query, setQuery] = useState("")
   const [arrived, setArrived] = useState<Set<string>>(new Set())
+  const { collapsed, toggle } = useAgentColumnCollapse()
   const fetchedRef = useRef(false)
   const approvalsInitRef = useRef(false)
   const prevCountsRef = useRef<Record<string, number>>({})
@@ -136,10 +156,66 @@ export default function AgentColumn({
     row.title.toLowerCase().includes(q) ||
     threads.some((t) => (t.title || "").toLowerCase().includes(q))
 
+  if (collapsed) {
+    return (
+      <div className="flex h-full w-14 shrink-0 flex-col items-center border-r border-white/[0.045] bg-[#353531] pt-4">
+        <button
+          onClick={toggle}
+          aria-label="Expand agent column"
+          title="Expand agent column"
+          className="mb-3 grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[8px] text-white/50 transition-colors hover:bg-white/[0.06] hover:text-white"
+        >
+          <ChevronRight className="h-[14px] w-[14px]" />
+        </button>
+        <div className="flex flex-1 flex-col items-center gap-[6px] overflow-y-auto pb-4">
+          {ROWS.map((row) => {
+            const isActiveAgent = row.type === agentTarget
+            const pending = approvalsByAgent[row.key]?.length ?? 0
+            return (
+              <button
+                key={row.key}
+                onClick={() => openAgent(row)}
+                title={row.title}
+                className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full transition-[box-shadow] ${
+                  isActiveAgent ? "ring-2 ring-white/25" : "hover:ring-2 hover:ring-white/10"
+                }`}
+              >
+                {row.type === streamingAgentType ? (
+                  <div className="grid h-full w-full place-items-center rounded-full bg-white/[0.06]">
+                    <ThinkingDots size={11} dotSize={1.8} />
+                  </div>
+                ) : (
+                  <AgentAvatar type={row.type} size={36} />
+                )}
+                {pending > 0 && (
+                  <span
+                    className={`absolute -right-0.5 -top-0.5 rounded-full bg-[#d9ab6e] px-[4px] text-[9px] font-bold leading-[13px] text-[#2b2b28] ${
+                      arrived.has(row.key) ? "pending-badge-arrived" : ""
+                    }`}
+                  >
+                    {pending}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex h-full flex-col border-r border-white/[0.045] bg-[#353531]">
+    <div className="flex h-full w-[264px] shrink-0 flex-col border-r border-white/[0.045] bg-[#353531]">
       <div className="flex items-center justify-between gap-2 px-4 pt-5 pb-3">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">Your Agents</h2>
+        <button
+          onClick={toggle}
+          aria-label="Collapse agent column"
+          title="Collapse agent column"
+          className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[7px] text-white/30 transition-colors hover:bg-white/[0.08] hover:text-white"
+        >
+          <ChevronLeft className="h-[13px] w-[13px]" />
+        </button>
       </div>
       <div className="px-4 pb-3">
         <input
@@ -158,46 +234,65 @@ export default function AgentColumn({
           const isActiveAgent = row.type === agentTarget
           const channels = channelsFor(row.type)
           const pending = approvalsByAgent[row.key]?.length ?? 0
+          const mostRecent = threads[0]
+          const isThinkingHere = row.type === streamingAgentType
           return (
             <div key={row.key} className="mb-0.5 w-full">
               <button
                 onClick={() => openAgent(row)}
-                className={`group flex w-full items-center gap-[9px] rounded-[10px] px-[10px] py-[9px] text-left transition-colors ${
+                className={`group flex w-full items-start gap-[9px] rounded-[10px] px-[9px] py-[8px] text-left transition-colors ${
                   isActiveAgent ? "bg-[#414039]" : "hover:bg-white/[0.04]"
                 }`}
               >
                 <ChevronRight
-                  className={`h-[13px] w-[13px] shrink-0 text-white/30 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                  className={`mt-[9px] h-[12px] w-[12px] shrink-0 text-white/25 transition-transform ${isOpen ? "rotate-90" : ""}`}
                 />
-                {row.type === streamingAgentType ? (
-                  <ThinkingDots size={9} dotSize={1.6} />
-                ) : row.type === null ? (
-                  <Terminal className="h-[14px] w-[14px] shrink-0 text-accent" />
-                ) : (
-                  <Bot className="h-[14px] w-[14px] shrink-0 text-accent" />
-                )}
-                <span
-                  className={`min-w-0 flex-1 truncate text-[13.5px] ${isActiveAgent ? "font-medium text-white" : "font-normal text-white/75"}`}
-                >
-                  {row.title}
-                </span>
-                {row.enterprise && <Lock className="h-[11px] w-[11px] shrink-0 text-[#e8b96a]/90" />}
-                {pending > 0 && (
-                  <span
-                    className={`shrink-0 rounded-full bg-[rgba(217,171,110,0.13)] px-[6px] py-[1px] text-[10.5px] font-semibold text-[#d9ab6e] ${
-                      arrived.has(row.key) ? "pending-badge-arrived" : ""
-                    }`}
-                  >
-                    {pending}
+                <AgentAvatar type={row.type} size={30} className="mt-[1px]" />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-[6px]">
+                    <span
+                      className={`min-w-0 flex-1 truncate text-[13.5px] ${isActiveAgent ? "font-medium text-white" : "font-normal text-white/80"}`}
+                    >
+                      {row.title}
+                    </span>
+                    {row.enterprise && <Lock className="h-[10.5px] w-[10.5px] shrink-0 text-[#e8b96a]/90" />}
+                    {mostRecent && (
+                      <span className="shrink-0 text-[10.5px] font-light tabular-nums text-white/30">
+                        {relativeTime(mostRecent.updatedAt)}
+                      </span>
+                    )}
                   </span>
-                )}
-                <span
-                  onClick={(e) => startThread(row, e)}
-                  role="button"
-                  aria-label={`New thread with ${row.title}`}
-                  className="grid h-[20px] w-[20px] shrink-0 place-items-center rounded-[7px] text-white/30 opacity-0 transition-opacity hover:bg-white/[0.1] hover:text-white group-hover:opacity-100"
-                >
-                  <Plus className="h-[12px] w-[12px]" />
+                  <span className="mt-[2px] flex items-center gap-[5px]">
+                    {isThinkingHere ? (
+                      <>
+                        <ThinkingDots size={9} dotSize={1.6} />
+                        <span className="truncate text-[12px] font-light text-white/45">thinking…</span>
+                      </>
+                    ) : (
+                      <span className="truncate text-[12px] font-light text-white/35">
+                        {mostRecent ? lastPreview(mostRecent) : "No conversations yet"}
+                      </span>
+                    )}
+                  </span>
+                </span>
+                <span className="mt-[1px] flex shrink-0 items-center gap-[6px]">
+                  {pending > 0 && (
+                    <span
+                      className={`rounded-full bg-[rgba(217,171,110,0.13)] px-[6px] py-[1px] text-[10.5px] font-semibold text-[#d9ab6e] ${
+                        arrived.has(row.key) ? "pending-badge-arrived" : ""
+                      }`}
+                    >
+                      {pending}
+                    </span>
+                  )}
+                  <span
+                    onClick={(e) => startThread(row, e)}
+                    role="button"
+                    aria-label={`New thread with ${row.title}`}
+                    className="grid h-[20px] w-[20px] shrink-0 place-items-center rounded-[7px] text-white/30 opacity-0 transition-opacity hover:bg-white/[0.1] hover:text-white group-hover:opacity-100"
+                  >
+                    <Plus className="h-[12px] w-[12px]" />
+                  </span>
                 </span>
               </button>
 
@@ -208,7 +303,6 @@ export default function AgentColumn({
                   ) : (
                     threads.map((t) => {
                       const active = t.id === currentSessionId
-                      const chans = channelsFor(row.type)
                       return (
                         <div
                           key={t.id}
@@ -218,11 +312,18 @@ export default function AgentColumn({
                         >
                           <button
                             onClick={() => switchSession(t.id)}
-                            className={`min-w-0 flex-1 truncate px-[10px] py-[5px] text-left text-[12.5px] font-light ${
-                              active ? "text-white" : "text-white/40 group-hover/thread:text-white/65"
-                            }`}
+                            className="min-w-0 flex-1 py-[5px] pl-[10px] text-left"
                           >
-                            {t.title || "New chat"}
+                            <span
+                              className={`block truncate text-[12.5px] font-light ${
+                                active ? "text-white" : "text-white/45 group-hover/thread:text-white/70"
+                              }`}
+                            >
+                              {t.title || "New chat"}
+                            </span>
+                            <span className="block truncate text-[11px] font-light text-white/25">
+                              {lastPreview(t)} · {relativeTime(t.updatedAt)}
+                            </span>
                           </button>
                           <button
                             onClick={(e) => {
@@ -232,7 +333,7 @@ export default function AgentColumn({
                               }
                             }}
                             aria-label={`Delete ${t.title || "thread"}`}
-                            className="grid h-[20px] w-[20px] shrink-0 place-items-center rounded-[6px] text-white/25 opacity-0 transition-opacity hover:bg-white/[0.1] hover:text-white/80 group-hover/thread:opacity-100"
+                            className="grid h-[20px] w-[20px] shrink-0 place-items-center self-start rounded-[6px] text-white/25 opacity-0 transition-opacity hover:bg-white/[0.1] hover:text-white/80 group-hover/thread:opacity-100"
                           >
                             <Trash2 className="h-[11px] w-[11px]" />
                           </button>

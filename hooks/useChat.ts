@@ -24,7 +24,7 @@ interface Message {
   approvalOutcome?: 'approved' | 'denied' | null
   approvalBusy?: boolean
 }
-export interface ChatSession { id: string; title: string; messages: Message[]; createdAt: number; pinned?: boolean; agentType: string | null }
+export interface ChatSession { id: string; title: string; messages: Message[]; createdAt: number; updatedAt: number; pinned?: boolean; agentType: string | null }
 
 const DEFAULT_SUGGESTIONS = [
   "Can you elaborate on that?",

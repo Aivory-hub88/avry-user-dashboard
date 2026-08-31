@@ -1,8 +1,6 @@
 "use client"
-import { asset } from "@/lib/asset";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import Image from 'next/image'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AgenticWorkflowState } from '@/types/agenticWorkflow'
@@ -15,6 +13,7 @@ import type { ClassifiedIntent } from '@/lib/intentClassifier'
 import { ThinkingDots } from '@/components/ui/ThinkingDots'
 import { describeTool } from '@/lib/agentApprovals'
 import type { ConsolePendingApproval } from '@/lib/agentChat'
+import { AgentAvatar } from '@/components/office/AgentAvatar'
 
 interface ChatMessageProps {
   role: 'user' | 'assistant'
@@ -35,6 +34,9 @@ interface ChatMessageProps {
   /** Display name of whichever agent is answering — shown in the thinking
    *  indicator so a room with several agents says who's actually busy. */
   agentName?: string
+  /** Which agent's avatar to show — same visual identity as the agent
+   *  column and rail, so the chat header isn't the odd one out. */
+  agentType?: string | null
 }
 
 /** Inline F-1 approval card — the console's own Approve/Deny, resolving
@@ -326,7 +328,7 @@ const markdownComponents = {
 
 /* ── Main component ────────────────────────────────────────────────────────── */
 
-export default function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, pendingApproval, approvalOutcome, approvalBusy, onApproveAction, onDenyAction, agentName = 'Aivory' }: ChatMessageProps) {
+export default function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, pendingApproval, approvalOutcome, approvalBusy, onApproveAction, onDenyAction, agentName = 'Aivory', agentType = null }: ChatMessageProps) {
   const noop = useCallback(() => {}, [])
   const hasAgenticPhases = !!(agenticState && agenticState.phases.length > 0)
   const hasTextContent = !!content
@@ -358,65 +360,61 @@ export default function ChatMessage({ role, content, isStreaming = false, agenti
         /* AI MESSAGE — avatar + clean Manus typography */
         <>
         <div className="flex items-start gap-4 group relative">
-          {/* Avatar */}
-          <div className="w-9 h-9 rounded-full flex-shrink-0 mt-0.5 flex items-center justify-center bg-accent/20">
-            <Image
-              src={asset("/Aivory_Avatar.svg")}
-              alt="Aivory"
-              width={18}
-              height={18}
-            />
-          </div>
+          {/* Avatar — same visual identity as the agent column and rail */}
+          <AgentAvatar type={agentType} size={36} className="mt-0.5" />
 
-          {/* Message content — max-w-[800px] for readability */}
-          <div className="flex-1 px-1 py-1 text-base text-[#f7f7f7] leading-[1.6] min-w-0 max-w-[800px] text-left">
-            {/* Thinking indicator */}
-            {isStreaming && !content && !hasAgenticPhases && (
-              <div className="flex items-center gap-2.5">
-                <ThinkingDots size={16} dotSize={2.5} />
-                <span className="text-sm text-[#a1a1aa]">{agentName} is thinking...</span>
-              </div>
-            )}
+          {/* Message bubble — mirrors the user bubble's shape language on a
+              lighter surface, max-w-[720px] for readability */}
+          <div className="flex-1 min-w-0 max-w-[720px] text-left">
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.035] px-5 py-3.5 text-base text-[#f7f7f7] leading-[1.6]">
+              {/* Thinking indicator */}
+              {isStreaming && !content && !hasAgenticPhases && (
+                <div className="flex items-center gap-2.5">
+                  <ThinkingDots size={16} dotSize={2.5} />
+                  <span className="text-sm text-[#a1a1aa]">{agentName} is thinking...</span>
+                </div>
+              )}
 
-            {/* Agentic workflow container */}
-            {hasAgenticPhases && (
-              <div className={hasTextContent ? 'mb-4' : ''}>
-                <WorkflowContainer
-                  phases={agenticState!.phases}
-                  isComplete={agenticState!.isComplete}
-                />
-              </div>
-            )}
-
-            {/* Rendered markdown content */}
-            {hasTextContent && (
-              <div className="prose-aivory">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={markdownComponents}
-                >
-                  {normalizedContent}
-                </ReactMarkdown>
-                {/* Streaming cursor — brand color blinking bar */}
-                {isStreaming && (
-                  <span
-                    className="inline-block w-[3px] h-[1.125rem] bg-[#b7cba6] ml-0.5 align-middle rounded-sm"
-                    style={{ animation: 'blink 1s step-end infinite' }}
-                    aria-hidden="true"
+              {/* Agentic workflow container */}
+              {hasAgenticPhases && (
+                <div className={hasTextContent ? 'mb-4' : ''}>
+                  <WorkflowContainer
+                    phases={agenticState!.phases}
+                    isComplete={agenticState!.isComplete}
                   />
-                )}
-              </div>
-            )}
+                </div>
+              )}
 
-            {pendingApproval && (
-              <ApprovalCard
-                approval={pendingApproval}
-                outcome={approvalOutcome}
-                busy={approvalBusy}
-                onApprove={() => onApproveAction?.()}
-                onDeny={() => onDenyAction?.()}
-              />
-            )}
+              {/* Rendered markdown content */}
+              {hasTextContent && (
+                <div className="prose-aivory">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={markdownComponents}
+                  >
+                    {normalizedContent}
+                  </ReactMarkdown>
+                  {/* Streaming cursor — brand color blinking bar */}
+                  {isStreaming && (
+                    <span
+                      className="inline-block w-[3px] h-[1.125rem] bg-[#b7cba6] ml-0.5 align-middle rounded-sm"
+                      style={{ animation: 'blink 1s step-end infinite' }}
+                      aria-hidden="true"
+                    />
+                  )}
+                </div>
+              )}
+
+              {pendingApproval && (
+                <ApprovalCard
+                  approval={pendingApproval}
+                  outcome={approvalOutcome}
+                  busy={approvalBusy}
+                  onApprove={() => onApproveAction?.()}
+                  onDeny={() => onDenyAction?.()}
+                />
+              )}
+            </div>
           </div>
           <MessageActions role="ai" content={content} onRegenerate={onRegenerate} />
         </div>

@@ -510,6 +510,7 @@ export default function ConsolePage() {
                         onApproveAction={() => resolveConsoleApproval(m.id, 'approve')}
                         onDenyAction={() => resolveConsoleApproval(m.id, 'deny')}
                         agentName={activeAgentName}
+                        agentType={agentTarget}
                       />
                     </div>
                   )

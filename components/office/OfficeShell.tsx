@@ -22,7 +22,7 @@ export default function OfficeShell({ agentColumn, rail, children }: OfficeShell
 
   return (
     <div ref={ref} className="relative flex h-full w-full min-w-0 overflow-hidden bg-[#353531]">
-      <div className="w-[250px] shrink-0">{agentColumn}</div>
+      {agentColumn}
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       {isValidElement(rail) ? cloneElement(rail, { mode }) : rail}
     </div>

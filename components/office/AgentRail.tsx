@@ -26,6 +26,7 @@ import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, listDeployments, type AgentDeployment } from "@/lib/agentChat"
 import { describeTool, type PendingApproval } from "@/lib/agentApprovals"
 import type { RailMode } from "@/hooks/useRailMode"
+import { AgentAvatar } from "@/components/office/AgentAvatar"
 
 const CHANNEL_ICON: Record<string, string> = {
   telegram: "/integrations/telegram.svg",
@@ -130,6 +131,7 @@ export default function AgentRail({
         >
           <ChevronRight className="h-[14px] w-[14px]" />
         </button>
+        <AgentAvatar type={agentTarget} size={24} />
         <h2 className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">{title}</h2>
       </div>
 
