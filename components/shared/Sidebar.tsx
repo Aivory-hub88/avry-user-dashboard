@@ -7,12 +7,11 @@ import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useTranslations } from "next-intl"
 import { getWorkflowCount } from "@/hooks/useWorkflows"
-import { listPendingApprovals } from "@/lib/agentApprovals"
+import { useAgentApprovals } from "@/hooks/useAgentApprovals"
 import { AuthManager } from "@/lib/authManager"
 import { canAccessNavKey } from "@/lib/moduleAccess"
 import LanguagePill from "./LanguagePill"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
-import ConversationHistory from "../sidebar/ConversationHistory"
 import UserProfile from "../UserProfile"
 
 function ChevronLeft() {
@@ -105,15 +104,6 @@ function ExecutionLogsIcon() {
   )
 }
 
-function ApprovalsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 11l3 3L22 4"/>
-      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-    </svg>
-  )
-}
-
 function IntegrationsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -184,7 +174,6 @@ const NAV_ICONS: Record<string, React.FC> = {
   executionLogs: ExecutionLogsIcon,
   integrations: IntegrationsIcon,
   agents: AgentsIcon,
-  approvals: ApprovalsIcon,
   settings: SettingsIcon,
   home: HomeIcon,
   profile: ProfileIcon,
@@ -194,7 +183,7 @@ const NAV_ICONS: Record<string, React.FC> = {
 export default function Sidebar() {
   const pathname = usePathname() || ""
   const [workflowCount, setWorkflowCount] = useState(0)
-  const [approvalCount, setApprovalCount] = useState(0)
+  const { total: approvalCount } = useAgentApprovals()
   // account_type + allowedModules drive per-module gating (demo accounts see
   // only their granted subset). Read after mount to stay SSR-safe and avoid
   // a hydration mismatch.
@@ -214,23 +203,6 @@ export default function Sidebar() {
     }
   }, [])
 
-  // Polled, not event-driven — a pending approval is created by the agent
-  // out-of-band (a real tool call the model made), so there's no local
-  // browser event to listen for the way workflowCount has. Failure is
-  // silent: an approval count badge is a convenience, not something worth
-  // surfacing an error state for in the sidebar.
-  useEffect(() => {
-    let cancelled = false
-    const update = () => {
-      listPendingApprovals()
-        .then((rows) => { if (!cancelled) setApprovalCount(rows.length) })
-        .catch(() => { if (!cancelled) setApprovalCount(0) })
-    }
-    update()
-    const interval = setInterval(update, 60_000)
-    return () => { cancelled = true; clearInterval(interval) }
-  }, [])
-
   useEffect(() => {
     const readAccountType = () => {
       const user = AuthManager.getUser()
@@ -247,7 +219,10 @@ export default function Sidebar() {
   }, [])
 
   const navItems = [
-    { key: "console",       href: "/console" },
+    // Approvals now live inside Console itself (agent column badges + the
+    // rail's "Waiting on you"), not a separate page — this badge is the one
+    // place left that surfaces the total across every agent.
+    { key: "console",       href: "/console", badge: approvalCount > 0 ? approvalCount : null },
     { key: "diagnostics",   href: "/diagnostics" },
     { key: "blueprint",     href: "/blueprint" },
     { key: "roadmap",       href: "/roadmap" },
@@ -256,7 +231,6 @@ export default function Sidebar() {
     { key: "integrations",  href: "/integrations" },
     { key: "templates",     href: "/templates", label: "Automation Templates" },
     { key: "agents",        href: "/agents" },
-    { key: "approvals",     href: "/approvals", badge: approvalCount > 0 ? approvalCount : null },
     { key: "profile",       href: "/overview", label: "Overview" },
   ].filter((item) => canAccessNavKey(accountType, item.key, allowedModules))
 
@@ -337,8 +311,7 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Conversation History */}
-      <ConversationHistory collapsed={collapsed} />      {/* Bottom Section */}
+      {/* Bottom Section */}
       <div className="mt-auto shrink-0 pt-4 border-t border-white/5">
         <UserProfile />
         <div className="px-2">

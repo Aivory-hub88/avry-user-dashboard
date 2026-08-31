@@ -14,12 +14,18 @@ import { useAgenticStream } from "@/hooks/useAgenticStream"
 import { useIntentRouter } from "@/hooks/useIntentRouter"
 import { useFileUpload } from "@/hooks/useFileUpload"
 import { useChat } from "@/hooks/useChat"
+import { useAgentApprovals } from "@/hooks/useAgentApprovals"
+import { PREBUILT_AGENTS } from "@/lib/agentChat"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
 import UploadMenu from "@/components/UploadMenu"
 import type { Attachment } from "@/components/UploadMenu"
 import { AttachmentCard } from "@/components/AttachmentCard"
 import { getUser } from "@/lib/auth"
 import { useSettingsModal } from "@/contexts/SettingsModalContext"
+import { useMode } from "@/contexts/ModeContext"
+import OfficeShell from "@/components/office/OfficeShell"
+import AgentColumn from "@/components/office/AgentColumn"
+import AgentRail from "@/components/office/AgentRail"
 
 interface Toast { id: string; type: "success" | "error"; message: string }
 
@@ -76,9 +82,9 @@ const MAX_VISIBLE_INTEGRATIONS = 4
 export default function ConsolePage() {
   const router = useRouter()
   const { openSettingsModal } = useSettingsModal()
+  const { agentTarget, setAgentTarget } = useMode()
 
   // UI-only state
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [activeChip, setActiveChip] = useState<string | null>(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
@@ -107,13 +113,15 @@ export default function ConsolePage() {
   const { attachments, setAttachments, isDragging, handleFileSelect } = useFileUpload(addToast)
   const {
     messages,
-    sessions,
+    sessionsByAgent,
     currentSessionId,
     isStreaming,
+    streamingAgentType,
     followUpSuggestions,
     setFollowUpSuggestions,
     isClarification,
     handleSend,
+    resolveConsoleApproval,
     handleNewChat,
     switchSession,
   } = useChat({
@@ -124,6 +132,20 @@ export default function ConsolePage() {
     triggerClassification,
     addToast,
   })
+
+  // A decision already rendered inline in this open thread must not also
+  // show up in the rail — same approval, one place, not two.
+  const inlineApprovalIds = messages
+    .filter((m) => m.pendingApproval)
+    .map((m) => m.pendingApproval!.id)
+  const { byAgent: approvalsByAgent, error: approvalsError, loaded: approvalsLoaded, resolve: resolveRailApproval } =
+    useAgentApprovals(inlineApprovalIds)
+
+  // Whoever is actually answering — named in the thinking indicator so a
+  // room with several agents says who's busy, not just "Aivory".
+  const activeAgentName = agentTarget
+    ? PREBUILT_AGENTS.find((a) => a.type === agentTarget)?.title ?? agentTarget
+    : "Aivory"
 
   // Fetch connected integrations from store
   const connectedIntegrations = listConnections("default")
@@ -217,6 +239,30 @@ export default function ConsolePage() {
   const activeChipData = CHIPS.find((chip) => chip.id === activeChip)
 
   return (
+    <OfficeShell
+      agentColumn={
+        <AgentColumn
+          sessionsByAgent={sessionsByAgent}
+          approvalsByAgent={approvalsByAgent}
+          approvalsLoaded={approvalsLoaded}
+          currentSessionId={currentSessionId}
+          agentTarget={agentTarget}
+          streamingAgentType={streamingAgentType}
+          setAgentTarget={setAgentTarget}
+          switchSession={switchSession}
+          handleNewChat={handleNewChat}
+        />
+      }
+      rail={
+        <AgentRail
+          agentTarget={agentTarget}
+          approvalsByAgent={approvalsByAgent}
+          approvalsLoaded={approvalsLoaded}
+          approvalsError={approvalsError}
+          onResolveApproval={resolveRailApproval}
+        />
+      }
+    >
     <div className="flex flex-col h-full bg-[#353531]">
       <ConsoleTopBar onNewChat={handleNewChat} />
 
@@ -448,14 +494,20 @@ export default function ConsolePage() {
                   console.log('[ConsolePage] rendering message:', m.role, '| isStreaming:', m.isStreaming, '| id:', m.id)
                   return (
                     <div key={m.id}>
-                      <ChatMessage 
-                        role={m.role} 
-                        content={m.content} 
-                        isStreaming={m.isStreaming} 
+                      <ChatMessage
+                        role={m.role}
+                        content={m.content}
+                        isStreaming={m.isStreaming}
                         attachments={m.attachments}
                         agenticState={m.role === 'assistant' && m.id === messages[messages.length - 1]?.id ? agenticState : undefined}
                         onAcceptRoute={acceptRoute}
                         onDismissRoute={dismissRoute}
+                        pendingApproval={m.pendingApproval}
+                        approvalOutcome={m.approvalOutcome}
+                        approvalBusy={m.approvalBusy}
+                        onApproveAction={() => resolveConsoleApproval(m.id, 'approve')}
+                        onDenyAction={() => resolveConsoleApproval(m.id, 'deny')}
+                        agentName={activeAgentName}
                       />
                     </div>
                   )
@@ -522,51 +574,6 @@ export default function ConsolePage() {
           </div>
         ))}
       </div>
-
-      {/* History sidebar */}
-      <aside
-        className={`fixed top-0 right-0 h-full w-72 z-40 flex flex-col transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "translate-x-full"}`}
-        style={{
-          background: "#353531",
-          backdropFilter: "blur(16px)",
-          borderLeft: "1px solid rgba(255, 255, 255, 0.08)",
-        }}
-      >
-        <div className="flex items-center justify-between px-4 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-          <span className="text-sm font-semibold text-text-primary">Chat History</span>
-          <button
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors duration-150"
-            style={{ background: "rgba(255,255,255,0.06)" }}
-            onClick={() => setSidebarOpen(false)}
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto py-2">
-          {sessions.length === 0 ? (
-            <p className="text-sm text-text-secondary px-4 py-3">No chat history yet.</p>
-          ) : (
-            sessions.map(s => {
-              const isActive = s.id === currentSessionId
-              return (
-                <div
-                  key={s.id}
-                  className={`px-4 py-3 cursor-pointer text-sm text-text-secondary transition-colors duration-150 rounded-lg mx-2 ${isActive ? "bg-[rgba(178, 204, 162,0.08)] border-l-2 border-accent text-text-primary" : "hover:bg-[rgba(255,255,255,0.04)]"}`}
-                  onClick={() => {
-                    if (s.id === currentSessionId) return
-                    switchSession(s.id)
-                  }}
-                >
-                  <div className="truncate text-sm font-medium">
-                    {s.title || "New chat"}
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-      </aside>
 
       {isDragging && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none">
@@ -655,5 +662,6 @@ export default function ConsolePage() {
         </div>
       )}
     </div>
+    </OfficeShell>
   )
 }

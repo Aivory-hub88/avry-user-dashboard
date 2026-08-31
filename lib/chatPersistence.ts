@@ -19,6 +19,8 @@ export interface PersistedSession {
   messages: Message[]     // Full message history
   createdAt: number       // Unix timestamp
   updatedAt: number       // Unix timestamp of last message
+  /** Prebuilt-agent type this thread belongs to; null = Aivory Console (Generalist). */
+  agentType: string | null
 }
 
 export class ChatStorageError extends Error {
@@ -37,7 +39,14 @@ const SESSIONS_KEY = "aivory_chat_sessions"
 function loadAllSessions(): PersistedSession[] {
   try {
     const raw = localStorage.getItem(SESSIONS_KEY)
-    return raw ? JSON.parse(raw) : []
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    // Migration: sessions persisted before agentType existed get null,
+    // meaning Aivory Console (Generalist) — same brain they were on.
+    return parsed.map((s: Omit<PersistedSession, 'agentType'> & { agentType?: string | null }) => ({
+      ...s,
+      agentType: s.agentType ?? null,
+    }))
   } catch {
     return []
   }
@@ -64,9 +73,16 @@ function persistSessions(sessions: PersistedSession[]): boolean {
  * Save messages for a given session ID.
  * Auto-generates title from first user message (max 50 chars).
  * Updates `updatedAt` timestamp.
+ * `agentType` stamps which agent this thread belongs to — only applied the
+ * first time a session is created; an existing session keeps the agent it
+ * started with even if the caller's current agent selection has moved on.
  * Throws ChatStorageError if localStorage quota is exceeded.
  */
-export function saveSessionMessages(sessionId: string, messages: Message[]): boolean {
+export function saveSessionMessages(
+  sessionId: string,
+  messages: Message[],
+  agentType: string | null = null,
+): boolean {
   const sessions = loadAllSessions()
   const existing = sessions.find(s => s.id === sessionId)
 
@@ -86,10 +102,19 @@ export function saveSessionMessages(sessionId: string, messages: Message[]): boo
       messages,
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      agentType,
     })
   }
 
   return persistSessions(sessions)
+}
+
+/**
+ * Look up a single persisted session, agentType included.
+ * Used to restore which agent a thread belongs to when it's reopened.
+ */
+export function getSession(sessionId: string): PersistedSession | undefined {
+  return loadAllSessions().find(s => s.id === sessionId)
 }
 
 /**

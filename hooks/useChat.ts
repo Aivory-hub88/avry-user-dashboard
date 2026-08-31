@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { getSessionId, clearSession, generateSessionId, saveSession } from '@/lib/session'
 import { streamConsoleResponse, typewriterStream } from '@/lib/streaming'
-import { saveSessionMessages, loadSessionMessages, listSessions, ChatStorageError } from '@/lib/chatPersistence'
+import { saveSessionMessages, loadSessionMessages, listSessions, getSession, ChatStorageError } from '@/lib/chatPersistence'
 import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
@@ -24,7 +24,7 @@ interface Message {
   approvalOutcome?: 'approved' | 'denied' | null
   approvalBusy?: boolean
 }
-interface ChatSession { id: string; title: string; messages: Message[]; createdAt: number; pinned?: boolean }
+export interface ChatSession { id: string; title: string; messages: Message[]; createdAt: number; pinned?: boolean; agentType: string | null }
 
 const DEFAULT_SUGGESTIONS = [
   "Can you elaborate on that?",
@@ -53,16 +53,30 @@ export function useChat({
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string>("")
   const [isStreaming, setIsStreaming] = useState(false)
+  // Which agent a reply is actually coming from — captured at send time, so
+  // it stays correct even if the user switches to a different agent while
+  // this one is still answering (agentTarget itself would have moved on).
+  // undefined = nothing streaming; null = Aivory Console itself is streaming
+  // (its own agentType) — kept distinct so a finished reply can't be
+  // mistaken for Console being busy, since both would otherwise read null.
+  const [streamingAgentType, setStreamingAgentType] = useState<string | null | undefined>(undefined)
   const [followUpSuggestions, setFollowUpSuggestions] = useState<string[]>([])
   const [isClarification, setIsClarification] = useState(false)
   const messagesRef = useRef<Message[]>([])
+  const currentSessionIdRef = useRef<string>("")
   const session = useSession(addToast)
-  const { agentTarget } = useMode()
+  const { agentTarget, setAgentTarget } = useMode()
 
   // Keep ref in sync with state so handleSend can read current messages without stale closure
   useEffect(() => {
     messagesRef.current = messages
   }, [messages])
+
+  // Lets a reply that resolves after the user has switched threads detect
+  // that it's no longer the one on screen — see handleSend's finally blocks.
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId
+  }, [currentSessionId])
 
   // Session init
   useEffect(() => {
@@ -76,7 +90,12 @@ export function useChat({
     setCurrentSessionId(sid)
     const restored = loadSessionMessages(sid)
     if (restored.length > 0) setMessages(restored)
+    // Restore which agent this thread belongs to — otherwise a refresh
+    // always lands back on the Generalist regardless of what was selected.
+    setAgentTarget(getSession(sid)?.agentType ?? null)
     setSessions(listSessions())
+    // Only ever runs once, on mount — setAgentTarget is stable from context.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleSend = useCallback(async (text: string, atts: Attachment[]) => {
@@ -94,19 +113,26 @@ export function useChat({
 
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: userContent, attachments: atts.length > 0 ? atts : undefined }
     const assistantId = (Date.now() + 1).toString()
+    const placeholderMsg: Message = { id: assistantId, role: "assistant", content: "", isStreaming: true }
 
     const allMessages = [...messagesRef.current, userMsg].map(m => ({
       role: m.role,
       content: m.content,
     }))
 
-    setMessages(p => [
-      ...p,
-      userMsg,
-      { id: assistantId, role: "assistant", content: "", isStreaming: true }
-    ])
+    // This request belongs to whichever thread/agent is active right now —
+    // captured once, so a later switch can't make the reply land somewhere
+    // else. `sentMessagesSnapshot` is this thread's own history plus the
+    // placeholder, independent of whatever `messages`/`currentSessionId`
+    // become after the user navigates away while this is still in flight.
+    const sentSessionId = currentSessionId
+    const sentAgentTarget = agentTarget
+    const sentMessagesSnapshot = [...messagesRef.current, userMsg, placeholderMsg]
+
+    setMessages(p => [...p, userMsg, placeholderMsg])
     clearAttachments()
     setIsStreaming(true)
+    setStreamingAgentType(agentTarget)
     setFollowUpSuggestions([])
     setIsClarification(false)
 
@@ -119,29 +145,47 @@ export function useChat({
       let pendingApproval: ConsolePendingApproval | null = null
       try {
         const result = await sendAgentMessage(
-          agentTarget as TelegramAgentType,
+          sentAgentTarget as TelegramAgentType,
           userContent,
-          currentSessionId
+          sentSessionId
         )
         finalContent = result.reply
         pendingApproval = result.pendingApproval
-        setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, pendingApproval } : m))
+        // Only touch the live thread if it's still the one on screen — if
+        // the user switched away, this would otherwise patch whatever
+        // thread they're now looking at instead of the one that answered.
+        if (currentSessionIdRef.current === sentSessionId) {
+          setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, pendingApproval } : m))
+        }
       } catch (error) {
         addToast("error", error instanceof Error ? error.message : "Agent is unavailable right now.")
-        setMessages(p => p.filter(m => m.id !== assistantId))
+        if (currentSessionIdRef.current === sentSessionId) {
+          setMessages(p => p.filter(m => m.id !== assistantId))
+        }
         streamError = true
       } finally {
         setIsStreaming(false)
+        setStreamingAgentType(undefined)
         if (!streamError) {
           try {
-            setMessages(prev => {
-              const updated = prev.map(m =>
+            if (currentSessionIdRef.current === sentSessionId) {
+              setMessages(prev => {
+                const updated = prev.map(m =>
+                  m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, pendingApproval } : m
+                )
+                saveSessionMessages(sentSessionId, updated, sentAgentTarget)
+                setSessions(listSessions())
+                return updated
+              })
+            } else {
+              // Viewing something else now — persist this thread's own
+              // correct history directly, without touching what's on screen.
+              const finalList = sentMessagesSnapshot.map(m =>
                 m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, pendingApproval } : m
               )
-              saveSessionMessages(currentSessionId, updated)
+              saveSessionMessages(sentSessionId, finalList, sentAgentTarget)
               setSessions(listSessions())
-              return updated
-            })
+            }
           } catch (e) {
             if (e instanceof ChatStorageError) {
               addToast("error", "Chat history storage is full. Messages may not be saved.")
@@ -154,7 +198,7 @@ export function useChat({
 
     try {
       const baseStream = streamConsoleResponse("/api/console/stream", {
-        session_id: currentSessionId,
+        session_id: sentSessionId,
         organization_id: "default",
         messages: allMessages,
         user_state: formatUserContextForAI(buildUserContextState()),
@@ -164,7 +208,11 @@ export function useChat({
         processEvent(chunk as any)
         if (chunk.type === "chunk" && chunk.content) {
           finalContent = chunk.content
-          setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent } : m))
+          // Don't paint chunks into whatever thread happens to be open —
+          // only the thread this stream actually belongs to.
+          if (currentSessionIdRef.current === sentSessionId) {
+            setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent } : m))
+          }
         } else if (chunk.type === "done") {
           const normalized = normalizeAssistantText(finalContent)
           const parsed = parseLLMResponse(normalized)
@@ -175,29 +223,42 @@ export function useChat({
           triggerClassification(text, parsed.reply)
         } else if (chunk.type === "error") {
           addToast("error", chunk.error || "Something went wrong.")
-          setMessages(p => p.filter(m => m.id !== assistantId))
+          if (currentSessionIdRef.current === sentSessionId) {
+            setMessages(p => p.filter(m => m.id !== assistantId))
+          }
           streamError = true
           break
         }
       }
     } catch (error) {
       addToast("error", "Something went wrong. Please try again.")
-      setMessages(p => p.filter(m => m.id !== assistantId))
+      if (currentSessionIdRef.current === sentSessionId) {
+        setMessages(p => p.filter(m => m.id !== assistantId))
+      }
       streamError = true
     } finally {
       setIsStreaming(false)
+      setStreamingAgentType(undefined)
       if (!streamError) {
         try {
-          setMessages(prev => {
-            const updated = prev.map(m =>
-              m.id === assistantId
-                ? { ...m, content: finalContent, isStreaming: false }
-                : m
+          if (currentSessionIdRef.current === sentSessionId) {
+            setMessages(prev => {
+              const updated = prev.map(m =>
+                m.id === assistantId
+                  ? { ...m, content: finalContent, isStreaming: false }
+                  : m
+              )
+              saveSessionMessages(sentSessionId, updated, sentAgentTarget)
+              setSessions(listSessions())
+              return updated
+            })
+          } else {
+            const finalList = sentMessagesSnapshot.map(m =>
+              m.id === assistantId ? { ...m, content: finalContent, isStreaming: false } : m
             )
-            saveSessionMessages(currentSessionId, updated)
+            saveSessionMessages(sentSessionId, finalList, sentAgentTarget)
             setSessions(listSessions())
-            return updated
-          })
+          }
         } catch (e) {
           if (e instanceof ChatStorageError) {
             addToast("error", "Chat history storage is full. Messages may not be saved.")
@@ -236,7 +297,7 @@ export function useChat({
             { id: (Date.now() + 2).toString(), role: 'assistant' as const, content: result.reply },
           ]
         }
-        saveSessionMessages(currentSessionId, updated)
+        saveSessionMessages(currentSessionId, updated, agentTarget)
         setSessions(listSessions())
         return updated
       })
@@ -248,7 +309,7 @@ export function useChat({
 
   const handleNewChat = useCallback(() => {
     if (messages.length > 0) {
-      session.save(currentSessionId, messages)
+      session.save(currentSessionId, messages, agentTarget)
     }
     clearSession()
     const sid = generateSessionId()
@@ -258,24 +319,38 @@ export function useChat({
     clearAttachments()
     resetAgentic()
     setSessions(listSessions())
-  }, [currentSessionId, messages, session, resetAgentic, clearAttachments])
+  }, [currentSessionId, messages, session, agentTarget, resetAgentic, clearAttachments])
 
   const switchSession = useCallback((targetSessionId: string) => {
     if (targetSessionId === currentSessionId) return
     if (messages.length > 0) {
-      session.save(currentSessionId, messages)
+      session.save(currentSessionId, messages, agentTarget)
     }
     const loaded = session.load(targetSessionId)
     setMessages(loaded)
     setCurrentSessionId(targetSessionId)
+    // A thread keeps the agent it was started under — restore it so the
+    // next message doesn't silently go to whatever was selected before.
+    setAgentTarget(session.getAgentType(targetSessionId))
     setSessions(listSessions())
-  }, [currentSessionId, messages, session])
+  }, [currentSessionId, messages, session, agentTarget, setAgentTarget])
+
+  // Threads nested under the agent that held them — one entry per agentType,
+  // 'null' (Aivory Console) included. Sessions are already updatedAt-desc
+  // from listSessions(), so each group stays most-recent-first too.
+  const sessionsByAgent = sessions.reduce<Record<string, ChatSession[]>>((acc, s) => {
+    const key = s.agentType ?? 'null'
+    ;(acc[key] ??= []).push(s)
+    return acc
+  }, {})
 
   return {
     messages,
     sessions,
+    sessionsByAgent,
     currentSessionId,
     isStreaming,
+    streamingAgentType,
     followUpSuggestions,
     setFollowUpSuggestions,
     isClarification,

@@ -35,6 +35,16 @@ export async function listPendingApprovals(): Promise<PendingApproval[]> {
   return data.approvals ?? []
 }
 
+/** Same list, grouped by `_agent_type` — 'unknown' for any row missing it. */
+export async function listPendingApprovalsByAgent(): Promise<Record<string, PendingApproval[]>> {
+  const approvals = await listPendingApprovals()
+  return approvals.reduce<Record<string, PendingApproval[]>>((acc, a) => {
+    const key = a._agent_type ?? 'unknown'
+    ;(acc[key] ??= []).push(a)
+    return acc
+  }, {})
+}
+
 export interface ResolveApprovalResult {
   success: boolean
   outcome: string | null
