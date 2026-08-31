@@ -15,6 +15,7 @@ import { useIntentRouter } from "@/hooks/useIntentRouter"
 import { useFileUpload } from "@/hooks/useFileUpload"
 import { useChat } from "@/hooks/useChat"
 import { useAgentApprovals } from "@/hooks/useAgentApprovals"
+import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
 import UploadMenu from "@/components/UploadMenu"
@@ -26,6 +27,7 @@ import { useMode } from "@/contexts/ModeContext"
 import OfficeShell from "@/components/office/OfficeShell"
 import AgentColumn from "@/components/office/AgentColumn"
 import AgentRail from "@/components/office/AgentRail"
+import AgentDeployNotice from "@/components/office/AgentDeployNotice"
 
 interface Toast { id: string; type: "success" | "error"; message: string }
 
@@ -139,14 +141,21 @@ export default function ConsolePage() {
   const inlineApprovalIds = messages
     .filter((m) => m.pendingApproval)
     .map((m) => m.pendingApproval!.id)
-  const { byAgent: approvalsByAgent, error: approvalsError, loaded: approvalsLoaded, resolve: resolveRailApproval } =
+  const { byAgent: approvalsByAgent, error: approvalsError, loaded: approvalsLoaded, resolve: resolveRailApproval, refetch: refetchApprovals } =
     useAgentApprovals(inlineApprovalIds)
+  const { deployments } = useAgentDeployments()
 
   // Whoever is actually answering — named in the thinking indicator so a
   // room with several agents says who's busy, not just "Aivory".
   const activeAgentName = agentTarget
     ? PREBUILT_AGENTS.find((a) => a.type === agentTarget)?.title ?? agentTarget
     : "Aivory"
+
+  // Shown immediately in the chat pane the moment an undeployed agent is
+  // open — Aivory Console itself has no deployment concept, so it never
+  // qualifies.
+  const activeAgentChannels = agentTarget ? deployments.filter((d) => d.agentType === agentTarget) : []
+  const showDeployNotice = agentTarget !== null && activeAgentChannels.length === 0
 
   // Fetch connected integrations from store
   const connectedIntegrations = listConnections("default")
@@ -246,6 +255,7 @@ export default function ConsolePage() {
           sessionsByAgent={sessionsByAgent}
           approvalsByAgent={approvalsByAgent}
           approvalsLoaded={approvalsLoaded}
+          deployments={deployments}
           currentSessionId={currentSessionId}
           agentTarget={agentTarget}
           streamingAgentType={streamingAgentType}
@@ -259,14 +269,17 @@ export default function ConsolePage() {
         <AgentRail
           agentTarget={agentTarget}
           approvalsByAgent={approvalsByAgent}
-          approvalsLoaded={approvalsLoaded}
           approvalsError={approvalsError}
           onResolveApproval={resolveRailApproval}
+          onRetryApprovals={refetchApprovals}
+          deployments={deployments}
         />
       }
     >
     <div className="flex flex-col h-full bg-[#353531]">
       <ConsoleTopBar onNewChat={handleNewChat} />
+
+      {showDeployNotice && <AgentDeployNotice agentName={activeAgentName} />}
 
       <div className="flex-1 flex flex-col overflow-hidden h-full">
         {messages.length === 0 ? (

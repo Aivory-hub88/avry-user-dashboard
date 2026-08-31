@@ -9,12 +9,11 @@ import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import { ChevronRight, ChevronLeft, Lock, Plus, Trash2 } from "lucide-react"
 import { asset } from "@/lib/asset"
-import { PREBUILT_AGENTS, listDeployments, type AgentDeployment } from "@/lib/agentChat"
+import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
 import type { ChatSession } from "@/hooks/useChat"
 import type { PendingApproval } from "@/lib/agentApprovals"
 import { ThinkingDots } from "@/components/ui/ThinkingDots"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
-import { useAgentColumnCollapse } from "@/hooks/useAgentColumnCollapse"
 
 const CHANNEL_ICON: Record<string, string> = {
   telegram: "/integrations/telegram.svg",
@@ -25,6 +24,7 @@ interface AgentColumnProps {
   sessionsByAgent: Record<string, ChatSession[]>
   approvalsByAgent: Record<string, PendingApproval[]>
   approvalsLoaded: boolean
+  deployments: AgentDeployment[]
   currentSessionId: string
   agentTarget: string | null
   streamingAgentType: string | null | undefined
@@ -32,6 +32,10 @@ interface AgentColumnProps {
   switchSession: (sessionId: string) => void
   handleNewChat: () => void
   deleteThread: (sessionId: string) => void
+  /** Controlled by OfficeShell — it owns the grid track sizing, this
+   *  component just renders itself accordingly. */
+  collapsed?: boolean
+  onToggleCollapse?: () => void
 }
 
 interface Row {
@@ -67,6 +71,7 @@ export default function AgentColumn({
   sessionsByAgent,
   approvalsByAgent,
   approvalsLoaded,
+  deployments,
   currentSessionId,
   agentTarget,
   streamingAgentType,
@@ -74,13 +79,12 @@ export default function AgentColumn({
   switchSession,
   handleNewChat,
   deleteThread,
+  collapsed = false,
+  onToggleCollapse,
 }: AgentColumnProps) {
   const [expanded, setExpanded] = useState<string>(agentTarget ?? "null")
-  const [deployments, setDeployments] = useState<AgentDeployment[]>([])
   const [query, setQuery] = useState("")
   const [arrived, setArrived] = useState<Set<string>>(new Set())
-  const { collapsed, toggle } = useAgentColumnCollapse()
-  const fetchedRef = useRef(false)
   const approvalsInitRef = useRef(false)
   const prevCountsRef = useRef<Record<string, number>>({})
 
@@ -109,13 +113,6 @@ export default function AgentColumn({
     const t = setTimeout(() => setArrived(new Set()), 2900)
     return () => clearTimeout(t)
   }, [approvalsByAgent, approvalsLoaded])
-
-  useEffect(() => {
-    // Channel badges are decorative — fetch once, not per row.
-    if (fetchedRef.current) return
-    fetchedRef.current = true
-    listDeployments().then(setDeployments).catch(() => {})
-  }, [])
 
   useEffect(() => {
     // Sync-from-prop: agentTarget can change from outside this component
@@ -158,9 +155,9 @@ export default function AgentColumn({
 
   if (collapsed) {
     return (
-      <div className="flex h-full w-14 shrink-0 flex-col items-center border-r border-white/[0.045] bg-[#353531] pt-4">
+      <div className="flex h-full w-full flex-col items-center border-r border-white/[0.045] bg-[#353531] pt-4">
         <button
-          onClick={toggle}
+          onClick={onToggleCollapse}
           aria-label="Expand agent column"
           title="Expand agent column"
           className="mb-3 grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[8px] text-white/50 transition-colors hover:bg-white/[0.06] hover:text-white"
@@ -205,11 +202,11 @@ export default function AgentColumn({
   }
 
   return (
-    <div className="flex h-full w-[264px] shrink-0 flex-col border-r border-white/[0.045] bg-[#353531]">
+    <div className="flex h-full w-full flex-col border-r border-white/[0.045] bg-[#353531]">
       <div className="flex items-center justify-between gap-2 px-4 pt-5 pb-3">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">Your Agents</h2>
         <button
-          onClick={toggle}
+          onClick={onToggleCollapse}
           aria-label="Collapse agent column"
           title="Collapse agent column"
           className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-[7px] text-white/30 transition-colors hover:bg-white/[0.08] hover:text-white"
