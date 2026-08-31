@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { normalizeN8nBaseUrl } from '@/lib/workflows/credentialStore'
 import { getAuthUser } from '@/lib/serverAuth'
+import { logWorkflowDeployed } from '@/lib/workflows/cogneeGraphLog'
 
 /**
  * POST /api/workflows/activate
@@ -188,7 +189,12 @@ export async function POST(req: NextRequest) {
     })
     if (res.status === 401 || res.status === 403) {
       return NextResponse.json(
-        { success: false, code: 'INVALID_CREDS', message: 'n8n rejected the API key' },
+        {
+          success: false,
+          code: 'INVALID_CREDS',
+          message:
+            'n8n rejected the API key. Verify the key is correct AND was created by an Owner/admin account on that instance — member keys cannot create or activate workflows.',
+        },
         { status: 401 },
       )
     }
@@ -244,6 +250,17 @@ export async function POST(req: NextRequest) {
   // never sent one — so a deploy gave no way to go look at the result. That is
   // the whole point of the superadmin test path, so return it in both modes.
   const n8nUrl = n8nId ? `${publicBase}/workflow/${n8nId}` : undefined
+
+  // Fire-and-forget graph log -- deploy has already succeeded, this is
+  // enrichment for later "what have we built before" queries, not something
+  // the response should wait on. See cogneeGraphLog.ts for why this lives
+  // here and not in the copilot generation path.
+  logWorkflowDeployed({
+    workflowName: workflow.name ?? body?.workflow_data?.name ?? `Aivory Workflow ${body?.workflow_id ?? ''}`,
+    steps: Array.isArray(body?.workflow_data?.steps) ? body.workflow_data.steps : [],
+    n8nWorkflowId: n8nId,
+    instance: useAivoryInstance ? 'aivory' : 'byo',
+  })
 
   return NextResponse.json({
     success: true,
