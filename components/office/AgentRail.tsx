@@ -1,11 +1,15 @@
 "use client"
 /**
- * Right column of the Console "working office" — what the active agent is
- * waiting on, running, and connected to.
+ * Right column of the Console "working office" — a unified notification
+ * feed for the active agent (approvals + missed replies in its other
+ * threads), plus what it's running and connected to.
  *
- * Approvals come from useAgentApprovals() via the parent (Console page),
- * already deduped against whatever's rendered inline in the open thread —
- * see docs/CERVEAU-WORKING-OFFICE-PLANNING.md Phase 3.
+ * The feed comes from useNotificationFeed() via the parent (Console page) —
+ * see docs/CERVEAU-WORKING-OFFICE-PLANNING.md Phase 10. Approvals are
+ * already deduped against whatever's rendered inline in the open thread
+ * (Phase 3); this panel only ever renders the slice for `agentTarget`, not
+ * a cross-agent view — Mission Control (Phase 9) is where "all agents at
+ * once" lives.
  *
  * Collapsible, but never an overlay: OfficeShell owns collapse state and
  * sizes this as a real CSS Grid track (a fixed 56px column when collapsed,
@@ -14,26 +18,38 @@
  * never a panel floating on top of content. Same three-pane behaviour as
  * Grok Bot's layout.
  *
- * Every status line in this panel is the same `Bar` molecule — a tinted
- * strip with an underlined action inline, the same DNA as the deploy
- * notice banner above the chat, varied per row: a link-first sentence for
- * the notice banner, a link-last sentence for "not deployed" here, two
- * inline actions instead of one for a pending approval, no action at all
- * for a plain status line. One visual family, several shapes.
+ * Every approval, activity, and status item renders through the one
+ * `NotificationCard` shape (icon, title, secondary line, timestamp) —
+ * macOS Notification Center's own move: one neutral card language, not a
+ * different visual treatment per kind. `Bar` survives only for the
+ * Aivory-Console placeholder copy and the "Running now"/"Connected
+ * channels" sections below, which are reference state, not notifications.
  *
  * Aivory Console (agentTarget === null) gets its own copy rather than the
- * approval/deployment sections — it's the direct SSE chat, not a deployable
+ * feed/deployment sections — it's the direct SSE chat, not a deployable
  * agent behind the F-1 gate, so "Could not load approvals" or "Not deployed
  * anywhere yet" would be true-sounding but meaningless there.
  */
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { ChevronLeft, ChevronRight, Check } from "lucide-react"
+import { ChevronLeft, ChevronRight, Check, MessageSquare, AlertTriangle } from "lucide-react"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
 import { describeTool, type PendingApproval } from "@/lib/agentApprovals"
+import type { Notification } from "@/types/notifications"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
+import { NotificationCard } from "@/components/office/NotificationCard"
+
+function relativeTime(ts: number): string {
+  const diffMs = Date.now() - ts
+  const mins = Math.round(diffMs / 60_000)
+  if (mins < 1) return "now"
+  if (mins < 60) return `${mins}m`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h`
+  return `${Math.round(hours / 24)}d`
+}
 
 const CHANNEL_ICON: Record<string, string> = {
   telegram: "/integrations/telegram.svg",
@@ -53,41 +69,14 @@ function Bar({ tone = "idle", children }: { tone?: "idle" | "warn"; children: Re
   )
 }
 
-/** The underlined actionable word/phrase inside a Bar — a link or a button. */
-function BarAction({
-  onClick,
-  href,
-  muted,
-  disabled,
-  children,
-}: {
-  onClick?: () => void
-  href?: string
-  muted?: boolean
-  disabled?: boolean
-  children: React.ReactNode
-}) {
-  const className = `font-medium underline underline-offset-2 transition-colors ${
-    disabled
-      ? "text-white/30 no-underline"
-      : muted
-        ? "text-white/70 hover:text-white"
-        : "text-[#e8c088] hover:text-[#f0cd9c]"
-  }`
-  if (href) return <Link href={href} className={className}>{children}</Link>
-  return (
-    <button onClick={onClick} disabled={disabled} className={className}>
-      {children}
-    </button>
-  )
-}
-
 interface AgentRailProps {
   agentTarget: string | null
-  approvalsByAgent: Record<string, PendingApproval[]>
+  /** Already sliced to this agent's own items — see useNotificationFeed. */
+  notifications: Notification[]
   approvalsError: boolean
   onResolveApproval: (approval: PendingApproval, decision: "approve" | "deny") => Promise<void>
   onRetryApprovals: () => void
+  onOpenThread: (sessionId: string) => void
   deployments: AgentDeployment[]
   /** Controlled by OfficeShell — it owns the grid track sizing, this
    *  component just renders itself accordingly. */
@@ -97,10 +86,11 @@ interface AgentRailProps {
 
 export default function AgentRail({
   agentTarget,
-  approvalsByAgent,
+  notifications,
   approvalsError,
   onResolveApproval,
   onRetryApprovals,
+  onOpenThread,
   deployments,
   collapsed = false,
   onToggleCollapse,
@@ -112,8 +102,10 @@ export default function AgentRail({
     ? PREBUILT_AGENTS.find((a) => a.type === agentTarget)?.title ?? agentTarget
     : "Aivory Console"
 
-  const mine = agentTarget ? approvalsByAgent[agentTarget] ?? [] : []
+  const approvalItems = notifications.filter((n): n is Extract<Notification, { kind: "approval" }> => n.kind === "approval")
+  const activityItems = notifications.filter((n): n is Extract<Notification, { kind: "activity" }> => n.kind === "activity")
   const channels = agentTarget ? deployments.filter((d) => d.agentType === agentTarget) : []
+  const notDeployed = agentTarget !== null && channels.length === 0
 
   const decide = async (approval: PendingApproval, decision: "approve" | "deny") => {
     setBusyId(approval.id)
@@ -139,9 +131,9 @@ export default function AgentRail({
           <ChevronLeft className="h-[14px] w-[14px]" />
         </button>
         <AgentAvatar type={agentTarget} size={30} />
-        {mine.length > 0 && (
+        {notifications.length > 0 && (
           <span className="mt-2 rounded-full bg-[rgba(217,171,110,0.13)] px-[6px] py-[2px] text-[11px] font-bold text-[#d9ab6e]">
-            {mine.length}
+            {notifications.length}
           </span>
         )}
       </div>
@@ -173,60 +165,87 @@ export default function AgentRail({
           <>
             <section className="flex flex-col gap-[8px]">
               <div className="flex items-baseline gap-[7px] px-0.5">
-                <h4 className="text-[12px] font-semibold text-white/65">Waiting on you</h4>
-                <span className={`text-[11px] ${mine.length > 0 ? "text-[#d9ab6e]" : "text-white/30"}`}>{mine.length}</span>
+                <h4 className="text-[12px] font-semibold text-white/65">Notifications</h4>
+                <span className={`text-[11px] ${notifications.length > 0 ? "text-[#d9ab6e]" : "text-white/30"}`}>
+                  {notifications.length}
+                </span>
               </div>
 
               {approvalsError && (
-                <Bar tone="warn">
-                  <BarAction onClick={onRetryApprovals}>Could not load approvals</BarAction> — tap to try again.
-                </Bar>
+                <NotificationCard
+                  tone="warn"
+                  icon={<AlertTriangle className="h-[13px] w-[13px]" />}
+                  title="Could not load approvals"
+                  subtitle="Tap to try again."
+                  onClick={onRetryApprovals}
+                />
               )}
-              {resolveError && <Bar tone="warn">{resolveError}</Bar>}
-              {!approvalsError && mine.length === 0 && <Bar tone="idle">Nothing waiting on you.</Bar>}
+              {resolveError && (
+                <NotificationCard tone="warn" icon={<AlertTriangle className="h-[13px] w-[13px]" />} title={resolveError} />
+              )}
+              {notDeployed && (
+                <NotificationCard
+                  tone="warn"
+                  icon={<AlertTriangle className="h-[13px] w-[13px]" />}
+                  title="Not deployed anywhere yet"
+                  subtitle="Connect it to Telegram, Slack, or WhatsApp to reach it outside Console."
+                  actions={
+                    <Link
+                      href="/agents"
+                      className="text-[12px] font-medium text-[#e8c088] underline underline-offset-2 transition-colors hover:text-[#f0cd9c]"
+                    >
+                      Deploy this agent
+                    </Link>
+                  }
+                />
+              )}
+              {!approvalsError && notifications.length === 0 && !notDeployed && (
+                <p className="px-0.5 text-[12.5px] font-light text-white/35">Nothing new right now.</p>
+              )}
 
-              {mine.map((a) => {
+              {approvalItems.map(({ approval: a }) => {
                 const busy = busyId === a.id
                 return (
-                  <div
+                  <NotificationCard
                     key={a.id}
-                    className="relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-white/[0.07] p-4"
-                    style={{
-                      backgroundColor: "#3a3a36",
-                      backgroundImage:
-                        "radial-gradient(circle at 12% 15%, rgba(183,203,166,0.22), transparent 42%)," +
-                        "radial-gradient(circle at 88% 12%, rgba(217,171,110,0.18), transparent 46%)," +
-                        "radial-gradient(circle at 65% 95%, rgba(143,179,217,0.16), transparent 55%)",
-                    }}
-                  >
-                    <span className="w-fit rounded-full bg-[rgba(217,171,110,0.16)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#e8c088]">
-                      Needs approval
-                    </span>
-                    <p className="text-[19px] font-semibold leading-[1.25] tracking-[-0.01em] text-white">
-                      {describeTool(a.tool_name)}
-                    </p>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => decide(a, "approve")}
-                        disabled={busy}
-                        aria-busy={busy}
-                        className="flex items-center gap-2 rounded-full bg-accent px-5 py-2 text-[13px] font-semibold text-[#1a1a18] transition-[opacity,transform] hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.97] disabled:opacity-50"
-                      >
-                        <Check className="h-[13px] w-[13px]" />
-                        {busy ? "Approving…" : "Approve"}
-                      </button>
-                      <button
-                        onClick={() => decide(a, "deny")}
-                        disabled={busy}
-                        aria-busy={busy}
-                        className="text-[13px] font-medium text-white/45 underline underline-offset-2 transition-colors hover:text-white/75 disabled:opacity-50"
-                      >
-                        Deny
-                      </button>
-                    </div>
-                  </div>
+                    badge="Needs approval"
+                    icon={<Check className="h-[13px] w-[13px]" />}
+                    title={describeTool(a.tool_name)}
+                    subtitle="Waiting for your decision."
+                    actions={
+                      <>
+                        <button
+                          onClick={() => decide(a, "approve")}
+                          disabled={busy}
+                          aria-busy={busy}
+                          className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-[12.5px] font-semibold text-[#1a1a18] transition-[opacity,transform] duration-150 ease-out hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.97] disabled:opacity-50"
+                        >
+                          <Check className="h-[12px] w-[12px]" />
+                          {busy ? "Approving…" : "Approve"}
+                        </button>
+                        <button
+                          onClick={() => decide(a, "deny")}
+                          disabled={busy}
+                          aria-busy={busy}
+                          className="text-[12.5px] font-medium text-white/45 underline underline-offset-2 transition-colors hover:text-white/75 active:scale-[0.97] disabled:opacity-50"
+                        >
+                          Deny
+                        </button>
+                      </>
+                    }
+                  />
                 )
               })}
+
+              {activityItems.map((item) => (
+                <NotificationCard
+                  key={item.id}
+                  icon={<MessageSquare className="h-[13px] w-[13px]" />}
+                  title={`New reply in “${item.title}”`}
+                  meta={relativeTime(item.updatedAt)}
+                  onClick={() => onOpenThread(item.sessionId)}
+                />
+              ))}
             </section>
 
             <section className="mt-[20px] flex flex-col gap-[8px]">
@@ -234,15 +253,10 @@ export default function AgentRail({
               <Bar tone="idle">Not running anything right now.</Bar>
             </section>
 
-            <section className="mt-[20px] flex flex-col gap-[8px]">
-              <h4 className="px-0.5 text-[12px] font-semibold text-white/65">Connected channels</h4>
-              {channels.length === 0 ? (
-                <Bar tone="warn">
-                  Not deployed anywhere yet — <BarAction href="/agents">deploy this agent</BarAction> to reach it
-                  outside Console.
-                </Bar>
-              ) : (
-                channels.map((c) => (
+            {channels.length > 0 && (
+              <section className="mt-[20px] flex flex-col gap-[8px]">
+                <h4 className="px-0.5 text-[12px] font-semibold text-white/65">Connected channels</h4>
+                {channels.map((c) => (
                   <Bar key={c.id} tone="idle">
                     <span className="flex items-center gap-[7px]">
                       {CHANNEL_ICON[c.kind] ? (
@@ -253,9 +267,9 @@ export default function AgentRail({
                       <span className="truncate text-white/75">{c.label}</span>
                     </span>
                   </Bar>
-                ))
-              )}
-            </section>
+                ))}
+              </section>
+            )}
           </>
         )}
       </div>

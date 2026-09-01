@@ -14,7 +14,7 @@ import { useAgenticStream } from "@/hooks/useAgenticStream"
 import { useIntentRouter } from "@/hooks/useIntentRouter"
 import { useFileUpload } from "@/hooks/useFileUpload"
 import { useChat } from "@/hooks/useChat"
-import { useAgentApprovals } from "@/hooks/useAgentApprovals"
+import { useNotificationFeed } from "@/hooks/useNotificationFeed"
 import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
@@ -146,8 +146,14 @@ export default function ConsolePage() {
   const inlineApprovalIds = messages
     .filter((m) => m.pendingApproval)
     .map((m) => m.pendingApproval!.id)
-  const { byAgent: approvalsByAgent, error: approvalsError, loaded: approvalsLoaded, resolve: resolveRailApproval, refetch: refetchApprovals } =
-    useAgentApprovals(inlineApprovalIds)
+  const {
+    byAgent: notificationsByAgent,
+    approvalsByAgent,
+    approvalsLoaded,
+    approvalsError,
+    resolveApproval: resolveRailApproval,
+    retryApprovals: refetchApprovals,
+  } = useNotificationFeed({ sessionsByAgent, currentSessionId, excludeApprovalIds: inlineApprovalIds })
   const { deployments } = useAgentDeployments()
 
   // Whoever is actually answering — named in the thinking indicator so a
@@ -275,8 +281,8 @@ export default function ConsolePage() {
       agentColumn={
         <AgentColumn
           sessionsByAgent={sessionsByAgent}
-          approvalsByAgent={approvalsByAgent}
-          approvalsLoaded={approvalsLoaded}
+          notificationsByAgent={notificationsByAgent}
+          notificationsLoaded={approvalsLoaded}
           deployments={deployments}
           currentSessionId={currentSessionId}
           agentTarget={agentTarget}
@@ -293,10 +299,14 @@ export default function ConsolePage() {
       rail={
         <AgentRail
           agentTarget={agentTarget}
-          approvalsByAgent={approvalsByAgent}
+          notifications={notificationsByAgent[agentTarget ?? "null"] ?? []}
           approvalsError={approvalsError}
           onResolveApproval={resolveRailApproval}
           onRetryApprovals={refetchApprovals}
+          onOpenThread={(sessionId) => {
+            setShowMissionControl(false)
+            switchSession(sessionId)
+          }}
           deployments={deployments}
         />
       }

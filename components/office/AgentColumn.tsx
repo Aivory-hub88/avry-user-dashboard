@@ -11,7 +11,7 @@ import { ChevronRight, ChevronLeft, Lock, Plus, Trash2, LayoutGrid } from "lucid
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
 import type { ChatSession } from "@/hooks/useChat"
-import type { PendingApproval } from "@/lib/agentApprovals"
+import type { Notification } from "@/types/notifications"
 import { ThinkingDots } from "@/components/ui/ThinkingDots"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 
@@ -22,8 +22,11 @@ const CHANNEL_ICON: Record<string, string> = {
 
 interface AgentColumnProps {
   sessionsByAgent: Record<string, ChatSession[]>
-  approvalsByAgent: Record<string, PendingApproval[]>
-  approvalsLoaded: boolean
+  /** Approvals + missed-reply activity, merged — see useNotificationFeed.
+   *  A row's badge counts "anything this agent needs your attention for,"
+   *  not just approvals. */
+  notificationsByAgent: Record<string, Notification[]>
+  notificationsLoaded: boolean
   deployments: AgentDeployment[]
   currentSessionId: string
   agentTarget: string | null
@@ -77,8 +80,8 @@ function lastPreview(session: ChatSession | undefined): string {
 
 export default function AgentColumn({
   sessionsByAgent,
-  approvalsByAgent,
-  approvalsLoaded,
+  notificationsByAgent,
+  notificationsLoaded,
   deployments,
   currentSessionId,
   agentTarget,
@@ -103,15 +106,15 @@ export default function AgentColumn({
     // Skip the pulse on the very first snapshot — that's existing work
     // surfacing, not something that just "arrived". Only count increases
     // after that baseline count as an arrival.
-    if (!approvalsLoaded) return
+    if (!notificationsLoaded) return
     if (!approvalsInitRef.current) {
       approvalsInitRef.current = true
-      for (const row of ROWS) prevCountsRef.current[row.key] = approvalsByAgent[row.key]?.length ?? 0
+      for (const row of ROWS) prevCountsRef.current[row.key] = notificationsByAgent[row.key]?.length ?? 0
       return
     }
     const next = new Set<string>()
     for (const row of ROWS) {
-      const count = approvalsByAgent[row.key]?.length ?? 0
+      const count = notificationsByAgent[row.key]?.length ?? 0
       if (count > (prevCountsRef.current[row.key] ?? 0)) next.add(row.key)
       prevCountsRef.current[row.key] = count
     }
@@ -123,7 +126,7 @@ export default function AgentColumn({
     setArrived(next)
     const t = setTimeout(() => setArrived(new Set()), 2900)
     return () => clearTimeout(t)
-  }, [approvalsByAgent, approvalsLoaded])
+  }, [notificationsByAgent, notificationsLoaded])
 
   useEffect(() => {
     // Sync-from-prop: agentTarget can change from outside this component
@@ -190,7 +193,7 @@ export default function AgentColumn({
         <div className="flex flex-1 flex-col items-center gap-[6px] overflow-y-auto pb-4">
           {ROWS.map((row) => {
             const isActiveAgent = !missionControlActive && row.type === agentTarget
-            const pending = approvalsByAgent[row.key]?.length ?? 0
+            const pending = notificationsByAgent[row.key]?.length ?? 0
             return (
               <button
                 key={row.key}
@@ -266,7 +269,7 @@ export default function AgentColumn({
           const isOpen = expanded === row.key
           const isActiveAgent = !missionControlActive && row.type === agentTarget
           const channels = channelsFor(row.type)
-          const pending = approvalsByAgent[row.key]?.length ?? 0
+          const pending = notificationsByAgent[row.key]?.length ?? 0
           const mostRecent = threads[0]
           const isThinkingHere = row.type === streamingAgentType
           return (
