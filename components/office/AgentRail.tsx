@@ -204,7 +204,7 @@ export default function AgentRail({
                 />
               )}
               {!approvalsError && notifications.length === 0 && !notDeployed && (
-                <p className="px-0.5 text-[12.5px] font-light text-white/35">Nothing new right now.</p>
+                <div className="px-0.5 text-[12.5px] font-light text-white/35">Nothing new right now.</div>
               )}
 
               {approvalItems.map(({ approval: a }) => {

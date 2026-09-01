@@ -667,10 +667,12 @@ export default function ConsolePage() {
               ✕
             </button>
 
-            <h2 className="mb-2 text-2xl font-semibold text-white/95">Connectors</h2>
-            <p className="mb-6 text-sm text-white/50">
+            {/* Not <h2>/<p> — global `main h2`/`main p` styles override
+                font-size/color/margin on any heading or paragraph tag here. */}
+            <div className="mb-2 text-2xl font-semibold leading-tight text-white/95">Connectors</div>
+            <div className="mb-6 text-sm text-white/50">
               Connect your tools and services to Aivory Agent
-            </p>
+            </div>
 
             <div className="grid grid-cols-3 gap-3 max-h-[420px] overflow-y-auto pr-2">
               {APP_CATALOG.map((app) => {

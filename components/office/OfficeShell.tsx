@@ -52,11 +52,13 @@ export default function OfficeShell({
       <div ref={ref} className="grid h-full w-full place-items-center bg-[#353531] px-8 text-center">
         <div className="max-w-[320px]">
           <Monitor className="mx-auto mb-3 h-6 w-6 text-white/25" />
-          <p className="mb-1.5 text-[14px] font-medium text-white/70">Widen your window</p>
-          <p className="text-[12.5px] font-light leading-[1.55] text-white/40">
+          {/* Not <p> — a global `main p` style overrides Tailwind's own
+              font-size/color/margin on any plain paragraph tag here. */}
+          <div className="mb-1.5 text-[14px] font-medium leading-tight text-white/70">Widen your window</div>
+          <div className="text-[12.5px] font-light leading-[1.55] text-white/40">
             The working office needs more room to show your agents, the conversation, and
             their status side by side. It isn&apos;t built for narrower screens yet.
-          </p>
+          </div>
         </div>
       </div>
     )

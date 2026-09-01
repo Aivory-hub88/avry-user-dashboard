@@ -70,17 +70,17 @@ export default function MissionControl({
   return (
     <div className="flex-1 overflow-y-auto px-8 py-10">
       <div className="mx-auto max-w-[1000px]">
-        {/* Not <h1> — a global `main h1` style overrides font-size, color,
-            and margins on any heading tag in this app's <main>. */}
-        <p
+        {/* Not <h1>/<p> — global `main h1`/`main p` styles override
+            font-size/color/margin on any heading or paragraph tag here. */}
+        <div
           className="mb-1 font-light text-[28px] leading-tight text-white/90"
           style={{ fontFamily: "var(--font-manrope), sans-serif", fontWeight: 300, letterSpacing: "-0.02em" }}
         >
           Mission Control
-        </p>
-        <p className="mb-8 text-[13px] font-light text-white/40">
+        </div>
+        <div className="mb-8 text-[13px] font-light text-white/40">
           Every agent, at a glance — pick one to open its thread.
-        </p>
+        </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {ROWS.map((row) => {
@@ -124,7 +124,7 @@ export default function MissionControl({
                   )}
                 </div>
 
-                <p className="truncate text-[12.5px] font-light text-white/40">{lastPreview(mostRecent)}</p>
+                <div className="truncate text-[12.5px] font-light text-white/40">{lastPreview(mostRecent)}</div>
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-[6px]">
