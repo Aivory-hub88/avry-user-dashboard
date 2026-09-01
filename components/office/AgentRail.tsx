@@ -152,7 +152,11 @@ export default function AgentRail({
           <ChevronRight className="h-[14px] w-[14px]" />
         </button>
         <AgentAvatar type={agentTarget} size={24} />
-        <h2 className="truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">{title}</h2>
+        {/* Not <h2> — a global `main h2` style overrides Tailwind's own
+            font-size on any heading tag, which is what made this render at
+            24px regardless of the class here. This is chrome, not a page
+            heading. */}
+        <span className="truncate text-[13px] font-medium leading-none text-white/55">{title}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto px-[14px] py-[14px]">
@@ -165,7 +169,7 @@ export default function AgentRail({
           <>
             <section className="flex flex-col gap-[8px]">
               <div className="flex items-baseline gap-[7px] px-0.5">
-                <h4 className="text-[12px] font-semibold text-white/65">Notifications</h4>
+                <span className="text-[12px] font-semibold leading-none text-white/65">Notifications</span>
                 <span className={`text-[11px] ${notifications.length > 0 ? "text-[#d9ab6e]" : "text-white/30"}`}>
                   {notifications.length}
                 </span>
@@ -249,13 +253,13 @@ export default function AgentRail({
             </section>
 
             <section className="mt-[20px] flex flex-col gap-[8px]">
-              <h4 className="px-0.5 text-[12px] font-semibold text-white/65">Running now</h4>
+              <span className="px-0.5 text-[12px] font-semibold leading-none text-white/65">Running now</span>
               <Bar tone="idle">Not running anything right now.</Bar>
             </section>
 
             {channels.length > 0 && (
               <section className="mt-[20px] flex flex-col gap-[8px]">
-                <h4 className="px-0.5 text-[12px] font-semibold text-white/65">Connected channels</h4>
+                <span className="px-0.5 text-[12px] font-semibold leading-none text-white/65">Connected channels</span>
                 {channels.map((c) => (
                   <Bar key={c.id} tone="idle">
                     <span className="flex items-center gap-[7px]">

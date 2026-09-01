@@ -230,7 +230,10 @@ export default function AgentColumn({
   return (
     <div className="flex h-full w-full flex-col border-r border-white/[0.045] bg-[#353531]">
       <div className="flex items-center justify-between gap-2 px-4 pt-5 pb-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">Your Agents</h2>
+        {/* Not <h2> — a global `main h2` style overrides Tailwind's own
+            font-size on any heading tag, forcing this to 24px regardless of
+            the class here. This is chrome, not a page heading. */}
+        <span className="text-[13px] font-medium leading-none text-white/50">Your agents</span>
         <button
           onClick={onToggleCollapse}
           aria-label="Collapse agent column"
@@ -243,12 +246,14 @@ export default function AgentColumn({
       <div className="px-4 pb-2">
         <button
           onClick={onOpenMissionControl}
-          className={`flex w-full items-center gap-[9px] rounded-[10px] px-[9px] py-[8px] text-left transition-colors ${
-            missionControlActive ? "bg-[#414039]" : "hover:bg-white/[0.04]"
+          className={`flex w-full items-center gap-[9px] rounded-full px-[13px] py-[8px] text-left transition-colors ${
+            missionControlActive ? "bg-[#414039]" : "bg-white/[0.045] hover:bg-white/[0.08]"
           }`}
         >
-          <LayoutGrid className={`h-[16px] w-[16px] shrink-0 ${missionControlActive ? "text-white" : "text-white/45"}`} />
-          <span className={`text-[13.5px] ${missionControlActive ? "font-medium text-white" : "font-normal text-white/70"}`}>
+          <LayoutGrid className={`h-[15px] w-[15px] shrink-0 ${missionControlActive ? "text-white" : "text-white/45"}`} />
+          <span
+            className={`text-[13px] leading-none ${missionControlActive ? "font-medium text-white" : "font-normal text-white/70"}`}
+          >
             Mission Control
           </span>
         </button>

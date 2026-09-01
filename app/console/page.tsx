@@ -314,7 +314,9 @@ export default function ConsolePage() {
     <div className="flex flex-col h-full bg-[#353531]">
       {showMissionControl ? (
         <div className="flex items-center border-b border-white/[0.045] px-6 py-[15px]">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">Mission Control</h2>
+          {/* Not <h2> — a global `main h2` style overrides Tailwind's own
+              font-size on any heading tag here. */}
+          <span className="text-[13px] font-medium leading-none text-white/55">Mission Control</span>
         </div>
       ) : (
         <ConsoleTopBar onNewChat={handleNewChat} />
