@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
-import { ChevronRight, ChevronLeft, Lock, Plus, Trash2 } from "lucide-react"
+import { ChevronRight, ChevronLeft, Lock, Plus, Trash2, LayoutGrid } from "lucide-react"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
 import type { ChatSession } from "@/hooks/useChat"
@@ -32,6 +32,14 @@ interface AgentColumnProps {
   switchSession: (sessionId: string) => void
   handleNewChat: () => void
   deleteThread: (sessionId: string) => void
+  /** Whether Mission Control (the cross-agent overview) is the active view. */
+  missionControlActive?: boolean
+  onOpenMissionControl?: () => void
+  /** Called whenever an agent/thread is opened from this column — lets the
+   *  parent drop out of Mission Control even if the target agent/session
+   *  was already the background selection (switchSession alone no-ops in
+   *  that case, since currentSessionId hasn't actually changed). */
+  onExitMissionControl?: () => void
   /** Controlled by OfficeShell — it owns the grid track sizing, this
    *  component just renders itself accordingly. */
   collapsed?: boolean
@@ -79,6 +87,9 @@ export default function AgentColumn({
   switchSession,
   handleNewChat,
   deleteThread,
+  missionControlActive = false,
+  onOpenMissionControl,
+  onExitMissionControl,
   collapsed = false,
   onToggleCollapse,
 }: AgentColumnProps) {
@@ -127,11 +138,12 @@ export default function AgentColumn({
 
   const openAgent = (row: Row) => {
     const threads = sessionsByAgent[row.key] ?? []
-    if (row.type === agentTarget) {
+    if (row.type === agentTarget && !missionControlActive) {
       setExpanded((e) => (e === row.key ? "" : row.key))
       return
     }
     setExpanded(row.key)
+    onExitMissionControl?.()
     if (threads.length > 0) {
       switchSession(threads[0].id)
     } else {
@@ -143,6 +155,7 @@ export default function AgentColumn({
   const startThread = (row: Row, e: React.MouseEvent) => {
     e.stopPropagation()
     setExpanded(row.key)
+    onExitMissionControl?.()
     handleNewChat()
     setAgentTarget(row.type)
   }
@@ -164,9 +177,19 @@ export default function AgentColumn({
         >
           <ChevronRight className="h-[14px] w-[14px]" />
         </button>
+        <button
+          onClick={onOpenMissionControl}
+          title="Mission Control"
+          aria-label="Mission Control"
+          className={`mb-3 grid h-9 w-9 shrink-0 place-items-center rounded-full transition-[box-shadow] ${
+            missionControlActive ? "bg-white/[0.08] ring-2 ring-white/25" : "text-white/40 hover:bg-white/[0.06] hover:text-white"
+          }`}
+        >
+          <LayoutGrid className="h-[16px] w-[16px]" />
+        </button>
         <div className="flex flex-1 flex-col items-center gap-[6px] overflow-y-auto pb-4">
           {ROWS.map((row) => {
-            const isActiveAgent = row.type === agentTarget
+            const isActiveAgent = !missionControlActive && row.type === agentTarget
             const pending = approvalsByAgent[row.key]?.length ?? 0
             return (
               <button
@@ -214,6 +237,19 @@ export default function AgentColumn({
           <ChevronLeft className="h-[13px] w-[13px]" />
         </button>
       </div>
+      <div className="px-4 pb-2">
+        <button
+          onClick={onOpenMissionControl}
+          className={`flex w-full items-center gap-[9px] rounded-[10px] px-[9px] py-[8px] text-left transition-colors ${
+            missionControlActive ? "bg-[#414039]" : "hover:bg-white/[0.04]"
+          }`}
+        >
+          <LayoutGrid className={`h-[16px] w-[16px] shrink-0 ${missionControlActive ? "text-white" : "text-white/45"}`} />
+          <span className={`text-[13.5px] ${missionControlActive ? "font-medium text-white" : "font-normal text-white/70"}`}>
+            Mission Control
+          </span>
+        </button>
+      </div>
       <div className="px-4 pb-3">
         <input
           value={query}
@@ -228,7 +264,7 @@ export default function AgentColumn({
           const threads = sessionsByAgent[row.key] ?? []
           if (!matchesQuery(row, threads)) return null
           const isOpen = expanded === row.key
-          const isActiveAgent = row.type === agentTarget
+          const isActiveAgent = !missionControlActive && row.type === agentTarget
           const channels = channelsFor(row.type)
           const pending = approvalsByAgent[row.key]?.length ?? 0
           const mostRecent = threads[0]
@@ -299,7 +335,7 @@ export default function AgentColumn({
                     <span className="px-[10px] py-1 text-[12px] font-light text-white/25">No threads yet</span>
                   ) : (
                     threads.map((t) => {
-                      const active = t.id === currentSessionId
+                      const active = !missionControlActive && t.id === currentSessionId
                       return (
                         <div
                           key={t.id}
@@ -308,7 +344,10 @@ export default function AgentColumn({
                           }`}
                         >
                           <button
-                            onClick={() => switchSession(t.id)}
+                            onClick={() => {
+                              onExitMissionControl?.()
+                              switchSession(t.id)
+                            }}
                             className="min-w-0 flex-1 py-[5px] pl-[10px] text-left"
                           >
                             <span

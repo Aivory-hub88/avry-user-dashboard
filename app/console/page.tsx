@@ -28,6 +28,7 @@ import OfficeShell from "@/components/office/OfficeShell"
 import AgentColumn from "@/components/office/AgentColumn"
 import AgentRail from "@/components/office/AgentRail"
 import AgentDeployNotice from "@/components/office/AgentDeployNotice"
+import MissionControl from "@/components/office/MissionControl"
 
 interface Toast { id: string; type: "success" | "error"; message: string }
 
@@ -87,6 +88,10 @@ export default function ConsolePage() {
   const { agentTarget, setAgentTarget } = useMode()
 
   // UI-only state
+  // Starts false so a reload keeps landing you back in your last thread
+  // (Phase 1's exit gate) — Mission Control is one click away, not the
+  // thing that overrides that guarantee.
+  const [showMissionControl, setShowMissionControl] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [activeChip, setActiveChip] = useState<string | null>(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
@@ -248,6 +253,23 @@ export default function ConsolePage() {
 
   const activeChipData = CHIPS.find((chip) => chip.id === activeChip)
 
+  // Same "open this agent's most recent thread, or start one" logic
+  // AgentColumn's own rows already run — duplicated here rather than
+  // threaded through as a shared prop, same independence the column/rail
+  // already keep from each other (see AgentRail's own copy of channel
+  // filtering, for instance).
+  const openAgentFromMissionControl = (type: string | null) => {
+    setShowMissionControl(false)
+    const key = type ?? "null"
+    const threads = sessionsByAgent[key] ?? []
+    if (threads.length > 0) {
+      switchSession(threads[0].id)
+    } else {
+      handleNewChat()
+      setAgentTarget(type)
+    }
+  }
+
   return (
     <OfficeShell
       agentColumn={
@@ -263,6 +285,9 @@ export default function ConsolePage() {
           switchSession={switchSession}
           deleteThread={deleteThread}
           handleNewChat={handleNewChat}
+          missionControlActive={showMissionControl}
+          onOpenMissionControl={() => setShowMissionControl(true)}
+          onExitMissionControl={() => setShowMissionControl(false)}
         />
       }
       rail={
@@ -277,12 +302,26 @@ export default function ConsolePage() {
       }
     >
     <div className="flex flex-col h-full bg-[#353531]">
-      <ConsoleTopBar onNewChat={handleNewChat} />
+      {showMissionControl ? (
+        <div className="flex items-center border-b border-white/[0.045] px-6 py-[15px]">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">Mission Control</h2>
+        </div>
+      ) : (
+        <ConsoleTopBar onNewChat={handleNewChat} />
+      )}
 
-      {showDeployNotice && <AgentDeployNotice agentName={activeAgentName} />}
+      {!showMissionControl && showDeployNotice && <AgentDeployNotice agentName={activeAgentName} />}
 
       <div className="flex-1 flex flex-col overflow-hidden h-full">
-        {messages.length === 0 ? (
+        {showMissionControl ? (
+          <MissionControl
+            sessionsByAgent={sessionsByAgent}
+            approvalsByAgent={approvalsByAgent}
+            deployments={deployments}
+            streamingAgentType={streamingAgentType}
+            onOpenAgent={openAgentFromMissionControl}
+          />
+        ) : messages.length === 0 ? (
           <div className="flex min-h-full items-start justify-center px-6 pt-[12vh]">
             <div className="flex w-full max-w-[800px] flex-col items-center">
               <div
