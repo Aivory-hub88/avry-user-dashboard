@@ -2,6 +2,7 @@
 import { asset } from "@/lib/asset";
 
 import { useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { useState, useRef, useEffect, useCallback } from "react"
 import Image from "next/image"
 import ChatMessage from "@/components/ChatMessage"
@@ -33,14 +34,14 @@ import MissionControl from "@/components/office/MissionControl"
 interface Toast { id: string; type: "success" | "error"; message: string }
 
 interface ChipOption {
-  text: string
+  textKey: string
   action: "assist" | "redirect"
   tab?: string
 }
 
 interface ChipData {
   id: string
-  label: string
+  labelKey: string
   options: ChipOption[]
 }
 
@@ -50,9 +51,9 @@ const CHIPS: ChipData[] = [
     // sends users with no diagnostic/blueprint purchase to Activate Features
     // instead of an empty deep-diagnostic page.
     id: "deep-diagnostic",
-    label: "Deep Diagnostic",
+    labelKey: "chipDeepDiagnostic",
     options: [
-      { text: "Direct me to deep diagnostic tab", action: "redirect", tab: "/diagnostics/deep" },
+      { textKey: "chipOptionDeepDiagnostic", action: "redirect", tab: "/diagnostics/deep" },
     ],
   },
   // No "Blueprint" chip and no "Blueprint Mode" button: neither had anywhere
@@ -61,9 +62,9 @@ const CHIPS: ChipData[] = [
   // right below the input already opens the same Connectors popup.
   {
     id: "workflow",
-    label: "Workflow",
+    labelKey: "chipWorkflow",
     options: [
-      { text: "Direct me to workflow tab", action: "redirect", tab: "/workflows" },
+      { textKey: "chipOptionWorkflow", action: "redirect", tab: "/workflows" },
     ],
   },
   {
@@ -73,9 +74,9 @@ const CHIPS: ChipData[] = [
     // to the Agents page for deployment status, tools, and activity, none
     // of which the console itself surfaces.
     id: "agents",
-    label: "Agents",
+    labelKey: "chipAgents",
     options: [
-      { text: "Direct me to agents tab", action: "redirect", tab: "/agents" },
+      { textKey: "chipOptionAgents", action: "redirect", tab: "/agents" },
     ],
   },
 ]
@@ -83,6 +84,7 @@ const CHIPS: ChipData[] = [
 const MAX_VISIBLE_INTEGRATIONS = 4
 
 export default function ConsolePage() {
+  const t = useTranslations('console')
   const router = useRouter()
   const { openSettingsModal } = useSettingsModal()
   const { agentTarget, setAgentTarget } = useMode()
@@ -231,7 +233,7 @@ export default function ConsolePage() {
 
   const handleChipOption = (option: ChipOption) => {
     if (option.action === "assist") {
-      setInputValue(option.text)
+      setInputValue(t(option.textKey))
       requestAnimationFrame(() => {
         if (textareaRef.current) {
           textareaRef.current.style.height = "auto"
@@ -316,7 +318,7 @@ export default function ConsolePage() {
         <div className="flex items-center border-b border-white/[0.045] px-6 py-[15px]">
           {/* Not <h2> — a global `main h2` style overrides Tailwind's own
               font-size on any heading tag here. */}
-          <span className="text-[13px] font-medium leading-none text-white/55">Mission Control</span>
+          <span className="text-[13px] font-medium leading-none text-white/55">{t('missionControl')}</span>
         </div>
       ) : (
         <ConsoleTopBar onNewChat={handleNewChat} />
@@ -359,7 +361,7 @@ export default function ConsolePage() {
                     margin: 0,
                   }}
                 >
-                  what can i do for you?
+                  {t('welcomeHeading')}
                 </h1>
               </div>
 
@@ -368,7 +370,7 @@ export default function ConsolePage() {
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
                   </svg>
-                  Attach Context
+                  {t('attachContext')}
                 </button>
 
                 <button
@@ -380,7 +382,7 @@ export default function ConsolePage() {
                     <polyline points="17 8 12 3 7 8"/>
                     <line x1="12" y1="3" x2="12" y2="15"/>
                   </svg>
-                  Upload File
+                  {t('uploadFile')}
                 </button>
               </div>
 
@@ -418,7 +420,7 @@ export default function ConsolePage() {
                         }
                       }
                     }}
-                    placeholder="Send Message to Aivory..."
+                    placeholder={t('sendPlaceholder')}
                     className="console-textarea w-full"
                     disabled={isStreaming}
                   />
@@ -427,7 +429,7 @@ export default function ConsolePage() {
                   <div className="flex items-center gap-[6px]">
                     <button
                       className="console-icon-btn"
-                      title="Upload file"
+                      title={t('uploadFileTitle')}
                       onClick={() => setUploadMenuOpen(o => !o)}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -444,7 +446,7 @@ export default function ConsolePage() {
                       }
                     }}
                     className="console-send-btn"
-                    aria-label="Send"
+                    aria-label={t('send')}
                     disabled={isStreaming}
                   >
                     ↑
@@ -458,7 +460,7 @@ export default function ConsolePage() {
                     className="flex items-center gap-[7px] text-[12.5px]"
                     style={{ color: "rgba(255,255,255,0.28)" }}
                   >
-                    <span>connect your tools to</span>
+                    <span>{t('connectToolsTo')}</span>
                     <Image 
                       src={asset("/Aivory_logo_2026.svg")} 
                       alt="Aivory" 
@@ -513,7 +515,7 @@ export default function ConsolePage() {
                     onClick={(e) => openChip(chip, e.currentTarget)}
                     className={`console-chip ${activeChip === chip.id ? "console-chip--active" : ""}`}
                   >
-                    {chip.label}
+                    {t(chip.labelKey)}
                   </button>
                 ))}
                 {activeChipData && (
@@ -528,7 +530,7 @@ export default function ConsolePage() {
                   >
                     <div className="flex items-center justify-between border-b border-white/10 px-4 py-[13px]">
                       <div className="text-[13.5px] font-medium text-white/90">
-                        {activeChipData.label}
+                        {t(activeChipData.labelKey)}
                       </div>
                       <button
                         onClick={() => setActiveChip(null)}
@@ -543,7 +545,7 @@ export default function ConsolePage() {
                         onClick={() => handleChipOption(option)}
                         className={`console-dropdown-item ${index > 0 ? "border-t border-white/10" : ""}`}
                       >
-                        {option.text}
+                        {t(option.textKey)}
                       </button>
                     ))}
                   </div>
@@ -645,7 +647,7 @@ export default function ConsolePage() {
       {isDragging && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none">
           <div className="px-6 py-4 border-2 border-dashed border-emerald-400 rounded-2xl text-emerald-300 text-lg">
-            Drop files to attach
+            {t('dropFilesToAttach')}
           </div>
         </div>
       )}
@@ -667,11 +669,9 @@ export default function ConsolePage() {
               ✕
             </button>
 
-            {/* Not <h2>/<p> — global `main h2`/`main p` styles override
-                font-size/color/margin on any heading or paragraph tag here. */}
-            <div className="mb-2 text-2xl font-semibold leading-tight text-white/95">Connectors</div>
+            <div className="mb-2 text-2xl font-semibold leading-tight text-white/95">{t('connectorsTitle')}</div>
             <div className="mb-6 text-sm text-white/50">
-              Connect your tools and services to Aivory Agent
+              {t('connectorsSubtitle')}
             </div>
 
             <div className="grid grid-cols-3 gap-3 max-h-[420px] overflow-y-auto pr-2">
@@ -724,7 +724,7 @@ export default function ConsolePage() {
                 }}
                 className="rounded-[20px] bg-[#353532] px-5 py-2.5 text-sm font-medium text-[#f7f7f7] border border-[#666864] transition hover:bg-[#444440]"
               >
-                Manage Integrations
+                {t('manageIntegrations')}
               </button>
             </div>
           </div>
