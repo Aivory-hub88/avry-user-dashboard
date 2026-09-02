@@ -199,7 +199,7 @@ export default function AgentRail({
 
               {approvalsError && (
                 <NotificationCard
-                  tone="warn"
+                  tone="error"
                   icon={<IoWarning className="h-[15px] w-[15px]" />}
                   title="Could not load approvals"
                   subtitle="Tap to try again."
@@ -207,7 +207,7 @@ export default function AgentRail({
                 />
               )}
               {resolveError && (
-                <NotificationCard tone="warn" icon={<IoWarning className="h-[15px] w-[15px]" />} title={resolveError} />
+                <NotificationCard tone="error" icon={<IoWarning className="h-[15px] w-[15px]" />} title={resolveError} />
               )}
               {notDeployed && (
                 <NotificationCard
@@ -218,7 +218,7 @@ export default function AgentRail({
                   actions={
                     <Link
                       href="/agents"
-                      className="text-[12px] font-medium text-[#e8c088] underline underline-offset-2 transition-colors hover:text-[#f0cd9c]"
+                      className="text-[12px] font-medium text-[#FFB454] underline underline-offset-2 transition-colors hover:text-[#ffc57a]"
                     >
                       Deploy this agent
                     </Link>

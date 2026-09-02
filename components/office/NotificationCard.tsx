@@ -48,22 +48,30 @@ interface NotificationCardProps {
   title: ReactNode
   subtitle?: ReactNode
   meta?: string
-  /** `warn` = amber glyph (status issues, approvals — the same amber
-   *  already used for "Needs approval"/warning language in this file).
-   *  `info` = neutral glyph (a missed reply — informational, not urgent). */
-  tone?: "info" | "warn"
+  /** Matches Apple's own semantic split, not one catch-all "attention"
+   *  color: `error` = something actually failed (a fetch, a decision) —
+   *  system red. `warn` = needs a decision or setup, nothing is broken —
+   *  system orange. `info` = purely informational — system blue. Values
+   *  are Apple's real dark-mode system colors (systemRed/systemOrange/
+   *  systemBlue, community-measured — Apple publishes these as adaptive
+   *  tokens, not hex), not this app's own amber accent, which read as a
+   *  muddy, context-free "everything is the same beige" treatment. */
+  tone?: "info" | "warn" | "error"
   badge?: string
   actions?: ReactNode
   onClick?: () => void
 }
 
-// Explicit amber, not `bg-accent` — `accent` is this app's sage-green
-// brand color (see styles/globals.css), a different identity from the
-// amber already used for "Needs approval"/warning language throughout
-// this file. #e8c088 is that same amber, used verbatim.
-const ICON_TONE_CLASS: Record<"info" | "warn", string> = {
-  warn: "text-[#e8c088]",
-  info: "text-white/45",
+const ICON_TONE_CLASS: Record<"info" | "warn" | "error", string> = {
+  error: "text-[#FF453A]",
+  warn: "text-[#FF9F0A]",
+  info: "text-[#0A84FF]",
+}
+
+const BADGE_TONE_CLASS: Record<"info" | "warn" | "error", string> = {
+  error: "bg-[rgba(255,69,58,0.16)] text-[#FF6961]",
+  warn: "bg-[rgba(255,159,10,0.16)] text-[#FFB454]",
+  info: "bg-[rgba(10,132,255,0.16)] text-[#5AA9FF]",
 }
 
 export function NotificationCard({ icon, title, subtitle, meta, tone = "info", badge, actions, onClick }: NotificationCardProps) {
@@ -75,7 +83,7 @@ export function NotificationCard({ icon, title, subtitle, meta, tone = "info", b
         <div className={`mt-[1px] grid h-[18px] w-[18px] shrink-0 place-items-center ${iconToneClass}`}>{icon}</div>
         <div className="min-w-0 flex-1">
           {badge && (
-            <span className="mb-1 inline-block rounded-full bg-[rgba(217,171,110,0.16)] px-2 py-[2px] text-[9.5px] font-semibold uppercase tracking-wider text-[#e8c088]">
+            <span className={`mb-1 inline-block rounded-full px-2 py-[2px] text-[9.5px] font-semibold uppercase tracking-wider ${BADGE_TONE_CLASS[tone]}`}>
               {badge}
             </span>
           )}
