@@ -2,6 +2,7 @@
 import { asset } from "@/lib/asset";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import { TelegramAgentType } from '@/lib/telegramDeploy';
 import { buildSlackOpenUrl } from '@/lib/slackDeploy';
@@ -56,9 +57,9 @@ const AGENT_HEADER_IMAGES = {
 const AGENTS = [
   {
     agentType: 'autonomous' as TelegramAgentType,
-    title: 'Generalist Agent',
-    description: 'One agent carrying every toolkit, deployed inside your communication hubs. It triages, responds, and updates your CRM 24/7.',
-    tools: ['Web search', 'Leads & tickets', 'Invoices', 'Workflows', 'Integrations'],
+    titleKey: 'generalistTitle',
+    descKey: 'generalistDesc',
+    toolsKey: 'generalistTools',
     headerImage: AGENT_HEADER_IMAGES.autonomous,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
@@ -68,9 +69,9 @@ const AGENTS = [
   },
   {
     agentType: 'customer_service' as TelegramAgentType,
-    title: 'Ticket Ops Agent',
-    description: 'Triage inbound support tickets 24/7 across your channels and hand your team everything they need to resolve them fast.',
-    tools: ['Ticket triage', 'Team handoff', 'Web search', 'SLA workflows'],
+    titleKey: 'ticketOpsTitle',
+    descKey: 'ticketOpsDesc',
+    toolsKey: 'ticketOpsTools',
     headerImage: AGENT_HEADER_IMAGES.service,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
@@ -80,9 +81,9 @@ const AGENTS = [
   },
   {
     agentType: 'leads_qualifier' as TelegramAgentType,
-    title: 'Leads Qualifier Agent',
-    description: 'Filter inbound leads using the BANT framework. Qualified leads are automatically routed to sales.',
-    tools: ['BANT scoring', 'Lead capture', 'Sales routing', 'Web search'],
+    titleKey: 'leadsTitle',
+    descKey: 'leadsDesc',
+    toolsKey: 'leadsTools',
     headerImage: AGENT_HEADER_IMAGES.leads,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
@@ -92,9 +93,9 @@ const AGENTS = [
   },
   {
     agentType: 'finance_invoice_ops' as TelegramAgentType,
-    title: 'Finance & Invoice Ops Agent',
-    description: 'Automate invoice processing, anomaly detection, and multi-tier approval routing - end to end.',
-    tools: ['Invoice ledger', 'Anomaly flags', 'Approval routing', 'Calculator'],
+    titleKey: 'financeTitle',
+    descKey: 'financeDesc',
+    toolsKey: 'financeTools',
     headerImage: AGENT_HEADER_IMAGES.finance,
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
@@ -104,9 +105,9 @@ const AGENTS = [
   },
   {
     agentType: 'office_assistant' as TelegramAgentType,
-    title: 'Office Assistant',
-    description: 'Save 4 hours per week by automatically extracting action items and syncing decisions to your workspace.',
-    tools: ['Meeting summaries', 'Action items', 'Notion sync', 'Slack alerts', 'Sheets log'],
+    titleKey: 'officeTitle',
+    descKey: 'officeDesc',
+    toolsKey: 'officeTools',
     enterprise: true,
     headerImage: AGENT_HEADER_IMAGES.office,
     icon: (
@@ -118,6 +119,7 @@ const AGENTS = [
 ];
 
 function HeroBanner() {
+  const t = useTranslations('agents');
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const heroRef = useRef<HTMLDivElement>(null);
 
@@ -148,19 +150,16 @@ function HeroBanner() {
       />
       <div className="relative z-10">
         <span className="inline-block text-[10px] font-semibold text-[#dddac5]/80 uppercase tracking-[0.12em] mb-3 px-2.5 py-[3px] rounded-full bg-white/[0.06] border border-white/[0.08]">
-          Agents
+          {t('heroBadge')}
         </span>
-        {/* globals.css has an unlayered `main h2/p{...}` rule that beats any
-            Tailwind class regardless of specificity — inline style is the only
-            reliable override. */}
         <h2
           className="text-white text-balance"
           style={{ fontSize: 22, fontWeight: 300, lineHeight: 1.25, letterSpacing: '-0.2px', margin: '0 0 10px', color: '#fff' }}
         >
-          Meet your team where they already work
+          {t('heroTitle')}
         </h2>
         <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: 0, maxWidth: '36rem' }}>
-          Deploy any Aivory agent directly to your communication channels, no extra apps, no friction.
+          {t('heroSubtitle')}
         </p>
       </div>
       {/* Decorative background glows */}
@@ -171,6 +170,7 @@ function HeroBanner() {
 }
 
 function IntegrationsRow() {
+  const t = useTranslations('agents');
   return (
     <div className="flex flex-col sm:flex-row items-stretch gap-3 mb-8">
       <div className="flex items-center gap-3.5 px-4 py-3 rounded-xl bg-white/[0.025] border border-white/[0.06] shadow-sm">
@@ -184,7 +184,7 @@ function IntegrationsRow() {
         </div>
         <div className="w-px self-stretch bg-white/[0.07]" />
         <span className="text-white/50 text-[10px] uppercase tracking-wider font-medium leading-snug">
-          Available for<br className="hidden sm:block"/>all tiers
+          {t('availableAllTiers')}
         </span>
       </div>
 
@@ -197,7 +197,7 @@ function IntegrationsRow() {
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 shrink-0">
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
           </svg>
-          Enterprise plan only
+          {t('enterprisePlanOnly')}
         </span>
       </div>
     </div>
@@ -205,6 +205,7 @@ function IntegrationsRow() {
 }
 
 function DeploymentRow({ deployment, onDisconnect }: { deployment: AgentDeployment, onDisconnect: (d: AgentDeployment) => void }) {
+  const t = useTranslations('agents');
   const [busy, setBusy] = useState(false);
   return (
     <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-accent/[0.05] border border-accent/[0.12]">
@@ -222,7 +223,7 @@ function DeploymentRow({ deployment, onDisconnect }: { deployment: AgentDeployme
           target="_blank"
           rel="noopener noreferrer"
           className="text-[10.5px] text-white/65 hover:text-accent truncate flex-1 transition-colors"
-          title={`Open chat with ${deployment.label} in Slack`}
+          title={t('openInSlack', { label: deployment.label })}
         >
           {deployment.label}
         </a>
@@ -236,13 +237,13 @@ function DeploymentRow({ deployment, onDisconnect }: { deployment: AgentDeployme
           if (busy) return;
           const confirmMsg =
             deployment.kind === 'api'
-              ? `Revoke API key "${deployment.label}"? Any integration using it will stop working immediately.`
-              : `Disconnect this agent from ${deployment.kind === 'telegram' ? 'Telegram chat' : 'Slack workspace'} "${deployment.label}"?`;
+              ? t('revokeApiKeyConfirm', { label: deployment.label })
+              : t('disconnectAgentConfirm', { channel: deployment.kind === 'telegram' ? t('channelTelegram') : t('channelSlack'), label: deployment.label });
           if (!window.confirm(confirmMsg)) return;
           setBusy(true);
           try { await onDisconnect(deployment); } finally { setBusy(false); }
         }}
-        title="Disconnect deployment"
+        title={t('disconnectDeployment')}
         className="shrink-0 text-white/30 hover:text-red-400/90 transition-colors disabled:opacity-40"
         disabled={busy}
       >
@@ -259,6 +260,7 @@ function DeploymentRow({ deployment, onDisconnect }: { deployment: AgentDeployme
 }
 
 function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: typeof AGENTS[0], deployments: AgentDeployment[], onConfigure: () => void, onDisconnect: (d: AgentDeployment) => void }) {
+  const t = useTranslations('agents');
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -271,6 +273,13 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
       y: e.clientY - rect.top,
     });
   };
+
+  // Built-in agents carry translation keys; agents fetched live from the
+  // backend catalog (dynamicAgents in AgentsPage) carry plain strings —
+  // there's nothing to translate those against.
+  const title = (agent as any).titleKey ? t((agent as any).titleKey) : (agent as any).title;
+  const description = (agent as any).descKey ? t((agent as any).descKey) : (agent as any).description;
+  const tools: string[] = (agent as any).toolsKey ? (t.raw((agent as any).toolsKey) as string[]) : ((agent as any).tools || []);
 
   return (
     <div 
@@ -302,7 +311,7 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 shrink-0">
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
             </svg>
-            Enterprise
+            {t('enterpriseBadge')}
           </span>
         )}
         <div className="absolute left-4 right-4 bottom-3 z-10 flex items-center gap-2.5">
@@ -315,7 +324,7 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
             className="text-white font-semibold text-[15px] leading-snug tracking-wide drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
             style={{ fontFamily: "'Manrope', sans-serif" }}
           >
-            {agent.title}
+            {title}
           </div>
         </div>
       </div>
@@ -323,13 +332,13 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
       {/* Bottom Half: Content */}
       <div className="p-5 flex flex-col flex-1">
         <div className="text-white/70 text-[12px] leading-relaxed font-light" style={{ fontFamily: "'Manrope', sans-serif" }}>
-          {agent.description}
+          {description}
         </div>
 
         {/* Tool capability chips */}
-        {Array.isArray((agent as any).tools) && (agent as any).tools.length > 0 && (
+        {tools.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-3.5">
-            {(agent as any).tools.map((tool: string) => (
+            {tools.map((tool: string) => (
               <span
                 key={tool}
                 className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-white/[0.05] border border-white/[0.08] text-white/55 text-[10px] font-medium tracking-wide"
@@ -344,7 +353,7 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
               <span
                 key={tool}
                 className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-amber-warn/[0.06] border border-amber-warn/[0.18] text-amber-warn/85 text-[10px] font-medium tracking-wide"
-                title="Enterprise plan only"
+                title={t('enterprisePlanOnly')}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 shrink-0">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
@@ -369,7 +378,7 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
             onClick={onConfigure}
             className="flex-1 py-2 rounded-lg bg-gradient-to-b from-white/[0.09] to-white/[0.03] hover:from-accent/25 hover:to-accent/10 text-white/95 hover:text-white text-[12.5px] font-medium transition-all border border-white/10 hover:border-accent/30 shadow-[0_1px_0_rgba(255,255,255,0.08)_inset,0_4px_12px_rgba(0,0,0,0.25)] flex items-center justify-center gap-2 group/btn"
           >
-            Configure
+            {t('configure')}
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover/btn:opacity-100 group-hover/btn:translate-x-0 transition-all duration-200">
               <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
             </svg>
@@ -380,23 +389,23 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
   )
 }
 
-const ACTION_META: Record<string, { label: string; emoji: string }> = {
-  lead: { label: 'Lead saved', emoji: '🎯' },
-  ticket: { label: 'Ticket created', emoji: '🎫' },
-  escalation: { label: 'Escalated to human', emoji: '🙋' },
-  invoice: { label: 'Invoice recorded', emoji: '🧾' },
-  anomaly: { label: 'Anomaly flagged', emoji: '🚩' },
-  workflow: { label: 'Workflow triggered', emoji: '⚡' },
-  integration: { label: 'Integration action', emoji: '🔗' },
-  meeting: { label: 'Meeting summarised', emoji: '📝' },
+const ACTION_META: Record<string, { labelKey: string; emoji: string }> = {
+  lead: { labelKey: 'actionLeadSaved', emoji: '🎯' },
+  ticket: { labelKey: 'actionTicketCreated', emoji: '🎫' },
+  escalation: { labelKey: 'actionEscalated', emoji: '🙋' },
+  invoice: { labelKey: 'actionInvoiceRecorded', emoji: '🧾' },
+  anomaly: { labelKey: 'actionAnomalyFlagged', emoji: '🚩' },
+  workflow: { labelKey: 'actionWorkflowTriggered', emoji: '⚡' },
+  integration: { labelKey: 'actionIntegration', emoji: '🔗' },
+  meeting: { labelKey: 'actionMeetingSummarised', emoji: '📝' },
 };
 
-const AGENT_TITLES: Record<string, string> = {
-  autonomous: 'Generalist Agent',
-  customer_service: 'Ticket Ops Agent',
-  leads_qualifier: 'Leads Qualifier Agent',
-  finance_invoice_ops: 'Finance & Invoice Ops Agent',
-  office_assistant: 'Office Assistant',
+const AGENT_TITLE_KEYS: Record<string, string> = {
+  autonomous: 'generalistTitle',
+  customer_service: 'ticketOpsTitle',
+  leads_qualifier: 'leadsTitle',
+  finance_invoice_ops: 'financeTitle',
+  office_assistant: 'officeTitle',
 };
 
 function actionSummary(action: AgentAction): string {
@@ -440,18 +449,19 @@ function actionSummary(action: AgentAction): string {
   }
 }
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, t: ReturnType<typeof useTranslations>): string {
   const then = new Date(iso.endsWith('Z') || iso.includes('+') ? iso : `${iso}Z`).getTime();
   if (Number.isNaN(then)) return '';
   const mins = Math.max(0, Math.floor((Date.now() - then) / 60000));
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t('justNow');
+  if (mins < 60) return t('minutesAgo', { mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+  if (hours < 24) return t('hoursAgo', { hours });
+  return t('daysAgo', { days: Math.floor(hours / 24) });
 }
 
 function AgentActivity() {
+  const t = useTranslations('agents');
   const [actions, setActions] = useState<AgentAction[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -466,35 +476,38 @@ function AgentActivity() {
   return (
     <div className="mt-10">
       <div className="flex items-center gap-2.5 mb-4">
-        <h3 style={{ fontSize: 16, fontWeight: 400, color: '#fff', margin: 0 }}>Agent Activity</h3>
-        <span className="text-white/35 text-[11px]">actions your deployed agents took</span>
+        <h3 style={{ fontSize: 16, fontWeight: 400, color: '#fff', margin: 0 }}>{t('agentActivityTitle')}</h3>
+        <span className="text-white/35 text-[11px]">{t('agentActivitySubtitle')}</span>
       </div>
 
       <div className="rounded-xl bg-white/[0.025] border border-white/[0.06] divide-y divide-white/[0.05]">
         {actions === null ? (
-          <div className="px-5 py-6 text-white/40 text-[12px]">Loading activity…</div>
+          <div className="px-5 py-6 text-white/40 text-[12px]">{t('loadingActivity')}</div>
         ) : actions.length === 0 ? (
           <div className="px-5 py-6 text-white/40 text-[12px]">
-            No activity yet. Once a deployed agent saves a lead, opens a ticket, records an invoice, or runs a workflow, it will show up here.
+            {t('noActivity')}
           </div>
         ) : (
           actions.map((a) => {
-            const meta = ACTION_META[a.action_type] || { label: a.action_type, emoji: '•' };
+            const meta = ACTION_META[a.action_type];
+            const label = meta ? t(meta.labelKey) : a.action_type;
+            const emoji = meta?.emoji || '•';
             const summary = actionSummary(a);
+            const agentTitleKey = AGENT_TITLE_KEYS[a.agent_type];
             return (
               <div key={a.action_id} className="flex items-center gap-3.5 px-5 py-3">
-                <span className="text-[15px] leading-none shrink-0">{meta.emoji}</span>
+                <span className="text-[15px] leading-none shrink-0">{emoji}</span>
                 <div className="min-w-0 flex-1">
                   <div className="text-white/85 text-[12.5px] font-medium truncate">
-                    {meta.label}
+                    {label}
                     {summary && <span className="text-white/55 font-normal"> — {summary}</span>}
                   </div>
                   <div className="text-white/35 text-[11px] mt-0.5">
-                    {AGENT_TITLES[a.agent_type] || a.agent_type}
-                    {a.channel ? ` · via ${a.channel}` : ''}
+                    {agentTitleKey ? t(agentTitleKey) : a.agent_type}
+                    {a.channel ? t('viaChannel', { channel: a.channel }) : ''}
                   </div>
                 </div>
-                <span className="text-white/30 text-[11px] shrink-0">{timeAgo(a.created_at)}</span>
+                <span className="text-white/30 text-[11px] shrink-0">{timeAgo(a.created_at, t)}</span>
               </div>
             );
           })
@@ -505,6 +518,7 @@ function AgentActivity() {
 }
 
 function CreditsPill() {
+  const t = useTranslations('agents');
   const [credits, setCredits] = useState<CreditStatus | null>(null);
   useEffect(() => {
     getCredits().then(setCredits).catch(() => {});
@@ -515,7 +529,7 @@ function CreditsPill() {
     : false;
   return (
     <span
-      title="AI message credits for your deployed agents this month"
+      title={t('creditsTooltip')}
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium ${
         low
           ? 'bg-amber-warn/[0.08] border-amber-warn/25 text-amber-warn/90'
@@ -526,13 +540,14 @@ function CreditsPill() {
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
       </svg>
       {credits.unlimited
-        ? 'Credits: unlimited'
-        : `Credits: ${credits.balance ?? 0} / ${credits.allowance ?? 0}`}
+        ? t('creditsUnlimited')
+        : t('creditsBalance', { balance: credits.balance ?? 0, allowance: credits.allowance ?? 0 })}
     </span>
   );
 }
 
 export default function AgentsPage() {
+  const t = useTranslations('agents');
   const [customizingAgent, setCustomizingAgent] = useState<{ title: string, agentType: TelegramAgentType } | null>(null);
   const [dynamicAgents, setDynamicAgents] = useState<any[]>([]);
   const [deployments, setDeployments] = useState<AgentDeployment[]>([]);
@@ -586,7 +601,7 @@ export default function AgentsPage() {
         {/* Header Title */}
         <div className="flex items-center justify-between mb-6">
           <div className="text-[13px] font-light text-[#a1a1aa] flex items-center gap-2">
-            <span className="text-white">Agent</span>
+            <span className="text-white">{t('breadcrumb')}</span>
           </div>
           <CreditsPill />
         </div>
@@ -604,7 +619,7 @@ export default function AgentsPage() {
               key={idx}
               agent={agent}
               deployments={deployments.filter((d) => d.agentType === (agent as any).agentType)}
-              onConfigure={() => setCustomizingAgent({ title: agent.title, agentType: (agent as any).agentType })}
+              onConfigure={() => setCustomizingAgent({ title: (agent as any).titleKey ? t((agent as any).titleKey) : (agent as any).title, agentType: (agent as any).agentType })}
               onDisconnect={handleDisconnect}
             />
           ))}
