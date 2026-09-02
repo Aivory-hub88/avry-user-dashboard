@@ -312,7 +312,16 @@
     "roadmapCtaEyebrow": "Next Step",
     "roadmapCtaTitle": "Transformation Roadmap",
     "roadmapCtaDesc": "Turn this blueprint into a phased, milestone-driven execution plan — sequenced waves, owners, and KPI targets your team can track from kickoff to ROI.",
-    "roadmapProgressEstimate": "estimated ~1 min"
+    "roadmapProgressEstimate": "estimated ~1 min",
+    "heroScoreSentence": "Your company scores {score}/100 at {maturity} maturity.",
+    "goalRationale": "Based on your {maturity} maturity level with a score of {score}/100, this goal is achievable within the proposed timeline.",
+    "actionReviewLabel": "Review this Blueprint with leadership and confirm Wave 1 scope",
+    "actionReviewOwner": "Leadership + AI Champion",
+    "actionBuildDeployLabel": "Build & deploy: {name}",
+    "actionBuildDeployOwner": "AI Champion + Operations",
+    "actionMitigationOwner": "Operations Lead",
+    "actionWithinDays": "Within {count} days",
+    "actionWithinWeeks": "Within {count} weeks"
   },
   "diagnostics": {
     "title": "Diagnostics",

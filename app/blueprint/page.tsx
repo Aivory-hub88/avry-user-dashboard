@@ -444,7 +444,13 @@ function stripMarkdown(text: string, maxLength = 280): string {
 }
 
 // ── Map VPS Bridge response → BLUEPRINT_INSIGHTS structure ───────────────────
-function mapBlueprintToInsights(bp: any) {
+// `t` is this component's own `useTranslations("blueprint")` — these are the
+// only hardcoded-English strings left after the LLM prompt itself was fixed
+// (2026-09-02) to stop losing its LANGUAGE instruction to the chat-persona
+// system message's "match the user's language" rule: the LLM's own fields
+// are correctly localized now, but these three sentences wrap around them
+// client-side and were never locale-aware in the first place.
+function mapBlueprintToInsights(bp: any, t: (key: string, values?: Record<string, unknown>) => string) {
   if (!bp) return BLUEPRINT_INSIGHTS
   const score = coerceScore(bp.diagnostic_summary?.ai_readiness_score, BLUEPRINT_INSIGHTS.score)
   const maturity = coerceToString(bp.diagnostic_summary?.maturity_level, BLUEPRINT_INSIGHTS.maturity)
@@ -456,7 +462,7 @@ function mapBlueprintToInsights(bp: any) {
     score,
     maturity,
     heroDescription: stripMarkdown(
-      `Your company scores ${score}/100 at ${maturity} maturity. ${coerceToString(strategic.primary_goal) || coerceToString(strategic)}`,
+      `${t("heroScoreSentence", { score, maturity })} ${coerceToString(strategic.primary_goal) || coerceToString(strategic)}`,
       400
     ),
     levers: [
@@ -467,7 +473,7 @@ function mapBlueprintToInsights(bp: any) {
     ],
     strategicObjective: {
       goal: stripMarkdown(coerceToString(strategic.primary_goal) || coerceToString(strategic), 240) || BLUEPRINT_INSIGHTS.strategicObjective.goal,
-      rationale: `Based on your ${maturity} maturity level with a score of ${score}/100, this goal is achievable within the proposed timeline.`,
+      rationale: t("goalRationale", { maturity, score }),
     },
     metrics: (Array.isArray(strategic.kpi_targets) ? strategic.kpi_targets : []).map((k: any) => ({
       metric: coerceToString(k?.metric, 'Metric'),
@@ -478,7 +484,7 @@ function mapBlueprintToInsights(bp: any) {
       impact: coerceToString(k?.expected_impact ?? k?.impact, '—'),
     })).concat(BLUEPRINT_INSIGHTS.metrics.slice((Array.isArray(strategic.kpi_targets) ? strategic.kpi_targets : []).length)),
     currentState: {
-      summary: `Your company is at ${maturity} maturity with an operational health score of ${score}/100.`,
+      summary: t("heroScoreSentence", { score, maturity }),
       highlights: [
         ...coerceList(bp.diagnostic_summary?.primary_constraints),
         ...coerceList(risk.data_risks).slice(0, 2),
@@ -517,34 +523,36 @@ function mapBlueprintToInsights(bp: any) {
         actions: coerceList(risk.mitigation_strategies).slice(0, 2),
       })),
     ].slice(0, 3),
-    // Derive the 30–90 day checklist from the blueprint itself (wave 1
-    // workflows + top mitigation) instead of static sample actions that
-    // referenced systems the client may not even use (SAP, etc.).
+    // Derive the 30–90 day checklist from the blueprint itself (workflow
+    // names actually in it + top mitigation) instead of static sample
+    // actions that referenced systems the client may not even use (SAP,
+    // etc.) — and read every wave in order, not just wave 1, since a wave 1
+    // that's pure documentation/data-quality work with zero workflows
+    // attached is a normal, common shape (not a sign the blueprint "gave us
+    // nothing"): the first real automation names usually land in wave 2+.
     actions: (() => {
       const wfModules = Array.isArray(bp.workflow_modules) ? bp.workflow_modules : []
-      const wave1 = Array.isArray(bp.deployment_plan?.waves) ? bp.deployment_plan.waves[0] : null
-      const wave1Names = coerceList(wave1?.included_workflows).map((wf: string) => {
-        const byId = wfModules.find((m: any) => m?.workflow_id === wf)
-        return byId?.name || wf
-      })
+      const waves = Array.isArray(bp.deployment_plan?.waves) ? bp.deployment_plan.waves : []
+      const workflowNames = waves
+        .flatMap((w: any) => coerceList(w?.included_workflows))
+        .map((wf: string) => wfModules.find((m: any) => m?.workflow_id === wf)?.name || wf)
       const derived: { label: string; owner: string; deadline: string }[] = [
         {
-          label: 'Review this Blueprint with leadership and confirm Wave 1 scope',
-          owner: 'Leadership + AI Champion',
-          deadline: 'Within 2 weeks',
+          label: t("actionReviewLabel"),
+          owner: t("actionReviewOwner"),
+          deadline: t("actionWithinWeeks", { count: 2 }),
         },
-        ...wave1Names.slice(0, 3).map((name: string, i: number) => ({
-          label: `Build & deploy: ${name}`,
-          owner: 'AI Champion + Operations',
-          deadline: i === 0 ? 'Within 30 days' : 'Within 60 days',
+        ...workflowNames.slice(0, 3).map((name: string, i: number) => ({
+          label: t("actionBuildDeployLabel", { name }),
+          owner: t("actionBuildDeployOwner"),
+          deadline: i === 0 ? t("actionWithinDays", { count: 30 }) : t("actionWithinDays", { count: 60 }),
         })),
       ]
       const mitigation = coerceList(risk.mitigation_strategies)[0]
       if (mitigation) {
-        derived.push({ label: mitigation, owner: 'Operations Lead', deadline: 'Within 90 days' })
+        derived.push({ label: mitigation, owner: t("actionMitigationOwner"), deadline: t("actionWithinDays", { count: 90 }) })
       }
-      // Static sample checklist only when the blueprint gave us nothing to derive from.
-      return wave1Names.length > 0 ? derived : BLUEPRINT_INSIGHTS.actions
+      return derived
     })(),
   }
 }
@@ -584,7 +592,7 @@ function BlueprintInsightsSection({
 }: InsightsSectionProps & { blueprint?: any }) {
   const t = useTranslations("blueprint")
   const tCommon = useTranslations("common")
-  const s = mapBlueprintToInsights(blueprint)
+  const s = mapBlueprintToInsights(blueprint, t)
 
   // Diagnostic context — the same source of truth the final-result page uses
   // for its Training/SDK sections. Loaded post-mount (client-only) so SSR and

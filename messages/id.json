@@ -312,7 +312,16 @@
     "roadmapCtaEyebrow": "Langkah Berikutnya",
     "roadmapCtaTitle": "Roadmap Transformasi",
     "roadmapCtaDesc": "Ubah blueprint ini menjadi rencana eksekusi bertahap — gelombang terurut, penanggung jawab, dan target KPI yang bisa dipantau tim Anda dari kickoff hingga ROI.",
-    "roadmapProgressEstimate": "estimasi ~1 mnt"
+    "roadmapProgressEstimate": "estimasi ~1 mnt",
+    "heroScoreSentence": "Perusahaan Anda memperoleh skor {score}/100 pada tingkat maturitas {maturity}.",
+    "goalRationale": "Berdasarkan tingkat maturitas {maturity} dengan skor {score}/100, tujuan ini dapat dicapai dalam rentang waktu yang direncanakan.",
+    "actionReviewLabel": "Tinjau Cetak Biru ini bersama pimpinan dan konfirmasi cakupan Gelombang 1",
+    "actionReviewOwner": "Pimpinan + AI Champion",
+    "actionBuildDeployLabel": "Bangun & terapkan: {name}",
+    "actionBuildDeployOwner": "AI Champion + Operasional",
+    "actionMitigationOwner": "Kepala Operasional",
+    "actionWithinDays": "Dalam {count} hari",
+    "actionWithinWeeks": "Dalam {count} minggu"
   },
   "diagnostics": {
     "title": "Diagnostik",
