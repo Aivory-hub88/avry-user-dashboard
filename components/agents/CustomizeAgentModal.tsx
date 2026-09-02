@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import QRCode from 'react-qr-code';
+import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AgentProfile,
@@ -27,6 +28,7 @@ import {
   listTenantMcpServers,
   registerTenantMcpServer,
   reverifyTenantMcpServer,
+  updateDisabledTools,
 } from '@/lib/tenantMcpServers';
 import {
   createDeployLink,
@@ -196,6 +198,7 @@ function MultiSelect({
   onChange: (values: string[]) => void;
   max?: number;
 }) {
+  const t = useTranslations('customizeAgent');
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -223,7 +226,7 @@ function MultiSelect({
       <div className="flex items-baseline justify-between mb-1.5">
         <label className="text-white/70 text-[12px] font-medium">{label}</label>
         <span className={`text-[10px] ${atMax ? 'text-amber-warn/80' : 'text-white/25'}`}>
-          {selected.length > 0 ? `${selected.length}${max ? `/${max}` : ''} selected` : max ? `up to ${max}` : ''}
+          {selected.length > 0 ? (max ? t('selectedCountMax', { count: selected.length, max }) : t('selectedCount', { count: selected.length })) : max ? t('upToMax', { max }) : ''}
         </span>
       </div>
       <button
@@ -247,7 +250,7 @@ function MultiSelect({
                   onClick={(e) => { e.stopPropagation(); toggle(v); }}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); toggle(v); } }}
                   className="text-[#dbe5d3]/60 hover:text-white leading-none cursor-pointer"
-                  aria-label={`Remove ${v}`}
+                  aria-label={t('removeSelection', { value: v })}
                 >
                   ×
                 </span>
@@ -297,6 +300,7 @@ export default function CustomizeAgentModal({
   agentName: string | null;
   agentType: string | null;
 }) {
+  const t = useTranslations('customizeAgent');
   const [tab, setTab] = useState<'identity' | 'integrations' | 'mcp' | 'deploy'>('identity');
   const [fields, setFields] = useState<Record<FieldKey, string>>(EMPTY);
   const [hasProfile, setHasProfile] = useState(false);
@@ -331,7 +335,7 @@ export default function CustomizeAgentModal({
     if (apiKeyBusy) return;
     setApiKeyError(null);
     if (!erpnextBaseUrl.trim() || !erpnextApiKey.trim() || !erpnextApiSecret.trim()) {
-      setApiKeyError('Base URL, API Key, and API Secret are all required.');
+      setApiKeyError(t('erpnextRequired'));
       return;
     }
     setApiKeyBusy(true);
@@ -345,10 +349,10 @@ export default function CustomizeAgentModal({
       setErpNextApiKey('');
       setErpNextApiSecret('');
       setApiKeyFormOpen(false);
-      setConnectFeedback({ type: 'success', message: 'ERPNext connected.' });
+      setConnectFeedback({ type: 'success', message: t('erpnextConnected') });
       refetchConnections();
     } catch (e: unknown) {
-      setApiKeyError(e instanceof Error ? e.message : 'Could not connect ERPNext. Please try again.');
+      setApiKeyError(e instanceof Error ? e.message : t('erpnextConnectFailed'));
     } finally {
       setApiKeyBusy(false);
     }
@@ -408,7 +412,7 @@ export default function CustomizeAgentModal({
         setFields(next);
         setHasProfile(!!profile);
       })
-      .catch(() => setError('Could not load the saved identity. You can still edit and save.'))
+      .catch(() => setError(t('loadIdentityFailed')))
       .finally(() => setLoading(false));
   }, [isOpen, agentType]);
 
@@ -464,7 +468,7 @@ export default function CustomizeAgentModal({
       const key = await createAgentApiKey(agentType, apiKeyLabel.trim() || undefined);
       setCreatedKey(key);
     } catch (e: any) {
-      setDeployError(e?.message || 'Could not create the API key. Please try again.');
+      setDeployError(e?.message || t('apiKeyCreateFailed'));
     } finally {
       setDeployLoading(false);
     }
@@ -499,7 +503,7 @@ export default function CustomizeAgentModal({
         } catch { /* keep polling */ }
       }, 2500);
     } catch (e: any) {
-      setDeployError(e?.message || 'Could not start the Slack install. Please try again.');
+      setDeployError(e?.message || t('slackDeployStartFailed'));
     } finally {
       setDeployLoading(false);
     }
@@ -525,7 +529,7 @@ export default function CustomizeAgentModal({
         } catch { /* keep polling */ }
       }, 2500);
     } catch (e: any) {
-      setDeployError(e?.message || 'Could not create deploy link. Please try again.');
+      setDeployError(e?.message || t('telegramDeployStartFailed'));
     } finally {
       setDeployLoading(false);
     }
@@ -551,7 +555,7 @@ export default function CustomizeAgentModal({
         } catch { /* keep polling */ }
       }, 2500);
     } catch (e: any) {
-      setDeployError(e?.message || 'Could not create a connect code. Please try again.');
+      setDeployError(e?.message || t('discordDeployStartFailed'));
     } finally {
       setDeployLoading(false);
     }
@@ -573,7 +577,7 @@ export default function CustomizeAgentModal({
         setConnections(conns);
         setConnectableApps(apps);
       })
-      .catch(() => setConnectionsError('Could not load your connections.'))
+      .catch(() => setConnectionsError(t('loadConnectionsFailed')))
       .finally(() => {
         setConnectionsLoading(false);
         setConnectionsFetched(true);
@@ -614,7 +618,7 @@ export default function CustomizeAgentModal({
           if (connectPollRef.current) clearInterval(connectPollRef.current);
           connectPollRef.current = null;
           setConnections(conns);
-          setConnectFeedback({ type: 'success', message: `Connected ${found.appName}.` });
+          setConnectFeedback({ type: 'success', message: t('connectedSuccess', { app: found.appName }) });
           setConnectBusyId(null);
         }
       } catch {
@@ -630,13 +634,13 @@ export default function CustomizeAgentModal({
     try {
       const popup = await startOAuthConnect(app.id);
       if (!popup) {
-        setConnectFeedback({ type: 'error', message: 'Pop-up blocked — allow pop-ups for this site and try again.' });
+        setConnectFeedback({ type: 'error', message: t('popupBlocked') });
         setConnectBusyId(null);
         return;
       }
       pollForConnection(app.id);
     } catch (e) {
-      setConnectFeedback({ type: 'error', message: e instanceof Error ? e.message : `Could not connect ${app.name}.` });
+      setConnectFeedback({ type: 'error', message: e instanceof Error ? e.message : t('connectFailedGeneric', { app: app.name }) });
       setConnectBusyId(null);
     }
   };
@@ -648,28 +652,28 @@ export default function CustomizeAgentModal({
     try {
       const popup = await startOAuthConnect(conn.appId);
       if (!popup) {
-        setConnectFeedback({ type: 'error', message: 'Pop-up blocked — allow pop-ups for this site and try again.' });
+        setConnectFeedback({ type: 'error', message: t('popupBlocked') });
         setConnectBusyId(null);
         return;
       }
       pollForConnection(conn.appId);
     } catch (e) {
-      setConnectFeedback({ type: 'error', message: e instanceof Error ? e.message : `Could not reconnect ${conn.appName}.` });
+      setConnectFeedback({ type: 'error', message: e instanceof Error ? e.message : t('reconnectFailedGeneric', { app: conn.appName }) });
       setConnectBusyId(null);
     }
   };
 
   const handleRevoke = async (conn: ConnectedApp) => {
     if (connectBusyId) return;
-    if (!confirm(`Revoke "${conn.displayName || conn.appName}"? This agent will lose access to it immediately.`)) return;
+    if (!confirm(t('revokeConfirm', { name: conn.displayName || conn.appName }))) return;
     setConnectBusyId(conn.appId);
     setConnectFeedback(null);
     try {
       await revokeConnectedApp(conn.id);
-      setConnectFeedback({ type: 'success', message: `Revoked ${conn.appName}.` });
+      setConnectFeedback({ type: 'success', message: t('revokedSuccess', { app: conn.appName }) });
       refetchConnections();
     } catch (e) {
-      setConnectFeedback({ type: 'error', message: e instanceof Error ? e.message : `Could not revoke ${conn.appName}.` });
+      setConnectFeedback({ type: 'error', message: e instanceof Error ? e.message : t('revokeFailedGeneric', { app: conn.appName }) });
     } finally {
       setConnectBusyId(null);
     }
@@ -681,7 +685,7 @@ export default function CustomizeAgentModal({
     setToolsError(null);
     getToolScope(agentType)
       .then(setToolScope)
-      .catch(() => setToolsError('Could not load tool settings.'))
+      .catch(() => setToolsError(t('loadToolSettingsFailed')))
       .finally(() => {
         setToolsLoading(false);
         setToolsFetched(true);
@@ -694,7 +698,7 @@ export default function CustomizeAgentModal({
     setMcpListError(null);
     listTenantMcpServers(agentType)
       .then(setMcpServers)
-      .catch((e) => setMcpListError(e instanceof TenantMcpServerError ? e.message : 'Could not load custom MCP servers.'))
+      .catch((e) => setMcpListError(e instanceof TenantMcpServerError ? e.message : t('mcpListLoadFailed')))
       .finally(() => {
         setMcpLoading(false);
         setMcpFetched(true);
@@ -713,7 +717,7 @@ export default function CustomizeAgentModal({
       await saveToolScope(agentType, { [slug]: enabled });
     } catch {
       setToolScope(previous); // revert on failure
-      setToolsError(`Could not update ${TOOLKIT_LABELS[slug] || slug}. Please try again.`);
+      setToolsError(t('toolUpdateFailed', { toolkit: TOOLKIT_LABELS[slug] || slug }));
     } finally {
       setSavingToolkit(null);
     }
@@ -724,7 +728,7 @@ export default function CustomizeAgentModal({
     const name = mcpForm.name.trim();
     const url = mcpForm.url.trim();
     if (!name || !url) {
-      setMcpFormError('Name and URL are required.');
+      setMcpFormError(t('mcpNameUrlRequired'));
       return;
     }
     setMcpRegistering(true);
@@ -747,9 +751,9 @@ export default function CustomizeAgentModal({
         // list (status: verification_failed) rather than just an error.
         setMcpServers((prev) => [e.server as TenantMcpServer, ...prev]);
         setMcpForm({ name: '', url: '', transport: 'streamable-http', authHeaderName: '', authHeaderValue: '' });
-        setMcpFormError(`Saved, but verification failed: ${e.message}`);
+        setMcpFormError(t('mcpSavedButFailed', { message: e.message }));
       } else {
-        setMcpFormError(e instanceof TenantMcpServerError ? e.message : 'Could not register the server.');
+        setMcpFormError(e instanceof TenantMcpServerError ? e.message : t('mcpRegisterFailed'));
       }
     } finally {
       setMcpRegistering(false);
@@ -767,8 +771,29 @@ export default function CustomizeAgentModal({
       if (e instanceof TenantMcpServerError && e.server) {
         setMcpServers((prev) => prev.map((s) => (s.id === id ? (e.server as TenantMcpServer) : s)));
       } else {
-        setMcpListError(e instanceof TenantMcpServerError ? e.message : 'Reverification failed.');
+        setMcpListError(e instanceof TenantMcpServerError ? e.message : t('mcpReverifyFailed'));
       }
+    } finally {
+      setMcpBusyId(null);
+    }
+  };
+
+  const handleToggleMcpTool = async (server: TenantMcpServer, toolName: string, nextEnabled: boolean) => {
+    if (mcpBusyId) return;
+    const nextDisabled = nextEnabled
+      ? server.disabled_tools.filter((n) => n !== toolName)
+      : [...server.disabled_tools, toolName];
+    // Optimistic — the PATCH validates against the server's own stored
+    // tools_json, so this can only fail on a stale/removed tool name, not
+    // on anything the checkbox itself could cause.
+    setMcpServers((prev) => prev.map((s) => (s.id === server.id ? { ...s, disabled_tools: nextDisabled } : s)));
+    setMcpBusyId(server.id);
+    try {
+      const result = await updateDisabledTools(server.id, nextDisabled);
+      setMcpServers((prev) => prev.map((s) => (s.id === server.id ? result : s)));
+    } catch (e) {
+      setMcpServers((prev) => prev.map((s) => (s.id === server.id ? server : s)));
+      setMcpListError(e instanceof TenantMcpServerError ? e.message : t('mcpToolUpdateFailed'));
     } finally {
       setMcpBusyId(null);
     }
@@ -776,14 +801,14 @@ export default function CustomizeAgentModal({
 
   const handleDeleteMcpServer = async (id: string, name: string) => {
     if (mcpBusyId) return;
-    if (!window.confirm(`Remove custom MCP server "${name}"? This agent will lose access to its tools immediately.`)) return;
+    if (!window.confirm(t('mcpRemoveConfirm', { name }))) return;
     setMcpBusyId(id);
     setMcpListError(null);
     try {
       await deleteTenantMcpServer(id);
       setMcpServers((prev) => prev.filter((s) => s.id !== id));
     } catch (e) {
-      setMcpListError(e instanceof TenantMcpServerError ? e.message : 'Could not remove the server.');
+      setMcpListError(e instanceof TenantMcpServerError ? e.message : t('mcpRemoveFailed'));
     } finally {
       setMcpBusyId(null);
     }
@@ -811,7 +836,7 @@ export default function CustomizeAgentModal({
       setHasProfile(true);
       setSaved(true);
     } catch {
-      setError('Saving failed. Please try again.');
+      setError(t('saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -832,22 +857,22 @@ export default function CustomizeAgentModal({
         setKnowledgeUploadNotice({
           type: 'success',
           message: result.truncated
-            ? `Added ${file.name} to this agent's memory (${result.chunks} sections, trimmed — the document is very long). No need to save.`
-            : `Added ${file.name} to this agent's memory (${result.chunks} sections). No need to save.`,
+            ? t('knowledgeIngestedTrimmed', { file: file.name, chunks: result.chunks ?? 0 })
+            : t('knowledgeIngested', { file: file.name, chunks: result.chunks ?? 0 }),
         });
       } else {
         set('knowledge')(result.knowledge);
         setKnowledgeUploadNotice({
           type: 'success',
           message: result.truncated
-            ? `Added from ${file.name} — trimmed to fit the knowledge limit.`
-            : `Added from ${file.name}.`,
+            ? t('knowledgeAddedTrimmed', { file: file.name })
+            : t('knowledgeAdded', { file: file.name }),
         });
       }
     } catch (e: unknown) {
       setKnowledgeUploadNotice({
         type: 'error',
-        message: e instanceof Error ? e.message : 'Could not read that file.',
+        message: e instanceof Error ? e.message : t('fileReadError'),
       });
     } finally {
       setKnowledgeUploadBusy(false);
@@ -857,7 +882,7 @@ export default function CustomizeAgentModal({
 
   const handleReset = async () => {
     if (!agentType || saving) return;
-    if (!window.confirm('Reset this agent to its default Aivory identity? Your saved customisation will be removed.')) return;
+    if (!window.confirm(t('resetConfirm'))) return;
     setSaving(true);
     setError(null);
     try {
@@ -866,7 +891,7 @@ export default function CustomizeAgentModal({
       setHasProfile(false);
       setSaved(true);
     } catch {
-      setError('Reset failed. Please try again.');
+      setError(t('resetFailed'));
     } finally {
       setSaving(false);
     }
@@ -885,29 +910,29 @@ export default function CustomizeAgentModal({
             </svg>
           </button>
           <h3 style={{ fontSize: 20, fontWeight: 300, color: '#fff', margin: '0 0 8px', lineHeight: 1.3 }}>
-            Customise {agentName}
+            {t('title', { name: agentName ?? '' })}
           </h3>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: '0 0 16px' }}>
-            {tab === 'identity' && 'Give this agent your business identity. It will introduce itself with your name, follow your tone, and answer from your business knowledge — on every channel it is deployed to.'}
-            {tab === 'integrations' && 'Connect a toolkit once, then decide which agents may use it. Writes to your systems always ask for your approval first.'}
-            {tab === 'mcp' && 'Connect this agent to your own systems by registering an MCP server you control. Available on all paid plans (Operational, Business, Enterprise), Aivory Cerveau agents only — every tool call requires your approval.'}
-            {tab === 'deploy' && 'Once this agent is set up the way you want, put it to work on a channel.'}
+            {tab === 'identity' && t('descIdentity')}
+            {tab === 'integrations' && t('descIntegrations')}
+            {tab === 'mcp' && t('descMcp')}
+            {tab === 'deploy' && t('descDeploy')}
           </p>
           <div className="flex items-center gap-1 border-b border-white/[0.06] -mb-4">
-            {(['identity', 'integrations', 'mcp', 'deploy'] as const).map((t) => (
+            {(['identity', 'integrations', 'mcp', 'deploy'] as const).map((tabKey) => (
               <button
-                key={t}
+                key={tabKey}
                 type="button"
-                onClick={() => setTab(t)}
+                onClick={() => setTab(tabKey)}
                 className={`px-3.5 py-2.5 text-[12.5px] font-medium transition-colors border-b-2 -mb-px ${
-                  t === 'mcp' ? '' : 'capitalize'
+                  tabKey === 'mcp' ? '' : 'capitalize'
                 } ${
-                  tab === t
+                  tab === tabKey
                     ? 'text-[#dbe5d3] border-accent'
                     : 'text-white/40 hover:text-white/65 border-transparent'
                 }`}
               >
-                {t === 'mcp' ? 'MCP' : t}
+                {tabKey === 'mcp' ? 'MCP' : t(tabKey === 'identity' ? 'tabIdentity' : tabKey === 'integrations' ? 'tabIntegrations' : 'tabDeploy')}
               </button>
             ))}
           </div>
@@ -916,50 +941,50 @@ export default function CustomizeAgentModal({
         <div className="px-8 overflow-y-auto flex-1 space-y-4 py-5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
           {tab === 'identity' && (
             loading ? (
-              <div className="py-10 text-center text-white/40 text-[13px]">Loading saved identity…</div>
+              <div className="py-10 text-center text-white/40 text-[13px]">{t('loadingIdentity')}</div>
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <div className="flex items-baseline justify-between mb-1.5">
-                      <label className="text-white/70 text-[12px] font-medium">Agent name</label>
+                      <label className="text-white/70 text-[12px] font-medium">{t('agentNameLabel')}</label>
                     </div>
                     <div className={`${inputClass} flex items-center text-white/45 cursor-not-allowed`}>
                       Aivory
                     </div>
                   </div>
-                  <Field label="Business name" value={fields.business_name} limit={FIELD_LIMITS.business_name} onChange={set('business_name')} placeholder="e.g. Toko Baju Melati" />
+                  <Field label={t('businessNameLabel')} value={fields.business_name} limit={FIELD_LIMITS.business_name} onChange={set('business_name')} placeholder={t('businessNamePlaceholder')} />
                 </div>
                 <p className="text-white/60 text-[12px] leading-relaxed -mt-2">
-                  <strong className="text-white/90 font-semibold">Your agent is always introduced as Aivory — that stays fixed. Business name, knowledge, and everything below is what you customise.</strong>
+                  <strong className="text-white/90 font-semibold">{t('fixedIdentityNote')}</strong>
                 </p>
                 <MultiSelect
-                  label="Tone of voice"
-                  placeholder="Default tone (warm & helpful)"
+                  label={t('toneLabel')}
+                  placeholder={t('tonePlaceholder')}
                   options={TONES}
                   max={3}
                   selected={parseSelection(fields.tone, TONES)}
                   onChange={(tones) => set('tone')(tones.join(', '))}
                 />
                 <MultiSelect
-                  label="Preferred languages"
-                  placeholder="Any language (auto-detect)"
+                  label={t('languagesLabel')}
+                  placeholder={t('languagesPlaceholder')}
                   options={LANGUAGES}
                   selected={parseSelection(fields.language_pref, LANGUAGES)}
                   onChange={(langs) => set('language_pref')(langs.join(', '))}
                 />
                 <Field
-                  label="About the business"
+                  label={t('aboutBusinessLabel')}
                   value={fields.business_description}
                   limit={FIELD_LIMITS.business_description}
                   onChange={set('business_description')}
                   textarea
-                  placeholder="What you sell, who your customers are, what makes you different…"
+                  placeholder={t('aboutBusinessPlaceholder')}
                 />
                 <div>
                   <Field
-                    label="Business knowledge / FAQ"
-                    hint="Opening hours, shipping, returns, pricing, common questions — the agent answers from this first."
+                    label={t('knowledgeLabel')}
+                    hint={t('knowledgeHint')}
                     value={fields.knowledge}
                     limit={FIELD_LIMITS.knowledge}
                     onChange={set('knowledge')}
@@ -981,9 +1006,9 @@ export default function CustomizeAgentModal({
                       onClick={() => knowledgeFileInputRef.current?.click()}
                       className="px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/10 text-white/60 hover:text-white/90 hover:border-white/20 text-[11.5px] font-medium disabled:opacity-40 transition-colors"
                     >
-                      {knowledgeUploadBusy ? 'Reading document…' : 'Upload a document'}
+                      {knowledgeUploadBusy ? t('uploadReading') : t('uploadDocument')}
                     </button>
-                    <span className="text-white/30 text-[11px]">PDF, Word, Excel, CSV, or text — added to the field above.</span>
+                    <span className="text-white/30 text-[11px]">{t('uploadHint')}</span>
                   </div>
                   {knowledgeUploadNotice && (
                     <p className={`mt-1 text-[11.5px] ${knowledgeUploadNotice.type === 'success' ? 'text-accent' : 'text-red-300/80'}`}>
@@ -992,19 +1017,19 @@ export default function CustomizeAgentModal({
                   )}
                 </div>
                 <Field
-                  label="Extra style notes"
+                  label={t('extraNotesLabel')}
                   value={fields.custom_instructions}
                   limit={FIELD_LIMITS.custom_instructions}
                   onChange={set('custom_instructions')}
                   textarea
-                  placeholder="e.g. Always mention the latest catalog at the end of a chat."
+                  placeholder={t('extraNotesPlaceholder')}
                 />
                 <Field
-                  label="Greeting"
+                  label={t('greetingLabel')}
                   value={fields.greeting}
                   limit={FIELD_LIMITS.greeting}
                   onChange={set('greeting')}
-                  placeholder="First message shown when a customer connects (optional)"
+                  placeholder={t('greetingPlaceholder')}
                 />
               </>
             )
@@ -1012,13 +1037,13 @@ export default function CustomizeAgentModal({
 
           {tab === 'integrations' && (
             (connectionsLoading || toolsLoading) ? (
-              <div className="py-10 text-center text-white/40 text-[13px]">Loading integrations…</div>
+              <div className="py-10 text-center text-white/40 text-[13px]">{t('loadingIntegrations')}</div>
             ) : (
               <div className="space-y-2">
                 {(toolScope === undefined ? [] : Object.keys(toolScope?.tools ?? {})).length === 0 &&
                   toolScope !== null && (
                   <div className="py-10 text-center text-white/40 text-[13px]">
-                    No external toolkits available — Aivory’s built-in tools always stay on.
+                    {t('noToolkits')}
                   </div>
                 )}
                 {Object.entries(toolScope?.tools ?? {}).map(([slug, enabled]) => {
@@ -1033,7 +1058,7 @@ export default function CustomizeAgentModal({
                         <span className="flex items-center gap-2.5 text-white/80 text-[13px]">
                           {TOOLKIT_LABELS[slug] || slug}
                           <span className={`px-2 py-[2px] rounded-full border text-[10.5px] font-medium ${style.className}`}>
-                            {conn ? 'Connected' : 'Not connected'}
+                            {conn ? t('connected') : t('notConnected')}
                           </span>
                         </span>
                         <span className="flex items-center gap-2 shrink-0">
@@ -1043,11 +1068,11 @@ export default function CustomizeAgentModal({
                               disabled={busy}
                               onClick={() => {
                                 if (app) handleConnect(app);
-                                else setConnectFeedback({ type: 'error', message: `Could not start ${TOOLKIT_LABELS[slug] || slug} connect.` });
+                                else setConnectFeedback({ type: 'error', message: t('connectStartError', { toolkit: TOOLKIT_LABELS[slug] || slug }) });
                               }}
                               className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/25 text-[#dbe5d3] hover:bg-accent/25 text-[11px] font-medium disabled:opacity-40 transition-colors"
                             >
-                              {busy ? '…' : 'Connect'}
+                              {busy ? '…' : t('connect')}
                             </button>
                           )}
                           {isApiKey && (
@@ -1056,7 +1081,7 @@ export default function CustomizeAgentModal({
                               onClick={() => { setApiKeyFormOpen((v) => !v); setApiKeyError(null); }}
                               className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/25 text-[#dbe5d3] hover:bg-accent/25 text-[11px] font-medium transition-colors"
                             >
-                              {apiKeyFormOpen ? 'Close' : 'Connect'}
+                              {apiKeyFormOpen ? t('close') : t('connect')}
                             </button>
                           )}
                           {conn && (
@@ -1066,7 +1091,7 @@ export default function CustomizeAgentModal({
                               onClick={() => handleRevoke({ id: (connections || []).find((c) => c.appId === slug)?.id ?? '', appId: slug, status: 'connected' } as ConnectedApp)}
                               className="px-2.5 py-1 rounded-lg border border-red-500/20 text-red-300/70 hover:text-red-300 hover:border-red-500/40 text-[11px] font-medium disabled:opacity-40 transition-colors"
                             >
-                              Revoke
+                              {t('revoke')}
                             </button>
                           )}
                           <button
@@ -1074,7 +1099,7 @@ export default function CustomizeAgentModal({
                             role="switch"
                             aria-checked={enabled}
                             disabled={!conn || savingToolkit === slug}
-                            title={conn ? undefined : 'Connect first'}
+                            title={conn ? undefined : t('connectFirst')}
                             onClick={() => toggleToolkit(slug, !enabled)}
                             className={`relative w-10 h-[22px] rounded-full transition-colors disabled:opacity-30 ${
                               enabled ? 'bg-accent/70' : 'bg-white/10'
@@ -1091,27 +1116,27 @@ export default function CustomizeAgentModal({
                       {isApiKey && apiKeyFormOpen && (
                         <div className="mt-3 space-y-2">
                           <p className="text-white/40 text-[11.5px] leading-relaxed">
-                            In your Frappe/ERPNext instance: User list → your user → Settings → API Access → Generate Keys.
+                            {t('erpnextInstructions')}
                           </p>
                           <input
                             type="text"
                             value={erpnextBaseUrl}
                             onChange={(e) => setErpNextBaseUrl(e.target.value)}
-                            placeholder="https://your-company.com (Frappe instance URL)"
+                            placeholder={t('erpnextUrlPlaceholder')}
                             className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-accent/50"
                           />
                           <input
                             type="password"
                             value={erpnextApiKey}
                             onChange={(e) => setErpNextApiKey(e.target.value)}
-                            placeholder="API Key"
+                            placeholder={t('apiKeyPlaceholder')}
                             className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-accent/50"
                           />
                           <input
                             type="password"
                             value={erpnextApiSecret}
                             onChange={(e) => setErpNextApiSecret(e.target.value)}
-                            placeholder="API Secret"
+                            placeholder={t('apiSecretPlaceholder')}
                             className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-accent/50"
                           />
                           {apiKeyError && (
@@ -1123,7 +1148,7 @@ export default function CustomizeAgentModal({
                             onClick={handleErpNextConnect}
                             className="w-full px-3 py-2 rounded-lg bg-accent/15 border border-accent/25 text-[#dbe5d3] hover:bg-accent/25 text-[12px] font-medium disabled:opacity-40 transition-colors"
                           >
-                            {apiKeyBusy ? 'Connecting…' : 'Save & connect'}
+                            {apiKeyBusy ? t('connecting') : t('saveAndConnect')}
                           </button>
                         </div>
                       )}
@@ -1136,9 +1161,13 @@ export default function CustomizeAgentModal({
 
           {tab === 'mcp' && (
             mcpLoading ? (
-              <div className="py-10 text-center text-white/40 text-[13px]">Loading custom MCP servers…</div>
+              <div className="py-10 text-center text-white/40 text-[13px]">{t('loadingMcp')}</div>
             ) : (
               <div className="space-y-4">
+                <div className="px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/45 text-[11.5px] leading-relaxed">
+                  {t('mcpApprovalNote')}
+                </div>
+
                 {mcpListError && (
                   <div className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300/90 text-[12px]">
                     {mcpListError}
@@ -1150,10 +1179,10 @@ export default function CustomizeAgentModal({
                     {mcpServers.map((s) => {
                       const style =
                         s.status === 'verified'
-                          ? { label: `Verified${s.tool_count != null ? ` · ${s.tool_count} tool${s.tool_count === 1 ? '' : 's'}` : ''}`, className: 'bg-accent/15 border-accent/25 text-[#dbe5d3]' }
+                          ? { label: s.tool_count != null ? t('mcpVerifiedTools', { count: s.tool_count }) : t('mcpVerified'), className: 'bg-accent/15 border-accent/25 text-[#dbe5d3]' }
                           : s.status === 'verification_failed'
-                            ? { label: 'Verification failed', className: 'bg-red-500/10 border-red-500/20 text-red-300/90' }
-                            : { label: 'Verifying…', className: 'bg-amber-warn/15 border-amber-warn/25 text-amber-warn' };
+                            ? { label: t('mcpVerificationFailed'), className: 'bg-red-500/10 border-red-500/20 text-red-300/90' }
+                            : { label: t('mcpVerifying'), className: 'bg-amber-warn/15 border-amber-warn/25 text-amber-warn' };
                       return (
                         <div key={s.id} className="px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                           <div className="flex items-center justify-between gap-2">
@@ -1168,6 +1197,39 @@ export default function CustomizeAgentModal({
                           {s.status === 'verification_failed' && s.last_verify_error && (
                             <div className="mt-2 text-red-300/70 text-[11.5px]">{s.last_verify_error}</div>
                           )}
+                          {s.status === 'verified' && s.tools.length > 0 && (
+                            <div className="mt-2.5 space-y-1 border-t border-white/[0.06] pt-2.5">
+                              {s.tools.map((tool) => {
+                                const toolEnabled = !s.disabled_tools.includes(tool.name);
+                                return (
+                                  <div key={tool.name} className="flex items-center justify-between gap-3 py-0.5">
+                                    <div className="min-w-0">
+                                      <div className="text-white/70 text-[12px] font-medium truncate">{tool.name}</div>
+                                      {tool.description && (
+                                        <div className="text-white/35 text-[11px] truncate">{tool.description}</div>
+                                      )}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      role="switch"
+                                      aria-checked={toolEnabled}
+                                      disabled={mcpBusyId === s.id}
+                                      onClick={() => handleToggleMcpTool(s, tool.name, !toolEnabled)}
+                                      className={`relative w-9 h-5 rounded-full shrink-0 transition-colors disabled:opacity-30 ${
+                                        toolEnabled ? 'bg-accent/70' : 'bg-white/10'
+                                      }`}
+                                    >
+                                      <span
+                                        className={`absolute left-[3px] top-[3px] w-3.5 h-3.5 rounded-full bg-white transition-transform ${
+                                          toolEnabled ? 'translate-x-[14px]' : 'translate-x-0'
+                                        }`}
+                                      />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                           <div className="mt-2.5 flex items-center gap-3">
                             <button
                               type="button"
@@ -1175,7 +1237,7 @@ export default function CustomizeAgentModal({
                               onClick={() => handleReverifyMcpServer(s.id)}
                               className="text-[#dbe5d3]/70 hover:text-[#dbe5d3] text-[11.5px] disabled:opacity-40"
                             >
-                              {mcpBusyId === s.id ? 'Working…' : 'Reverify'}
+                              {mcpBusyId === s.id ? t('mcpReverifyWorking') : t('mcpReverify')}
                             </button>
                             <button
                               type="button"
@@ -1183,7 +1245,7 @@ export default function CustomizeAgentModal({
                               onClick={() => handleDeleteMcpServer(s.id, s.name)}
                               className="text-red-300/60 hover:text-red-300/90 text-[11.5px] disabled:opacity-40"
                             >
-                              Remove
+                              {t('mcpRemove')}
                             </button>
                           </div>
                         </div>
@@ -1198,7 +1260,7 @@ export default function CustomizeAgentModal({
                     onClick={() => { setMcpFormError(null); setMcpFormOpen(true); }}
                     className="w-full py-2.5 rounded-lg bg-white/[0.05] hover:bg-white/10 border border-white/10 text-white/70 hover:text-white/90 text-[13px] font-medium transition-colors"
                   >
-                    + Add MCP server
+                    {t('mcpAddServer')}
                   </button>
                 )}
 
@@ -1210,52 +1272,52 @@ export default function CustomizeAgentModal({
                       </div>
                     )}
                     <Field
-                      label="Name"
+                      label={t('mcpNameLabel')}
                       value={mcpForm.name}
                       limit={40}
                       onChange={(v) => setMcpForm((f) => ({ ...f, name: v.replace(/[^a-zA-Z0-9_-]/g, '') }))}
-                      placeholder="e.g. inventory-system"
+                      placeholder={t('mcpNamePlaceholder')}
                     />
                     <Field
-                      label="MCP server URL"
+                      label={t('mcpUrlLabel')}
                       value={mcpForm.url}
                       limit={2000}
                       onChange={(v) => setMcpForm((f) => ({ ...f, url: v }))}
-                      placeholder="https://your-system.example.com/mcp"
+                      placeholder={t('mcpUrlPlaceholder')}
                     />
                     <div>
-                      <label className="text-white/70 text-[12px] font-medium mb-1.5 block">Transport</label>
+                      <label className="text-white/70 text-[12px] font-medium mb-1.5 block">{t('mcpTransportLabel')}</label>
                       <div className="flex gap-2">
-                        {(['streamable-http', 'sse'] as const).map((t) => (
+                        {(['streamable-http', 'sse'] as const).map((transportOption) => (
                           <button
-                            key={t}
+                            key={transportOption}
                             type="button"
-                            onClick={() => setMcpForm((f) => ({ ...f, transport: t }))}
+                            onClick={() => setMcpForm((f) => ({ ...f, transport: transportOption }))}
                             className={`px-3.5 py-2 rounded-lg border text-[12.5px] transition-colors ${
-                              mcpForm.transport === t
+                              mcpForm.transport === transportOption
                                 ? 'bg-accent/15 border-accent/30 text-[#dbe5d3]'
                                 : 'bg-white/[0.04] border-white/10 text-white/50 hover:text-white/75'
                             }`}
                           >
-                            {t}
+                            {transportOption}
                           </button>
                         ))}
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Field
-                        label="Auth header name (optional)"
+                        label={t('mcpAuthNameLabel')}
                         value={mcpForm.authHeaderName}
                         limit={200}
                         onChange={(v) => setMcpForm((f) => ({ ...f, authHeaderName: v }))}
-                        placeholder="e.g. X-Api-Key"
+                        placeholder={t('mcpAuthNamePlaceholder')}
                       />
                       <Field
-                        label="Auth header value (optional)"
+                        label={t('mcpAuthValueLabel')}
                         value={mcpForm.authHeaderValue}
                         limit={4000}
                         onChange={(v) => setMcpForm((f) => ({ ...f, authHeaderValue: v }))}
-                        placeholder="Encrypted at rest, never shown again"
+                        placeholder={t('mcpAuthValuePlaceholder')}
                       />
                     </div>
                     <button
@@ -1264,7 +1326,7 @@ export default function CustomizeAgentModal({
                       disabled={mcpRegistering}
                       className="w-full py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50"
                     >
-                      {mcpRegistering ? 'Registering & verifying…' : 'Register & verify server'}
+                      {mcpRegistering ? t('mcpRegistering') : t('mcpRegisterButton')}
                     </button>
                   </>
                 )}
@@ -1290,8 +1352,8 @@ export default function CustomizeAgentModal({
                       <Image src={asset('/integrations/icons/slack.svg')} alt="Slack" width={20} height={20} />
                     </div>
                     <div>
-                      <div className="text-white/90 font-medium text-[14px]">Slack</div>
-                      <div className="text-white/40 text-[12px] mt-0.5">{deployLoading ? 'Preparing install…' : 'Connect to a Slack workspace'}</div>
+                      <div className="text-white/90 font-medium text-[14px]">{t('slack')}</div>
+                      <div className="text-white/40 text-[12px] mt-0.5">{deployLoading ? t('slackPreparing') : t('slackConnectDesc')}</div>
                     </div>
                     <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
                       {deployLoading ? (
@@ -1313,8 +1375,8 @@ export default function CustomizeAgentModal({
                       <Image src={asset('/integrations/icons/telegram.svg')} alt="Telegram" width={40} height={40} />
                     </div>
                     <div>
-                      <div className="text-white/90 font-medium text-[14px]">Telegram</div>
-                      <div className="text-white/40 text-[12px] mt-0.5">{deployLoading ? 'Generating QR code…' : 'Deploy as a Telegram bot — scan a QR code'}</div>
+                      <div className="text-white/90 font-medium text-[14px]">{t('telegram')}</div>
+                      <div className="text-white/40 text-[12px] mt-0.5">{deployLoading ? t('telegramGeneratingQr') : t('telegramConnectDesc')}</div>
                     </div>
                     <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
                       {deployLoading ? (
@@ -1336,8 +1398,8 @@ export default function CustomizeAgentModal({
                       <Image src={asset('/integrations/icons/discord.svg')} alt="Discord" width={40} height={40} />
                     </div>
                     <div>
-                      <div className="text-white/90 font-medium text-[14px]">Discord</div>
-                      <div className="text-white/40 text-[12px] mt-0.5">{deployLoading ? 'Generating connect code…' : 'Deploy as a Discord bot — invite + connect code'}</div>
+                      <div className="text-white/90 font-medium text-[14px]">{t('discord')}</div>
+                      <div className="text-white/40 text-[12px] mt-0.5">{deployLoading ? t('discordGeneratingCode') : t('discordConnectDesc')}</div>
                     </div>
                     <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
                       {deployLoading ? (
@@ -1359,8 +1421,8 @@ export default function CustomizeAgentModal({
                       <Image src={asset('/integrations/icons/http-api.svg')} alt="API" width={40} height={40} />
                     </div>
                     <div>
-                      <div className="text-white/90 font-medium text-[14px]">API</div>
-                      <div className="text-white/40 text-[12px] mt-0.5">Deploy to your own app or bot — Business plan and above</div>
+                      <div className="text-white/90 font-medium text-[14px]">{t('api')}</div>
+                      <div className="text-white/40 text-[12px] mt-0.5">{t('apiConnectDesc')}</div>
                     </div>
                     <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-accent">
@@ -1374,8 +1436,8 @@ export default function CustomizeAgentModal({
                       <Image src={asset('/integrations/icons/whatsapp.svg')} alt="WhatsApp" width={40} height={40} />
                     </div>
                     <div>
-                      <div className="text-white/90 font-medium text-[14px]">WhatsApp</div>
-                      <div className="text-white/40 text-[12px] mt-0.5">Deploy to WhatsApp Business</div>
+                      <div className="text-white/90 font-medium text-[14px]">{t('whatsapp')}</div>
+                      <div className="text-white/40 text-[12px] mt-0.5">{t('whatsappConnectDesc')}</div>
                     </div>
                     <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-accent">
@@ -1391,18 +1453,18 @@ export default function CustomizeAgentModal({
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                   </svg>
-                  Back
+                  {t('back')}
                 </button>
 
                 <h4 className="text-white text-[15px] font-normal mb-1.5">
-                  {linkStatus === 'connected' ? 'Agent connected' : 'Deploy to Slack'}
+                  {linkStatus === 'connected' ? t('agentConnected') : t('deployToSlack')}
                 </h4>
                 <p className="text-white/60 text-[13px] leading-relaxed mb-5">
                   {linkStatus === 'connected'
-                    ? <>Your <strong className="text-white font-medium">{slackLink.agent_name}</strong> is live in your Slack workspace. Open the chat below, or DM/@mention it directly.</>
+                    ? <>{t('slackConnectedPre')}<strong className="text-white font-medium">{slackLink.agent_name}</strong>{t('slackConnectedPost')}</>
                     : linkStatus === 'expired'
-                    ? 'This install link has expired. Generate a new one to continue.'
-                    : <>Approve the install in the Slack tab that just opened to connect your <strong className="text-white font-medium">{slackLink.agent_name}</strong>.</>}
+                    ? t('slackExpired')
+                    : <>{t('slackApprovePre')}<strong className="text-white font-medium">{slackLink.agent_name}</strong>{t('slackApprovePost')}</>}
                 </p>
 
                 <div className="flex flex-col items-center">
@@ -1414,7 +1476,7 @@ export default function CustomizeAgentModal({
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                           </svg>
                         </div>
-                        <span className="text-accent text-[13px] font-medium">Connected</span>
+                        <span className="text-accent text-[13px] font-medium">{t('connectedBadge')}</span>
                       </>
                     ) : (
                       <>
@@ -1427,10 +1489,10 @@ export default function CustomizeAgentModal({
                             disabled={deployLoading}
                             className="px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-accent/50 transition-all"
                           >
-                            {deployLoading ? 'Generating…' : 'Generate new link'}
+                            {deployLoading ? t('generating') : t('generateNewLink')}
                           </button>
                         ) : (
-                          <span className="text-white/50 text-[12px] px-6 text-center">Waiting for Slack authorization…</span>
+                          <span className="text-white/50 text-[12px] px-6 text-center">{t('waitingSlackAuth')}</span>
                         )}
                       </>
                     )}
@@ -1443,7 +1505,7 @@ export default function CustomizeAgentModal({
                       rel="noopener noreferrer"
                       className="mt-4 w-full py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 text-[13px] font-medium text-center transition-all border border-white/10"
                     >
-                      Open chat in Slack
+                      {t('openChatInSlack')}
                     </a>
                   )}
 
@@ -1451,7 +1513,7 @@ export default function CustomizeAgentModal({
                     <>
                       <div className="flex items-center gap-2 mt-5 text-white/50 text-[12px]">
                         <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-accent rounded-full animate-spin" />
-                        Waiting for approval…
+                        {t('waitingApproval')}
                       </div>
                       <a
                         href={slackLink.install_url}
@@ -1459,7 +1521,7 @@ export default function CustomizeAgentModal({
                         rel="noopener noreferrer"
                         className="mt-3 text-accent/80 hover:text-accent text-[12px] underline underline-offset-2 transition-colors"
                       >
-                        Re-open the Slack authorization page
+                        {t('reopenSlackAuth')}
                       </a>
                     </>
                   )}
@@ -1471,18 +1533,18 @@ export default function CustomizeAgentModal({
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                   </svg>
-                  Back
+                  {t('back')}
                 </button>
 
                 <h4 className="text-white text-[15px] font-normal mb-1.5">
-                  {linkStatus === 'connected' ? 'Agent connected' : 'Deploy to Telegram'}
+                  {linkStatus === 'connected' ? t('agentConnected') : t('deployToTelegram')}
                 </h4>
                 <p className="text-white/60 text-[13px] leading-relaxed mb-5">
                   {linkStatus === 'connected'
-                    ? <>Your <strong className="text-white font-medium">{deployLink.agent_name}</strong> is live in Telegram. Say hi!</>
+                    ? <>{t('telegramConnectedPre')}<strong className="text-white font-medium">{deployLink.agent_name}</strong>{t('telegramConnectedPost')}</>
                     : linkStatus === 'expired'
-                    ? 'This QR code has expired. Generate a new one to continue.'
-                    : <>Scan with your phone&apos;s camera or Telegram app to connect your <strong className="text-white font-medium">{deployLink.agent_name}</strong>.</>}
+                    ? t('telegramExpired')
+                    : <>{t('telegramScanPre')}<strong className="text-white font-medium">{deployLink.agent_name}</strong>{t('telegramScanPost')}</>}
                 </p>
 
                 <div className="flex flex-col items-center">
@@ -1493,7 +1555,7 @@ export default function CustomizeAgentModal({
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                         </svg>
                       </div>
-                      <span className="text-accent text-[13px] font-medium">Connected</span>
+                      <span className="text-accent text-[13px] font-medium">{t('connectedBadge')}</span>
                     </div>
                   ) : (
                     <div className={`relative p-4 bg-white rounded-2xl ${linkStatus === 'expired' ? 'opacity-30' : ''}`}>
@@ -1505,7 +1567,7 @@ export default function CustomizeAgentModal({
                             disabled={deployLoading}
                             className="px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-accent/50 transition-all"
                           >
-                            {deployLoading ? 'Generating…' : 'Generate new QR'}
+                            {deployLoading ? t('generating') : t('generateNewQr')}
                           </button>
                         </div>
                       )}
@@ -1516,7 +1578,7 @@ export default function CustomizeAgentModal({
                     <>
                       <div className="flex items-center gap-2 mt-5 text-white/50 text-[12px]">
                         <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-accent rounded-full animate-spin" />
-                        Waiting for scan…
+                        {t('waitingScan')}
                       </div>
                       <a
                         href={deployLink.deep_link}
@@ -1524,7 +1586,7 @@ export default function CustomizeAgentModal({
                         rel="noopener noreferrer"
                         className="mt-3 text-accent/80 hover:text-accent text-[12px] underline underline-offset-2 transition-colors"
                       >
-                        Or open in Telegram on this device
+                        {t('openInTelegramDevice')}
                       </a>
                     </>
                   )}
@@ -1536,18 +1598,18 @@ export default function CustomizeAgentModal({
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                   </svg>
-                  Back
+                  {t('back')}
                 </button>
 
                 <h4 className="text-white text-[15px] font-normal mb-1.5">
-                  {discordLinkStatus === 'connected' ? 'Agent connected' : 'Deploy to Discord'}
+                  {discordLinkStatus === 'connected' ? t('agentConnected') : t('deployToDiscord')}
                 </h4>
                 <p className="text-white/60 text-[13px] leading-relaxed mb-5">
                   {discordLinkStatus === 'connected'
-                    ? <>Your <strong className="text-white font-medium">{discordLink.agent_name}</strong> is live in that Discord channel. Say hi!</>
+                    ? <>{t('discordConnectedPre')}<strong className="text-white font-medium">{discordLink.agent_name}</strong>{t('discordConnectedPost')}</>
                     : discordLinkStatus === 'expired'
-                    ? 'This connect code has expired. Generate a new one to continue.'
-                    : <>Invite the bot, then type <code className="text-white/90 bg-white/10 rounded px-1 py-0.5">/connect</code> with the code below in the channel you want your <strong className="text-white font-medium">{discordLink.agent_name}</strong> to live in.</>}
+                    ? t('discordExpired')
+                    : <>{t('discordInvitePre')}<code className="text-white/90 bg-white/10 rounded px-1 py-0.5">/connect</code>{t('discordInvitePost')}<strong className="text-white font-medium">{discordLink.agent_name}</strong>{t('discordInviteEnd')}</>}
                 </p>
 
                 <div className="flex flex-col items-center">
@@ -1558,7 +1620,7 @@ export default function CustomizeAgentModal({
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                         </svg>
                       </div>
-                      <span className="text-accent text-[13px] font-medium">Connected</span>
+                      <span className="text-accent text-[13px] font-medium">{t('connectedBadge')}</span>
                     </div>
                   ) : (
                     <>
@@ -1569,11 +1631,11 @@ export default function CustomizeAgentModal({
                         className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/90 text-[13px] font-medium transition-all mb-4"
                       >
                         <Image src={asset('/integrations/icons/discord.svg')} alt="Discord" width={18} height={18} />
-                        1. Invite bot to your server
+                        {t('inviteBotStep')}
                       </a>
 
                       <div className={`w-full rounded-2xl border p-5 text-center ${discordLinkStatus === 'expired' ? 'opacity-30 bg-white/[0.03] border-white/10' : 'bg-white/[0.03] border-white/10'}`}>
-                        <div className="text-white/40 text-[11px] uppercase tracking-wide mb-2">2. Type /connect with this code</div>
+                        <div className="text-white/40 text-[11px] uppercase tracking-wide mb-2">{t('typeConnectStep')}</div>
                         <div className="text-white text-[22px] font-mono tracking-[0.15em]">{discordLink.code}</div>
                       </div>
                       {discordLinkStatus === 'expired' && (
@@ -1582,7 +1644,7 @@ export default function CustomizeAgentModal({
                           disabled={deployLoading}
                           className="mt-3 px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-accent/50 transition-all"
                         >
-                          {deployLoading ? 'Generating…' : 'Generate new code'}
+                          {deployLoading ? t('generating') : t('generateNewCode')}
                         </button>
                       )}
                     </>
@@ -1591,7 +1653,7 @@ export default function CustomizeAgentModal({
                   {discordLinkStatus === 'pending' && (
                     <div className="flex items-center gap-2 mt-5 text-white/50 text-[12px]">
                       <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-accent rounded-full animate-spin" />
-                      Waiting for /connect…
+                      {t('waitingConnectCommand')}
                     </div>
                   )}
                 </div>
@@ -1602,16 +1664,16 @@ export default function CustomizeAgentModal({
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                   </svg>
-                  Back
+                  {t('back')}
                 </button>
 
                 <h4 className="text-white text-[15px] font-normal mb-1.5">
-                  {createdKey ? 'API key created' : 'Deploy via API'}
+                  {createdKey ? t('apiKeyCreated') : t('deployViaApi')}
                 </h4>
                 <p className="text-white/60 text-[13px] leading-relaxed mb-4">
                   {createdKey
-                    ? 'Copy this key now — it will not be shown again.'
-                    : <>Send messages to your <strong className="text-white font-medium">{agentName}</strong> from your own app, bot, or backend.</>}
+                    ? t('copyKeyNotice')
+                    : <>{t('sendMessagesPre')}<strong className="text-white font-medium">{agentName}</strong>{t('sendMessagesPost')}</>}
                 </p>
 
                 {deployError && (
@@ -1622,12 +1684,12 @@ export default function CustomizeAgentModal({
 
                 {!createdKey ? (
                   <>
-                    <label className="block text-white/70 text-[12px] font-medium mb-1.5">Label (optional)</label>
+                    <label className="block text-white/70 text-[12px] font-medium mb-1.5">{t('labelOptional')}</label>
                     <input
                       type="text"
                       value={apiKeyLabel}
                       onChange={(e) => setApiKeyLabel(e.target.value.slice(0, 200))}
-                      placeholder="e.g. Discord bot prod"
+                      placeholder={t('labelPlaceholder')}
                       className="w-full px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 text-white/90 text-[13px] placeholder-white/25 focus:outline-none focus:border-accent/40 transition-colors mb-4"
                     />
                     <button
@@ -1635,7 +1697,7 @@ export default function CustomizeAgentModal({
                       disabled={deployLoading}
                       className="w-full py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50"
                     >
-                      {deployLoading ? 'Creating…' : 'Create API key'}
+                      {deployLoading ? t('creating') : t('createApiKey')}
                     </button>
                   </>
                 ) : (
@@ -1650,14 +1712,14 @@ export default function CustomizeAgentModal({
                         }}
                         className="shrink-0 px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/10 text-white/70 text-[11px] transition-colors"
                       >
-                        {apiKeyCopied ? 'Copied ✓' : 'Copy'}
+                        {apiKeyCopied ? t('copied') : t('copy')}
                       </button>
                     </div>
                     <p className="text-white/35 text-[11px] mb-4">
-                      Store this somewhere safe — Aivory never stores or shows the plaintext key again.
+                      {t('storeKeySafely')}
                     </p>
 
-                    <label className="block text-white/70 text-[12px] font-medium mb-1.5">Example request</label>
+                    <label className="block text-white/70 text-[12px] font-medium mb-1.5">{t('exampleRequest')}</label>
                     <pre className="w-full px-3.5 py-3 rounded-lg bg-black/30 border border-white/10 text-white/60 text-[10.5px] overflow-x-auto whitespace-pre-wrap break-all">
 {`curl -X POST ${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'}/api/v1/agent-api/message \\
   -H "X-Aivory-Api-Key: ${createdKey.key}" \\
@@ -1684,7 +1746,7 @@ export default function CustomizeAgentModal({
               disabled={saving || loading}
               className="flex-1 py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save identity'}
+              {saving ? t('saving') : saved ? t('saved') : t('saveIdentity')}
             </button>
             {hasProfile && (
               <button
@@ -1692,7 +1754,7 @@ export default function CustomizeAgentModal({
                 disabled={saving || loading}
                 className="px-4 py-2.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-white/60 hover:text-white/85 text-[13px] transition-all border border-white/10 disabled:opacity-50"
               >
-                Reset to default
+                {t('resetToDefault')}
               </button>
             )}
           </div>
