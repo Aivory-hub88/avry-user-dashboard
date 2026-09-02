@@ -283,7 +283,7 @@ export function SettingsModal({ user }: SettingsModalProps) {
                         }`}
                       >
                         {pkg.popular && (
-                          <span className="absolute -top-2.5 bg-accent text-[#1a0b2e] text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                          <span className="absolute -top-2.5 bg-accent text-on-accent text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                             Most Popular
                           </span>
                         )}
@@ -386,7 +386,7 @@ function Toggle({ checked, onChange }: { checked: boolean, onChange: (v: boolean
       onClick={() => onChange(!checked)}
       className={`w-10 h-6 rounded-full relative transition-colors duration-200 focus:outline-none ${checked ? 'bg-accent' : 'bg-white/20'}`}
     >
-      <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-[#1a0b2e] transition-transform duration-200 ${checked ? 'translate-x-4' : 'translate-x-0'}`}></div>
+      <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-on-accent transition-transform duration-200 ${checked ? 'translate-x-4' : 'translate-x-0'}`}></div>
     </button>
   )
 }

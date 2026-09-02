@@ -258,7 +258,7 @@ export default function AgentRail({
                           onClick={() => decide(a, "approve")}
                           disabled={busy}
                           aria-busy={busy}
-                          className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-[12.5px] font-semibold text-[#1a1a18] transition-[opacity,transform] duration-150 ease-out hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.97] disabled:opacity-50"
+                          className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-[12.5px] font-semibold text-on-accent transition-[opacity,transform] duration-150 ease-out hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.97] disabled:opacity-50"
                         >
                           <IoCheckmark className="h-[13px] w-[13px]" />
                           {busy ? "Approving…" : "Approve"}

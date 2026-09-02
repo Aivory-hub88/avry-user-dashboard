@@ -177,7 +177,7 @@
 }
 
 .warning a:hover {
-  color: #00f5b0;
+  color: var(--color-accent-link-hover);
   text-decoration: underline;
 }
 

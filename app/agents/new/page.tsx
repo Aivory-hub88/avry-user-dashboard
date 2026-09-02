@@ -77,7 +77,7 @@ export default function NewAgentPage() {
       <div className="max-w-2xl mx-auto overflow-x-hidden">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/agents" className="text-accent hover:text-[#00f5b0] text-sm font-medium mb-4 inline-block">
+          <Link href="/agents" className="text-accent hover:text-accent-link-hover text-sm font-medium mb-4 inline-block">
             ← Back to Agents
           </Link>
           <h1 className="text-3xl font-bold text-zinc-100">Create New Agent</h1>

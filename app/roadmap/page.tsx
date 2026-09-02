@@ -702,7 +702,7 @@ function BtnPrimary({ onClick, disabled, loading, children }: {
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{
         background: disabled ? T.green : `linear-gradient(to bottom, ${h ? '#d3e2c4' : '#c9dab8'}, ${h ? '#c2d5af' : 'var(--color-accent)'})`,
-        color: '#1c2318', border: 'none', borderRadius: 9,
+        color: 'var(--color-on-accent)', border: 'none', borderRadius: 9,
         padding: '9px 22px', fontSize: '0.8125rem', fontWeight: 600,
         fontFamily: 'inherit', cursor: disabled ? 'not-allowed' : 'pointer',
         display: 'flex', alignItems: 'center', gap: 8,

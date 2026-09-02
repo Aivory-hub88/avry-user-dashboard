@@ -82,7 +82,7 @@ export function UserProfile() {
         onClick={() => openSettingsModal()}
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-t border-white/5 text-left group"
       >
-        <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-[#1a0b2e] font-bold text-sm shrink-0">
+        <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-on-accent font-bold text-sm shrink-0">
           {initial}
         </div>
         <div className="flex-1 min-w-0 overflow-hidden">

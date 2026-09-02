@@ -20,6 +20,12 @@
    differently: --color-amber = pending/notification-count badges,
    --color-amber-warn = enterprise-lock icon / status text / limit warnings,
    --color-amber-light = "Upgrade" link text (with its own hover tint). */
+/* Three "accent, but on hover" greens, each hardcoded ~7x — not random
+   drift, each was already used consistently for one specific hover
+   context, just never named: --color-accent-btn-hover on solid bg-accent
+   buttons, --color-accent-link-hover on text-accent links/node borders,
+   --color-accent-badge-hover on the chat action-list number badge.
+   Tokenized as the same three verbatim values, not merged into one. */
 @theme {
   --color-accent: #b7cba6;
   --color-accent-dim: rgba(183, 203, 166, 0.12);
@@ -27,6 +33,18 @@
   --color-amber-warn: #e8b96a;
   --color-amber-light: #e8c088;
   --color-amber-light-hover: #f0cd9c;
+  --color-accent-btn-hover: #00d489;
+  --color-accent-link-hover: #00f5b0;
+  --color-accent-badge-hover: #2dd4a0;
+  /* Unlike the greens above, this one WAS unintentional drift: 5 different
+     near-blacks (#1a1a18, #1a1a24, #1c2318, #1a0b2e, plain black) were each
+     used ad hoc for text/elements sitting on the accent-green fill, with no
+     shared token. Consolidated to the most-used value (#1a1a18) — the
+     other four are a deliberate visual decision, not just a rename, so
+     don't reintroduce them for this purpose. Doesn't touch unrelated
+     coincidental reuses of these same hex values for plain dark panel
+     backgrounds / print-document body text / workflow-node chrome. */
+  --color-on-accent: #1a1a18;
 }
 
 /* Real font files for literal font-family: 'Manrope'/'Doto' lookups — needed

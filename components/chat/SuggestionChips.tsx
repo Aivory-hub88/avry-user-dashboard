@@ -34,8 +34,8 @@ export default function SuggestionChips({ suggestions, onSelect }: SuggestionChi
             text-[13px] font-medium text-white/70
             cursor-pointer
             transition-all duration-150
-            hover:text-[#2dd4a0] hover:border-[#2dd4a0] hover:bg-white/5
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2dd4a0]/50 focus-visible:ring-offset-1 focus-visible:ring-offset-[#353531]
+            hover:text-accent-badge-hover hover:border-accent-badge-hover hover:bg-white/5
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-badge-hover/50 focus-visible:ring-offset-1 focus-visible:ring-offset-[#353531]
           "
         >
           {/* Sparkle icon */}

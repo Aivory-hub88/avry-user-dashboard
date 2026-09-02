@@ -137,7 +137,7 @@ export default function AgentDetailPage() {
     return (
       <div className="min-h-screen bg-[#353531] p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         <div className="max-w-2xl mx-auto overflow-x-hidden">
-          <Link href="/agents" className="text-accent hover:text-[#00f5b0] text-sm font-medium mb-4 inline-block">
+          <Link href="/agents" className="text-accent hover:text-accent-link-hover text-sm font-medium mb-4 inline-block">
             ← Back to Agents
           </Link>
           <div className="text-center py-12 bg-white/5 border border-white/10 rounded-lg">
@@ -153,7 +153,7 @@ export default function AgentDetailPage() {
       <div className="max-w-2xl mx-auto overflow-x-hidden">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/agents" className="text-accent hover:text-[#00f5b0] text-sm font-medium mb-4 inline-block">
+          <Link href="/agents" className="text-accent hover:text-accent-link-hover text-sm font-medium mb-4 inline-block">
             ← Back to Agents
           </Link>
           <div className="flex items-center justify-between">

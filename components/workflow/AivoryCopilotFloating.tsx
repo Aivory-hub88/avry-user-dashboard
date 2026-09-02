@@ -177,7 +177,7 @@ export function AivoryCopilotFloating({
                 {msg.suggestion && onApplySuggestion && (
                   <div className="flex gap-1.5 flex-wrap mt-0.5">
                     <button
-                      className="bg-accent border-none rounded-md text-black text-xs font-bold px-3.5 py-1.5 cursor-pointer hover:bg-accent/90 transition-colors duration-150 font-inherit"
+                      className="bg-accent border-none rounded-md text-on-accent text-xs font-bold px-3.5 py-1.5 cursor-pointer hover:bg-accent/90 transition-colors duration-150 font-inherit"
                       onClick={() => onApplySuggestion(msg.suggestion!)}
                     >
                       Generate on canvas
@@ -220,7 +220,7 @@ export function AivoryCopilotFloating({
         <div className="flex items-center justify-between px-3 py-2 bg-accent/6 border-t border-accent/2">
           <span className="text-xs text-accent font-medium">Workflow ready — {lastSuggestion.steps.length} steps generated</span>
           <button
-            className="bg-accent border-none rounded-md text-black text-xs font-semibold px-3 py-1.25 cursor-pointer hover:bg-accent/9 transition-all duration-150 font-inherit whitespace-nowrap"
+            className="bg-accent border-none rounded-md text-on-accent text-xs font-semibold px-3 py-1.25 cursor-pointer hover:bg-accent/9 transition-all duration-150 font-inherit whitespace-nowrap"
             onClick={() => onApplySuggestion(lastSuggestion)}
           >
             Apply to canvas
@@ -241,7 +241,7 @@ export function AivoryCopilotFloating({
           aria-label="Message Aivory"
         />
         <button
-          className="flex items-center justify-center w-8.5 h-8.5 bg-accent border-none rounded-lg text-black hover:bg-accent/9 transition-colors duration-150 flex-shrink-0 disabled:opacity-35 disabled:cursor-not-allowed"
+          className="flex items-center justify-center w-8.5 h-8.5 bg-accent border-none rounded-lg text-on-accent hover:bg-accent/9 transition-colors duration-150 flex-shrink-0 disabled:opacity-35 disabled:cursor-not-allowed"
           onClick={handleSend}
           disabled={!input.trim() || loading}
           aria-label="Send"

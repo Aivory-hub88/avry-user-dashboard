@@ -94,7 +94,7 @@ export default function TemplateDetailPage() {
               <button
                 onClick={handleTryIt}
                 disabled={applying}
-                className="flex-1 h-8 rounded-lg bg-gradient-to-b from-[#c9dab8] to-accent text-[#1c2318] font-semibold text-[12px] hover:brightness-105 active:brightness-95 transition-all shadow-[0_1px_0_rgba(255,255,255,0.4)_inset,0_4px_14px_rgba(183,203,166,0.25)] disabled:opacity-60"
+                className="flex-1 h-8 rounded-lg bg-gradient-to-b from-[#c9dab8] to-accent text-on-accent font-semibold text-[12px] hover:brightness-105 active:brightness-95 transition-all shadow-[0_1px_0_rgba(255,255,255,0.4)_inset,0_4px_14px_rgba(183,203,166,0.25)] disabled:opacity-60"
               >
                 {applying ? "Opening…" : "Try it"}
               </button>

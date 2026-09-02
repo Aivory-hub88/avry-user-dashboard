@@ -148,7 +148,7 @@ export default function ContextToolbar({ onToolSelect }: ContextToolbarProps) {
                       strokeWidth="2.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      className="text-[#2dd4a0] shrink-0"
+                      className="text-accent-badge-hover shrink-0"
                       aria-hidden="true"
                     >
                       <polyline points="20 6 9 17 4 12" />

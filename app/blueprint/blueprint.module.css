@@ -2,7 +2,7 @@
 
 /* ── Design tokens ───────────────────────────────────────── */
 /* accent:       var(--color-accent)  (teal-green primary) */
-/* accent-hover: #00f5b0  (brighter on hover)  */
+/* accent-hover: var(--color-accent-link-hover)  (brighter on hover)  */
 /* accent-glow:  rgba(178, 204, 162,0.18) */
 /* bg-page:      #121212  */
 /* bg-card:      #1a1a1a  */
@@ -917,7 +917,7 @@
 }
 
 .generatedWorkflowToggle:hover {
-  color: #00f5b0;
+  color: var(--color-accent-link-hover);
 }
 
 .generatedWorkflowBody {

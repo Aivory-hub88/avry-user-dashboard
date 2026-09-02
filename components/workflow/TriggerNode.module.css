@@ -101,7 +101,7 @@
 
 .handle:hover {
   background: var(--color-accent);
-  border-color: #00f5b0;
+  border-color: var(--color-accent-link-hover);
   width: 10px;
   height: 10px;
 }

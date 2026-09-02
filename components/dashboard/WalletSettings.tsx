@@ -435,7 +435,7 @@ export default function WalletSettings() {
 
           <button
             onClick={() => setShowTopup(!showTopup)}
-            className="w-full mt-4 py-2 px-4 bg-accent text-black font-medium rounded-lg hover:bg-[#00d489] transition-colors"
+            className="w-full mt-4 py-2 px-4 bg-accent text-on-accent font-medium rounded-lg hover:bg-accent-btn-hover transition-colors"
           >
             {showTopup ? "Cancel" : "+ Add Money"}
           </button>
@@ -463,7 +463,7 @@ export default function WalletSettings() {
             <button
               onClick={handleTopupClick}
               disabled={topupLoading || !topupAmount}
-              className="px-6 py-2 bg-accent text-black font-medium rounded-lg hover:bg-[#00d489] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-accent text-on-accent font-medium rounded-lg hover:bg-accent-btn-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {topupLoading ? "Processing..." : "Proceed"}
             </button>
@@ -548,7 +548,7 @@ export default function WalletSettings() {
 
               <button
                 type="submit"
-                className="w-full py-2 px-4 bg-accent text-black font-medium rounded-lg hover:bg-[#00d489] transition-colors"
+                className="w-full py-2 px-4 bg-accent text-on-accent font-medium rounded-lg hover:bg-accent-btn-hover transition-colors"
               >
                 Add Card
               </button>
@@ -575,7 +575,7 @@ export default function WalletSettings() {
                         {card.brand.toUpperCase()} •••• {card.lastFour}
                       </span>
                       {card.isDefault && (
-                        <span className="text-xs px-2 py-1 bg-accent text-black rounded font-medium">
+                        <span className="text-xs px-2 py-1 bg-accent text-on-accent rounded font-medium">
                           Default
                         </span>
                       )}

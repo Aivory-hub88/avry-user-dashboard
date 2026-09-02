@@ -73,7 +73,7 @@ function ApprovalCard({
         <button
           onClick={onApprove}
           disabled={busy}
-          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-[#1a1a18] transition hover:opacity-90 disabled:opacity-50"
+          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-on-accent transition hover:opacity-90 disabled:opacity-50"
         >
           Approve
         </button>

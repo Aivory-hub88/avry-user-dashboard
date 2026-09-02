@@ -39,8 +39,8 @@ export default function ActionList({ items, onSelect }: ActionListProps) {
             text-left
             cursor-pointer
             transition-all duration-150
-            hover:border-[#2dd4a0]/30
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2dd4a0]/50 focus-visible:ring-offset-1 focus-visible:ring-offset-[#353531]
+            hover:border-accent-badge-hover/30
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-badge-hover/50 focus-visible:ring-offset-1 focus-visible:ring-offset-[#353531]
           "
         >
           {/* Number badge */}
@@ -52,7 +52,7 @@ export default function ActionList({ items, onSelect }: ActionListProps) {
               border border-white/15
               text-[12px] font-semibold text-white/60
               transition-all duration-150
-              group-hover:bg-[#2dd4a0] group-hover:border-[#2dd4a0] group-hover:text-[#1a1a18]
+              group-hover:bg-accent-badge-hover group-hover:border-accent-badge-hover group-hover:text-on-accent
             "
           >
             {index + 1}
@@ -64,7 +64,7 @@ export default function ActionList({ items, onSelect }: ActionListProps) {
               flex-1
               text-[14px] font-medium text-white/80
               transition-colors duration-150
-              group-hover:text-[#2dd4a0]
+              group-hover:text-accent-badge-hover
             "
           >
             {item.label}
@@ -84,7 +84,7 @@ export default function ActionList({ items, onSelect }: ActionListProps) {
             className="
               text-white/40
               transition-all duration-150
-              group-hover:text-[#2dd4a0] group-hover:translate-x-[3px]
+              group-hover:text-accent-badge-hover group-hover:translate-x-[3px]
             "
           >
             <polyline points="9 18 15 12 9 6" />

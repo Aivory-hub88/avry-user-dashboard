@@ -172,7 +172,7 @@ export function MemoryModal({ agentType, agentTitle, open, onClose }: MemoryModa
                         onClick={() => save(entry)}
                         disabled={busy}
                         aria-busy={busy}
-                        className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-[12.5px] font-semibold text-[#1a1a18] transition-[opacity,transform] duration-150 ease-out hover:opacity-90 active:scale-[0.97] disabled:opacity-50"
+                        className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-[12.5px] font-semibold text-on-accent transition-[opacity,transform] duration-150 ease-out hover:opacity-90 active:scale-[0.97] disabled:opacity-50"
                       >
                         <Check className="h-[12px] w-[12px]" />
                         {busy ? "Saving…" : "Save"}

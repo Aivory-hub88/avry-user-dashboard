@@ -235,7 +235,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('profile')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'profile'
-              ? 'bg-accent text-[#1a1a24]'
+              ? 'bg-accent text-on-accent'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -245,7 +245,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('wallet')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'wallet'
-              ? 'bg-accent text-[#1a1a24]'
+              ? 'bg-accent text-on-accent'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -255,7 +255,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('quota')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'quota'
-              ? 'bg-accent text-[#1a1a24]'
+              ? 'bg-accent text-on-accent'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -265,7 +265,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('subscriptions')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'subscriptions'
-              ? 'bg-accent text-[#1a1a24]'
+              ? 'bg-accent text-on-accent'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -275,7 +275,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('payments')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'payments'
-              ? 'bg-accent text-[#1a1a24]'
+              ? 'bg-accent text-on-accent'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -292,7 +292,7 @@ export default function DashboardPage() {
               {/* Avatar Section */}
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-gradient-to-br from-accent to-[#00b87d] flex items-center justify-center flex-shrink-0">
-                  <span className="text-2xl font-semibold text-black">
+                  <span className="text-2xl font-semibold text-on-accent">
                     {AuthManager.getUser()?.email?.charAt(0).toUpperCase()}
                   </span>
                 </div>
@@ -390,7 +390,7 @@ export default function DashboardPage() {
                     >
                       <div className="flex justify-between items-start mb-4">
                         <h3 className="text-lg font-medium text-white">{TIER_DISPLAY_NAMES[card.tier]}</h3>
-                        {isCurrent && <span className="text-xs font-medium px-2 py-1 bg-accent text-black rounded">Active</span>}
+                        {isCurrent && <span className="text-xs font-medium px-2 py-1 bg-accent text-on-accent rounded">Active</span>}
                       </div>
                       <p className="text-sm text-gray-400 mb-4">{card.blurb}</p>
                       <div className="mb-6">
@@ -414,13 +414,13 @@ export default function DashboardPage() {
                           href={CONTACT_SALES_URL}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="w-full py-3 rounded-lg font-medium transition-colors mt-auto bg-accent text-black hover:bg-[#00d489] text-center"
+                          className="w-full py-3 rounded-lg font-medium transition-colors mt-auto bg-accent text-on-accent hover:bg-accent-btn-hover text-center"
                         >
                           Contact Sales
                         </a>
                       ) : (
                         <button
-                          className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${isCurrent ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-accent text-black hover:bg-[#00d489]'}`}
+                          className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${isCurrent ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-accent text-on-accent hover:bg-accent-btn-hover'}`}
                           onClick={() => !isCurrent && handlePayment(card.tier, price ?? 0, `${TIER_DISPLAY_NAMES[card.tier]} Plan`)}
                           disabled={paymentLoading || isCurrent}
                         >

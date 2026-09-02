@@ -268,7 +268,7 @@ export default function CreditPurchaseTab() {
                 loading
                   ? "opacity-50 cursor-not-allowed"
                   : pkg.popular
-                  ? "border-accent bg-white/[0.03] hover:border-[#00d489]"
+                  ? "border-accent bg-white/[0.03] hover:border-accent-btn-hover"
                   : "border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]"
               }`}
             >
@@ -293,7 +293,7 @@ export default function CreditPurchaseTab() {
                   loading
                     ? "bg-white/[0.1] text-white/60 cursor-not-allowed"
                     : pkg.popular
-                    ? "bg-accent text-black hover:bg-[#00d489]"
+                    ? "bg-accent text-on-accent hover:bg-accent-btn-hover"
                     : "bg-white/[0.05] text-white hover:bg-white/[0.1]"
                 }`}
               >
