@@ -114,11 +114,11 @@ export function MemoryModal({ agentType, agentTitle, open, onClose }: MemoryModa
 
         <div className="flex-1 space-y-2 overflow-y-auto pr-1">
           {error && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border-l-2 border-l-[#d9ab6e] bg-[rgba(217,171,110,0.06)] px-3.5 py-2.5 text-[12.5px] text-white/70">
+            <div className="flex items-center justify-between gap-3 rounded-lg border-l-2 border-l-amber bg-amber/6 px-3.5 py-2.5 text-[12.5px] text-white/70">
               <span>{error}</span>
               <button
                 onClick={load}
-                className="shrink-0 font-medium text-[#e8c088] underline underline-offset-2 hover:text-[#f0cd9c]"
+                className="shrink-0 font-medium text-amber-light underline underline-offset-2 hover:text-amber-light-hover"
               >
                 Retry
               </button>

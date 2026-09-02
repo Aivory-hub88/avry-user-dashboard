@@ -44,7 +44,7 @@
   border: 1px solid rgba(178, 204, 162, 0.25);
 }
 .readyBlocked {
-  color: #e8b96a; background: rgba(232, 185, 106, 0.08);
+  color: var(--color-amber-warn); background: rgba(232, 185, 106, 0.08);
   border: 1px solid rgba(232, 185, 106, 0.22);
 }
 
@@ -98,7 +98,7 @@
 }
 .checkOk { color: var(--color-accent); background: rgba(178, 204, 162, 0.12); }
 .checkError { color: #f19999; background: rgba(248, 113, 113, 0.12); }
-.checkWarn { color: #e8b96a; background: rgba(232, 185, 106, 0.1); }
+.checkWarn { color: var(--color-amber-warn); background: rgba(232, 185, 106, 0.1); }
 .checkText { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .checkLabel { font-size: 12px; color: #d6d3cc; line-height: 1.4; }
 .checkHint { font-size: 10.5px; color: #7d7b76; line-height: 1.4; }

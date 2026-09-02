@@ -116,7 +116,7 @@ const TOOLKIT_LABELS: Record<string, string> = {
 
 const CONNECTION_STATUS_STYLES: Record<ConnectedApp['status'], { label: string; className: string }> = {
   connected: { label: 'Connected', className: 'bg-accent/15 border-accent/25 text-[#dbe5d3]' },
-  needs_reauth: { label: 'Needs reconnect', className: 'bg-[#e8b96a]/15 border-[#e8b96a]/25 text-[#e8b96a]' },
+  needs_reauth: { label: 'Needs reconnect', className: 'bg-amber-warn/15 border-amber-warn/25 text-amber-warn' },
   revoked: { label: 'Revoked', className: 'bg-white/[0.06] border-white/10 text-white/40' },
 };
 
@@ -160,7 +160,7 @@ function Field({
     <div>
       <div className="flex items-baseline justify-between mb-1.5">
         <label className="text-white/70 text-[12px] font-medium">{label}</label>
-        <span className={`text-[10px] ${value.length > limit * 0.9 ? 'text-[#e8b96a]/80' : 'text-white/25'}`}>
+        <span className={`text-[10px] ${value.length > limit * 0.9 ? 'text-amber-warn/80' : 'text-white/25'}`}>
           {value.length}/{limit}
         </span>
       </div>
@@ -222,7 +222,7 @@ function MultiSelect({
     <div ref={wrapRef} className="relative">
       <div className="flex items-baseline justify-between mb-1.5">
         <label className="text-white/70 text-[12px] font-medium">{label}</label>
-        <span className={`text-[10px] ${atMax ? 'text-[#e8b96a]/80' : 'text-white/25'}`}>
+        <span className={`text-[10px] ${atMax ? 'text-amber-warn/80' : 'text-white/25'}`}>
           {selected.length > 0 ? `${selected.length}${max ? `/${max}` : ''} selected` : max ? `up to ${max}` : ''}
         </span>
       </div>
@@ -1153,7 +1153,7 @@ export default function CustomizeAgentModal({
                           ? { label: `Verified${s.tool_count != null ? ` · ${s.tool_count} tool${s.tool_count === 1 ? '' : 's'}` : ''}`, className: 'bg-accent/15 border-accent/25 text-[#dbe5d3]' }
                           : s.status === 'verification_failed'
                             ? { label: 'Verification failed', className: 'bg-red-500/10 border-red-500/20 text-red-300/90' }
-                            : { label: 'Verifying…', className: 'bg-[#e8b96a]/15 border-[#e8b96a]/25 text-[#e8b96a]' };
+                            : { label: 'Verifying…', className: 'bg-amber-warn/15 border-amber-warn/25 text-amber-warn' };
                       return (
                         <div key={s.id} className="px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                           <div className="flex items-center justify-between gap-2">

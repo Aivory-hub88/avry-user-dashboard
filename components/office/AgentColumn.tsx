@@ -212,7 +212,7 @@ export default function AgentColumn({
                 )}
                 {pending > 0 && (
                   <span
-                    className={`absolute -right-0.5 -top-0.5 rounded-full bg-[#d9ab6e] px-[4px] text-[9px] font-bold leading-[13px] text-[#2b2b28] ${
+                    className={`absolute -right-0.5 -top-0.5 rounded-full bg-amber px-[4px] text-[9px] font-bold leading-[13px] text-[#2b2b28] ${
                       arrived.has(row.key) ? "pending-badge-arrived" : ""
                     }`}
                   >
@@ -296,7 +296,7 @@ export default function AgentColumn({
                     >
                       {row.title}
                     </span>
-                    {row.enterprise && <Lock className="h-[10.5px] w-[10.5px] shrink-0 text-[#e8b96a]/90" />}
+                    {row.enterprise && <Lock className="h-[10.5px] w-[10.5px] shrink-0 text-amber-warn/90" />}
                     {mostRecent && (
                       <span className="shrink-0 text-[10.5px] font-light tabular-nums text-white/30">
                         {relativeTime(mostRecent.updatedAt)}
@@ -319,7 +319,7 @@ export default function AgentColumn({
                 <span className="mt-[1px] flex shrink-0 items-center gap-[6px]">
                   {pending > 0 && (
                     <span
-                      className={`rounded-full bg-[rgba(217,171,110,0.13)] px-[6px] py-[1px] text-[10.5px] font-semibold text-[#d9ab6e] ${
+                      className={`rounded-full bg-amber/13 px-[6px] py-[1px] text-[10.5px] font-semibold text-amber ${
                         arrived.has(row.key) ? "pending-badge-arrived" : ""
                       }`}
                     >

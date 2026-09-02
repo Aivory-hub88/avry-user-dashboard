@@ -70,7 +70,7 @@ function Bar({ tone = "idle", children }: { tone?: "idle" | "warn"; children: Re
   return (
     <div
       className={`w-full rounded-lg px-3.5 py-2.5 text-[12.5px] font-light leading-[1.55] ${
-        tone === "warn" ? "bg-[rgba(217,171,110,0.1)] text-white/70" : "bg-white/[0.035] text-white/45"
+        tone === "warn" ? "bg-amber/10 text-white/70" : "bg-white/[0.035] text-white/45"
       }`}
     >
       {children}
@@ -142,7 +142,7 @@ export default function AgentRail({
         </button>
         <AgentAvatar type={agentTarget} size={30} />
         {notifications.length > 0 && (
-          <span className="mt-2 rounded-full bg-[rgba(217,171,110,0.13)] px-[6px] py-[2px] text-[11px] font-bold text-[#d9ab6e]">
+          <span className="mt-2 rounded-full bg-amber/13 px-[6px] py-[2px] text-[11px] font-bold text-amber">
             {notifications.length}
           </span>
         )}
@@ -192,7 +192,7 @@ export default function AgentRail({
             <section className="flex flex-col gap-[8px]">
               <div className="flex items-baseline gap-[7px] px-0.5">
                 <span className="text-[12px] font-semibold leading-none text-white/65">Notifications</span>
-                <span className={`text-[11px] ${notifications.length > 0 ? "text-[#d9ab6e]" : "text-white/30"}`}>
+                <span className={`text-[11px] ${notifications.length > 0 ? "text-amber" : "text-white/30"}`}>
                   {notifications.length}
                 </span>
               </div>

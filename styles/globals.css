@@ -12,9 +12,21 @@
    rendered as fully transparent. Mapped to the exact same values as :root's
    --accent/--accent-dim below, not a new color — this fixes the utility,
    it doesn't redefine the brand color. */
+/* Three amber shades that were each hardcoded ~5-8x across the office/agent
+   UI as both a bracket hex class AND its rgba() equivalent (e.g. `#d9ab6e`
+   next to `rgba(217,171,110,0.13)` for the same badge) — no shared token,
+   so a color tweak meant hunting every call site in both formats. Tokenized
+   verbatim (same three shades, not merged into one) so nothing renders
+   differently: --color-amber = pending/notification-count badges,
+   --color-amber-warn = enterprise-lock icon / status text / limit warnings,
+   --color-amber-light = "Upgrade" link text (with its own hover tint). */
 @theme {
   --color-accent: #b7cba6;
   --color-accent-dim: rgba(183, 203, 166, 0.12);
+  --color-amber: #d9ab6e;
+  --color-amber-warn: #e8b96a;
+  --color-amber-light: #e8c088;
+  --color-amber-light-hover: #f0cd9c;
 }
 
 /* Real font files for literal font-family: 'Manrope'/'Doto' lookups — needed

@@ -193,7 +193,7 @@ function IntegrationsRow() {
           <Image src={asset("/integrations/icons/whatsapp.svg")} alt="WhatsApp" width={32} height={32} />
         </div>
         <div className="w-px self-stretch bg-white/[0.07]" />
-        <span className="inline-flex items-center gap-1.5 text-[#e8b96a]/90 text-[10px] uppercase tracking-wider font-medium">
+        <span className="inline-flex items-center gap-1.5 text-amber-warn/90 text-[10px] uppercase tracking-wider font-medium">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 shrink-0">
             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
           </svg>
@@ -343,7 +343,7 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
             {Array.isArray((agent as any).enterpriseTools) && (agent as any).enterpriseTools.map((tool: string) => (
               <span
                 key={tool}
-                className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-[#e8b96a]/[0.06] border border-[#e8b96a]/[0.18] text-[#e8b96a]/85 text-[10px] font-medium tracking-wide"
+                className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-amber-warn/[0.06] border border-amber-warn/[0.18] text-amber-warn/85 text-[10px] font-medium tracking-wide"
                 title="Enterprise plan only"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 shrink-0">
@@ -518,7 +518,7 @@ function CreditsPill() {
       title="AI message credits for your deployed agents this month"
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium ${
         low
-          ? 'bg-[#e8b96a]/[0.08] border-[#e8b96a]/25 text-[#e8b96a]/90'
+          ? 'bg-amber-warn/[0.08] border-amber-warn/25 text-amber-warn/90'
           : 'bg-white/[0.04] border-white/[0.08] text-white/60'
       }`}
     >

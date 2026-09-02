@@ -92,7 +92,7 @@ export default function MissionControl({
               : []
             const isThinking = row.type === streamingAgentType
             const status = isThinking ? "Thinking…" : pending > 0 ? "Needs you" : "Idle"
-            const statusColor = pending > 0 ? "text-[#d9ab6e]" : isThinking ? "text-white/60" : "text-white/35"
+            const statusColor = pending > 0 ? "text-amber" : isThinking ? "text-white/60" : "text-white/35"
 
             return (
               <button
@@ -112,13 +112,13 @@ export default function MissionControl({
                     <div className="min-w-0">
                       <div className="flex items-center gap-[6px]">
                         <span className="truncate text-[14px] font-medium text-white">{row.title}</span>
-                        {row.enterprise && <Lock className="h-[11px] w-[11px] shrink-0 text-[#e8b96a]/90" />}
+                        {row.enterprise && <Lock className="h-[11px] w-[11px] shrink-0 text-amber-warn/90" />}
                       </div>
                       <span className={`text-[11.5px] font-light ${statusColor}`}>{status}</span>
                     </div>
                   </div>
                   {pending > 0 && (
-                    <span className="shrink-0 rounded-full bg-[rgba(217,171,110,0.15)] px-[8px] py-[3px] text-[11px] font-semibold text-[#d9ab6e]">
+                    <span className="shrink-0 rounded-full bg-amber/15 px-[8px] py-[3px] text-[11px] font-semibold text-amber">
                       {pending}
                     </span>
                   )}
