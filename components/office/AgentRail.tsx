@@ -33,7 +33,15 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { ChevronLeft, ChevronRight, Check, MessageSquare, AlertTriangle, Brain } from "lucide-react"
+import { ChevronLeft, ChevronRight, Brain } from "lucide-react"
+// Notification-card glyphs specifically use Ionicons (MIT-licensed, part of
+// react-icons) rather than Lucide — Ionicons' filled "ios" style is what
+// real iOS/macOS system notifications (Low Battery, Screen Time, etc.) use:
+// solid glyphs, not thin outlines. Apple's own SF Symbols are proprietary
+// and licensed only for software running on Apple platforms, so they
+// aren't an option to embed in this web dashboard — Ionicons is the
+// legitimately-licensed way to get that same visual language.
+import { IoWarning, IoCheckmarkCircle, IoCheckmark, IoChatbubbleEllipses } from "react-icons/io5"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
 import { describeTool, type PendingApproval } from "@/lib/agentApprovals"
@@ -192,19 +200,19 @@ export default function AgentRail({
               {approvalsError && (
                 <NotificationCard
                   tone="warn"
-                  icon={<AlertTriangle className="h-[13px] w-[13px]" />}
+                  icon={<IoWarning className="h-[15px] w-[15px]" />}
                   title="Could not load approvals"
                   subtitle="Tap to try again."
                   onClick={onRetryApprovals}
                 />
               )}
               {resolveError && (
-                <NotificationCard tone="warn" icon={<AlertTriangle className="h-[13px] w-[13px]" />} title={resolveError} />
+                <NotificationCard tone="warn" icon={<IoWarning className="h-[15px] w-[15px]" />} title={resolveError} />
               )}
               {notDeployed && (
                 <NotificationCard
                   tone="warn"
-                  icon={<AlertTriangle className="h-[13px] w-[13px]" />}
+                  icon={<IoWarning className="h-[15px] w-[15px]" />}
                   title="Not deployed anywhere yet"
                   subtitle="Connect it to Telegram, Slack, or WhatsApp to reach it outside Console."
                   actions={
@@ -228,7 +236,7 @@ export default function AgentRail({
                     key={a.id}
                     tone="warn"
                     badge="Needs approval"
-                    icon={<Check className="h-[13px] w-[13px]" />}
+                    icon={<IoCheckmarkCircle className="h-[16px] w-[16px]" />}
                     title={describeTool(a.tool_name)}
                     subtitle="Waiting for your decision."
                     actions={
@@ -239,7 +247,7 @@ export default function AgentRail({
                           aria-busy={busy}
                           className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-[12.5px] font-semibold text-[#1a1a18] transition-[opacity,transform] duration-150 ease-out hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.97] disabled:opacity-50"
                         >
-                          <Check className="h-[12px] w-[12px]" />
+                          <IoCheckmark className="h-[13px] w-[13px]" />
                           {busy ? "Approving…" : "Approve"}
                         </button>
                         <button
@@ -259,7 +267,7 @@ export default function AgentRail({
               {activityItems.map((item) => (
                 <NotificationCard
                   key={item.id}
-                  icon={<MessageSquare className="h-[13px] w-[13px]" />}
+                  icon={<IoChatbubbleEllipses className="h-[15px] w-[15px]" />}
                   title={`New reply in “${item.title}”`}
                   meta={relativeTime(item.updatedAt)}
                   onClick={() => onOpenThread(item.sessionId)}
