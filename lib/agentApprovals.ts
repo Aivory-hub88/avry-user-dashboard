@@ -8,6 +8,7 @@
  */
 
 import { authedFetch } from './deployAuth'
+import { APP_CATALOG } from './integrations/store'
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'
@@ -79,4 +80,18 @@ export function describeTool(toolName: string): string {
     .replace(/_/g, ' ')
     .replace(/^\w/, (c) => c.toUpperCase())
   return toolkit ? `${toolkit} — ${readable}` : readable
+}
+
+/**
+ * The real brand icon for the toolkit a tool call belongs to (Gmail,
+ * Slack, whatever Composio toolkit the tool name is prefixed with) — the
+ * exact same `/integrations/*.svg` set `APP_CATALOG` already uses
+ * everywhere else a connected tool is shown. `null` for a bare loopback
+ * tool name (no `__` prefix) or a toolkit not in the catalog — the caller
+ * falls back to a generic glyph in that case, never a broken image.
+ */
+export function toolkitIconPath(toolName: string): string | null {
+  if (!toolName.includes('__')) return null
+  const slug = toolName.split('__')[0].replace(/^composio-/, '')
+  return APP_CATALOG.find((app) => app.id === slug)?.iconPath || null
 }

@@ -44,7 +44,7 @@ import { ChevronLeft, ChevronRight, Brain } from "lucide-react"
 import { IoWarning, IoCheckmarkCircle, IoCheckmark, IoChatbubbleEllipses } from "react-icons/io5"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
-import { describeTool, type PendingApproval } from "@/lib/agentApprovals"
+import { describeTool, toolkitIconPath, type PendingApproval } from "@/lib/agentApprovals"
 import type { Notification } from "@/types/notifications"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { NotificationCard } from "@/components/office/NotificationCard"
@@ -231,12 +231,25 @@ export default function AgentRail({
 
               {approvalItems.map(({ approval: a }) => {
                 const busy = busyId === a.id
+                // A real approval is always about a specific tool/service —
+                // Gmail, Slack, whatever's being called. Show that service's
+                // own brand icon (the same /integrations/*.svg set the rest
+                // of the dashboard already uses) instead of a generic glyph
+                // whenever the tool name resolves to one; only a bare
+                // loopback tool with no toolkit prefix falls back.
+                const brandIcon = toolkitIconPath(a.tool_name)
                 return (
                   <NotificationCard
                     key={a.id}
                     tone="warn"
                     badge="Needs approval"
-                    icon={<IoCheckmarkCircle className="h-[16px] w-[16px]" />}
+                    icon={
+                      brandIcon ? (
+                        <Image src={asset(brandIcon)} alt="" width={18} height={18} className="rounded-[4px]" />
+                      ) : (
+                        <IoCheckmarkCircle className="h-[16px] w-[16px]" />
+                      )
+                    }
                     title={describeTool(a.tool_name)}
                     subtitle="Waiting for your decision."
                     actions={
