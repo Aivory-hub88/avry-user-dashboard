@@ -16,6 +16,11 @@ import { authedFetch } from './deployAuth'
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'
 
+export interface VerifiedTool {
+  name: string
+  description: string
+}
+
 export interface TenantMcpServer {
   id: string
   agent_type: string
@@ -28,16 +33,14 @@ export interface TenantMcpServer {
   last_verify_error: string | null
   tool_count: number | null
   created_at: string
+  /** This server's own last-verified tool list — empty until the first
+   *  successful verification. */
+  tools: VerifiedTool[]
+  /** Tool names (from `tools`) the tenant has turned off via `updateDisabledTools`. */
+  disabled_tools: string[]
 }
 
-export interface VerifiedTool {
-  name: string
-  description: string
-}
-
-export interface RegisterResult extends TenantMcpServer {
-  tools?: VerifiedTool[]
-}
+export type RegisterResult = TenantMcpServer
 
 export class TenantMcpServerError extends Error {
   status: number
@@ -103,6 +106,19 @@ export async function registerTenantMcpServer(input: RegisterServerInput): Promi
 export async function reverifyTenantMcpServer(id: string): Promise<RegisterResult> {
   const res = await authedFetch(`${BACKEND_URL}/api/v1/tenant-mcp-servers/${encodeURIComponent(id)}/reverify`, {
     method: 'POST',
+  })
+  if (!res.ok) await parseErrorAndThrow(res)
+  return res.json()
+}
+
+/** Full replacement of the server's disabled-tool set — not a toggle of one
+ *  name — since the backend validates the whole list against its stored
+ *  tools_json in one pass. Callers should send the complete set they want
+ *  disabled after each checkbox change. */
+export async function updateDisabledTools(id: string, disabledTools: string[]): Promise<TenantMcpServer> {
+  const res = await authedFetch(`${BACKEND_URL}/api/v1/tenant-mcp-servers/${encodeURIComponent(id)}/tools`, {
+    method: 'PATCH',
+    body: JSON.stringify({ disabled_tools: disabledTools }),
   })
   if (!res.ok) await parseErrorAndThrow(res)
   return res.json()
