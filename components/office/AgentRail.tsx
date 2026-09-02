@@ -33,13 +33,14 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { ChevronLeft, ChevronRight, Check, MessageSquare, AlertTriangle } from "lucide-react"
+import { ChevronLeft, ChevronRight, Check, MessageSquare, AlertTriangle, Brain } from "lucide-react"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
 import { describeTool, type PendingApproval } from "@/lib/agentApprovals"
 import type { Notification } from "@/types/notifications"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { NotificationCard } from "@/components/office/NotificationCard"
+import { MemoryModal } from "@/components/office/MemoryModal"
 
 function relativeTime(ts: number): string {
   const diffMs = Date.now() - ts
@@ -97,6 +98,7 @@ export default function AgentRail({
 }: AgentRailProps) {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
+  const [memoryOpen, setMemoryOpen] = useState(false)
 
   const title = agentTarget
     ? PREBUILT_AGENTS.find((a) => a.type === agentTarget)?.title ?? agentTarget
@@ -156,8 +158,20 @@ export default function AgentRail({
             font-size on any heading tag, which is what made this render at
             24px regardless of the class here. This is chrome, not a page
             heading. */}
-        <span className="truncate text-[13px] font-medium leading-none text-white/55">{title}</span>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-none text-white/55">{title}</span>
+        {agentTarget !== null && (
+          <button
+            onClick={() => setMemoryOpen(true)}
+            aria-label={`What ${title} remembers`}
+            title={`What ${title} remembers`}
+            className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[8px] text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
+          >
+            <Brain className="h-[14px] w-[14px]" />
+          </button>
+        )}
       </div>
+
+      <MemoryModal agentType={agentTarget} agentTitle={title} open={memoryOpen} onClose={() => setMemoryOpen(false)} />
 
       <div className="flex-1 overflow-y-auto px-[14px] py-[14px]">
         {agentTarget === null ? (
