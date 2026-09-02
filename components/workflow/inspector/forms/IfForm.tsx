@@ -46,7 +46,7 @@ export default function IfForm({ config, onChange, errors }: Props) {
               style={{ padding: '4px 12px', borderRadius: 5, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: '1px solid', fontFamily: 'inherit', transition: 'all 0.15s',
                 background: config.combinator === op ? 'rgba(178, 204, 162,0.15)' : 'rgba(255,255,255,0.04)',
                 borderColor: config.combinator === op ? 'rgba(178, 204, 162,0.3)' : 'rgba(255,255,255,0.08)',
-                color: config.combinator === op ? '#b7cba6' : '#a8a6a2',
+                color: config.combinator === op ? 'var(--color-accent)' : '#a8a6a2',
               }}>{op}</button>
           ))}
         </div>

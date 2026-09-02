@@ -164,7 +164,7 @@ function HeroBanner() {
         </p>
       </div>
       {/* Decorative background glows */}
-      <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-[#b7cba6]/[0.06] rounded-full blur-3xl" />
+      <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-accent/[0.06] rounded-full blur-3xl" />
       <div className="absolute -top-16 -left-12 w-56 h-56 bg-white/[0.04] rounded-full blur-3xl" />
     </div>
   );
@@ -207,8 +207,8 @@ function IntegrationsRow() {
 function DeploymentRow({ deployment, onDisconnect }: { deployment: AgentDeployment, onDisconnect: (d: AgentDeployment) => void }) {
   const [busy, setBusy] = useState(false);
   return (
-    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#b7cba6]/[0.05] border border-[#b7cba6]/[0.12]">
-      <span className="w-1.5 h-1.5 rounded-full bg-[#b7cba6] shrink-0" />
+    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-accent/[0.05] border border-accent/[0.12]">
+      <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
       <Image
         src={asset(`/integrations/icons/${deployment.kind === 'api' ? 'http-api' : deployment.kind}.svg`)}
         alt={deployment.kind}
@@ -221,7 +221,7 @@ function DeploymentRow({ deployment, onDisconnect }: { deployment: AgentDeployme
           href={buildSlackOpenUrl(deployment.id)}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[10.5px] text-white/65 hover:text-[#b7cba6] truncate flex-1 transition-colors"
+          className="text-[10.5px] text-white/65 hover:text-accent truncate flex-1 transition-colors"
           title={`Open chat with ${deployment.label} in Slack`}
         >
           {deployment.label}
@@ -334,7 +334,7 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
                 key={tool}
                 className="inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-white/[0.05] border border-white/[0.08] text-white/55 text-[10px] font-medium tracking-wide"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 text-[#b7cba6]/80">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 text-accent/80">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085" />
                 </svg>
                 {tool}
@@ -367,7 +367,7 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
         <div className="mt-auto pt-5 flex items-center gap-2">
           <button
             onClick={onConfigure}
-            className="flex-1 py-2 rounded-lg bg-gradient-to-b from-white/[0.09] to-white/[0.03] hover:from-[#b7cba6]/25 hover:to-[#b7cba6]/10 text-white/95 hover:text-white text-[12.5px] font-medium transition-all border border-white/10 hover:border-[#b7cba6]/30 shadow-[0_1px_0_rgba(255,255,255,0.08)_inset,0_4px_12px_rgba(0,0,0,0.25)] flex items-center justify-center gap-2 group/btn"
+            className="flex-1 py-2 rounded-lg bg-gradient-to-b from-white/[0.09] to-white/[0.03] hover:from-accent/25 hover:to-accent/10 text-white/95 hover:text-white text-[12.5px] font-medium transition-all border border-white/10 hover:border-accent/30 shadow-[0_1px_0_rgba(255,255,255,0.08)_inset,0_4px_12px_rgba(0,0,0,0.25)] flex items-center justify-center gap-2 group/btn"
           >
             Configure
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover/btn:opacity-100 group-hover/btn:translate-x-0 transition-all duration-200">
@@ -522,7 +522,7 @@ function CreditsPill() {
           : 'bg-white/[0.04] border-white/[0.08] text-white/60'
       }`}
     >
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-3 h-3 text-[#b7cba6]/90">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-3 h-3 text-accent/90">
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
       </svg>
       {credits.unlimited

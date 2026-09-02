@@ -50,7 +50,7 @@ const StickyNode = ({ data }: { data: any }) => {
           if (match) {
             return (
               <div key={i} className="flex gap-2 items-start">
-                <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-[#b7cba6]/15 text-[#c9dab8] text-[8px] font-semibold flex items-center justify-center mt-0.5">
+                <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-accent/15 text-[#c9dab8] text-[8px] font-semibold flex items-center justify-center mt-0.5">
                   {match[1].replace('.', '')}
                 </span>
                 <span>{match[2]}</span>

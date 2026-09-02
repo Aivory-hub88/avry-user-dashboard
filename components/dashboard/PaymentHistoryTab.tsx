@@ -90,7 +90,7 @@ export default function PaymentHistoryTab() {
     switch (status?.toLowerCase()) {
       case "paid":
       case "completed":
-        return "bg-[#b7cba6]/20 text-[#b7cba6]"
+        return "bg-accent/20 text-accent"
       case "failed":
         return "bg-red-500/20 text-red-400"
       case "refunded":

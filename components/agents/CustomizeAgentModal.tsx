@@ -115,7 +115,7 @@ const TOOLKIT_LABELS: Record<string, string> = {
 };
 
 const CONNECTION_STATUS_STYLES: Record<ConnectedApp['status'], { label: string; className: string }> = {
-  connected: { label: 'Connected', className: 'bg-[#b7cba6]/15 border-[#b7cba6]/25 text-[#dbe5d3]' },
+  connected: { label: 'Connected', className: 'bg-accent/15 border-accent/25 text-[#dbe5d3]' },
   needs_reauth: { label: 'Needs reconnect', className: 'bg-[#e8b96a]/15 border-[#e8b96a]/25 text-[#e8b96a]' },
   revoked: { label: 'Revoked', className: 'bg-white/[0.06] border-white/10 text-white/40' },
 };
@@ -142,7 +142,7 @@ const EMPTY: Record<FieldKey, string> = {
 };
 
 const inputClass =
-  'w-full px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 text-white/90 text-[13px] placeholder-white/25 focus:outline-none focus:border-[#b7cba6]/40 transition-colors';
+  'w-full px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 text-white/90 text-[13px] placeholder-white/25 focus:outline-none focus:border-accent/40 transition-colors';
 
 function Field({
   label, hint, value, limit, onChange, textarea, rows, placeholder,
@@ -238,7 +238,7 @@ function MultiSelect({
             {selected.map((v) => (
               <span
                 key={v}
-                className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-[#b7cba6]/15 border border-[#b7cba6]/25 text-[#dbe5d3] text-[11px]"
+                className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-accent/15 border border-accent/25 text-[#dbe5d3] text-[11px]"
               >
                 {v}
                 <span
@@ -272,7 +272,7 @@ function MultiSelect({
                 disabled={disabled}
                 className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-[13px] transition-colors ${disabled ? 'text-white/25 cursor-not-allowed' : 'text-white/80 hover:bg-white/[0.06]'}`}
               >
-                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${checked ? 'bg-[#b7cba6]/80 border-[#b7cba6]' : disabled ? 'border-white/10' : 'border-white/25'}`}>
+                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${checked ? 'bg-accent/80 border-accent' : disabled ? 'border-white/10' : 'border-white/25'}`}>
                   {checked && (
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="#242424" className="w-3 h-3">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -903,7 +903,7 @@ export default function CustomizeAgentModal({
                   t === 'mcp' ? '' : 'capitalize'
                 } ${
                   tab === t
-                    ? 'text-[#dbe5d3] border-[#b7cba6]'
+                    ? 'text-[#dbe5d3] border-accent'
                     : 'text-white/40 hover:text-white/65 border-transparent'
                 }`}
               >
@@ -986,7 +986,7 @@ export default function CustomizeAgentModal({
                     <span className="text-white/30 text-[11px]">PDF, Word, Excel, CSV, or text — added to the field above.</span>
                   </div>
                   {knowledgeUploadNotice && (
-                    <p className={`mt-1 text-[11.5px] ${knowledgeUploadNotice.type === 'success' ? 'text-[#b7cba6]' : 'text-red-300/80'}`}>
+                    <p className={`mt-1 text-[11.5px] ${knowledgeUploadNotice.type === 'success' ? 'text-accent' : 'text-red-300/80'}`}>
                       {knowledgeUploadNotice.message}
                     </p>
                   )}
@@ -1045,7 +1045,7 @@ export default function CustomizeAgentModal({
                                 if (app) handleConnect(app);
                                 else setConnectFeedback({ type: 'error', message: `Could not start ${TOOLKIT_LABELS[slug] || slug} connect.` });
                               }}
-                              className="px-2.5 py-1 rounded-lg bg-[#b7cba6]/15 border border-[#b7cba6]/25 text-[#dbe5d3] hover:bg-[#b7cba6]/25 text-[11px] font-medium disabled:opacity-40 transition-colors"
+                              className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/25 text-[#dbe5d3] hover:bg-accent/25 text-[11px] font-medium disabled:opacity-40 transition-colors"
                             >
                               {busy ? '…' : 'Connect'}
                             </button>
@@ -1054,7 +1054,7 @@ export default function CustomizeAgentModal({
                             <button
                               type="button"
                               onClick={() => { setApiKeyFormOpen((v) => !v); setApiKeyError(null); }}
-                              className="px-2.5 py-1 rounded-lg bg-[#b7cba6]/15 border border-[#b7cba6]/25 text-[#dbe5d3] hover:bg-[#b7cba6]/25 text-[11px] font-medium transition-colors"
+                              className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/25 text-[#dbe5d3] hover:bg-accent/25 text-[11px] font-medium transition-colors"
                             >
                               {apiKeyFormOpen ? 'Close' : 'Connect'}
                             </button>
@@ -1077,7 +1077,7 @@ export default function CustomizeAgentModal({
                             title={conn ? undefined : 'Connect first'}
                             onClick={() => toggleToolkit(slug, !enabled)}
                             className={`relative w-10 h-[22px] rounded-full transition-colors disabled:opacity-30 ${
-                              enabled ? 'bg-[#b7cba6]/70' : 'bg-white/10'
+                              enabled ? 'bg-accent/70' : 'bg-white/10'
                             }`}
                           >
                             <span
@@ -1098,21 +1098,21 @@ export default function CustomizeAgentModal({
                             value={erpnextBaseUrl}
                             onChange={(e) => setErpNextBaseUrl(e.target.value)}
                             placeholder="https://your-company.com (Frappe instance URL)"
-                            className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-[#b7cba6]/50"
+                            className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-accent/50"
                           />
                           <input
                             type="password"
                             value={erpnextApiKey}
                             onChange={(e) => setErpNextApiKey(e.target.value)}
                             placeholder="API Key"
-                            className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-[#b7cba6]/50"
+                            className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-accent/50"
                           />
                           <input
                             type="password"
                             value={erpnextApiSecret}
                             onChange={(e) => setErpNextApiSecret(e.target.value)}
                             placeholder="API Secret"
-                            className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-[#b7cba6]/50"
+                            className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-accent/50"
                           />
                           {apiKeyError && (
                             <p className="text-red-300/80 text-[11.5px]">{apiKeyError}</p>
@@ -1121,7 +1121,7 @@ export default function CustomizeAgentModal({
                             type="button"
                             disabled={apiKeyBusy}
                             onClick={handleErpNextConnect}
-                            className="w-full px-3 py-2 rounded-lg bg-[#b7cba6]/15 border border-[#b7cba6]/25 text-[#dbe5d3] hover:bg-[#b7cba6]/25 text-[12px] font-medium disabled:opacity-40 transition-colors"
+                            className="w-full px-3 py-2 rounded-lg bg-accent/15 border border-accent/25 text-[#dbe5d3] hover:bg-accent/25 text-[12px] font-medium disabled:opacity-40 transition-colors"
                           >
                             {apiKeyBusy ? 'Connecting…' : 'Save & connect'}
                           </button>
@@ -1150,7 +1150,7 @@ export default function CustomizeAgentModal({
                     {mcpServers.map((s) => {
                       const style =
                         s.status === 'verified'
-                          ? { label: `Verified${s.tool_count != null ? ` · ${s.tool_count} tool${s.tool_count === 1 ? '' : 's'}` : ''}`, className: 'bg-[#b7cba6]/15 border-[#b7cba6]/25 text-[#dbe5d3]' }
+                          ? { label: `Verified${s.tool_count != null ? ` · ${s.tool_count} tool${s.tool_count === 1 ? '' : 's'}` : ''}`, className: 'bg-accent/15 border-accent/25 text-[#dbe5d3]' }
                           : s.status === 'verification_failed'
                             ? { label: 'Verification failed', className: 'bg-red-500/10 border-red-500/20 text-red-300/90' }
                             : { label: 'Verifying…', className: 'bg-[#e8b96a]/15 border-[#e8b96a]/25 text-[#e8b96a]' };
@@ -1233,7 +1233,7 @@ export default function CustomizeAgentModal({
                             onClick={() => setMcpForm((f) => ({ ...f, transport: t }))}
                             className={`px-3.5 py-2 rounded-lg border text-[12.5px] transition-colors ${
                               mcpForm.transport === t
-                                ? 'bg-[#b7cba6]/15 border-[#b7cba6]/30 text-[#dbe5d3]'
+                                ? 'bg-accent/15 border-accent/30 text-[#dbe5d3]'
                                 : 'bg-white/[0.04] border-white/10 text-white/50 hover:text-white/75'
                             }`}
                           >
@@ -1262,7 +1262,7 @@ export default function CustomizeAgentModal({
                       type="button"
                       onClick={handleRegisterMcpServer}
                       disabled={mcpRegistering}
-                      className="w-full py-2.5 rounded-lg bg-[#b7cba6]/20 hover:bg-[#b7cba6]/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-[#b7cba6]/30 disabled:opacity-50"
+                      className="w-full py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50"
                     >
                       {mcpRegistering ? 'Registering & verifying…' : 'Register & verify server'}
                     </button>
@@ -1295,9 +1295,9 @@ export default function CustomizeAgentModal({
                     </div>
                     <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
                       {deployLoading ? (
-                        <div className="w-5 h-5 border-2 border-[#b7cba6]/30 border-t-[#b7cba6] rounded-full animate-spin" />
+                        <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
                       ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-accent">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                         </svg>
                       )}
@@ -1318,9 +1318,9 @@ export default function CustomizeAgentModal({
                     </div>
                     <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
                       {deployLoading ? (
-                        <div className="w-5 h-5 border-2 border-[#b7cba6]/30 border-t-[#b7cba6] rounded-full animate-spin" />
+                        <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
                       ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-accent">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                         </svg>
                       )}
@@ -1341,9 +1341,9 @@ export default function CustomizeAgentModal({
                     </div>
                     <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
                       {deployLoading ? (
-                        <div className="w-5 h-5 border-2 border-[#b7cba6]/30 border-t-[#b7cba6] rounded-full animate-spin" />
+                        <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
                       ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-accent">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                         </svg>
                       )}
@@ -1363,7 +1363,7 @@ export default function CustomizeAgentModal({
                       <div className="text-white/40 text-[12px] mt-0.5">Deploy to your own app or bot — Business plan and above</div>
                     </div>
                     <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-accent">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                       </svg>
                     </div>
@@ -1378,7 +1378,7 @@ export default function CustomizeAgentModal({
                       <div className="text-white/40 text-[12px] mt-0.5">Deploy to WhatsApp Business</div>
                     </div>
                     <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-[#b7cba6]">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-accent">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                       </svg>
                     </div>
@@ -1406,15 +1406,15 @@ export default function CustomizeAgentModal({
                 </p>
 
                 <div className="flex flex-col items-center">
-                  <div className={`w-[216px] h-[216px] rounded-2xl border flex flex-col items-center justify-center gap-3 ${linkStatus === 'connected' ? 'bg-[#b7cba6]/10 border-[#b7cba6]/30' : 'bg-white/[0.03] border-white/10'}`}>
+                  <div className={`w-[216px] h-[216px] rounded-2xl border flex flex-col items-center justify-center gap-3 ${linkStatus === 'connected' ? 'bg-accent/10 border-accent/30' : 'bg-white/[0.03] border-white/10'}`}>
                     {linkStatus === 'connected' ? (
                       <>
-                        <div className="w-14 h-14 rounded-full bg-[#b7cba6]/20 flex items-center justify-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7 text-[#b7cba6]">
+                        <div className="w-14 h-14 rounded-full bg-accent/20 flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7 text-accent">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                           </svg>
                         </div>
-                        <span className="text-[#b7cba6] text-[13px] font-medium">Connected</span>
+                        <span className="text-accent text-[13px] font-medium">Connected</span>
                       </>
                     ) : (
                       <>
@@ -1425,7 +1425,7 @@ export default function CustomizeAgentModal({
                           <button
                             onClick={startSlackDeploy}
                             disabled={deployLoading}
-                            className="px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-[#b7cba6]/50 transition-all"
+                            className="px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-accent/50 transition-all"
                           >
                             {deployLoading ? 'Generating…' : 'Generate new link'}
                           </button>
@@ -1450,14 +1450,14 @@ export default function CustomizeAgentModal({
                   {linkStatus === 'pending' && (
                     <>
                       <div className="flex items-center gap-2 mt-5 text-white/50 text-[12px]">
-                        <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-[#b7cba6] rounded-full animate-spin" />
+                        <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-accent rounded-full animate-spin" />
                         Waiting for approval…
                       </div>
                       <a
                         href={slackLink.install_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-3 text-[#b7cba6]/80 hover:text-[#b7cba6] text-[12px] underline underline-offset-2 transition-colors"
+                        className="mt-3 text-accent/80 hover:text-accent text-[12px] underline underline-offset-2 transition-colors"
                       >
                         Re-open the Slack authorization page
                       </a>
@@ -1487,13 +1487,13 @@ export default function CustomizeAgentModal({
 
                 <div className="flex flex-col items-center">
                   {linkStatus === 'connected' ? (
-                    <div className="w-[216px] h-[216px] rounded-2xl bg-[#b7cba6]/10 border border-[#b7cba6]/30 flex flex-col items-center justify-center gap-3">
-                      <div className="w-14 h-14 rounded-full bg-[#b7cba6]/20 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7 text-[#b7cba6]">
+                    <div className="w-[216px] h-[216px] rounded-2xl bg-accent/10 border border-accent/30 flex flex-col items-center justify-center gap-3">
+                      <div className="w-14 h-14 rounded-full bg-accent/20 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7 text-accent">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                         </svg>
                       </div>
-                      <span className="text-[#b7cba6] text-[13px] font-medium">Connected</span>
+                      <span className="text-accent text-[13px] font-medium">Connected</span>
                     </div>
                   ) : (
                     <div className={`relative p-4 bg-white rounded-2xl ${linkStatus === 'expired' ? 'opacity-30' : ''}`}>
@@ -1503,7 +1503,7 @@ export default function CustomizeAgentModal({
                           <button
                             onClick={startTelegramDeploy}
                             disabled={deployLoading}
-                            className="px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-[#b7cba6]/50 transition-all"
+                            className="px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-accent/50 transition-all"
                           >
                             {deployLoading ? 'Generating…' : 'Generate new QR'}
                           </button>
@@ -1515,14 +1515,14 @@ export default function CustomizeAgentModal({
                   {linkStatus === 'pending' && (
                     <>
                       <div className="flex items-center gap-2 mt-5 text-white/50 text-[12px]">
-                        <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-[#b7cba6] rounded-full animate-spin" />
+                        <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-accent rounded-full animate-spin" />
                         Waiting for scan…
                       </div>
                       <a
                         href={deployLink.deep_link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-3 text-[#b7cba6]/80 hover:text-[#b7cba6] text-[12px] underline underline-offset-2 transition-colors"
+                        className="mt-3 text-accent/80 hover:text-accent text-[12px] underline underline-offset-2 transition-colors"
                       >
                         Or open in Telegram on this device
                       </a>
@@ -1552,13 +1552,13 @@ export default function CustomizeAgentModal({
 
                 <div className="flex flex-col items-center">
                   {discordLinkStatus === 'connected' ? (
-                    <div className="w-[216px] h-[216px] rounded-2xl bg-[#b7cba6]/10 border border-[#b7cba6]/30 flex flex-col items-center justify-center gap-3">
-                      <div className="w-14 h-14 rounded-full bg-[#b7cba6]/20 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7 text-[#b7cba6]">
+                    <div className="w-[216px] h-[216px] rounded-2xl bg-accent/10 border border-accent/30 flex flex-col items-center justify-center gap-3">
+                      <div className="w-14 h-14 rounded-full bg-accent/20 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7 text-accent">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                         </svg>
                       </div>
-                      <span className="text-[#b7cba6] text-[13px] font-medium">Connected</span>
+                      <span className="text-accent text-[13px] font-medium">Connected</span>
                     </div>
                   ) : (
                     <>
@@ -1580,7 +1580,7 @@ export default function CustomizeAgentModal({
                         <button
                           onClick={startDiscordDeploy}
                           disabled={deployLoading}
-                          className="mt-3 px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-[#b7cba6]/50 transition-all"
+                          className="mt-3 px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-accent/50 transition-all"
                         >
                           {deployLoading ? 'Generating…' : 'Generate new code'}
                         </button>
@@ -1590,7 +1590,7 @@ export default function CustomizeAgentModal({
 
                   {discordLinkStatus === 'pending' && (
                     <div className="flex items-center gap-2 mt-5 text-white/50 text-[12px]">
-                      <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-[#b7cba6] rounded-full animate-spin" />
+                      <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-accent rounded-full animate-spin" />
                       Waiting for /connect…
                     </div>
                   )}
@@ -1628,12 +1628,12 @@ export default function CustomizeAgentModal({
                       value={apiKeyLabel}
                       onChange={(e) => setApiKeyLabel(e.target.value.slice(0, 200))}
                       placeholder="e.g. Discord bot prod"
-                      className="w-full px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 text-white/90 text-[13px] placeholder-white/25 focus:outline-none focus:border-[#b7cba6]/40 transition-colors mb-4"
+                      className="w-full px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 text-white/90 text-[13px] placeholder-white/25 focus:outline-none focus:border-accent/40 transition-colors mb-4"
                     />
                     <button
                       onClick={startApiKeyCreate}
                       disabled={deployLoading}
-                      className="w-full py-2.5 rounded-lg bg-[#b7cba6]/20 hover:bg-[#b7cba6]/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-[#b7cba6]/30 disabled:opacity-50"
+                      className="w-full py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50"
                     >
                       {deployLoading ? 'Creating…' : 'Create API key'}
                     </button>
@@ -1682,7 +1682,7 @@ export default function CustomizeAgentModal({
             <button
               onClick={handleSave}
               disabled={saving || loading}
-              className="flex-1 py-2.5 rounded-lg bg-[#b7cba6]/20 hover:bg-[#b7cba6]/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-[#b7cba6]/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save identity'}
             </button>

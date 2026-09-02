@@ -31,7 +31,7 @@
 .value {
   font-size: 14px;
   font-weight: 700;
-  color: #b7cba6;
+  color: var(--color-accent);
   line-height: 1.25;
   overflow-wrap: anywhere;
 }

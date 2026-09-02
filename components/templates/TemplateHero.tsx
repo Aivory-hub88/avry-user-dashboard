@@ -41,7 +41,7 @@ export default function TemplateHero() {
       </div>
 
       {/* Decorative background glows */}
-      <div className="absolute -bottom-16 -right-16 w-56 h-56 bg-[#b7cba6]/[0.07] rounded-full blur-3xl" />
+      <div className="absolute -bottom-16 -right-16 w-56 h-56 bg-accent/[0.07] rounded-full blur-3xl" />
     </div>
   );
 }

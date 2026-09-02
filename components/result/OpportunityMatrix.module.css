@@ -59,7 +59,7 @@
   letter-spacing: 0.03em;
 }
 
-.labelQuickWin { fill: #b7cba6; }
+.labelQuickWin { fill: var(--color-accent); }
 .labelThankless { fill: #e08a8a; }
 .labelNeutral { fill: #8f9089; }
 

@@ -47,7 +47,7 @@
 .lifecycleCard:hover .cardIcon {
   background: rgba(178, 204, 162, 0.08);
   border-color: rgba(178, 204, 162, 0.2);
-  color: #b7cba6;
+  color: var(--color-accent);
 }
 
 .title {
@@ -101,7 +101,7 @@
 
 .statusBadge.completed {
   background: rgba(178, 204, 162, 0.1);
-  color: #b7cba6;
+  color: var(--color-accent);
   border: 1px solid rgba(178, 204, 162, 0.2);
 }
 

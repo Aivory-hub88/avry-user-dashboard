@@ -43,7 +43,7 @@ export default function ScoreRing({ score, maturityLevel, isPrintMode, locale = 
                 single-tone stroke. */}
             <linearGradient id="scoreArcGradient" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#7fae6f" />
-              <stop offset="55%" stopColor="#b7cba6" />
+              <stop offset="55%" stopColor="var(--color-accent)" />
               <stop offset="100%" stopColor="#d9ecc9" />
             </linearGradient>
             {/* Soft glow behind the arc for a "high-tech instrument" feel */}

@@ -122,7 +122,7 @@ export default function AgentDetailPage() {
       <div className="min-h-screen bg-[#353531] p-8 flex items-center justify-center overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         <div className="text-center">
           <div className="inline-block animate-spin mb-4">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#b7cba6]">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
               <circle cx="12" cy="12" r="10" opacity="0.3" />
               <path d="M12 2a10 10 0 0 1 10 10" />
             </svg>
@@ -137,7 +137,7 @@ export default function AgentDetailPage() {
     return (
       <div className="min-h-screen bg-[#353531] p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         <div className="max-w-2xl mx-auto overflow-x-hidden">
-          <Link href="/agents" className="text-[#b7cba6] hover:text-[#00f5b0] text-sm font-medium mb-4 inline-block">
+          <Link href="/agents" className="text-accent hover:text-[#00f5b0] text-sm font-medium mb-4 inline-block">
             ← Back to Agents
           </Link>
           <div className="text-center py-12 bg-white/5 border border-white/10 rounded-lg">
@@ -153,7 +153,7 @@ export default function AgentDetailPage() {
       <div className="max-w-2xl mx-auto overflow-x-hidden">
         {/* Header */}
         <div className="mb-8">
-          <Link href="/agents" className="text-[#b7cba6] hover:text-[#00f5b0] text-sm font-medium mb-4 inline-block">
+          <Link href="/agents" className="text-accent hover:text-[#00f5b0] text-sm font-medium mb-4 inline-block">
             ← Back to Agents
           </Link>
           <div className="flex items-center justify-between">
@@ -230,7 +230,7 @@ export default function AgentDetailPage() {
                   name="name"
                   value={formData.name || ''}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-[#b7cba6] transition-colors"
+                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-accent transition-colors"
                 />
               </div>
 
@@ -241,7 +241,7 @@ export default function AgentDetailPage() {
                   value={formData.description || ''}
                   onChange={handleChange}
                   rows={3}
-                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-[#b7cba6] transition-colors resize-none"
+                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-accent transition-colors resize-none"
                 />
               </div>
 
@@ -268,7 +268,7 @@ export default function AgentDetailPage() {
                     name="provider"
                     value={formData.provider || ''}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-[#b7cba6] transition-colors"
+                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-accent transition-colors"
                   >
                     {PROVIDERS.map(p => (
                       <option key={p} value={p} className="bg-[#2a2a26]">
@@ -284,7 +284,7 @@ export default function AgentDetailPage() {
                     name="runtime"
                     value={formData.runtime || ''}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-[#b7cba6] transition-colors"
+                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-accent transition-colors"
                   >
                     {RUNTIMES.map(r => (
                       <option key={r} value={r} className="bg-[#2a2a26]">
@@ -300,7 +300,7 @@ export default function AgentDetailPage() {
                     name="status"
                     value={formData.status || ''}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-[#b7cba6] transition-colors"
+                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-zinc-100 focus:outline-none focus:border-accent transition-colors"
                   >
                     {STATUSES.map(s => (
                       <option key={s} value={s} className="bg-[#2a2a26]">

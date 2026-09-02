@@ -13,7 +13,7 @@ interface OpportunityCardProps {
 
 // Must stay in sync with DOT_COLORS in OpportunityMatrix.tsx
 const DOT_COLORS = [
-  '#b7cba6',
+  'var(--color-accent)',
   '#60a5fa',
   '#f59e0b',
   '#f472b6',

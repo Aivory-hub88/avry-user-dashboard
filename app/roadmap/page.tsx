@@ -19,10 +19,10 @@ const T = {
   cardHover:    'rgba(255,255,255,0.05)',
   border:       'rgba(255,255,255,0.07)',
   borderGreen:  '#666864',
-  green:        '#b7cba6',
+  green:        'var(--color-accent)',
   greenDim:     '#282827',
   greenGlow:    'rgba(255,255,255,0.08)',
-  purple:       '#b7cba6',
+  purple:       'var(--color-accent)',
   purpleDim:    '#282827',
   purpleBorder: '#666864',
   text:         '#f0ede9',
@@ -701,7 +701,7 @@ function BtnPrimary({ onClick, disabled, loading, children }: {
     <button onClick={onClick} disabled={disabled}
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{
-        background: disabled ? T.green : `linear-gradient(to bottom, ${h ? '#d3e2c4' : '#c9dab8'}, ${h ? '#c2d5af' : '#b7cba6'})`,
+        background: disabled ? T.green : `linear-gradient(to bottom, ${h ? '#d3e2c4' : '#c9dab8'}, ${h ? '#c2d5af' : 'var(--color-accent)'})`,
         color: '#1c2318', border: 'none', borderRadius: 9,
         padding: '9px 22px', fontSize: '0.8125rem', fontWeight: 600,
         fontFamily: 'inherit', cursor: disabled ? 'not-allowed' : 'pointer',

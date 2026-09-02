@@ -668,7 +668,7 @@ function BlueprintInsightsSection({
                 <tr key={i}>
                   <td style={{ color: '#ccc' }}>{row.metric}</td>
                   <td>{row.current}</td>
-                  <td style={{ color: '#b7cba6', fontWeight: 600 }}>{row.target}</td>
+                  <td style={{ color: 'var(--color-accent)', fontWeight: 600 }}>{row.target}</td>
                   <td>{row.impact}</td>
                 </tr>
               ))}
@@ -686,7 +686,7 @@ function BlueprintInsightsSection({
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {s.currentState.highlights.map((h, i) => (
               <li key={i} style={{ fontSize: '0.875rem', color: '#c6c6bf', paddingLeft: 14, position: 'relative', lineHeight: 1.5 }}>
-                <span style={{ position: 'absolute', left: 0, color: '#b7cba6' }}>•</span>
+                <span style={{ position: 'absolute', left: 0, color: 'var(--color-accent)' }}>•</span>
                 {typeof h === 'string' ? h : coerceToString(h, 'Highlight')}
               </li>
             ))}
@@ -984,7 +984,7 @@ function BlueprintInsightsSection({
               </div>
               <div className={styles.deployMetaItem}>
                 <span className={styles.deployMetaLabel}>{t("estimatedRoiLabel")}</span>
-                <span className={styles.deployMetaValue} style={{ color: '#b7cba6', fontWeight: 600 }}>{t("monthsCount", { count: deploymentPlan.estimated_roi_months })}</span>
+                <span className={styles.deployMetaValue} style={{ color: 'var(--color-accent)', fontWeight: 600 }}>{t("monthsCount", { count: deploymentPlan.estimated_roi_months })}</span>
               </div>
             </div>
             <p className={styles.insightParagraph}>{deploymentPlan.estimated_impact}</p>

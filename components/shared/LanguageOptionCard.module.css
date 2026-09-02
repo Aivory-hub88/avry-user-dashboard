@@ -20,7 +20,7 @@
 }
 
 .card.active {
-  border-color: #b7cba6;
+  border-color: var(--color-accent);
   background: rgba(178, 204, 162, 0.06);
 }
 
@@ -40,7 +40,7 @@
   position: absolute;
   top: 12px;
   right: 14px;
-  color: #b7cba6;
+  color: var(--color-accent);
   font-size: 16px;
   font-weight: 700;
 }

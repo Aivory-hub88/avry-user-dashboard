@@ -346,7 +346,7 @@ export default function AivoryAssistant() {
       {/* Mobile overlay */}
       {open && (
         <div
-          className="md:hidden fixed inset-0 bg-black/55 z-[1001]"
+          className="md:hidden fixed inset-0 bg-black/55 z-40"
           onClick={handleClose}
           aria-hidden="true"
         />
@@ -420,7 +420,7 @@ export default function AivoryAssistant() {
                 }
               }}
               disabled={isLoading}
-              className="w-full bg-transparent border-none outline-none resize-none text-white/80 text-sm font-light placeholder:text-white/30 min-h-[24px] max-h-[140px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden caret-[#b7cba6] leading-relaxed disabled:opacity-50"
+              className="w-full bg-transparent border-none outline-none resize-none text-white/80 text-sm font-light placeholder:text-white/30 min-h-[24px] max-h-[140px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden caret-accent leading-relaxed disabled:opacity-50"
             />
             <div className="flex items-center justify-between">
               <button

@@ -163,7 +163,7 @@ export function StepInspector({ selectedNodeId, nodeData, onChange, collapsed = 
                 <button
                   type="button"
                   onClick={handleApply}
-                  style={{ width: '100%', background: 'rgba(178, 204, 162,0.1)', border: '1px solid rgba(178, 204, 162,0.3)', borderRadius: 8, padding: '9px 12px', fontSize: 12, fontWeight: 600, color: '#b7cba6', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
+                  style={{ width: '100%', background: 'rgba(178, 204, 162,0.1)', border: '1px solid rgba(178, 204, 162,0.3)', borderRadius: 8, padding: '9px 12px', fontSize: 12, fontWeight: 600, color: 'var(--color-accent)', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
                   onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.background = 'rgba(178, 204, 162,0.16)' }}
                   onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.background = 'rgba(178, 204, 162,0.1)' }}
                 >

@@ -198,7 +198,7 @@ export function SettingsModal({ user }: SettingsModalProps) {
                 <div className="bg-white/5 border border-white/10 rounded-xl p-5 flex items-center justify-between mb-6">
                   <div>
                     <h4 className="text-sm font-medium flex items-center mb-1">
-                      {isSuperAdmin ? 'Full platform access' : 'Thanks for subscribing to Aivory'} <span className="ml-2 px-2 py-0.5 rounded bg-[#b7cba6]/10 text-[#b7cba6] text-[11px] font-bold uppercase">{displayTier}</span>
+                      {isSuperAdmin ? 'Full platform access' : 'Thanks for subscribing to Aivory'} <span className="ml-2 px-2 py-0.5 rounded bg-accent/10 text-accent text-[11px] font-bold uppercase">{displayTier}</span>
                     </h4>
                     <p className="text-[13px] text-white/60">
                       {isSuperAdmin
@@ -278,12 +278,12 @@ export function SettingsModal({ user }: SettingsModalProps) {
                         }}
                         className={`relative flex flex-col items-center justify-center p-5 rounded-xl border transition-all text-center group ${
                           pkg.popular 
-                            ? 'bg-[#b7cba6]/5 border-[#b7cba6]/30 hover:border-[#b7cba6]/60 hover:bg-[#b7cba6]/10' 
+                            ? 'bg-accent/5 border-accent/30 hover:border-accent/60 hover:bg-accent/10' 
                             : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
                         }`}
                       >
                         {pkg.popular && (
-                          <span className="absolute -top-2.5 bg-[#b7cba6] text-[#1a0b2e] text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                          <span className="absolute -top-2.5 bg-accent text-[#1a0b2e] text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                             Most Popular
                           </span>
                         )}
@@ -384,7 +384,7 @@ function Toggle({ checked, onChange }: { checked: boolean, onChange: (v: boolean
   return (
     <button 
       onClick={() => onChange(!checked)}
-      className={`w-10 h-6 rounded-full relative transition-colors duration-200 focus:outline-none ${checked ? 'bg-[#b7cba6]' : 'bg-white/20'}`}
+      className={`w-10 h-6 rounded-full relative transition-colors duration-200 focus:outline-none ${checked ? 'bg-accent' : 'bg-white/20'}`}
     >
       <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-[#1a0b2e] transition-transform duration-200 ${checked ? 'translate-x-4' : 'translate-x-0'}`}></div>
     </button>

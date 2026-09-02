@@ -10,7 +10,7 @@
 }
 
 .halo {
-  fill: #b7cba6;
+  fill: var(--color-accent);
   opacity: 0.06;
   filter: blur(10px);
 }
@@ -29,7 +29,7 @@
 
 .arc {
   fill: none;
-  stroke: #b7cba6;
+  stroke: var(--color-accent);
   stroke-width: 12;
   stroke-linecap: round;
   transition: stroke-dasharray 1.1s cubic-bezier(0.22, 1, 0.36, 1);

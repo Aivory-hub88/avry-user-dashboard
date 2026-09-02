@@ -406,12 +406,12 @@ export default function WalletSettings() {
       )}
 
       {/* Wallet Balance Card */}
-      <div className="bg-gradient-to-br from-[#b7cba6]/10 to-[#00b87d]/10 rounded-lg p-6 border border-[#b7cba6]/[0.3]">
+      <div className="bg-gradient-to-br from-accent/10 to-[#00b87d]/10 rounded-lg p-6 border border-accent/[0.3]">
         <div className="space-y-4">
           <div>
             <p className="text-sm text-gray-400 mb-1">Available Balance</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-bold text-[#b7cba6]">
+              <span className="text-4xl font-bold text-accent">
                 ${(walletData?.balance || 0).toFixed(2)}
               </span>
               <span className="text-sm text-gray-400">{walletData?.currency || "USD"}</span>
@@ -435,7 +435,7 @@ export default function WalletSettings() {
 
           <button
             onClick={() => setShowTopup(!showTopup)}
-            className="w-full mt-4 py-2 px-4 bg-[#b7cba6] text-black font-medium rounded-lg hover:bg-[#00d489] transition-colors"
+            className="w-full mt-4 py-2 px-4 bg-accent text-black font-medium rounded-lg hover:bg-[#00d489] transition-colors"
           >
             {showTopup ? "Cancel" : "+ Add Money"}
           </button>
@@ -457,13 +457,13 @@ export default function WalletSettings() {
                 value={topupAmount}
                 onChange={(e) => setTopupAmount(e.target.value)}
                 disabled={topupLoading}
-                className="flex-1 px-3 py-2 bg-white/[0.05] border border-white/[0.07] text-white placeholder-gray-500 text-sm focus:outline-none focus:border-[#b7cba6] disabled:opacity-50"
+                className="flex-1 px-3 py-2 bg-white/[0.05] border border-white/[0.07] text-white placeholder-gray-500 text-sm focus:outline-none focus:border-accent disabled:opacity-50"
               />
             </div>
             <button
               onClick={handleTopupClick}
               disabled={topupLoading || !topupAmount}
-              className="px-6 py-2 bg-[#b7cba6] text-black font-medium rounded-lg hover:bg-[#00d489] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-accent text-black font-medium rounded-lg hover:bg-[#00d489] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {topupLoading ? "Processing..." : "Proceed"}
             </button>
@@ -494,7 +494,7 @@ export default function WalletSettings() {
                   placeholder="John Doe"
                   value={cardForm.holderName}
                   onChange={(e) => setCardForm({ ...cardForm, holderName: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.07] text-white placeholder-gray-500 text-sm focus:outline-none focus:border-[#b7cba6]"
+                  className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.07] text-white placeholder-gray-500 text-sm focus:outline-none focus:border-accent"
                 />
               </div>
 
@@ -510,7 +510,7 @@ export default function WalletSettings() {
                     value = value.replace(/(\d{4})/g, "$1 ").trim()
                     setCardForm({ ...cardForm, cardNumber: value })
                   }}
-                  className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.07] text-white placeholder-gray-500 text-sm focus:outline-none focus:border-[#b7cba6]"
+                  className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.07] text-white placeholder-gray-500 text-sm focus:outline-none focus:border-accent"
                 />
               </div>
 
@@ -529,7 +529,7 @@ export default function WalletSettings() {
                       }
                       setCardForm({ ...cardForm, expiryDate: value })
                     }}
-                    className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.07] text-white placeholder-gray-500 text-sm focus:outline-none focus:border-[#b7cba6]"
+                    className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.07] text-white placeholder-gray-500 text-sm focus:outline-none focus:border-accent"
                   />
                 </div>
 
@@ -541,14 +541,14 @@ export default function WalletSettings() {
                     maxLength={4}
                     value={cardForm.cvv}
                     onChange={(e) => setCardForm({ ...cardForm, cvv: e.target.value.replace(/\D/g, "") })}
-                    className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.07] text-white placeholder-gray-500 text-sm focus:outline-none focus:border-[#b7cba6]"
+                    className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.07] text-white placeholder-gray-500 text-sm focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2 px-4 bg-[#b7cba6] text-black font-medium rounded-lg hover:bg-[#00d489] transition-colors"
+                className="w-full py-2 px-4 bg-accent text-black font-medium rounded-lg hover:bg-[#00d489] transition-colors"
               >
                 Add Card
               </button>
@@ -564,7 +564,7 @@ export default function WalletSettings() {
                 key={card.card_id}
                 className={`rounded-lg border p-4 transition-colors ${
                   card.isDefault
-                    ? "border-[#b7cba6] bg-white/[0.03]"
+                    ? "border-accent bg-white/[0.03]"
                     : "border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]"
                 }`}
               >
@@ -575,7 +575,7 @@ export default function WalletSettings() {
                         {card.brand.toUpperCase()} •••• {card.lastFour}
                       </span>
                       {card.isDefault && (
-                        <span className="text-xs px-2 py-1 bg-[#b7cba6] text-black rounded font-medium">
+                        <span className="text-xs px-2 py-1 bg-accent text-black rounded font-medium">
                           Default
                         </span>
                       )}

@@ -100,7 +100,7 @@
 }
 
 .handle:hover {
-  background: #b7cba6;
+  background: var(--color-accent);
   border-color: #00f5b0;
   width: 10px;
   height: 10px;

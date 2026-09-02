@@ -111,7 +111,7 @@ export function AgentConfigPanel({
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
-                style={{ color: '#b7cba6' }}
+                style={{ color: 'var(--color-accent)' }}
               >
                 <circle cx="12" cy="12" r="10" opacity="0.3" />
                 <path d="M12 2a10 10 0 0 1 10 10" />
@@ -153,7 +153,7 @@ export function AgentConfigPanel({
             </p>
             <p style={{ fontSize: 12, color: '#5a5a58', margin: '4px 0 0 0' }}>
               Create an agent in the{' '}
-              <Link href="/agents" style={{ color: '#b7cba6', textDecoration: 'none' }}>
+              <Link href="/agents" style={{ color: 'var(--color-accent)', textDecoration: 'none' }}>
                 Agents
               </Link>{' '}
               section first
@@ -215,7 +215,7 @@ export function AgentConfigPanel({
                     style={{
                       marginTop: 2,
                       cursor: 'pointer',
-                      accentColor: '#b7cba6',
+                      accentColor: 'var(--color-accent)',
                     }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -271,7 +271,7 @@ export function AgentConfigPanel({
             <div style={{ fontSize: 11, color: '#5a5a58', marginBottom: 4 }}>
               Selected:
             </div>
-            <div style={{ fontSize: 13, fontWeight: 500, color: '#b7cba6' }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-accent)' }}>
               {selectedAgent.name}
             </div>
           </div>

@@ -57,7 +57,7 @@ function ApprovalCard({
   if (outcome) {
     return (
       <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm">
-        <span className={outcome === 'approved' ? 'text-[#b7cba6]' : 'text-white/50'}>
+        <span className={outcome === 'approved' ? 'text-accent' : 'text-white/50'}>
           {outcome === 'approved' ? '✓ Approved' : '✕ Denied'}
         </span>
         <span className="text-white/40">— {describeTool(approval.tool_name)}</span>
@@ -73,7 +73,7 @@ function ApprovalCard({
         <button
           onClick={onApprove}
           disabled={busy}
-          className="rounded-lg bg-[#b7cba6] px-3.5 py-1.5 text-sm font-medium text-[#1a1a18] transition hover:opacity-90 disabled:opacity-50"
+          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-[#1a1a18] transition hover:opacity-90 disabled:opacity-50"
         >
           Approve
         </button>
@@ -273,7 +273,7 @@ const markdownComponents = {
   ),
 
   a: ({ href, children }: any) => (
-    <a href={href} className="text-[#b7cba6] hover:text-[#b7cba6]/80 underline underline-offset-2 transition-colors" target="_blank" rel="noopener noreferrer">
+    <a href={href} className="text-accent hover:text-accent/80 underline underline-offset-2 transition-colors" target="_blank" rel="noopener noreferrer">
       {children}
     </a>
   ),
@@ -292,7 +292,7 @@ const markdownComponents = {
   li: MarkdownListItem,
 
   blockquote: ({ children }: any) => (
-    <blockquote className="my-5 pl-4 border-l-2 border-[#b7cba6]/40 text-[#a1a1aa] italic">
+    <blockquote className="my-5 pl-4 border-l-2 border-accent/40 text-[#a1a1aa] italic">
       {children}
     </blockquote>
   ),
@@ -397,7 +397,7 @@ export default function ChatMessage({ role, content, isStreaming = false, agenti
                   {/* Streaming cursor — brand color blinking bar */}
                   {isStreaming && (
                     <span
-                      className="inline-block w-[3px] h-[1.125rem] bg-[#b7cba6] ml-0.5 align-middle rounded-sm"
+                      className="inline-block w-[3px] h-[1.125rem] bg-accent ml-0.5 align-middle rounded-sm"
                       style={{ animation: 'blink 1s step-end infinite' }}
                       aria-hidden="true"
                     />

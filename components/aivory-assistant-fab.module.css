@@ -6,7 +6,7 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: #b7cba6;
+  background: var(--color-accent);
   border: none;
   cursor: pointer;
   display: flex;
@@ -28,7 +28,7 @@
 }
 
 .fab:focus-visible {
-  outline: 2px solid #b7cba6;
+  outline: 2px solid var(--color-accent);
   outline-offset: 3px;
 }
 
@@ -115,7 +115,7 @@
 }
 
 .closeBtn:focus-visible {
-  outline: 2px solid #b7cba6;
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 

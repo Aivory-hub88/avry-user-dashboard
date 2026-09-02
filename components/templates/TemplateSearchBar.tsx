@@ -19,7 +19,7 @@ export default function TemplateSearchBar({
       </div>
       <input
         type="text"
-        className="w-full bg-white/[0.03] shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)] border border-white/[0.07] rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-[#8b8985] focus:outline-none focus:border-[#b7cba6]/35 focus:bg-white/[0.045] transition-all text-[13px] font-light"
+        className="w-full bg-white/[0.03] shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)] border border-white/[0.07] rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-[#8b8985] focus:outline-none focus:border-accent/35 focus:bg-white/[0.045] transition-all text-[13px] font-light"
         placeholder="Search templates"
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}

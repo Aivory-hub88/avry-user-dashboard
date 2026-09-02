@@ -38,7 +38,7 @@ export default function TemplateCard({ template }: { template: Template }) {
         <div className="text-[10px] text-[#a1a1aa] font-light">
           {template.uses} uses
         </div>
-        <div className="text-[9px] font-medium uppercase tracking-wider text-[#c9dab8] bg-[#b7cba6]/[0.12] px-2 py-1 rounded-md border border-[#b7cba6]/20">
+        <div className="text-[9px] font-medium uppercase tracking-wider text-[#c9dab8] bg-accent/[0.12] px-2 py-1 rounded-md border border-accent/20">
           AI-powered
         </div>
       </div>

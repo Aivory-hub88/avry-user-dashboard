@@ -82,12 +82,12 @@ export function UserProfile() {
         onClick={() => openSettingsModal()}
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-t border-white/5 text-left group"
       >
-        <div className="w-8 h-8 rounded-full bg-[#b7cba6] flex items-center justify-center text-[#1a0b2e] font-bold text-sm shrink-0">
+        <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-[#1a0b2e] font-bold text-sm shrink-0">
           {initial}
         </div>
         <div className="flex-1 min-w-0 overflow-hidden">
           <p className="text-sm font-semibold text-white truncate">{displayUsername}</p>
-          <p className="text-[11px] font-bold text-[#b7cba6] uppercase tracking-wider">{displayTier}</p>
+          <p className="text-[11px] font-bold text-accent uppercase tracking-wider">{displayTier}</p>
         </div>
         <div className="text-white/30 group-hover:text-white/70 transition-colors">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

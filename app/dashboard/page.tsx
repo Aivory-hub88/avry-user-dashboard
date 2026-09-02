@@ -235,7 +235,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('profile')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'profile'
-              ? 'bg-[#b7cba6] text-[#1a1a24]'
+              ? 'bg-accent text-[#1a1a24]'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -245,7 +245,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('wallet')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'wallet'
-              ? 'bg-[#b7cba6] text-[#1a1a24]'
+              ? 'bg-accent text-[#1a1a24]'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -255,7 +255,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('quota')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'quota'
-              ? 'bg-[#b7cba6] text-[#1a1a24]'
+              ? 'bg-accent text-[#1a1a24]'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -265,7 +265,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('subscriptions')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'subscriptions'
-              ? 'bg-[#b7cba6] text-[#1a1a24]'
+              ? 'bg-accent text-[#1a1a24]'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -275,7 +275,7 @@ export default function DashboardPage() {
           onClick={() => setActiveTab('payments')}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
             activeTab === 'payments'
-              ? 'bg-[#b7cba6] text-[#1a1a24]'
+              ? 'bg-accent text-[#1a1a24]'
               : 'bg-white/[0.05] text-white hover:bg-white/[0.1]'
           }`}
         >
@@ -291,7 +291,7 @@ export default function DashboardPage() {
             <div className="space-y-6">
               {/* Avatar Section */}
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#b7cba6] to-[#00b87d] flex items-center justify-center flex-shrink-0">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-accent to-[#00b87d] flex items-center justify-center flex-shrink-0">
                   <span className="text-2xl font-semibold text-black">
                     {AuthManager.getUser()?.email?.charAt(0).toUpperCase()}
                   </span>
@@ -310,11 +310,11 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-400">Tier</span>
-                  <span className="text-sm text-[#b7cba6] font-medium">{AuthManager.getUser()?.tier?.toUpperCase() || 'N/A'}</span>
+                  <span className="text-sm text-accent font-medium">{AuthManager.getUser()?.tier?.toUpperCase() || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-400">Subscription Status</span>
-                  <span className={`text-sm font-medium ${AuthManager.getUser()?.is_subscribed ? 'text-[#b7cba6]' : 'text-gray-400'}`}>
+                  <span className={`text-sm font-medium ${AuthManager.getUser()?.is_subscribed ? 'text-accent' : 'text-gray-400'}`}>
                     {AuthManager.getUser()?.is_subscribed ? 'Active' : 'Inactive'}
                   </span>
                 </div>
@@ -386,11 +386,11 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={card.tier}
-                      className={`rounded-lg border p-6 transition-all flex flex-col ${isCurrent ? 'border-[#b7cba6] bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}
+                      className={`rounded-lg border p-6 transition-all flex flex-col ${isCurrent ? 'border-accent bg-white/[0.03]' : 'border-white/[0.07] bg-white/[0.01] hover:border-white/[0.1]'}`}
                     >
                       <div className="flex justify-between items-start mb-4">
                         <h3 className="text-lg font-medium text-white">{TIER_DISPLAY_NAMES[card.tier]}</h3>
-                        {isCurrent && <span className="text-xs font-medium px-2 py-1 bg-[#b7cba6] text-black rounded">Active</span>}
+                        {isCurrent && <span className="text-xs font-medium px-2 py-1 bg-accent text-black rounded">Active</span>}
                       </div>
                       <p className="text-sm text-gray-400 mb-4">{card.blurb}</p>
                       <div className="mb-6">
@@ -414,13 +414,13 @@ export default function DashboardPage() {
                           href={CONTACT_SALES_URL}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="w-full py-3 rounded-lg font-medium transition-colors mt-auto bg-[#b7cba6] text-black hover:bg-[#00d489] text-center"
+                          className="w-full py-3 rounded-lg font-medium transition-colors mt-auto bg-accent text-black hover:bg-[#00d489] text-center"
                         >
                           Contact Sales
                         </a>
                       ) : (
                         <button
-                          className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${isCurrent ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-[#b7cba6] text-black hover:bg-[#00d489]'}`}
+                          className={`w-full py-3 rounded-lg font-medium transition-colors mt-auto ${isCurrent ? 'bg-white/[0.05] text-gray-400 cursor-default' : paymentLoading ? 'bg-white/[0.1] text-white/60' : 'bg-accent text-black hover:bg-[#00d489]'}`}
                           onClick={() => !isCurrent && handlePayment(card.tier, price ?? 0, `${TIER_DISPLAY_NAMES[card.tier]} Plan`)}
                           disabled={paymentLoading || isCurrent}
                         >

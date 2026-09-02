@@ -414,7 +414,7 @@ function CopilotPanelExpanded({
         />
         <textarea
           ref={textareaRef}
-          className="flex-1 bg-transparent border-none outline-none resize-none text-[#f7f7f7] text-[13px] leading-relaxed placeholder:text-white/30 min-h-[22px] max-h-[180px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden caret-[#b7cba6] disabled:opacity-50 text-left"
+          className="flex-1 bg-transparent border-none outline-none resize-none text-[#f7f7f7] text-[13px] leading-relaxed placeholder:text-white/30 min-h-[22px] max-h-[180px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden caret-accent disabled:opacity-50 text-left"
           rows={1}
           value={input}
           onChange={handleInputChange}
@@ -476,7 +476,7 @@ const MD_CLASSES = [
   '[&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-1 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:my-1 [&_li]:my-0.5',
   '[&_code]:bg-white/10 [&_code]:px-1 [&_code]:py-px [&_code]:rounded [&_code]:text-[12px] [&_code]:font-mono',
   '[&_pre]:bg-black/30 [&_pre]:border [&_pre]:border-white/5 [&_pre]:rounded-lg [&_pre]:p-2.5 [&_pre]:my-1.5 [&_pre]:overflow-x-auto [&_pre]:text-[12px] [&_pre_code]:bg-transparent [&_pre_code]:p-0',
-  '[&_a]:underline [&_a]:text-[#b7cba6]',
+  '[&_a]:underline [&_a]:text-accent',
   '[&_blockquote]:border-l-2 [&_blockquote]:border-white/15 [&_blockquote]:pl-3 [&_blockquote]:my-1 [&_blockquote]:text-white/70',
   '[&_hr]:border-white/10 [&_hr]:my-2 [&_table]:text-[12px] [&_th]:text-left [&_th]:font-semibold [&_th]:pr-3 [&_td]:pr-3',
 ].join(' ')
@@ -497,7 +497,7 @@ function ActionBtn({ label, onClick, children }: { label: string; onClick: () =>
 
 const ICONS = {
   copy: <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
-  check: <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="#b7cba6" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>,
+  check: <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>,
   edit: <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>,
   trash: <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>,
 }
@@ -558,7 +558,7 @@ function MessageRow({
         <div className="w-[85%] flex flex-col gap-1.5">
           <textarea
             ref={editRef}
-            className="w-full bg-black/25 border border-white/15 rounded-xl px-3 py-2 text-[13px] leading-[1.6] text-[#f7f7f7] resize-none outline-none focus:border-[#b7cba6]/50 min-h-[60px]"
+            className="w-full bg-black/25 border border-white/15 rounded-xl px-3 py-2 text-[13px] leading-[1.6] text-[#f7f7f7] resize-none outline-none focus:border-accent/50 min-h-[60px]"
             value={draft}
             onChange={e => setDraft(e.target.value)}
             onKeyDown={e => {
@@ -603,7 +603,7 @@ function MessageRow({
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
             {msg.isStreaming && (
               <span
-                className="inline-block w-[3px] h-[1.125rem] bg-[#b7cba6] ml-0.5 align-middle rounded-sm"
+                className="inline-block w-[3px] h-[1.125rem] bg-accent ml-0.5 align-middle rounded-sm"
                 style={{ animation: 'blink 1s step-end infinite' }}
                 aria-hidden="true"
               />

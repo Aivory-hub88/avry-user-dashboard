@@ -170,7 +170,7 @@
 }
 
 .warning a {
-  color: #b7cba6;
+  color: var(--color-accent);
   text-decoration: none;
   font-weight: 600;
   transition: color 0.15s ease;
@@ -265,7 +265,7 @@
   border-radius: 6px;
   background: rgba(178, 204, 162, 0.1);
   border: 1px solid rgba(178, 204, 162, 0.2);
-  color: #b7cba6;
+  color: var(--color-accent);
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;

@@ -36,7 +36,7 @@
 .phaseItem.current {
   background: rgba(43, 44, 40, 0.8);
   border-color: rgba(255, 255, 255, 0.04);
-  border-left-color: #b7cba6;
+  border-left-color: var(--color-accent);
   cursor: default;
 }
 

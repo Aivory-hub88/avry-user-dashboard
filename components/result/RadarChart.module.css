@@ -15,7 +15,7 @@
 }
 
 .dataPolygon {
-  stroke: #b7cba6;
+  stroke: var(--color-accent);
   stroke-width: 2;
   stroke-linejoin: round;
 }

@@ -35,7 +35,7 @@
 
 .nextButton {
   background: rgba(178, 204, 162, 0.1);
-  color: #b7cba6;
+  color: var(--color-accent);
   border: 1px solid rgba(178, 204, 162, 0.25);
   font-weight: 600;
 }

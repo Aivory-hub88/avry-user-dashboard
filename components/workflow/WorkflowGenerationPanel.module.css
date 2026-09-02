@@ -107,7 +107,7 @@
 
 .checkboxLabel input {
   cursor: pointer;
-  accent-color: #b7cba6;
+  accent-color: var(--color-accent);
 }
 
 .checkboxLabel input:disabled {
@@ -168,7 +168,7 @@
 .generateBtn {
   flex: 1;
   background: rgba(178, 204, 162, 0.15);
-  color: #b7cba6;
+  color: var(--color-accent);
   border: 1px solid rgba(178, 204, 162, 0.3);
 }
 

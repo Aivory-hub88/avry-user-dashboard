@@ -55,8 +55,8 @@
 }
 
 .btnFilled {
-  background: #b7cba6;
-  border: 1px solid #b7cba6;
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
   color: #1a1a18;
 }
 

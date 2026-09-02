@@ -22,7 +22,7 @@ const MID_Y = PLOT_TOP + ((10 - 5.5) / 9) * PLOT_HEIGHT
 
 // Distinct colors per opportunity index — enough for up to 8 opportunities
 const DOT_COLORS = [
-  '#b7cba6', // teal-green
+  'var(--color-accent)', // teal-green
   '#60a5fa', // blue
   '#f59e0b', // amber
   '#f472b6', // pink

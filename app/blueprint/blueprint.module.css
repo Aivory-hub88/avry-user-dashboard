@@ -1,7 +1,7 @@
 /* Blueprint v1 — dark teal-green accent theme */
 
 /* ── Design tokens ───────────────────────────────────────── */
-/* accent:       #b7cba6  (teal-green primary) */
+/* accent:       var(--color-accent)  (teal-green primary) */
 /* accent-hover: #00f5b0  (brighter on hover)  */
 /* accent-glow:  rgba(178, 204, 162,0.18) */
 /* bg-page:      #121212  */
@@ -54,7 +54,7 @@
 }
 
 .languageSwitcher:focus-visible {
-  outline: 2px solid #b7cba6;
+  outline: 2px solid var(--color-accent);
   outline-offset: 1px;
 }
 
@@ -72,7 +72,7 @@
   width: 40px;
   height: 40px;
   border: 3px solid rgba(255,255,255,0.06);
-  border-top-color: #b7cba6;
+  border-top-color: var(--color-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -205,7 +205,7 @@
 
 .statusBadge {
   background-color: rgba(178, 204, 162,0.1);
-  color: #b7cba6;
+  color: var(--color-accent);
   border: 1px solid rgba(178, 204, 162,0.35);
   border-radius: 6px;
   padding: 4px 12px;
@@ -268,7 +268,7 @@
   background-color: transparent;
   border: 1px solid rgba(178, 204, 162, 0.35);
   border-radius: 8px;
-  color: #b7cba6;
+  color: var(--color-accent);
   font-size: 13px;
   font-weight: 600;
   padding: 8px 14px;
@@ -280,7 +280,7 @@
 
 .roadmapBtn:hover:not(:disabled) {
   background-color: rgba(178, 204, 162, 0.08);
-  border-color: #b7cba6;
+  border-color: var(--color-accent);
 }
 
 .roadmapBtn:active:not(:disabled) {
@@ -395,7 +395,7 @@
 }
 .downloadMenuItem:hover {
   background: rgba(255,255,255,0.05);
-  color: #b7cba6;
+  color: var(--color-accent);
 }
 
 /* ── Toast notification ─────────────────────────────────── */
@@ -407,7 +407,7 @@
   background: #1e1e1e;
   border: 1px solid rgba(178, 204, 162,0.35);
   border-radius: 10px;
-  color: #b7cba6;
+  color: var(--color-accent);
   font-size: 13px;
   font-weight: 500;
   padding: 12px 24px;
@@ -534,7 +534,7 @@
 
 .versionLoadBtn {
   background-color: rgba(178, 204, 162,0.12);
-  color: #b7cba6;
+  color: var(--color-accent);
   border: 1px solid rgba(178, 204, 162,0.3);
   border-radius: 7px;
   padding: 5px 14px;
@@ -647,7 +647,7 @@
 
 .kpiTdAccent {
   font-size: 0.9375rem;
-  color: #b7cba6;
+  color: var(--color-accent);
   font-weight: 600;
   padding: 10px 0;
   border-bottom: 1px solid var(--card-border, rgba(255,255,255,0.05));
@@ -679,7 +679,7 @@
 .archNodeLabel {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #b7cba6;
+  color: var(--color-accent);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -790,7 +790,7 @@
 .generateWorkflowBtn:hover:not(:disabled) {
   background: rgba(178, 204, 162,0.09);
   border-color: rgba(178, 204, 162,0.3);
-  color: #b7cba6;
+  color: var(--color-accent);
 }
 
 .generateWorkflowBtn:active:not(:disabled) {
@@ -907,7 +907,7 @@
 .generatedWorkflowToggle {
   background: none;
   border: none;
-  color: #b7cba6;
+  color: var(--color-accent);
   font-size: 0.8125rem;
   font-weight: 600;
   font-family: 'Manrope', 'Manrope', sans-serif;
@@ -950,7 +950,7 @@
 }
 
 .gwAutomationPct {
-  color: #b7cba6;
+  color: var(--color-accent);
   font-weight: 700;
 }
 
@@ -974,7 +974,7 @@
   width: 22px;
   height: 22px;
   background-color: rgba(178, 204, 162,0.12);
-  color: #b7cba6;
+  color: var(--color-accent);
   border-radius: 50%;
   font-size: 0.75rem;
   font-weight: 700;
@@ -1060,7 +1060,7 @@
   content: '•';
   position: absolute;
   left: 0;
-  color: #b7cba6;
+  color: var(--color-accent);
 }
 
 .mitigationList {
@@ -1086,7 +1086,7 @@
   width: 24px;
   height: 24px;
   background: rgba(178, 204, 162,0.1);
-  color: #b7cba6;
+  color: var(--color-accent);
   border: 1px solid rgba(178, 204, 162,0.25);
   border-radius: 50%;
   font-size: 0.75rem;
@@ -1295,7 +1295,7 @@
 
 .modalSave {
   background: rgba(178, 204, 162,0.1);
-  color: #b7cba6;
+  color: var(--color-accent);
   border: 1px solid rgba(178, 204, 162,0.3);
   border-radius: 9px;
   padding: 9px 24px;
@@ -1397,7 +1397,7 @@
   background: rgba(178, 204, 162, 0.1);
   border: 1px solid rgba(178, 204, 162, 0.25);
   border-radius: 8px;
-  color: #b7cba6;
+  color: var(--color-accent);
   font-size: 0.78125rem;
   font-weight: 600;
   cursor: pointer;
@@ -1510,7 +1510,7 @@
   align-items: center;
   gap: 6px;
   background: rgba(178, 204, 162,0.1);
-  color: #b7cba6;
+  color: var(--color-accent);
   border: 1px solid rgba(178, 204, 162,0.25);
   border-radius: 999px;
   padding: 4px 12px;
@@ -1523,7 +1523,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #b7cba6;
+  background: var(--color-accent);
   flex-shrink: 0;
 }
 
@@ -1555,7 +1555,7 @@
 .heroLeverLabel {
   font-size: 0.6875rem;
   font-weight: 700;
-  color: #b7cba6;
+  color: var(--color-accent);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -1607,7 +1607,7 @@
 .insightSubheading {
   font-size: 0.8125rem;
   font-weight: 700;
-  color: #b7cba6;
+  color: var(--color-accent);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 4px 0 0;
@@ -1645,7 +1645,7 @@
 }
 
 .metricsTable td:last-child {
-  color: #b7cba6;
+  color: var(--color-accent);
   font-weight: 600;
 }
 
@@ -1678,7 +1678,7 @@
   justify-content: center;
   background: rgba(178, 204, 162, 0.1);
   border-radius: 8px;
-  color: #b7cba6;
+  color: var(--color-accent);
   flex-shrink: 0;
 }
 
@@ -1690,7 +1690,7 @@
 .archPipelineLabel {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #b7cba6;
+  color: var(--color-accent);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -1754,7 +1754,7 @@
   gap: 5px;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #b7cba6;
+  color: var(--color-accent);
   background: rgba(178, 204, 162,0.08);
   border: 1px solid rgba(178, 204, 162,0.2);
   border-radius: 999px;
@@ -1821,7 +1821,7 @@
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: #b7cba6;
+  background: var(--color-accent);
   box-shadow: 0 0 0 3px rgba(183, 203, 166, 0.15);
 }
 
@@ -1844,7 +1844,7 @@
 
 .roadmapWaveTimeline {
   font-size: 0.75rem;
-  color: #b7cba6;
+  color: var(--color-accent);
   font-weight: 600;
   background: rgba(178, 204, 162,0.08);
   border: 1px solid rgba(178, 204, 162,0.2);
@@ -1884,7 +1884,7 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: #b7cba6;
+  background: var(--color-accent);
   flex-shrink: 0;
   margin-top: 8px;
 }
@@ -1934,7 +1934,7 @@
 .riskThemePriority {
   font-size: 0.8125rem;
   font-weight: 700;
-  color: #b7cba6;
+  color: var(--color-accent);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   min-width: 16px;
@@ -1976,7 +1976,7 @@
 
 .riskThemeAction::before {
   content: '→';
-  color: #b7cba6;
+  color: var(--color-accent);
   flex-shrink: 0;
   font-size: 0.75rem;
   margin-top: 2px;
@@ -2008,7 +2008,7 @@
 .actionItemNum {
   font-size: 0.8125rem;
   font-weight: 700;
-  color: #b7cba6;
+  color: var(--color-accent);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   min-width: 18px;
@@ -2078,7 +2078,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.09em;
-  color: #b7cba6;
+  color: var(--color-accent);
 }
 
 .roadmapCtaTitle {
@@ -2109,7 +2109,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background-color: #b7cba6;
+  background-color: var(--color-accent);
   color: #26301f;
   border: none;
   border-radius: 10px;
@@ -2166,7 +2166,7 @@
 .roadmapProgressFill {
   height: 100%;
   border-radius: 2px;
-  background: #b7cba6;
+  background: var(--color-accent);
   transition: width 5s linear;
 }
 
@@ -2288,7 +2288,7 @@
   height: 25px;
   border-radius: 50%;
   background: rgba(178, 204, 162, 0.12);
-  color: #b7cba6;
+  color: var(--color-accent);
   font-size: 0.75rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;

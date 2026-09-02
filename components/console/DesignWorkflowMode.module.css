@@ -165,7 +165,7 @@
 }
 
 .createBtn {
-  background: linear-gradient(135deg, #b7cba6 0%, #00d48a 100%);
+  background: linear-gradient(135deg, var(--color-accent) 0%, #00d48a 100%);
   color: #000;
 }
 
