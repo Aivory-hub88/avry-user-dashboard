@@ -27,8 +27,21 @@ export class DiagnosticErrorBoundary extends React.Component<Props, State> {
     window.location.href = '/diagnostics/deep'
   }
 
+  // Class components can't use the useLocaleContext hook, and this boundary
+  // needs to render before/around whatever hook-based locale state its
+  // children hold — reads the same localStorage key that hook is backed
+  // by (see STORAGE_KEY in hooks/useLocale.tsx) directly instead.
+  getLocale(): 'en' | 'id' {
+    try {
+      return localStorage.getItem('aivory_locale') === 'id' ? 'id' : 'en'
+    } catch {
+      return 'en'
+    }
+  }
+
   render() {
     if (this.state.hasError) {
+      const locale = this.getLocale()
       return (
         <div
           style={{
@@ -59,7 +72,9 @@ export class DiagnosticErrorBoundary extends React.Component<Props, State> {
                 lineHeight: '1.6',
               }}
             >
-              Something went wrong. Please refresh the page or start over.
+              {locale === 'id'
+                ? 'Terjadi kesalahan. Silakan muat ulang halaman atau mulai dari awal.'
+                : 'Something went wrong. Please refresh the page or start over.'}
             </p>
             <button
               onClick={this.handleStartOver}
@@ -74,7 +89,7 @@ export class DiagnosticErrorBoundary extends React.Component<Props, State> {
                 cursor: 'pointer',
               }}
             >
-              Start Over
+              {locale === 'id' ? 'Mulai Ulang' : 'Start Over'}
             </button>
           </div>
         </div>
