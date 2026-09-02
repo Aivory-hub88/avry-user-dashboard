@@ -151,9 +151,9 @@ export default function FinalResultPage() {
         },
         ...(llmResult ? {
           ai_analysis: {
-            summary: (llmResult as any).summary ?? null,
+            summary: (llmResult as any).narrative_summary ?? (llmResult as any).narrative ?? null,
             strengths: (llmResult as any).strengths ?? null,
-            constraints: (llmResult as any).constraints ?? null,
+            constraints: (llmResult as any).primary_constraints ?? null,
             automation_opportunities: (llmResult as any).automation_opportunities ?? null,
             recommended_next_step: (llmResult as any).recommended_next_step ?? null,
           },
