@@ -15,6 +15,10 @@ interface RoutingSuggestBannerProps {
   onDismiss: () => void
 }
 
+// Deliberate per-intent categorical palette (peach/lavender/mint/tan/pink),
+// not a duplicate of the brand accent — each pastel bg + darker text pair
+// is scoped to this banner only and lives nowhere else in the codebase, so
+// there's nothing to consolidate into a shared theme token.
 const TAB_COLORS: Record<string, string> = {
   diagnostic: 'bg-[#F2A988] text-[#7A2E12] hover:bg-[#E89370]',
   blueprint: 'bg-[#A39DEB] text-[#292275] hover:bg-[#8D86D6]',
