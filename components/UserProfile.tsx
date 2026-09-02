@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { User as UserIcon } from 'lucide-react'
 import { logout, getUser } from '@/lib/auth'
 import { getMarketingUrl } from '@/lib/config'
 import { SettingsModal, User } from '@/components/settings/SettingsModal'
@@ -74,7 +75,6 @@ export function UserProfile() {
   const displayEmail = user?.email || 'guest@aivory.id'
   const displayUsername = user ? user.email.split('@')[0] : 'Guest'
   const displayTier = user?.account_type === 'superadmin' ? 'Admin' : 'Pro'
-  const initial = displayUsername.charAt(0).toUpperCase()
 
   return (
     <>
@@ -82,8 +82,8 @@ export function UserProfile() {
         onClick={() => openSettingsModal()}
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-t border-white/5 text-left group"
       >
-        <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-on-accent font-bold text-sm shrink-0">
-          {initial}
+        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 shrink-0">
+          <UserIcon size={16} strokeWidth={2} />
         </div>
         <div className="flex-1 min-w-0 overflow-hidden">
           <p className="text-sm font-semibold text-white truncate">{displayUsername}</p>
