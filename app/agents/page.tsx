@@ -308,7 +308,7 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
         <div className="absolute left-4 right-4 bottom-3 z-10 flex items-center gap-2.5">
           <AgentAvatar
             type={agent.agentType}
-            size={30}
+            size={44}
             className="ring-2 ring-black/25 shadow-[0_2px_6px_rgba(0,0,0,0.35)]"
           />
           <div
