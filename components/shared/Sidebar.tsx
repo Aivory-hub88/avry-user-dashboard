@@ -223,6 +223,7 @@ export default function Sidebar() {
     // rail's "Waiting on you"), not a separate page — this badge is the one
     // place left that surfaces the total across every agent.
     { key: "console",       href: "/console", badge: approvalCount > 0 ? approvalCount : null },
+    { key: "agents",        href: "/agents" },
     { key: "diagnostics",   href: "/diagnostics" },
     { key: "blueprint",     href: "/blueprint" },
     { key: "roadmap",       href: "/roadmap" },
@@ -230,7 +231,6 @@ export default function Sidebar() {
     { key: "executionLogs", href: "/logs" },
     { key: "integrations",  href: "/integrations" },
     { key: "templates",     href: "/templates", label: "Automation Templates" },
-    { key: "agents",        href: "/agents" },
     { key: "profile",       href: "/overview", label: "Overview" },
   ].filter((item) => canAccessNavKey(accountType, item.key, allowedModules))
 
