@@ -1,19 +1,21 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { TEMPLATE_CATEGORIES } from "./template-data";
 
-export default function TemplatesSidebar({ 
-  activeCategory, 
-  setActiveCategory 
-}: { 
-  activeCategory: string, 
-  setActiveCategory: (cat: string) => void 
+export default function TemplatesSidebar({
+  activeCategory,
+  setActiveCategory
+}: {
+  activeCategory: string,
+  setActiveCategory: (cat: string) => void
 }) {
+  const t = useTranslations("templates");
   return (
     <div className="w-48 shrink-0 pr-6 border-r border-white/5 hidden md:block">
       <div className="mb-6 flex items-center justify-between text-white/90 text-[15px] font-medium px-3">
-        <span>Categories</span>
+        <span>{t("categoriesLabel")}</span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 15l-6-6-6 6"/>
         </svg>

@@ -1,14 +1,16 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 
-export default function TemplateSearchBar({ 
-  searchQuery, 
-  setSearchQuery 
-}: { 
-  searchQuery: string, 
-  setSearchQuery: (query: string) => void 
+export default function TemplateSearchBar({
+  searchQuery,
+  setSearchQuery
+}: {
+  searchQuery: string,
+  setSearchQuery: (query: string) => void
 }) {
+  const t = useTranslations("templates");
   return (
     <div className="relative mb-6">
       <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none">
@@ -20,7 +22,7 @@ export default function TemplateSearchBar({
       <input
         type="text"
         className="w-full bg-white/[0.03] shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)] border border-white/[0.07] rounded-lg py-2.5 pl-10 pr-4 text-white placeholder:text-[#8b8985] focus:outline-none focus:border-accent/35 focus:bg-white/[0.045] transition-all text-[13px] font-light"
-        placeholder="Search templates"
+        placeholder={t("searchPlaceholder")}
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
       />

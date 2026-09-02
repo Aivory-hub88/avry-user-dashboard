@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import TemplatesSidebar from "@/components/templates/TemplatesSidebar";
 import TemplateHero from "@/components/templates/TemplateHero";
 import TemplateSearchBar from "@/components/templates/TemplateSearchBar";
@@ -24,6 +25,7 @@ function mapTemplate(t: any) {
 }
 
 export default function TemplatesPage() {
+  const t = useTranslations("templates");
   const [activeCategory, setActiveCategory] = useState("All Categories");
   const [searchQuery, setSearchQuery] = useState("");
   const [templates, setTemplates] = useState<any[]>(FALLBACK_TEMPLATES);
@@ -72,7 +74,7 @@ export default function TemplatesPage() {
       <div className="flex-1 overflow-y-auto p-6 md:p-8 lg:p-10">
         <div className="max-w-7xl mx-auto">
           <div className="text-[13px] font-light text-[#a1a1aa] mb-6 flex items-center gap-2">
-            <span>Discover</span>
+            <span>{t("breadcrumbDiscover")}</span>
             <span>/</span>
             <span className="text-white">{activeCategory}</span>
           </div>

@@ -1,9 +1,11 @@
 import React from "react";
+import { useTranslations } from "next-intl";
 import { Template } from "./template-data";
 import AppIcon from "./AppIcon";
 import Link from "next/link";
 
 export default function TemplateCard({ template }: { template: Template }) {
+  const t = useTranslations("templates");
   return (
     <Link href={`/templates/${template.id}`} className="block h-full">
       <div className="bg-[#3a3a36] border border-white/[0.06] rounded-[16px] p-5 flex flex-col h-full transition-all duration-200 group cursor-pointer shadow-[0_4px_20px_rgba(0,0,0,0.2)] hover:-translate-y-1 hover:border-white/[0.12] hover:shadow-[0_12px_32px_rgba(0,0,0,0.35)]">
@@ -36,10 +38,10 @@ export default function TemplateCard({ template }: { template: Template }) {
       {/* Footer: Uses and Badge */}
       <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/[0.06]">
         <div className="text-[10px] text-[#a1a1aa] font-light">
-          {template.uses} uses
+          {t("usesCount", { count: template.uses })}
         </div>
         <div className="text-[9px] font-medium uppercase tracking-wider text-[#c9dab8] bg-accent/[0.12] px-2 py-1 rounded-md border border-accent/20">
-          AI-powered
+          {t("aiPowered")}
         </div>
       </div>
       </div>

@@ -417,5 +417,27 @@
     "target": "Target",
     "actual": "Actual",
     "enterActual": "Enter actual"
+  },
+  "templates": {
+    "badgeLabel": "Templates",
+    "heroTitle": "Explore templates by use case",
+    "heroSubtitle": "Discover templates for your needs and get started with automation—no coding required.",
+    "searchPlaceholder": "Search templates",
+    "categoriesLabel": "Categories",
+    "usesCount": "{count} uses",
+    "aiPowered": "AI-powered",
+    "noResults": "No templates found matching your criteria.",
+    "popularTemplates": "Popular templates",
+    "breadcrumbDiscover": "Discover",
+    "loading": "Loading template…",
+    "notFound": "Template not found.",
+    "backToTemplates": "Back to templates",
+    "share": "Share",
+    "opening": "Opening…",
+    "tryIt": "Try it",
+    "createdBy": "Created By",
+    "lastUpdated": "Last Updated",
+    "nodes": "Nodes",
+    "aboutTemplate": "About this template"
   }
 }

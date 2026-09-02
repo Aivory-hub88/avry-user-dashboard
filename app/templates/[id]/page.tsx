@@ -2,6 +2,7 @@
 
 import { asset } from "@/lib/asset";
 import React, { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -12,6 +13,7 @@ import AppIcon from "@/components/templates/AppIcon";
 import { ChevronRight, Bookmark, Share } from "lucide-react";
 
 export default function TemplateDetailPage() {
+  const t = useTranslations("templates");
   const params = useParams();
   const router = useRouter();
   const id = (params?.id as string) || "";
@@ -40,7 +42,7 @@ export default function TemplateDetailPage() {
   if (template === undefined) {
     return (
       <div className="flex h-full w-full items-center justify-center text-white/40 text-[13px]">
-        Loading template…
+        {t("loading")}
       </div>
     );
   }
@@ -48,9 +50,9 @@ export default function TemplateDetailPage() {
   if (template === null) {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-white/60">
-        <p className="text-[13px]">Template not found.</p>
+        <p className="text-[13px]">{t("notFound")}</p>
         <Link href="/templates" className="text-[12px] text-[#c9dab8] hover:underline">
-          Back to templates
+          {t("backToTemplates")}
         </Link>
       </div>
     );
@@ -62,7 +64,7 @@ export default function TemplateDetailPage() {
         {/* Top Header / Breadcrumb */}
         <div className="h-16 flex items-center px-8">
           <Link href="/templates" className="text-white/50 hover:text-white transition-colors text-[13px]">
-            Templates
+            {t("badgeLabel")}
           </Link>
           <ChevronRight className="w-4 h-4 mx-2 text-white/30" />
           <span className="text-white/90 text-[13px] font-medium">{template.title}</span>
@@ -72,9 +74,6 @@ export default function TemplateDetailPage() {
         <div className="flex-1 flex flex-row overflow-hidden">
           {/* Left Metadata Pane (1/3) */}
           <div className="w-[340px] p-5 border-r border-white/[0.06] overflow-y-auto">
-            {/* NOTE: globals.css has an unlayered `main h1{...}` rule (30px/700) that
-                beats any Tailwind class regardless of specificity — only an inline
-                style can override it. Same applies to h2/h3/h4/p below. */}
             <h1
               className="text-white text-balance"
               style={{ fontSize: 17, fontWeight: 300, lineHeight: 1.3, letterSpacing: '-0.2px', margin: '0 0 16px', color: '#fff' }}
@@ -89,14 +88,14 @@ export default function TemplateDetailPage() {
               </button>
               <button className="flex-1 h-8 rounded-lg border border-white/[0.08] bg-white/[0.02] flex items-center justify-center gap-1.5 hover:bg-white/[0.06] hover:border-white/[0.14] transition-all">
                 <Share className="w-3.5 h-3.5 text-white/70" />
-                <span className="text-[12px] font-medium text-white/80">Share</span>
+                <span className="text-[12px] font-medium text-white/80">{t("share")}</span>
               </button>
               <button
                 onClick={handleTryIt}
                 disabled={applying}
                 className="flex-1 h-8 rounded-lg bg-gradient-to-b from-[#c9dab8] to-accent text-on-accent font-semibold text-[12px] hover:brightness-105 active:brightness-95 transition-all shadow-[0_1px_0_rgba(255,255,255,0.4)_inset,0_4px_14px_rgba(183,203,166,0.25)] disabled:opacity-60"
               >
-                {applying ? "Opening…" : "Try it"}
+                {applying ? t("opening") : t("tryIt")}
               </button>
             </div>
 
@@ -104,7 +103,7 @@ export default function TemplateDetailPage() {
             <div className="space-y-4 mb-6 p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
               {template.author && (
                 <div>
-                  <div className="text-[9px] font-semibold text-white/35 uppercase tracking-wider mb-1.5">Created By</div>
+                  <div className="text-[9px] font-semibold text-white/35 uppercase tracking-wider mb-1.5">{t("createdBy")}</div>
                   <div className="flex items-center gap-2">
                     {template.author.avatar ? (
                       template.author.name === "Aivory Tech Lab" ? (
@@ -139,13 +138,13 @@ export default function TemplateDetailPage() {
 
               {template.lastUpdated && (
                 <div>
-                  <div className="text-[9px] font-semibold text-white/35 uppercase tracking-wider mb-1">Last Updated</div>
+                  <div className="text-[9px] font-semibold text-white/35 uppercase tracking-wider mb-1">{t("lastUpdated")}</div>
                   <div className="text-[12px] text-white/75">{template.lastUpdated}</div>
                 </div>
               )}
 
               <div>
-                <div className="text-[9px] font-semibold text-white/35 uppercase tracking-wider mb-1.5">Categories</div>
+                <div className="text-[9px] font-semibold text-white/35 uppercase tracking-wider mb-1.5">{t("categoriesLabel")}</div>
                 <div className="flex flex-wrap gap-1.5">
                   <div className="px-2 py-1 rounded-full bg-accent/[0.12] border border-accent/20 text-[10px] text-[#c9dab8] font-medium">
                     {template.category}
@@ -165,7 +164,7 @@ export default function TemplateDetailPage() {
                 <h3
                   className="uppercase tracking-wider"
                   style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.4)', margin: '0 0 8px', lineHeight: 1.3 }}
-                >Nodes</h3>
+                >{t("nodes")}</h3>
                 <div className="space-y-1">
                   {template.nodesList.map((node, i) => (
                     <div key={i} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.045] hover:border-white/[0.08] transition-colors">
@@ -201,7 +200,7 @@ export default function TemplateDetailPage() {
               <h3
                 className="uppercase tracking-wider"
                 style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.4)', margin: '0 0 8px', lineHeight: 1.3 }}
-              >About this template</h3>
+              >{t("aboutTemplate")}</h3>
               <p
                 className="whitespace-pre-wrap"
                 style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6, margin: 0 }}

@@ -417,5 +417,27 @@
     "target": "Target",
     "actual": "Aktual",
     "enterActual": "Masukkan nilai aktual"
+  },
+  "templates": {
+    "badgeLabel": "Template",
+    "heroTitle": "Jelajahi template berdasarkan kasus penggunaan",
+    "heroSubtitle": "Temukan template sesuai kebutuhan Anda dan mulai otomasi—tanpa perlu coding.",
+    "searchPlaceholder": "Cari template",
+    "categoriesLabel": "Kategori",
+    "usesCount": "{count} kali dipakai",
+    "aiPowered": "Bertenaga AI",
+    "noResults": "Tidak ada template yang cocok dengan kriteria Anda.",
+    "popularTemplates": "Template populer",
+    "breadcrumbDiscover": "Jelajahi",
+    "loading": "Memuat template…",
+    "notFound": "Template tidak ditemukan.",
+    "backToTemplates": "Kembali ke template",
+    "share": "Bagikan",
+    "opening": "Membuka…",
+    "tryIt": "Coba",
+    "createdBy": "Dibuat Oleh",
+    "lastUpdated": "Terakhir Diperbarui",
+    "nodes": "Node",
+    "aboutTemplate": "Tentang template ini"
   }
 }

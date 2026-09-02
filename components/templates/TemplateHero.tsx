@@ -1,6 +1,8 @@
 import React from "react";
+import { useTranslations } from "next-intl";
 
 export default function TemplateHero() {
+  const t = useTranslations("templates");
   return (
     <div
       className="relative w-full rounded-2xl overflow-hidden p-6 md:p-8 mb-8 border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
@@ -24,19 +26,16 @@ export default function TemplateHero() {
 
       <div className="relative z-10 max-w-2xl">
         <span className="inline-block text-[10px] font-semibold text-[#dddac5]/80 uppercase tracking-[0.12em] mb-3 px-2.5 py-[3px] rounded-full bg-white/[0.06] border border-white/[0.08]">
-          Templates
+          {t("badgeLabel")}
         </span>
-        {/* globals.css has an unlayered `main h1/p{...}` rule that beats any
-            Tailwind class regardless of specificity — inline style is the only
-            reliable override (see app/templates/[id]/page.tsx for the same fix). */}
         <h1
           className="text-white text-balance"
           style={{ fontSize: 22, fontWeight: 300, lineHeight: 1.25, letterSpacing: '-0.2px', margin: '0 0 10px', color: '#fff' }}
         >
-          Explore templates by use case
+          {t("heroTitle")}
         </h1>
         <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: 0 }}>
-          Discover templates for your needs and get started with automation—no coding required.
+          {t("heroSubtitle")}
         </p>
       </div>
 
