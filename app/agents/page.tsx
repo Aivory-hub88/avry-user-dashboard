@@ -9,6 +9,7 @@ import { listAgentActions, AgentAction } from '@/lib/agentActions';
 import { listDeployments, deleteDeployment, AgentDeployment } from '@/lib/agentChat';
 import { getCredits, CreditStatus } from '@/lib/agentProfiles';
 import CustomizeAgentModal from '@/components/agents/CustomizeAgentModal';
+import { AgentAvatar } from '@/components/office/AgentAvatar';
 
 const NoiseOverlay = () => (
   <>
@@ -304,11 +305,18 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
             Enterprise
           </span>
         )}
-        <div
-          className="absolute left-4 right-4 bottom-3 z-10 text-white font-semibold text-[15px] leading-snug tracking-wide drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
-        >
-          {agent.title}
+        <div className="absolute left-4 right-4 bottom-3 z-10 flex items-center gap-2.5">
+          <AgentAvatar
+            type={agent.agentType}
+            size={30}
+            className="ring-2 ring-black/25 shadow-[0_2px_6px_rgba(0,0,0,0.35)]"
+          />
+          <div
+            className="text-white font-semibold text-[15px] leading-snug tracking-wide drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
+            style={{ fontFamily: "'Manrope', sans-serif" }}
+          >
+            {agent.title}
+          </div>
         </div>
       </div>
 
