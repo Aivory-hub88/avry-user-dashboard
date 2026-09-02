@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+/* Tailwind v4 only generates a color utility (bg-accent, text-accent,
+   outline-accent, …) from a variable named --color-<name> inside @theme —
+   a plain :root custom property (see --accent below) is invisible to it.
+   --accent/--accent-dim have been defined in :root, but never re-declared
+   here, since this app was set up: every `bg-accent`/`text-accent`/
+   `outline-accent`/`bg-accent-dim` class anywhere in the codebase (9 files,
+   including the office rail's own "Approve" button) has been compiling to
+   nothing — no color, no error, silently invisible. Found live 2026-09-02
+   redesigning NotificationCard's icons, when a "solid accent fill" icon
+   rendered as fully transparent. Mapped to the exact same values as :root's
+   --accent/--accent-dim below, not a new color — this fixes the utility,
+   it doesn't redefine the brand color. */
+@theme {
+  --color-accent: #b7cba6;
+  --color-accent-dim: rgba(183, 203, 166, 0.12);
+}
+
 /* Real font files for literal font-family: 'Manrope'/'Doto' lookups — needed
    both by the many hardcoded `font-family: 'Manrope'` rules below (next/font
    only exposes a scoped class name, not the literal family) and by the PDF

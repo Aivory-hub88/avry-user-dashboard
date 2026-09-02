@@ -226,6 +226,7 @@ export default function AgentRail({
                 return (
                   <NotificationCard
                     key={a.id}
+                    tone="warn"
                     badge="Needs approval"
                     icon={<Check className="h-[13px] w-[13px]" />}
                     title={describeTool(a.tool_name)}

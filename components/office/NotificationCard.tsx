@@ -12,6 +12,17 @@
  * - Icon is a rounded square ("squircle"), not a circle — macOS app icons
  *   are all rounded-rect, and that's part of what reads as "notification"
  *   rather than "avatar."
+ * - The icon itself is a **fully opaque, solid-colour fill with a white
+ *   (or near-black, for light fills) glyph** — never a low-opacity tint.
+ *   Confirmed against Apple's own App Icon guidelines (opaque, no alpha —
+ *   developer.apple.com/design/human-interface-guidelines/foundations/
+ *   app-icons) and against a real macOS Notification Centre screenshot
+ *   (Creative Cloud's gradient mark, Screen Time's solid-purple hourglass —
+ *   both fully saturated, neither a tint of the card background). Our
+ *   first pass used `rgba(217,171,110,0.18)` — an 18%-opacity wash — which
+ *   is exactly backwards and read as washed-out. A soft drop shadow under
+ *   the icon (the system adds one automatically on real Apple platforms)
+ *   is the other detail that was missing.
  * - Title and the timestamp share one line (title truncates, timestamp
  *   never does); the secondary line sits below, spanning full width.
  * - An actions row (Approve/Deny, etc.) gets a hairline divider above it
@@ -37,14 +48,26 @@ interface NotificationCardProps {
   title: ReactNode
   subtitle?: ReactNode
   meta?: string
-  tone?: "default" | "warn"
+  /** `warn` = solid amber (status issues, approvals — Aivory's existing
+   *  "needs attention" colour, same family as the Approve button/badge).
+   *  `info` = solid blue (a missed reply — informational, not urgent). */
+  tone?: "info" | "warn"
   badge?: string
   actions?: ReactNode
   onClick?: () => void
 }
 
-export function NotificationCard({ icon, title, subtitle, meta, tone = "default", badge, actions, onClick }: NotificationCardProps) {
-  const iconToneClass = tone === "warn" ? "bg-[rgba(217,171,110,0.18)] text-[#e8c088]" : "bg-white/[0.07] text-white/55"
+const ICON_TONE_CLASS: Record<"info" | "warn", string> = {
+  // Explicit amber, not `bg-accent` — `accent` is this app's sage-green
+  // brand color (see styles/globals.css), a different identity from the
+  // amber already used for "Needs approval"/warning language throughout
+  // this file. #d9ab6e/#e8c088 are that same amber, used verbatim.
+  warn: "bg-[#d9ab6e] text-[#2b2318] shadow-[0_2px_5px_rgba(0,0,0,0.35)]",
+  info: "bg-[#6f93bd] text-white shadow-[0_2px_5px_rgba(0,0,0,0.35)]",
+}
+
+export function NotificationCard({ icon, title, subtitle, meta, tone = "info", badge, actions, onClick }: NotificationCardProps) {
+  const iconToneClass = ICON_TONE_CLASS[tone]
 
   const content = (
     <>
