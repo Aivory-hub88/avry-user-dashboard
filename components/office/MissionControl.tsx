@@ -17,7 +17,6 @@ import type { ChatSession } from "@/hooks/useChat"
 import { readVerifierFinding, type PendingApproval } from "@/lib/agentApprovals"
 import { ThinkingDots } from "@/components/ui/ThinkingDots"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
-import EmailAssistantWidget from "@/components/office/EmailAssistantWidget"
 
 const CHANNEL_ICON: Record<string, string> = {
   telegram: "/integrations/telegram.svg",
@@ -173,11 +172,6 @@ export default function MissionControl({
               </button>
             )
           })}
-        </div>
-
-        {/* Aivory Email Assistant — Mission Control push feed */}
-        <div className="mt-6">
-          <EmailAssistantWidget />
         </div>
       </div>
     </div>
