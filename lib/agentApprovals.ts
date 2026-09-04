@@ -13,6 +13,25 @@ import { APP_CATALOG } from './integrations/store'
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'
 
+/**
+ * A second opinion attached to a pending approval by Cerveau's
+ * `verifier_brain` sweep (ADR-008 Phase 3a), so the person deciding sees an
+ * assessment rather than only a tool name and an argument blob.
+ *
+ * Strictly advisory. The verifier runs with zero tools and cannot resolve
+ * any approval — `verdict: "ok"` means "an automated check found nothing
+ * unusual", never "this is approved". The human decision is unchanged.
+ *
+ * `error` is a real, expected verdict, not a bug: the sweep folds every
+ * failure (spawn refused, LLM call failed, unparseable reply) into one so a
+ * row always carries something visible rather than silently staying blank.
+ */
+export interface VerifierFinding {
+  verdict: 'ok' | 'flag' | 'error'
+  reasoning: string
+  confidence: number
+}
+
 export interface PendingApproval {
   id: string
   principal: string
@@ -23,10 +42,34 @@ export interface PendingApproval {
   status: string
   resolved_at: string | null
   resolved_by: string | null
+  /** `null` both when the sweep hasn't reached this row yet and when
+   *  `verifier_brain` isn't configured at all — the gateway deliberately
+   *  collapses those cases, since neither gives the caller anything to
+   *  show. Absent entirely on an older Cerveau that predates the column. */
+  verifier_finding?: VerifierFinding | null
   /** Present on rows returned by the list endpoint — required to resolve
    *  without avry-backend re-scanning every (instance, agent_type) pair. */
   _gateway_base?: string
   _agent_type?: string
+}
+
+/** Narrow an unknown `verifier_finding` to something safe to render.
+ *
+ *  The value crosses two service boundaries and originates from a model
+ *  summarising *untrusted tool arguments*, so nothing about its shape is
+ *  guaranteed by the time it reaches here — a malformed or partial object
+ *  must render as "no finding", never as a crash or a half-drawn chip. */
+export function readVerifierFinding(approval: PendingApproval): VerifierFinding | null {
+  const f = approval.verifier_finding
+  if (!f || typeof f !== 'object') return null
+  const verdict = (f as VerifierFinding).verdict
+  if (verdict !== 'ok' && verdict !== 'flag' && verdict !== 'error') return null
+  const reasoning = (f as VerifierFinding).reasoning
+  return {
+    verdict,
+    reasoning: typeof reasoning === 'string' ? reasoning : '',
+    confidence: typeof (f as VerifierFinding).confidence === 'number' ? (f as VerifierFinding).confidence : 0,
+  }
 }
 
 export async function listPendingApprovals(): Promise<PendingApproval[]> {

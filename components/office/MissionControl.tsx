@@ -14,9 +14,10 @@ import { Lock } from "lucide-react"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
 import type { ChatSession } from "@/hooks/useChat"
-import type { PendingApproval } from "@/lib/agentApprovals"
+import { readVerifierFinding, type PendingApproval } from "@/lib/agentApprovals"
 import { ThinkingDots } from "@/components/ui/ThinkingDots"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
+import EmailAssistantWidget from "@/components/office/EmailAssistantWidget"
 
 const CHANNEL_ICON: Record<string, string> = {
   telegram: "/integrations/telegram.svg",
@@ -86,12 +87,26 @@ export default function MissionControl({
           {ROWS.map((row) => {
             const threads = sessionsByAgent[row.key] ?? []
             const mostRecent = threads[0]
-            const pending = approvalsByAgent[row.key]?.length ?? 0
+            const approvals = approvalsByAgent[row.key] ?? []
+            const pending = approvals.length
+            // ADR-008 Phase 3a: an approval `verifier_brain` flagged is still
+            // just one of the pending ones — the count badge already carries
+            // "how many". What the glance view was missing is "is any of them
+            // worth opening first", so the status line says that instead.
+            // Reading it off the approvals already passed in keeps this view's
+            // no-new-data-source rule intact.
+            const flagged = approvals.some((a) => readVerifierFinding(a)?.verdict === "flag")
             const channels = row.type
               ? [...new Set(deployments.filter((d) => d.agentType === row.type).map((d) => d.kind))]
               : []
             const isThinking = row.type === streamingAgentType
-            const status = isThinking ? "Thinking…" : pending > 0 ? "Needs you" : "Idle"
+            const status = isThinking
+              ? "Thinking…"
+              : flagged
+                ? "Flagged"
+                : pending > 0
+                  ? "Needs you"
+                  : "Idle"
             const statusColor = pending > 0 ? "text-amber" : isThinking ? "text-white/60" : "text-white/35"
 
             return (
@@ -158,6 +173,11 @@ export default function MissionControl({
               </button>
             )
           })}
+        </div>
+
+        {/* Aivory Email Assistant — Mission Control push feed */}
+        <div className="mt-6">
+          <EmailAssistantWidget />
         </div>
       </div>
     </div>

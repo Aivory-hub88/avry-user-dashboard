@@ -44,7 +44,7 @@ import { ChevronLeft, ChevronRight, Brain } from "lucide-react"
 import { IoWarning, IoCheckmarkCircle, IoCheckmark, IoChatbubbleEllipses } from "react-icons/io5"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
-import { describeTool, toolkitIconPath, type PendingApproval } from "@/lib/agentApprovals"
+import { describeTool, toolkitIconPath, readVerifierFinding, type PendingApproval } from "@/lib/agentApprovals"
 import type { Notification } from "@/types/notifications"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { NotificationCard } from "@/components/office/NotificationCard"
@@ -238,11 +238,31 @@ export default function AgentRail({
                 // whenever the tool name resolves to one; only a bare
                 // loopback tool with no toolkit prefix falls back.
                 const brandIcon = toolkitIconPath(a.tool_name)
+                // ADR-008 Phase 3a: `verifier_brain` may have already looked at
+                // this call and left a finding. It is advisory only — the
+                // verifier runs with zero tools and cannot resolve anything —
+                // so it never replaces the decision, only informs it.
+                //
+                // The badge is the one place strong enough to carry "look
+                // closer at this one" without a second colour treatment, so a
+                // flag takes it over; everything else keeps the standing label,
+                // which the Approve/Deny buttons already imply anyway.
+                //
+                // `confidence` is deliberately not shown: nothing calibrates
+                // it, and an uncalibrated 0.85 next to a sentence reads as
+                // precision the number does not have.
+                const finding = readVerifierFinding(a)
+                const subtitle =
+                  finding === null
+                    ? "Waiting for your decision."
+                    : finding.verdict === "error"
+                      ? "Automated check didn't complete — use your own judgement."
+                      : `Automated check: ${finding.reasoning}`
                 return (
                   <NotificationCard
                     key={a.id}
                     tone="warn"
-                    badge="Needs approval"
+                    badge={finding?.verdict === "flag" ? "Flagged" : "Needs approval"}
                     icon={
                       brandIcon ? (
                         <Image src={asset(brandIcon)} alt="" width={18} height={18} className="rounded-[4px]" />
@@ -251,7 +271,7 @@ export default function AgentRail({
                       )
                     }
                     title={describeTool(a.tool_name)}
-                    subtitle="Waiting for your decision."
+                    subtitle={subtitle}
                     actions={
                       <>
                         <button

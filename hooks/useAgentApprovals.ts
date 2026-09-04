@@ -27,7 +27,26 @@ export function useAgentApprovals(excludeIds?: Iterable<string>) {
   // callers that only want to auto-open on a real pending decision (not on
   // the empty state before the first response lands) need this.
   const [loaded, setLoaded] = useState(false)
-  const exclude = useMemo(() => new Set(excludeIds ?? []), [excludeIds])
+  // Keyed on the ids themselves, never on the iterable's identity. The
+  // natural way to call this hook is with a freshly-derived array
+  // (`messages.filter(...).map(...)`), which is a new object every render —
+  // memoising on that identity made `refetch` new every render, which made
+  // the `useEffect` below re-run every render, which set state and rendered
+  // again: an unbounded refetch loop that only appears once there is at
+  // least one approval to exclude. It surfaced as React's "Maximum update
+  // depth exceeded" under a fast (cached/stubbed) response, and as silent,
+  // continuous polling against avry-backend under a real one — which is why
+  // it went unnoticed while production had zero pending approvals.
+  //
+  // Recomputing this small join every render is deliberate and cheap; what
+  // has to stay stable is the *value*, so everything downstream of it does.
+  // NUL as the separator: ids are UUIDs today, but a separator that cannot
+  // occur inside an id at all removes the question rather than assuming it.
+  const excludeKey = excludeIds ? [...excludeIds].sort().join('\u0000') : ''
+  const exclude = useMemo(
+    () => new Set(excludeKey === '' ? [] : excludeKey.split('\u0000')),
+    [excludeKey],
+  )
 
   const refetch = useCallback(() => {
     listPendingApprovalsByAgent()
