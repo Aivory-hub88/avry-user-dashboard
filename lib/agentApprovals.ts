@@ -47,6 +47,18 @@ export interface PendingApproval {
    *  collapses those cases, since neither gives the caller anything to
    *  show. Absent entirely on an older Cerveau that predates the column. */
   verifier_finding?: VerifierFinding | null
+  /** ADR-009 Phase 3: true when this approval was raised by a scheduled
+   *  run rather than a live conversation — nobody is blocked waiting for
+   *  the decision. Derived by Cerveau from the session the run actually
+   *  wrote, not by matching a string here. Absent on an older Cerveau that
+   *  predates the field, which reads the same as `false`: a missing badge
+   *  costs nothing, whereas telling someone nobody is waiting when someone
+   *  is costs them the wait. */
+  unattended?: boolean
+  /** What the turn was originally asked to do — for a scheduled run, the
+   *  tenant's own schedule instruction. `null` on a row that predates the
+   *  capture, and on any turn whose origin was never recorded. */
+  origin_message?: string | null
   /** Present on rows returned by the list endpoint — required to resolve
    *  without avry-backend re-scanning every (instance, agent_type) pair. */
   _gateway_base?: string

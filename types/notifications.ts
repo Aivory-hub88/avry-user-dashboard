@@ -17,3 +17,8 @@ import type { PendingApproval } from '@/lib/agentApprovals'
 export type Notification =
   | { id: string; kind: 'approval'; agentType: string; approval: PendingApproval }
   | { id: string; kind: 'activity'; agentType: string; sessionId: string; title: string; updatedAt: number }
+  /** ADR-009 Phase 3: a standing condition, not an event — today only a
+   *  scheduled run Cerveau has reported as `failed`. Unlike the other two
+   *  this does not clear by being read; it clears when the underlying
+   *  condition does, which is why it carries no timestamp. */
+  | { id: string; kind: 'status'; agentType: string; title: string; detail: string | null }

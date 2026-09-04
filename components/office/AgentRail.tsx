@@ -114,6 +114,7 @@ export default function AgentRail({
 
   const approvalItems = notifications.filter((n): n is Extract<Notification, { kind: "approval" }> => n.kind === "approval")
   const activityItems = notifications.filter((n): n is Extract<Notification, { kind: "activity" }> => n.kind === "activity")
+  const statusItems = notifications.filter((n): n is Extract<Notification, { kind: "status" }> => n.kind === "status")
   const channels = agentTarget ? deployments.filter((d) => d.agentType === agentTarget) : []
   const notDeployed = agentTarget !== null && channels.length === 0
 
@@ -252,9 +253,19 @@ export default function AgentRail({
                 // it, and an uncalibrated 0.85 next to a sentence reads as
                 // precision the number does not have.
                 const finding = readVerifierFinding(a)
+                // ADR-009 Phase 3: an approval raised by a scheduled run
+                // fired while nobody was watching. Saying "Waiting for your
+                // decision" over it is not just uninformative, it is wrong —
+                // it implies a turn is blocked on the reader when nothing is.
+                const scheduled = a.unattended === true
+                const origin = a.origin_message?.trim()
                 const subtitle =
                   finding === null
-                    ? "Waiting for your decision."
+                    ? scheduled
+                      ? origin
+                        ? `Ran on a schedule: “${origin}”`
+                        : "Ran on a schedule — nothing is blocked while this waits."
+                      : "Waiting for your decision."
                     : finding.verdict === "error"
                       ? "Automated check didn't complete — use your own judgement."
                       : `Automated check: ${finding.reasoning}`
@@ -262,7 +273,17 @@ export default function AgentRail({
                   <NotificationCard
                     key={a.id}
                     tone="warn"
-                    badge={finding?.verdict === "flag" ? "Flagged" : "Needs approval"}
+                    // The badge carries the most informative thing available,
+                    // in that order: a flag beats where it came from, which
+                    // beats "Needs approval" — a label the Approve/Deny pair
+                    // directly below already implies.
+                    badge={
+                      finding?.verdict === "flag"
+                        ? "Flagged"
+                        : scheduled
+                          ? "Scheduled run"
+                          : "Needs approval"
+                    }
                     icon={
                       brandIcon ? (
                         <Image src={asset(brandIcon)} alt="" width={18} height={18} className="rounded-[4px]" />
@@ -296,6 +317,28 @@ export default function AgentRail({
                   />
                 )
               })}
+
+              {/* ADR-009 Phase 3: a scheduled run Cerveau has reported as
+                  failed. `error` tone rather than `warn` on purpose — this
+                  is not a decision waiting for someone, it is work the
+                  customer believes is happening that is not. No action
+                  button: fixing it means editing the schedule, which lives
+                  in Customise Agent, and a button that only opens another
+                  screen is worse than the sentence that says where to go. */}
+              {statusItems.map((item) => (
+                <NotificationCard
+                  key={item.id}
+                  tone="error"
+                  badge="Not running"
+                  icon={<IoWarning className="h-[16px] w-[16px]" />}
+                  title={`Scheduled run “${item.title}” isn’t running`}
+                  subtitle={
+                    item.detail
+                      ? `${item.detail} — fix it under Customise agent → Schedules.`
+                      : "Fix it under Customise agent → Schedules."
+                  }
+                />
+              ))}
 
               {activityItems.map((item) => (
                 <NotificationCard
