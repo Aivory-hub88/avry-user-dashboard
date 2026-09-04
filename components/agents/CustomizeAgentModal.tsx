@@ -50,6 +50,7 @@ import {
 } from '@/lib/discordDeploy';
 import { createAgentApiKey, CreatedApiKey } from '@/lib/agentApiKeys';
 import { asset } from '@/lib/asset';
+import SchedulesTab from '@/components/agents/SchedulesTab';
 
 /**
  * Per-agent identity editor. What the operator saves here is injected into
@@ -145,6 +146,16 @@ const EMPTY: Record<FieldKey, string> = {
 
 const inputClass =
   'w-full px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 text-white/90 text-[13px] placeholder-white/25 focus:outline-none focus:border-accent/40 transition-colors';
+
+/** Tab key → its translation key. A lookup rather than a ternary chain so
+ *  adding a tab is one line here, not a longer expression in the strip. */
+const TAB_LABEL_KEY = {
+  identity: 'tabIdentity',
+  integrations: 'tabIntegrations',
+  mcp: 'tabMcp',
+  schedules: 'tabSchedules',
+  deploy: 'tabDeploy',
+} as const;
 
 function Field({
   label, hint, value, limit, onChange, textarea, rows, placeholder,
@@ -301,7 +312,7 @@ export default function CustomizeAgentModal({
   agentType: string | null;
 }) {
   const t = useTranslations('customizeAgent');
-  const [tab, setTab] = useState<'identity' | 'integrations' | 'mcp' | 'deploy'>('identity');
+  const [tab, setTab] = useState<'identity' | 'integrations' | 'mcp' | 'schedules' | 'deploy'>('identity');
   const [fields, setFields] = useState<Record<FieldKey, string>>(EMPTY);
   const [hasProfile, setHasProfile] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -916,10 +927,11 @@ export default function CustomizeAgentModal({
             {tab === 'identity' && t('descIdentity')}
             {tab === 'integrations' && t('descIntegrations')}
             {tab === 'mcp' && t('descMcp')}
+            {tab === 'schedules' && t('descSchedules')}
             {tab === 'deploy' && t('descDeploy')}
           </p>
           <div className="flex items-center gap-1 border-b border-white/[0.06] -mb-4">
-            {(['identity', 'integrations', 'mcp', 'deploy'] as const).map((tabKey) => (
+            {(['identity', 'integrations', 'mcp', 'schedules', 'deploy'] as const).map((tabKey) => (
               <button
                 key={tabKey}
                 type="button"
@@ -932,7 +944,7 @@ export default function CustomizeAgentModal({
                     : 'text-white/40 hover:text-white/65 border-transparent'
                 }`}
               >
-                {tabKey === 'mcp' ? 'MCP' : t(tabKey === 'identity' ? 'tabIdentity' : tabKey === 'integrations' ? 'tabIntegrations' : 'tabDeploy')}
+                {tabKey === 'mcp' ? 'MCP' : t(TAB_LABEL_KEY[tabKey])}
               </button>
             ))}
           </div>
@@ -1331,6 +1343,16 @@ export default function CustomizeAgentModal({
                   </>
                 )}
               </div>
+            )
+          )}
+
+          {/* ADR-009 Phase 3. Its own component, mounted with one line: the
+              tab owns all of its own state, and this file is long enough. */}
+          {tab === 'schedules' && (
+            agentType ? (
+              <SchedulesTab key={agentType} agentType={agentType} />
+            ) : (
+              <div className="py-10 text-center text-white/40 text-[13px]">{t('scheduleNoAgent')}</div>
             )
           )}
 
