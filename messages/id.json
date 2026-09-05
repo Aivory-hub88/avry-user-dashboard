@@ -664,7 +664,12 @@
     "scheduleEdit": "Ubah",
     "scheduleRemove": "Hapus",
     "scheduleWorking": "Memproses…",
-    "scheduleNoAgent": "Pilih agen dulu."
+    "scheduleNoAgent": "Pilih agen dulu.",
+    "scheduleQuotaUsed": "{used} dari {limit} jadwal terpakai di agen ini",
+    "scheduleQuotaNone": "Paket {plan} Anda belum mencakup jadwal.",
+    "scheduleQuotaFullHint": "Anda sudah memakai semua {limit} jadwal yang diizinkan paket {plan} untuk agen ini. Hapus satu untuk mengosongkan slot, atau naikkan paket.",
+    "scheduleQuotaNoneHint": "Jadwal belum termasuk dalam paket {plan}. Naikkan ke Operational atau di atasnya untuk mulai membuatnya.",
+    "scheduleCreditsLeft": "{balance, number} dari {allowance, number} Intelligence Credit tersisa"
   },
   "agents": {
     "breadcrumb": "Agen",

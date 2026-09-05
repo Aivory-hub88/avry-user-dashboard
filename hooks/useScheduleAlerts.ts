@@ -33,8 +33,8 @@ export function useScheduleAlerts(): { failedByAgent: Record<string, ScheduledRu
   useEffect(() => {
     let cancelled = false
     listScheduledRuns()
-      .then((rows) => {
-        if (!cancelled) setFailed(rows.filter((r) => r.status === 'failed'))
+      .then(({ runs }) => {
+        if (!cancelled) setFailed(runs.filter((r) => r.status === 'failed'))
       })
       .catch(() => {
         // Deliberately swallowed — see the module doc.

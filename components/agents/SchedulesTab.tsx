@@ -32,6 +32,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { getCredits, type CreditStatus } from '@/lib/agentProfiles'
 import {
   DEFAULT_SHAPE,
   buildCronExpression,
@@ -43,6 +44,7 @@ import {
   supportedTimeZones,
   updateScheduledRun,
   type Cadence,
+  type ScheduleQuota,
   type ScheduleShape,
   type ScheduledRun,
 } from '@/lib/tenantScheduledRuns'
@@ -71,6 +73,8 @@ export default function SchedulesTab({ agentType }: SchedulesTabProps) {
   const t = useTranslations('customizeAgent')
 
   const [runs, setRuns] = useState<ScheduledRun[]>([])
+  const [quota, setQuota] = useState<ScheduleQuota | null>(null)
+  const [credits, setCredits] = useState<CreditStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -107,8 +111,10 @@ export default function SchedulesTab({ agentType }: SchedulesTabProps) {
   useEffect(() => {
     let cancelled = false
     listScheduledRuns(agentType)
-      .then((rows) => {
-        if (!cancelled) setRuns(rows)
+      .then((page) => {
+        if (cancelled) return
+        setRuns(page.runs)
+        setQuota(page.quota)
       })
       .catch((e: unknown) => {
         if (!cancelled) setListError(e instanceof Error ? e.message : t('scheduleListFailed'))
@@ -120,6 +126,23 @@ export default function SchedulesTab({ agentType }: SchedulesTabProps) {
       cancelled = true
     }
   }, [agentType, t])
+
+  // Intelligence Credits are what a scheduled run actually spends, so the
+  // allowance and the balance belong on the same line — a tenant deciding
+  // whether to add a schedule is really deciding whether to spend. Failures
+  // are swallowed: `getCredits` already returns `null` on a non-OK response,
+  // and a credits outage must not stop someone managing their schedules.
+  useEffect(() => {
+    let cancelled = false
+    getCredits()
+      .then((status) => {
+        if (!cancelled) setCredits(status)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   /** Plain-language cadence, built from the shape the expression parses back
    *  into. An expression this builder could not have written is shown as
@@ -242,6 +265,15 @@ export default function SchedulesTab({ agentType }: SchedulesTabProps) {
     }
   }
 
+  // Unknown quota (an older backend that predates the field) is not the
+  // same as a full one: without a number, offer the form and let the
+  // backend be the authority, rather than blocking on a guess.
+  const atQuota = quota !== null && runs.length >= quota.perAgentLimit
+  // Superadmins are unlimited; a balance line for them is noise.
+  const showCredits = credits !== null && !credits.unlimited && credits.allowance !== null
+  const lowCredits =
+    showCredits && credits.allowance ? (credits.balance ?? 0) / credits.allowance < 0.15 : false
+
   if (loading) {
     return <div className="py-10 text-center text-white/40 text-[13px]">{t('loadingSchedules')}</div>
   }
@@ -251,6 +283,31 @@ export default function SchedulesTab({ agentType }: SchedulesTabProps) {
       <div className="px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white/45 text-[11.5px] leading-relaxed">
         {t('scheduleBillingNote')}
       </div>
+
+      {/* The allowance and what a run actually spends, on one line. Both are
+          reported by the backend — no copy of either ladder lives here, so
+          neither can quietly promise something the API no longer grants.
+          A superadmin's credits are unlimited and the number would be
+          noise, so that half is omitted rather than shown as "∞". */}
+      {(quota || showCredits) && (
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-0.5 text-[11.5px]">
+          {quota && (
+            <span className={atQuota ? 'text-amber-warn/90' : 'text-white/40'}>
+              {quota.perAgentLimit === 0
+                ? t('scheduleQuotaNone', { plan: quota.tierLabel })
+                : t('scheduleQuotaUsed', { used: runs.length, limit: quota.perAgentLimit })}
+            </span>
+          )}
+          {showCredits && (
+            <span className={lowCredits ? 'text-amber-warn/90' : 'text-white/40'}>
+              {t('scheduleCreditsLeft', {
+                balance: credits!.balance ?? 0,
+                allowance: credits!.allowance ?? 0,
+              })}
+            </span>
+          )}
+        </div>
+      )}
 
       {listError && (
         <div className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300/90 text-[12px]">
@@ -274,15 +331,27 @@ export default function SchedulesTab({ agentType }: SchedulesTabProps) {
         </div>
       )}
 
-      {!formOpen && (
-        <button
-          type="button"
-          onClick={openCreate}
-          className="w-full py-2.5 rounded-lg bg-white/[0.05] hover:bg-white/10 border border-white/10 text-white/70 hover:text-white/90 text-[13px] font-medium transition-colors duration-150 ease-out active:scale-[0.99]"
-        >
-          {t('scheduleAdd')}
-        </button>
-      )}
+      {/* At the limit the form is not offered at all. The backend would
+          refuse the save with a good message, but only after someone had
+          written the whole thing — saying so up front, next to the way to
+          free a slot, is the same information delivered before the work
+          rather than after it. */}
+      {!formOpen &&
+        (atQuota ? (
+          <div className="px-4 py-2.5 rounded-xl bg-amber-warn/[0.08] border border-amber-warn/20 text-amber-warn/90 text-[11.5px] leading-relaxed">
+            {quota!.perAgentLimit === 0
+              ? t('scheduleQuotaNoneHint', { plan: quota!.tierLabel })
+              : t('scheduleQuotaFullHint', { limit: quota!.perAgentLimit, plan: quota!.tierLabel })}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={openCreate}
+            className="w-full py-2.5 rounded-lg bg-white/[0.05] hover:bg-white/10 border border-white/10 text-white/70 hover:text-white/90 text-[13px] font-medium transition-colors duration-150 ease-out active:scale-[0.99]"
+          >
+            {t('scheduleAdd')}
+          </button>
+        ))}
 
       {formOpen && (
         <div className="space-y-4 rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">

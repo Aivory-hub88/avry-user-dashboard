@@ -73,12 +73,50 @@ async function parseErrorAndThrow(res: Response): Promise<never> {
   throw new ScheduledRunError(`Request failed (${res.status})`, res.status)
 }
 
-export async function listScheduledRuns(agentType?: string): Promise<ScheduledRun[]> {
+/**
+ * How many scheduled runs this plan allows, reported by the backend with
+ * every list call.
+ *
+ * Deliberately not derived from a copy of the ladder here. A second copy
+ * would drift the first time a plan's allowance changed, and it would drift
+ * silently — the UI would keep promising an allowance the API no longer
+ * grants, and the tenant would only find out by being refused.
+ *
+ * `perAgentLimit` is per (user, agent_type), not a total: a caller listing
+ * every agent at once must not compare it against the whole list's length.
+ * `0` means this plan has no scheduled runs at all — not an error, just
+ * nothing allowed.
+ */
+export interface ScheduleQuota {
+  perAgentLimit: number
+  tier: string
+  tierLabel: string
+}
+
+export interface ScheduledRunsPage {
+  runs: ScheduledRun[]
+  /** `null` on a Cerveau/backend that predates the field — the caller shows
+   *  the list without a quota line rather than inventing a number. */
+  quota: ScheduleQuota | null
+}
+
+export async function listScheduledRuns(agentType?: string): Promise<ScheduledRunsPage> {
   const query = agentType ? `?agent_type=${encodeURIComponent(agentType)}` : ''
   const res = await authedFetch(`${BACKEND_URL}/api/v1/tenant-scheduled-runs${query}`)
   if (!res.ok) await parseErrorAndThrow(res)
   const data = await res.json()
-  return data.scheduled_runs ?? []
+  const raw = data.quota
+  return {
+    runs: data.scheduled_runs ?? [],
+    quota:
+      raw && typeof raw.per_agent_limit === 'number'
+        ? {
+            perAgentLimit: raw.per_agent_limit,
+            tier: String(raw.tier ?? ''),
+            tierLabel: String(raw.tier_label ?? ''),
+          }
+        : null,
+  }
 }
 
 export interface CreateScheduledRunInput {
