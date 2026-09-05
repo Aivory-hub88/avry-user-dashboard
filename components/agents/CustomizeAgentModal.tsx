@@ -51,6 +51,7 @@ import {
 import { createAgentApiKey, CreatedApiKey } from '@/lib/agentApiKeys';
 import { asset } from '@/lib/asset';
 import SchedulesTab from '@/components/agents/SchedulesTab';
+import SkillsTab from '@/components/agents/SkillsTab';
 
 /**
  * Per-agent identity editor. What the operator saves here is injected into
@@ -153,6 +154,7 @@ const TAB_LABEL_KEY = {
   identity: 'tabIdentity',
   integrations: 'tabIntegrations',
   mcp: 'tabMcp',
+  skills: 'tabSkills',
   schedules: 'tabSchedules',
   deploy: 'tabDeploy',
 } as const;
@@ -312,7 +314,7 @@ export default function CustomizeAgentModal({
   agentType: string | null;
 }) {
   const t = useTranslations('customizeAgent');
-  const [tab, setTab] = useState<'identity' | 'integrations' | 'mcp' | 'schedules' | 'deploy'>('identity');
+  const [tab, setTab] = useState<'identity' | 'integrations' | 'mcp' | 'skills' | 'schedules' | 'deploy'>('identity');
   const [fields, setFields] = useState<Record<FieldKey, string>>(EMPTY);
   const [hasProfile, setHasProfile] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -927,11 +929,12 @@ export default function CustomizeAgentModal({
             {tab === 'identity' && t('descIdentity')}
             {tab === 'integrations' && t('descIntegrations')}
             {tab === 'mcp' && t('descMcp')}
+            {tab === 'skills' && t('descSkills')}
             {tab === 'schedules' && t('descSchedules')}
             {tab === 'deploy' && t('descDeploy')}
           </p>
           <div className="flex items-center gap-1 border-b border-white/[0.06] -mb-4">
-            {(['identity', 'integrations', 'mcp', 'schedules', 'deploy'] as const).map((tabKey) => (
+            {(['identity', 'integrations', 'mcp', 'skills', 'schedules', 'deploy'] as const).map((tabKey) => (
               <button
                 key={tabKey}
                 type="button"
@@ -1343,6 +1346,17 @@ export default function CustomizeAgentModal({
                   </>
                 )}
               </div>
+            )
+          )}
+
+          {/* ADR-008 Phase 4. Same reasoning as SchedulesTab below: its
+              own component, mounted with one line, owns all of its own
+              state. */}
+          {tab === 'skills' && (
+            agentType ? (
+              <SkillsTab key={agentType} agentType={agentType} />
+            ) : (
+              <div className="py-10 text-center text-white/40 text-[13px]">{t('scheduleNoAgent')}</div>
             )
           )}
 

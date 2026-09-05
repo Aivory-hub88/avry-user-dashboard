@@ -672,7 +672,18 @@
     "scheduleCreditsLeft": "{balance, number} dari {allowance, number} Intelligence Credit tersisa",
     "scheduleLapsedNotice": "Jalan terakhir pada {date} meminta persetujuan {tool}, tapi tidak ada yang menjawab tepat waktu.",
     "scheduleDismiss": "Tutup",
-    "scheduleDismissLapsedFailed": "Tidak bisa menutup notifikasi."
+    "scheduleDismissLapsedFailed": "Tidak bisa menutup notifikasi.",
+    "tabSkills": "Skill",
+    "descSkills": "Apa yang sudah bisa dilakukan agen ini — daftar baca-saja, dikonfigurasi oleh operator Anda. Tidak ada yang diatur dari dashboard di sini.",
+    "skillsIntro": "Ini kemampuan spesifik yang dimiliki agen ini di luar percakapan biasa — masing-masing berasal dari cara operator Anda mengonfigurasi instalasi ini.",
+    "skillsLoading": "Memuat skill…",
+    "skillsLoadFailed": "Tidak bisa memuat skill agen ini.",
+    "skillsEmpty": "Belum ada skill tambahan yang dikonfigurasi untuk agen ini.",
+    "skillOriginWorkspace": "Workspace",
+    "skillOriginOpenSkills": "Open Skills",
+    "skillOriginPlugin": "Plugin",
+    "skillOriginBundle": "Bundle",
+    "skillOriginOther": "Lainnya"
   },
   "agents": {
     "breadcrumb": "Agen",

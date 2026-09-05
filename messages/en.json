@@ -672,7 +672,18 @@
     "scheduleCreditsLeft": "{balance, number} of {allowance, number} Intelligence Credits left",
     "scheduleLapsedNotice": "Last run on {date} asked for {tool} approval, but nobody answered in time.",
     "scheduleDismiss": "Dismiss",
-    "scheduleDismissLapsedFailed": "Could not dismiss the notice."
+    "scheduleDismissLapsedFailed": "Could not dismiss the notice.",
+    "tabSkills": "Skills",
+    "descSkills": "What this agent can already do — a read-only list, configured by your operator. Nothing here is set from the dashboard.",
+    "skillsIntro": "These are the specific capabilities this agent has beyond ordinary conversation — each one came from how your operator configured this install.",
+    "skillsLoading": "Loading skills…",
+    "skillsLoadFailed": "Could not load this agent's skills.",
+    "skillsEmpty": "No extra skills configured for this agent yet.",
+    "skillOriginWorkspace": "Workspace",
+    "skillOriginOpenSkills": "Open Skills",
+    "skillOriginPlugin": "Plugin",
+    "skillOriginBundle": "Bundle",
+    "skillOriginOther": "Other"
   },
   "agents": {
     "breadcrumb": "Agent",
