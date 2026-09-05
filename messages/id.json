@@ -669,7 +669,10 @@
     "scheduleQuotaNone": "Paket {plan} Anda belum mencakup jadwal.",
     "scheduleQuotaFullHint": "Anda sudah memakai semua {limit} jadwal yang diizinkan paket {plan} untuk agen ini. Hapus satu untuk mengosongkan slot, atau naikkan paket.",
     "scheduleQuotaNoneHint": "Jadwal belum termasuk dalam paket {plan}. Naikkan ke Operational atau di atasnya untuk mulai membuatnya.",
-    "scheduleCreditsLeft": "{balance, number} dari {allowance, number} Intelligence Credit tersisa"
+    "scheduleCreditsLeft": "{balance, number} dari {allowance, number} Intelligence Credit tersisa",
+    "scheduleLapsedNotice": "Jalan terakhir pada {date} meminta persetujuan {tool}, tapi tidak ada yang menjawab tepat waktu.",
+    "scheduleDismiss": "Tutup",
+    "scheduleDismissLapsedFailed": "Tidak bisa menutup notifikasi."
   },
   "agents": {
     "breadcrumb": "Agen",

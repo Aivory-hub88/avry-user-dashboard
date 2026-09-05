@@ -47,6 +47,17 @@ export interface ScheduledRun {
   last_synced_at: string | null
   created_at: string | null
   updated_at: string | null
+  /**
+   * ADR-009 §14 follow-up. When this run fires unattended and the turn
+   * raises an approval nobody is there to answer, Cerveau retires it after
+   * 72 hours and reports the lapse back here — independent of `status`,
+   * because the schedule itself is not broken, one run's approval just went
+   * unanswered. `null` once nothing is flagged, or after the tenant
+   * dismisses it (see `dismissLapsedApproval`).
+   */
+  last_lapsed_at: string | null
+  /** The tool name from the lapsed approval, e.g. `GMAIL__SEND_EMAIL` — paired with `last_lapsed_at`, `null` together. */
+  last_lapsed_tool: string | null
 }
 
 export class ScheduledRunError extends Error {
@@ -165,6 +176,24 @@ export async function deleteScheduledRun(id: string): Promise<void> {
     { method: 'DELETE' },
   )
   if (!res.ok) await parseErrorAndThrow(res)
+}
+
+/**
+ * Acknowledge a `last_lapsed_at` flag and clear it. Its own endpoint rather
+ * than `updateScheduledRun({})`: the generic PATCH forces `status` back to
+ * `pending_activation` on every call (any content change invalidates what
+ * Cerveau holds), which would needlessly flip an `active` schedule to
+ * "not yet running" for a dismiss that touches neither content nor
+ * activation.
+ */
+export async function dismissLapsedApproval(id: string): Promise<ScheduledRun> {
+  const res = await authedFetch(
+    `${BACKEND_URL}/api/v1/tenant-scheduled-runs/${encodeURIComponent(id)}/dismiss-lapsed`,
+    { method: 'POST' },
+  )
+  if (!res.ok) await parseErrorAndThrow(res)
+  const data = await res.json()
+  return data.scheduled_run
 }
 
 // ── Building a cron expression without asking anyone to write cron ───────

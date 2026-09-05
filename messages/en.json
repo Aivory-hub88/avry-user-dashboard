@@ -669,7 +669,10 @@
     "scheduleQuotaNone": "Your {plan} plan doesn’t include scheduled runs.",
     "scheduleQuotaFullHint": "You’ve used all {limit} scheduled runs your {plan} plan allows on this agent. Remove one to free a slot, or upgrade for more.",
     "scheduleQuotaNoneHint": "Scheduled runs aren’t part of the {plan} plan. Upgrade to Operational or above to set one up.",
-    "scheduleCreditsLeft": "{balance, number} of {allowance, number} Intelligence Credits left"
+    "scheduleCreditsLeft": "{balance, number} of {allowance, number} Intelligence Credits left",
+    "scheduleLapsedNotice": "Last run on {date} asked for {tool} approval, but nobody answered in time.",
+    "scheduleDismiss": "Dismiss",
+    "scheduleDismissLapsedFailed": "Could not dismiss the notice."
   },
   "agents": {
     "breadcrumb": "Agent",

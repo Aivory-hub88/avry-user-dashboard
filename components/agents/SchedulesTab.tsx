@@ -39,6 +39,7 @@ import {
   createScheduledRun,
   deleteScheduledRun,
   detectTimeZone,
+  dismissLapsedApproval,
   listScheduledRuns,
   parseCronExpression,
   supportedTimeZones,
@@ -265,6 +266,23 @@ export default function SchedulesTab({ agentType }: SchedulesTabProps) {
     }
   }
 
+  // Its own handler rather than folding into handleToggle/handleDelete:
+  // dismissing a lapsed-approval flag is a distinct backend endpoint
+  // (dismissLapsedApproval, not updateScheduledRun) specifically so it never
+  // forces the row back to pending_activation the way any other edit does.
+  const handleDismissLapsed = async (run: ScheduledRun) => {
+    setBusyId(run.id)
+    setListError(null)
+    try {
+      const updated = await dismissLapsedApproval(run.id)
+      setRuns((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
+    } catch (e) {
+      setListError(e instanceof Error ? e.message : t('scheduleDismissLapsedFailed'))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   // Unknown quota (an older backend that predates the field) is not the
   // same as a full one: without a number, offer the form and let the
   // backend be the authority, rather than blocking on a guess.
@@ -326,6 +344,7 @@ export default function SchedulesTab({ agentType }: SchedulesTabProps) {
               onToggle={() => handleToggle(run)}
               onEdit={() => openEdit(run)}
               onDelete={() => handleDelete(run)}
+              onDismissLapsed={() => handleDismissLapsed(run)}
             />
           ))}
         </div>
@@ -546,6 +565,7 @@ function ScheduleRow({
   onToggle,
   onEdit,
   onDelete,
+  onDismissLapsed,
 }: {
   run: ScheduledRun
   cadence: string
@@ -553,6 +573,7 @@ function ScheduleRow({
   onToggle: () => void
   onEdit: () => void
   onDelete: () => void
+  onDismissLapsed: () => void
 }) {
   const t = useTranslations('customizeAgent')
 
@@ -584,6 +605,34 @@ function ScheduleRow({
 
       {run.status === 'failed' && run.status_detail && (
         <div className="mt-2 text-red-300/70 text-[11.5px]">{run.status_detail}</div>
+      )}
+
+      {/* Independent of `status` and of the pill above on purpose: the
+          schedule can be `active` and keep firing while this sits flagged —
+          the run itself isn't broken, one fire raised a question nobody was
+          there to answer. Shown even for a paused/failed row, since the
+          lapse is a fact about a past run, not about the row's current
+          state. */}
+      {run.last_lapsed_at && (
+        <div className="mt-2 flex items-start justify-between gap-2 px-2.5 py-2 rounded-lg bg-amber-warn/[0.08] border border-amber-warn/20">
+          <div className="text-amber-warn/90 text-[11.5px] leading-[1.4]">
+            {t('scheduleLapsedNotice', {
+              tool: run.last_lapsed_tool ?? '',
+              date: new Date(run.last_lapsed_at).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+              }),
+            })}
+          </div>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onDismissLapsed}
+            className="shrink-0 text-amber-warn/70 hover:text-amber-warn text-[11px] font-medium transition-colors duration-150 ease-out disabled:opacity-40"
+          >
+            {t('scheduleDismiss')}
+          </button>
+        </div>
       )}
 
       <div className="mt-2 line-clamp-2 text-white/45 text-[11.5px] leading-[1.5]">{run.prompt}</div>
