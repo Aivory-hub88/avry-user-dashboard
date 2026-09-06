@@ -1,10 +1,10 @@
 "use client"
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AgenticWorkflowState } from '@/types/agenticWorkflow'
-import WorkflowContainer from '@/components/console/WorkflowContainer'
+import dynamic from 'next/dynamic'
 import MessageActions from './chat/MessageActions'
 import { RoutingSuggestBanner } from './chat/RoutingSuggestBanner'
 import { AttachmentCard } from '@/components/AttachmentCard'
@@ -14,6 +14,8 @@ import { ThinkingDots } from '@/components/ui/ThinkingDots'
 import { describeTool } from '@/lib/agentApprovals'
 import type { ConsolePendingApproval } from '@/lib/agentChat'
 import { AgentAvatar } from '@/components/office/AgentAvatar'
+
+const WorkflowContainer = dynamic(() => import('@/components/console/WorkflowContainer'), { ssr: false })
 
 interface ChatMessageProps {
   role: 'user' | 'assistant'
@@ -98,7 +100,21 @@ function normalizeMarkdown(text: string): string {
   return text.replace(/\n(?!\n)(?![-*+>|#`\d])/g, '\n\n')
 }
 
-/* ── Code block with syntax highlighting (lazy-loaded) ─────────────────────── */
+/* ── Code block with syntax highlighting (lazy-loaded, shared) ───────────── */
+/* Satu promise global untuk semua message — sebelumnya tiap message
+   menjalankan Promise.all import Prism sendiri (N message = N import
+   ~400KB duplikat). Sekarang import sekali, dipakai bareng. */
+
+let highlighterPromise: Promise<{ hl: any; style: any }> | null = null
+function loadHighlighterOnce() {
+  if (!highlighterPromise) {
+    highlighterPromise = Promise.all([
+      import('react-syntax-highlighter').then(m => m.Prism),
+      import('react-syntax-highlighter/dist/esm/styles/prism').then(m => m.vscDarkPlus),
+    ]).then(([hl, style]) => ({ hl, style }))
+  }
+  return highlighterPromise
+}
 
 interface CodeBlockProps {
   inline?: boolean
@@ -113,15 +129,15 @@ function CodeBlock({ inline, className, children, ...props }: CodeBlockProps) {
   const [loadFailed, setLoadFailed] = useState(false)
 
   useEffect(() => {
-    Promise.all([
-      import('react-syntax-highlighter').then(m => m.Prism),
-      import('react-syntax-highlighter/dist/esm/styles/prism').then(m => m.vscDarkPlus),
-    ]).then(([hl, style]) => {
+    let cancelled = false
+    loadHighlighterOnce().then(({ hl, style }) => {
+      if (cancelled) return
       setHighlighter(() => hl)
       setHighlightStyle(style)
     }).catch(() => {
-      setLoadFailed(true)
+      if (!cancelled) setLoadFailed(true)
     })
+    return () => { cancelled = true }
   }, [])
 
   const match = /language-(\w+)/.exec(className || '')
@@ -328,7 +344,7 @@ const markdownComponents = {
 
 /* ── Main component ────────────────────────────────────────────────────────── */
 
-export default function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, pendingApproval, approvalOutcome, approvalBusy, onApproveAction, onDenyAction, agentName = 'Aivory', agentType = null }: ChatMessageProps) {
+export default memo(function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, pendingApproval, approvalOutcome, approvalBusy, onApproveAction, onDenyAction, agentName = 'Aivory', agentType = null }: ChatMessageProps) {
   const noop = useCallback(() => {}, [])
   const hasAgenticPhases = !!(agenticState && agenticState.phases.length > 0)
   const hasTextContent = !!content
@@ -339,7 +355,7 @@ export default function ChatMessage({ role, content, isStreaming = false, agenti
       {role === 'user' ? (
         /* USER BUBBLE — right-aligned, subtle container */
         <div className="flex justify-end group relative">
-          <div className="max-w-[80%] bg-[#282825] rounded-2xl px-5 py-3.5 text-base text-white leading-[1.6] border border-[#E5E7EB]/5 shadow-[0_1px_3px_0_rgb(0_0_0/0.1),0_1px_2px_-1px_rgb(0_0_0/0.1)] text-left">
+          <div className="max-w-[80%] bg-[#282825] rounded-[20px] px-5 py-3.5 text-base text-white leading-[1.6] border border-line text-left">
             {attachments && attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
                 {attachments.map((att, i) => (
@@ -366,7 +382,7 @@ export default function ChatMessage({ role, content, isStreaming = false, agenti
           {/* Message bubble — mirrors the user bubble's shape language on a
               lighter surface, max-w-[720px] for readability */}
           <div className="flex-1 min-w-0 max-w-[720px] text-left">
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.035] px-5 py-3.5 text-base text-[#f7f7f7] leading-[1.6]">
+            <div className="rounded-2xl border border-line bg-white/[0.035] px-5 py-3.5 text-base text-[#f7f7f7] leading-[1.6]">
               {/* Thinking indicator */}
               {isStreaming && !content && !hasAgenticPhases && (
                 <div className="flex items-center gap-2.5">
@@ -387,7 +403,7 @@ export default function ChatMessage({ role, content, isStreaming = false, agenti
 
               {/* Rendered markdown content */}
               {hasTextContent && (
-                <div className="prose-aivory">
+                <div className={`prose-aivory${isStreaming ? " is-streaming" : ""}`}>
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={markdownComponents}
@@ -432,4 +448,4 @@ export default function ChatMessage({ role, content, isStreaming = false, agenti
       )}
     </div>
   )
-}
+})

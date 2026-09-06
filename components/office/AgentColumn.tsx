@@ -171,7 +171,7 @@ export default function AgentColumn({
 
   if (collapsed) {
     return (
-      <div className="flex h-full w-full flex-col items-center border-r border-white/[0.045] bg-[#353531] pt-4">
+      <div className="flex h-full w-full flex-col items-center border-r border-line bg-surface-1 pt-4">
         <button
           onClick={onToggleCollapse}
           aria-label="Expand agent column"
@@ -228,7 +228,7 @@ export default function AgentColumn({
   }
 
   return (
-    <div className="flex h-full w-full flex-col border-r border-white/[0.045] bg-[#353531]">
+    <div className="flex h-full w-full flex-col border-r border-line bg-surface-1">
       <div className="flex items-center justify-between gap-2 px-4 pt-5 pb-3">
         {/* Not <h2> — a global `main h2` style overrides Tailwind's own
             font-size on any heading tag, forcing this to 24px regardless of
@@ -264,7 +264,7 @@ export default function AgentColumn({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search agents and threads"
           aria-label="Search agents and threads"
-          className="w-full rounded-[9px] border border-white/[0.045] bg-white/[0.04] px-[11px] py-[7px] text-[12.5px] font-light text-white placeholder:text-white/30 focus:border-accent/40 focus:bg-white/[0.06] focus:outline-none"
+          className="w-full rounded-[9px] border border-line bg-white/[0.04] px-[11px] py-[7px] text-[12.5px] font-light text-white placeholder:text-white/30 focus:border-accent/40 focus:bg-white/[0.06] focus:outline-none"
         />
       </div>
       <div className="flex-1 overflow-y-auto px-[10px] pb-4">

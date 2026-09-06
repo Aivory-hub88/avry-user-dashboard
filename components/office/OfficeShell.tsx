@@ -49,7 +49,7 @@ export default function OfficeShell({
 
   if (tooNarrow) {
     return (
-      <div ref={ref} className="grid h-full w-full place-items-center bg-[#353531] px-8 text-center">
+      <div ref={ref} className="grid h-full w-full place-items-center bg-surface-1 px-8 text-center">
         <div className="max-w-[320px]">
           <Monitor className="mx-auto mb-3 h-6 w-6 text-white/25" />
           {/* Not <p> — a global `main p` style overrides Tailwind's own
@@ -71,7 +71,7 @@ export default function OfficeShell({
   ].join(" ")
 
   return (
-    <div ref={ref} className="grid h-full w-full min-w-0 overflow-hidden bg-[#353531]" style={{ gridTemplateColumns }}>
+    <div ref={ref} className="grid h-full w-full min-w-0 overflow-hidden bg-surface-1" style={{ gridTemplateColumns }}>
       <div className="min-h-0 min-w-0">
         {isValidElement(agentColumn)
           ? cloneElement(agentColumn, { collapsed: agentCol.collapsed, onToggleCollapse: agentCol.toggle })

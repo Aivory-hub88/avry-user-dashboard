@@ -4,6 +4,7 @@ import { asset } from "@/lib/asset";
 import { useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
 import { useState, useRef, useEffect, useCallback } from "react"
+import dynamic from "next/dynamic"
 import Image from "next/image"
 import ChatMessage from "@/components/ChatMessage"
 import ChatInput from "@/components/ChatInput"
@@ -19,7 +20,6 @@ import { useNotificationFeed } from "@/hooks/useNotificationFeed"
 import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
-import UploadMenu from "@/components/UploadMenu"
 import type { Attachment } from "@/components/UploadMenu"
 import { AttachmentCard } from "@/components/AttachmentCard"
 import { getUser } from "@/lib/auth"
@@ -30,6 +30,10 @@ import AgentColumn from "@/components/office/AgentColumn"
 import AgentRail from "@/components/office/AgentRail"
 import AgentDeployNotice from "@/components/office/AgentDeployNotice"
 import MissionControl from "@/components/office/MissionControl"
+
+// LobeHub-style route-split: UploadMenu + WorkflowContainer ditarik dinamis
+// agar chunk Console awal tidak ikut membawa pemroses file berat.
+const UploadMenu = dynamic(() => import("@/components/UploadMenu"), { ssr: false })
 
 interface Toast { id: string; type: "success" | "error"; message: string }
 
@@ -313,9 +317,9 @@ export default function ConsolePage() {
         />
       }
     >
-    <div className="flex flex-col h-full bg-[#353531]">
+    <div className="flex flex-col h-full bg-surface-1">
       {showMissionControl ? (
-        <div className="flex items-center border-b border-white/[0.045] px-6 py-[15px]">
+        <div className="flex items-center border-b border-line px-6 py-[15px]">
           {/* Not <h2> — a global `main h2` style overrides Tailwind's own
               font-size on any heading tag here. */}
           <span className="text-[13px] font-medium leading-none text-white/55">{t('missionControl')}</span>
@@ -339,25 +343,24 @@ export default function ConsolePage() {
           <div className="flex min-h-full items-start justify-center px-6 pt-[12vh]">
             <div className="flex w-full max-w-[800px] flex-col items-center">
               <div
-                className="mb-8 flex items-center gap-4 [animation:fadeUp_0.55s_0s_cubic-bezier(0.22,1,0.36,1)_both]"
-                style={{ alignItems: 'center' }}
+                className="mb-8 flex items-center justify-center gap-3 [animation:fadeUp_0.55s_0s_cubic-bezier(0.22,1,0.36,1)_both]"
               >
                 <Image
                   src={asset("/Aivory_Avatar.svg")}
                   alt="Aivory"
-                  width={44}
-                  height={44}
-                  style={{ display: 'block', width: 44, height: 44, flexShrink: 0, marginTop: 8 }}
+                  width={40}
+                  height={40}
+                  className="block h-10 w-10 shrink-0"
                 />
                 <h1
                   className="font-light"
                   style={{
                     fontFamily: "var(--font-manrope), sans-serif",
                     fontWeight: 300,
-                    fontSize: "clamp(26px, 4.5vw, 42px)",
-                    letterSpacing: "-0.025em",
+                    fontSize: "clamp(24px, 3.5vw, 32px)",
+                    letterSpacing: "-0.02em",
                     color: "rgba(255,255,255,0.92)",
-                    lineHeight: 1,
+                    lineHeight: 1.1,
                     margin: 0,
                   }}
                 >
@@ -425,7 +428,7 @@ export default function ConsolePage() {
                     disabled={isStreaming}
                   />
                 </div>
-                <div className="flex items-center justify-between px-3 pt-1 pb-3">
+                <div className="flex items-center justify-between px-4 pt-1 pb-3">
                   <div className="flex items-center gap-[6px]">
                     <button
                       className="console-icon-btn"
@@ -452,9 +455,9 @@ export default function ConsolePage() {
                     ↑
                   </button>
                 </div>
-                <button 
+                <button
                   onClick={() => setConnectorsOpen(true)}
-                  className="console-connect-banner flex items-center justify-between px-[18px] py-[10px] w-full cursor-pointer transition-opacity hover:opacity-80"
+                  className="console-connect-banner flex items-center justify-between px-4 py-[10px] w-full cursor-pointer transition-opacity hover:opacity-80"
                 >
                   <div
                     className="flex items-center gap-[7px] text-[12.5px]"
@@ -473,8 +476,7 @@ export default function ConsolePage() {
                         <div
                           key={integration.id}
                           title={integration.name}
-                          className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-full transition-transform duration-150 hover:scale-110 overflow-hidden"
-                          style={{ background: "#42423f" }}
+                          className="flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-full bg-surface-3 transition-transform duration-150 hover:scale-110 overflow-hidden"
                         >
                           {integration.iconPath && (
                             <Image
@@ -559,7 +561,6 @@ export default function ConsolePage() {
             <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-8 py-8 pb-44">
               <div className="max-w-[800px] mx-auto gap-0 flex flex-col">
                 {messages.map(m => {
-                  console.log('[ConsolePage] rendering message:', m.role, '| isStreaming:', m.isStreaming, '| id:', m.id)
                   return (
                     <div key={m.id}>
                       <ChatMessage
@@ -616,7 +617,7 @@ export default function ConsolePage() {
                 )}
               </div>
             </div>
-            <div className="sticky bottom-0 z-10 px-8 pt-2 pb-4" style={{ background: 'linear-gradient(to bottom, transparent, #353531 24px)' }}>
+            <div className="sticky bottom-0 z-10 px-8 pt-2 pb-4" style={{ background: 'linear-gradient(to bottom, transparent, var(--color-surface-1) 24px)' }}>
               <div className="max-w-[800px] mx-auto">
                 <ChatInput
                   onSend={(text: string, atts: Attachment[]) => handleSend(text, atts)}
@@ -685,7 +686,7 @@ export default function ConsolePage() {
                       setConnectorsOpen(false)
                       router.push("/integrations")
                     }}
-                    className="group relative flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-[#353531] p-4 transition hover:border-white/20 hover:bg-[#3a3a36]"
+                    className="group relative flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-surface-1 p-4 transition hover:border-white/20 hover:bg-surface-2"
                   >
                     {isConnected && (
                       <div className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/20">
