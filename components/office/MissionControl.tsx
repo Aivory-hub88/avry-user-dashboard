@@ -19,6 +19,7 @@ import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
 import type { ChatSession } from "@/hooks/useChat"
 import { readVerifierFinding, type PendingApproval } from "@/lib/agentApprovals"
+import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 import { ThinkingDots } from "@/components/ui/ThinkingDots"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 
@@ -79,7 +80,7 @@ export default function MissionControl({
     let alive = true
     const load = async () => {
       try {
-        const r = await fetch("/api/workspace/demo/database")
+const r = await fetch("/api/workspace/demo/database", { headers: collabAuthHeaders() })
         if (!r.ok) return
         const j = await r.json()
         if (alive) setWsRows((j.rows ?? []).slice(0, 3))
@@ -102,7 +103,7 @@ export default function MissionControl({
     const doc = new Y.Doc()
     let provider: WebsocketProvider | null = null
     try {
-      provider = new WebsocketProvider(wsUrl, "workspace:demo", doc, { connect: true })
+      provider = new WebsocketProvider(wsUrl, "workspace:demo", doc, { connect: true, params: collabWsParams() })
       const updatePeers = () => {
         const peers = Array.from(provider!.awareness.getStates().values())
           .map((s: unknown) => (s as { user?: { name: string; color: string; agentType: string } })?.user)
@@ -123,10 +124,10 @@ export default function MissionControl({
     try {
       await fetch(`/api/workspace/demo/database/${rowId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
         body: JSON.stringify({ status }),
       })
-      const r = await fetch("/api/workspace/demo/database")
+      const r = await fetch("/api/workspace/demo/database", { headers: collabAuthHeaders() })
       if (r.ok) {
         const j = await r.json()
         setWsRows((j.rows ?? []).slice(0, 3))

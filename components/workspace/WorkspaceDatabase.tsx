@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
 import { Table, Kanban, Plus, GripVertical, Calendar, User, Flag } from "lucide-react"
+import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 
 type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; due: string }
 
@@ -102,14 +103,14 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
       setRows(toRows(yRows))
       const upd = Y.encodeStateAsUpdate(doc)
       localStorage.setItem(storageKey, JSON.stringify(Array.from(upd)))
-      fetch(`/api/workspace/${docId}/doc`, { method: "PUT", headers: { "Content-Type": "application/octet-stream" }, body: upd as unknown as BodyInit }).catch(() => {})
+      fetch(`/api/workspace/${docId}/doc`, { method: "PUT", headers: { "Content-Type": "application/octet-stream", ...collabAuthHeaders() }, body: upd as unknown as BodyInit }).catch(() => {})
     }
     yRows.observe(obs)
 
     const wsUrl = typeof window !== "undefined" && window.location.hostname === "localhost" ? "ws://localhost:3200" : "wss://aivory.uk/yjs"
     let provider: WebsocketProvider | null = null
     try {
-      provider = new WebsocketProvider(wsUrl, `workspace:db:${docId}`, doc, { connect: true })
+      provider = new WebsocketProvider(wsUrl, `workspace:db:${docId}`, doc, { connect: true, params: collabWsParams() })
       const agentType = typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user"
       const userId = typeof window !== "undefined" ? (localStorage.getItem("aivory:userId") || "anon") : "anon"
       const color = agentType === "user" ? "#7c3aed" : agentType.includes("leads") ? "#f59e0b" : "#10b981"
@@ -119,7 +120,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
       setPeers(provider.awareness.getStates().size)
     } catch {}
 
-    fetch(`/api/workspace/${docId}/doc`)
+    fetch(`/api/workspace/${docId}/doc`, { headers: collabAuthHeaders() })
       .then((r) => (r.ok ? r.arrayBuffer() : null))
       .then((buf) => {
         if (buf && buf.byteLength > 0) Y.applyUpdate(doc, new Uint8Array(buf))

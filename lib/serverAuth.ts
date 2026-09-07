@@ -22,28 +22,23 @@ export interface AuthUser {
 
 /** Returns the verified user, or null when the request carries no valid token. */
 export function getAuthUser(request: NextRequest): AuthUser | null {
+  return getAuthUserWithToken(request)?.user ?? null
+}
+
+/**
+ * Like `getAuthUser`, but also returns the raw JWT that verified, so the
+ * dashboard can forward it onward (e.g. to aivory-collab, which verifies the
+ * same HS256 JWT and enforces its own per-doc RBAC).
+ */
+export function getAuthUserWithToken(
+  request: NextRequest,
+): { user: AuthUser; token: string } | null {
   const secret = process.env.JWT_SECRET
   if (!secret) {
     throw new Error('JWT_SECRET env var is required — refusing to verify tokens against a default secret')
   }
 
   const bearer = request.headers.get('authorization')
-  // Cookie fallbacks cover both names in use: `aivory_access_token` (set at
-  // login by the dashboard's own proxy routes) and `aivory_session_token`
-  // (the cross-subdomain SSO cookie the landing-site login writes, which
-  // AuthManager reads).
-  //
-  // Try every candidate in order rather than picking exactly one source and
-  // committing to it: the Bearer header (from localStorage's access token)
-  // expires after ~60 minutes with no auto-refresh on THIS specific cookie
-  // pair, while a route calling this via authedFetch always attaches
-  // whatever token localStorage currently holds, valid or not. Stopping at
-  // the first present-but-expired candidate used to hard-fail the request
-  // even when a still-valid cookie was sitting right there — every
-  // reload/executions/fixtures call regressed from "no credentials saved"
-  // (400) to "not authenticated at all" (401) the moment authedFetch was
-  // wired into WorkflowCanvas.tsx, despite the user's cookie session being
-  // perfectly fine.
   const candidates = [
     bearer?.startsWith('Bearer ') ? bearer.slice('Bearer '.length) : null,
     request.cookies.get('aivory_access_token')?.value ?? null,
@@ -60,9 +55,12 @@ export function getAuthUser(request: NextRequest): AuthUser | null {
         : typeof p.sub === 'string' && p.sub ? p.sub : null
       if (!userId) continue
       return {
-        user_id: userId,
-        email: typeof p.email === 'string' ? p.email : undefined,
-        account_type: typeof p.account_type === 'string' ? p.account_type : undefined,
+        user: {
+          user_id: userId,
+          email: typeof p.email === 'string' ? p.email : undefined,
+          account_type: typeof p.account_type === 'string' ? p.account_type : undefined,
+        },
+        token,
       }
     } catch {
       // This candidate didn't verify — try the next one instead of failing
