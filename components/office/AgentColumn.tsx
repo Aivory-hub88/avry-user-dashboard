@@ -286,18 +286,18 @@ export default function AgentColumn({
             <div key={row.key} className="mb-0.5 w-full">
               <button
                 onClick={() => openAgent(row)}
-                className={`group flex w-full items-start gap-[9px] rounded-[10px] px-[9px] py-[8px] text-left transition-colors ${
+                className={`group flex w-full gap-[9px] rounded-[10px] px-[9px] text-left transition-colors ${
                   isActiveAgent ? "bg-[#414039]" : "hover:bg-white/[0.04]"
-                }`}
+                } ${isOpen ? "items-center py-[10px]" : "items-start py-[8px]"}`}
               >
                 <ChevronRight
-                  className={`mt-[9px] h-[12px] w-[12px] shrink-0 text-white/25 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                  className={`h-[12px] w-[12px] shrink-0 text-white/25 transition-transform ${isOpen ? "rotate-90" : ""}`}
                 />
-                <AgentAvatar type={row.type} size={30} className="mt-[1px]" />
+                <AgentAvatar type={row.type} size={30} className="shrink-0" />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-[6px]">
                     <span
-                      className={`min-w-0 flex-1 truncate text-[13.5px] ${isActiveAgent ? "font-medium text-white" : "font-normal text-white/80"}`}
+                      className={`min-w-0 flex-1 truncate text-[13.5px] leading-none ${isActiveAgent ? "font-medium text-white" : "font-normal text-white/80"}`}
                     >
                       {row.title}
                     </span>
@@ -308,20 +308,23 @@ export default function AgentColumn({
                       </span>
                     )}
                   </span>
-                  <span className="mt-[2px] flex items-center gap-[5px]">
-                    {isThinkingHere ? (
-                      <>
-                        <ThinkingDots size={9} dotSize={1.6} />
-                        <span className="truncate text-[12px] font-light text-white/45">thinking…</span>
-                      </>
-                    ) : (
-                      <span className="truncate text-[12px] font-light text-white/35">
-                        {mostRecent ? lastPreview(mostRecent) : "No conversations yet"}
-                      </span>
-                    )}
-                  </span>
+                  {/* Preview baris ini redundan saat row expanded — thread di
+                      bawahnya sudah render lastPreview yang sama (Hello!
+                      Welcome...). Tampilkan hanya saat collapsed agar header
+                      tetap 1 baris dan seimbang dengan icon 30px. Thinking
+                      tetap tampil meski expanded. */}
+                  {isThinkingHere ? (
+                    <span className="mt-[2px] flex items-center gap-[5px]">
+                      <ThinkingDots size={9} dotSize={1.6} />
+                      <span className="truncate text-[12px] font-light text-white/45">thinking…</span>
+                    </span>
+                  ) : !isOpen ? (
+                    <span className="mt-[2px] block truncate text-[12px] font-light leading-none text-white/35">
+                      {mostRecent ? lastPreview(mostRecent) : "No conversations yet"}
+                    </span>
+                  ) : null}
                 </span>
-                <span className="mt-[1px] flex shrink-0 items-center gap-[6px]">
+                <span className="flex shrink-0 items-center gap-[6px] self-center">
                   {pending > 0 && (
                     <span
                       className={`rounded-full bg-amber/13 px-[6px] py-[1px] text-[10.5px] font-semibold text-amber ${
