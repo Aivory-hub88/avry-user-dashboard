@@ -30,6 +30,7 @@ import AgentColumn from "@/components/office/AgentColumn"
 import AgentRail from "@/components/office/AgentRail"
 import AgentDeployNotice from "@/components/office/AgentDeployNotice"
 import MissionControl from "@/components/office/MissionControl"
+import { AgentAvatar } from "@/components/office/AgentAvatar"
 
 // LobeHub-style route-split: UploadMenu + WorkflowContainer ditarik dinamis
 // agar chunk Console awal tidak ikut membawa pemroses file berat.
@@ -345,13 +346,7 @@ export default function ConsolePage() {
               <div
                 className="mb-8 flex items-center justify-center gap-3 [animation:fadeUp_0.55s_0s_cubic-bezier(0.22,1,0.36,1)_both]"
               >
-                <Image
-                  src={asset("/Aivory_Avatar.svg")}
-                  alt="Aivory"
-                  width={40}
-                  height={40}
-                  className="block h-10 w-10 shrink-0"
-                />
+                <AgentAvatar type={agentTarget} size={40} />
                 <h1
                   className="font-light"
                   style={{
