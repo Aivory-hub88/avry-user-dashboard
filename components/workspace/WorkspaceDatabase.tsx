@@ -95,6 +95,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
         for (const r of seed) yRows.push([yMapFromRow(r)])
       }, agentOrigin())
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRows(toRows(yRows))
 
     const obs = () => {
