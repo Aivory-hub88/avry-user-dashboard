@@ -9,9 +9,12 @@
  * page for the agent column and rail — this just lays the same props out as
  * a grid. Ringan by construction, not by discipline.
  */
+import Link from "next/link"
 import Image from "next/image"
 import { Lock } from "lucide-react"
 import { useEffect, useState } from "react"
+import * as Y from "yjs"
+import { WebsocketProvider } from "y-websocket"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
 import type { ChatSession } from "@/hooks/useChat"
@@ -70,6 +73,7 @@ export default function MissionControl({
 }: MissionControlProps) {
   const [wsRows, setWsRows] = useState<{ id: string; title: string; status: string; priority: string }[]>([])
   const [wsBusy, setWsBusy] = useState<string | null>(null)
+  const [awarenessPeers, setAwarenessPeers] = useState<Array<{ name: string; color: string; agentType: string }>>([])
 
   useEffect(() => {
     let alive = true
@@ -86,6 +90,31 @@ export default function MissionControl({
     return () => {
       alive = false
       clearInterval(t)
+    }
+  }, [])
+
+  // y-octo awareness for workspace:demo (same room as WorkspaceEditor)
+  useEffect(() => {
+    const wsUrl =
+      typeof window !== "undefined" && window.location.hostname === "localhost"
+        ? "ws://localhost:3200"
+        : "wss://aivory.uk/yjs"
+    const doc = new Y.Doc()
+    let provider: WebsocketProvider | null = null
+    try {
+      provider = new WebsocketProvider(wsUrl, "workspace:demo", doc, { connect: true })
+      const updatePeers = () => {
+        const peers = Array.from(provider!.awareness.getStates().values())
+          .map((s: unknown) => (s as { user?: { name: string; color: string; agentType: string } })?.user)
+          .filter(Boolean) as Array<{ name: string; color: string; agentType: string }>
+        setAwarenessPeers(peers)
+      }
+      provider.awareness.on("change", updatePeers)
+      updatePeers()
+    } catch {}
+    return () => {
+      provider?.destroy()
+      doc.destroy()
     }
   }, [])
 
@@ -214,7 +243,27 @@ export default function MissionControl({
           })}
         </div>
 
-        {/* Workspace — Leads DB activity (Phase B.3) */}
+        {/* Workspace — Leads DB activity (Phase B.3) + y-octo awareness */}
+        {awarenessPeers.length > 0 && (
+          <div className="mt-8">
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] text-white/30">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+              <span>
+                {awarenessPeers.map((p) => p.name).join(" · ")} · {awarenessPeers.length} peer{awarenessPeers.length !== 1 ? "s" : ""} · y-octo
+              </span>
+              <span className="ml-1 flex items-center gap-1">
+                {awarenessPeers.map((p, i) => (
+                  <span
+                    key={i}
+                    className="h-2 w-2 rounded-full border border-white/10"
+                    style={{ background: p.color }}
+                    title={`${p.name} (${p.agentType})`}
+                  />
+                ))}
+              </span>
+            </div>
+          </div>
+        )}
         {wsRows.length > 0 && (
           <div className="mt-8">
             <div className="mb-3 flex items-center gap-2">
@@ -252,9 +301,9 @@ export default function MissionControl({
             </div>
             <div className="mt-2 text-[11px] text-white/25">
               From <code className="rounded bg-white/[0.06] px-1.5 py-0.5">Y.Doc demo</code> ·{" "}
-              <a href="/workspace/demo?view=database" className="underline decoration-white/20 underline-offset-2 hover:text-white/50">
+              <Link href="/workspace/demo?view=database" className="underline decoration-white/20 underline-offset-2 hover:text-white/50">
                 Open Database
-              </a>
+              </Link>
             </div>
           </div>
         )}
