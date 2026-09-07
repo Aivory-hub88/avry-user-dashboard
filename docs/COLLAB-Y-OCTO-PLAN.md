@@ -109,7 +109,7 @@ doc.transact(() => { /* ... */ }, agentType)
 - [ ] `app/api/workspace/[id]/doc` → `aivory-collab` (not `pg` BYTEA)
 - [ ] Migration `migrate_yjs_to_octo` + drop `workspace_docs` after stable
 - [ ] `MissionControl` + `AgentRail` show `agentType` collaborator
-- [ ] `wss://aivory.uk/yjs` `101` via Traefik `websecure` (Cloudflare `wss`)
+- [x] `wss://aivory.uk/yjs` `101` via Traefik `websecure` (Cloudflare `wss`) — fixed 2026-09-07: CF Worker `aivory-uk-reverse-proxy` (`aivory.uk/*`) wrapped origin response in `new Response()`, which throws on `101` (CF `1101`). Fix: passthrough `fetch(request)` for `/yjs` + `/yjs/*` (no Host rewrite, Upgrade preserved). Verified `101` via CF edge (`CF-Ray`), apex `200` + `www`→apex `301` intact. Worker backup: VPS `/tmp/rp.js.bak`. CF token lives only in VPS `~/AVRY-V2-Main/.env` (`CF_EDGE_TOKEN_USER`, gitignored, `600`) — never in repo.
 - [ ] Merge `feat/workspace-*` (DB UI) + `feat/collab-y-octo` → `main` → `https://aivory.uk/dashboard` stable
 
 ## Risks
