@@ -243,7 +243,7 @@ export default function AgentColumn({
           <ChevronLeft className="h-[13px] w-[13px]" />
         </button>
       </div>
-      <div className="px-4 pb-2">
+      <div className="px-4 pt-4 pb-3">
         <button
           onClick={onOpenMissionControl}
           className={`flex w-full items-center gap-[9px] rounded-full px-[13px] py-[8px] text-left transition-colors ${
@@ -258,7 +258,7 @@ export default function AgentColumn({
           </span>
         </button>
       </div>
-      <div className="px-4 pb-3">
+      <div className="px-4 pb-4">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -267,7 +267,7 @@ export default function AgentColumn({
           className="w-full rounded-[9px] border border-line bg-white/[0.04] px-[11px] py-[7px] text-[12.5px] font-light text-white placeholder:text-white/30 focus:border-accent/40 focus:bg-white/[0.06] focus:outline-none"
         />
       </div>
-      <div className="flex-1 overflow-y-auto px-[10px] pb-4">
+      <div className="flex-1 overflow-y-auto px-[10px] pb-4 pt-1">
         {ROWS.map((row) => {
           const threads = sessionsByAgent[row.key] ?? []
           if (!matchesQuery(row, threads)) return null
