@@ -194,13 +194,18 @@ export default function AgentColumn({
           {ROWS.map((row) => {
             const isActiveAgent = !missionControlActive && row.type === agentTarget
             const pending = notificationsByAgent[row.key]?.length ?? 0
+            const isConsole = row.type === null
             return (
               <button
                 key={row.key}
                 onClick={() => openAgent(row)}
                 title={row.title}
-                className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full transition-[box-shadow] ${
-                  isActiveAgent ? "ring-2 ring-white/25" : "hover:ring-2 hover:ring-white/10"
+                className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full transition-[background-color,box-shadow] ${
+                  isConsole
+                    ? ""
+                    : isActiveAgent
+                      ? "ring-2 ring-white/25"
+                      : "hover:ring-2 hover:ring-white/10"
                 }`}
               >
                 {row.type === streamingAgentType ? (
