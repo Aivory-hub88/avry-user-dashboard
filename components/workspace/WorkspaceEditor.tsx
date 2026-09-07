@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
+import * as Y from "yjs"
+import { WebsocketProvider } from "y-websocket"
 
 type Block = { id: string; type: "h1" | "h2" | "p" | "todo" | "bullet" | "quote"; text: string; checked?: boolean }
 
@@ -10,49 +12,142 @@ function uid() {
 
 const DEFAULT_BLOCKS: Block[] = [
   { id: uid(), type: "h1", text: "Untitled" },
-  { id: uid(), type: "p", text: "Press / for commands — this is a BlockSuite-style Yjs placeholder persisting to localStorage. Next iteration syncs to y-websocket." },
+  { id: uid(), type: "p", text: "Yjs Doc active — edits sync via y-websocket (3220) and persist to localStorage + /api/workspace/[id]/doc." },
   { id: uid(), type: "todo", text: "Try typing, then hit Enter", checked: false },
   { id: uid(), type: "bullet", text: "Agents can create rows in Workspace DB" },
 ]
 
+function toBlocks(yArray: Y.Array<Y.Map<unknown>>): Block[] {
+  return yArray.toArray().map((m) => ({
+    id: (m.get("id") as string) ?? uid(),
+    type: (m.get("type") as Block["type"]) ?? "p",
+    text: (m.get("text") as string) ?? "",
+    checked: m.get("checked") as boolean | undefined,
+  }))
+}
+
+function yMapFromBlock(block: Block): Y.Map<unknown> {
+  const m = new Y.Map<unknown>()
+  m.set("id", block.id)
+  m.set("type", block.type)
+  m.set("text", block.text)
+  if (block.checked !== undefined) m.set("checked", block.checked)
+  return m
+}
+
 export default function WorkspaceEditor({ docId }: { docId: string }) {
+  const docRef = useRef<Y.Doc | null>(null)
+  const yArrayRef = useRef<Y.Array<Y.Map<unknown>> | null>(null)
+  const providerRef = useRef<WebsocketProvider | null>(null)
+
   const [blocks, setBlocks] = useState<Block[]>(DEFAULT_BLOCKS)
   const [slash, setSlash] = useState<{ idx: number; open: boolean }>({ idx: 0, open: false })
-  const storageKey = `aivory:workspace:${docId}`
+  const [status, setStatus] = useState<"local" | "synced" | "connecting">("connecting")
+  const storageKey = `aivory:workspace:yjs:${docId}`
 
+  // init Y.Doc + Y.Array + y-websocket
   useEffect(() => {
-    const raw = localStorage.getItem(storageKey)
-    if (raw) {
+    const doc = new Y.Doc()
+    const yArray = doc.getArray<Y.Map<unknown>>("blocks")
+    docRef.current = doc
+    yArrayRef.current = yArray
+
+    // restore from localStorage (Yjs update) or init with defaults
+    const saved = localStorage.getItem(storageKey)
+    if (saved) {
       try {
-        const parsed = JSON.parse(raw) as Block[]
-        if (Array.isArray(parsed) && parsed.length) setBlocks(parsed)
+        const update = Uint8Array.from(JSON.parse(saved) as number[])
+        Y.applyUpdate(doc, update)
       } catch {}
     }
-  }, [storageKey])
+    if (yArray.length === 0) {
+      doc.transact(() => {
+        for (const b of DEFAULT_BLOCKS) yArray.push([yMapFromBlock(b)])
+      })
+    }
+    setBlocks(toBlocks(yArray))
 
-  useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(blocks))
-  }, [blocks, storageKey])
+    const observer = () => {
+      setBlocks(toBlocks(yArray))
+      // persist Yjs update to localStorage
+      const update = Y.encodeStateAsUpdate(doc)
+      localStorage.setItem(storageKey, JSON.stringify(Array.from(update)))
+      // also PUT to API (fire-and-forget, no auth yet)
+      fetch(`/api/workspace/${docId}/doc`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: update as unknown as BodyInit,
+      }).catch(() => {})
+    }
+    yArray.observe(observer)
+
+    // try y-websocket (fails gracefully if server not yet at 3220)
+    // In prod, dashboard runs behind traefik; ws at wss://aivory.uk/yjs or host.docker.internal:3220
+    const wsUrl =
+      typeof window !== "undefined" && window.location.hostname === "localhost"
+        ? "ws://localhost:3220"
+        : "wss://aivory.uk/yjs"
+    try {
+      const provider = new WebsocketProvider(wsUrl, `workspace:${docId}`, doc, { connect: true })
+      providerRef.current = provider
+      provider.on("status", (e: { status: string }) => {
+        setStatus(e.status === "connected" ? "synced" : e.status === "connecting" ? "connecting" : "local")
+      })
+      // restore from server if available
+      fetch(`/api/workspace/${docId}/doc`)
+        .then((r) => (r.ok ? r.arrayBuffer() : null))
+        .then((buf) => {
+          if (buf && buf.byteLength > 0) {
+            Y.applyUpdate(doc, new Uint8Array(buf))
+          }
+        })
+        .catch(() => {})
+    } catch {
+      setStatus("local")
+    }
+
+    return () => {
+      yArray.unobserve(observer)
+      providerRef.current?.destroy()
+      doc.destroy()
+    }
+  }, [docId, storageKey])
 
   const update = (i: number, patch: Partial<Block>) => {
-    setBlocks((b) => b.map((x, idx) => (idx === i ? { ...x, ...patch } : x)))
+    const yArray = yArrayRef.current
+    const doc = docRef.current
+    if (!yArray || !doc) return
+    const m = yArray.get(i) as Y.Map<unknown>
+    doc.transact(() => {
+      for (const [k, v] of Object.entries(patch)) m.set(k, v)
+    })
   }
 
   const addAfter = (i: number, type: Block["type"] = "p") => {
+    const yArray = yArrayRef.current
+    const doc = docRef.current
+    if (!yArray || !doc) return
     const nb: Block = { id: uid(), type, text: "", ...(type === "todo" ? { checked: false } : {}) }
-    setBlocks((b) => [...b.slice(0, i + 1), nb, ...b.slice(i + 1)])
+    doc.transact(() => {
+      yArray.insert(i + 1, [yMapFromBlock(nb)])
+    })
     setTimeout(() => document.getElementById(`block-${nb.id}`)?.focus(), 10)
   }
 
   const remove = (i: number) => {
-    if (blocks.length === 1) return
-    setBlocks((b) => b.filter((_, idx) => idx !== i))
+    const yArray = yArrayRef.current
+    const doc = docRef.current
+    if (!yArray || !doc || yArray.length <= 1) return
+    doc.transact(() => {
+      yArray.delete(i, 1)
+    })
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, i: number) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      addAfter(i, blocks[i].type === "h1" || blocks[i].type === "h2" ? "p" : blocks[i].type)
+      const cur = blocks[i]
+      addAfter(i, cur.type === "h1" || cur.type === "h2" ? "p" : cur.type)
     }
     if (e.key === "Backspace" && blocks[i].text === "") {
       e.preventDefault()
@@ -63,17 +158,27 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
     }
   }
 
+  const reset = () => {
+    const yArray = yArrayRef.current
+    const doc = docRef.current
+    if (!yArray || !doc) return
+    doc.transact(() => {
+      yArray.delete(0, yArray.length)
+      for (const b of DEFAULT_BLOCKS) yArray.push([yMapFromBlock(b)])
+    })
+  }
+
   return (
     <div className="mx-auto w-full max-w-[720px]">
       <div className="mb-6 flex items-center gap-2 text-[11px] text-white/30">
-        <span className="rounded bg-white/[0.06] px-2 py-1">Yjs localStorage</span>
+        <span className={`rounded px-2 py-1 ${status === "synced" ? "bg-emerald-500/20 text-emerald-300" : status === "connecting" ? "bg-amber-500/20 text-amber-300" : "bg-white/[0.06]"}`}>
+          {status === "synced" ? "Yjs synced" : status === "connecting" ? "Yjs connecting…" : "Yjs local"}
+        </span>
         <span>•</span>
         <span>{blocks.length} blocks</span>
         <span>•</span>
-        <button
-          onClick={() => setBlocks(DEFAULT_BLOCKS)}
-          className="rounded bg-white/[0.06] px-2 py-1 hover:bg-white/[0.08]"
-        >
+        <span className="hidden sm:inline">ws {status === "synced" ? "3220" : "localStorage"} + /api/workspace/{docId}/doc</span>
+        <button onClick={reset} className="ml-auto rounded bg-white/[0.06] px-2 py-1 hover:bg-white/[0.08]">
           Reset
         </button>
       </div>
@@ -143,10 +248,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
                       {t}
                     </button>
                   ))}
-                  <button
-                    onClick={() => setSlash({ idx: 0, open: false })}
-                    className="px-2 text-[12px] text-white/30"
-                  >
+                  <button onClick={() => setSlash({ idx: 0, open: false })} className="px-2 text-[12px] text-white/30">
                     ✕
                   </button>
                 </div>
@@ -157,10 +259,12 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
       </div>
 
       <div className="mt-8 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-[12px] leading-relaxed text-white/40">
-        AFFiNE parity next: mount <code className="rounded bg-white/[0.06] px-1.5 py-0.5">@blocksuite/store</code> Yjs Doc +{" "}
-        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">y-websocket</code> at{" "}
-        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">host.docker.internal:3200</code>. This POC already
-        persists to <code className="rounded bg-white/[0.06] px-1.5 py-0.5">localStorage</code> per docId.
+        Yjs Doc <code className="rounded bg-white/[0.06] px-1.5 py-0.5">workspace:{docId}</code> via{" "}
+        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">y-websocket</code> @{" "}
+        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">wss://aivory.uk/yjs</code> (fallback{" "}
+        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">ws://localhost:3220</code>) + persist{" "}
+        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">localStorage</code> +{" "}
+        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">/api/workspace/[id]/doc</code>.
       </div>
     </div>
   )
