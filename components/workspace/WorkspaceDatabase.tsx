@@ -3,11 +3,18 @@
 import { useState, useRef, useEffect } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
+import { Table, Kanban, Plus, GripVertical, Calendar, User, Flag } from "lucide-react"
 
 type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; due: string }
 
 const STATUSES = ["Todo", "Doing", "Done"] as const
 const PRIORITIES = ["Low", "Med", "High"] as const
+
+const STATUS_DOT: Record<string, string> = {
+  Todo: "bg-white/40",
+  Doing: "bg-amber-400",
+  Done: "bg-emerald-400",
+}
 
 function uid() {
   return Math.random().toString(36).slice(2, 8)
@@ -28,6 +35,31 @@ function toRows(arr: Y.Array<Y.Map<unknown>>): Row[] {
     assignee: (m.get("assignee") as string) ?? "",
     due: (m.get("due") as string) ?? "",
   }))
+}
+
+function PriorityPill({ p }: { p: Row["priority"] }) {
+  const cls =
+    p === "High"
+      ? "bg-red-500/10 text-red-300 border-red-500/20"
+      : p === "Med"
+        ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
+        : "bg-white/[0.06] text-white/45 border-white/10"
+  return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>{p}</span>
+}
+
+function StatusPill({ s }: { s: string }) {
+  const cls =
+    s === "Doing"
+      ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
+      : s === "Done"
+        ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+        : "bg-white/[0.06] text-white/50 border-white/10"
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[s] ?? "bg-white/40"}`} />
+      {s}
+    </span>
+  )
 }
 
 export default function WorkspaceDatabase({ docId }: { docId: string }) {
@@ -69,7 +101,6 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
     }
     yRows.observe(obs)
 
-    // y-websocket (optional, graceful fallback)
     const wsUrl = typeof window !== "undefined" && window.location.hostname === "localhost" ? "ws://localhost:3220" : "wss://aivory.uk/yjs"
     let provider: WebsocketProvider | null = null
     try {
@@ -94,7 +125,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
-    const r: Row = { id: uid(), title: "Untitled", status: "Todo", priority: "Med", assignee: "", due: "" }
+    const r: Row = { id: uid(), title: "", status: "Todo", priority: "Med", assignee: "", due: "" }
     doc.transact(() => yRows.push([yMapFromRow(r)]))
   }
 
@@ -116,56 +147,71 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[860px]">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+    <div className="mx-auto w-full max-w-[900px]">
+      {/* Header — AFFiNE-like database title + view switcher (LobeHub pill style) */}
+      <div className="mb-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
+              <button
+                onClick={() => setView("table")}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition ${view === "table" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white/80"}`}
+              >
+                <Table className="h-3.5 w-3.5" />
+                Table
+              </button>
+              <button
+                onClick={() => setView("kanban")}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition ${view === "kanban" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white/80"}`}
+              >
+                <Kanban className="h-3.5 w-3.5" />
+                Board
+              </button>
+            </div>
+            <span className="text-[12px] text-white/25">{rows.length} records</span>
+          </div>
           <button
-            onClick={() => setView("table")}
-            className={`rounded-full px-3 py-1 text-[12px] ${view === "table" ? "bg-white text-black" : "border border-line bg-white/[0.04] text-white/60 hover:bg-white/[0.06]"}`}
+            onClick={addRow}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[12.5px] font-medium text-black shadow-sm transition hover:bg-white/90"
           >
-            Table
-          </button>
-          <button
-            onClick={() => setView("kanban")}
-            className={`rounded-full px-3 py-1 text-[12px] ${view === "kanban" ? "bg-white text-black" : "border border-line bg-white/[0.04] text-white/60 hover:bg-white/[0.06]"}`}
-          >
-            Kanban
+            <Plus className="h-3.5 w-3.5" />
+            New
           </button>
         </div>
-        <button onClick={addRow} className="rounded-full bg-white px-3 py-1.5 text-[12px] font-medium text-black hover:bg-white/90">
-          + New row
-        </button>
       </div>
 
       {view === "table" ? (
-        <div className="overflow-hidden rounded-[16px] border border-line bg-white/[0.03]">
+        <div className="overflow-hidden rounded-[14px] border border-line bg-surface-1">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
-              <thead className="bg-white/[0.04] text-[11px] uppercase tracking-wider text-white/40">
-                <tr>
-                  <th className="px-3 py-2">Title</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2">Priority</th>
-                  <th className="px-3 py-2">Assignee</th>
-                  <th className="px-3 py-2">Due</th>
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-line bg-white/[0.02]">
+                  <th className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Title</th>
+                  <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Status</th>
+                  <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Priority</th>
+                  <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Assignee</th>
+                  <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Due</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-line">
                 {rows.map((r) => (
-                  <tr key={r.id} className="border-t border-line hover:bg-white/[0.03]">
-                    <td className="px-3 py-2">
-                      <input
-                        value={r.title}
-                        onChange={(e) => updateRow(r.id, { title: e.target.value })}
-                        className="w-full bg-transparent text-white/80 outline-none placeholder:text-white/30"
-                        placeholder="Untitled"
-                      />
+                  <tr key={r.id} className="group hover:bg-white/[0.03]">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <GripVertical className="h-3.5 w-3.5 shrink-0 text-white/15 opacity-0 group-hover:opacity-100" />
+                        <input
+                          value={r.title}
+                          onChange={(e) => updateRow(r.id, { title: e.target.value })}
+                          placeholder="Untitled"
+                          className="w-full bg-transparent text-[13.5px] text-white/85 placeholder:text-white/25 outline-none"
+                        />
+                      </div>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-3">
                       <select
                         value={r.status}
                         onChange={(e) => updateRow(r.id, { status: e.target.value })}
-                        className="rounded bg-[#353531] px-2 py-1 text-white/80 outline-none"
+                        className="rounded-full border bg-surface-2 px-2.5 py-1 text-[12px] text-white/70 outline-none"
                       >
                         {STATUSES.map((s) => (
                           <option key={s} value={s}>
@@ -174,54 +220,61 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
                         ))}
                       </select>
                     </td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={r.priority}
-                        onChange={(e) => updateRow(r.id, { priority: e.target.value as Row["priority"] })}
-                        className="rounded bg-[#353531] px-2 py-1 text-white/80 outline-none"
-                      >
-                        {PRIORITIES.map((p) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
-                        ))}
-                      </select>
+                    <td className="px-3 py-3">
+                      <PriorityPill p={r.priority} />
                     </td>
-                    <td className="px-3 py-2">
-                      <input
-                        value={r.assignee}
-                        onChange={(e) => updateRow(r.id, { assignee: e.target.value })}
-                        className="w-full bg-transparent text-white/60 outline-none"
-                        placeholder="—"
-                      />
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <User className="h-3 w-3 text-white/25" />
+                        <input
+                          value={r.assignee}
+                          onChange={(e) => updateRow(r.id, { assignee: e.target.value })}
+                          placeholder="—"
+                          className="w-full bg-transparent text-[13px] text-white/60 placeholder:text-white/25 outline-none"
+                        />
+                      </div>
                     </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="date"
-                        value={r.due}
-                        onChange={(e) => updateRow(r.id, { due: e.target.value })}
-                        className="bg-transparent text-white/60 outline-none"
-                      />
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="h-3 w-3 text-white/25" />
+                        <input
+                          type="date"
+                          value={r.due}
+                          onChange={(e) => updateRow(r.id, { due: e.target.value })}
+                          className="bg-transparent text-[13px] text-white/60 outline-none"
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <button
+            onClick={addRow}
+            className="flex w-full items-center gap-2 border-t border-line px-4 py-3 text-left text-[13px] text-white/40 hover:bg-white/[0.02] hover:text-white/60"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New row
+          </button>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-4">
           {STATUSES.map((s) => (
             <div
               key={s}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => onDropKanban(e, s)}
-              className="rounded-[16px] border border-line bg-white/[0.02] p-3"
+              className="rounded-[14px] border border-line bg-white/[0.02] p-3"
             >
-              <div className="mb-2 text-[12px] font-medium uppercase tracking-wider text-white/40">
-                {s} · {rows.filter((r) => r.status === s).length}
+              <div className="mb-3 flex items-center gap-2 px-1">
+                <span className={`h-2 w-2 rounded-full ${STATUS_DOT[s]}`} />
+                <span className="text-[12px] font-medium uppercase tracking-wider text-white/60">{s}</span>
+                <span className="rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[11px] font-medium text-white/40">
+                  {rows.filter((r) => r.status === s).length}
+                </span>
               </div>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2.5">
                 {rows
                   .filter((r) => r.status === s)
                   .map((r) => (
@@ -229,27 +282,38 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
                       key={r.id}
                       draggable
                       onDragStart={(e) => e.dataTransfer.setData("text/plain", r.id)}
-                      className="cursor-grab rounded-xl border border-line bg-[#353531] p-3 active:cursor-grabbing"
+                      className="group cursor-grab rounded-[12px] border border-line bg-surface-1 p-4 shadow-sm transition hover:border-white/10 active:cursor-grabbing"
                     >
-                      <div className="text-[13px] font-medium text-white/80">{r.title || "Untitled"}</div>
-                      <div className="mt-1 flex items-center gap-1.5 text-[11px] text-white/40">
-                        <span className={`rounded px-1.5 py-0.5 ${r.priority === "High" ? "bg-red-500/20 text-red-300" : r.priority === "Med" ? "bg-amber-500/20 text-amber-300" : "bg-white/10"}`}>
-                          {r.priority}
-                        </span>
-                        <span>{r.assignee || "—"}</span>
+                      <div className="text-[13.5px] font-medium leading-snug text-white/85">{r.title || "Untitled"}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <PriorityPill p={r.priority} />
+                        {r.assignee && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] text-white/50">
+                            <User className="h-3 w-3" />
+                            {r.assignee}
+                          </span>
+                        )}
                       </div>
+                      {r.due && (
+                        <div className="mt-2 flex items-center gap-1 text-[11px] text-white/35">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(r.due).toLocaleDateString("en-GB")}
+                        </div>
+                      )}
                     </div>
                   ))}
-                {rows.filter((r) => r.status === s).length === 0 && <div className="py-6 text-center text-[12px] text-white/20">Drop here</div>}
+                <button
+                  onClick={addRow}
+                  className="flex items-center justify-center gap-1.5 rounded-[12px] border border-dashed border-white/10 py-2.5 text-[12px] text-white/30 hover:border-white/15 hover:bg-white/[0.02] hover:text-white/50"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  New
+                </button>
               </div>
             </div>
           ))}
         </div>
       )}
-
-      <div className="mt-4 text-[11px] text-white/30">
-        Yjs `database` in same `Y.Doc` (`workspace:{docId}`) + `localStorage` + `PUT /api/workspace/[id]/doc`.
-      </div>
     </div>
   )
 }
