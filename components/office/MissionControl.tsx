@@ -9,8 +9,12 @@
  * page for the agent column and rail — this just lays the same props out as
  * a grid. Ringan by construction, not by discipline.
  */
+import Link from "next/link"
 import Image from "next/image"
 import { Lock } from "lucide-react"
+import { useEffect, useState } from "react"
+import * as Y from "yjs"
+import { WebsocketProvider } from "y-websocket"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
 import type { ChatSession } from "@/hooks/useChat"
@@ -67,6 +71,71 @@ export default function MissionControl({
   streamingAgentType,
   onOpenAgent,
 }: MissionControlProps) {
+  const [wsRows, setWsRows] = useState<{ id: string; title: string; status: string; priority: string }[]>([])
+  const [wsBusy, setWsBusy] = useState<string | null>(null)
+  const [awarenessPeers, setAwarenessPeers] = useState<Array<{ name: string; color: string; agentType: string }>>([])
+
+  useEffect(() => {
+    let alive = true
+    const load = async () => {
+      try {
+        const r = await fetch("/api/workspace/demo/database")
+        if (!r.ok) return
+        const j = await r.json()
+        if (alive) setWsRows((j.rows ?? []).slice(0, 3))
+      } catch {}
+    }
+    load()
+    const t = setInterval(load, 5000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [])
+
+  // y-octo awareness for workspace:demo (same room as WorkspaceEditor)
+  useEffect(() => {
+    const wsUrl =
+      typeof window !== "undefined" && window.location.hostname === "localhost"
+        ? "ws://localhost:3200"
+        : "wss://aivory.uk/yjs"
+    const doc = new Y.Doc()
+    let provider: WebsocketProvider | null = null
+    try {
+      provider = new WebsocketProvider(wsUrl, "workspace:demo", doc, { connect: true })
+      const updatePeers = () => {
+        const peers = Array.from(provider!.awareness.getStates().values())
+          .map((s: unknown) => (s as { user?: { name: string; color: string; agentType: string } })?.user)
+          .filter(Boolean) as Array<{ name: string; color: string; agentType: string }>
+        setAwarenessPeers(peers)
+      }
+      provider.awareness.on("change", updatePeers)
+      updatePeers()
+    } catch {}
+    return () => {
+      provider?.destroy()
+      doc.destroy()
+    }
+  }, [])
+
+  const actOnRow = async (rowId: string, status: string) => {
+    setWsBusy(rowId)
+    try {
+      await fetch(`/api/workspace/demo/database/${rowId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      })
+      const r = await fetch("/api/workspace/demo/database")
+      if (r.ok) {
+        const j = await r.json()
+        setWsRows((j.rows ?? []).slice(0, 3))
+      }
+    } finally {
+      setWsBusy(null)
+    }
+  }
+
   return (
     <div className="flex-1 overflow-y-auto px-8 py-10">
       <div className="mx-auto max-w-[1000px]">
@@ -173,6 +242,71 @@ export default function MissionControl({
             )
           })}
         </div>
+
+        {/* Workspace — Leads DB activity (Phase B.3) + y-octo awareness */}
+        {awarenessPeers.length > 0 && (
+          <div className="mt-8">
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] text-white/30">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+              <span>
+                {awarenessPeers.map((p) => p.name).join(" · ")} · {awarenessPeers.length} peer{awarenessPeers.length !== 1 ? "s" : ""} · y-octo
+              </span>
+              <span className="ml-1 flex items-center gap-1">
+                {awarenessPeers.map((p, i) => (
+                  <span
+                    key={i}
+                    className="h-2 w-2 rounded-full border border-white/10"
+                    style={{ background: p.color }}
+                    title={`${p.name} (${p.agentType})`}
+                  />
+                ))}
+              </span>
+            </div>
+          </div>
+        )}
+        {wsRows.length > 0 && (
+          <div className="mt-8">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-[12px] font-medium uppercase tracking-wider text-white/40">Workspace · Leads DB</span>
+              <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] text-white/40">{wsRows.length}</span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {wsRows.map((r) => (
+                <div key={r.id} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[13px] font-medium text-white/85">{r.title || "Untitled"}</span>
+                    <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[11px] text-white/50">{r.status}</span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-white/30">
+                    {r.priority} · {r.status === "Todo" ? "needs review" : r.status}
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => actOnRow(r.id, "Doing")}
+                      disabled={!!wsBusy}
+                      className="rounded-full bg-white px-3 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-50"
+                    >
+                      {wsBusy === r.id ? "…" : "Approve → Doing"}
+                    </button>
+                    <button
+                      onClick={() => actOnRow(r.id, "Todo")}
+                      disabled={!!wsBusy}
+                      className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/60 hover:bg-white/[0.06] disabled:opacity-50"
+                    >
+                      Keep Todo
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 text-[11px] text-white/25">
+              From <code className="rounded bg-white/[0.06] px-1.5 py-0.5">Y.Doc demo</code> ·{" "}
+              <Link href="/workspace/demo?view=database" className="underline decoration-white/20 underline-offset-2 hover:text-white/50">
+                Open Database
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

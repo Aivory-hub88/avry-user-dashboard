@@ -30,7 +30,9 @@
  * agent behind the F-1 gate, so "Could not load approvals" or "Not deployed
  * anywhere yet" would be true-sounding but meaningless there.
  */
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import * as Y from "yjs"
+import { WebsocketProvider } from "y-websocket"
 import Image from "next/image"
 import Link from "next/link"
 import { ChevronLeft, ChevronRight, Brain } from "lucide-react"
@@ -107,6 +109,32 @@ export default function AgentRail({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
   const [memoryOpen, setMemoryOpen] = useState(false)
+  const [awarenessPeers, setAwarenessPeers] = useState<Array<{ name: string; color: string; agentType: string }>>([])
+
+  // y-octo awareness for workspace:demo — show who is editing now
+  useEffect(() => {
+    const wsUrl =
+      typeof window !== "undefined" && window.location.hostname === "localhost"
+        ? "ws://localhost:3200"
+        : "wss://aivory.uk/yjs"
+    const doc = new Y.Doc()
+    let provider: WebsocketProvider | null = null
+    try {
+      provider = new WebsocketProvider(wsUrl, "workspace:demo", doc, { connect: true })
+      const updatePeers = () => {
+        const peers = Array.from(provider!.awareness.getStates().values())
+          .map((s: unknown) => (s as { user?: { name: string; color: string; agentType: string } })?.user)
+          .filter(Boolean) as Array<{ name: string; color: string; agentType: string }>
+        setAwarenessPeers(peers)
+      }
+      provider.awareness.on("change", updatePeers)
+      updatePeers()
+    } catch {}
+    return () => {
+      provider?.destroy()
+      doc.destroy()
+    }
+  }, [])
 
   const title = agentTarget
     ? PREBUILT_AGENTS.find((a) => a.type === agentTarget)?.title ?? agentTarget
@@ -350,6 +378,34 @@ export default function AgentRail({
                 />
               ))}
             </section>
+
+            {awarenessPeers.length > 0 && (
+              <section className="mt-[20px] flex flex-col gap-[8px]">
+                <span className="px-0.5 text-[12px] font-semibold leading-none text-white/65">Active in Workspace</span>
+                <Bar tone="idle">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                    <span className="text-white/60">
+                      {awarenessPeers.map((p) => p.name).join(" · ")} · {awarenessPeers.length} peer
+                      {awarenessPeers.length !== 1 ? "s" : ""} · y-octo
+                    </span>
+                    <span className="ml-1 flex items-center gap-1">
+                      {awarenessPeers.map((p, i) => (
+                        <span
+                          key={i}
+                          className="h-2 w-2 shrink-0 rounded-full border border-white/10"
+                          style={{ background: p.color }}
+                          title={`${p.name} (${p.agentType})`}
+                        />
+                      ))}
+                    </span>
+                  </span>
+                  {agentTarget && awarenessPeers.some((p) => p.agentType === agentTarget) && (
+                    <span className="mt-1 text-[11px] text-emerald-300">● {agentTarget} is editing now</span>
+                  )}
+                </Bar>
+              </section>
+            )}
 
             <section className="mt-[20px] flex flex-col gap-[8px]">
               <span className="px-0.5 text-[12px] font-semibold leading-none text-white/65">Running now</span>

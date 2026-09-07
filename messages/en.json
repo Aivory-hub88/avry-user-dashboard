@@ -175,9 +175,11 @@
     "connectorsTitle": "Connectors",
     "connectorsSubtitle": "Connect your tools and services to Aivory Agent",
     "manageIntegrations": "Manage Integrations",
+    "chipWorkspace": "Workspace",
     "chipDeepDiagnostic": "Deep Diagnostic",
     "chipWorkflow": "Workflow",
     "chipAgents": "Agents",
+    "chipOptionWorkspace": "Add Acme lead to Leads DB",
     "chipOptionDeepDiagnostic": "Direct me to deep diagnostic tab",
     "chipOptionWorkflow": "Direct me to workflow tab",
     "chipOptionAgents": "Direct me to agents tab"

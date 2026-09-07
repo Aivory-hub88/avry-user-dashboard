@@ -175,9 +175,11 @@
     "connectorsTitle": "Konektor",
     "connectorsSubtitle": "Hubungkan tool dan layanan Anda ke Aivory Agent",
     "manageIntegrations": "Kelola Integrasi",
+    "chipWorkspace": "Ruang Kerja",
     "chipDeepDiagnostic": "Diagnostik Mendalam",
     "chipWorkflow": "Alur Kerja",
     "chipAgents": "Agen",
+    "chipOptionWorkspace": "Tambah Acme lead ke Leads DB",
     "chipOptionDeepDiagnostic": "Arahkan saya ke tab Diagnostik Mendalam",
     "chipOptionWorkflow": "Arahkan saya ke tab alur kerja",
     "chipOptionAgents": "Arahkan saya ke tab agen"
