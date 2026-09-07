@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation"
 import Link from "next/link"
+import WorkspaceEditor from "@/components/workspace/WorkspaceEditor"
 
 export default function WorkspaceDocPage() {
   const params = useParams()
@@ -22,24 +23,8 @@ export default function WorkspaceDocPage() {
         </span>
       </div>
       <div className="flex flex-1 flex-col overflow-hidden">
-        <div className="mx-auto w-full max-w-[760px] flex-1 overflow-y-auto px-8 py-10">
-          <div className="rounded-[16px] border border-dashed border-white/10 bg-white/[0.02] p-8">
-            <h1 className="text-[22px] font-medium text-white/90">Page: {id}</h1>
-            <p className="mt-2 text-[13px] text-white/40">
-              Placeholder for BlockSuite Yjs editor. Next iteration mounts{" "}
-              <code className="rounded bg-white/[0.06] px-1.5 py-0.5">@blocksuite/store</code> +{" "}
-              <code className="rounded bg-white/[0.06] px-1.5 py-0.5">y-websocket</code>.
-            </p>
-            <div className="mt-6 rounded-xl border border-line bg-[#353531] p-4 font-mono text-[12px] leading-relaxed text-white/60">
-              <div className="text-white/80">// TODO: mount editor</div>
-              <div>import &#123; Doc &#125; from &apos;yjs&apos;</div>
-              <div>import &#123; BlockSuiteEditor &#125; from &apos;@/components/workspace/BlockSuiteEditor&apos;</div>
-            </div>
-            <div className="mt-4 text-[12px] text-white/30">
-              Yjs sync: <code className="rounded bg-white/[0.06] px-1.5 py-0.5">host.docker.internal:3200</code> ·
-              API: <code className="rounded bg-white/[0.06] px-1.5 py-0.5">/api/workspace/[id]/doc</code>
-            </div>
-          </div>
+        <div className="mx-auto w-full max-w-[760px] flex-1 overflow-y-auto px-8 py-8">
+          <WorkspaceEditor docId={id} />
         </div>
       </div>
     </div>
