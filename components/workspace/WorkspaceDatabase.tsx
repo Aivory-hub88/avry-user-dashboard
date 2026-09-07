@@ -69,7 +69,9 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
   const [view, setView] = useState<"table" | "kanban" | "calendar">("table")
   const [statusFilter, setStatusFilter] = useState<string>("All")
   const [priorityFilter, setPriorityFilter] = useState<string>("All")
+  const [peers, setPeers] = useState<number>(1)
   const storageKey = `aivory:workspace:db:${docId}`
+  const agentOrigin = () => (typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user")
 
   useEffect(() => {
     const doc = new Y.Doc()
@@ -91,8 +93,9 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
       ]
       doc.transact(() => {
         for (const r of seed) yRows.push([yMapFromRow(r)])
-      })
+      }, agentOrigin())
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRows(toRows(yRows))
 
     const obs = () => {
@@ -103,10 +106,17 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
     }
     yRows.observe(obs)
 
-    const wsUrl = typeof window !== "undefined" && window.location.hostname === "localhost" ? "ws://localhost:3220" : "wss://aivory.uk/yjs"
+    const wsUrl = typeof window !== "undefined" && window.location.hostname === "localhost" ? "ws://localhost:3200" : "wss://aivory.uk/yjs"
     let provider: WebsocketProvider | null = null
     try {
       provider = new WebsocketProvider(wsUrl, `workspace:db:${docId}`, doc, { connect: true })
+      const agentType = typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user"
+      const userId = typeof window !== "undefined" ? (localStorage.getItem("aivory:userId") || "anon") : "anon"
+      const color = agentType === "user" ? "#7c3aed" : agentType.includes("leads") ? "#f59e0b" : "#10b981"
+      const name = agentType === "user" ? "You" : agentType.replace(/_/g, " ")
+      provider.awareness.setLocalStateField("user", { name, color, agentType, userId })
+      provider.awareness.on("change", () => setPeers(provider!.awareness.getStates().size))
+      setPeers(provider.awareness.getStates().size)
     } catch {}
 
     fetch(`/api/workspace/${docId}/doc`)
@@ -128,7 +138,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
     const doc = docRef.current
     if (!yRows || !doc) return
     const r: Row = { id: uid(), title: "", status: "Todo", priority: "Med", assignee: "", due: "" }
-    doc.transact(() => yRows.push([yMapFromRow(r)]))
+    doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
   }
 
   const updateRow = (id: string, patch: Partial<Row>) => {
@@ -140,7 +150,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
     const m = yRows.get(idx) as Y.Map<unknown>
     doc.transact(() => {
       for (const [k, v] of Object.entries(patch)) m.set(k, v)
-    })
+    }, agentOrigin())
   }
 
   const onDropKanban = (e: React.DragEvent, status: string) => {
@@ -191,6 +201,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
               </button>
             </div>
             <span className="text-[12px] text-white/25">{filtered.length}/{rows.length}</span>
+            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-300">{peers} peer{peers !== 1 ? "s" : ""} · y-octo</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
