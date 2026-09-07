@@ -153,8 +153,9 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
         </div>
       )}
 
-      {/* Input card — matches reference: rounded container, text on top, icons below */}
-      <div className="bg-[#42423f] border border-white/10 rounded-2xl overflow-hidden">
+      {/* Input card — single composer language, sama seperti hero.
+          radius-lg (20px), border-line, textarea px-5 pt-[14px], bar px-4. */}
+      <div className="bg-surface-3 border border-line rounded-[20px] overflow-hidden">
         {/* Textarea area */}
         <textarea
           ref={textareaRef}
@@ -163,16 +164,16 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           disabled={disabled}
-          rows={1}
-          className="w-full bg-transparent px-4 pt-3.5 pb-2 text-base text-zinc-100 placeholder:text-[#a1a1aa] focus:outline-none resize-none text-left"
+          rows={2}
+          className="console-textarea w-full px-5 pt-[14px] pb-1 text-[15px]"
         />
 
         {/* Bottom toolbar row: icons left, send right */}
-        <div className="flex items-center justify-between px-3 pb-3">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between px-4 pt-1 pb-3">
+          <div className="flex items-center gap-[6px]">
             {/* Attach / upload button — + icon */}
             <button
-              className="w-8 h-8 rounded-full border border-white/10 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:border-white/20 transition-colors"
+              className="console-icon-btn"
               onClick={() => setUploadMenuOpen(o => !o)}
               aria-label="Upload file"
               type="button"
@@ -185,7 +186,7 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
 
           {/* Send button */}
           <button
-            className="w-8 h-8 rounded-[20px] bg-[#353532] text-white border border-[#666864] hover:bg-[#444440] disabled:bg-zinc-600 disabled:text-zinc-400 disabled:border-transparent transition-colors flex items-center justify-center"
+            className="console-send-btn"
             onClick={handleSend}
             disabled={!canSend}
             aria-label="Send"

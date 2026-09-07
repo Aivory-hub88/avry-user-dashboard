@@ -11,7 +11,7 @@ interface WorkflowContainerProps {
 
 export default function WorkflowContainer({ phases, isComplete }: WorkflowContainerProps) {
   return (
-    <div className="bg-[#2C2C2C] rounded-xl p-6 border border-white/10">
+    <div className="bg-surface-inset rounded-[16px] p-6 border border-line">
       {phases.map((phase, index) => (
         <PhaseBox
           key={phase.id}
@@ -20,7 +20,7 @@ export default function WorkflowContainer({ phases, isComplete }: WorkflowContai
         />
       ))}
       {isComplete && phases.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2">
+        <div className="mt-4 pt-4 border-t border-line flex items-center gap-2">
           <svg
             width={16}
             height={16}

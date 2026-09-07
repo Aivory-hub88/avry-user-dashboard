@@ -13,8 +13,8 @@ export default function ConsoleTopBar({ onNewChat }: ConsoleTopBarProps) {
   const activeAgent = PREBUILT_AGENTS.find((a) => a.type === agentTarget)
 
   return (
-    <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#353531] backdrop-blur sticky top-0 z-10 h-12">
-      <div className="flex items-center gap-2 text-sm font-medium text-white/80">
+    <div className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-surface-1 px-6 sticky top-0 z-10">
+      <div className="flex items-center gap-2 text-[13px] font-medium text-white/80">
         {activeAgent ? <Bot className="w-3.5 h-3.5 text-accent" /> : <Terminal className="w-3.5 h-3.5 text-accent" />}
         {activeAgent ? activeAgent.title : "Aivory Console"}
         {agentTarget && (
@@ -25,7 +25,7 @@ export default function ConsoleTopBar({ onNewChat }: ConsoleTopBarProps) {
       </div>
       <div className="flex items-center">
         <button
-          className="px-4 py-2 text-sm text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors border border-zinc-700 hover:border-zinc-600"
+          className="console-pill !py-2"
           onClick={onNewChat}
           title="Start a new conversation"
         >

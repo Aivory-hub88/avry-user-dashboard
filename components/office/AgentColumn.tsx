@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
-import { ChevronRight, ChevronLeft, Lock, Plus, Trash2, LayoutGrid } from "lucide-react"
+import { ChevronRight, ChevronLeft, Lock, Plus, Trash2, LayoutGrid, Search } from "lucide-react"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
 import type { ChatSession } from "@/hooks/useChat"
@@ -171,7 +171,7 @@ export default function AgentColumn({
 
   if (collapsed) {
     return (
-      <div className="flex h-full w-full flex-col items-center border-r border-white/[0.045] bg-[#353531] pt-4">
+      <div className="flex h-full w-full flex-col items-center border-r border-line bg-surface-1 pt-4">
         <button
           onClick={onToggleCollapse}
           aria-label="Expand agent column"
@@ -194,13 +194,18 @@ export default function AgentColumn({
           {ROWS.map((row) => {
             const isActiveAgent = !missionControlActive && row.type === agentTarget
             const pending = notificationsByAgent[row.key]?.length ?? 0
+            const isConsole = row.type === null
             return (
               <button
                 key={row.key}
                 onClick={() => openAgent(row)}
                 title={row.title}
-                className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full transition-[box-shadow] ${
-                  isActiveAgent ? "ring-2 ring-white/25" : "hover:ring-2 hover:ring-white/10"
+                className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full transition-[background-color,box-shadow] ${
+                  isConsole
+                    ? ""
+                    : isActiveAgent
+                      ? "ring-2 ring-white/25"
+                      : "hover:ring-2 hover:ring-white/10"
                 }`}
               >
                 {row.type === streamingAgentType ? (
@@ -228,8 +233,8 @@ export default function AgentColumn({
   }
 
   return (
-    <div className="flex h-full w-full flex-col border-r border-white/[0.045] bg-[#353531]">
-      <div className="flex items-center justify-between gap-2 px-4 pt-5 pb-3">
+    <div className="flex h-full w-full flex-col border-r border-line bg-surface-1">
+      <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-line px-4">
         {/* Not <h2> — a global `main h2` style overrides Tailwind's own
             font-size on any heading tag, forcing this to 24px regardless of
             the class here. This is chrome, not a page heading. */}
@@ -243,7 +248,7 @@ export default function AgentColumn({
           <ChevronLeft className="h-[13px] w-[13px]" />
         </button>
       </div>
-      <div className="px-4 pb-2">
+      <div className="px-4 pt-4 pb-3">
         <button
           onClick={onOpenMissionControl}
           className={`flex w-full items-center gap-[9px] rounded-full px-[13px] py-[8px] text-left transition-colors ${
@@ -258,16 +263,19 @@ export default function AgentColumn({
           </span>
         </button>
       </div>
-      <div className="px-4 pb-3">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search agents and threads"
-          aria-label="Search agents and threads"
-          className="w-full rounded-[9px] border border-white/[0.045] bg-white/[0.04] px-[11px] py-[7px] text-[12.5px] font-light text-white placeholder:text-white/30 focus:border-accent/40 focus:bg-white/[0.06] focus:outline-none"
-        />
+      <div className="px-4 pb-4">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-[14px] w-[14px] -translate-y-1/2 text-white/35" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search agents and threads"
+            aria-label="Search agents and threads"
+            className="w-full rounded-[9px] border border-line bg-white/[0.04] py-[7px] pl-9 pr-[11px] text-[12.5px] font-light text-white placeholder:text-white/30 focus:border-accent/40 focus:bg-white/[0.06] focus:outline-none"
+          />
+        </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-[10px] pb-4">
+      <div className="flex-1 overflow-y-auto px-[10px] pb-4 pt-1">
         {ROWS.map((row) => {
           const threads = sessionsByAgent[row.key] ?? []
           if (!matchesQuery(row, threads)) return null
@@ -281,18 +289,18 @@ export default function AgentColumn({
             <div key={row.key} className="mb-0.5 w-full">
               <button
                 onClick={() => openAgent(row)}
-                className={`group flex w-full items-start gap-[9px] rounded-[10px] px-[9px] py-[8px] text-left transition-colors ${
+                className={`group flex w-full gap-[9px] rounded-[10px] px-[9px] text-left transition-colors ${
                   isActiveAgent ? "bg-[#414039]" : "hover:bg-white/[0.04]"
-                }`}
+                } ${isOpen ? "items-center py-[10px]" : "items-start py-[8px]"}`}
               >
                 <ChevronRight
-                  className={`mt-[9px] h-[12px] w-[12px] shrink-0 text-white/25 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                  className={`h-[12px] w-[12px] shrink-0 text-white/25 transition-transform ${isOpen ? "rotate-90" : ""}`}
                 />
-                <AgentAvatar type={row.type} size={30} className="mt-[1px]" />
+                <AgentAvatar type={row.type} size={30} className="shrink-0" />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-[6px]">
                     <span
-                      className={`min-w-0 flex-1 truncate text-[13.5px] ${isActiveAgent ? "font-medium text-white" : "font-normal text-white/80"}`}
+                      className={`min-w-0 flex-1 truncate text-[13.5px] leading-none ${isActiveAgent ? "font-medium text-white" : "font-normal text-white/80"}`}
                     >
                       {row.title}
                     </span>
@@ -303,20 +311,23 @@ export default function AgentColumn({
                       </span>
                     )}
                   </span>
-                  <span className="mt-[2px] flex items-center gap-[5px]">
-                    {isThinkingHere ? (
-                      <>
-                        <ThinkingDots size={9} dotSize={1.6} />
-                        <span className="truncate text-[12px] font-light text-white/45">thinking…</span>
-                      </>
-                    ) : (
-                      <span className="truncate text-[12px] font-light text-white/35">
-                        {mostRecent ? lastPreview(mostRecent) : "No conversations yet"}
-                      </span>
-                    )}
-                  </span>
+                  {/* Preview baris ini redundan saat row expanded — thread di
+                      bawahnya sudah render lastPreview yang sama (Hello!
+                      Welcome...). Tampilkan hanya saat collapsed agar header
+                      tetap 1 baris dan seimbang dengan icon 30px. Thinking
+                      tetap tampil meski expanded. */}
+                  {isThinkingHere ? (
+                    <span className="mt-[2px] flex items-center gap-[5px]">
+                      <ThinkingDots size={9} dotSize={1.6} />
+                      <span className="truncate text-[12px] font-light text-white/45">thinking…</span>
+                    </span>
+                  ) : !isOpen ? (
+                    <span className="mt-[2px] block truncate text-[12px] font-light leading-none text-white/35">
+                      {mostRecent ? lastPreview(mostRecent) : "No conversations yet"}
+                    </span>
+                  ) : null}
                 </span>
-                <span className="mt-[1px] flex shrink-0 items-center gap-[6px]">
+                <span className="flex shrink-0 items-center gap-[6px] self-center">
                   {pending > 0 && (
                     <span
                       className={`rounded-full bg-amber/13 px-[6px] py-[1px] text-[10.5px] font-semibold text-amber ${

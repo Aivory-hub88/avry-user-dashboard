@@ -36,6 +36,17 @@
   --color-accent-btn-hover: #00d489;
   --color-accent-link-hover: #00f5b0;
   --color-accent-badge-hover: #2dd4a0;
+  /* LobeHub-style single tokens — one border, three surfaces, three radii.
+     Semua panel console harus pakai ini, bukan border-white/[0.045..0.12]
+     acak atau radius 8/9/10/12/14/16/20/24/28 sebar. */
+  --color-line: rgba(255, 255, 255, 0.06);
+  --color-surface-1: #353531;
+  --color-surface-2: #3a3a36;
+  --color-surface-3: #42423f;
+  --color-surface-inset: #2d2d2b;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
   /* Unlike the greens above, this one WAS unintentional drift: 5 different
      near-blacks (#1a1a18, #1a1a24, #1c2318, #1a0b2e, plain black) were each
      used ad hoc for text/elements sitting on the accent-green fill, with no
@@ -87,7 +98,10 @@
 
   --surface-secondary: #353531;
   --surface-tertiary: #3a3a36;
-  --border-subtle: rgba(255,255,255,0.07);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  /* Alias token tunggal — semua border hairline console mengacu ke sini.
+     Jangan perkenalkan opacity border baru (0.045/0.05/0.07/0.08/0.10/0.12)
+     di komponen console; pakai border-line (Tailwind) / var(--border-subtle). */
 
   --card-bg: rgba(255,255,255,0.03);
   --card-border: rgba(255,255,255,0.05);
@@ -244,7 +258,7 @@ body {
   margin: 0 auto;
   display: flex;
   align-items: flex-end;
-  background: #42423f;
+  background: var(--color-surface-3);
   border: 1px solid var(--border-soft);
   border-radius: 28px;
   padding: 12px 16px;
@@ -294,7 +308,7 @@ body {
   outline: none;
   font-size: 15px;
   line-height: 1.6;
-  font-family: 'Manrope', sans-serif;
+  font-family: var(--font-manrope), 'Manrope', sans-serif;
   min-height: 24px;
   max-height: 200px;
   padding: 6px 0;
@@ -323,7 +337,7 @@ body {
   transition: all 0.2s ease;
   font-size: 14px;
   font-weight: 500;
-  font-family: 'Manrope', sans-serif;
+  font-family: var(--font-manrope), 'Manrope', sans-serif;
   white-space: nowrap;
 }
 
@@ -683,6 +697,24 @@ body {
   animation: proseTokenFadeIn 0.2s ease-out;
 }
 
+/* Saat streaming, matikan animasi per-token — tiap token baru me-remount
+   dan me-retrigger fade, terlihat kedip + boros compositor. LobeHub hanya
+   menganimasikan mount awal, bukan tiap delta stream. */
+.prose-aira.is-streaming p,
+.prose-aira.is-streaming li,
+.prose-aira.is-streaming h1,
+.prose-aira.is-streaming h2,
+.prose-aira.is-streaming h3,
+.prose-aira.is-streaming h4,
+.prose-aira.is-streaming blockquote,
+.prose-aira.is-streaming table,
+.prose-aivory.is-streaming p,
+.prose-aivory.is-streaming li,
+.prose-aivory.is-streaming blockquote,
+.prose-aivory.is-streaming table {
+  animation: none;
+}
+
 @keyframes proseTokenFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -701,7 +733,7 @@ body {
 .app-main-content h1,
 .app-main-content h2,
 .app-main-content h3 {
-  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--font-manrope), 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 300;
   line-height: 1.3;
   color: var(--text-primary);
@@ -836,7 +868,7 @@ body {
     [class*="heading"]:not([class*="node"]):not([class*="workflow"]):not([class*="Node"]):not([class*="Workflow"]),
     [class*="Heading"]:not([class*="node"]):not([class*="workflow"]):not([class*="Node"]):not([class*="Workflow"])
   ) {
-    font-family: 'Manrope', sans-serif;
+    font-family: var(--font-manrope), 'Manrope', sans-serif;
     font-weight: 200;
   }
 }
@@ -864,29 +896,31 @@ body {
   }
 }
 
-.console-pill {
+.console-pill,
+.console-chip {
   padding: 8px 16px;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
   color: rgba(255, 255, 255, 0.7);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   white-space: nowrap;
 }
 
-.console-pill:hover {
+.console-pill:hover,
+.console-chip:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.9);
 }
 
 .console-input-card {
-  background: #42423f;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 24px;
+  background: var(--color-surface-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   transition: border-color 0.2s ease;
 }
@@ -903,7 +937,7 @@ body {
   outline: none;
   font-size: 15px;
   line-height: 1.6;
-  font-family: 'Manrope', sans-serif;
+  font-family: var(--font-manrope), 'Manrope', sans-serif;
   min-height: 48px;
   max-height: 180px;
   overflow-y: auto;
@@ -988,8 +1022,8 @@ body {
 }
 
 .console-connect-banner {
-  background: #2d2d2b;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--color-surface-inset);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .console-overflow-pill {
@@ -1006,24 +1040,9 @@ body {
   font-weight: 600;
 }
 
-.console-chip {
-  padding: 9px 18px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.console-chip:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.9);
-}
+/* .console-chip adalah alias dari .console-pill — satu komponen Pill.
+   Definisi dasar ada di atas (lihat .console-pill,.console-chip); di sini
+   hanya state aktif. Jangan divergenkan padding/radius lagi. */
 
 .console-chip--active {
   background: rgba(178, 204, 162, 0.12);
@@ -1035,8 +1054,8 @@ body {
   position: absolute;
   width: 320px;
   background: #2a2926;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
   overflow: hidden;
   z-index: 50;
@@ -1066,13 +1085,13 @@ body {
 
 /* ── Global Button Styles ── */
 .btn-style-a {
-  background: #42423f;
+  background: var(--color-surface-3);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   color: rgba(255, 255, 255, 0.75);
   padding: 10px 20px;
   font-size: 0.9rem;
-  font-family: 'Manrope', sans-serif;
+  font-family: var(--font-manrope), 'Manrope', sans-serif;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -1094,7 +1113,7 @@ body {
   color: rgba(255, 255, 255, 0.75);
   padding: 10px 20px;
   font-size: 0.9rem;
-  font-family: 'Manrope', sans-serif;
+  font-family: var(--font-manrope), 'Manrope', sans-serif;
   cursor: pointer;
   transition: all 0.15s ease;
 }
