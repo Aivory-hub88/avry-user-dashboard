@@ -69,10 +69,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
   const [view, setView] = useState<"table" | "kanban" | "calendar">("table")
   const [statusFilter, setStatusFilter] = useState<string>("All")
   const [priorityFilter, setPriorityFilter] = useState<string>("All")
-<<<<<<< HEAD
   const [peers, setPeers] = useState<number>(1)
-=======
->>>>>>> 088ef58 (feat(workspace): Calendar view + filters (AFFiNE parity))
   const storageKey = `aivory:workspace:db:${docId}`
   const agentOrigin = () => (typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user")
 
@@ -204,10 +201,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
               </button>
             </div>
             <span className="text-[12px] text-white/25">{filtered.length}/{rows.length}</span>
-<<<<<<< HEAD
             <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-300">{peers} peer{peers !== 1 ? "s" : ""} · y-octo</span>
-=======
->>>>>>> 088ef58 (feat(workspace): Calendar view + filters (AFFiNE parity))
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
