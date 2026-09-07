@@ -153,7 +153,7 @@ export default function AgentRail({
 
   return (
     <div className="flex h-full w-full flex-col border-l border-line bg-[#2f2f2c]">
-      <div className="flex items-center gap-[10px] border-b border-line px-4 py-[15px]">
+      <div className="flex h-12 shrink-0 items-center gap-[10px] border-b border-line px-4">
         <button
           onClick={onToggleCollapse}
           aria-label="Collapse agent panel"

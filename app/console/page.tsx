@@ -319,7 +319,7 @@ export default function ConsolePage() {
     >
     <div className="flex flex-col h-full bg-surface-1">
       {showMissionControl ? (
-        <div className="flex items-center border-b border-line px-6 py-[15px]">
+        <div className="flex h-12 shrink-0 items-center border-b border-line px-6">
           {/* Not <h2> — a global `main h2` style overrides Tailwind's own
               font-size on any heading tag here. */}
           <span className="text-[13px] font-medium leading-none text-white/55">{t('missionControl')}</span>
