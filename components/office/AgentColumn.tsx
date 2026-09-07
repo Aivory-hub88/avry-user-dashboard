@@ -263,15 +263,17 @@ export default function AgentColumn({
           </span>
         </button>
       </div>
-      <div className="relative px-4 pb-4">
-        <Search className="pointer-events-none absolute left-[26px] top-1/2 h-[13px] w-[13px] -translate-y-1/2 text-white/30" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search agents and threads"
-          aria-label="Search agents and threads"
-          className="w-full rounded-[9px] border border-line bg-white/[0.04] py-[7px] pl-[30px] pr-[11px] text-[12.5px] font-light text-white placeholder:text-white/30 focus:border-accent/40 focus:bg-white/[0.06] focus:outline-none"
-        />
+      <div className="px-4 pb-4">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-[14px] w-[14px] -translate-y-1/2 text-white/35" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search agents and threads"
+            aria-label="Search agents and threads"
+            className="w-full rounded-[9px] border border-line bg-white/[0.04] py-[7px] pl-9 pr-[11px] text-[12.5px] font-light text-white placeholder:text-white/30 focus:border-accent/40 focus:bg-white/[0.06] focus:outline-none"
+          />
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto px-[10px] pb-4 pt-1">
         {ROWS.map((row) => {
