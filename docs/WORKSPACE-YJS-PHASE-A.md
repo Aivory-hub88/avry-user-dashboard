@@ -62,19 +62,19 @@ All routes behind `requireEnv` + `JWT_SECRET` (same as `avry-backend:8081`).
 
 ## Backend Tasks
 
-- [ ] `y-websocket` server `services/y-websocket` (Node 20, `PORT=3220`, `YJS_PERSIST=postgres`) — not yet deployed, client gracefully degrades to `local`
-- [ ] `docker-compose.prod.yml`: service `y-websocket` (port `3220:1234`, network `aivory-network`, env `DATABASE_URL`, `YJS_WS_PATH=/workspace/[id]`)
-- [ ] `traefik`: `Host(workspace.aivory.uk) && PathPrefix(/yjs)` → `y-websocket` (optional, for external ws `wss://workspace.aivory.uk/yjs`)
+- [x] `y-websocket` server `services/y-websocket` (Node 20, `PORT=3220`, `y-websocket@1.5.4` + `ws`) — deployed on `tencent-vps` (`y-websocket` `Up`, `0.0.0.0:3220->1234`, `101 Switching Protocols` on direct ws)
+- [x] `docker-compose.prod.yml`: service `y-websocket` (port `3220:1234`, network `aivory-network`, Traefik `Host(aivory.uk) && PathPrefix(/yjs)` → `1234`)
+- [ ] `traefik`: `Host(workspace.aivory.uk) && PathPrefix(/yjs)` → `y-websocket` (optional, for external ws `wss://workspace.aivory.uk/yjs`) — `wss://aivory.uk/yjs` now 404 via Traefik, direct `ws://127.0.0.1:3220` works (101)
 - [x] `app/api/workspace/[id]/doc` in-memory POC (no Postgres yet) — `GET 404` / `PUT 200` working via `curl 127.0.0.1:9001`
 - [ ] Migration `010_workspace_docs.sql` applied on `avry-postgres` — next after y-websocket server
 
 ## Testing
 
-- [ ] 2 tabs `https://aivory.uk/dashboard/workspace/demo` type simultaneously → both see updates <100ms (requires y-websocket @3220)
+- [ ] 2 tabs `https://aivory.uk/dashboard/workspace/demo` type simultaneously → both see updates <100ms (requires `wss://aivory.uk/yjs` Traefik fix)
 - [x] Refresh → content persists (currently from `localStorage` + in-memory `PUT`, not yet Postgres)
 - [x] Offline → edits queued in `Y.Doc`, sync on reconnect (Yjs CRDT)
 - [x] `curl http://127.0.0.1:9001/dashboard/workspace/demo` → `200` + `curl http://127.0.0.1:9001/api/workspace/demo/doc` → `200/404`
-- [ ] `curl -s http://127.0.0.1:3220` (ws) → upgrade handshake — pending server
+- [x] `curl -s http://127.0.0.1:3220` (ws) → `101 Switching Protocols` + `aivory y-websocket ok`
 
 ## Rollout
 
