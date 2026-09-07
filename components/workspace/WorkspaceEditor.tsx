@@ -45,6 +45,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
   const [status, setStatus] = useState<"local" | "synced" | "connecting">("connecting")
   const [peers, setPeers] = useState<number>(1)
   const storageKey = `aivory:workspace:yjs:${docId}`
+  const agentOrigin = () => (typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user")
 
   // init Y.Doc + Y.Array + y-websocket
   useEffect(() => {
@@ -66,6 +67,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
         for (const b of DEFAULT_BLOCKS) yArray.push([yMapFromBlock(b)])
       }, agentOrigin())
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBlocks(toBlocks(yArray))
 
     const observer = () => {
@@ -121,8 +123,6 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
       doc.destroy()
     }
   }, [docId, storageKey])
-
-  const agentOrigin = () => (typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user")
 
   const update = (i: number, patch: Partial<Block>) => {
     const yArray = yArrayRef.current
