@@ -1,123 +1,138 @@
-# Collab — y-octo + OctoBase (Option B) — Planning
+# Collab — y-octo + OctoBase (Option B) — Planning & As-Built
 
-> Full control & rapih — Rust CRDT + local-first DB, bukan y-websocket Node.
-> Branch: `feat/collab-y-octo` from `main` (`92a16b3`)
-> Live now: `main` stable `https://aivory.uk/dashboard` (tanpa Workspace), `feat/workspace-*` (`c2647b5` + DB UI `86439a4` + Yjs `a407d7c`) jadi referensi, `y-websocket:3220` in-memory di `tencent-vps` (direct `101`, Traefik `http` `101`, `wss` `200` pending).
+> Full control & rapih — Rust CRDT + pg-backed store, bukan y-websocket Node.
+> Status snapshot 2026-09-07 — `main` dashboard `fd15433` live `https://aivory.uk/dashboard/workspace` (200),
+> `aivory-collab:3200` healthy di `tencent-vps`, `wss://aivory.uk/yjs` `101` via Cloudflare edge.
+
+## Branch & Commit Map
+
+| Repo | Branch | Head | Isi |
+|---|---|---|---|
+| `avry-user-dashboard` | `main` | `fd15433` | workspace POC squash `5ae34b3` + API proxy → collab (`71546ca` cherry-pick) |
+| `avry-user-dashboard` | `feat/collab-y-octo` | `4a7241b` | rebase `main` + Agent wiring + Calendar + API proxy + MissionControl/AgentRail awareness + doc ini |
+| `AVRY-V2-Main` | `feat/collab-y-octo` | `999cb05` | `services/collab` Rust + compose + dashboard bump |
+
+Live: `main` stabil dengan Workspace — `y-websocket:3220` tetap Up sebagai fallback.
 
 ## Goal
-Ganti `y-websocket:3220` (Node, `BYTEA` di `avry-postgres`) dengan `aivory-collab:3200` (Rust `y-octo` + `OctoBase`) sebagai **single collab engine** untuk `Workspace` (`Pages` + `Database` Table/Kanban/Calendar) di `https://aivory.uk/dashboard/workspace`, dengan `Cerveau` agent sebagai collaborator CRDT native (bukan cuma `POST /api/...`).
 
-## Tech Stack
+Ganti `y-websocket:3220` (Node, in-memory) dengan `aivory-collab:3200` (Rust `yrs` + pg store)
+sebagai **single collab engine** untuk `Workspace` (`Pages` + `Database` Table/Kanban/Calendar)
+di `https://aivory.uk/dashboard/workspace`, dengan `Cerveau` agent sebagai collaborator CRDT
+native (bukan cuma `POST /api/...`).
 
-| Layer | Choice | Why |
-|---|---|---|
-| **CRDT** | `y-octo` (Rust, `y-crdt` fork, `yjs` compat) | `thread-safe`, `zero-copy`, `10x` merge vs JS `yjs`, dipakai AFFiNE prod |
-| **DB** | `OctoBase` (Rust, local-first) | `workspace` table, `Yjs` doc per `id`, `time-travel`, `IndexedDB` di browser + `Postgres` di server (via `OctoBase` sync), bukan `BYTEA` blob |
-| **Server** | `aivory-collab` Rust `cargo` `1.75` | `cargo` build `~400MB` image, `EXPOSE 3200`, `traefik` `Host(aivory.uk) && PathPrefix(/yjs)` → `3200` |
-| **Client** | `@toeverything/y-octo` wasm + `yjs@13` + `BlockSuite` (`MPL-2.0`) | `Y.Doc` di `WorkspaceEditor`/`WorkspaceDatabase` tetap `yjs` JS, `y-octo` di server, `awareness` via `y-protocols` |
-| **Infra** | `AVRY-V2-Main` `aivory-network`, `avry-postgres` (keep for `aivory` DB, OctoBase punya store sendiri), `traefik` `web,websecure`, `Cloudflare` `wss` |
-| **Auth** | `JWT` (`DATABASE_URL`, `JWT_SECRET` dari `avry-backend:8081`) + `X-Agent-Type` | `awareness.user = {name, color, agentType, userId}` + `doc.transact(..., agentType)` |
-
-## Architecture
+## As-Built Architecture
 
 ```
 Browser (Next.js avry-user-dashboard:9001, basePath /dashboard)
-  ├─ Y.Doc (yjs) per docId (demo) — Y.Array blocks + Y.Array database
-  ├─ @toeverything/y-octo wasm (client) + y-websocket compat
-  └─ WebSocket wss://aivory.uk/yjs (Traefik websecure 443 → aivory-collab:3200)
-        │
-        └─► aivory-collab:3200 (Rust y-octo + OctoBase)
-              ├─ OctoBase workspace store (local-first, time-travel)
-              ├─ y-octo CRDT merge (actor_id = userId | agentType)
-              └─ Postgres (via OctoBase sync, not BYTEA) + Redis (optional pub/sub for scale)
+  ├─ Y.Doc (yjs 13) per docId — Y.Array blocks + Y.Array database
+  ├─ WebsocketProvider (y-websocket compat, NO wasm client — see D2)
+  ├─ awareness.user = { name, color, agentType, userId }
+  ├─ doc.transact(..., agentType) origin
+  └─ wss://aivory.uk/yjs/:room ──► Cloudflare edge
+        │  (Worker aivory-uk-reverse-proxy: /yjs* passthrough mentah, see D6)
+        └─► Traefik websecure 443, PathPrefix(/yjs) priority 100 ──► aivory-collab:3200
+              ├─ yrs 0.17 CRDT merge (y-protocols sync step1/step2/update + awareness broadcast)
+              ├─ OctoBase pg store: dashboard.workspace_docs, room-keyed (lazy-load + 300ms debounce flush)
+              ├─ legacy BYTEA merge on first access (built-in yjs→OctoBase migration, see D4)
+              └─ HTTP GET/PUT /api/workspace/:id/doc (X-Agent-Type) untuk Next.js API proxy
+
+Next.js API (avry-user-dashboard, COLLAB_URL=http://aivory-collab:3200, timeout 2s, fallback pg):
+  GET /api/workspace/[id]/doc      → collab dulu, fallback pg BYTEA (header X-Source)
+  PUT /api/workspace/[id]/doc      → collab (X-Agent-Type) + pg upsert → { source: collab+pg }
+  POST /api/workspace/[id]/database → loadDoc (collab-first) + transact origin agentType + saveDoc (collab+pg)
 ```
 
-*No `y-websocket:3220` after B — single `aivory-collab:3200`.*
+## Decision Log (As-Built ≠ Rencana Awal)
 
-## Services
+- **D1 — `yrs 0.17`, bukan crate `y-octo`/`octobase`.** Crate `y-octo` tidak ada di crates.io dalam bentuk itu;
+  `yrs` adalah implementasi Rust Yjs yang wire-compat dengan `yjs 13` (sync state-vector/update V1).
+  Store "OctoBase" diimplementasi sebagai pg-backed room store (`dashboard.workspace_docs`),
+  bukan crate OctoBase. Nama konsep dipertahankan, implementasi pragmatis.
+- **D2 — Tanpa `@toeverything/y-octo` wasm di client.** Provider `y-websocket` JS sudah speak
+  `y-protocols` yang dimengerti server `yrs`; wasm `~200KB` tidak memberi nilai tambah untuk fase ini.
+- **D3 — Dual-write collab + pg (bukan cutover).** Dashboard tetap upsert `pg BYTEA` sebagai fallback;
+  collab flush room-keyed (`workspace:{id}`). `GET` prefer collab → fallback pg. Drop `BYTEA` ditunda (scope tersisa).
+- **D4 — Migrasi = lazy merge, tanpa script terpisah.** `ensure_room` load row room-keyed, lalu merge
+  legacy row bare-docId (`octo-test-1`) sekali saat first access. Tidak ada `migrate_yjs_to_octo.rs`.
+- **D5 — Routing `PathPrefix(/yjs)` priority `100`, tanpa Host.** CF Worker me-rewrite Host origin
+  menjadi `aivory.id`, sehingga rule `Host(aivory.uk)` tidak match untuk traffic via CF.
+  PathPrefix-only + priority 100 menang atas `y-websocket` (default ~37) & `main-app` (1).
+- **D6 — CF Worker bypass `/yjs`.** Worker `aivory-uk-reverse-proxy` (`aivory.uk/*`) membungkus origin
+  response dalam `new Response()` → throw untuk status `101` (CF `1101`). Fix: `return fetch(request)`
+  mentah untuk `/yjs` + `/yjs/*`. Source mirror: `services/collab/edge-worker.js`. Backup: VPS `/tmp/rp.js.bak`.
+- **D7 — VPS host port `3201:3200`.** Port `3200` host dipakai `cerveau-server` (host network);
+  repo compose tetap `3200:3200` untuk lokal. Traefik internal tetap `3200`.
+- **D8 — Toolchain `rust:1.89`.** `1.75` gagal (`getrandom edition2024`), `1.82` gagal (transitif `idna`
+  butuh ≥1.86 via `sqlx`), `1.85` OK tanpa `sqlx`, `1.89` OK dengan `sqlx 0.7`.
+- **D9 — `yrs Transaction` is `!Send`.** Semua transaksi di-scope dalam block `{}` agar tidak ada
+  borrow yang menyeberang `.await` (explicit `drop()` tidak cukup untuk borrowck di async fn).
 
-- `AVRY-V2-Main/services/collab/Cargo.toml` (`y-octo`, `octobase`, `tokio`, `axum`, `ws`)
-- `Dockerfile` `FROM rust:1.75` `cargo build --release`
-- `docker-compose.prod.yml`:
-```yaml
-aivory-collab:
-  build: {context: ./services/collab, dockerfile: Dockerfile}
-  container_name: aivory-collab
-  restart: unless-stopped
-  networks: [aivory-network]
-  ports: ["3200:3200"]
-  environment: [DATABASE_URL, JWT_SECRET, OCTOBASE_PATH=/data]
-  volumes: [collab_data:/data]
-  labels:
-    - "traefik.enable=true"
-    - "traefik.docker.network=aivory-network"
-    - "traefik.http.routers.collab.rule=Host(`aivory.uk`) && PathPrefix(`/yjs`)"
-    - "traefik.http.routers.collab.entrypoints=websecure"
-    - "traefik.http.routers.collab.tls=true"
-    - "traefik.http.routers.collab.tls.certresolver=letsencrypt"
-    - "traefik.http.services.collab.loadbalancer.server.port=3200"
-```
+## Tech Stack (As-Built)
 
-## DB & Migration
-
-- Drop `dashboard.workspace_docs BYTEA` after OctoBase stable (keep for fallback 1 release).
-- OctoBase schema (Rust, not SQL):
-```rust
-workspace { id: String PK, doc: YDoc, created_at, updated_at, owner }
-block { id, workspace_id FK, type, text, parent_id }
-database_row { id, workspace_id FK, title, status, priority, assignee, due }
-```
-- Migration script `migrate_yjs_to_octo.rs` — load `BYTEA` from `avry-postgres`, `Y.applyUpdate` via `y-octo`, insert into `OctoBase`.
-
-## API
-
-Keep `GET/PUT /api/workspace/[id]/doc` (Yjs binary) for `WorkspaceEditor` fallback + `POST/PATCH /api/workspace/[id]/database` for `Leads Agent`, but server impl ganti dari `pg` `BYTEA` ke `aivory-collab` client (Rust `reqwest`).
-
-- `POST /api/workspace/[id]/database` → `aivory-collab` `POST /yjs/:id` with `X-Agent-Type`
-- `awareness` + `history` now has `actor_id`, so `MissionControl` card can show `Leads Agent edited` with real CRDT actor, not anon `origin`.
-
-## Frontend
-
-- `components/workspace/WorkspaceEditor.tsx` / `WorkspaceDatabase.tsx`:
-```ts
-import * as Y from "yjs"
-import { WebsocketProvider } from "y-websocket" // compat, underlying y-octo ws
-// or @toeverything/y-octo wasm provider
-awareness.setLocalStateField('user', { name: agentType ? AGENT_TITLE : 'You', color, agentType, userId })
-doc.transact(() => { /* ... */ }, agentType)
-```
-- `AgentRail Active pages` + `MissionControl` WorkspaceActivity use `awareness` + `Yjs` history.
-
-## Deployment & Scale
-
-- `tencent-vps` (`129.226.155.216:3220` → `3200`), `traefik` `aivory-network`, `Cloudflare` `wss` (Full SSL, WebSocket on).
-- Scale: `aivory-collab` stateless + `OctoBase` sharded by `workspace_id`, `Redis` pub/sub for `awareness` (optional, `y-octo` already handles via `ws`).
-- Monitoring: `aivory-collab` `/health` → `avry-traefik` healthcheck, `prometheus` metrics (later).
-
-## Security & Enterprise
-
-- `JWT` + `X-Agent-Type` header, `Cerveau` webhook `CERVEAU_WEBHOOK_SECRET` already in `docker-compose.prod.yml:246`.
-- `RBAC` per `workspace_id` (owner, member), `audit` via `OctoBase` history (`actor_id`, `timestamp`).
-- `GDPR`: `y-octo` `time-travel` + `OctoBase` retention.
+| Layer | Choice | Note |
+|---|---|---|
+| **CRDT server** | `yrs 0.17` + `axum 0.7` ws + `tokio` | `y-protocols` compat `yjs 13`, `DashMap` rooms + `broadcast` per room |
+| **Store** | `avry-postgres` `dashboard.workspace_docs` (`BYTEA`) | room-keyed rows + legacy bare-id rows; `sqlx 0.7`, `connect_lazy`, debounce flush 300ms |
+| **Server** | `aivory-collab` Rust `1.89`, image `avry-v2-main-aivory-collab` | `EXPOSE 3200`, `/health` + `/info`, env `PORT/DATABASE_URL/JWT_SECRET/OCTOBASE_PATH` |
+| **Client** | `yjs 13` + `y-websocket` (tanpa wasm) | `awareness.user {name,color,agentType,userId}`, `transact` origin `agentType`, `peers` badge |
+| **Infra** | `aivory-network`, Traefik `web,websecure`, CF proxied `aivory.uk → 129.226.155.216` | `ssl=full`, `websockets=on`, Worker bypass `/yjs` |
+| **AuthN/Z** | `X-Agent-Type` (+ `X-User-Id`) via WS header & HTTP | `JWT`/RBAC per-workspace: scope tersisa (belum di-enforce di collab) |
 
 ## Tracking Checklist
 
-- [ ] `feat/collab-y-octo` branch from `main`
-- [ ] `services/collab/Cargo.toml` + `Dockerfile` Rust skeleton
-- [ ] `aivory-collab:3200` `Up` on `tencent-vps` (`101` via `wss://aivory.uk/yjs`)
-- [ ] `WorkspaceEditor`/`WorkspaceDatabase` `y-octo` wasm + `awareness` agent
-- [ ] `app/api/workspace/[id]/doc` → `aivory-collab` (not `pg` BYTEA)
-- [ ] Migration `migrate_yjs_to_octo` + drop `workspace_docs` after stable
-- [ ] `MissionControl` + `AgentRail` show `agentType` collaborator
-- [x] `wss://aivory.uk/yjs` `101` via Traefik `websecure` (Cloudflare `wss`) — fixed 2026-09-07: CF Worker `aivory-uk-reverse-proxy` (`aivory.uk/*`) wrapped origin response in `new Response()`, which throws on `101` (CF `1101`). Fix: passthrough `fetch(request)` for `/yjs` + `/yjs/*` (no Host rewrite, Upgrade preserved). Verified `101` via CF edge (`CF-Ray`), apex `200` + `www`→apex `301` intact. Worker backup: VPS `/tmp/rp.js.bak`. CF token lives only in VPS `~/AVRY-V2-Main/.env` (`CF_EDGE_TOKEN_USER`, gitignored, `600`) — never in repo.
-- [ ] Merge `feat/workspace-*` (DB UI) + `feat/collab-y-octo` → `main` → `https://aivory.uk/dashboard` stable
+- [x] `feat/collab-y-octo` branch (dashboard + root)
+- [x] `services/collab` Rust skeleton (`Cargo.toml` + `Dockerfile` + `src/main.rs`)
+- [x] `aivory-collab` `Up (healthy)` di `tencent-vps`, pool `OctoBase pg store: ready`
+- [x] `WorkspaceEditor`/`WorkspaceDatabase` `awareness` `agentType` + `peers` + `transact` origin
+- [x] `app/api/workspace/[id]/doc` + `database` proxy → collab (`X-Agent-Type`) + pg fallback (live di `main fd15433`)
+- [x] Migrasi lazy (legacy BYTEA merge) — terbukti: restart container → `GET 200 174B` via lazy-load
+- [x] `MissionControl` + `AgentRail` tampil `agentType` collaborator (`Active in Workspace`)
+- [x] `wss://aivory.uk/yjs` `101` direct origin DAN via Cloudflare edge (Worker bypass, apex `200` + `www→301` intact)
+- [ ] Merge `feat/collab-y-octo` → `main` (root + dashboard) → stable
+- [ ] Drop `dashboard.workspace_docs` legacy rows + `y-websocket:3220` setelah 1 release stabil
 
-## Risks
+## Scope Tersisa (IN)
 
-- Rust build `3-4m` on `tencent-vps` (vs `y-websocket` Node `10s`).
-- `y-octo` wasm `~200KB` extra in `avry-user-dashboard` bundle.
-- `OctoBase` not `avry-postgres` — 2 stores during migration.
-- `y-websocket:3220` must stay up until `aivory-collab:3200` stable (fallback).
+1. **Merge → main.** Root `feat/collab-y-octo` (`999cb05`) + dashboard `feat/collab-y-octo` (`4a7241b`)
+   → `main` → redeploy VPS → `https://aivory.uk/dashboard` stabil.
+2. **Stabilisasi 1 release**, lalu drop legacy bare-id rows + hentikan `y-websocket:3220`.
+3. **AuthZ collab.** Enforce `JWT` + RBAC per `workspace_id` di WS upgrade & HTTP API
+   (sekarang `X-Agent-Type` trusted, tanpa verifikasi).
+4. **Rotasi token Cloudflare.** Token di chat terekspos → rotate di CF dashboard, update
+   `CF_EDGE_TOKEN_USER` di VPS `.env`, hapus token lama. (`cfk_` tidak valid sebagai Bearer — klarifikasi/rotasi juga.)
+5. **Observabilitas.** Log `actor` per flush sudah ada; tambah `prometheus` metrics bila perlu.
 
-## Next
-After checklist 100% → `main` → `aivory.uk/dashboard` enterprise Workspace.
+## Explicit Non-Goals (OUT)
+
+- Migrasi `BlockSuite` editor (tetap `contentEditable` + `yjs` binding sekarang).
+- Client wasm `@toeverything/y-octo`.
+- `Redis` pub/sub antar-replika (single replica sekarang; `broadcast` in-process cukup).
+- `time-travel` UI / history API (store punya `updated_at`; versi per-update belum disimpan).
+- Sharding `OctoBase` per `workspace_id` (scale-out belum dibutuhkan).
+
+## Ops Runbook (ringkas; detail: `services/collab/README.md`)
+
+```bash
+# deploy collab (VPS tencent-vps, ~/.ssh/claude_code_vps, -p 63222)
+cd ~/AVRY-V2-Main
+docker compose -f docker-compose.prod.yml build aivory-collab
+docker compose -f docker-compose.prod.yml up -d --force-recreate aivory-collab
+curl -s http://localhost:3201/health                                  # aivory-collab ok 3200 y-octo
+docker exec avry-postgres psql -U aivory -d aivory \
+  -c "select id, octet_length(yjs_update), updated_at from dashboard.workspace_docs order by updated_at desc limit 5"
+# wss via CF edge (harus 101):
+curl --http1.1 -k -m 8 -i -N -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+  -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==' \
+  https://aivory.uk/yjs/<room>
+```
+
+Secrets: token Cloudflare HANYA di VPS `~/AVRY-V2-Main/.env` (`CF_EDGE_TOKEN_USER`, `600`,
+gitignored) — jangan hardcode, jangan commit. Script diagnosis di `/tmp/cf_*.sh` (bukan repo).
+
+## Risks (update)
+
+- Build Rust `>10 mnt` di VPS saat tambah dep besar (`sqlx` + `ring`); gunakan background build + poll.
+- VPS load tinggi saat compile → SSH bisa timeout sesaat; `uptime`/retry.
+- `sqlx 0.7` future-incompat warning — pin revisi bila toolchain naik.
+- CF Worker adalah config edge di luar repo — mirror di `services/collab/edge-worker.js` wajib dijaga sinkron.
