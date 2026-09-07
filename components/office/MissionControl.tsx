@@ -10,6 +10,7 @@
  * a grid. Ringan by construction, not by discipline.
  */
 import Image from "next/image"
+import Link from "next/link"
 import { Lock } from "lucide-react"
 import { useEffect, useState } from "react"
 import { asset } from "@/lib/asset"
@@ -252,9 +253,9 @@ export default function MissionControl({
             </div>
             <div className="mt-2 text-[11px] text-white/25">
               From <code className="rounded bg-white/[0.06] px-1.5 py-0.5">Y.Doc demo</code> ·{" "}
-              <a href="/workspace/demo?view=database" className="underline decoration-white/20 underline-offset-2 hover:text-white/50">
+              <Link href="/workspace/demo?view=database" className="underline decoration-white/20 underline-offset-2 hover:text-white/50">
                 Open Database
-              </a>
+              </Link>
             </div>
           </div>
         )}
