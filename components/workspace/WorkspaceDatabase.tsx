@@ -66,8 +66,12 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
   const docRef = useRef<Y.Doc | null>(null)
   const yRowsRef = useRef<Y.Array<Y.Map<unknown>> | null>(null)
   const [rows, setRows] = useState<Row[]>([])
-  const [view, setView] = useState<"table" | "kanban">("table")
+  const [view, setView] = useState<"table" | "kanban" | "calendar">("table")
+  const [statusFilter, setStatusFilter] = useState<string>("All")
+  const [priorityFilter, setPriorityFilter] = useState<string>("All")
+  const [peers, setPeers] = useState<number>(1)
   const storageKey = `aivory:workspace:db:${docId}`
+  const agentOrigin = () => (typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user")
 
   useEffect(() => {
     const doc = new Y.Doc()
@@ -89,7 +93,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
       ]
       doc.transact(() => {
         for (const r of seed) yRows.push([yMapFromRow(r)])
-      })
+      }, agentOrigin())
     }
     setRows(toRows(yRows))
 
@@ -101,10 +105,17 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
     }
     yRows.observe(obs)
 
-    const wsUrl = typeof window !== "undefined" && window.location.hostname === "localhost" ? "ws://localhost:3220" : "wss://aivory.uk/yjs"
+    const wsUrl = typeof window !== "undefined" && window.location.hostname === "localhost" ? "ws://localhost:3200" : "wss://aivory.uk/yjs"
     let provider: WebsocketProvider | null = null
     try {
       provider = new WebsocketProvider(wsUrl, `workspace:db:${docId}`, doc, { connect: true })
+      const agentType = typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user"
+      const userId = typeof window !== "undefined" ? (localStorage.getItem("aivory:userId") || "anon") : "anon"
+      const color = agentType === "user" ? "#7c3aed" : agentType.includes("leads") ? "#f59e0b" : "#10b981"
+      const name = agentType === "user" ? "You" : agentType.replace(/_/g, " ")
+      provider.awareness.setLocalStateField("user", { name, color, agentType, userId })
+      provider.awareness.on("change", () => setPeers(provider!.awareness.getStates().size))
+      setPeers(provider.awareness.getStates().size)
     } catch {}
 
     fetch(`/api/workspace/${docId}/doc`)
@@ -126,7 +137,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
     const doc = docRef.current
     if (!yRows || !doc) return
     const r: Row = { id: uid(), title: "", status: "Todo", priority: "Med", assignee: "", due: "" }
-    doc.transact(() => yRows.push([yMapFromRow(r)]))
+    doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
   }
 
   const updateRow = (id: string, patch: Partial<Row>) => {
@@ -138,7 +149,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
     const m = yRows.get(idx) as Y.Map<unknown>
     doc.transact(() => {
       for (const [k, v] of Object.entries(patch)) m.set(k, v)
-    })
+    }, agentOrigin())
   }
 
   const onDropKanban = (e: React.DragEvent, status: string) => {
@@ -146,11 +157,24 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
     if (id) updateRow(id, { status })
   }
 
+  const filtered = rows.filter(
+    (r) => (statusFilter === "All" || r.status === statusFilter) && (priorityFilter === "All" || r.priority === priorityFilter),
+  )
+
+  // Calendar helpers (current month)
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const firstDow = new Date(year, month, 1).getDay()
+  const monthName = now.toLocaleString("en-US", { month: "long", year: "numeric" })
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1)
+
   return (
     <div className="mx-auto w-full max-w-[900px]">
       {/* Header — AFFiNE-like database title + view switcher (LobeHub pill style) */}
       <div className="mb-4 flex flex-col gap-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
               <button
@@ -167,16 +191,53 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
                 <Kanban className="h-3.5 w-3.5" />
                 Board
               </button>
+              <button
+                onClick={() => setView("calendar")}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition ${view === "calendar" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white/80"}`}
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                Calendar
+              </button>
             </div>
-            <span className="text-[12px] text-white/25">{rows.length} records</span>
+            <span className="text-[12px] text-white/25">{filtered.length}/{rows.length}</span>
+            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-300">{peers} peer{peers !== 1 ? "s" : ""} · y-octo</span>
           </div>
-          <button
-            onClick={addRow}
-            className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[12.5px] font-medium text-black shadow-sm transition hover:bg-white/90"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none"
+              >
+                <option value="All">All status</option>
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <span className="text-white/10">|</span>
+              <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                className="bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none"
+              >
+                <option value="All">All priority</option>
+                {PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={addRow}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[12.5px] font-medium text-black shadow-sm transition hover:bg-white/90"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New
+            </button>
+          </div>
         </div>
       </div>
 
@@ -194,7 +255,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {rows.map((r) => (
+                {filtered.map((r) => (
                   <tr key={r.id} className="group hover:bg-white/[0.03]">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -258,7 +319,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
             New row
           </button>
         </div>
-      ) : (
+      ) : view === "kanban" ? (
         <div className="grid grid-cols-3 gap-4">
           {STATUSES.map((s) => (
             <div
@@ -271,11 +332,11 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
                 <span className={`h-2 w-2 rounded-full ${STATUS_DOT[s]}`} />
                 <span className="text-[12px] font-medium uppercase tracking-wider text-white/60">{s}</span>
                 <span className="rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[11px] font-medium text-white/40">
-                  {rows.filter((r) => r.status === s).length}
+                  {filtered.filter((r) => r.status === s).length}
                 </span>
               </div>
               <div className="flex flex-col gap-2.5">
-                {rows
+                {filtered
                   .filter((r) => r.status === s)
                   .map((r) => (
                     <div
@@ -312,6 +373,53 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
               </div>
             </div>
           ))}
+        </div>
+      ) : (
+        <div className="rounded-[14px] border border-line bg-surface-1 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-[13px] font-medium text-white/80">{monthName}</span>
+            <span className="text-[11px] text-white/30">{filtered.filter((r) => r.due).length} dated</span>
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-[11px]">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+              <div key={d} className="py-1 text-center font-medium uppercase tracking-wider text-white/25">
+                {d}
+              </div>
+            ))}
+            {Array.from({ length: firstDow === 0 ? 6 : firstDow - 1 }).map((_, i) => (
+              <div key={`e-${i}`} className="h-[88px] rounded-[10px] bg-transparent" />
+            ))}
+            {days.map((d) => {
+              const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`
+              const items = filtered.filter((r) => r.due === iso)
+              return (
+                <div key={d} className="min-h-[88px] rounded-[10px] border border-line bg-white/[0.02] p-1.5">
+                  <div className="text-[11px] font-medium text-white/40">{d}</div>
+                  <div className="mt-1 flex flex-col gap-1">
+                    {items.map((r) => (
+                      <div key={r.id} className="truncate rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-black">
+                        {r.title || "Untitled"}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {filtered.filter((r) => !r.due).length > 0 && (
+            <div className="mt-4 border-t border-line pt-3">
+              <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/30">Undated</div>
+              <div className="flex flex-wrap gap-1.5">
+                {filtered
+                  .filter((r) => !r.due)
+                  .map((r) => (
+                    <span key={r.id} className="rounded-full border border-line bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/60">
+                      {r.title || "Untitled"}
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

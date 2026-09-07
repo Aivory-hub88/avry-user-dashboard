@@ -43,6 +43,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
   const [blocks, setBlocks] = useState<Block[]>(DEFAULT_BLOCKS)
   const [slash, setSlash] = useState<{ idx: number; open: boolean }>({ idx: 0, open: false })
   const [status, setStatus] = useState<"local" | "synced" | "connecting">("connecting")
+  const [peers, setPeers] = useState<number>(1)
   const storageKey = `aivory:workspace:yjs:${docId}`
 
   // init Y.Doc + Y.Array + y-websocket
@@ -63,7 +64,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
     if (yArray.length === 0) {
       doc.transact(() => {
         for (const b of DEFAULT_BLOCKS) yArray.push([yMapFromBlock(b)])
-      })
+      }, agentOrigin())
     }
     setBlocks(toBlocks(yArray))
 
@@ -81,15 +82,23 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
     }
     yArray.observe(observer)
 
-    // try y-websocket (fails gracefully if server not yet at 3220)
-    // In prod, dashboard runs behind traefik; ws at wss://aivory.uk/yjs or host.docker.internal:3220
+    // y-octo (aivory-collab:3200) compat — y-websocket provider still works over wss://aivory.uk/yjs/:room
+    // In prod, dashboard runs behind traefik; ws at wss://aivory.uk/yjs (collab:3200, fallback y-websocket:3220)
     const wsUrl =
       typeof window !== "undefined" && window.location.hostname === "localhost"
-        ? "ws://localhost:3220"
+        ? "ws://localhost:3200"
         : "wss://aivory.uk/yjs"
+    const agentType = typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user"
+    const userId = typeof window !== "undefined" ? (localStorage.getItem("aivory:userId") || "anon") : "anon"
     try {
       const provider = new WebsocketProvider(wsUrl, `workspace:${docId}`, doc, { connect: true })
       providerRef.current = provider
+      // y-octo awareness: expose agentType so MissionControl + AgentRail can show “Leads Agent edited”
+      const color = agentType === "user" ? "#7c3aed" : agentType.includes("leads") ? "#f59e0b" : "#10b981"
+      const name = agentType === "user" ? "You" : agentType.replace(/_/g, " ")
+      provider.awareness.setLocalStateField("user", { name, color, agentType, userId })
+      provider.awareness.on("change", () => setPeers(provider.awareness.getStates().size))
+      setPeers(provider.awareness.getStates().size)
       provider.on("status", (e: { status: string }) => {
         setStatus(e.status === "connected" ? "synced" : e.status === "connecting" ? "connecting" : "local")
       })
@@ -113,6 +122,8 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
     }
   }, [docId, storageKey])
 
+  const agentOrigin = () => (typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user")
+
   const update = (i: number, patch: Partial<Block>) => {
     const yArray = yArrayRef.current
     const doc = docRef.current
@@ -120,7 +131,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
     const m = yArray.get(i) as Y.Map<unknown>
     doc.transact(() => {
       for (const [k, v] of Object.entries(patch)) m.set(k, v)
-    })
+    }, agentOrigin())
   }
 
   const addAfter = (i: number, type: Block["type"] = "p") => {
@@ -130,7 +141,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
     const nb: Block = { id: uid(), type, text: "", ...(type === "todo" ? { checked: false } : {}) }
     doc.transact(() => {
       yArray.insert(i + 1, [yMapFromBlock(nb)])
-    })
+    }, agentOrigin())
     setTimeout(() => document.getElementById(`block-${nb.id}`)?.focus(), 10)
   }
 
@@ -140,7 +151,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
     if (!yArray || !doc || yArray.length <= 1) return
     doc.transact(() => {
       yArray.delete(i, 1)
-    })
+    }, agentOrigin())
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, i: number) => {
@@ -165,7 +176,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
     doc.transact(() => {
       yArray.delete(0, yArray.length)
       for (const b of DEFAULT_BLOCKS) yArray.push([yMapFromBlock(b)])
-    })
+    }, agentOrigin())
   }
 
   return (
@@ -177,7 +188,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
         <span>•</span>
         <span>{blocks.length} blocks</span>
         <span>•</span>
-        <span className="hidden sm:inline">ws {status === "synced" ? "3220" : "localStorage"} + /api/workspace/{docId}/doc</span>
+        <span className="hidden sm:inline">ws {status === "synced" ? "3200" : "localStorage"} · {peers} peer{peers !== 1 ? "s" : ""} · y-octo</span>
         <button onClick={reset} className="ml-auto rounded bg-white/[0.06] px-2 py-1 hover:bg-white/[0.08]">
           Reset
         </button>
@@ -260,9 +271,9 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
 
       <div className="mt-8 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-[12px] leading-relaxed text-white/40">
         Yjs Doc <code className="rounded bg-white/[0.06] px-1.5 py-0.5">workspace:{docId}</code> via{" "}
-        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">y-websocket</code> @{" "}
-        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">wss://aivory.uk/yjs</code> (fallback{" "}
-        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">ws://localhost:3220</code>) + persist{" "}
+        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">y-octo</code> @{" "}
+        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">wss://aivory.uk/yjs</code> ({" "}
+        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">ws://localhost:3200</code> fallback 3220) +{" "}
         <code className="rounded bg-white/[0.06] px-1.5 py-0.5">localStorage</code> +{" "}
         <code className="rounded bg-white/[0.06] px-1.5 py-0.5">/api/workspace/[id]/doc</code>.
       </div>
