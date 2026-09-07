@@ -128,6 +128,16 @@ function AgentsIcon() {
   )
 }
 
+function WorkspaceIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+      <path d="M2 17l10 5 10-5" />
+      <path d="M2 12l10 5 10-5" />
+    </svg>
+  )
+}
+
 function SettingsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -167,6 +177,7 @@ function ExploreIcon() {
 
 const NAV_ICONS: Record<string, React.FC> = {
   console: ConsoleIcon,
+  workspace: WorkspaceIcon,
   diagnostics: DiagnosticsIcon,
   blueprint: BlueprintIcon,
   roadmap: RoadmapIcon,
@@ -223,6 +234,7 @@ export default function Sidebar() {
     // rail's "Waiting on you"), not a separate page — this badge is the one
     // place left that surfaces the total across every agent.
     { key: "console",       href: "/console", badge: approvalCount > 0 ? approvalCount : null },
+    { key: "workspace",     href: "/workspace", label: "Workspace" },
     { key: "agents",        href: "/agents" },
     { key: "diagnostics",   href: "/diagnostics" },
     { key: "blueprint",     href: "/blueprint" },
