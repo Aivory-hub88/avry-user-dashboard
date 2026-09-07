@@ -52,6 +52,11 @@ interface ChipData {
 
 const CHIPS: ChipData[] = [
   {
+    id: "workspace",
+    labelKey: "chipWorkspace",
+    options: [{ textKey: "chipOptionWorkspace", action: "assist", tab: undefined }],
+  },
+  {
     // Redirect-only (see "Agents" below for why): the gate in openChip()
     // sends users with no diagnostic/blueprint purchase to Activate Features
     // instead of an empty deep-diagnostic page.
@@ -174,6 +179,39 @@ export default function ConsolePage() {
   // qualifies.
   const activeAgentChannels = agentTarget ? deployments.filter((d) => d.agentType === agentTarget) : []
   const showDeployNotice = agentTarget !== null && activeAgentChannels.length === 0
+
+  // Workspace create via Console (Phase B.3): `Add Acme lead to Leads DB` → POST /api/workspace/demo/database
+  const tryWorkspaceCreate = useCallback(async (text: string) => {
+    const m = text.match(/add\s+(.+?)\s+to\s+(leads|workspace|database)\s*(db)?/i)
+    if (!m) return false
+    const title = m[1].trim().replace(/^["']|["']$/g, "")
+    if (!title) return false
+    try {
+      const r = await fetch(`/api/workspace/demo/database`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, status: "Todo", priority: "High", assignee: activeAgentName }),
+      })
+      if (r.ok) {
+        addToast("success", `Added "${title}" to Leads DB`)
+        return true
+      }
+    } catch {}
+    return false
+  }, [activeAgentName, addToast])
+
+  const handleSendWithWorkspace = useCallback(
+    async (text: string, atts: Attachment[]) => {
+      if (await tryWorkspaceCreate(text)) {
+        setInputValue("")
+        if (textareaRef.current) textareaRef.current.style.height = "auto"
+        setAttachments([])
+        return
+      }
+      handleSend(text, atts)
+    },
+    [tryWorkspaceCreate, handleSend],
+  )
 
   // Fetch connected integrations from store
   const connectedIntegrations = listConnections("default")
@@ -412,7 +450,7 @@ export default function ConsolePage() {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault()
                         if (inputValue.trim() || attachments.length > 0) {
-                          handleSend(inputValue, attachments)
+                          handleSendWithWorkspace(inputValue, attachments)
                           setInputValue("")
                           if (textareaRef.current) textareaRef.current.style.height = "auto"
                         }
@@ -438,7 +476,7 @@ export default function ConsolePage() {
                   <button
                     onClick={() => {
                       if (inputValue.trim() || attachments.length > 0) {
-                        handleSend(inputValue, attachments)
+                        handleSendWithWorkspace(inputValue, attachments)
                         setInputValue("")
                         if (textareaRef.current) textareaRef.current.style.height = "auto"
                       }
@@ -595,7 +633,7 @@ export default function ConsolePage() {
                           items={followUpSuggestions.map(s => ({ label: s }))}
                           onSelect={(label) => {
                             setFollowUpSuggestions([])
-                            handleSend(label, [])
+                            handleSendWithWorkspace(label, [])
                           }}
                         />
                       </div>
@@ -604,7 +642,7 @@ export default function ConsolePage() {
                         suggestions={followUpSuggestions}
                         onSelect={(suggestion) => {
                           setFollowUpSuggestions([])
-                          handleSend(suggestion, [])
+                          handleSendWithWorkspace(suggestion, [])
                         }}
                       />
                     ) : null}
@@ -615,7 +653,7 @@ export default function ConsolePage() {
             <div className="sticky bottom-0 z-10 px-8 pt-2 pb-4" style={{ background: 'linear-gradient(to bottom, transparent, var(--color-surface-1) 24px)' }}>
               <div className="max-w-[800px] mx-auto">
                 <ChatInput
-                  onSend={(text: string, atts: Attachment[]) => handleSend(text, atts)}
+                  onSend={(text: string, atts: Attachment[]) => handleSendWithWorkspace(text, atts)}
                   disabled={isStreaming}
                   pendingAttachments={attachments}
                   onClearPendingAttachments={() => setAttachments([])}
