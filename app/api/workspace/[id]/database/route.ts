@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import * as Y from "yjs"
 import { query } from "@/lib/db"
+import { workspaceCredential, collabAuthHeaders, authorizeDocFallback, unauthorized, forbidden, type WorkspaceCredential } from "@/lib/workspaceAuth"
 
 export const runtime = "nodejs"
 
@@ -12,19 +13,31 @@ function uid() {
 
 const COLLAB_URL = process.env.COLLAB_URL || "http://aivory-collab:3200"
 
-async function loadDoc(id: string): Promise<Y.Doc> {
-  const doc = new Y.Doc()
-  // try collab first
+async function collabFetch(id: string, cred: WorkspaceCredential, init?: RequestInit): Promise<Response | null> {
   try {
     const res = await fetch(`${COLLAB_URL}/api/workspace/${encodeURIComponent(id)}/doc`, {
+      ...init,
+      headers: { ...collabAuthHeaders(cred), ...(init?.headers || {}) },
       signal: AbortSignal.timeout(2000),
     } as RequestInit)
-    if (res.ok) {
-      const buf = await res.arrayBuffer()
-      if (buf.byteLength > 0) Y.applyUpdate(doc, new Uint8Array(buf))
-      return doc
-    }
-  } catch {}
+    return res
+  } catch {
+    return null
+  }
+}
+
+async function loadDoc(id: string, cred: WorkspaceCredential): Promise<Y.Doc> {
+  const doc = new Y.Doc()
+  // try collab first (authoritative RBAC)
+  const res = await collabFetch(id, cred)
+  if (res && (res.status === 401 || res.status === 403)) throw new WorkspaceDenied(res.status)
+  if (res?.ok) {
+    const buf = await res.arrayBuffer()
+    if (buf.byteLength > 0) Y.applyUpdate(doc, new Uint8Array(buf))
+    return doc
+  }
+  // collab down — pg fallback, gated
+  if (!(await authorizeDocFallback(cred, id))) throw new WorkspaceDenied(403)
   const r = await query("SELECT yjs_update FROM dashboard.workspace_docs WHERE id = $1", [id])
   if (r.rows.length > 0) {
     const upd: Buffer = r.rows[0].yjs_update
@@ -33,17 +46,28 @@ async function loadDoc(id: string): Promise<Y.Doc> {
   return doc
 }
 
-async function saveDoc(id: string, doc: Y.Doc, agentType = "user") {
+class WorkspaceDenied extends Error {
+  status: number
+  constructor(status: number) {
+    super("denied")
+    this.status = status
+  }
+}
+
+async function saveDoc(id: string, doc: Y.Doc, cred: WorkspaceCredential, agentType = "user") {
   const upd = Buffer.from(Y.encodeStateAsUpdate(doc))
-  // push to collab (y-octo) — fire and forget, but await with timeout
+  // push to collab (y-octo) — collab enforces RBAC; a 401/403 means a viewer
+  // write attempt, which must NOT leak into the pg fallback write.
   try {
-    await fetch(`${COLLAB_URL}/api/workspace/${encodeURIComponent(id)}/doc`, {
+    const res = await collabFetch(id, cred, {
       method: "PUT",
       headers: { "Content-Type": "application/octet-stream", "X-Agent-Type": agentType },
       body: upd as unknown as BodyInit,
-      signal: AbortSignal.timeout(2000),
-    } as RequestInit)
-  } catch {}
+    })
+    if (res && (res.status === 401 || res.status === 403)) throw new WorkspaceDenied(res.status)
+  } catch (e) {
+    if (e instanceof WorkspaceDenied) throw e
+  }
   await query(
     `INSERT INTO dashboard.workspace_docs (id, yjs_update, updated_at)
      VALUES ($1, $2, now())
@@ -64,13 +88,16 @@ function rowsFromDoc(doc: Y.Doc): Row[] {
   }))
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const cred = workspaceCredential(req)
+  if (!cred) return unauthorized()
   try {
-    const doc = await loadDoc(id)
+    const doc = await loadDoc(id, cred)
     const rows = rowsFromDoc(doc)
     return NextResponse.json({ id, rows })
   } catch (e) {
+    if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
     console.error("[workspace/database GET]", e)
     return NextResponse.json({ error: "db" }, { status: 500 })
   }
@@ -78,6 +105,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const cred = workspaceCredential(req)
+  if (!cred) return unauthorized()
   let body: Partial<Row>
   try {
     body = await req.json()
@@ -92,15 +121,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const agentType = req.headers.get("x-agent-type") || req.headers.get("X-Agent-Type") || (assignee || "user")
 
   try {
-    const doc = await loadDoc(id)
+    const doc = await loadDoc(id, cred)
     const arr = doc.getArray<Y.Map<unknown>>("database")
     const newRow: Row = { id: uid(), title, status, priority, assignee, due }
     const m = new Y.Map<unknown>()
     for (const [k, v] of Object.entries(newRow)) m.set(k, v)
     doc.transact(() => arr.push([m]), agentType)
-    await saveDoc(id, doc, agentType)
+    await saveDoc(id, doc, cred, agentType)
     return NextResponse.json({ id: newRow.id, row: newRow, agentType }, { status: 201 })
   } catch (e) {
+    if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
     console.error("[workspace/database POST]", e)
     return NextResponse.json({ error: "db" }, { status: 500 })
   }

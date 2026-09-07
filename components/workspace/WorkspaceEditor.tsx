@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
+import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 
 type Block = { id: string; type: "h1" | "h2" | "p" | "todo" | "bullet" | "quote"; text: string; checked?: boolean }
 
@@ -75,10 +76,10 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
       // persist Yjs update to localStorage
       const update = Y.encodeStateAsUpdate(doc)
       localStorage.setItem(storageKey, JSON.stringify(Array.from(update)))
-      // also PUT to API (fire-and-forget, no auth yet)
+      // also PUT to API (fire-and-forget; the collab proxy enforces RBAC)
       fetch(`/api/workspace/${docId}/doc`, {
         method: "PUT",
-        headers: { "Content-Type": "application/octet-stream" },
+        headers: { "Content-Type": "application/octet-stream", ...collabAuthHeaders() },
         body: update as unknown as BodyInit,
       }).catch(() => {})
     }
@@ -93,7 +94,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
     const agentType = typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user"
     const userId = typeof window !== "undefined" ? (localStorage.getItem("aivory:userId") || "anon") : "anon"
     try {
-      const provider = new WebsocketProvider(wsUrl, `workspace:${docId}`, doc, { connect: true })
+      const provider = new WebsocketProvider(wsUrl, `workspace:${docId}`, doc, { connect: true, params: collabWsParams() })
       providerRef.current = provider
       // y-octo awareness: expose agentType so MissionControl + AgentRail can show “Leads Agent edited”
       const color = agentType === "user" ? "#7c3aed" : agentType.includes("leads") ? "#f59e0b" : "#10b981"
@@ -105,7 +106,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
         setStatus(e.status === "connected" ? "synced" : e.status === "connecting" ? "connecting" : "local")
       })
       // restore from server if available
-      fetch(`/api/workspace/${docId}/doc`)
+      fetch(`/api/workspace/${docId}/doc`, { headers: collabAuthHeaders() })
         .then((r) => (r.ok ? r.arrayBuffer() : null))
         .then((buf) => {
           if (buf && buf.byteLength > 0) {

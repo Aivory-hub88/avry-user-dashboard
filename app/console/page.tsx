@@ -20,6 +20,7 @@ import { useNotificationFeed } from "@/hooks/useNotificationFeed"
 import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
+import { collabAuthHeaders } from "@/lib/collabClient"
 import type { Attachment } from "@/components/UploadMenu"
 import { AttachmentCard } from "@/components/AttachmentCard"
 import { getUser } from "@/lib/auth"
@@ -189,7 +190,7 @@ export default function ConsolePage() {
     try {
       const r = await fetch(`/api/workspace/demo/database`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
         body: JSON.stringify({ title, status: "Todo", priority: "High", assignee: activeAgentName }),
       })
       if (r.ok) {
