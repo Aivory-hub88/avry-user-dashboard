@@ -53,7 +53,7 @@ export default function WorkspaceNavigator({ currentId }: { currentId: string })
   })
 
   return (
-    <aside className="flex w-full shrink-0 flex-col border-b border-line bg-black/10 lg:w-[232px] lg:border-b-0 lg:border-r">
+    <aside className="flex w-full shrink-0 flex-col border-b border-line bg-black/10 lg:min-h-0 lg:w-[232px] lg:overflow-hidden lg:border-b-0 lg:border-r">
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
         <div>
           <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">Pages</div>
@@ -77,7 +77,7 @@ export default function WorkspaceNavigator({ currentId }: { currentId: string })
           className="min-w-0 flex-1 bg-transparent text-[12px] text-white/75 outline-none placeholder:text-white/25"
         />
       </label>
-      <nav className="flex max-h-[180px] flex-row gap-1 overflow-x-auto px-3 pb-3 lg:max-h-none lg:flex-col lg:overflow-y-auto lg:pb-4">
+      <nav className="flex max-h-[180px] flex-row gap-1 overflow-x-auto px-3 pb-3 lg:min-h-0 lg:max-h-none lg:flex-col lg:overflow-y-auto lg:pb-4">
         {filtered.map((doc) => (
           <Link
             key={doc.id}

@@ -225,9 +225,9 @@ export default function WorkspaceDocPage() {
           )}
         </div>
       </div>
-      <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <WorkspaceNavigator currentId={id} />
-        <div className="mx-auto w-full max-w-[860px] flex-1 overflow-y-auto px-8 py-8">
+        <div className="min-w-0 flex-1 overflow-y-auto px-8 py-8 lg:px-10 xl:px-12">
           {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
           {!canWrite && (
             <div className="mx-auto mt-6 max-w-[720px] rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">
@@ -235,7 +235,7 @@ export default function WorkspaceDocPage() {
             </div>
           )}
         </div>
-        <div className="w-full shrink-0 border-t border-line p-4 lg:w-[360px] lg:border-l lg:border-t-0">
+        <div className="w-full shrink-0 overflow-y-auto border-t border-line p-4 lg:w-[360px] lg:max-w-[360px] lg:border-l lg:border-t-0">
           <SharingPanel docId={id} isOwner={!!isOwner} />
           {meta?.ownerEmail && (
             <div className="mt-3 text-[11px] text-white/30">Owner: {meta.ownerName ?? meta.ownerEmail}</div>

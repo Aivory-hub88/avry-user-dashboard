@@ -240,7 +240,7 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
   }
 
   return (
-    <div className="mx-auto w-full max-w-[720px]">
+    <div className="mx-auto w-full max-w-[780px] lg:pl-[52px]">
       <div className="mb-8 flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-white/25">
         <span className="h-1.5 w-1.5 rounded-full bg-white/50" />
         Page
