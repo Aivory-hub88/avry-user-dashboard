@@ -7,7 +7,7 @@ import WorkspaceEditor from "@/components/workspace/WorkspaceEditor"
 import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
 import SharingPanel from "@/components/workspace/SharingPanel"
 import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
-import { collabAuthHeaders } from "@/lib/collabClient"
+import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 import { Share2 } from "lucide-react"
 
@@ -43,7 +43,7 @@ export default function WorkspaceDocPage() {
   const loadMeta = async () => {
     try {
       const r = await fetch(`/api/workspace/${id}/meta`, { headers: collabAuthHeaders() })
-      if (r.status === 401) { setStatus('unauth'); return }
+       if (r.status === 401) { clearClientAuthSession(); setStatus('unauth'); return }
       if (r.status === 403) { setStatus('locked'); 
         const j = await r.json().catch(()=>({}))
         // try to still get owner info via 403 body? fallback

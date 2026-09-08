@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { collabAuthHeaders } from "@/lib/collabClient"
+import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 
 type DocItem = { id: string; title: string; workspace_id: string; owner: string | null; updated_at: string | null; myRole: string }
@@ -30,6 +30,7 @@ export default function WorkspacePage() {
         setDocs(j.docs ?? [])
         setAuthRequired(false)
       } else if (r.status === 401) {
+        clearClientAuthSession()
         setAuthRequired(true)
         setError('Your session has expired. Sign in again to continue.')
       } else setError('We could not load your pages. Please try again.')
