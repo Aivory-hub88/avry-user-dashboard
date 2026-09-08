@@ -75,7 +75,8 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   useEffect(() => {
     readOnlyRef.current = readOnly
   }, [readOnly])
-  const storageKey = `aivory:workspace:db:${docId}`
+  // v2: POC-era cached updates were stale demo text; server is source of truth
+  const storageKey = `aivory:workspace:db:v2:${docId}`
   const agentOrigin = () => (typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user")
 
   useEffect(() => {

@@ -41,7 +41,8 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
   const [blocks, setBlocks] = useState<Block[]>([])
   const [slash, setSlash] = useState<{ idx: number; open: boolean }>({ idx: 0, open: false })
   const [ready, setReady] = useState(false)
-  const storageKey = `aivory:workspace:yjs:${docId}`
+  // v2: POC-era cached updates were stale demo text; server is source of truth
+  const storageKey = `aivory:workspace:yjs:v2:${docId}`
   const agentOrigin = () => (typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user")
 
   // init Y.Doc: local cache first, then server — seed a starter only when truly empty
