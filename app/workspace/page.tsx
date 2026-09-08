@@ -1,48 +1,111 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { collabAuthHeaders } from "@/lib/collabClient"
 
-/**
- * POC placeholder for AFFiNE-style Workspace.
- * Real editor is BlockSuite (Yjs) in app/workspace/[id]/page.tsx.
- * See docs/AFFINE-WORKSPACE-ADOPTION.md.
- */
+type DocItem = { id: string; title: string; workspace_id: string; owner: string | null; updated_at: string | null; myRole: string }
+
 export default function WorkspacePage() {
+  const [docs, setDocs] = useState<DocItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [title, setTitle] = useState('')
+  const router = useRouter()
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const r = await fetch('/api/workspace', { headers: collabAuthHeaders() })
+      if (r.ok) {
+        const j = await r.json()
+        setDocs(j.docs ?? [])
+      }
+    } catch {}
+    setLoading(false)
+  }
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { load() }, [])
+
+  const create = async () => {
+    if (creating) return
+    setCreating(true)
+    try {
+      const r = await fetch('/api/workspace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...collabAuthHeaders() },
+        body: JSON.stringify({ title: title.trim() || 'Untitled' }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (r.ok && j.id) router.push(`/workspace/${j.id}`)
+      else load()
+    } catch {}
+    setCreating(false)
+  }
+
   return (
     <div className="flex h-full w-full flex-col bg-surface-1">
-      <div className="flex h-12 shrink-0 items-center border-b border-line px-6">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-line px-6">
         <span className="text-[13px] font-medium leading-none text-white/80">Workspace</span>
-        <span className="ml-2 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
-          POC
-        </span>
+        <div className="flex items-center gap-2">
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="New doc title"
+            className="w-[180px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none"
+          />
+          <button onClick={create} disabled={creating} className="rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-50">
+            {creating ? 'Creating…' : 'New doc'}
+          </button>
+        </div>
       </div>
-      <div className="flex flex-1 flex-col items-center justify-center px-8 py-12">
-        <div className="w-full max-w-[640px] rounded-[20px] border border-line bg-white/[0.03] p-8 text-center">
-          <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] text-white/60">
-            <span className="text-lg">◨</span>
+
+      <div className="mx-auto w-full max-w-[860px] flex-1 overflow-y-auto px-8 py-8">
+        <div className="rounded-[16px] border border-line bg-white/[0.03] p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-[13px] font-medium text-white/80">Your documents</h2>
+            <span className="text-[11px] text-white/30">{loading ? 'loading…' : `${docs.length} docs`}</span>
           </div>
-          <h1 className="text-[18px] font-medium text-white/90">Aivory Workspace</h1>
-          <p className="mx-auto mt-2 max-w-[420px] text-[13px] leading-relaxed text-white/40">
-            Notion-like Pages + Database (Table / Kanban / Calendar) backed by BlockSuite Yjs.
-            Agents will create and operate pages here, surfaced in Mission Control.
-          </p>
-          <div className="mt-6 flex justify-center gap-2">
-            <Link
-              href="/workspace/demo"
-              className="rounded-full bg-white px-4 py-2 text-[13px] font-medium text-black transition hover:bg-white/90"
-            >
-              Open demo page
-            </Link>
-            <Link
-              href="/console"
-              className="rounded-full border border-line bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-white/70 transition hover:bg-white/[0.08]"
-            >
-              Back to Console
+
+          {loading ? (
+            <div className="py-8 text-center text-[12px] text-white/30">Loading…</div>
+          ) : docs.length === 0 ? (
+            <div className="py-8 text-center">
+              <div className="text-[13px] text-white/40">No documents yet</div>
+              <div className="mt-2 text-[11px] text-white/25">Create your first doc or ask an agent to create one</div>
+              <div className="mt-4 flex justify-center gap-2">
+                <button onClick={create} className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black">Create doc</button>
+                <Link href="/workspace/demo" className="rounded-full border border-line bg-white/[0.04] px-4 py-2 text-[12px] text-white/60">Open demo</Link>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {docs.map((d) => (
+                <Link
+                  key={d.id}
+                  href={`/workspace/${d.id}`}
+                  className="flex items-center justify-between rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 hover:border-line hover:bg-white/[0.04]"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-[13px] font-medium text-white/80">{d.title || d.id}</div>
+                    <div className="mt-0.5 text-[11px] text-white/30">
+                      {d.id} · {d.myRole} {d.updated_at ? `· ${new Date(d.updated_at).toLocaleDateString()}` : ''}
+                    </div>
+                  </div>
+                  <span className="ml-3 shrink-0 rounded-full bg-white/[0.06] px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-white/40">
+                    {d.myRole}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-6 flex justify-center">
+            <Link href="/workspace/demo" className="text-[11px] text-white/30 underline-offset-4 hover:underline">
+              Open demo page →
             </Link>
           </div>
-          <p className="mt-4 text-[11px] text-white/25">
-            Spec: <code className="rounded bg-white/[0.06] px-1.5 py-0.5">docs/AFFINE-WORKSPACE-ADOPTION.md</code>
-          </p>
         </div>
       </div>
     </div>
