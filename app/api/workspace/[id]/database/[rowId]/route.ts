@@ -87,3 +87,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "db" }, { status: 500 })
   }
 }
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string; rowId: string }> }) {
+  const { id, rowId } = await params
+  const cred = workspaceCredential(req)
+  if (!cred) return unauthorized()
+  try {
+    const doc = await loadDoc(id, cred)
+    const arr = doc.getArray<Y.Map<unknown>>("database")
+    const idx = arr.toArray().findIndex((m) => (m.get("id") as string) === rowId)
+    if (idx < 0) return NextResponse.json({ error: "not found" }, { status: 404 })
+    doc.transact(() => arr.delete(idx, 1))
+    await saveDoc(id, doc, cred)
+    return NextResponse.json({ ok: true, id: rowId })
+  } catch (e) {
+    if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
+    console.error("[workspace/database DELETE]", e)
+    return NextResponse.json({ error: "db" }, { status: 500 })
+  }
+}

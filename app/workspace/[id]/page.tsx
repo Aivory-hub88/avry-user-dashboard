@@ -1,6 +1,6 @@
 "use client"
 
-import { useParams, useSearchParams } from "next/navigation"
+import { useParams, useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import WorkspaceEditor from "@/components/workspace/WorkspaceEditor"
@@ -22,6 +22,7 @@ type Meta = {
 export default function WorkspaceDocPage() {
   const params = useParams()
   const search = useSearchParams()
+  const router = useRouter()
   const id = (params?.id as string) ?? "demo"
   const view = search.get("view") === "database" ? "database" : "page"
 
@@ -29,6 +30,10 @@ export default function WorkspaceDocPage() {
   const [status, setStatus] = useState<'loading' | 'ok' | 'locked' | 'unauth'>('loading')
   const [reqRole, setReqRole] = useState<'viewer' | 'editor'>('viewer')
   const [reqMsg, setReqMsg] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState("")
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   const loadMeta = async () => {
     try {
@@ -123,18 +128,69 @@ export default function WorkspaceDocPage() {
   const isOwner = meta?.myRole === 'owner'
   const canWrite = meta?.myRole === 'owner' || meta?.myRole === 'editor'
 
+  const saveTitle = async () => {
+    const t = titleDraft.trim()
+    if (!t || busy) { setEditingTitle(false); return }
+    setBusy(true)
+    try {
+      const r = await fetch(`/api/workspace/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...collabAuthHeaders() },
+        body: JSON.stringify({ title: t }),
+      })
+      if (r.ok) {
+        const j = await r.json()
+        setMeta((m) => (m ? { ...m, title: j.title } : m))
+      }
+    } catch {}
+    setBusy(false)
+    setEditingTitle(false)
+  }
+
+  const removeDoc = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const r = await fetch(`/api/workspace/${id}`, { method: 'DELETE', headers: collabAuthHeaders() })
+      if (r.ok) router.push('/workspace')
+    } catch {}
+    setBusy(false)
+    setConfirmDelete(false)
+  }
+
   return (
     <div className="flex h-full w-full flex-col bg-surface-1">
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-line px-6">
-        <div className="flex items-center gap-2">
-          <Link href="/workspace" className="text-[13px] text-white/40 hover:text-white/70">
+        <div className="flex min-w-0 items-center gap-2">
+          <Link href="/workspace" className="shrink-0 text-[13px] text-white/40 hover:text-white/70">
             Workspace
           </Link>
-          <span className="text-white/20">/</span>
-          <span className="text-[13px] font-medium text-white/80">{meta?.title ?? id}</span>
-          <span className="ml-2 rounded-full bg-white/[0.06] px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-white/40">{meta?.myRole}</span>
-          {!canWrite && <span className="rounded-full bg-amber-500/15 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-amber-300">read-only</span>}
-          <div className="ml-3 flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
+          <span className="shrink-0 text-white/20">/</span>
+          {editingTitle ? (
+            <input
+              value={titleDraft}
+              autoFocus
+              disabled={busy}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={saveTitle}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveTitle()
+                if (e.key === 'Escape') setEditingTitle(false)
+              }}
+              className="w-[220px] rounded-lg border border-line bg-white/[0.04] px-2 py-1 text-[13px] text-white/85 outline-none"
+            />
+          ) : (
+            <button
+              onClick={() => { if (canWrite) { setTitleDraft(meta?.title ?? id); setEditingTitle(true) } }}
+              title={canWrite ? "Rename" : undefined}
+              className={`truncate text-[13px] font-medium text-white/80 ${canWrite ? "hover:text-white" : ""}`}
+            >
+              {meta?.title ?? id}
+            </button>
+          )}
+          <span className="ml-1 shrink-0 rounded-full bg-white/[0.06] px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-white/40">{meta?.myRole}</span>
+          {!canWrite && <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-amber-300">read-only</span>}
+          <div className="ml-3 flex shrink-0 items-center gap-1 rounded-full bg-white/[0.04] p-1">
             <Link
               href={`/workspace/${id}`}
               className={`rounded-full px-3 py-1 text-[12px] ${view === "page" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
@@ -149,16 +205,31 @@ export default function WorkspaceDocPage() {
             </Link>
           </div>
         </div>
-        <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
-          {canWrite ? 'BlockSuite' : 'Viewer'}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          {isOwner && !confirmDelete && (
+            <button onClick={() => setConfirmDelete(true)} className="rounded-full px-3 py-1.5 text-[12px] text-white/35 hover:bg-white/[0.06] hover:text-red-300">
+              Delete
+            </button>
+          )}
+          {isOwner && confirmDelete && (
+            <>
+              <span className="text-[12px] text-white/50">Delete this doc?</span>
+              <button onClick={removeDoc} disabled={busy} className="rounded-full bg-red-500/90 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-red-500 disabled:opacity-50">
+                Confirm
+              </button>
+              <button onClick={() => setConfirmDelete(false)} className="rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:text-white/80">
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
         <div className="mx-auto w-full max-w-[860px] flex-1 overflow-y-auto px-8 py-8">
-          {view === "database" ? <WorkspaceDatabase docId={id} /> : <WorkspaceEditor docId={id} />}
+          {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
           {!canWrite && (
             <div className="mx-auto mt-6 max-w-[720px] rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">
-              You have viewer access — edits are read-only and won’t be saved.
+              You have viewer access — this document is read-only.
             </div>
           )}
         </div>

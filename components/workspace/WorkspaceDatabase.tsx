@@ -63,14 +63,18 @@ function StatusPill({ s }: { s: string }) {
   )
 }
 
-export default function WorkspaceDatabase({ docId }: { docId: string }) {
+export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: string; readOnly?: boolean }) {
   const docRef = useRef<Y.Doc | null>(null)
   const yRowsRef = useRef<Y.Array<Y.Map<unknown>> | null>(null)
   const [rows, setRows] = useState<Row[]>([])
   const [view, setView] = useState<"table" | "kanban" | "calendar">("table")
   const [statusFilter, setStatusFilter] = useState<string>("All")
   const [priorityFilter, setPriorityFilter] = useState<string>("All")
-  const [peers, setPeers] = useState<number>(1)
+  const [ready, setReady] = useState(false)
+  const readOnlyRef = useRef(readOnly)
+  useEffect(() => {
+    readOnlyRef.current = readOnly
+  }, [readOnly])
   const storageKey = `aivory:workspace:db:${docId}`
   const agentOrigin = () => (typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user")
 
@@ -79,6 +83,8 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
     const yRows = doc.getArray<Y.Map<unknown>>("database")
     docRef.current = doc
     yRowsRef.current = yRows
+    let alive = true
+    let putTimer: ReturnType<typeof setTimeout> | null = null
 
     const saved = localStorage.getItem(storageKey)
     if (saved) {
@@ -86,26 +92,41 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
         Y.applyUpdate(doc, Uint8Array.from(JSON.parse(saved) as number[]))
       } catch {}
     }
-    if (yRows.length === 0) {
-      const seed: Row[] = [
-        { id: uid(), title: "Qualify Acme lead", status: "Todo", priority: "High", assignee: "Leads Agent", due: "2026-09-10" },
-        { id: uid(), title: "Fix login bug", status: "Doing", priority: "Med", assignee: "Ticket Ops", due: "2026-09-12" },
-        { id: uid(), title: "Q3 Roadmap review", status: "Done", priority: "Low", assignee: "Generalist", due: "2026-09-08" },
-      ]
-      doc.transact(() => {
-        for (const r of seed) yRows.push([yMapFromRow(r)])
-      }, agentOrigin())
+
+    const schedulePut = () => {
+      if (readOnlyRef.current) return
+      if (putTimer) clearTimeout(putTimer)
+      putTimer = setTimeout(() => {
+        const upd = Y.encodeStateAsUpdate(doc)
+        fetch(`/api/workspace/${docId}/doc`, { method: "PUT", headers: { "Content-Type": "application/octet-stream", ...collabAuthHeaders() }, body: upd as unknown as BodyInit }).catch(() => {})
+      }, 500)
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setRows(toRows(yRows))
 
     const obs = () => {
+      if (!alive) return
       setRows(toRows(yRows))
-      const upd = Y.encodeStateAsUpdate(doc)
-      localStorage.setItem(storageKey, JSON.stringify(Array.from(upd)))
-      fetch(`/api/workspace/${docId}/doc`, { method: "PUT", headers: { "Content-Type": "application/octet-stream", ...collabAuthHeaders() }, body: upd as unknown as BodyInit }).catch(() => {})
+      try {
+        const upd = Y.encodeStateAsUpdate(doc)
+        localStorage.setItem(storageKey, JSON.stringify(Array.from(upd)))
+      } catch {}
+      schedulePut()
     }
     yRows.observe(obs)
+
+    // databases start empty — never seed demo rows; server is the source of truth
+    fetch(`/api/workspace/${docId}/doc`, { headers: collabAuthHeaders() })
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .then((buf) => {
+        if (!alive) return
+        if (buf && buf.byteLength > 0) Y.applyUpdate(doc, new Uint8Array(buf))
+        setRows(toRows(yRows))
+        setReady(true)
+      })
+      .catch(() => {
+        if (!alive) return
+        setRows(toRows(yRows))
+        setReady(true)
+      })
 
     const wsUrl = typeof window !== "undefined" && window.location.hostname === "localhost" ? "ws://localhost:3200" : "wss://aivory.uk/yjs"
     let provider: WebsocketProvider | null = null
@@ -116,25 +137,21 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
       const color = agentType === "user" ? "#7c3aed" : agentType.includes("leads") ? "#f59e0b" : "#10b981"
       const name = agentType === "user" ? "You" : agentType.replace(/_/g, " ")
       provider.awareness.setLocalStateField("user", { name, color, agentType, userId })
-      provider.awareness.on("change", () => setPeers(provider!.awareness.getStates().size))
-      setPeers(provider.awareness.getStates().size)
     } catch {}
 
-    fetch(`/api/workspace/${docId}/doc`, { headers: collabAuthHeaders() })
-      .then((r) => (r.ok ? r.arrayBuffer() : null))
-      .then((buf) => {
-        if (buf && buf.byteLength > 0) Y.applyUpdate(doc, new Uint8Array(buf))
-      })
-      .catch(() => {})
-
     return () => {
+      alive = false
+      if (putTimer) clearTimeout(putTimer)
       yRows.unobserve(obs)
       provider?.destroy()
       doc.destroy()
     }
   }, [docId, storageKey])
 
+  const guard = () => !readOnlyRef.current
+
   const addRow = () => {
+    if (!guard()) return
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
@@ -142,7 +159,18 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
     doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
   }
 
+  const deleteRow = (id: string) => {
+    if (!guard()) return
+    const yRows = yRowsRef.current
+    const doc = docRef.current
+    if (!yRows || !doc) return
+    const idx = toRows(yRows).findIndex((x) => x.id === id)
+    if (idx < 0) return
+    doc.transact(() => yRows.delete(idx, 1), agentOrigin())
+  }
+
   const updateRow = (id: string, patch: Partial<Row>) => {
+    if (!guard()) return
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
@@ -202,7 +230,7 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
               </button>
             </div>
             <span className="text-[12px] text-white/25">{filtered.length}/{rows.length}</span>
-            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-300">{peers} peer{peers !== 1 ? "s" : ""} · y-octo</span>
+            {!ready && <span className="text-[11px] text-white/25">Loading…</span>}
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
@@ -232,18 +260,33 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
                 ))}
               </select>
             </div>
-            <button
-              onClick={addRow}
-              className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[12.5px] font-medium text-black shadow-sm transition hover:bg-white/90"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New
-            </button>
+            {!readOnly && (
+              <button
+                onClick={addRow}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[12.5px] font-medium text-black shadow-sm transition hover:bg-white/90"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {view === "table" ? (
+      {ready && rows.length === 0 ? (
+        <div className="rounded-[14px] border border-dashed border-white/10 py-14 text-center">
+          <div className="text-[13px] text-white/40">{readOnly ? "No rows yet." : "No rows yet — add the first one."}</div>
+          {!readOnly && (
+            <button
+              onClick={addRow}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white px-5 py-2 text-[12.5px] font-medium text-black hover:bg-white/90"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add row
+            </button>
+          )}
+        </div>
+      ) : view === "table" ? (
         <div className="overflow-hidden rounded-[14px] border border-line bg-surface-1">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -264,17 +307,28 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
                         <GripVertical className="h-3.5 w-3.5 shrink-0 text-white/15 opacity-0 group-hover:opacity-100" />
                         <input
                           value={r.title}
+                          disabled={readOnly}
                           onChange={(e) => updateRow(r.id, { title: e.target.value })}
                           placeholder="Untitled"
-                          className="w-full bg-transparent text-[13.5px] text-white/85 placeholder:text-white/25 outline-none"
+                          className="w-full bg-transparent text-[13.5px] text-white/85 placeholder:text-white/25 outline-none disabled:opacity-80"
                         />
+                        {!readOnly && (
+                          <button
+                            onClick={() => deleteRow(r.id)}
+                            title="Delete row"
+                            className="shrink-0 rounded px-1.5 py-0.5 text-white/20 opacity-0 hover:bg-white/[0.06] hover:text-white/60 group-hover:opacity-100"
+                          >
+                            ✕
+                          </button>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-3">
                       <select
                         value={r.status}
+                        disabled={readOnly}
                         onChange={(e) => updateRow(r.id, { status: e.target.value })}
-                        className="rounded-full border bg-surface-2 px-2.5 py-1 text-[12px] text-white/70 outline-none"
+                        className="rounded-full border bg-surface-2 px-2.5 py-1 text-[12px] text-white/70 outline-none disabled:opacity-60"
                       >
                         {STATUSES.map((s) => (
                           <option key={s} value={s}>
@@ -291,9 +345,10 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
                         <User className="h-3 w-3 text-white/25" />
                         <input
                           value={r.assignee}
+                          disabled={readOnly}
                           onChange={(e) => updateRow(r.id, { assignee: e.target.value })}
                           placeholder="—"
-                          className="w-full bg-transparent text-[13px] text-white/60 placeholder:text-white/25 outline-none"
+                          className="w-full bg-transparent text-[13px] text-white/60 placeholder:text-white/25 outline-none disabled:opacity-80"
                         />
                       </div>
                     </td>
@@ -303,8 +358,9 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
                         <input
                           type="date"
                           value={r.due}
+                          disabled={readOnly}
                           onChange={(e) => updateRow(r.id, { due: e.target.value })}
-                          className="bg-transparent text-[13px] text-white/60 outline-none"
+                          className="bg-transparent text-[13px] text-white/60 outline-none disabled:opacity-60"
                         />
                       </div>
                     </td>
@@ -313,13 +369,15 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
               </tbody>
             </table>
           </div>
-          <button
-            onClick={addRow}
-            className="flex w-full items-center gap-2 border-t border-line px-4 py-3 text-left text-[13px] text-white/40 hover:bg-white/[0.02] hover:text-white/60"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New row
-          </button>
+          {!readOnly && (
+            <button
+              onClick={addRow}
+              className="flex w-full items-center gap-2 border-t border-line px-4 py-3 text-left text-[13px] text-white/40 hover:bg-white/[0.02] hover:text-white/60"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New row
+            </button>
+          )}
         </div>
       ) : view === "kanban" ? (
         <div className="grid grid-cols-3 gap-4">
@@ -343,11 +401,22 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
                   .map((r) => (
                     <div
                       key={r.id}
-                      draggable
+                      draggable={!readOnly}
                       onDragStart={(e) => e.dataTransfer.setData("text/plain", r.id)}
                       className="group cursor-grab rounded-[12px] border border-line bg-surface-1 p-4 shadow-sm transition hover:border-white/10 active:cursor-grabbing"
                     >
-                      <div className="text-[13.5px] font-medium leading-snug text-white/85">{r.title || "Untitled"}</div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 text-[13.5px] font-medium leading-snug text-white/85">{r.title || "Untitled"}</div>
+                        {!readOnly && (
+                          <button
+                            onClick={() => deleteRow(r.id)}
+                            title="Delete card"
+                            className="shrink-0 rounded px-1 text-[12px] text-white/20 opacity-0 hover:text-white/60 group-hover:opacity-100"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <PriorityPill p={r.priority} />
                         {r.assignee && (
@@ -365,13 +434,15 @@ export default function WorkspaceDatabase({ docId }: { docId: string }) {
                       )}
                     </div>
                   ))}
-                <button
-                  onClick={addRow}
-                  className="flex items-center justify-center gap-1.5 rounded-[12px] border border-dashed border-white/10 py-2.5 text-[12px] text-white/30 hover:border-white/15 hover:bg-white/[0.02] hover:text-white/50"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  New
-                </button>
+                {!readOnly && (
+                  <button
+                    onClick={addRow}
+                    className="flex items-center justify-center gap-1.5 rounded-[12px] border border-dashed border-white/10 py-2.5 text-[12px] text-white/30 hover:border-white/15 hover:bg-white/[0.02] hover:text-white/50"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    New
+                  </button>
+                )}
               </div>
             </div>
           ))}
