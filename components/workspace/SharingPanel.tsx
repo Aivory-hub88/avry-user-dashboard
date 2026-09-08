@@ -59,6 +59,14 @@ export default function SharingPanel({ docId, isOwner }: { docId: string; isOwne
     if (r.ok) load()
   }
 
+  const removeGrant = async (userId: string) => {
+    const r = await fetch(`/api/workspace/${docId}/acl/${userId}`, {
+      method: 'DELETE',
+      headers: collabAuthHeaders(),
+    })
+    if (r.ok) load()
+  }
+
   if (!isOwner) {
     return (
       <div className="rounded-xl border border-line bg-white/[0.03] p-4">
@@ -73,24 +81,27 @@ export default function SharingPanel({ docId, isOwner }: { docId: string; isOwne
   return (
     <div className="rounded-xl border border-line bg-white/[0.03] p-4">
       <div className="text-[13px] font-medium text-white/80">Share</div>
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex flex-col gap-2">
         <input
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') invite() }}
           placeholder="email@aivory.id"
-          className="flex-1 rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[13px] text-white/80 placeholder:text-white/30 outline-none"
+          className="w-full rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[13px] text-white/80 placeholder:text-white/30 outline-none"
         />
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as any)}
-          className="rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70"
-        >
-          <option value="viewer">viewer</option>
-          <option value="editor">editor</option>
-        </select>
-        <button onClick={invite} className="rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90">
-          Invite
-        </button>
+        <div className="flex gap-2">
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as any)}
+            className="flex-1 rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70"
+          >
+            <option value="viewer">viewer</option>
+            <option value="editor">editor</option>
+          </select>
+          <button onClick={invite} className="flex-1 rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90">
+            Invite
+          </button>
+        </div>
       </div>
       {msg && <div className="mt-2 text-[11px] text-white/50">{msg}</div>}
 
@@ -101,9 +112,18 @@ export default function SharingPanel({ docId, isOwner }: { docId: string; isOwne
             <div className="text-[12px] text-white/30">No additional collaborators</div>
           ) : (
             acl.map((a) => (
-              <div key={a.user_id} className="flex items-center justify-between rounded-lg bg-white/[0.04] px-3 py-2">
-                <span className="text-[12px] text-white/70">{a.email ?? a.user_id}</span>
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/60">{a.role}</span>
+              <div key={a.user_id} className="group flex items-center justify-between gap-2 rounded-lg bg-white/[0.04] px-3 py-2">
+                <span className="min-w-0 truncate text-[12px] text-white/70">{a.email ?? a.user_id}</span>
+                <span className="flex shrink-0 items-center gap-1">
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/60">{a.role}</span>
+                  <button
+                    onClick={() => removeGrant(a.user_id)}
+                    title="Remove access"
+                    className="rounded px-1 text-[12px] text-white/20 opacity-0 hover:text-red-300 group-hover:opacity-100"
+                  >
+                    ✕
+                  </button>
+                </span>
               </div>
             ))
           )}

@@ -11,12 +11,14 @@ function uid() {
   return Math.random().toString(36).slice(2, 8)
 }
 
-const DEFAULT_BLOCKS: Block[] = [
-  { id: uid(), type: "h1", text: "Untitled" },
-  { id: uid(), type: "p", text: "Yjs Doc active — edits sync via y-websocket (3220) and persist to localStorage + /api/workspace/[id]/doc." },
-  { id: uid(), type: "todo", text: "Try typing, then hit Enter", checked: false },
-  { id: uid(), type: "bullet", text: "Agents can create rows in Workspace DB" },
-]
+function yMapFromBlock(block: Block): Y.Map<unknown> {
+  const m = new Y.Map<unknown>()
+  m.set("id", block.id)
+  m.set("type", block.type)
+  m.set("text", block.text)
+  if (block.checked !== undefined) m.set("checked", block.checked)
+  return m
+}
 
 function toBlocks(yArray: Y.Array<Y.Map<unknown>>): Block[] {
   return yArray.toArray().map((m) => ({
@@ -27,35 +29,30 @@ function toBlocks(yArray: Y.Array<Y.Map<unknown>>): Block[] {
   }))
 }
 
-function yMapFromBlock(block: Block): Y.Map<unknown> {
-  const m = new Y.Map<unknown>()
-  m.set("id", block.id)
-  m.set("type", block.type)
-  m.set("text", block.text)
-  if (block.checked !== undefined) m.set("checked", block.checked)
-  return m
-}
-
-export default function WorkspaceEditor({ docId }: { docId: string }) {
+export default function WorkspaceEditor({ docId, readOnly = false }: { docId: string; readOnly?: boolean }) {
   const docRef = useRef<Y.Doc | null>(null)
   const yArrayRef = useRef<Y.Array<Y.Map<unknown>> | null>(null)
   const providerRef = useRef<WebsocketProvider | null>(null)
+  const readOnlyRef = useRef(readOnly)
+  useEffect(() => {
+    readOnlyRef.current = readOnly
+  }, [readOnly])
 
-  const [blocks, setBlocks] = useState<Block[]>(DEFAULT_BLOCKS)
+  const [blocks, setBlocks] = useState<Block[]>([])
   const [slash, setSlash] = useState<{ idx: number; open: boolean }>({ idx: 0, open: false })
-  const [status, setStatus] = useState<"local" | "synced" | "connecting">("connecting")
-  const [peers, setPeers] = useState<number>(1)
+  const [ready, setReady] = useState(false)
   const storageKey = `aivory:workspace:yjs:${docId}`
   const agentOrigin = () => (typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user")
 
-  // init Y.Doc + Y.Array + y-websocket
+  // init Y.Doc: local cache first, then server — seed a starter only when truly empty
   useEffect(() => {
     const doc = new Y.Doc()
     const yArray = doc.getArray<Y.Map<unknown>>("blocks")
     docRef.current = doc
     yArrayRef.current = yArray
+    let alive = true
+    let putTimer: ReturnType<typeof setTimeout> | null = null
 
-    // restore from localStorage (Yjs update) or init with defaults
     const saved = localStorage.getItem(storageKey)
     if (saved) {
       try {
@@ -63,30 +60,61 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
         Y.applyUpdate(doc, update)
       } catch {}
     }
-    if (yArray.length === 0) {
-      doc.transact(() => {
-        for (const b of DEFAULT_BLOCKS) yArray.push([yMapFromBlock(b)])
-      }, agentOrigin())
+
+    const schedulePut = () => {
+      if (readOnlyRef.current) return
+      if (putTimer) clearTimeout(putTimer)
+      putTimer = setTimeout(() => {
+        const update = Y.encodeStateAsUpdate(doc)
+        fetch(`/api/workspace/${docId}/doc`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/octet-stream", ...collabAuthHeaders() },
+          body: update as unknown as BodyInit,
+        }).catch(() => {})
+      }, 500)
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setBlocks(toBlocks(yArray))
 
     const observer = () => {
+      if (!alive) return
       setBlocks(toBlocks(yArray))
-      // persist Yjs update to localStorage
-      const update = Y.encodeStateAsUpdate(doc)
-      localStorage.setItem(storageKey, JSON.stringify(Array.from(update)))
-      // also PUT to API (fire-and-forget; the collab proxy enforces RBAC)
-      fetch(`/api/workspace/${docId}/doc`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/octet-stream", ...collabAuthHeaders() },
-        body: update as unknown as BodyInit,
-      }).catch(() => {})
+      try {
+        const update = Y.encodeStateAsUpdate(doc)
+        localStorage.setItem(storageKey, JSON.stringify(Array.from(update)))
+      } catch {}
+      schedulePut()
     }
     yArray.observe(observer)
 
-    // y-octo (aivory-collab:3200) compat — y-websocket provider still works over wss://aivory.uk/yjs/:room
-    // In prod, dashboard runs behind traefik; ws at wss://aivory.uk/yjs (collab:3200, fallback y-websocket:3220)
+    fetch(`/api/workspace/${docId}/doc`, { headers: collabAuthHeaders() })
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .then((buf) => {
+        if (!alive) return
+        if (buf && buf.byteLength > 0) {
+          Y.applyUpdate(doc, new Uint8Array(buf))
+        }
+        // seed a blank starter only when nothing exists anywhere
+        if (yArray.length === 0 && !readOnlyRef.current) {
+          doc.transact(() => {
+            yArray.push([yMapFromBlock({ id: uid(), type: "h1", text: "" })])
+            yArray.push([yMapFromBlock({ id: uid(), type: "p", text: "" })])
+          }, agentOrigin())
+          schedulePut()
+        }
+        setBlocks(toBlocks(yArray))
+        setReady(true)
+      })
+      .catch(() => {
+        if (!alive) return
+        // offline: use local cache only
+        if (yArray.length === 0 && !readOnlyRef.current) {
+          doc.transact(() => {
+            yArray.push([yMapFromBlock({ id: uid(), type: "p", text: "" })])
+          }, agentOrigin())
+        }
+        setBlocks(toBlocks(yArray))
+        setReady(true)
+      })
+
     const wsUrl =
       typeof window !== "undefined" && window.location.hostname === "localhost"
         ? "ws://localhost:3200"
@@ -96,36 +124,27 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
     try {
       const provider = new WebsocketProvider(wsUrl, `workspace:${docId}`, doc, { connect: true, params: collabWsParams() })
       providerRef.current = provider
-      // y-octo awareness: expose agentType so MissionControl + AgentRail can show “Leads Agent edited”
       const color = agentType === "user" ? "#7c3aed" : agentType.includes("leads") ? "#f59e0b" : "#10b981"
       const name = agentType === "user" ? "You" : agentType.replace(/_/g, " ")
       provider.awareness.setLocalStateField("user", { name, color, agentType, userId })
-      provider.awareness.on("change", () => setPeers(provider.awareness.getStates().size))
-      setPeers(provider.awareness.getStates().size)
-      provider.on("status", (e: { status: string }) => {
-        setStatus(e.status === "connected" ? "synced" : e.status === "connecting" ? "connecting" : "local")
-      })
-      // restore from server if available
-      fetch(`/api/workspace/${docId}/doc`, { headers: collabAuthHeaders() })
-        .then((r) => (r.ok ? r.arrayBuffer() : null))
-        .then((buf) => {
-          if (buf && buf.byteLength > 0) {
-            Y.applyUpdate(doc, new Uint8Array(buf))
-          }
-        })
-        .catch(() => {})
-    } catch {
-      setStatus("local")
-    }
+    } catch {}
 
     return () => {
+      alive = false
+      if (putTimer) clearTimeout(putTimer)
       yArray.unobserve(observer)
       providerRef.current?.destroy()
       doc.destroy()
     }
   }, [docId, storageKey])
 
+  const guard = () => {
+    if (readOnlyRef.current) return false
+    return true
+  }
+
   const update = (i: number, patch: Partial<Block>) => {
+    if (!guard()) return
     const yArray = yArrayRef.current
     const doc = docRef.current
     if (!yArray || !doc) return
@@ -136,6 +155,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
   }
 
   const addAfter = (i: number, type: Block["type"] = "p") => {
+    if (!guard()) return
     const yArray = yArrayRef.current
     const doc = docRef.current
     if (!yArray || !doc) return
@@ -147,6 +167,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
   }
 
   const remove = (i: number) => {
+    if (!guard()) return
     const yArray = yArrayRef.current
     const doc = docRef.current
     if (!yArray || !doc || yArray.length <= 1) return
@@ -156,6 +177,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, i: number) => {
+    if (readOnly) return
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       const cur = blocks[i]
@@ -170,56 +192,62 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
     }
   }
 
-  const reset = () => {
-    const yArray = yArrayRef.current
-    const doc = docRef.current
-    if (!yArray || !doc) return
-    doc.transact(() => {
-      yArray.delete(0, yArray.length)
-      for (const b of DEFAULT_BLOCKS) yArray.push([yMapFromBlock(b)])
-    }, agentOrigin())
+  if (!ready) {
+    return (
+      <div className="mx-auto w-full max-w-[720px] py-12 text-center text-[13px] text-white/30">
+        Loading document…
+      </div>
+    )
+  }
+
+  if (blocks.length === 0) {
+    return (
+      <div className="mx-auto w-full max-w-[720px] py-8">
+        {readOnly ? (
+          <div className="py-12 text-center text-[13px] text-white/30">This document is empty.</div>
+        ) : (
+          <button
+            onClick={() => addAfter(-1)}
+            className="w-full rounded-xl border border-dashed border-white/10 py-10 text-[13px] text-white/35 hover:border-white/20 hover:bg-white/[0.02] hover:text-white/60"
+          >
+            Start writing — click here or press Enter
+          </button>
+        )}
+      </div>
+    )
   }
 
   return (
     <div className="mx-auto w-full max-w-[720px]">
-      <div className="mb-6 flex items-center gap-2 text-[11px] text-white/30">
-        <span className={`rounded px-2 py-1 ${status === "synced" ? "bg-emerald-500/20 text-emerald-300" : status === "connecting" ? "bg-amber-500/20 text-amber-300" : "bg-white/[0.06]"}`}>
-          {status === "synced" ? "Yjs synced" : status === "connecting" ? "Yjs connecting…" : "Yjs local"}
-        </span>
-        <span>•</span>
-        <span>{blocks.length} blocks</span>
-        <span>•</span>
-        <span className="hidden sm:inline">ws {status === "synced" ? "3200" : "localStorage"} · {peers} peer{peers !== 1 ? "s" : ""} · y-octo</span>
-        <button onClick={reset} className="ml-auto rounded bg-white/[0.06] px-2 py-1 hover:bg-white/[0.08]">
-          Reset
-        </button>
-      </div>
-
       <div className="flex flex-col gap-1">
         {blocks.map((b, i) => (
           <div key={b.id} className="group flex items-start gap-2">
-            <button
-              onClick={() => addAfter(i)}
-              className="mt-1 hidden h-6 w-6 shrink-0 items-center justify-center rounded text-white/20 hover:bg-white/[0.06] hover:text-white/60 group-hover:flex"
-            >
-              +
-            </button>
+            {!readOnly && (
+              <button
+                onClick={() => addAfter(i)}
+                className="mt-1 hidden h-6 w-6 shrink-0 items-center justify-center rounded text-white/20 hover:bg-white/[0.06] hover:text-white/60 group-hover:flex"
+              >
+                +
+              </button>
+            )}
             <div className="min-w-0 flex-1">
               {b.type === "todo" ? (
                 <label className="flex items-start gap-2 py-1.5">
                   <input
                     type="checkbox"
                     checked={!!b.checked}
+                    disabled={readOnly}
                     onChange={(e) => update(i, { checked: e.target.checked })}
                     className="mt-1 h-4 w-4 shrink-0 rounded border border-white/20 bg-transparent accent-white"
                   />
                   <div
                     id={`block-${b.id}`}
-                    contentEditable
+                    contentEditable={!readOnly}
                     suppressContentEditableWarning
                     onInput={(e) => update(i, { text: (e.target as HTMLDivElement).innerText })}
                     onKeyDown={(e) => onKeyDown(e, i)}
-                    className={`min-w-0 flex-1 outline-none ${b.checked ? "text-white/30 line-through" : "text-white/80"} ${slash.open && slash.idx === i ? "ring-1 ring-white/10" : ""}`}
+                    data-placeholder={b.text === "" ? "To-do" : undefined}
+                    className={`min-w-0 flex-1 outline-none empty:before:text-white/25 empty:before:content-[attr(data-placeholder)] ${b.checked ? "text-white/30 line-through" : "text-white/80"} ${slash.open && slash.idx === i ? "ring-1 ring-white/10" : ""}`}
                   >
                     {b.text}
                   </div>
@@ -227,11 +255,12 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
               ) : (
                 <div
                   id={`block-${b.id}`}
-                  contentEditable
+                  contentEditable={!readOnly}
                   suppressContentEditableWarning
                   onInput={(e) => update(i, { text: (e.target as HTMLDivElement).innerText })}
                   onKeyDown={(e) => onKeyDown(e, i)}
-                  className={`w-full rounded-lg px-3 py-1.5 outline-none focus:bg-white/[0.03] ${
+                  data-placeholder={b.text === "" ? (b.type === "h1" ? "Untitled" : "Type '/' for commands") : undefined}
+                  className={`w-full rounded-lg px-3 py-1.5 outline-none focus:bg-white/[0.03] empty:before:text-white/25 empty:before:content-[attr(data-placeholder)] ${
                     b.type === "h1"
                       ? "text-[28px] font-semibold text-white/90"
                       : b.type === "h2"
@@ -246,7 +275,7 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
                   {b.text}
                 </div>
               )}
-              {slash.open && slash.idx === i && (
+              {!readOnly && slash.open && slash.idx === i && (
                 <div className="mt-1 flex flex-wrap gap-1">
                   {(["h1", "h2", "p", "todo", "bullet", "quote"] as const).map((t) => (
                     <button
@@ -268,15 +297,6 @@ export default function WorkspaceEditor({ docId }: { docId: string }) {
             </div>
           </div>
         ))}
-      </div>
-
-      <div className="mt-8 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-[12px] leading-relaxed text-white/40">
-        Yjs Doc <code className="rounded bg-white/[0.06] px-1.5 py-0.5">workspace:{docId}</code> via{" "}
-        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">y-octo</code> @{" "}
-        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">wss://aivory.uk/yjs</code> ({" "}
-        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">ws://localhost:3200</code> fallback 3220) +{" "}
-        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">localStorage</code> +{" "}
-        <code className="rounded bg-white/[0.06] px-1.5 py-0.5">/api/workspace/[id]/doc</code>.
       </div>
     </div>
   )
