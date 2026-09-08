@@ -32,6 +32,7 @@ import AgentRail from "@/components/office/AgentRail"
 import AgentDeployNotice from "@/components/office/AgentDeployNotice"
 import MissionControl from "@/components/office/MissionControl"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
+import { useWorkspaceContext } from "@/contexts/WorkspaceContext"
 
 // LobeHub-style route-split: UploadMenu + WorkflowContainer ditarik dinamis
 // agar chunk Console awal tidak ikut membawa pemroses file berat.
@@ -99,6 +100,7 @@ export default function ConsolePage() {
   const router = useRouter()
   const { openSettingsModal } = useSettingsModal()
   const { agentTarget, setAgentTarget } = useMode()
+  const { activeWorkspaceId } = useWorkspaceContext()
 
   // UI-only state
   // Starts false so a reload keeps landing you back in your last thread
@@ -344,6 +346,7 @@ export default function ConsolePage() {
       }
       rail={
         <AgentRail
+          workspaceId={activeWorkspaceId}
           agentTarget={agentTarget}
           notifications={notificationsByAgent[agentTarget ?? "null"] ?? []}
           approvalsError={approvalsError}
@@ -373,6 +376,7 @@ export default function ConsolePage() {
       <div className="flex-1 flex flex-col overflow-hidden h-full">
         {showMissionControl ? (
           <MissionControl
+            workspaceId={activeWorkspaceId}
             sessionsByAgent={sessionsByAgent}
             approvalsByAgent={approvalsByAgent}
             deployments={deployments}

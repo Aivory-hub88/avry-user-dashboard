@@ -51,6 +51,7 @@ import type { Notification } from "@/types/notifications"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { NotificationCard } from "@/components/office/NotificationCard"
 import { MemoryModal } from "@/components/office/MemoryModal"
+import { collabWsParams } from "@/lib/collabClient"
 
 function relativeTime(ts: number): string {
   const diffMs = Date.now() - ts
@@ -81,6 +82,7 @@ function Bar({ tone = "idle", children }: { tone?: "idle" | "warn"; children: Re
 }
 
 interface AgentRailProps {
+  workspaceId: string | null
   agentTarget: string | null
   /** Already sliced to this agent's own items — see useNotificationFeed. */
   notifications: Notification[]
@@ -96,6 +98,7 @@ interface AgentRailProps {
 }
 
 export default function AgentRail({
+  workspaceId,
   agentTarget,
   notifications,
   approvalsError,
@@ -111,8 +114,13 @@ export default function AgentRail({
   const [memoryOpen, setMemoryOpen] = useState(false)
   const [awarenessPeers, setAwarenessPeers] = useState<Array<{ name: string; color: string; agentType: string }>>([])
 
-  // y-octo awareness for workspace:demo — show who is editing now
   useEffect(() => {
+    if (!workspaceId) {
+      // Reset presence when the active workspace is cleared.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAwarenessPeers([])
+      return
+    }
     const wsUrl =
       typeof window !== "undefined" && window.location.hostname === "localhost"
         ? "ws://localhost:3200"
@@ -120,7 +128,7 @@ export default function AgentRail({
     const doc = new Y.Doc()
     let provider: WebsocketProvider | null = null
     try {
-      provider = new WebsocketProvider(wsUrl, "workspace:demo", doc, { connect: true })
+      provider = new WebsocketProvider(wsUrl, `workspace:${workspaceId}`, doc, { connect: true, params: collabWsParams() })
       const updatePeers = () => {
         const peers = Array.from(provider!.awareness.getStates().values())
           .map((s: unknown) => (s as { user?: { name: string; color: string; agentType: string } })?.user)
@@ -134,7 +142,7 @@ export default function AgentRail({
       provider?.destroy()
       doc.destroy()
     }
-  }, [])
+  }, [workspaceId])
 
   const title = agentTarget
     ? PREBUILT_AGENTS.find((a) => a.type === agentTarget)?.title ?? agentTarget
@@ -145,6 +153,7 @@ export default function AgentRail({
   const statusItems = notifications.filter((n): n is Extract<Notification, { kind: "status" }> => n.kind === "status")
   const channels = agentTarget ? deployments.filter((d) => d.agentType === agentTarget) : []
   const notDeployed = agentTarget !== null && channels.length === 0
+  const visibleAwarenessPeers = workspaceId ? awarenessPeers : []
 
   const decide = async (approval: PendingApproval, decision: "approve" | "deny") => {
     setBusyId(approval.id)
@@ -379,18 +388,18 @@ export default function AgentRail({
               ))}
             </section>
 
-            {awarenessPeers.length > 0 && (
+             {visibleAwarenessPeers.length > 0 && (
               <section className="mt-[20px] flex flex-col gap-[8px]">
                 <span className="px-0.5 text-[12px] font-semibold leading-none text-white/65">Active in Workspace</span>
                 <Bar tone="idle">
                   <span className="flex flex-wrap items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
                     <span className="text-white/60">
-                      {awarenessPeers.map((p) => p.name).join(" · ")} · {awarenessPeers.length} peer
-                      {awarenessPeers.length !== 1 ? "s" : ""} · y-octo
+                       {visibleAwarenessPeers.map((p) => p.name).join(" · ")} · {visibleAwarenessPeers.length} active collaborator
+                      {visibleAwarenessPeers.length !== 1 ? "s" : ""}
                     </span>
                     <span className="ml-1 flex items-center gap-1">
-                      {awarenessPeers.map((p, i) => (
+                       {visibleAwarenessPeers.map((p, i) => (
                         <span
                           key={i}
                           className="h-2 w-2 shrink-0 rounded-full border border-white/10"
@@ -400,7 +409,7 @@ export default function AgentRail({
                       ))}
                     </span>
                   </span>
-                  {agentTarget && awarenessPeers.some((p) => p.agentType === agentTarget) && (
+                   {agentTarget && visibleAwarenessPeers.some((p) => p.agentType === agentTarget) && (
                     <span className="mt-1 text-[11px] text-emerald-300">● {agentTarget} is editing now</span>
                   )}
                 </Bar>

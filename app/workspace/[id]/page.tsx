@@ -9,6 +9,7 @@ import SharingPanel from "@/components/workspace/SharingPanel"
 import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
+import { useWorkspaceContext } from "@/contexts/WorkspaceContext"
 import { Share2 } from "lucide-react"
 
 type Meta = {
@@ -39,6 +40,7 @@ export default function WorkspaceDocPage() {
   const [busy, setBusy] = useState(false)
   const [showSharing, setShowSharing] = useState(false)
   const loginUrl = `${getMarketingUrl()}/login`
+  const { setActiveWorkspaceId } = useWorkspaceContext()
 
   const loadMeta = async () => {
     try {
@@ -58,6 +60,10 @@ export default function WorkspaceDocPage() {
   }
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadMeta() }, [id])
+
+  useEffect(() => {
+    if (status === 'ok') setActiveWorkspaceId(id)
+  }, [id, setActiveWorkspaceId, status])
 
   // for locked, fetch owner info via separate? meta already 403, so need owner via other means
   // we show generic locked; request access still works

@@ -58,6 +58,7 @@ function lastPreview(session: ChatSession | undefined): string {
 }
 
 interface MissionControlProps {
+  workspaceId: string | null
   sessionsByAgent: Record<string, ChatSession[]>
   approvalsByAgent: Record<string, PendingApproval[]>
   deployments: AgentDeployment[]
@@ -66,6 +67,7 @@ interface MissionControlProps {
 }
 
 export default function MissionControl({
+  workspaceId,
   sessionsByAgent,
   approvalsByAgent,
   deployments,
@@ -79,8 +81,12 @@ export default function MissionControl({
   useEffect(() => {
     let alive = true
     const load = async () => {
-      try {
-const r = await fetch("/api/workspace/demo/database", { headers: collabAuthHeaders() })
+       try {
+         if (!workspaceId) {
+           setWsRows([])
+           return
+         }
+         const r = await fetch(`/api/workspace/${workspaceId}/database`, { headers: collabAuthHeaders() })
         if (!r.ok) return
         const j = await r.json()
         if (alive) setWsRows((j.rows ?? []).slice(0, 3))
@@ -92,10 +98,15 @@ const r = await fetch("/api/workspace/demo/database", { headers: collabAuthHeade
       alive = false
       clearInterval(t)
     }
-  }, [])
+  }, [workspaceId])
 
-  // y-octo awareness for workspace:demo (same room as WorkspaceEditor)
   useEffect(() => {
+    if (!workspaceId) {
+      // Reset presence when the active workspace is cleared.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAwarenessPeers([])
+      return
+    }
     const wsUrl =
       typeof window !== "undefined" && window.location.hostname === "localhost"
         ? "ws://localhost:3200"
@@ -103,7 +114,7 @@ const r = await fetch("/api/workspace/demo/database", { headers: collabAuthHeade
     const doc = new Y.Doc()
     let provider: WebsocketProvider | null = null
     try {
-      provider = new WebsocketProvider(wsUrl, "workspace:demo", doc, { connect: true, params: collabWsParams() })
+      provider = new WebsocketProvider(wsUrl, `workspace:${workspaceId}`, doc, { connect: true, params: collabWsParams() })
       const updatePeers = () => {
         const peers = Array.from(provider!.awareness.getStates().values())
           .map((s: unknown) => (s as { user?: { name: string; color: string; agentType: string } })?.user)
@@ -117,17 +128,18 @@ const r = await fetch("/api/workspace/demo/database", { headers: collabAuthHeade
       provider?.destroy()
       doc.destroy()
     }
-  }, [])
+  }, [workspaceId])
 
   const actOnRow = async (rowId: string, status: string) => {
     setWsBusy(rowId)
     try {
-      await fetch(`/api/workspace/demo/database/${rowId}`, {
+      if (!workspaceId) return
+      await fetch(`/api/workspace/${workspaceId}/database/${rowId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
         body: JSON.stringify({ status }),
       })
-      const r = await fetch("/api/workspace/demo/database", { headers: collabAuthHeaders() })
+       const r = await fetch(`/api/workspace/${workspaceId}/database`, { headers: collabAuthHeaders() })
       if (r.ok) {
         const j = await r.json()
         setWsRows((j.rows ?? []).slice(0, 3))
@@ -136,6 +148,8 @@ const r = await fetch("/api/workspace/demo/database", { headers: collabAuthHeade
       setWsBusy(null)
     }
   }
+
+  const visibleAwarenessPeers = workspaceId ? awarenessPeers : []
 
   return (
     <div className="flex-1 overflow-y-auto px-8 py-10">
@@ -244,16 +258,16 @@ const r = await fetch("/api/workspace/demo/database", { headers: collabAuthHeade
           })}
         </div>
 
-        {/* Workspace — Leads DB activity (Phase B.3) + y-octo awareness */}
-        {awarenessPeers.length > 0 && (
+         {/* Workspace activity and active collaborators */}
+         {visibleAwarenessPeers.length > 0 && (
           <div className="mt-8">
             <div className="mb-2 flex items-center gap-1.5 text-[11px] text-white/30">
               <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
               <span>
-                {awarenessPeers.map((p) => p.name).join(" · ")} · {awarenessPeers.length} peer{awarenessPeers.length !== 1 ? "s" : ""} · y-octo
+                 {visibleAwarenessPeers.map((p) => p.name).join(" · ")} · {visibleAwarenessPeers.length} active collaborator{visibleAwarenessPeers.length !== 1 ? "s" : ""}
               </span>
               <span className="ml-1 flex items-center gap-1">
-                {awarenessPeers.map((p, i) => (
+                 {visibleAwarenessPeers.map((p, i) => (
                   <span
                     key={i}
                     className="h-2 w-2 rounded-full border border-white/10"
@@ -301,9 +315,8 @@ const r = await fetch("/api/workspace/demo/database", { headers: collabAuthHeade
               ))}
             </div>
             <div className="mt-2 text-[11px] text-white/25">
-              From <code className="rounded bg-white/[0.06] px-1.5 py-0.5">Y.Doc demo</code> ·{" "}
-              <Link href="/workspace/demo?view=database" className="underline decoration-white/20 underline-offset-2 hover:text-white/50">
-                Open Database
+               <Link href={workspaceId ? `/workspace/${workspaceId}?view=database` : "/workspace"} className="underline decoration-white/20 underline-offset-2 hover:text-white/50">
+                 Open Data
               </Link>
             </div>
           </div>

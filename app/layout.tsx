@@ -9,6 +9,7 @@ import { TokenInitializer } from "@/components/TokenInitializer"
 import { ModeProvider } from "@/contexts/ModeContext"
 import { RouterProvider } from "@/contexts/RouterContext"
 import { SettingsModalProvider } from "@/contexts/SettingsModalContext"
+import { WorkspaceProvider } from "@/contexts/WorkspaceContext"
 import "@/styles/globals.css"
 import "@/styles/workflow-nodes.css"
 
@@ -44,14 +45,16 @@ export default function RootLayout({
           <ModeProvider>
             <RouterProvider>
               <SettingsModalProvider>
-                <DashboardEntryGate>
-                  <DemoRouteGuard />
-                  <Sidebar />
-                  <main className="flex-1 flex flex-col h-full min-w-0 overflow-y-auto">
-                    {children}
-                  </main>
-                  <ClientShell />
-                </DashboardEntryGate>
+                <WorkspaceProvider>
+                  <DashboardEntryGate>
+                    <DemoRouteGuard />
+                    <Sidebar />
+                    <main className="flex-1 flex flex-col h-full min-w-0 overflow-y-auto">
+                      {children}
+                    </main>
+                    <ClientShell />
+                  </DashboardEntryGate>
+                </WorkspaceProvider>
               </SettingsModalProvider>
             </RouterProvider>
           </ModeProvider>
