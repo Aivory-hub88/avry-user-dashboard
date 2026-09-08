@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { collabAuthHeaders } from "@/lib/collabClient"
+import { getMarketingUrl } from "@/lib/config"
 
 type DocItem = { id: string; title: string; workspace_id: string; owner: string | null; updated_at: string | null; myRole: string }
 
@@ -16,6 +17,7 @@ export default function WorkspacePage() {
   const [error, setError] = useState<string | null>(null)
   const [authRequired, setAuthRequired] = useState(false)
   const router = useRouter()
+  const loginUrl = `${getMarketingUrl()}/login`
 
   const load = async () => {
     setLoading(true)
@@ -105,7 +107,7 @@ export default function WorkspacePage() {
              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">
                <span>{error}</span>
                {authRequired ? (
-                 <Link href="/login?next=/workspace" className="rounded-full bg-white px-3 py-1.5 text-[11px] font-medium text-black">Sign in</Link>
+                 <a href={loginUrl} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-medium text-black">Sign in</a>
                ) : (
                  <button onClick={load} className="rounded-full border border-white/20 px-3 py-1.5 text-[11px] text-white/75 hover:bg-white/[0.08]">Try again</button>
                )}

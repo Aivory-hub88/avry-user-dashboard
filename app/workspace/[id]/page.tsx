@@ -8,6 +8,7 @@ import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
 import SharingPanel from "@/components/workspace/SharingPanel"
 import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import { collabAuthHeaders } from "@/lib/collabClient"
+import { getMarketingUrl } from "@/lib/config"
 import { Share2 } from "lucide-react"
 
 type Meta = {
@@ -37,6 +38,7 @@ export default function WorkspaceDocPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
   const [showSharing, setShowSharing] = useState(false)
+  const loginUrl = `${getMarketingUrl()}/login`
 
   const loadMeta = async () => {
     try {
@@ -82,7 +84,7 @@ export default function WorkspaceDocPage() {
           <div className="w-full max-w-[520px] rounded-2xl border border-line bg-white/[0.03] p-8 text-center">
             <div className="text-[15px] font-medium text-white/80">Sign in required</div>
             <div className="mt-2 text-[13px] leading-relaxed text-white/40">Please sign in to view this workspace document.</div>
-            <Link href="/login" className="mt-6 inline-block rounded-full bg-white px-5 py-2 text-[13px] font-medium text-black">Go to login</Link>
+            <a href={loginUrl} className="mt-6 inline-block rounded-full bg-white px-5 py-2 text-[13px] font-medium text-black">Go to login</a>
           </div>
         </div>
       </div>
