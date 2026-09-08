@@ -1,32 +1,53 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
+import type { FormEvent, KeyboardEvent } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
+import { CheckSquare, GripVertical, Heading1, Heading2, List, MoreHorizontal, Plus, Quote, Trash2, Type } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 
-type Block = { id: string; type: "h1" | "h2" | "p" | "todo" | "bullet" | "quote"; text: string; checked?: boolean }
+type BlockType = "h1" | "h2" | "p" | "todo" | "bullet" | "quote"
+type Block = { id: string; type: BlockType; text: string; checked?: boolean }
+type SlashState = { idx: number; query: string } | null
+
+const BLOCK_TYPES: Array<{ type: BlockType; label: string; hint: string; Icon: typeof Type }> = [
+  { type: "p", label: "Text", hint: "Start writing", Icon: Type },
+  { type: "h1", label: "Heading 1", hint: "Large section heading", Icon: Heading1 },
+  { type: "h2", label: "Heading 2", hint: "Medium section heading", Icon: Heading2 },
+  { type: "todo", label: "To-do", hint: "Track a task", Icon: CheckSquare },
+  { type: "bullet", label: "Bulleted list", hint: "Make a simple list", Icon: List },
+  { type: "quote", label: "Quote", hint: "Highlight an idea", Icon: Quote },
+]
 
 function uid() {
   return Math.random().toString(36).slice(2, 8)
 }
 
 function yMapFromBlock(block: Block): Y.Map<unknown> {
-  const m = new Y.Map<unknown>()
-  m.set("id", block.id)
-  m.set("type", block.type)
-  m.set("text", block.text)
-  if (block.checked !== undefined) m.set("checked", block.checked)
-  return m
+  const map = new Y.Map<unknown>()
+  map.set("id", block.id)
+  map.set("type", block.type)
+  map.set("text", block.text)
+  if (block.checked !== undefined) map.set("checked", block.checked)
+  return map
 }
 
 function toBlocks(yArray: Y.Array<Y.Map<unknown>>): Block[] {
-  return yArray.toArray().map((m) => ({
-    id: (m.get("id") as string) ?? uid(),
-    type: (m.get("type") as Block["type"]) ?? "p",
-    text: (m.get("text") as string) ?? "",
-    checked: m.get("checked") as boolean | undefined,
+  return yArray.toArray().map((map) => ({
+    id: (map.get("id") as string) ?? uid(),
+    type: (map.get("type") as BlockType) ?? "p",
+    text: (map.get("text") as string) ?? "",
+    checked: map.get("checked") as boolean | undefined,
   }))
+}
+
+function blockClass(type: BlockType) {
+  if (type === "h1") return "text-[30px] font-semibold leading-tight text-white/90"
+  if (type === "h2") return "text-[21px] font-medium leading-tight text-white/85"
+  if (type === "quote") return "border-l-2 border-white/15 pl-4 italic text-white/60"
+  if (type === "bullet") return "pl-5 text-[14px] leading-relaxed text-white/80 before:absolute before:ml-[-17px] before:mt-[8px] before:h-1.5 before:w-1.5 before:rounded-full before:bg-white/40 before:content-['']"
+  return "text-[14px] leading-relaxed text-white/80"
 }
 
 export default function WorkspaceEditor({ docId, readOnly = false }: { docId: string; readOnly?: boolean }) {
@@ -34,18 +55,18 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
   const yArrayRef = useRef<Y.Array<Y.Map<unknown>> | null>(null)
   const providerRef = useRef<WebsocketProvider | null>(null)
   const readOnlyRef = useRef(readOnly)
+  const [blocks, setBlocks] = useState<Block[]>([])
+  const [slash, setSlash] = useState<SlashState>(null)
+  const [openMenu, setOpenMenu] = useState<number | null>(null)
+  const [ready, setReady] = useState(false)
+
   useEffect(() => {
     readOnlyRef.current = readOnly
   }, [readOnly])
 
-  const [blocks, setBlocks] = useState<Block[]>([])
-  const [slash, setSlash] = useState<{ idx: number; open: boolean }>({ idx: 0, open: false })
-  const [ready, setReady] = useState(false)
-  // v2: POC-era cached updates were stale demo text; server is source of truth
   const storageKey = `aivory:workspace:yjs:v2:${docId}`
-  const agentOrigin = () => (typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user")
+  const agentOrigin = () => (typeof window !== "undefined" ? localStorage.getItem("aivory:agentType") || "user" : "user")
 
-  // init Y.Doc: local cache first, then server — seed a starter only when truly empty
   useEffect(() => {
     const doc = new Y.Doc()
     const yArray = doc.getArray<Y.Map<unknown>>("blocks")
@@ -57,8 +78,7 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
     const saved = localStorage.getItem(storageKey)
     if (saved) {
       try {
-        const update = Uint8Array.from(JSON.parse(saved) as number[])
-        Y.applyUpdate(doc, update)
+        Y.applyUpdate(doc, Uint8Array.from(JSON.parse(saved) as number[]))
       } catch {}
     }
 
@@ -79,55 +99,43 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
       if (!alive) return
       setBlocks(toBlocks(yArray))
       try {
-        const update = Y.encodeStateAsUpdate(doc)
-        localStorage.setItem(storageKey, JSON.stringify(Array.from(update)))
+        localStorage.setItem(storageKey, JSON.stringify(Array.from(Y.encodeStateAsUpdate(doc))))
       } catch {}
       schedulePut()
     }
     yArray.observe(observer)
 
     fetch(`/api/workspace/${docId}/doc`, { headers: collabAuthHeaders() })
-      .then((r) => (r.ok ? r.arrayBuffer() : null))
-      .then((buf) => {
+      .then((response) => (response.ok ? response.arrayBuffer() : null))
+      .then((buffer) => {
         if (!alive) return
-        if (buf && buf.byteLength > 0) {
-          Y.applyUpdate(doc, new Uint8Array(buf))
-        }
-        // seed a blank starter only when nothing exists anywhere
+        if (buffer && buffer.byteLength > 0) Y.applyUpdate(doc, new Uint8Array(buffer))
         if (yArray.length === 0 && !readOnlyRef.current) {
           doc.transact(() => {
             yArray.push([yMapFromBlock({ id: uid(), type: "h1", text: "" })])
             yArray.push([yMapFromBlock({ id: uid(), type: "p", text: "" })])
           }, agentOrigin())
-          schedulePut()
         }
         setBlocks(toBlocks(yArray))
         setReady(true)
       })
       .catch(() => {
         if (!alive) return
-        // offline: use local cache only
         if (yArray.length === 0 && !readOnlyRef.current) {
-          doc.transact(() => {
-            yArray.push([yMapFromBlock({ id: uid(), type: "p", text: "" })])
-          }, agentOrigin())
+          doc.transact(() => yArray.push([yMapFromBlock({ id: uid(), type: "p", text: "" })]), agentOrigin())
         }
         setBlocks(toBlocks(yArray))
         setReady(true)
       })
 
-    const wsUrl =
-      typeof window !== "undefined" && window.location.hostname === "localhost"
-        ? "ws://localhost:3200"
-        : "wss://aivory.uk/yjs"
-    const agentType = typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user"
-    const userId = typeof window !== "undefined" ? (localStorage.getItem("aivory:userId") || "anon") : "anon"
+    const wsUrl = typeof window !== "undefined" && window.location.hostname === "localhost" ? "ws://localhost:3200" : "wss://aivory.uk/yjs"
     try {
       const provider = new WebsocketProvider(wsUrl, `workspace:${docId}`, doc, { connect: true, params: collabWsParams() })
       providerRef.current = provider
+      const agentType = typeof window !== "undefined" ? localStorage.getItem("aivory:agentType") || "user" : "user"
+      const userId = typeof window !== "undefined" ? localStorage.getItem("aivory:userId") || "anon" : "anon"
       const color = agentType === "user" ? "#7c3aed" : agentType.includes("leads") ? "#f59e0b" : "#10b981"
-      const name = agentType === "user" ? "You" : agentType.replace(/_/g, " ")
-      provider.awareness.setLocalStateField("user", { name, color, agentType, userId })
+      provider.awareness.setLocalStateField("user", { name: agentType === "user" ? "You" : agentType.replace(/_/g, " "), color, agentType, userId })
     } catch {}
 
     return () => {
@@ -139,79 +147,92 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
     }
   }, [docId, storageKey])
 
-  const guard = () => {
-    if (readOnlyRef.current) return false
-    return true
+  const guard = () => !readOnlyRef.current
+
+  const update = (index: number, patch: Partial<Block>) => {
+    if (!guard()) return
+    const yArray = yArrayRef.current
+    const doc = docRef.current
+    if (!yArray || !doc || !yArray.get(index)) return
+    const map = yArray.get(index) as Y.Map<unknown>
+    doc.transact(() => {
+      for (const [key, value] of Object.entries(patch)) map.set(key, value)
+    }, agentOrigin())
   }
 
-  const update = (i: number, patch: Partial<Block>) => {
+  const focusBlock = (id: string) => setTimeout(() => document.getElementById(`block-${id}`)?.focus(), 10)
+
+  const addAfter = (index: number, type: BlockType = "p") => {
     if (!guard()) return
     const yArray = yArrayRef.current
     const doc = docRef.current
     if (!yArray || !doc) return
-    const m = yArray.get(i) as Y.Map<unknown>
-    doc.transact(() => {
-      for (const [k, v] of Object.entries(patch)) m.set(k, v)
-    }, agentOrigin())
+    const next: Block = { id: uid(), type, text: "", ...(type === "todo" ? { checked: false } : {}) }
+    doc.transact(() => yArray.insert(index + 1, [yMapFromBlock(next)]), agentOrigin())
+    focusBlock(next.id)
   }
 
-  const addAfter = (i: number, type: Block["type"] = "p") => {
-    if (!guard()) return
-    const yArray = yArrayRef.current
-    const doc = docRef.current
-    if (!yArray || !doc) return
-    const nb: Block = { id: uid(), type, text: "", ...(type === "todo" ? { checked: false } : {}) }
-    doc.transact(() => {
-      yArray.insert(i + 1, [yMapFromBlock(nb)])
-    }, agentOrigin())
-    setTimeout(() => document.getElementById(`block-${nb.id}`)?.focus(), 10)
-  }
-
-  const remove = (i: number) => {
+  const remove = (index: number) => {
     if (!guard()) return
     const yArray = yArrayRef.current
     const doc = docRef.current
     if (!yArray || !doc || yArray.length <= 1) return
-    doc.transact(() => {
-      yArray.delete(i, 1)
-    }, agentOrigin())
+    const previousId = index > 0 ? ((yArray.get(index - 1)?.get("id") as string) ?? "") : ""
+    doc.transact(() => yArray.delete(index, 1), agentOrigin())
+    if (previousId) focusBlock(previousId)
   }
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, i: number) => {
+  const selectType = (index: number, type: BlockType) => {
+    update(index, { type, text: "", ...(type === "todo" ? { checked: false } : {}) })
+    setSlash(null)
+    setOpenMenu(null)
+    focusBlock(blocks[index]?.id ?? "")
+  }
+
+  const onInput = (index: number, event: FormEvent<HTMLDivElement>) => {
+    const text = event.currentTarget.innerText.replace(/\n$/, "")
+    update(index, { text })
+    if (!readOnly && text.startsWith("/")) setSlash({ idx: index, query: text.slice(1) })
+    else if (slash?.idx === index) setSlash(null)
+  }
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>, index: number) => {
     if (readOnly) return
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      const cur = blocks[i]
-      addAfter(i, cur.type === "h1" || cur.type === "h2" ? "p" : cur.type)
+    const current = blocks[index]
+    if (event.key === "Escape") {
+      setSlash(null)
+      setOpenMenu(null)
+      return
     }
-    if (e.key === "Backspace" && blocks[i].text === "") {
-      e.preventDefault()
-      remove(i)
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault()
+      if (slash?.idx === index) {
+        update(index, { text: "" })
+        setSlash(null)
+      } else addAfter(index, current.type === "h1" || current.type === "h2" ? "p" : current.type)
+      return
     }
-    if (e.key === "/" && blocks[i].text === "") {
-      setSlash({ idx: i, open: true })
+    if (event.key === "Backspace" && current.text === "") {
+      event.preventDefault()
+      remove(index)
     }
   }
 
-  if (!ready) {
-    return (
-      <div className="mx-auto w-full max-w-[720px] py-12 text-center text-[13px] text-white/30">
-        Loading document…
-      </div>
-    )
-  }
+  const visibleSlash = slash
+    ? BLOCK_TYPES.filter((item) => item.label.toLowerCase().includes(slash.query.trim().toLowerCase()))
+    : []
+
+  if (!ready) return <div className="mx-auto w-full max-w-[720px] py-12 text-center text-[13px] text-white/30">Loading page…</div>
 
   if (blocks.length === 0) {
     return (
       <div className="mx-auto w-full max-w-[720px] py-8">
         {readOnly ? (
-          <div className="py-12 text-center text-[13px] text-white/30">This document is empty.</div>
+          <div className="py-12 text-center text-[13px] text-white/30">This page is empty.</div>
         ) : (
-          <button
-            onClick={() => addAfter(-1)}
-            className="w-full rounded-xl border border-dashed border-white/10 py-10 text-[13px] text-white/35 hover:border-white/20 hover:bg-white/[0.02] hover:text-white/60"
-          >
-            Start writing — click here or press Enter
+          <button onClick={() => addAfter(-1)} className="w-full rounded-xl border border-dashed border-white/10 py-10 text-[13px] text-white/35 hover:border-white/20 hover:bg-white/[0.02] hover:text-white/60">
+            Start writing
+            <span className="mt-1 block text-[12px] text-white/25">Press Enter for a new block or / for commands</span>
           </button>
         )}
       </div>
@@ -220,85 +241,71 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
 
   return (
     <div className="mx-auto w-full max-w-[720px]">
+      <div className="mb-8 flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-white/25">
+        <span className="h-1.5 w-1.5 rounded-full bg-white/50" />
+        Page
+        <span className="text-white/15">·</span>
+        {blocks.length} blocks
+      </div>
       <div className="flex flex-col gap-1">
-        {blocks.map((b, i) => (
-          <div key={b.id} className="group flex items-start gap-2">
+        {blocks.map((block, index) => (
+          <div key={block.id} className="group relative flex items-start gap-1">
             {!readOnly && (
-              <button
-                onClick={() => addAfter(i)}
-                className="mt-1 hidden h-6 w-6 shrink-0 items-center justify-center rounded text-white/20 hover:bg-white/[0.06] hover:text-white/60 group-hover:flex"
-              >
-                +
-              </button>
+              <div className="absolute -left-[58px] top-1 hidden items-center gap-0.5 group-hover:flex">
+                <button onClick={() => addAfter(index)} title="Add block" className="rounded p-1 text-white/25 hover:bg-white/[0.06] hover:text-white/75"><Plus className="h-4 w-4" /></button>
+                <button onClick={() => setOpenMenu(openMenu === index ? null : index)} title="Block type" className="rounded p-1 text-white/25 hover:bg-white/[0.06] hover:text-white/75"><GripVertical className="h-4 w-4" /></button>
+              </div>
             )}
             <div className="min-w-0 flex-1">
-              {b.type === "todo" ? (
-                <label className="flex items-start gap-2 py-1.5">
+              <div className="flex items-start gap-2">
+                {block.type === "todo" && (
                   <input
                     type="checkbox"
-                    checked={!!b.checked}
+                    checked={!!block.checked}
                     disabled={readOnly}
-                    onChange={(e) => update(i, { checked: e.target.checked })}
-                    className="mt-1 h-4 w-4 shrink-0 rounded border border-white/20 bg-transparent accent-white"
+                    onChange={(event) => update(index, { checked: event.target.checked })}
+                    className="mt-2 h-4 w-4 shrink-0 rounded border border-white/20 bg-transparent accent-white"
                   />
-                  <div
-                    id={`block-${b.id}`}
-                    contentEditable={!readOnly}
-                    suppressContentEditableWarning
-                    onInput={(e) => update(i, { text: (e.target as HTMLDivElement).innerText })}
-                    onKeyDown={(e) => onKeyDown(e, i)}
-                    data-placeholder={b.text === "" ? "To-do" : undefined}
-                    className={`min-w-0 flex-1 outline-none empty:before:text-white/25 empty:before:content-[attr(data-placeholder)] ${b.checked ? "text-white/30 line-through" : "text-white/80"} ${slash.open && slash.idx === i ? "ring-1 ring-white/10" : ""}`}
-                  >
-                    {b.text}
-                  </div>
-                </label>
-              ) : (
+                )}
                 <div
-                  id={`block-${b.id}`}
+                  id={`block-${block.id}`}
                   contentEditable={!readOnly}
                   suppressContentEditableWarning
-                  onInput={(e) => update(i, { text: (e.target as HTMLDivElement).innerText })}
-                  onKeyDown={(e) => onKeyDown(e, i)}
-                  data-placeholder={b.text === "" ? (b.type === "h1" ? "Untitled" : "Type '/' for commands") : undefined}
-                  className={`w-full rounded-lg px-3 py-1.5 outline-none focus:bg-white/[0.03] empty:before:text-white/25 empty:before:content-[attr(data-placeholder)] ${
-                    b.type === "h1"
-                      ? "text-[28px] font-semibold text-white/90"
-                      : b.type === "h2"
-                        ? "text-[20px] font-medium text-white/85"
-                        : b.type === "quote"
-                          ? "border-l-2 border-white/10 pl-3 italic text-white/60"
-                          : b.type === "bullet"
-                            ? "text-[14px] text-white/80 before:mr-2 before:content-['•']"
-                            : "text-[14px] leading-relaxed text-white/80"
-                  }`}
+                  onInput={(event) => onInput(index, event)}
+                  onKeyDown={(event) => onKeyDown(event, index)}
+                  data-placeholder={block.text === "" ? (block.type === "h1" ? "Untitled" : "Type '/' for commands") : undefined}
+                  className={`relative w-full rounded-lg px-2 py-1.5 outline-none empty:before:text-white/25 empty:before:content-[attr(data-placeholder)] focus:bg-white/[0.03] ${block.checked ? "text-white/30 line-through" : ""} ${blockClass(block.type)}`}
                 >
-                  {b.text}
+                  {block.text}
                 </div>
-              )}
-              {!readOnly && slash.open && slash.idx === i && (
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {(["h1", "h2", "p", "todo", "bullet", "quote"] as const).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => {
-                        update(i, { type: t })
-                        setSlash({ idx: 0, open: false })
-                      }}
-                      className="rounded-full border border-line bg-[#353531] px-3 py-1 text-[12px] text-white/60 hover:bg-white/[0.06] hover:text-white/90"
-                    >
-                      {t}
+              </div>
+              {!readOnly && slash?.idx === index && visibleSlash.length > 0 && (
+                <div className="mt-1 w-full max-w-[320px] rounded-xl border border-line bg-[#2c2c29] p-1.5 shadow-2xl">
+                  <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-white/25">Turn into</div>
+                  {visibleSlash.map(({ type, label, hint, Icon }) => (
+                    <button key={type} onMouseDown={(event) => event.preventDefault()} onClick={() => selectType(index, type)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-white/[0.07]">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white/[0.06] text-white/65"><Icon className="h-3.5 w-3.5" /></span>
+                      <span className="min-w-0"><span className="block text-[12px] text-white/80">{label}</span><span className="block text-[10px] text-white/30">{hint}</span></span>
                     </button>
                   ))}
-                  <button onClick={() => setSlash({ idx: 0, open: false })} className="px-2 text-[12px] text-white/30">
-                    ✕
-                  </button>
+                </div>
+              )}
+              {!readOnly && openMenu === index && (
+                <div className="absolute left-0 top-8 z-10 w-[190px] rounded-xl border border-line bg-[#2c2c29] p-1.5 shadow-2xl">
+                  {BLOCK_TYPES.map(({ type, label, Icon }) => (
+                    <button key={type} onClick={() => selectType(index, type)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[12px] text-white/65 hover:bg-white/[0.07] hover:text-white/90">
+                      <Icon className="h-3.5 w-3.5" />{label}
+                    </button>
+                  ))}
+                  <button onClick={() => remove(index)} className="mt-1 flex w-full items-center gap-2 border-t border-line px-2 py-2 text-left text-[12px] text-red-300/70 hover:text-red-200"><Trash2 className="h-3.5 w-3.5" />Delete block</button>
                 </div>
               )}
             </div>
+            {!readOnly && <button onClick={() => setOpenMenu(openMenu === index ? null : index)} title="More block actions" className="mt-1 rounded p-1 text-white/0 group-hover:text-white/25 hover:bg-white/[0.06] hover:text-white/70"><MoreHorizontal className="h-4 w-4" /></button>}
           </div>
         ))}
       </div>
+      {!readOnly && <button onClick={() => addAfter(blocks.length - 1)} className="mt-5 flex items-center gap-2 px-2 text-[12px] text-white/25 hover:text-white/55"><Plus className="h-3.5 w-3.5" />New block</button>}
     </div>
   )
 }

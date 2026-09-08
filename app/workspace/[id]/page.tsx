@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import WorkspaceEditor from "@/components/workspace/WorkspaceEditor"
 import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
 import SharingPanel from "@/components/workspace/SharingPanel"
+import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import { collabAuthHeaders } from "@/lib/collabClient"
 
 type Meta = {
@@ -225,6 +226,7 @@ export default function WorkspaceDocPage() {
         </div>
       </div>
       <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
+        <WorkspaceNavigator currentId={id} />
         <div className="mx-auto w-full max-w-[860px] flex-1 overflow-y-auto px-8 py-8">
           {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
           {!canWrite && (
