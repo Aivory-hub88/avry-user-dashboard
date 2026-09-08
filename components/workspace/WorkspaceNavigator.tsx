@@ -18,6 +18,7 @@ export default function WorkspaceNavigator({ currentId }: { currentId: string })
   const [docs, setDocs] = useState<DocItem[]>([])
   const [query, setQuery] = useState("")
   const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -35,6 +36,7 @@ export default function WorkspaceNavigator({ currentId }: { currentId: string })
   const createDocument = async () => {
     if (creating) return
     setCreating(true)
+    setCreateError(null)
     try {
       const response = await fetch("/api/workspace", {
         method: "POST",
@@ -43,7 +45,8 @@ export default function WorkspaceNavigator({ currentId }: { currentId: string })
       })
       const payload = await response.json().catch(() => ({}))
       if (response.ok && payload.id) router.push(`/workspace/${payload.id}`)
-    } catch {}
+      else setCreateError(response.status === 401 ? "Sign in required" : "Could not create page")
+    } catch { setCreateError("Could not create page") }
     setCreating(false)
   }
 
@@ -77,6 +80,7 @@ export default function WorkspaceNavigator({ currentId }: { currentId: string })
           className="min-w-0 flex-1 bg-transparent text-[12px] text-white/75 outline-none placeholder:text-white/25"
         />
       </label>
+      {createError && <div className="mx-3 mb-2 rounded-lg bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-200">{createError}</div>}
       <nav className="flex max-h-[180px] flex-row gap-1 overflow-x-auto px-3 pb-3 lg:min-h-0 lg:max-h-none lg:flex-col lg:overflow-y-auto lg:pb-4">
         {filtered.map((doc) => (
           <Link

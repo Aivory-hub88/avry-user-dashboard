@@ -13,17 +13,25 @@ export default function WorkspacePage() {
   const [creating, setCreating] = useState(false)
   const [title, setTitle] = useState('')
   const [q, setQ] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [authRequired, setAuthRequired] = useState(false)
   const router = useRouter()
 
   const load = async () => {
     setLoading(true)
+    setError(null)
+    setAuthRequired(false)
     try {
       const r = await fetch('/api/workspace', { headers: collabAuthHeaders() })
       if (r.ok) {
         const j = await r.json()
         setDocs(j.docs ?? [])
-      }
-    } catch {}
+        setAuthRequired(false)
+      } else if (r.status === 401) {
+        setAuthRequired(true)
+        setError('Your session has expired. Sign in again to continue.')
+      } else setError('We could not load your pages. Please try again.')
+    } catch { setError('We could not connect to your workspace. Please try again.') }
     setLoading(false)
   }
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -32,6 +40,7 @@ export default function WorkspacePage() {
   const create = async () => {
     if (creating) return
     setCreating(true)
+    setError(null)
     try {
       const r = await fetch('/api/workspace', {
         method: 'POST',
@@ -40,8 +49,11 @@ export default function WorkspacePage() {
       })
       const j = await r.json().catch(() => ({}))
       if (r.ok && j.id) router.push(`/workspace/${j.id}`)
-      else load()
-    } catch {}
+      else if (r.status === 401) {
+        setAuthRequired(true)
+        setError('Your session has expired. Sign in again to create a page.')
+      } else setError(j.error === 'db' ? 'Your page could not be created. Please try again.' : 'Your page could not be created.')
+    } catch { setError('We could not connect to your workspace. Please try again.') }
     setCreating(false)
   }
 
@@ -84,12 +96,23 @@ export default function WorkspacePage() {
 
       <div className="mx-auto w-full max-w-[860px] flex-1 overflow-y-auto px-8 py-8">
         <div className="rounded-[16px] border border-line bg-white/[0.03] p-6">
-          <div className="mb-4 flex items-center justify-between">
+           <div className="mb-4 flex items-center justify-between">
              <h2 className="text-[13px] font-medium text-white/80">Your pages</h2>
             <span className="text-[11px] text-white/30">{loading ? 'loading…' : `${filtered.length} of ${docs.length}`}</span>
-          </div>
+           </div>
 
-          {loading ? (
+           {error && (
+             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">
+               <span>{error}</span>
+               {authRequired ? (
+                 <Link href="/login?next=/workspace" className="rounded-full bg-white px-3 py-1.5 text-[11px] font-medium text-black">Sign in</Link>
+               ) : (
+                 <button onClick={load} className="rounded-full border border-white/20 px-3 py-1.5 text-[11px] text-white/75 hover:bg-white/[0.08]">Try again</button>
+               )}
+             </div>
+           )}
+
+           {loading ? (
             <div className="py-8 text-center text-[12px] text-white/30">Loading…</div>
           ) : docs.length === 0 ? (
             <div className="py-8 text-center">
