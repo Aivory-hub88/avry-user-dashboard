@@ -61,23 +61,23 @@ export default function WorkspacePage() {
   return (
     <div className="flex h-full w-full flex-col bg-surface-1">
       <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line px-6">
-        <span className="shrink-0 text-[13px] font-medium leading-none text-white/80">Workspace</span>
+        <span className="shrink-0 text-[13px] font-medium leading-none text-white/80">My workspace</span>
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search documents"
+            placeholder="Find a page"
             className="hidden w-[160px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none sm:block"
           />
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') create() }}
-            placeholder="New doc title"
+            placeholder="Page title"
             className="w-[140px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none sm:w-[180px]"
           />
           <button onClick={create} disabled={creating} className="shrink-0 rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-50">
-            {creating ? 'Creating…' : 'New doc'}
+             {creating ? 'Creating…' : 'New page'}
           </button>
         </div>
       </div>
@@ -85,7 +85,7 @@ export default function WorkspacePage() {
       <div className="mx-auto w-full max-w-[860px] flex-1 overflow-y-auto px-8 py-8">
         <div className="rounded-[16px] border border-line bg-white/[0.03] p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-[13px] font-medium text-white/80">Your documents</h2>
+             <h2 className="text-[13px] font-medium text-white/80">Your pages</h2>
             <span className="text-[11px] text-white/30">{loading ? 'loading…' : `${filtered.length} of ${docs.length}`}</span>
           </div>
 
@@ -93,10 +93,10 @@ export default function WorkspacePage() {
             <div className="py-8 text-center text-[12px] text-white/30">Loading…</div>
           ) : docs.length === 0 ? (
             <div className="py-8 text-center">
-              <div className="text-[13px] text-white/40">No documents yet</div>
-              <div className="mt-2 text-[11px] text-white/25">Create your first doc or ask an agent to create one</div>
+               <div className="text-[13px] text-white/40">Nothing here yet</div>
+               <div className="mt-2 text-[11px] text-white/25">Create a page for a note, task list, or idea.</div>
               <div className="mt-4 flex justify-center">
-                <button onClick={create} className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black">Create doc</button>
+                 <button onClick={create} className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black">Create your first page</button>
               </div>
             </div>
           ) : filtered.length === 0 ? (

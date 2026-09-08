@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react"
 import type { FormEvent, KeyboardEvent } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
-import { CheckSquare, GripVertical, Heading1, Heading2, List, MoreHorizontal, Plus, Quote, Trash2, Type } from "lucide-react"
+import { Check, CheckSquare, CloudOff, GripVertical, Heading1, Heading2, List, LoaderCircle, MoreHorizontal, Plus, Quote, Trash2, Type } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 
 type BlockType = "h1" | "h2" | "p" | "todo" | "bullet" | "quote"
 type Block = { id: string; type: BlockType; text: string; checked?: boolean }
 type SlashState = { idx: number; query: string } | null
+type SaveState = "saved" | "saving" | "offline"
 
 const BLOCK_TYPES: Array<{ type: BlockType; label: string; hint: string; Icon: typeof Type }> = [
   { type: "p", label: "Text", hint: "Start writing", Icon: Type },
@@ -64,6 +65,7 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
   const [slash, setSlash] = useState<SlashState>(null)
   const [openMenu, setOpenMenu] = useState<number | null>(null)
   const [ready, setReady] = useState(false)
+  const [saveState, setSaveState] = useState<SaveState>("saved")
 
   useEffect(() => {
     readOnlyRef.current = readOnly
@@ -90,13 +92,21 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
     const schedulePut = () => {
       if (readOnlyRef.current) return
       if (putTimer) clearTimeout(putTimer)
+      setSaveState("saving")
       putTimer = setTimeout(() => {
         const update = Y.encodeStateAsUpdate(doc)
         fetch(`/api/workspace/${docId}/doc`, {
           method: "PUT",
           headers: { "Content-Type": "application/octet-stream", ...collabAuthHeaders() },
           body: update as unknown as BodyInit,
-        }).catch(() => {})
+        })
+          .then((response) => {
+            if (!alive) return
+            setSaveState(response.ok ? "saved" : "offline")
+          })
+          .catch(() => {
+            if (alive) setSaveState("offline")
+          })
       }, 500)
     }
 
@@ -242,6 +252,10 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
   const visibleSlash = slash
     ? BLOCK_TYPES.filter((item) => item.label.toLowerCase().includes(slash.query.trim().toLowerCase()))
     : []
+  const isStarter = blocks.length === 2 && blocks[0]?.type === "h1" && blocks[1]?.type === "p" && blocks.every((block) => block.text === "")
+
+  const saveLabel = saveState === "saving" ? "Saving" : saveState === "offline" ? "Offline" : "Saved"
+  const SaveIcon = saveState === "saving" ? LoaderCircle : saveState === "offline" ? CloudOff : Check
 
   if (!ready) return <div className="mx-auto w-full max-w-[720px] py-12 text-center text-[13px] text-white/30">Loading page…</div>
 
@@ -262,11 +276,15 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
 
   return (
     <div className="mx-auto w-full max-w-[780px] lg:pl-[52px]">
-      <div className="mb-8 flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-white/25">
-        <span className="h-1.5 w-1.5 rounded-full bg-white/50" />
-        Page
-        <span className="text-white/15">·</span>
-        {blocks.length} blocks
+      <div className="mb-8 flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.16em] text-white/25">
+        <div className="flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-white/50" />
+          {isStarter ? "Start here" : "Your page"}
+        </div>
+        <div className="flex items-center gap-1.5 normal-case tracking-normal text-white/30">
+          <SaveIcon className={`h-3.5 w-3.5 ${saveState === "saving" ? "animate-spin" : ""}`} />
+          {saveLabel}
+        </div>
       </div>
       <div className="flex flex-col gap-1">
         {blocks.map((block, index) => (
@@ -294,7 +312,7 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
                   suppressContentEditableWarning
                   onInput={(event) => onInput(index, event)}
                   onKeyDown={(event) => onKeyDown(event, index)}
-                  data-placeholder={block.text === "" ? (block.type === "h1" ? "Untitled" : "Type '/' for commands") : undefined}
+                  data-placeholder={block.text === "" ? (block.type === "h1" ? "What are you working on?" : "Start writing...") : undefined}
                   className={`relative w-full rounded-lg px-2 py-1.5 outline-none empty:before:text-white/25 empty:before:content-[attr(data-placeholder)] focus:bg-white/[0.03] ${block.checked ? "text-white/30 line-through" : ""} ${blockClass(block.type)}`}
                 >
                   {block.text}
@@ -327,6 +345,17 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
         ))}
       </div>
       {!readOnly && <button onClick={() => addAfter(blocks.length - 1)} className="mt-5 flex items-center gap-2 px-2 text-[12px] text-white/25 hover:text-white/55"><Plus className="h-3.5 w-3.5" />New block</button>}
+      {isStarter && !readOnly && (
+        <div className="mt-10 rounded-2xl border border-line bg-white/[0.025] p-5">
+          <div className="text-[13px] font-medium text-white/70">Start with a simple idea</div>
+          <div className="mt-1 text-[12px] text-white/35">Choose a starting point, or just begin typing above.</div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button onClick={() => focusBlock(blocks[0].id)} className="rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/60 hover:bg-white/[0.08] hover:text-white/85">Write a note</button>
+            <button onClick={() => selectType(1, "todo")} className="rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/60 hover:bg-white/[0.08] hover:text-white/85">Make a task</button>
+            <button onClick={() => addAfter(1, "h2")} className="rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/60 hover:bg-white/[0.08] hover:text-white/85">Add a section</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

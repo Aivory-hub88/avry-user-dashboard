@@ -80,7 +80,7 @@ export default function SharingPanel({ docId, isOwner }: { docId: string; isOwne
 
   return (
     <div className="rounded-xl border border-line bg-white/[0.03] p-4">
-      <div className="text-[13px] font-medium text-white/80">Share</div>
+       <div className="text-[13px] font-medium text-white/80">Share this page</div>
       <div className="mt-3 flex flex-col gap-2">
         <input
           value={email}

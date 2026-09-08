@@ -8,6 +8,7 @@ import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
 import SharingPanel from "@/components/workspace/SharingPanel"
 import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import { collabAuthHeaders } from "@/lib/collabClient"
+import { Share2 } from "lucide-react"
 
 type Meta = {
   id: string
@@ -35,6 +36,7 @@ export default function WorkspaceDocPage() {
   const [titleDraft, setTitleDraft] = useState("")
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [showSharing, setShowSharing] = useState(false)
 
   const loadMeta = async () => {
     try {
@@ -190,24 +192,32 @@ export default function WorkspaceDocPage() {
             </button>
           )}
           <span className="ml-1 shrink-0 rounded-full bg-white/[0.06] px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-white/40">{meta?.myRole}</span>
-          {!canWrite && <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-amber-300">read-only</span>}
-          <div className="ml-3 flex shrink-0 items-center gap-1 rounded-full bg-white/[0.04] p-1">
+           {!canWrite && <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-amber-300">view only</span>}
+           <div className="ml-3 flex shrink-0 items-center gap-1 rounded-full bg-white/[0.04] p-1">
             <Link
               href={`/workspace/${id}`}
               className={`rounded-full px-3 py-1 text-[12px] ${view === "page" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
             >
-              Page
+               Write
             </Link>
             <Link
               href={`/workspace/${id}?view=database`}
               className={`rounded-full px-3 py-1 text-[12px] ${view === "database" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
             >
-              Database
+               Data
             </Link>
           </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {isOwner && !confirmDelete && (
+         </div>
+         <div className="flex shrink-0 items-center gap-2">
+           <button
+             onClick={() => setShowSharing((open) => !open)}
+             aria-expanded={showSharing}
+             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] ${showSharing ? "bg-white/[0.1] text-white/85" : "text-white/40 hover:bg-white/[0.06] hover:text-white/80"}`}
+           >
+             <Share2 className="h-3.5 w-3.5" />
+             Share
+           </button>
+           {isOwner && !confirmDelete && (
             <button onClick={() => setConfirmDelete(true)} className="rounded-full px-3 py-1.5 text-[12px] text-white/35 hover:bg-white/[0.06] hover:text-red-300">
               Delete
             </button>
@@ -235,12 +245,14 @@ export default function WorkspaceDocPage() {
             </div>
           )}
         </div>
-        <div className="w-full shrink-0 overflow-y-auto border-t border-line p-4 lg:w-[360px] lg:max-w-[360px] lg:border-l lg:border-t-0">
-          <SharingPanel docId={id} isOwner={!!isOwner} />
-          {meta?.ownerEmail && (
-            <div className="mt-3 text-[11px] text-white/30">Owner: {meta.ownerName ?? meta.ownerEmail}</div>
-          )}
-        </div>
+        {showSharing && (
+          <div className="w-full shrink-0 overflow-y-auto border-t border-line p-4 lg:w-[360px] lg:max-w-[360px] lg:border-l lg:border-t-0">
+            <SharingPanel docId={id} isOwner={!!isOwner} />
+            {meta?.ownerEmail && (
+              <div className="mt-3 text-[11px] text-white/30">Owner: {meta.ownerName ?? meta.ownerEmail}</div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

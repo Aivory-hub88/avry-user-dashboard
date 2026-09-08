@@ -56,13 +56,13 @@ export default function WorkspaceNavigator({ currentId }: { currentId: string })
     <aside className="flex w-full shrink-0 flex-col border-b border-line bg-black/10 lg:min-h-0 lg:w-[232px] lg:overflow-hidden lg:border-b-0 lg:border-r">
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
         <div>
-          <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">Pages</div>
-          <div className="mt-1 text-[12px] text-white/55">Your workspace</div>
+          <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">My pages</div>
+          <div className="mt-1 text-[12px] text-white/55">Notes, tasks, and ideas</div>
         </div>
         <button
           onClick={createDocument}
           disabled={creating}
-          title="New page"
+          title="Create a new page"
           className="rounded-lg p-1.5 text-white/35 hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-40"
         >
           <Plus className="h-4 w-4" />
