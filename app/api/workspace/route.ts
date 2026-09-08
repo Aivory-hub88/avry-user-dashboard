@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { workspaceCredential, unauthorized } from '@/lib/workspaceAuth'
 import { getDocRole } from '@/lib/workspaceAccess'
+import { recordWorkspaceActivity } from '@/lib/workspaceActivity'
 
 export const runtime = 'nodejs'
 
@@ -75,6 +76,14 @@ export async function POST(req: NextRequest) {
        ON CONFLICT (id) DO NOTHING`,
       [`workspace:${id}`, workspaceId, userId, title],
     )
+    await recordWorkspaceActivity({
+      docId: id,
+      credential: cred,
+      action: 'page.created',
+      summary: `Created page “${title}”`,
+      targetType: 'page',
+      targetId: id,
+    })
     return NextResponse.json({ id, title, workspace_id: workspaceId, owner: userId }, { status: 201 })
   } catch (e) {
     console.error('[workspace create]', e)

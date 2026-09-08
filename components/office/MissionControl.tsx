@@ -35,6 +35,14 @@ interface Row {
   enterprise?: boolean
 }
 
+type Activity = {
+  id: number
+  actor_type: "user" | "agent" | "system"
+  actor_name: string | null
+  summary: string
+  created_at: string
+}
+
 const ROWS: Row[] = [
   { key: "null", type: null, title: "Aivory Console" },
   ...PREBUILT_AGENTS.map((a) => ({ key: a.type, type: a.type, title: a.title, enterprise: a.enterprise })),
@@ -75,6 +83,7 @@ export default function MissionControl({
   onOpenAgent,
 }: MissionControlProps) {
   const [wsRows, setWsRows] = useState<{ id: string; title: string; status: string; priority: string }[]>([])
+  const [activities, setActivities] = useState<Activity[]>([])
   const [wsBusy, setWsBusy] = useState<string | null>(null)
   const [awarenessPeers, setAwarenessPeers] = useState<Array<{ name: string; color: string; agentType: string }>>([])
 
@@ -84,12 +93,19 @@ export default function MissionControl({
        try {
          if (!workspaceId) {
            setWsRows([])
+           setActivities([])
            return
          }
          const r = await fetch(`/api/workspace/${workspaceId}/database`, { headers: collabAuthHeaders() })
-        if (!r.ok) return
-        const j = await r.json()
-        if (alive) setWsRows((j.rows ?? []).slice(0, 3))
+         const activityResponse = await fetch(`/api/workspace/${workspaceId}/activity`, { headers: collabAuthHeaders() })
+         if (alive && r.ok) {
+           const j = await r.json()
+           setWsRows((j.rows ?? []).slice(0, 3))
+         }
+         if (alive && activityResponse.ok) {
+           const j = await activityResponse.json()
+           setActivities((j.activities ?? []).slice(0, 6))
+         }
       } catch {}
     }
     load()
@@ -259,7 +275,7 @@ export default function MissionControl({
         </div>
 
          {/* Workspace activity and active collaborators */}
-         {visibleAwarenessPeers.length > 0 && (
+        {visibleAwarenessPeers.length > 0 && (
           <div className="mt-8">
             <div className="mb-2 flex items-center gap-1.5 text-[11px] text-white/30">
               <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
@@ -276,6 +292,25 @@ export default function MissionControl({
                   />
                 ))}
               </span>
+            </div>
+          </div>
+        )}
+        {activities.length > 0 && (
+          <div className="mt-8">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-[12px] font-medium uppercase tracking-wider text-white/40">Recent activity</span>
+              <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] text-white/40">{activities.length}</span>
+            </div>
+            <div className="flex flex-col gap-2">
+              {activities.map((activity) => (
+                <div key={activity.id} className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3.5 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-[12px] font-medium text-white/70">{activity.actor_name ?? activity.actor_type}</span>
+                    <span className="shrink-0 text-[10px] text-white/25">{relativeTime(new Date(activity.created_at).getTime())}</span>
+                  </div>
+                  <div className="mt-1 text-[12px] text-white/45">{activity.summary}</div>
+                </div>
+              ))}
             </div>
           </div>
         )}

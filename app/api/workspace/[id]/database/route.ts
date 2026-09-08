@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import * as Y from "yjs"
 import { query } from "@/lib/db"
 import { workspaceCredential, collabAuthHeaders, authorizeDocFallback, unauthorized, forbidden, type WorkspaceCredential } from "@/lib/workspaceAuth"
+import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 
 export const runtime = "nodejs"
 
@@ -128,6 +129,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     for (const [k, v] of Object.entries(newRow)) m.set(k, v)
     doc.transact(() => arr.push([m]), agentType)
     await saveDoc(id, doc, cred, agentType)
+    await recordWorkspaceActivity({
+      docId: id,
+      credential: cred,
+      agentType,
+      action: 'database.row_created',
+      summary: `Created task “${title}”`,
+      targetType: 'database-row',
+      targetId: newRow.id,
+      metadata: { status, priority, assignee, due },
+    })
     return NextResponse.json({ id: newRow.id, row: newRow, agentType }, { status: 201 })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })

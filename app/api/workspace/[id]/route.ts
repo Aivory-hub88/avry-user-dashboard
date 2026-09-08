@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { workspaceCredential, unauthorized, forbidden } from '@/lib/workspaceAuth'
 import { getDocRole, canWrite } from '@/lib/workspaceAccess'
+import { recordWorkspaceActivity } from '@/lib/workspaceActivity'
 
 export const runtime = 'nodejs'
 
@@ -25,6 +26,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       `UPDATE dashboard.workspace_docs SET title = $2, updated_at = now() WHERE id = $1 OR id = $3`,
       [`workspace:${id}`, title, id],
     )
+    await recordWorkspaceActivity({
+      docId: id,
+      credential: cred,
+      action: 'page.renamed',
+      summary: `Renamed page to “${title}”`,
+      targetType: 'page',
+      targetId: id,
+    })
     return NextResponse.json({ id, title })
   } catch (e) {
     console.error('[workspace rename]', e)
