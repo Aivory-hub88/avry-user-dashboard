@@ -42,6 +42,11 @@ function toBlocks(yArray: Y.Array<Y.Map<unknown>>): Block[] {
   }))
 }
 
+function isLegacyPrototypeContent(blocks: Block[]) {
+  const text = blocks.map((block) => block.text).join("\n")
+  return text.includes("Yjs Doc active") && (text.includes("Try typing") || text.includes("Agents can create rows"))
+}
+
 function blockClass(type: BlockType) {
   if (type === "h1") return "text-[30px] font-semibold leading-tight text-white/90"
   if (type === "h2") return "text-[21px] font-medium leading-tight text-white/85"
@@ -64,7 +69,7 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
     readOnlyRef.current = readOnly
   }, [readOnly])
 
-  const storageKey = `aivory:workspace:yjs:v2:${docId}`
+  const storageKey = `aivory:workspace:yjs:v3:${docId}`
   const agentOrigin = () => (typeof window !== "undefined" ? localStorage.getItem("aivory:agentType") || "user" : "user")
 
   useEffect(() => {
@@ -95,6 +100,18 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
       }, 500)
     }
 
+    const clearLegacyPrototype = () => {
+      if (readOnlyRef.current || !isLegacyPrototypeContent(toBlocks(yArray))) return false
+      doc.transact(() => {
+        yArray.delete(0, yArray.length)
+        yArray.push([
+          yMapFromBlock({ id: uid(), type: "h1", text: "" }),
+          yMapFromBlock({ id: uid(), type: "p", text: "" }),
+        ])
+      }, agentOrigin())
+      return true
+    }
+
     const observer = () => {
       if (!alive) return
       setBlocks(toBlocks(yArray))
@@ -110,21 +127,25 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
       .then((buffer) => {
         if (!alive) return
         if (buffer && buffer.byteLength > 0) Y.applyUpdate(doc, new Uint8Array(buffer))
+        const legacy = isLegacyPrototypeContent(toBlocks(yArray))
+        if (legacy) clearLegacyPrototype()
         if (yArray.length === 0 && !readOnlyRef.current) {
           doc.transact(() => {
             yArray.push([yMapFromBlock({ id: uid(), type: "h1", text: "" })])
             yArray.push([yMapFromBlock({ id: uid(), type: "p", text: "" })])
           }, agentOrigin())
         }
-        setBlocks(toBlocks(yArray))
+        setBlocks(legacy && readOnlyRef.current ? [] : toBlocks(yArray))
         setReady(true)
       })
       .catch(() => {
         if (!alive) return
+        const legacy = isLegacyPrototypeContent(toBlocks(yArray))
+        if (legacy) clearLegacyPrototype()
         if (yArray.length === 0 && !readOnlyRef.current) {
           doc.transact(() => yArray.push([yMapFromBlock({ id: uid(), type: "p", text: "" })]), agentOrigin())
         }
-        setBlocks(toBlocks(yArray))
+        setBlocks(legacy && readOnlyRef.current ? [] : toBlocks(yArray))
         setReady(true)
       })
 
