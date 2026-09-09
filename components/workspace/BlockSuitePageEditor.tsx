@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation"
 import type { Doc } from "@blocksuite/store"
 import { DocCollection } from "@blocksuite/store"
 import { createEmptyDoc } from "@blocksuite/presets"
+import { ThemeProvider } from "@blocksuite/blocks"
+import { ColorScheme } from "@blocksuite/affine-model"
+import type { BlockStdScope } from "@blocksuite/block-std"
 import { effects as installBlockEffects } from "@blocksuite/blocks/effects"
 import { effects as installPresetEffects } from "@blocksuite/presets/effects"
 import { WebsocketProvider } from "y-websocket"
@@ -21,6 +24,8 @@ type AffineEditorContainerElement = HTMLElement & {
   doc: Doc
   mode: EditorDocMode
   switchEditor: (mode: EditorDocMode) => void
+  readonly std: BlockStdScope
+  readonly updateComplete: Promise<unknown>
 }
 
 type TextBearingModel = {
@@ -270,12 +275,35 @@ export default function BlockSuitePageEditor({
       containerRef.current = editor
       mount.replaceChildren(editor)
     }
-    // BlockSuite's ThemeObserver defaults to light and only reacts to
-    // *mutations* of documentElement[data-theme] — a value set before the
-    // editor connects is never picked up. Re-assert dark after connect so the
-    // mutation fires while the observer exists (idempotent on remounts).
-    document.documentElement.dataset.theme = "dark"
-    return () => mount.replaceChildren()
+    // Theme: the container picks its page AND edgeless palettes from
+    // ThemeService signals that default to Light. The singleton
+    // ThemeObserver only flips them on *mutations* of
+    // documentElement[data-theme] that happen AFTER it starts observing — a
+    // write issued before first render is silently missed, which is exactly
+    // the stuck-light-canvas / dark-text-on-dark-shell bug. So: wait for
+    // first render (observer exists by then), force a real mutation, then
+    // set both signals directly (deterministic, no timing luck).
+    let cancelled = false
+    void (async () => {
+      try {
+        await editor.updateComplete
+      } catch {}
+      if (cancelled) return
+      try {
+        const root = document.documentElement
+        delete root.dataset.theme
+        root.dataset.theme = "dark"
+      } catch {}
+      try {
+        const service = editor.std.get(ThemeProvider)
+        service.app$.value = ColorScheme.Dark
+        service.edgeless$.value = ColorScheme.Dark
+      } catch {}
+    })()
+    return () => {
+      cancelled = true
+      mount.replaceChildren()
+    }
   }, [pageDoc])
 
   // Apply mode switches (user toggle, initial meta, remote awareness) to the
