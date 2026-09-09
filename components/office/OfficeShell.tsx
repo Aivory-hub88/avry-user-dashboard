@@ -16,15 +16,14 @@
  * elements via cloneElement, rather than each panel silently deciding its
  * own pixel width the way flex children could get away with.
  *
- * Below MIN_WIDTH, the grid doesn't render at all — a fixed-ratio track
- * still degrades gracefully in the sense that nothing overlaps, but three
- * columns squeezed into too little space just produces an unreadable
- * sliver of chat. Refusing outright (this product is desktop-only by
- * design — see [user-dashboard-local-preview] memory) is more honest than
- * a degraded layout nobody asked for.
+ * Below MIN_WIDTH the grid auto-collapses both side panels to stubs instead
+ * of refusing to render: three columns squeezed into too little space produce
+ * an unreadable sliver of chat, but locking the user out on an ordinary
+ * laptop (viewport minus the global nav sidebar) is worse. Collapsing hands
+ * the freed space straight to the `1fr` chat column, so MissionControl stays
+ * visible with the sidebar open. Manual expand is honored again once wider.
  */
 import { cloneElement, isValidElement } from "react"
-import { Monitor } from "lucide-react"
 import { useAgentColumnCollapse } from "@/hooks/useAgentColumnCollapse"
 import { useRailCollapse } from "@/hooks/useRailCollapse"
 import { useMinWidth } from "@/hooks/useMinWidth"
@@ -47,40 +46,28 @@ export default function OfficeShell({
   const railCol = useRailCollapse()
   const { ref, tooNarrow } = useMinWidth<HTMLDivElement>(MIN_WIDTH)
 
-  if (tooNarrow) {
-    return (
-      <div ref={ref} className="grid h-full w-full place-items-center bg-surface-1 px-8 text-center">
-        <div className="max-w-[320px]">
-          <Monitor className="mx-auto mb-3 h-6 w-6 text-white/25" />
-          {/* Not <p> — a global `main p` style overrides Tailwind's own
-              font-size/color/margin on any plain paragraph tag here. */}
-          <div className="mb-1.5 text-[14px] font-medium leading-tight text-white/70">Widen your window</div>
-          <div className="text-[12.5px] font-light leading-[1.55] text-white/40">
-            The working office needs more room to show your agents, the conversation, and
-            their status side by side. It isn&apos;t built for narrower screens yet.
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Narrow office: force both side panels to stubs so the conversation keeps
+  // the room. Manual collapse state is untouched and applies again once wide.
+  const agentCollapsed = agentCol.collapsed || tooNarrow
+  const railCollapsed = railCol.collapsed || tooNarrow
 
   const gridTemplateColumns = [
-    agentCol.collapsed ? STUB_WIDTH : AGENT_COL_TRACK,
+    agentCollapsed ? STUB_WIDTH : AGENT_COL_TRACK,
     "1fr",
-    railCol.collapsed ? STUB_WIDTH : RAIL_TRACK,
+    railCollapsed ? STUB_WIDTH : RAIL_TRACK,
   ].join(" ")
 
   return (
     <div ref={ref} className="grid h-full w-full min-w-0 overflow-hidden bg-surface-1" style={{ gridTemplateColumns }}>
       <div className="min-h-0 min-w-0">
         {isValidElement(agentColumn)
-          ? cloneElement(agentColumn, { collapsed: agentCol.collapsed, onToggleCollapse: agentCol.toggle })
+          ? cloneElement(agentColumn, { collapsed: agentCollapsed, onToggleCollapse: agentCol.toggle })
           : agentColumn}
       </div>
       <div className="flex min-h-0 min-w-0 flex-col">{children}</div>
       <div className="min-h-0 min-w-0">
         {isValidElement(rail)
-          ? cloneElement(rail, { collapsed: railCol.collapsed, onToggleCollapse: railCol.toggle })
+          ? cloneElement(rail, { collapsed: railCollapsed, onToggleCollapse: railCol.toggle })
           : rail}
       </div>
     </div>
