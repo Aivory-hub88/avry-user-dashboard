@@ -6,7 +6,8 @@ import { WebsocketProvider } from "y-websocket"
 import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2 } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 
-type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; due: string }
+type RowComment = { id: string; text: string; author: string; at: string }
+type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; due: string; description: string; comments: RowComment[] }
 
 const STATUSES = ["Todo", "Doing", "Done"] as const
 const PRIORITIES = ["Low", "Med", "High"] as const
@@ -28,14 +29,23 @@ function yMapFromRow(r: Row): Y.Map<unknown> {
 }
 
 function toRows(arr: Y.Array<Y.Map<unknown>>): Row[] {
-  return arr.toArray().map((m) => ({
-    id: (m.get("id") as string) ?? uid(),
-    title: (m.get("title") as string) ?? "",
-    status: (m.get("status") as string) ?? "Todo",
-    priority: (m.get("priority") as Row["priority"]) ?? "Med",
-    assignee: (m.get("assignee") as string) ?? "",
-    due: (m.get("due") as string) ?? "",
-  }))
+  return arr.toArray().map((m) => {
+    const rawComments = m.get("comments")
+    let comments: RowComment[] = []
+    if (Array.isArray(rawComments)) {
+      comments = (rawComments as unknown[]).filter((c): c is RowComment => !!c && typeof c === "object" && typeof (c as RowComment).id === "string" && typeof (c as RowComment).text === "string").slice(0, 100) as RowComment[]
+    }
+    return {
+      id: (m.get("id") as string) ?? uid(),
+      title: (m.get("title") as string) ?? "",
+      status: (m.get("status") as string) ?? "Todo",
+      priority: (m.get("priority") as Row["priority"]) ?? "Med",
+      assignee: (m.get("assignee") as string) ?? "",
+      due: (m.get("due") as string) ?? "",
+      description: (m.get("description") as string) ?? "",
+      comments,
+    }
+  })
 }
 
 function PriorityPill({ p }: { p: Row["priority"] }) {
@@ -88,7 +98,10 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   const [activeViewId, setActiveViewId] = useState<string | null>(null)
   const [viewsLoaded, setViewsLoaded] = useState(false)
   const [savingView, setSavingView] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [commentDraft, setCommentDraft] = useState("")
   const [ready, setReady] = useState(false)
+  const selectedRow = selectedId ? rows.find((r) => r.id === selectedId) ?? null : null
   const readOnlyRef = useRef(readOnly)
   useEffect(() => {
     readOnlyRef.current = readOnly
@@ -242,7 +255,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
-    const r: Row = { id: uid(), title: "", status: "Todo", priority: "Med", assignee: "", due: "" }
+    const r: Row = { id: uid(), title: "", status: "Todo", priority: "Med", assignee: "", due: "", description: "", comments: [] }
     doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
   }
 
@@ -272,6 +285,14 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   const onDropKanban = (e: React.DragEvent, status: string) => {
     const id = e.dataTransfer.getData("text/plain")
     if (id) updateRow(id, { status })
+  }
+
+  const addComment = () => {
+    if (!selectedRow || !commentDraft.trim() || readOnlyRef.current) return
+    const author = (typeof window !== "undefined" ? localStorage.getItem("aivory:userId") || localStorage.getItem("aivory:agentType") || "You" : "You") as string
+    const next = [...selectedRow.comments, { id: `c-${Date.now().toString(36)}`, text: commentDraft.trim().slice(0, 500), author, at: new Date().toISOString() }]
+    updateRow(selectedRow.id, { comments: next } as unknown as Partial<Row>)
+    setCommentDraft("")
   }
 
   const baseFiltered = rows.filter((r) => {
@@ -449,6 +470,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Priority</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Assignee</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Due</th>
+                  <th className="px-2 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -516,6 +538,11 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                         />
                       </div>
                     </td>
+                    <td className="px-2 py-3 text-right">
+                      <button onClick={() => setSelectedId(r.id)} title="Open row detail" className="rounded-full bg-white/[0.06] px-2 py-1 text-[11px] text-white/50 hover:bg-white/[0.10] hover:text-white/80">
+                        Open
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -558,16 +585,21 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                       className="group cursor-grab rounded-[12px] border border-line bg-surface-1 p-4 shadow-sm transition hover:border-white/10 active:cursor-grabbing"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 text-[13.5px] font-medium leading-snug text-white/85">{r.title || "Untitled"}</div>
-                        {!readOnly && (
-                          <button
-                            onClick={() => deleteRow(r.id)}
-                            title="Delete card"
-                            className="shrink-0 rounded px-1 text-[12px] text-white/20 opacity-0 hover:text-white/60 group-hover:opacity-100"
-                          >
-                            ✕
-                          </button>
-                        )}
+                        <button onClick={() => setSelectedId(r.id)} className="min-w-0 flex-1 text-left text-[13.5px] font-medium leading-snug text-white/85 hover:text-white">
+                          {r.title || "Untitled"}
+                        </button>
+                        <span className="flex shrink-0 items-center gap-1">
+                          <button onClick={() => setSelectedId(r.id)} title="Open detail" className="rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-white/50 opacity-0 hover:bg-white/[0.10] group-hover:opacity-100">Open</button>
+                          {!readOnly && (
+                            <button
+                              onClick={() => deleteRow(r.id)}
+                              title="Delete card"
+                              className="shrink-0 rounded px-1 text-[12px] text-white/20 opacity-0 hover:text-white/60 group-hover:opacity-100"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </span>
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <PriorityPill p={r.priority} />
@@ -645,6 +677,85 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Row detail drawer — AppFlowy-style: click a row/card to edit description & thread comments */}
+      {selectedRow && (
+        <div className="fixed inset-0 z-40 flex justify-end bg-black/40 backdrop-blur-[2px]" onClick={() => setSelectedId(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="flex h-full w-full max-w-[420px] flex-col border-l border-line bg-[#1a1a18] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-line px-4 py-3">
+              <span className="text-[12px] font-medium uppercase tracking-wider text-white/40">Row detail</span>
+              <button onClick={() => setSelectedId(null)} className="rounded-full bg-white/[0.06] px-3 py-1 text-[12px] text-white/60 hover:bg-white/[0.10]">Close</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <label className="block text-[11px] uppercase tracking-wider text-white/30">Title</label>
+              <input
+                value={selectedRow.title}
+                disabled={readOnly}
+                onChange={(e) => updateRow(selectedRow.id, { title: e.target.value })}
+                placeholder="Untitled"
+                className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-3 py-2 text-[13px] text-white/85 outline-none placeholder:text-white/25 disabled:opacity-60"
+              />
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-[11px] uppercase tracking-wider text-white/30">Status</span>
+                  <select value={selectedRow.status} disabled={readOnly} onChange={(e) => updateRow(selectedRow.id, { status: e.target.value })} className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-2.5 py-2 text-[12px] text-white/70 outline-none disabled:opacity-60">
+                    {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="text-[11px] uppercase tracking-wider text-white/30">Priority</span>
+                  <select value={selectedRow.priority as string} disabled={readOnly} onChange={(e) => updateRow(selectedRow.id, { priority: e.target.value as Row["priority"] })} className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-2.5 py-2 text-[12px] text-white/70 outline-none disabled:opacity-60">
+                    {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="text-[11px] uppercase tracking-wider text-white/30">Assignee</span>
+                  <input value={selectedRow.assignee} disabled={readOnly} onChange={(e) => updateRow(selectedRow.id, { assignee: e.target.value })} placeholder="—" className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-3 py-2 text-[12px] text-white/60 outline-none placeholder:text-white/25 disabled:opacity-60" />
+                </label>
+                <label className="block">
+                  <span className="text-[11px] uppercase tracking-wider text-white/30">Due</span>
+                  <input type="date" value={selectedRow.due} disabled={readOnly} onChange={(e) => updateRow(selectedRow.id, { due: e.target.value })} className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-3 py-2 text-[12px] text-white/60 outline-none disabled:opacity-60" />
+                </label>
+              </div>
+              <label className="mt-4 block">
+                <span className="text-[11px] uppercase tracking-wider text-white/30">Description</span>
+                <textarea value={selectedRow.description} disabled={readOnly} onChange={(e) => updateRow(selectedRow.id, { description: e.target.value })} placeholder="Add details…" rows={4} className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-3 py-2 text-[13px] text-white/70 outline-none placeholder:text-white/25 disabled:opacity-60" />
+              </label>
+
+              <div className="mt-6 border-t border-line pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] uppercase tracking-wider text-white/30">Comments · {selectedRow.comments.length}</span>
+                  {!readOnly && selectedRow.comments.length > 0 && <span className="text-[11px] text-white/20">Newest last</span>}
+                </div>
+                <div className="mt-3 flex flex-col gap-2">
+                  {selectedRow.comments.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-white/10 py-6 text-center text-[12px] text-white/30">No comments yet.</div>
+                  ) : (
+                    selectedRow.comments.map((c) => (
+                      <div key={c.id} className="rounded-xl border border-line bg-white/[0.03] px-3 py-2.5">
+                        <div className="flex items-center justify-between text-[11px] text-white/30">
+                          <span className="font-medium text-white/50">{c.author}</span>
+                          <span>{new Date(c.at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                        </div>
+                        <div className="mt-1 text-[12px] leading-relaxed text-white/75">{c.text}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {!readOnly && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <input value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addComment() } }} placeholder="Write a comment…" className="flex-1 rounded-full border border-line bg-white/[0.04] px-3 py-2 text-[12px] text-white/80 placeholder:text-white/25 outline-none" />
+                    <button onClick={addComment} disabled={!commentDraft.trim()} className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40">Send</button>
+                  </div>
+                )}
+                {!readOnly && (
+                  <button onClick={() => { if (confirm("Delete this row?")) { deleteRow(selectedRow.id); setSelectedId(null) } }} className="mt-4 w-full rounded-full border border-red-500/20 bg-red-500/10 py-2 text-[12px] text-red-300 hover:bg-red-500/15">Delete row</button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
