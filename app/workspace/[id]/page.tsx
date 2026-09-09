@@ -35,6 +35,7 @@ type Meta = {
   props: DocProps
   created_at: string | null
   updated_at: string | null
+  deleted_at: string | null
   myRole: string | null
   myRequest: { id: string; status: string; role_requested: string } | null
 }
@@ -86,6 +87,7 @@ export default function WorkspaceDocPage() {
           props: (j as Meta).props && typeof (j as Meta).props === "object" ? (j as Meta).props : {},
           created_at: (j as Meta).created_at ?? null,
           updated_at: (j as Meta).updated_at ?? null,
+          deleted_at: (j as Meta).deleted_at ?? null,
         })
         setStatus('ok')
       } else setStatus('locked')
@@ -171,6 +173,7 @@ export default function WorkspaceDocPage() {
 
   const isOwner = meta?.myRole === 'owner'
   const canWrite = meta?.myRole === 'owner' || meta?.myRole === 'editor'
+  const isTrashed = !!meta?.deleted_at
 
   const saveTitle = async () => {
     const t = titleDraft.trim()
@@ -241,6 +244,20 @@ export default function WorkspaceDocPage() {
     } catch {}
     setBusy(false)
     setConfirmDelete(false)
+  }
+
+  const restoreDoc = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const r = await fetch(`/api/workspace/${id}`, { method: 'POST', headers: collabAuthHeaders() })
+      if (r.ok) {
+        const j = await r.json().catch(() => ({}))
+        void j
+        await loadMeta()
+      }
+    } catch {}
+    setBusy(false)
   }
 
   return (
@@ -344,6 +361,15 @@ export default function WorkspaceDocPage() {
           )}
         </div>
       </div>
+      {isTrashed && (
+        <div className="flex items-center justify-between gap-3 border-b border-amber-500/20 bg-amber-500/10 px-6 py-3 text-[12px] text-amber-200">
+          <span>This page is in trash — it’s hidden from the list until restored.</span>
+          <span className="flex items-center gap-2">
+            <button onClick={restoreDoc} disabled={busy} className="rounded-full bg-white px-3 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-50">Restore</button>
+            <Link href="/workspace" className="text-[11px] text-amber-200/70 underline">Back to workspace</Link>
+          </span>
+        </div>
+      )}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <WorkspaceNavigator currentId={id} />
         <div className="min-w-0 flex-1 overflow-y-auto px-8 py-8 lg:px-10 xl:px-12">

@@ -13,10 +13,11 @@ function newId(): string {
 export async function GET(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const showTrash = req.nextUrl.searchParams.get('trash') === '1'
   try {
     const r = await query(
-      `SELECT id, workspace_id, owner, title, mode, favorite, updated_at, octet_length(yjs_update) as bytes
-       FROM dashboard.workspace_docs ORDER BY updated_at DESC LIMIT 100`,
+      `SELECT id, workspace_id, owner, title, mode, favorite, deleted_at, updated_at, octet_length(yjs_update) as bytes
+       FROM dashboard.workspace_docs WHERE deleted_at IS ${showTrash ? 'NOT NULL' : 'NULL'} ORDER BY updated_at DESC LIMIT 100`,
     )
     const visible: any[] = []
     for (const row of r.rows) {
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
           title: row.title ?? bare,
           mode: row.mode === 'edgeless' ? 'edgeless' : 'page',
           favorite: row.favorite === true,
+          deleted_at: row.deleted_at ?? null,
           updated_at: row.updated_at,
           bytes: Number(row.bytes ?? 0),
           myRole: role,

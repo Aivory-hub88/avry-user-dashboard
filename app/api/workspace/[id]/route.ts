@@ -159,9 +159,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 }
 
-// DELETE /api/workspace/[id] — owner/admin only. Removes rows + ACL + requests.
-// Note: collab in-memory rooms are NOT purged; a still-open client that writes
-// afterwards will re-create the rows as a new doc (accepted MVP behavior).
+// DELETE /api/workspace/[id] — soft delete (owner only). Sets deleted_at.
+// Hard delete is now via ?hard=1 or via restore flow. Collab room not purged
+// (still-open client that writes afterwards will still have soft-deleted doc
+// hidden from list until restored — accepted).
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const cred = workspaceCredential(req)
@@ -169,16 +170,45 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const role = await getDocRole(cred, id)
   const isOwner = role === 'owner'
   if (!isOwner) return forbidden()
+  const hard = req.nextUrl.searchParams.get('hard') === '1'
   try {
-    await query(
-      `DELETE FROM dashboard.workspace_docs WHERE id = ANY($1::text[])`,
-      [[id, `workspace:${id}`, `workspace:db:${id}`, `db:${id}`]],
-    )
-    await query(`DELETE FROM dashboard.workspace_doc_acl WHERE doc_id = $1`, [id])
-    await query(`DELETE FROM dashboard.workspace_access_requests WHERE doc_id = $1`, [id])
-    return NextResponse.json({ ok: true, id })
+    if (hard) {
+      await query(`DELETE FROM dashboard.workspace_docs WHERE id = ANY($1::text[])`, [[id, `workspace:${id}`, `workspace:db:${id}`, `db:${id}`]])
+      await query(`DELETE FROM dashboard.workspace_doc_acl WHERE doc_id = $1`, [id])
+      await query(`DELETE FROM dashboard.workspace_access_requests WHERE doc_id = $1`, [id])
+      await query(`DELETE FROM dashboard.workspace_doc_links WHERE src = $1 OR dst = $1`, [id])
+    } else {
+      await query(`UPDATE dashboard.workspace_docs SET deleted_at = now() WHERE id = ANY($1::text[]) AND deleted_at IS NULL`, [[id, `workspace:${id}`, `workspace:db:${id}`, `db:${id}`]])
+    }
+    return NextResponse.json({ ok: true, id, hard })
   } catch (e) {
     console.error('[workspace delete]', e)
+    return NextResponse.json({ error: 'db' }, { status: 500 })
+  }
+}
+
+// POST /api/workspace/[id]/restore — owner only, clears deleted_at
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const cred = workspaceCredential(req)
+  if (!cred) return unauthorized()
+  const role = await getDocRole(cred, id)
+  // Even if soft-deleted, owner's ACL still resolvable via workspace_doc_acl, so check owner via direct query
+  const isOwner = role === 'owner'
+  if (!isOwner) {
+    // Fallback: check workspace_docs owner directly for soft-deleted rows (getDocRole filters deleted)
+    try {
+      const r = await query(`SELECT owner FROM dashboard.workspace_docs WHERE id = $1 OR id = $2 LIMIT 1`, [id, `workspace:${id}`])
+      const owner = r.rows[0]?.owner as string | undefined
+      const caller = cred.kind === 'user' ? cred.user.user_id : 'service'
+      if (owner !== caller) return forbidden()
+    } catch { return forbidden() }
+  }
+  try {
+    await query(`UPDATE dashboard.workspace_docs SET deleted_at = NULL WHERE id = ANY($1::text[])`, [[id, `workspace:${id}`, `workspace:db:${id}`, `db:${id}`]])
+    return NextResponse.json({ ok: true, id })
+  } catch (e) {
+    console.error('[workspace restore]', e)
     return NextResponse.json({ error: 'db' }, { status: 500 })
   }
 }
