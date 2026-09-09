@@ -15,7 +15,7 @@ import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 import { useWorkspaceContext } from "@/contexts/WorkspaceContext"
-import { Share2, Star, Trash2, Sparkles } from "lucide-react"
+import { Share2, Star, Trash2, Sparkles, Download, FileDown, Presentation } from "lucide-react"
 
 const BlockSuitePageEditor = dynamic(() => import("@/components/workspace/BlockSuitePageEditor"), {
   ssr: false,
@@ -64,6 +64,8 @@ export default function WorkspaceDocPage() {
   const [showOutline, setShowOutline] = useState(false)
   const [showAI, setShowAI] = useState(false)
   const [aiDocText, setAiDocText] = useState("")
+  const [showExport, setShowExport] = useState(false)
+  const [present, setPresent] = useState(false)
   const loginUrl = `${getMarketingUrl()}/login`
   const { setActiveWorkspaceId } = useWorkspaceContext()
 
@@ -326,6 +328,69 @@ export default function WorkspaceDocPage() {
             >
               <Sparkles className="h-3.5 w-3.5" /> AI
             </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowExport((v) => !v)}
+                title="Export"
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[12px] ${showExport ? "bg-white/[0.1] text-white/85" : "text-white/35 hover:bg-white/[0.06] hover:text-white/80"}`}
+              >
+                <Download className="h-3.5 w-3.5" /> Export
+              </button>
+              {showExport && (
+                <div className="absolute right-0 top-full z-20 mt-2 w-[200px] rounded-2xl border border-line bg-[#1e1e1c] p-2 shadow-2xl">
+                  <button
+                    onClick={() => {
+                      const md = `# ${meta?.title ?? "Untitled"}\n\n${aiDocText || "_No content yet_"}\n\n---\nTags: ${(meta?.tags ?? []).map((t) => t.label).join(", ") || "—"}\n`
+                      const blob = new Blob([md], { type: "text/markdown;charset=utf-8" })
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement("a")
+                      a.href = url
+                      a.download = `${(meta?.title ?? id).replace(/[^a-z0-9-_ ]/gi, "_")}.md`
+                      a.click()
+                      URL.revokeObjectURL(url)
+                      setShowExport(false)
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] text-white/70 hover:bg-white/[0.06] hover:text-white"
+                  >
+                    <FileDown className="h-3.5 w-3.5" /> Markdown (.md)
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const { default: jsPDF } = await import("jspdf")
+                        const doc = new jsPDF({ unit: "pt", format: "a4" })
+                        const title = meta?.title ?? "Untitled"
+                        const margin = 40
+                        let y = margin
+                        doc.setFontSize(18)
+                        doc.text(title, margin, y)
+                        y += 18
+                        if (meta?.icon) { doc.setFontSize(22); doc.text(meta.icon, margin, y); y += 20 }
+                        doc.setFontSize(10)
+                        doc.setTextColor(110)
+                        const lines: string[] = doc.splitTextToSize(aiDocText || "No content yet.", 515)
+                        for (const line of lines.slice(0, 80)) {
+                          if (y > 800) { doc.addPage(); y = margin }
+                          doc.text(line, margin, y)
+                          y += 13
+                        }
+                        doc.save(`${title.replace(/[^a-z0-9-_ ]/gi, "_")}.pdf`)
+                      } catch (e) { console.error(e) }
+                      setShowExport(false)
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] text-white/70 hover:bg-white/[0.06] hover:text-white"
+                  >
+                    <FileDown className="h-3.5 w-3.5" /> PDF (.pdf)
+                  </button>
+                  <button
+                    onClick={() => { setPresent(true); setShowExport(false) }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] text-white/70 hover:bg-white/[0.06] hover:text-white"
+                  >
+                    <Presentation className="h-3.5 w-3.5" /> Present
+                  </button>
+                </div>
+              )}
+            </div>
             {canWrite && (
               <button
                 onClick={toggleFavorite}
@@ -489,6 +554,19 @@ export default function WorkspaceDocPage() {
           </div>
         )}
       </div>
+      {present && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-[#0f0f0e] p-8">
+          <div className="mx-auto flex w-full max-w-[860px] items-center justify-between">
+            <span className="text-[11px] uppercase tracking-wider text-white/30">Present — {meta?.title ?? id}</span>
+            <button onClick={() => setPresent(false)} className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black">Exit</button>
+          </div>
+          <div className="mx-auto mt-8 w-full max-w-[720px] flex-1 overflow-y-auto">
+            <div className="text-[40px] font-bold leading-tight text-white/90">{meta?.icon ? `${meta.icon} ` : ""}{meta?.title ?? "Untitled"}</div>
+            <div className="mt-6 whitespace-pre-wrap text-[16px] leading-relaxed text-white/70">{aiDocText || "No content yet."}</div>
+            {(meta?.tags ?? []).length > 0 && <div className="mt-6 flex flex-wrap gap-1.5">{(meta?.tags ?? []).map((t) => <span key={t.id} className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/50">{t.label}</span>)}</div>}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

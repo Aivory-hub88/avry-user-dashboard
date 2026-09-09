@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
 import { Link2, ArrowLeftRight, Plus, Trash2 } from "lucide-react"
 import { collabAuthHeaders } from "@/lib/collabClient"
+import { PeekableDocLink } from "./WorkspacePeek"
 
 type DocBrief = { id: string; title: string }
 type LinkRow = { src: string; dst: string; created_at: string }
@@ -87,9 +87,9 @@ export default function WorkspaceBacklinks({ docId, canWrite }: { docId: string;
             <div className="flex flex-col gap-1">
               {outgoing.map((l) => (
                 <div key={l.dst} className="flex items-center justify-between rounded-xl border border-line bg-white/[0.03] px-3 py-2">
-                  <Link href={`/workspace/${l.dst}`} className="truncate text-[12px] text-white/70 hover:text-white">
+                  <PeekableDocLink docId={l.dst} className="truncate text-[12px] text-white/70 hover:text-white">
                     {titleOf(l.dst)}
-                  </Link>
+                  </PeekableDocLink>
                   {canWrite && (
                     <button onClick={() => removeLink(l.dst)} className="rounded-full p-1 text-white/30 hover:bg-white/[0.06] hover:text-white/60">
                       <Trash2 className="h-3 w-3" />
@@ -121,9 +121,9 @@ export default function WorkspaceBacklinks({ docId, canWrite }: { docId: string;
           ) : (
             <div className="flex flex-col gap-1">
               {incoming.map((l) => (
-                <Link key={l.src} href={`/workspace/${l.src}`} className="rounded-xl border border-line bg-white/[0.03] px-3 py-2 text-[12px] text-white/70 hover:bg-white/[0.04] hover:text-white">
+                <PeekableDocLink key={l.src} docId={l.src} className="rounded-xl border border-line bg-white/[0.03] px-3 py-2 text-[12px] text-white/70 hover:bg-white/[0.04] hover:text-white">
                   {titleOf(l.src)}
-                </Link>
+                </PeekableDocLink>
               ))}
             </div>
           )}
