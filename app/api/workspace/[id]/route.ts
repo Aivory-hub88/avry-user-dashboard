@@ -70,13 +70,51 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!body.props || typeof body.props !== "object" || Array.isArray(body.props)) {
       return NextResponse.json({ error: 'props must be object' }, { status: 400 })
     }
-    // Only allow known flags; strip everything else to avoid JSON bloat.
+    // Only allow known flags + persisted DB views; strip everything else to avoid JSON bloat.
     const allowed: Record<string, unknown> = {}
     const src = body.props as Record<string, unknown>
     if (typeof src.isJournal === "boolean") allowed.isJournal = src.isJournal
     if (typeof src.isTemplate === "boolean") allowed.isTemplate = src.isTemplate
     if (src.pageWidth === "full" || src.pageWidth === "standard") allowed.pageWidth = src.pageWidth
     if (src.edgelessTheme === "light" || src.edgelessTheme === "dark") allowed.edgelessTheme = src.edgelessTheme
+    // Persisted database views (saved filters/sorts) — array of lightweight view configs.
+    // Kept inside props so one JSONB column holds all per-doc UI state, no extra table.
+    if (Array.isArray(src.dbViews)) {
+      const kinds = new Set(["table","kanban","calendar"])
+      const sortFields = new Set(["title","status","priority","due","assignee"])
+      const sortDirs = new Set(["asc","desc"])
+      const cleanedViews: unknown[] = []
+      for (const v of src.dbViews.slice(0, 10)) {
+        if (!v || typeof v !== "object") continue
+        const vv = v as Record<string, unknown>
+        const id = vv.id?.toString().slice(0, 32) || `view-${Math.random().toString(36).slice(2, 6)}`
+        const name = vv.name?.toString().slice(0, 24).trim() || "Untitled"
+        const kind = kinds.has(vv.kind as string) ? (vv.kind as string) : "table"
+        const statusFilter = typeof vv.statusFilter === "string" ? vv.statusFilter.slice(0, 16) : "All"
+        const priorityFilter = typeof vv.priorityFilter === "string" ? vv.priorityFilter.slice(0, 16) : "All"
+        const q = typeof vv.q === "string" ? vv.q.slice(0, 64) : ""
+        const sortField = sortFields.has(vv.sortField as string) ? (vv.sortField as string) : "title"
+        const sortDir = sortDirs.has(vv.sortDir as string) ? (vv.sortDir as string) : "asc"
+        cleanedViews.push({ id, name, kind, statusFilter, priorityFilter, q, sortField, sortDir })
+      }
+      allowed.dbViews = cleanedViews
+    } else if (src.dbViews === undefined) {
+      // No change — handled below via merge below; keep existing value by not touching.
+    }
+    // Merge with existing row's props when caller only patches part of props:
+    // fetch current props, shallow-merge, then write. This keeps other keys intact
+    // when only dbViews is sent, and vice versa.
+    const existingPropsRow = await query(`SELECT props FROM dashboard.workspace_docs WHERE id = $1 OR id = $2 LIMIT 1`, [`workspace:${id}`, id])
+    const existingProps = (existingPropsRow.rows[0]?.props as Record<string, unknown> | null) ?? {}
+    // If caller sent props, merge allowed keys over existing; if they sent e.g. only dbViews, keep other flags.
+    if (body.props !== undefined) {
+      // When dbViews not provided but existing has it, preserve it.
+      if (allowed.dbViews === undefined && Array.isArray(existingProps.dbViews)) allowed.dbViews = existingProps.dbViews
+      // Preserve other existing keys that weren't overwritten (e.g. isJournal when only dbViews patched).
+      for (const k of ["isJournal","isTemplate","pageWidth","edgelessTheme"] as const) {
+        if (allowed[k] === undefined && existingProps[k] !== undefined) allowed[k] = existingProps[k]
+      }
+    }
     props = allowed
     sets.push(`props = $${nextParam++}::jsonb`)
     values.push(JSON.stringify(props))

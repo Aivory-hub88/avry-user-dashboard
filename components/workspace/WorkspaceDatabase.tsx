@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
-import { Table, Kanban, Plus, GripVertical, Calendar, User, Flag } from "lucide-react"
+import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2 } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 
 type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; due: string }
@@ -63,6 +63,17 @@ function StatusPill({ s }: { s: string }) {
   )
 }
 
+type SavedView = {
+  id: string
+  name: string
+  kind: "table" | "kanban" | "calendar"
+  statusFilter: string
+  priorityFilter: string
+  q: string
+  sortField: string
+  sortDir: "asc" | "desc"
+}
+
 export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: string; readOnly?: boolean }) {
   const docRef = useRef<Y.Doc | null>(null)
   const yRowsRef = useRef<Y.Array<Y.Map<unknown>> | null>(null)
@@ -70,11 +81,86 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   const [view, setView] = useState<"table" | "kanban" | "calendar">("table")
   const [statusFilter, setStatusFilter] = useState<string>("All")
   const [priorityFilter, setPriorityFilter] = useState<string>("All")
+  const [q, setQ] = useState("")
+  const [sortField, setSortField] = useState<string>("title")
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
+  const [savedViews, setSavedViews] = useState<SavedView[]>([])
+  const [activeViewId, setActiveViewId] = useState<string | null>(null)
+  const [viewsLoaded, setViewsLoaded] = useState(false)
+  const [savingView, setSavingView] = useState(false)
   const [ready, setReady] = useState(false)
   const readOnlyRef = useRef(readOnly)
   useEffect(() => {
     readOnlyRef.current = readOnly
   }, [readOnly])
+  // Load persisted saved views (tabs like “Current sprint”) from pg props.dbViews.
+  useEffect(() => {
+    let alive = true
+    fetch(`/api/workspace/${docId}/meta`, { headers: collabAuthHeaders() })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!alive || !j) return
+        const raw = (j.props as Record<string, unknown> | undefined)?.dbViews
+        if (Array.isArray(raw)) {
+          const cleaned = raw
+            .filter((v): v is SavedView => !!v && typeof v === "object" && typeof (v as SavedView).id === "string" && typeof (v as SavedView).name === "string")
+            .slice(0, 10) as SavedView[]
+          setSavedViews(cleaned)
+        }
+        setViewsLoaded(true)
+      })
+      .catch(() => { if (alive) setViewsLoaded(true) })
+    return () => { alive = false }
+  }, [docId])
+
+  const persistViews = async (next: SavedView[]) => {
+    setSavedViews(next)
+    try {
+      await fetch(`/api/workspace/${docId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+        body: JSON.stringify({ props: { dbViews: next } }),
+      })
+    } catch {}
+  }
+
+  const applyView = (v: SavedView) => {
+    setActiveViewId(v.id)
+    setView(v.kind)
+    setStatusFilter(v.statusFilter)
+    setPriorityFilter(v.priorityFilter)
+    setQ(v.q)
+    setSortField(v.sortField)
+    setSortDir(v.sortDir)
+  }
+
+  const saveCurrentAsView = async () => {
+    if (savingView || readOnly) return
+    const name = window.prompt("View name", `View ${savedViews.length + 1}`)
+    if (!name || !name.trim()) return
+    setSavingView(true)
+    const next: SavedView = {
+      id: `view-${Date.now().toString(36)}`,
+      name: name.trim().slice(0, 24),
+      kind: view,
+      statusFilter,
+      priorityFilter,
+      q: q.slice(0, 64),
+      sortField,
+      sortDir,
+    }
+    await persistViews([...savedViews, next])
+    setActiveViewId(next.id)
+    setSavingView(false)
+  }
+
+  const deleteView = async (id: string) => {
+    if (readOnly) return
+    const next = savedViews.filter((v) => v.id !== id)
+    await persistViews(next)
+    if (activeViewId === id) setActiveViewId(null)
+  }
+
   // v2: POC-era cached updates were stale demo text; server is source of truth
   const storageKey = `aivory:workspace:db:v2:${docId}`
   const agentOrigin = () => (typeof window !== "undefined" ? (localStorage.getItem("aivory:agentType") || "user") : "user")
@@ -188,9 +274,25 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     if (id) updateRow(id, { status })
   }
 
-  const filtered = rows.filter(
-    (r) => (statusFilter === "All" || r.status === statusFilter) && (priorityFilter === "All" || r.priority === priorityFilter),
-  )
+  const baseFiltered = rows.filter((r) => {
+    const statusOk = statusFilter === "All" || r.status === statusFilter
+    const prioOk = priorityFilter === "All" || r.priority === priorityFilter
+    const needle = q.trim().toLowerCase()
+    const searchOk = !needle || r.title.toLowerCase().includes(needle) || r.assignee.toLowerCase().includes(needle) || r.id.toLowerCase().includes(needle)
+    return statusOk && prioOk && searchOk
+  })
+
+  const priorityRank: Record<string, number> = { High: 3, Med: 2, Low: 1 }
+  const statusRank: Record<string, number> = { Todo: 0, Doing: 1, Done: 2 }
+  const filtered = [...baseFiltered].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1
+    if (sortField === "priority") return (priorityRank[a.priority] - priorityRank[b.priority]) * dir
+    if (sortField === "status") return (statusRank[a.status] - statusRank[b.status]) * dir
+    if (sortField === "due") return ((a.due || "") < (b.due || "") ? -1 : (a.due || "") > (b.due || "") ? 1 : 0) * dir
+    if (sortField === "assignee") return a.assignee.localeCompare(b.assignee) * dir
+    // title default
+    return a.title.localeCompare(b.title) * dir
+  })
 
   // Calendar helpers (current month)
   const now = new Date()
@@ -203,27 +305,61 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
 
   return (
     <div className="mx-auto w-full max-w-[900px]">
+      {/* Saved views tabs — AppFlowy-style: “All” + user saved views (persisted in pg props.dbViews) */}
+      {viewsLoaded && (
+        <div className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1">
+          <button
+            onClick={() => { setActiveViewId(null); setView("table"); setStatusFilter("All"); setPriorityFilter("All"); setQ(""); setSortField("title"); setSortDir("asc") }}
+            className={`shrink-0 rounded-full border px-3 py-1 text-[12px] ${activeViewId === null ? "border-white bg-white text-black" : "border-line bg-white/[0.04] text-white/50 hover:text-white/80"}`}
+          >
+            All
+          </button>
+          {savedViews.map((v) => (
+            <span key={v.id} className={`group inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-[12px] ${activeViewId === v.id ? "border-white bg-white text-black" : "border-line bg-white/[0.04] text-white/50 hover:text-white/80"}`}>
+              <button onClick={() => applyView(v)} className="max-w-[120px] truncate text-left">
+                {v.name}
+              </button>
+              {!readOnly && (
+                <button onClick={() => deleteView(v.id)} title="Delete view" className="rounded-full p-0.5 opacity-40 hover:bg-black/10 group-hover:opacity-80">
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              )}
+            </span>
+          ))}
+          {!readOnly && (
+            <button
+              onClick={saveCurrentAsView}
+              disabled={savingView || savedViews.length >= 10}
+              title={savedViews.length >= 10 ? "Max 10 views" : "Save current filters as a view"}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-white/15 bg-transparent px-3 py-1 text-[12px] text-white/40 hover:text-white/70 disabled:opacity-30"
+            >
+              <BookmarkPlus className="h-3 w-3" /> Save view
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Header — AFFiNE-like database title + view switcher (LobeHub pill style) */}
       <div className="mb-4 flex flex-col gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
               <button
-                onClick={() => setView("table")}
+                onClick={() => { setView("table"); setActiveViewId(null) }}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition ${view === "table" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white/80"}`}
               >
                 <Table className="h-3.5 w-3.5" />
                 Table
               </button>
               <button
-                onClick={() => setView("kanban")}
+                onClick={() => { setView("kanban"); setActiveViewId(null) }}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition ${view === "kanban" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white/80"}`}
               >
                 <Kanban className="h-3.5 w-3.5" />
                 Board
               </button>
               <button
-                onClick={() => setView("calendar")}
+                onClick={() => { setView("calendar"); setActiveViewId(null) }}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition ${view === "calendar" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white/80"}`}
               >
                 <Calendar className="h-3.5 w-3.5" />
@@ -233,7 +369,11 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
             <span className="text-[12px] text-white/25">{filtered.length}/{rows.length}</span>
             {!ready && <span className="text-[11px] text-white/25">Loading…</span>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-3 py-1.5">
+              <Search className="h-3.5 w-3.5 text-white/30" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="w-[110px] bg-transparent text-[12px] text-white/70 placeholder:text-white/25 outline-none" />
+            </label>
             <div className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
               <select
                 value={statusFilter}
@@ -260,6 +400,17 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                   </option>
                 ))}
               </select>
+              <span className="text-white/10">|</span>
+              <select value={sortField} onChange={(e) => setSortField(e.target.value)} className="bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none">
+                <option value="title">Title</option>
+                <option value="status">Status</option>
+                <option value="priority">Priority</option>
+                <option value="due">Due</option>
+                <option value="assignee">Assignee</option>
+              </select>
+              <button onClick={() => setSortDir(sortDir === "asc" ? "desc" : "asc")} title={sortDir === "asc" ? "Ascending" : "Descending"} className="rounded-full bg-white/[0.06] p-1 text-white/50 hover:text-white/80">
+                <ArrowUpNarrowWide className={`h-3.5 w-3.5 transition ${sortDir === "desc" ? "rotate-180" : ""}`} />
+              </button>
             </div>
             {!readOnly && (
               <button
