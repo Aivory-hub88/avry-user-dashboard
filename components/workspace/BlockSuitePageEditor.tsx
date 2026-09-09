@@ -62,6 +62,34 @@ function useDocHasContent(doc: Doc | null) {
   return docHasContent(doc)
 }
 
+function extractDocText(doc: Doc | null): string {
+  if (!doc) return ""
+  try {
+    const parts: string[] = []
+    for (const flavour of ["affine:paragraph", "affine:list", "affine:code", "affine:heading" as string]) {
+      const blocks = doc.getBlocksByFlavour(flavour) as Array<{ model: { text?: { toString?: () => string } | string } }>
+      for (const b of blocks) {
+        const t = b.model.text
+        const s = typeof t === "string" ? t : typeof t?.toString === "function" ? t.toString() : ""
+        if (s && s.trim()) parts.push(s.trim())
+      }
+    }
+    // Fallback: also collect via store's block map if flavour filter missed
+    if (parts.length === 0) {
+      try {
+        const all = doc.getBlocksByFlavour("affine:paragraph") as Array<{ model: { text?: unknown } }>
+        for (const b of all) {
+          const s = (b.model.text as { toString?: () => string } | undefined)?.toString?.() ?? ""
+          if (s.trim()) parts.push(s.trim())
+        }
+      } catch {}
+    }
+    return parts.join("\n").slice(0, 6000)
+  } catch {
+    return ""
+  }
+}
+
 let blockSuiteEffectsInstalled = false
 
 function ensureBlockSuiteEffects() {
@@ -77,12 +105,16 @@ export default function BlockSuitePageEditor({
   initialMode = "page",
   pageTitle = "",
   outlineOpen = false,
+  onDocTextChange,
+  onInsertBlock,
 }: {
   docId: string
   readOnly?: boolean
   initialMode?: EditorDocMode
   pageTitle?: string
   outlineOpen?: boolean
+  onDocTextChange?: (text: string) => void
+  onInsertBlock?: (text: string) => void
 }) {
   const router = useRouter()
   const mountRef = useRef<HTMLDivElement | null>(null)
@@ -292,6 +324,38 @@ export default function BlockSuitePageEditor({
       }
     } catch {}
   }
+
+  // Expose doc text to parent (AI panel) whenever blocks change.
+  useEffect(() => {
+    if (!pageDoc || !onDocTextChange) return
+    const push = () => onDocTextChange(extractDocText(pageDoc))
+    push()
+    const sub = pageDoc.slots.blockUpdated.on(push)
+    return () => sub.dispose()
+  }, [pageDoc, onDocTextChange])
+
+  // Allow parent (AI panel) to insert a block — exposed imperatively on the container.
+  useEffect(() => {
+    if (!pageDoc) return
+    const editor = containerRef.current
+    if (editor) {
+      ;(editor as unknown as Record<string, unknown>).__aivoryInsert = (text: string) => {
+        if (readOnly) return
+        const note = pageDoc.getBlocksByFlavour("affine:note")[0]
+        if (!note) return
+        const lines = text.split("\n").slice(0, 30)
+        for (const line of lines) {
+          const t = line.trim()
+          if (!t) continue
+          if (t.startsWith("- ") || t.startsWith("• ")) {
+            pageDoc.addBlock("affine:list", { type: "bulleted", text: new pageDoc.Text(t.slice(2)) }, note.id)
+          } else {
+            pageDoc.addBlock("affine:paragraph", { type: "text", text: new pageDoc.Text(t) }, note.id)
+          }
+        }
+      }
+    }
+  }, [pageDoc, readOnly])
 
   useEffect(() => {
     if (!mountRef.current || !pageDoc) return

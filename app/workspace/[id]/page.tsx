@@ -7,12 +7,13 @@ import WorkspaceEditor from "@/components/workspace/WorkspaceEditor"
 import dynamic from "next/dynamic"
 import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
 import WorkspaceProperties, { type DocTag, type DocProps } from "@/components/workspace/WorkspaceProperties"
+import WorkspaceAIPanel from "@/components/workspace/WorkspaceAIPanel"
 import SharingPanel from "@/components/workspace/SharingPanel"
 import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 import { useWorkspaceContext } from "@/contexts/WorkspaceContext"
-import { Share2, Star, Trash2 } from "lucide-react"
+import { Share2, Star, Trash2, Sparkles } from "lucide-react"
 
 const BlockSuitePageEditor = dynamic(() => import("@/components/workspace/BlockSuitePageEditor"), {
   ssr: false,
@@ -58,6 +59,8 @@ export default function WorkspaceDocPage() {
   const [showSharing, setShowSharing] = useState(false)
   const [showIconPicker, setShowIconPicker] = useState(false)
   const [showOutline, setShowOutline] = useState(false)
+  const [showAI, setShowAI] = useState(false)
+  const [aiDocText, setAiDocText] = useState("")
   const loginUrl = `${getMarketingUrl()}/login`
   const { setActiveWorkspaceId } = useWorkspaceContext()
 
@@ -297,6 +300,13 @@ export default function WorkspaceDocPage() {
           </div>
          </div>
           <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={() => setShowAI((v) => !v)}
+              title="Cerveau AI"
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] ${showAI ? "bg-violet-500/20 text-violet-200 border border-violet-500/30" : "text-white/35 hover:bg-white/[0.06] hover:text-white/80"}`}
+            >
+              <Sparkles className="h-3.5 w-3.5" /> AI
+            </button>
             {canWrite && (
               <button
                 onClick={toggleFavorite}
@@ -408,7 +418,24 @@ export default function WorkspaceDocPage() {
               </div>
             </>
           )}
-          {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : editor === "blocksuite" ? <BlockSuitePageEditor key={id} docId={id} readOnly={!canWrite} initialMode={meta?.mode ?? "page"} pageTitle={meta?.title ?? ""} outlineOpen={showOutline} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
+          {view === "page" && showAI && (
+            <div className="mx-auto mb-4 w-full max-w-[960px]">
+              <WorkspaceAIPanel
+                docId={id}
+                pageTitle={meta?.title ?? ""}
+                pageIcon={meta?.icon ?? null}
+                tags={meta?.tags ?? []}
+                canWrite={canWrite}
+                docText={aiDocText}
+                onInsertBlock={(text) => {
+                  const el = document.querySelector("affine-editor-container") as unknown as Record<string, unknown> | null
+                  const fn = el?.["__aivoryInsert"] as ((t: string) => void) | undefined
+                  if (fn) fn(text)
+                }}
+              />
+            </div>
+          )}
+          {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : editor === "blocksuite" ? <BlockSuitePageEditor key={id} docId={id} readOnly={!canWrite} initialMode={meta?.mode ?? "page"} pageTitle={meta?.title ?? ""} outlineOpen={showOutline} onDocTextChange={setAiDocText} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
           {!canWrite && (
             <div className="mx-auto mt-6 max-w-[720px] rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">
               You have viewer access — this document is read-only.
