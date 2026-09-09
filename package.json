@@ -11,6 +11,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@blocksuite/blocks": "0.19.5",
+    "@blocksuite/icons": "2.1.75",
+    "@blocksuite/presets": "0.19.5",
+    "@blocksuite/store": "0.19.5",
     "@composio/core": "^0.13.1",
     "@tailwindcss/postcss": "^4.2.2",
     "@xyflow/react": "^12.10.1",

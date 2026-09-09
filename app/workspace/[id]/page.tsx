@@ -4,6 +4,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import WorkspaceEditor from "@/components/workspace/WorkspaceEditor"
+import dynamic from "next/dynamic"
 import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
 import SharingPanel from "@/components/workspace/SharingPanel"
 import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
@@ -11,6 +12,11 @@ import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 import { useWorkspaceContext } from "@/contexts/WorkspaceContext"
 import { Share2 } from "lucide-react"
+
+const BlockSuitePageEditor = dynamic(() => import("@/components/workspace/BlockSuitePageEditor"), {
+  ssr: false,
+  loading: () => <div className="mx-auto w-full max-w-[720px] py-12 text-center text-[13px] text-white/30">Loading editor preview...</div>,
+})
 
 type Meta = {
   id: string
@@ -29,6 +35,7 @@ export default function WorkspaceDocPage() {
   const router = useRouter()
   const id = (params?.id as string) ?? "demo"
   const view = search.get("view") === "database" ? "database" : "page"
+  const editor = search.get("editor") === "blocksuite" ? "blocksuite" : "legacy"
 
   const [meta, setMeta] = useState<Meta | null>(null)
   const [status, setStatus] = useState<'loading' | 'ok' | 'locked' | 'unauth'>('loading')
@@ -246,7 +253,7 @@ export default function WorkspaceDocPage() {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <WorkspaceNavigator currentId={id} />
         <div className="min-w-0 flex-1 overflow-y-auto px-8 py-8 lg:px-10 xl:px-12">
-          {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
+          {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : editor === "blocksuite" ? <BlockSuitePageEditor docId={id} readOnly={!canWrite} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
           {!canWrite && (
             <div className="mx-auto mt-6 max-w-[720px] rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">
               You have viewer access — this document is read-only.

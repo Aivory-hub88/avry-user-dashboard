@@ -1,25 +1,82 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { FormEvent, KeyboardEvent } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
-import { Check, CheckSquare, CloudOff, GripVertical, Heading1, Heading2, List, LoaderCircle, MoreHorizontal, Plus, Quote, Trash2, Type } from "lucide-react"
+import { Check, CheckSquare, CloudOff, Code2, GripVertical, Heading1, Heading2, Heading3, List, ListOrdered, LoaderCircle, Minus, MoreHorizontal, Plus, Quote, Table2, Tag, Trash2, Type } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 
-type BlockType = "h1" | "h2" | "p" | "todo" | "bullet" | "quote"
+type BlockType = "h1" | "h2" | "h3" | "p" | "todo" | "bullet" | "numbered" | "quote" | "code" | "divider" | "database"
 type Block = { id: string; type: BlockType; text: string; checked?: boolean }
 type SlashState = { idx: number; query: string } | null
 type SaveState = "saved" | "saving" | "offline"
 
-const BLOCK_TYPES: Array<{ type: BlockType; label: string; hint: string; Icon: typeof Type }> = [
-  { type: "p", label: "Text", hint: "Start writing", Icon: Type },
-  { type: "h1", label: "Heading 1", hint: "Large section heading", Icon: Heading1 },
-  { type: "h2", label: "Heading 2", hint: "Medium section heading", Icon: Heading2 },
-  { type: "todo", label: "To-do", hint: "Track a task", Icon: CheckSquare },
-  { type: "bullet", label: "Bulleted list", hint: "Make a simple list", Icon: List },
-  { type: "quote", label: "Quote", hint: "Highlight an idea", Icon: Quote },
+const BLOCK_TYPES: Array<{ type: BlockType; label: string; hint: string; group: string; Icon: typeof Type }> = [
+  { type: "p", label: "Text", hint: "Just start writing", group: "Text", Icon: Type },
+  { type: "h1", label: "Heading 1", hint: "Big section heading", group: "Style", Icon: Heading1 },
+  { type: "h2", label: "Heading 2", hint: "Medium section heading", group: "Style", Icon: Heading2 },
+  { type: "h3", label: "Heading 3", hint: "Small section heading", group: "Style", Icon: Heading3 },
+  { type: "quote", label: "Quote", hint: "Capture a quote", group: "Style", Icon: Quote },
+  { type: "code", label: "Code Block", hint: "Code snippet", group: "Style", Icon: Code2 },
+  { type: "divider", label: "Divider", hint: "Visual separator", group: "Style", Icon: Minus },
+  { type: "todo", label: "To-do", hint: "Track a task", group: "List", Icon: CheckSquare },
+  { type: "bullet", label: "Bulleted list", hint: "Simple bullet list", group: "List", Icon: List },
+  { type: "numbered", label: "Numbered list", hint: "Ordered list", group: "List", Icon: ListOrdered },
+  { type: "database", label: "Table", hint: "Database table view", group: "Database", Icon: Table2 },
 ]
+
+// Uncontrolled contentEditable — syncs from Yjs only when not focused
+function BlockContent({
+  block,
+  readOnly,
+  onInput,
+  onKeyDown,
+  onContextMenu,
+}: {
+  block: Block
+  readOnly: boolean
+  onInput: (e: FormEvent<HTMLDivElement>) => void
+  onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void
+  onContextMenu: (e: React.MouseEvent) => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    // Don't clobber while user is typing
+    if (document.activeElement === el) {
+      // Only patch if remote text differs and local caret isn't at risk
+      // For local edits block.text already equals innerText so skip
+      if (el.textContent !== block.text) {
+        // Keep if user just typed "/" trigger — let slash logic handle clearing
+        if (el.textContent !== `/${block.text}`) return
+      } else return
+    }
+    if (el.textContent !== block.text) el.textContent = block.text
+  }, [block.text])
+
+  // initial mount
+  useLayoutEffect(() => {
+    if (ref.current && ref.current.textContent !== block.text) ref.current.textContent = block.text
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <div
+      ref={ref}
+      id={`block-${block.id}`}
+      contentEditable={!readOnly}
+      suppressContentEditableWarning
+      onInput={onInput}
+      onKeyDown={onKeyDown}
+      onContextMenu={onContextMenu}
+      data-placeholder={block.text === "" ? (block.type === "h1" ? "What are you working on?" : block.type === "h3" ? "Heading 3" : block.type === "todo" ? "To-do" : "Start writing...  '/' for commands") : undefined}
+      className={`relative w-full rounded-lg px-2 py-1.5 outline-none empty:before:text-white/25 empty:before:content-[attr(data-placeholder)] focus:bg-white/[0.03] ${block.checked ? "text-white/30 line-through" : ""} ${blockClass(block.type)}`}
+    />
+  )
+}
 
 function uid() {
   return Math.random().toString(36).slice(2, 8)
@@ -51,8 +108,13 @@ function isLegacyPrototypeContent(blocks: Block[]) {
 function blockClass(type: BlockType) {
   if (type === "h1") return "text-[30px] font-semibold leading-tight text-white/90"
   if (type === "h2") return "text-[21px] font-medium leading-tight text-white/85"
+  if (type === "h3") return "text-[17px] font-semibold leading-tight text-white/80"
   if (type === "quote") return "border-l-2 border-white/15 pl-4 italic text-white/60"
+  if (type === "code") return "rounded-lg bg-white/[0.06] font-mono text-[13px] text-white/75 px-3 py-2"
+  if (type === "divider") return "py-2 text-white/10"
   if (type === "bullet") return "pl-5 text-[14px] leading-relaxed text-white/80 before:absolute before:ml-[-17px] before:mt-[8px] before:h-1.5 before:w-1.5 before:rounded-full before:bg-white/40 before:content-['']"
+  if (type === "numbered") return "pl-5 text-[14px] leading-relaxed text-white/80 list-decimal"
+  if (type === "database") return "rounded-xl border border-white/10 bg-white/[0.02] p-3 text-[13px] text-white/60"
   return "text-[14px] leading-relaxed text-white/80"
 }
 
@@ -214,16 +276,28 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
   }
 
   const selectType = (index: number, type: BlockType) => {
-    update(index, { type, text: "", ...(type === "todo" ? { checked: false } : {}) })
+    if (type === "divider") {
+      update(index, { type, text: "—" })
+    } else if (type === "database") {
+      // Keep as p but signal table — database view is separate; slash creates a marker
+      update(index, { type: "p", text: "" })
+      // Could trigger database block insertion; for now treat as table placeholder
+    } else {
+      const curText = blocks[index]?.text ?? ""
+      const cleaned = curText.startsWith("/") ? "" : curText
+      update(index, { type, text: cleaned, ...(type === "todo" ? { checked: false } : {}) })
+    }
     setSlash(null)
     setOpenMenu(null)
     focusBlock(blocks[index]?.id ?? "")
   }
 
   const onInput = (index: number, event: FormEvent<HTMLDivElement>) => {
-    const text = event.currentTarget.innerText.replace(/\n$/, "")
-    update(index, { text })
-    if (!readOnly && text.startsWith("/")) setSlash({ idx: index, query: text.slice(1) })
+    const text = (event.currentTarget.textContent ?? "").replace(/\u00a0/g, " ")
+    // Don't include trailing newline browsers add
+    const clean = text.replace(/\n$/, "")
+    update(index, { text: clean })
+    if (!readOnly && clean.startsWith("/")) setSlash({ idx: index, query: clean.slice(1) })
     else if (slash?.idx === index) setSlash(null)
   }
 
@@ -238,20 +312,42 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
       if (slash?.idx === index) {
-        update(index, { text: "" })
-        setSlash(null)
-      } else addAfter(index, current.type === "h1" || current.type === "h2" ? "p" : current.type)
+        // Pick first filtered option on Enter
+        const first = BLOCK_TYPES.filter((b) => b.label.toLowerCase().includes(slash.query.trim().toLowerCase()))[0]
+        if (first) selectType(index, first.type)
+        else {
+          update(index, { text: "" })
+          setSlash(null)
+        }
+      } else addAfter(index, current.type === "h1" || current.type === "h2" || current.type === "h3" ? "p" : current.type)
       return
     }
-    if (event.key === "Backspace" && current.text === "") {
-      event.preventDefault()
-      remove(index)
+    if (event.key === "Backspace") {
+      const el = event.currentTarget as HTMLDivElement
+      const isEmpty = (el.textContent ?? "").trim() === "" && current.text === ""
+      if (isEmpty) {
+        event.preventDefault()
+        remove(index)
+      }
+    }
+    if (event.key === "/" && (event.currentTarget.textContent ?? "") === "") {
+      // Open slash immediately
+      setSlash({ idx: index, query: "" })
     }
   }
 
-  const visibleSlash = slash
-    ? BLOCK_TYPES.filter((item) => item.label.toLowerCase().includes(slash.query.trim().toLowerCase()))
-    : []
+  // Grouped slash menu like AFFiNE
+  const visibleSlashGroups = (() => {
+    if (!slash) return []
+    const q = slash.query.trim().toLowerCase()
+    const filtered = q ? BLOCK_TYPES.filter((b) => b.label.toLowerCase().includes(q) || b.group.toLowerCase().includes(q)) : BLOCK_TYPES
+    const groups = new Map<string, typeof BLOCK_TYPES>()
+    for (const b of filtered) {
+      if (!groups.has(b.group)) groups.set(b.group, [])
+      groups.get(b.group)!.push(b)
+    }
+    return Array.from(groups.entries())
+  })()
   const isStarter = blocks.length === 2 && blocks[0]?.type === "h1" && blocks[1]?.type === "p" && blocks.every((block) => block.text === "")
 
   const saveLabel = saveState === "saving" ? "Saving" : saveState === "offline" ? "Offline" : "Saved"
@@ -306,31 +402,38 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
                     className="mt-2 h-4 w-4 shrink-0 rounded border border-white/20 bg-transparent accent-white"
                   />
                 )}
-                <div
-                  id={`block-${block.id}`}
-                  contentEditable={!readOnly}
-                  suppressContentEditableWarning
-                  onInput={(event) => onInput(index, event)}
-                  onKeyDown={(event) => onKeyDown(event, index)}
-                  data-placeholder={block.text === "" ? (block.type === "h1" ? "What are you working on?" : "Start writing...") : undefined}
-                  className={`relative w-full rounded-lg px-2 py-1.5 outline-none empty:before:text-white/25 empty:before:content-[attr(data-placeholder)] focus:bg-white/[0.03] ${block.checked ? "text-white/30 line-through" : ""} ${blockClass(block.type)}`}
-                >
-                  {block.text}
-                </div>
+                <BlockContent
+                  block={block}
+                  readOnly={readOnly}
+                  onInput={(e) => onInput(index, e)}
+                  onKeyDown={(e) => onKeyDown(e, index)}
+                  onContextMenu={(e) => {
+                    if (readOnly) return
+                    e.preventDefault()
+                    setOpenMenu(openMenu === index ? null : index)
+                  }}
+                />
               </div>
-              {!readOnly && slash?.idx === index && visibleSlash.length > 0 && (
-                <div className="mt-1 w-full max-w-[320px] rounded-xl border border-line bg-[#2c2c29] p-1.5 shadow-2xl">
-                  <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-white/25">Turn into</div>
-                  {visibleSlash.map(({ type, label, hint, Icon }) => (
-                    <button key={type} onMouseDown={(event) => event.preventDefault()} onClick={() => selectType(index, type)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-white/[0.07]">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white/[0.06] text-white/65"><Icon className="h-3.5 w-3.5" /></span>
-                      <span className="min-w-0"><span className="block text-[12px] text-white/80">{label}</span><span className="block text-[10px] text-white/30">{hint}</span></span>
-                    </button>
+              {block.type === "divider" && <div className="mt-1 h-px w-full bg-white/10" />}
+              {!readOnly && slash?.idx === index && visibleSlashGroups.length > 0 && (
+                <div className="mt-1 w-full max-w-[360px] rounded-xl border border-line bg-[#2c2c29] p-1.5 shadow-2xl">
+                  {visibleSlashGroups.map(([group, items]) => (
+                    <div key={group} className="mb-1 last:mb-0">
+                      <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-white/25">{group}</div>
+                      {items.map(({ type, label, hint, Icon }) => (
+                        <button key={type} onMouseDown={(e) => e.preventDefault()} onClick={() => selectType(index, type)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-white/[0.07]">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white/[0.06] text-white/65"><Icon className="h-3.5 w-3.5" /></span>
+                          <span className="min-w-0"><span className="block text-[12px] text-white/80">{label}</span><span className="block text-[10px] text-white/30">{hint}</span></span>
+                        </button>
+                      ))}
+                    </div>
                   ))}
+                  <div className="mt-1 border-t border-white/5 px-2 py-1 text-[10px] text-white/20">Tip: type / then heading, todo, table…</div>
                 </div>
               )}
               {!readOnly && openMenu === index && (
-                <div className="absolute left-0 top-8 z-10 w-[190px] rounded-xl border border-line bg-[#2c2c29] p-1.5 shadow-2xl">
+                <div className="absolute left-0 top-8 z-10 w-[260px] rounded-xl border border-line bg-[#2c2c29] p-1.5 shadow-2xl">
+                  <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-white/25">Turn into</div>
                   {BLOCK_TYPES.map(({ type, label, Icon }) => (
                     <button key={type} onClick={() => selectType(index, type)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[12px] text-white/65 hover:bg-white/[0.07] hover:text-white/90">
                       <Icon className="h-3.5 w-3.5" />{label}
@@ -340,7 +443,7 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
                 </div>
               )}
             </div>
-            {!readOnly && <button onClick={() => setOpenMenu(openMenu === index ? null : index)} title="More block actions" className="mt-1 rounded p-1 text-white/0 group-hover:text-white/25 hover:bg-white/[0.06] hover:text-white/70"><MoreHorizontal className="h-4 w-4" /></button>}
+            {!readOnly && <button onContextMenu={(e)=>{e.preventDefault(); setOpenMenu(openMenu===index?null:index)}} onClick={() => setOpenMenu(openMenu === index ? null : index)} title="More block actions (right-click)" className="mt-1 rounded p-1 text-white/0 group-hover:text-white/25 hover:bg-white/[0.06] hover:text-white/70"><MoreHorizontal className="h-4 w-4" /></button>}
           </div>
         ))}
       </div>
