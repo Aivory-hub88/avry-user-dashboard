@@ -73,6 +73,67 @@ function StatusPill({ s }: { s: string }) {
   )
 }
 
+function DonutByStatus({ rows }: { rows: Row[] }) {
+  const total = rows.length || 1
+  const counts: Record<string, number> = { Todo: 0, Doing: 0, Done: 0 }
+  for (const r of rows) counts[r.status] = (counts[r.status] ?? 0) + 1
+  const segments = [
+    { label: "Todo", value: counts.Todo, color: "#6b7280" },
+    { label: "Doing", value: counts.Doing, color: "#f59e0b" },
+    { label: "Done", value: counts.Done, color: "#10b981" },
+  ]
+  let acc = 0
+  const r = 32
+  const C = 2 * Math.PI * r
+  return (
+    <div className="flex items-center gap-4">
+      <svg width={88} height={88} viewBox="0 0 88 88" className="shrink-0">
+        <circle cx={44} cy={44} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={12} />
+        {segments.map((s) => {
+          const len = total ? (s.value / total) * C : 0
+          const dash = `${len} ${C - len}`
+          const offset = -acc * C
+          acc += s.value / total
+          return <circle key={s.label} cx={44} cy={44} r={r} fill="none" stroke={s.color} strokeWidth={12} strokeDasharray={dash} strokeDashoffset={offset} strokeLinecap="round" transform="rotate(-90 44 44)" opacity={s.value ? 1 : 0.15} />
+        })}
+        <text x={44} y={44} textAnchor="middle" dy="0.35em" fontSize={14} fontWeight={700} fill="rgba(255,255,255,0.85)">{rows.length}</text>
+      </svg>
+      <div className="flex flex-col gap-1.5">
+        {segments.map((s) => (
+          <span key={s.label} className="inline-flex items-center gap-2 text-[11px] text-white/60">
+            <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
+            {s.label} <span className="text-white/30">· {s.value}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function BarsByPriority({ rows }: { rows: Row[] }) {
+  const counts: Record<string, number> = { High: 0, Med: 0, Low: 0 }
+  for (const r of rows) counts[r.priority] = (counts[r.priority] ?? 0) + 1
+  const max = Math.max(1, ...Object.values(counts))
+  const items: Array<{ label: string; value: number; color: string }> = [
+    { label: "High", value: counts.High, color: "#ef4444" },
+    { label: "Med", value: counts.Med, color: "#f59e0b" },
+    { label: "Low", value: counts.Low, color: "rgba(255,255,255,0.45)" },
+  ]
+  return (
+    <div className="flex flex-col gap-2">
+      {items.map((it) => (
+        <div key={it.label} className="flex items-center gap-2">
+          <span className="w-10 text-[11px] text-white/40">{it.label}</span>
+          <div className="flex-1 rounded-full bg-white/[0.06] p-0.5">
+            <div className="h-2 rounded-full transition-all" style={{ width: `${(it.value / max) * 100}%`, background: it.color }} />
+          </div>
+          <span className="w-6 text-right text-[11px] text-white/60">{it.value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 type SavedView = {
   id: string
   name: string
@@ -357,6 +418,21 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
               <BookmarkPlus className="h-3 w-3" /> Save view
             </button>
           )}
+        </div>
+      )}
+
+      {/* Insights — lightweight SVG charts (no extra deps): donut by status + bars by priority */}
+      {rows.length > 0 && (
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-line bg-white/[0.025] p-4">
+            <div className="mb-3 text-[11px] font-medium uppercase tracking-wider text-white/30">By status</div>
+            <DonutByStatus rows={rows} />
+          </div>
+          <div className="rounded-2xl border border-line bg-white/[0.025] p-4">
+            <div className="mb-3 text-[11px] font-medium uppercase tracking-wider text-white/30">By priority</div>
+            <BarsByPriority rows={rows} />
+            <div className="mt-3 text-[11px] text-white/25">{rows.filter((r) => !r.due).length} without due date · {rows.filter((r) => r.due && new Date(r.due) < new Date(new Date().toISOString().slice(0,10))).length} overdue</div>
+          </div>
         </div>
       )}
 
