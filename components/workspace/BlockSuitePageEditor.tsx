@@ -264,6 +264,32 @@ export default function BlockSuitePageEditor({
     }
   }, [docId, readOnly])
 
+  // Hide the empty template gallery (vanilla BlockSuite ships with
+  // builtInTemplates = [] so the panel is just an empty card). The toolbar
+  // lives in light DOM (ShadowlessElement) but may be re-created on mode
+  // switches, so hide via JS *and* CSS.
+  const hideEmptyTemplateUI = () => {
+    try {
+      for (const el of document.querySelectorAll("edgeless-template-button")) {
+        ;(el as HTMLElement).style.display = "none"
+      }
+      for (const el of document.querySelectorAll("edgeless-templates-panel")) {
+        ;(el as HTMLElement).style.display = "none"
+      }
+    } catch {}
+    try {
+      const root = containerRef.current as unknown as HTMLElement | null
+      if (root) {
+        for (const el of root.querySelectorAll("edgeless-template-button")) {
+          ;(el as HTMLElement).style.display = "none"
+        }
+        for (const el of root.querySelectorAll("edgeless-templates-panel")) {
+          ;(el as HTMLElement).style.display = "none"
+        }
+      }
+    } catch {}
+  }
+
   useEffect(() => {
     if (!mountRef.current || !pageDoc) return
     const mount = mountRef.current
@@ -305,9 +331,22 @@ export default function BlockSuitePageEditor({
         service.app$.value = ColorScheme.Dark
         service.edgeless$.value = ColorScheme.Dark
       } catch {}
+      hideEmptyTemplateUI()
     })()
+    // The toolbar lazily creates the template button a frame later; watch
+    // for it and hide as soon as it appears so there's no white-card flash.
+    let observer: MutationObserver | null = null
+    try {
+      observer = new MutationObserver(hideEmptyTemplateUI)
+      observer.observe(editor, { childList: true, subtree: true })
+    } catch {}
+    const timer = window.setTimeout(hideEmptyTemplateUI, 400)
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
+      try {
+        observer?.disconnect()
+      } catch {}
       mount.replaceChildren()
     }
   }, [pageDoc])
@@ -332,6 +371,9 @@ export default function BlockSuitePageEditor({
       service.edgeless$.value = ColorScheme.Dark
       document.documentElement.dataset.theme = "dark"
     } catch {}
+    // Toolbar is rebuilt on switch; hide the empty template entry again.
+    hideEmptyTemplateUI()
+    window.setTimeout(hideEmptyTemplateUI, 200)
   }, [mode])
 
   const SaveIcon = saveState === "saving" ? LoaderCircle : saveState === "offline" ? CloudOff : Check
