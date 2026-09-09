@@ -80,6 +80,26 @@ describe("extractLegacyDoc", () => {
   it("returns null for corrupt bytes", () => {
     expect(extractLegacyDoc(Buffer.from([0, 1, 2, 3]))).toBeNull()
   })
+
+  it("never re-migrates dual state (legacy array beside a migrated tree)", () => {
+    // This is the exact production failure: every load re-migrated, adding
+    // one page tree per reload until the doc had multiple affine:page roots
+    // and the editor rendered blank.
+    const legacy = legacyUpdate([{ id: "a", type: "h1", text: "Video meeting app" }])
+    const migrated = buildMigratedDoc({ blocks: [{ id: "a", type: "h1", text: "Video meeting app" }], rows: [] })
+    let migratedBytes: Uint8Array
+    try {
+      migratedBytes = encodeMigratedDoc(migrated)
+    } finally {
+      migrated.dispose()
+    }
+    const dual = new Y.Doc()
+    Y.applyUpdate(dual, legacy)
+    Y.applyUpdate(dual, migratedBytes)
+    const dualBytes = Buffer.from(Y.encodeStateAsUpdate(dual))
+    dual.destroy()
+    expect(extractLegacyDoc(dualBytes)).toBeNull()
+  })
 })
 
 describe("buildMigratedDoc", () => {

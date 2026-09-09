@@ -54,16 +54,21 @@ function asFlatMap(item: unknown): FlatMap | null {
 
 /** Read legacy flat blocks + database rows out of raw server bytes. */
 export function extractLegacyDoc(update: Uint8Array | Buffer): LegacyDocSnapshot | null {
-  const doc = new Y.Doc()
+  const bytes = update instanceof Uint8Array ? update : new Uint8Array(update)
+  // Yjs binds ONE constructor per shared-type name per doc (second binding
+  // throws), so probe each side in its own throwaway doc.
+  const arrayDoc = new Y.Doc()
   try {
-    Y.applyUpdate(doc, update instanceof Uint8Array ? update : new Uint8Array(update))
+    Y.applyUpdate(arrayDoc, bytes)
   } catch {
+    arrayDoc.destroy()
     return null
   }
   let items: unknown[]
   try {
-    items = doc.getArray<unknown>("blocks").toArray()
+    items = arrayDoc.getArray<unknown>("blocks").toArray()
   } catch {
+    arrayDoc.destroy()
     return null
   }
   const flat: FlatMap[] = []
@@ -72,12 +77,24 @@ export function extractLegacyDoc(update: Uint8Array | Buffer): LegacyDocSnapshot
     if (m) flat.push(m)
   }
   if (flat.length === 0) {
-    // No flat blocks. A BlockSuite-native doc carries its tree in the Y.Map
-    // side — never migrate that (re-migration would duplicate content).
-    // A truly empty doc migrates to an empty tree via the normal init path,
-    // so only the flat legacy shape returns a snapshot here.
-    doc.destroy()
+    // No flat blocks: BlockSuite-native (or empty) state. Never migrate —
+    // re-migration would duplicate the tree on every load (proven in prod:
+    // one page tree per reload accumulated in the same room).
+    arrayDoc.destroy()
     return null
+  }
+  const mapDoc = new Y.Doc()
+  try {
+    Y.applyUpdate(mapDoc, bytes)
+    if (mapDoc.getMap("blocks").size > 0) {
+      // Dual state: legacy array beside an already-migrated tree. The tree
+      // wins; migrating again would duplicate every block.
+      return null
+    }
+  } catch {
+    return null
+  } finally {
+    mapDoc.destroy()
   }
   const blocks: LegacyFlatBlock[] = []
   let auto = 0
@@ -96,12 +113,17 @@ export function extractLegacyDoc(update: Uint8Array | Buffer): LegacyDocSnapshot
   }
   const rows: LegacyDbRow[] = []
   try {
-    const dbArray = doc.getArray("database")
+    const dbArray = arrayDoc.getArray("database")
     for (const item of dbArray.toArray()) {
-      const m = item as unknown as { get?: (key: string) => unknown } | null
+      const m = asFlatMap(item) ?? (item as unknown as { get?: (key: string) => unknown } | null)
       if (!m || typeof m.get !== "function") continue
       const str = (key: string, fallback: string) => {
-        const v = m.get!(key)
+        let v: unknown
+        try {
+          v = (m as { get: (key: string) => unknown }).get(key)
+        } catch {
+          return fallback
+        }
         return typeof v === "string" ? v : fallback
       }
       rows.push({
@@ -116,7 +138,7 @@ export function extractLegacyDoc(update: Uint8Array | Buffer): LegacyDocSnapshot
   } catch {
     // Database array unreadable — migrate blocks anyway, data view stays empty.
   }
-  doc.destroy()
+  arrayDoc.destroy()
   return { blocks, rows }
 }
 
