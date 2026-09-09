@@ -10,6 +10,7 @@ import WorkspaceProperties, { type DocTag, type DocProps } from "@/components/wo
 import WorkspaceAIPanel from "@/components/workspace/WorkspaceAIPanel"
 import WorkspaceBacklinks from "@/components/workspace/WorkspaceBacklinks"
 import WorkspacePageComments from "@/components/workspace/WorkspacePageComments"
+import WorkspaceHistory from "@/components/workspace/WorkspaceHistory"
 import SharingPanel from "@/components/workspace/SharingPanel"
 import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
@@ -536,6 +537,9 @@ export default function WorkspaceDocPage() {
               </div>
               <div className="mx-auto mt-4 w-full max-w-[960px]">
                 <WorkspacePageComments docId={id} canWrite={canWrite} />
+              </div>
+              <div className="mx-auto mt-4 w-full max-w-[960px]">
+                <WorkspaceHistory docId={id} canWrite={canWrite} />
               </div>
             </>
           )}

@@ -93,6 +93,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
        ON CONFLICT (id) DO UPDATE SET yjs_update = EXCLUDED.yjs_update, updated_at = now()`,
       [id, upd],
     )
+    // Best-effort history snapshot (throttled: at most one per minute, deduped by size)
+    try {
+      const last = await query(`SELECT octet_length(yjs_update) as bytes, created_at FROM dashboard.workspace_doc_history WHERE doc_id = $1 ORDER BY created_at DESC LIMIT 1`, [id])
+      const lastBytes = last.rows[0] ? Number(last.rows[0].bytes) : -1
+      const lastAt = last.rows[0]?.created_at ? new Date(last.rows[0].created_at as string).getTime() : 0
+      const nowMs = Date.now()
+      if (upd.length !== lastBytes && nowMs - lastAt > 60_000) {
+        const actorId = cred?.kind === 'user' ? cred.user.user_id : 'service'
+        await query(`INSERT INTO dashboard.workspace_doc_history (doc_id, yjs_update, actor_id) VALUES ($1,$2,$3)`, [id, upd, actorId])
+      }
+    } catch {}
   } catch (e) {
     console.error("[workspace/doc PUT pg]", e)
     // if collab succeeded, still return success even if pg fails
