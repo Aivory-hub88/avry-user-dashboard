@@ -8,6 +8,7 @@ import dynamic from "next/dynamic"
 import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
 import WorkspaceProperties, { type DocTag, type DocProps } from "@/components/workspace/WorkspaceProperties"
 import WorkspaceAIPanel from "@/components/workspace/WorkspaceAIPanel"
+import WorkspaceBacklinks from "@/components/workspace/WorkspaceBacklinks"
 import SharingPanel from "@/components/workspace/SharingPanel"
 import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
@@ -436,6 +437,11 @@ export default function WorkspaceDocPage() {
             </div>
           )}
           {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : editor === "blocksuite" ? <BlockSuitePageEditor key={id} docId={id} readOnly={!canWrite} initialMode={meta?.mode ?? "page"} pageTitle={meta?.title ?? ""} outlineOpen={showOutline} onDocTextChange={setAiDocText} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
+          {view === "page" && (
+            <div className="mx-auto mt-4 w-full max-w-[960px]">
+              <WorkspaceBacklinks docId={id} canWrite={canWrite} />
+            </div>
+          )}
           {!canWrite && (
             <div className="mx-auto mt-6 max-w-[720px] rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">
               You have viewer access — this document is read-only.
