@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { Trash2 } from "lucide-react"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 
@@ -16,6 +17,8 @@ export default function WorkspacePage() {
   const [q, setQ] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [authRequired, setAuthRequired] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const router = useRouter()
   const loginUrl = `${getMarketingUrl()}/login`
 
@@ -58,6 +61,23 @@ export default function WorkspacePage() {
       } else setError(j.error === 'db' ? 'Your page could not be created. Please try again.' : 'Your page could not be created.')
     } catch { setError('We could not connect to your workspace. Please try again.') }
     setCreating(false)
+  }
+
+  const removeDoc = async (docId: string) => {
+    if (deletingId) return
+    setDeletingId(docId)
+    try {
+      const r = await fetch(`/api/workspace/${docId}`, { method: 'DELETE', headers: collabAuthHeaders() })
+      if (r.ok) {
+        setDocs((prev) => prev.filter((d) => d.id !== docId))
+      } else {
+        setError(r.status === 401 ? 'Your session has expired. Sign in again.' : 'This page could not be deleted.')
+      }
+    } catch {
+      setError('We could not connect to your workspace. Please try again.')
+    }
+    setDeletingId(null)
+    setConfirmDeleteId(null)
   }
 
   const filtered = docs.filter((d) => {
@@ -130,21 +150,49 @@ export default function WorkspacePage() {
           ) : (
             <div className="flex flex-col gap-1">
               {filtered.map((d) => (
-                <Link
+                <div
                   key={d.id}
-                  href={`/workspace/${d.id}`}
-                  className="flex items-center justify-between rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 hover:border-line hover:bg-white/[0.04]"
+                  className="group flex items-center justify-between rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 hover:border-line hover:bg-white/[0.04]"
                 >
-                  <div className="min-w-0">
+                  <Link href={`/workspace/${d.id}`} className="min-w-0 flex-1">
                     <div className="truncate text-[13px] font-medium text-white/80">{d.title || d.id}</div>
                     <div className="mt-0.5 text-[11px] text-white/30">
                       {d.updated_at ? new Date(d.updated_at).toLocaleDateString() : '—'}
                     </div>
+                  </Link>
+                  <div className="ml-3 flex shrink-0 items-center gap-2">
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-medium uppercase tracking-wider ${roleBadge(d.myRole)}`}>
+                      {d.myRole}
+                    </span>
+                    {d.myRole === 'owner' && (
+                      confirmDeleteId === d.id ? (
+                        <span className="flex items-center gap-1">
+                          <button
+                            onClick={() => removeDoc(d.id)}
+                            disabled={deletingId === d.id}
+                            className="rounded-full bg-red-500/90 px-2.5 py-1 text-[10px] font-medium text-white hover:bg-red-500 disabled:opacity-50"
+                          >
+                            {deletingId === d.id ? '…' : 'Confirm'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="rounded-full px-2 py-1 text-[10px] text-white/50 hover:text-white/80"
+                          >
+                            Cancel
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(d.id)}
+                          title="Delete this page"
+                          className="rounded-full p-1.5 text-white/25 opacity-0 hover:bg-white/[0.06] hover:text-red-300 focus:opacity-100 group-hover:opacity-100"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )
+                    )}
                   </div>
-                  <span className={`ml-3 shrink-0 rounded-full px-2 py-1 text-[10px] font-medium uppercase tracking-wider ${roleBadge(d.myRole)}`}>
-                    {d.myRole}
-                  </span>
-                </Link>
+                </div>
               ))}
             </div>
           )}

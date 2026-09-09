@@ -1,27 +1,35 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import type { Doc } from "@blocksuite/store"
 import { DocCollection } from "@blocksuite/store"
 import { createEmptyDoc } from "@blocksuite/presets"
 import { effects as installBlockEffects } from "@blocksuite/blocks/effects"
 import { effects as installPresetEffects } from "@blocksuite/presets/effects"
 import { WebsocketProvider } from "y-websocket"
-import { Check, CheckSquare, CloudOff, Heading1, LoaderCircle, Table2, Wifi } from "lucide-react"
+import { Check, CheckSquare, CloudOff, FileText, Heading1, LoaderCircle, PenTool, Sparkles, Table2, Wifi } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 import { buildMigratedDoc, extractLegacyDoc } from "@/lib/workspaceMigration"
+
+export type EditorDocMode = "page" | "edgeless"
 
 type SaveState = "loading" | "saving" | "saved" | "offline"
 type ConnectionState = "connecting" | "connected" | "disconnected"
 
-type PageEditorElement = HTMLElement & {
+type AffineEditorContainerElement = HTMLElement & {
   doc: Doc
-  hasViewport: boolean
+  mode: EditorDocMode
+  switchEditor: (mode: EditorDocMode) => void
 }
 
 type TextBearingModel = {
   text?: { length?: number }
 }
+
+/** Awareness key broadcasting doc mode (page/edgeless) across clients. */
+const MODE_STATE_KEY = "aivoryDocMode"
+type AwarenessModeState = { mode: EditorDocMode; at: number }
 
 /** True once the doc holds any real content (hides the empty-state panel). */
 function docHasContent(doc: Doc): boolean {
@@ -54,12 +62,24 @@ let blockSuiteEffectsInstalled = false
 function ensureBlockSuiteEffects() {
   if (blockSuiteEffectsInstalled) return
   if (!customElements.get("affine-page-root")) installBlockEffects()
-  if (!customElements.get("page-editor")) installPresetEffects()
+  if (!customElements.get("affine-editor-container")) installPresetEffects()
   blockSuiteEffectsInstalled = true
 }
 
-export default function BlockSuitePageEditor({ docId, readOnly = false }: { docId: string; readOnly?: boolean }) {
+export default function BlockSuitePageEditor({
+  docId,
+  readOnly = false,
+  initialMode = "page",
+  pageTitle = "",
+}: {
+  docId: string
+  readOnly?: boolean
+  initialMode?: EditorDocMode
+  pageTitle?: string
+}) {
+  const router = useRouter()
   const mountRef = useRef<HTMLDivElement | null>(null)
+  const containerRef = useRef<AffineEditorContainerElement | null>(null)
   const providerRef = useRef<WebsocketProvider | null>(null)
   const docRef = useRef<Doc | null>(null)
   const [pageDoc, setPageDoc] = useState<Doc | null>(null)
@@ -67,6 +87,42 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
   const [connection, setConnection] = useState<ConnectionState>("connecting")
   const [migrated, setMigrated] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [mode, setMode] = useState<EditorDocMode>(initialMode)
+  // Mirror of mode for use inside websocket/awareness callbacks.
+  const modeRef = useRef<EditorDocMode>(initialMode)
+  const modeAtRef = useRef<number>(0)
+  const appliedInitialMode = useRef(false)
+
+  // Server is the source of truth for reloads (pg-backed mode column);
+  // apply it once when meta arrives, never overriding the user's own toggle.
+  useEffect(() => {
+    if (appliedInitialMode.current) return
+    appliedInitialMode.current = true
+    modeRef.current = initialMode
+    modeAtRef.current = Date.now()
+    setMode(initialMode)
+  }, [initialMode])
+
+  const persistMode = (next: EditorDocMode) => {
+    fetch(`/api/workspace/${docId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+      body: JSON.stringify({ mode: next }),
+    }).catch(() => {})
+  }
+
+  /** User-initiated toggle: switch locally, broadcast, persist. */
+  const switchMode = (next: EditorDocMode) => {
+    if (next === modeRef.current || readOnly) return
+    const at = Date.now()
+    modeAtRef.current = at
+    modeRef.current = next
+    setMode(next)
+    try {
+      providerRef.current?.awareness.setLocalStateField(MODE_STATE_KEY, { mode: next, at } satisfies AwarenessModeState)
+    } catch {}
+    persistMode(next)
+  }
 
   useEffect(() => {
     let alive = true
@@ -144,6 +200,36 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
         provider.on("status", ({ status }: { status: "connected" | "disconnected" | "connecting" }) => {
           if (alive) setConnection(status)
         })
+        // Live mode sync: broadcast our mode over the same WS channel and
+        // adopt the newest remote mode (last-writer-wins). Reloads always
+        // re-read the pg-backed mode via `initialMode`.
+        try {
+          provider.awareness.setLocalStateField(MODE_STATE_KEY, { mode: modeRef.current, at: modeAtRef.current } satisfies AwarenessModeState)
+        } catch {}
+        const onAwarenessChange = () => {
+          try {
+            // Reduce (not a closure-assigned `let`) so TS keeps the union type.
+            const remote = Array.from(provider.awareness.getStates().entries())
+              .filter(([clientId]) => clientId !== provider.awareness.clientID)
+              .map(([, state]) => (state as Record<string, unknown>)[MODE_STATE_KEY] as AwarenessModeState | undefined)
+              .filter(
+                (candidate): candidate is AwarenessModeState =>
+                  !!candidate &&
+                  (candidate.mode === "page" || candidate.mode === "edgeless") &&
+                  typeof candidate.at === "number",
+              )
+              .reduce<AwarenessModeState | null>(
+                (acc, candidate) => (!acc || candidate.at > acc.at ? candidate : acc),
+                null,
+              )
+            if (remote && remote.mode !== modeRef.current && remote.at > modeAtRef.current) {
+              modeAtRef.current = remote.at
+              modeRef.current = remote.mode
+              if (alive) setMode(remote.mode)
+            }
+          } catch {}
+        }
+        provider.awareness.on("change", onAwarenessChange)
       } catch (cause) {
         doc?.dispose()
         doc = null
@@ -160,8 +246,12 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
       if (previousTheme === undefined) delete rootDataset.theme
       else rootDataset.theme = previousTheme
       if (persistTimer) clearTimeout(persistTimer)
+      try {
+        providerRef.current?.awareness.off("change", () => {})
+      } catch {}
       providerRef.current?.destroy()
       providerRef.current = null
+      containerRef.current = null
       if (doc) doc.spaceDoc.off("update", persist)
       docRef.current?.dispose()
       docRef.current = null
@@ -172,10 +262,14 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
   useEffect(() => {
     if (!mountRef.current || !pageDoc) return
     const mount = mountRef.current
-    const editor = document.createElement("page-editor") as PageEditorElement
-    editor.doc = pageDoc
-    editor.hasViewport = true
-    mount.replaceChildren(editor)
+    let editor = containerRef.current
+    if (!editor) {
+      editor = document.createElement("affine-editor-container") as AffineEditorContainerElement
+      editor.doc = pageDoc
+      editor.mode = modeRef.current
+      containerRef.current = editor
+      mount.replaceChildren(editor)
+    }
     // BlockSuite's ThemeObserver defaults to light and only reacts to
     // *mutations* of documentElement[data-theme] — a value set before the
     // editor connects is never picked up. Re-assert dark after connect so the
@@ -184,11 +278,22 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
     return () => mount.replaceChildren()
   }, [pageDoc])
 
+  // Apply mode switches (user toggle, initial meta, remote awareness) to the
+  // mounted container without remounting the whole editor.
+  useEffect(() => {
+    const editor = containerRef.current
+    if (!editor) return
+    try {
+      if (editor.mode !== mode) editor.switchEditor(mode)
+    } catch {}
+  }, [mode])
+
   const SaveIcon = saveState === "saving" ? LoaderCircle : saveState === "offline" ? CloudOff : Check
   const saveLabel = saveState === "loading" ? "Loading" : saveState === "saving" ? "Saving" : saveState === "offline" ? "Offline" : "Saved"
   const connectionLabel = connection === "connected" ? "Connected" : connection === "connecting" ? "Connecting" : "Offline"
   const hasContent = useDocHasContent(pageDoc)
-  const showEmptyState = !!pageDoc && !hasContent && !error
+  // Starter panel is a page-mode concept; the canvas has its own toolbar.
+  const showEmptyState = !!pageDoc && !hasContent && !error && mode === "page"
 
   const insertStarter = (kind: "heading" | "todo") => {
     const doc = docRef.current
@@ -202,12 +307,42 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
     }
   }
 
+  const askAI = () => {
+    if (readOnly) return
+    try {
+      const label = pageTitle.trim() || "this workspace page"
+      localStorage.setItem("aivory:console:draft", `Help me write and organize ${label}: `)
+    } catch {}
+    router.push("/console")
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-[960px] flex-col gap-3">
+      {/* Hide the container's built-in doc-title: title is pg-backed (the
+          collection meta it writes to never persists in 1-doc-1-room), so
+          the Big Title in the page header is the single source of truth. */}
+      <style>{`[data-aivory-doc] doc-title{display:none!important}`}</style>
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-white/35">
-        <div className="flex items-center gap-2 uppercase tracking-[0.16em]">
-          <span className="h-1.5 w-1.5 rounded-full bg-violet-300/80" />
-          Editor preview
+        <div className="flex items-center gap-2">
+          <span className="uppercase tracking-[0.16em]">Editor preview</span>
+          {!readOnly && pageDoc && (
+            <div className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1 normal-case tracking-normal">
+              <button
+                onClick={() => switchMode("page")}
+                title="Page mode"
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] ${mode === "page" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
+              >
+                <FileText className="h-3.5 w-3.5" />Page
+              </button>
+              <button
+                onClick={() => switchMode("edgeless")}
+                title="Edgeless canvas mode"
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] ${mode === "edgeless" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
+              >
+                <PenTool className="h-3.5 w-3.5" />Edgeless
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3 normal-case tracking-normal">
           <span className="inline-flex items-center gap-1.5"><Wifi className="h-3.5 w-3.5" />{connectionLabel}</span>
@@ -242,6 +377,18 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
                 >
                   <CheckSquare className="h-3.5 w-3.5" />Add to-do
                 </button>
+                <button
+                  onClick={() => switchMode("edgeless")}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
+                >
+                  <PenTool className="h-3.5 w-3.5" />Edgeless canvas
+                </button>
+                <button
+                  onClick={askAI}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />With AI
+                </button>
                 <a
                   href={`/workspace/${docId}?view=database`}
                   className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
@@ -259,7 +406,7 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
         // NOTE: no `overflow-hidden` here on purpose. BlockSuite renders the
         // slash menu, drag handle, and format bar as overlays inside the
         // editor tree; a clipping ancestor cuts them off like AFFiNE would not.
-        <div data-theme="dark" className={`min-h-[560px] rounded-2xl border border-line bg-[#252522] ${readOnly ? "pointer-events-none" : ""}`} aria-readonly={readOnly}>
+        <div data-theme="dark" data-aivory-doc className={`min-h-[560px] rounded-2xl border border-line bg-[#252522] ${readOnly ? "pointer-events-none" : ""}`} aria-readonly={readOnly}>
           <div ref={mountRef} className="h-[min(72vh,760px)] min-h-[560px]" />
         </div>
       )}

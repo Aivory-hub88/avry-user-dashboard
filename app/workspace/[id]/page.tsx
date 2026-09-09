@@ -11,7 +11,7 @@ import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 import { useWorkspaceContext } from "@/contexts/WorkspaceContext"
-import { Share2, Trash2 } from "lucide-react"
+import { Share2, Star, Trash2 } from "lucide-react"
 
 const BlockSuitePageEditor = dynamic(() => import("@/components/workspace/BlockSuitePageEditor"), {
   ssr: false,
@@ -25,6 +25,8 @@ type Meta = {
   ownerEmail: string | null
   ownerName: string | null
   title: string
+  mode: "page" | "edgeless"
+  favorite: boolean
   myRole: string | null
   myRequest: { id: string; status: string; role_requested: string } | null
 }
@@ -62,7 +64,12 @@ export default function WorkspaceDocPage() {
       }
       if (r.ok) {
         const j = (await r.json()) as Meta
-        setMeta(j)
+        // Pre-migration servers omit mode/favorite — default, never crash.
+        setMeta({
+          ...j,
+          mode: (j as Meta).mode === "edgeless" ? "edgeless" : "page",
+          favorite: (j as Meta).favorite === true,
+        })
         setStatus('ok')
       } else setStatus('locked')
     } catch { setStatus('locked') }
@@ -167,6 +174,29 @@ export default function WorkspaceDocPage() {
     setEditingTitle(false)
   }
 
+  const focusBigTitle = () => {
+    if (!canWrite) return
+    setTitleDraft(meta?.title ?? id)
+    setEditingTitle(true)
+    setTimeout(() => document.getElementById("aivory-big-title")?.focus(), 10)
+  }
+
+  const toggleFavorite = async () => {
+    if (!canWrite || busy || !meta) return
+    const next = !meta.favorite
+    setMeta({ ...meta, favorite: next })
+    try {
+      const r = await fetch(`/api/workspace/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...collabAuthHeaders() },
+        body: JSON.stringify({ favorite: next }),
+      })
+      if (!r.ok) setMeta((m) => (m ? { ...m, favorite: !next } : m))
+    } catch {
+      setMeta((m) => (m ? { ...m, favorite: !next } : m))
+    }
+  }
+
   const removeDoc = async () => {
     if (busy) return
     setBusy(true)
@@ -186,7 +216,17 @@ export default function WorkspaceDocPage() {
             Workspace
           </Link>
           <span className="shrink-0 text-white/20">/</span>
-          {editingTitle ? (
+          {view === "page" ? (
+            // Write view: the Big Title above the editor is the rename surface
+            // (single PATCH path); the breadcrumb just jumps to it.
+            <button
+              onClick={focusBigTitle}
+              title={canWrite ? "Rename" : undefined}
+              className={`truncate text-[13px] font-medium text-white/80 ${canWrite ? "hover:text-white" : ""}`}
+            >
+              {meta?.title ?? id}
+            </button>
+          ) : editingTitle ? (
             <input
               value={titleDraft}
               autoFocus
@@ -225,8 +265,17 @@ export default function WorkspaceDocPage() {
             </Link>
           </div>
          </div>
-         <div className="flex shrink-0 items-center gap-2">
-           <button
+          <div className="flex shrink-0 items-center gap-2">
+            {canWrite && (
+              <button
+                onClick={toggleFavorite}
+                title={meta?.favorite ? "Unstar" : "Star"}
+                className={`rounded-full p-2 ${meta?.favorite ? "text-amber-300" : "text-white/35 hover:bg-white/[0.06] hover:text-white/80"}`}
+              >
+                <Star className={`h-3.5 w-3.5 ${meta?.favorite ? "fill-current" : ""}`} />
+              </button>
+            )}
+            <button
              onClick={() => setShowSharing((open) => !open)}
              aria-expanded={showSharing}
              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] ${showSharing ? "bg-white/[0.1] text-white/85" : "text-white/40 hover:bg-white/[0.06] hover:text-white/80"}`}
@@ -256,7 +305,37 @@ export default function WorkspaceDocPage() {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <WorkspaceNavigator currentId={id} />
         <div className="min-w-0 flex-1 overflow-y-auto px-8 py-8 lg:px-10 xl:px-12">
-          {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : editor === "blocksuite" ? <BlockSuitePageEditor docId={id} readOnly={!canWrite} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
+          {view === "page" && (
+            <div className="mx-auto mb-2 w-full max-w-[960px]">
+              {editingTitle ? (
+                <input
+                  id="aivory-big-title"
+                  value={titleDraft}
+                  autoFocus
+                  disabled={busy}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onBlur={saveTitle}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveTitle()
+                    if (e.key === 'Escape') setEditingTitle(false)
+                  }}
+                  placeholder="Untitled"
+                  className="w-full bg-transparent text-[32px] font-bold leading-tight text-white/90 outline-none placeholder:text-white/20"
+                />
+              ) : canWrite ? (
+                <button
+                  onClick={focusBigTitle}
+                  title="Rename"
+                  className="block w-full truncate text-left text-[32px] font-bold leading-tight text-white/90 hover:text-white"
+                >
+                  {meta?.title || "Untitled"}
+                </button>
+              ) : (
+                <div className="truncate text-[32px] font-bold leading-tight text-white/90">{meta?.title || "Untitled"}</div>
+              )}
+            </div>
+          )}
+          {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : editor === "blocksuite" ? <BlockSuitePageEditor key={id} docId={id} readOnly={!canWrite} initialMode={meta?.mode ?? "page"} pageTitle={meta?.title ?? ""} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
           {!canWrite && (
             <div className="mx-auto mt-6 max-w-[720px] rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">
               You have viewer access — this document is read-only.

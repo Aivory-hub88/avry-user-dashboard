@@ -13,7 +13,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!role) return forbidden()
   try {
     const r = await query(
-      `SELECT id, workspace_id, owner, title, updated_at FROM dashboard.workspace_docs WHERE id = $1 OR id = $2 LIMIT 2`,
+      `SELECT id, workspace_id, owner, title, mode, favorite, updated_at FROM dashboard.workspace_docs WHERE id = $1 OR id = $2 LIMIT 2`,
       [`workspace:${id}`, id],
     )
     const row = r.rows.find((x: any) => x.id === `workspace:${id}`) ?? r.rows[0] ?? null
@@ -41,6 +41,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       ownerEmail,
       ownerName,
       title: row?.title ?? id,
+      mode: row?.mode === 'edgeless' ? 'edgeless' : 'page',
+      favorite: row?.favorite === true,
       updated_at: row?.updated_at ?? null,
       myRole: role,
       myRequest,

@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   if (!cred) return unauthorized()
   try {
     const r = await query(
-      `SELECT id, workspace_id, owner, title, updated_at, octet_length(yjs_update) as bytes
+      `SELECT id, workspace_id, owner, title, mode, favorite, updated_at, octet_length(yjs_update) as bytes
        FROM dashboard.workspace_docs ORDER BY updated_at DESC LIMIT 100`,
     )
     const visible: any[] = []
@@ -30,6 +30,8 @@ export async function GET(req: NextRequest) {
           workspace_id: row.workspace_id,
           owner: row.owner,
           title: row.title ?? bare,
+          mode: row.mode === 'edgeless' ? 'edgeless' : 'page',
+          favorite: row.favorite === true,
           updated_at: row.updated_at,
           bytes: Number(row.bytes ?? 0),
           myRole: role,

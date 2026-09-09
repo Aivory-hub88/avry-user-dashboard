@@ -121,6 +121,20 @@ export default function ConsolePage() {
   const chipsWrapRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
+  // "With AI" entry from the workspace empty-state: a draft prompt stashed in
+  // localStorage becomes the console input (consumed once, then cleared).
+  useEffect(() => {
+    try {
+      const draft = localStorage.getItem("aivory:console:draft")
+      if (draft) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setInputValue(draft)
+        localStorage.removeItem("aivory:console:draft")
+        setTimeout(() => textareaRef.current?.focus(), 50)
+      }
+    } catch {}
+  }, [])
+
   const addToast = useCallback((type: Toast["type"], message: string) => {
     const id = Math.random().toString(36).slice(2)
     setToasts(p => [...p, { id, type, message }])
