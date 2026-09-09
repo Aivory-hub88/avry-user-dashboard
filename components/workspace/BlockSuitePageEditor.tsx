@@ -42,12 +42,11 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
     let alive = true
     let persistTimer: ReturnType<typeof setTimeout> | null = null
     let doc: Doc | null = null
-    // BlockSuite's ThemeObserver defaults to light and watches
-    // `document.documentElement[data-theme]`. The dashboard is dark, so scope
-    // the dark theme while the spike is mounted and restore afterwards.
+    // Theme scope: capture only. The actual `data-theme="dark"` write happens
+    // in the mount effect AFTER the editor connects — ThemeObserver only
+    // reacts to mutations, so writing before it exists would stick on light.
     const rootDataset = document.documentElement.dataset
     const previousTheme = rootDataset.theme
-    rootDataset.theme = "dark"
 
     const persist = () => {
       if (!doc || readOnly) return
@@ -147,6 +146,11 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
     editor.doc = pageDoc
     editor.hasViewport = true
     mount.replaceChildren(editor)
+    // BlockSuite's ThemeObserver defaults to light and only reacts to
+    // *mutations* of documentElement[data-theme] — a value set before the
+    // editor connects is never picked up. Re-assert dark after connect so the
+    // mutation fires while the observer exists (idempotent on remounts).
+    document.documentElement.dataset.theme = "dark"
     return () => mount.replaceChildren()
   }, [pageDoc])
 
