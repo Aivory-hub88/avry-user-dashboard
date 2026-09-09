@@ -52,6 +52,12 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
     let alive = true
     let persistTimer: ReturnType<typeof setTimeout> | null = null
     let doc: Doc | null = null
+    // BlockSuite's ThemeObserver defaults to light and watches
+    // `document.documentElement[data-theme]`. The dashboard is dark, so scope
+    // the dark theme while the spike is mounted and restore afterwards.
+    const rootDataset = document.documentElement.dataset
+    const previousTheme = rootDataset.theme
+    rootDataset.theme = "dark"
 
     const persist = () => {
       if (!doc || readOnly) return
@@ -126,6 +132,8 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
     void load()
     return () => {
       alive = false
+      if (previousTheme === undefined) delete rootDataset.theme
+      else rootDataset.theme = previousTheme
       if (persistTimer) clearTimeout(persistTimer)
       providerRef.current?.destroy()
       providerRef.current = null
@@ -174,7 +182,10 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
       {error ? (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>
       ) : (
-        <div className={`min-h-[560px] overflow-hidden rounded-2xl border border-line bg-[#252522] ${readOnly ? "pointer-events-none" : ""}`} aria-readonly={readOnly}>
+        // NOTE: no `overflow-hidden` here on purpose. BlockSuite renders the
+        // slash menu, drag handle, and format bar as overlays inside the
+        // editor tree; a clipping ancestor cuts them off like AFFiNE would not.
+        <div data-theme="dark" className={`min-h-[560px] rounded-2xl border border-line bg-[#252522] ${readOnly ? "pointer-events-none" : ""}`} aria-readonly={readOnly}>
           <div ref={mountRef} className="h-[min(72vh,760px)] min-h-[560px]" />
         </div>
       )}

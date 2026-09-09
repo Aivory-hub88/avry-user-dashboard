@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { FormEvent, KeyboardEvent } from "react"
+import Link from "next/link"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
 import { Check, CheckSquare, CloudOff, Code2, GripVertical, Heading1, Heading2, Heading3, List, ListOrdered, LoaderCircle, Minus, MoreHorizontal, Plus, Quote, Table2, Tag, Trash2, Type } from "lucide-react"
@@ -9,6 +10,7 @@ import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 
 type BlockType = "h1" | "h2" | "h3" | "p" | "todo" | "bullet" | "numbered" | "quote" | "code" | "divider" | "database"
 type Block = { id: string; type: BlockType; text: string; checked?: boolean }
+type DbRow = { id: string; title: string; status: string }
 type SlashState = { idx: number; query: string } | null
 type SaveState = "saved" | "saving" | "offline"
 
@@ -82,6 +84,50 @@ function uid() {
   return Math.random().toString(36).slice(2, 8)
 }
 
+function toDbRows(dbArray: Y.Array<Y.Map<unknown>>): DbRow[] {
+  return dbArray.toArray().map((map) => ({
+    id: (map.get("id") as string) ?? uid(),
+    title: (map.get("title") as string) ?? "",
+    status: (map.get("status") as string) ?? "Todo",
+  }))
+}
+
+function statusPill(status: string) {
+  const s = status.toLowerCase()
+  if (s === "done") return "bg-emerald-500/15 text-emerald-300"
+  if (s === "in progress" || s === "doing") return "bg-sky-500/15 text-sky-300"
+  return "bg-amber-500/15 text-amber-300"
+}
+
+function DatabaseEmbed({ rows, docId }: { rows: DbRow[]; docId: string }) {
+  const preview = rows.slice(0, 4)
+  return (
+    <div className="w-full rounded-xl border border-white/10 bg-white/[0.02] p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[12px] font-medium text-white/70">
+          <Table2 className="h-3.5 w-3.5" />Table
+        </div>
+        <Link href={`/workspace/${docId}?view=database`} className="text-[11px] text-white/35 hover:text-white/70">
+          Open data →
+        </Link>
+      </div>
+      {preview.length === 0 ? (
+        <div className="py-3 text-center text-[12px] text-white/30">No records yet — open data to add one.</div>
+      ) : (
+        <div className="flex flex-col gap-1">
+          {preview.map((row) => (
+            <div key={row.id} className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-2.5 py-1.5">
+              <span className="truncate text-[12px] text-white/75">{row.title || "Untitled"}</span>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusPill(row.status)}`}>{row.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {rows.length > preview.length && <div className="mt-1.5 text-[11px] text-white/25">+{rows.length - preview.length} more</div>}
+    </div>
+  )
+}
+
 function yMapFromBlock(block: Block): Y.Map<unknown> {
   const map = new Y.Map<unknown>()
   map.set("id", block.id)
@@ -124,10 +170,14 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
   const providerRef = useRef<WebsocketProvider | null>(null)
   const readOnlyRef = useRef(readOnly)
   const [blocks, setBlocks] = useState<Block[]>([])
+  const [dbRows, setDbRows] = useState<DbRow[]>([])
   const [slash, setSlash] = useState<SlashState>(null)
   const [openMenu, setOpenMenu] = useState<number | null>(null)
   const [ready, setReady] = useState(false)
-  const [saveState, setSaveState] = useState<SaveState>("saved")
+  // Start honest: nothing is confirmed on the server yet, so never claim
+  // "Saved" before the first verified round-trip (the old initial "saved"
+  // made local-only cache look persisted).
+  const [saveState, setSaveState] = useState<SaveState>("saving")
 
   useEffect(() => {
     readOnlyRef.current = readOnly
@@ -184,21 +234,29 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
       return true
     }
 
+    const dbArray = doc.getArray<Y.Map<unknown>>("database")
     const observer = () => {
       if (!alive) return
       setBlocks(toBlocks(yArray))
+      setDbRows(toDbRows(dbArray))
       try {
         localStorage.setItem(storageKey, JSON.stringify(Array.from(Y.encodeStateAsUpdate(doc))))
       } catch {}
       schedulePut()
     }
     yArray.observe(observer)
+    const dbObserver = () => {
+      if (!alive) return
+      setDbRows(toDbRows(dbArray))
+    }
+    dbArray.observe(dbObserver)
 
     fetch(`/api/workspace/${docId}/doc`, { headers: collabAuthHeaders() })
       .then((response) => (response.ok ? response.arrayBuffer() : null))
       .then((buffer) => {
         if (!alive) return
-        if (buffer && buffer.byteLength > 0) Y.applyUpdate(doc, new Uint8Array(buffer))
+        const serverEmpty = !buffer || buffer.byteLength === 0
+        if (!serverEmpty) Y.applyUpdate(doc, new Uint8Array(buffer as ArrayBuffer))
         const legacy = isLegacyPrototypeContent(toBlocks(yArray))
         if (legacy) clearLegacyPrototype()
         if (yArray.length === 0 && !readOnlyRef.current) {
@@ -208,7 +266,13 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
           }, agentOrigin())
         }
         setBlocks(legacy && readOnlyRef.current ? [] : toBlocks(yArray))
+        setDbRows(toDbRows(dbArray))
         setReady(true)
+        // Rescue stranded local cache: content that only exists in this
+        // browser (server has no record) previously never uploaded, while the
+        // badge claimed "Saved". Push the merged state so the server converges.
+        if (!readOnlyRef.current && serverEmpty && yArray.length > 0) schedulePut()
+        else if (alive) setSaveState(serverEmpty && !readOnlyRef.current ? "saving" : "saved")
       })
       .catch(() => {
         if (!alive) return
@@ -218,7 +282,12 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
           doc.transact(() => yArray.push([yMapFromBlock({ id: uid(), type: "p", text: "" })]), agentOrigin())
         }
         setBlocks(legacy && readOnlyRef.current ? [] : toBlocks(yArray))
+        setDbRows(toDbRows(dbArray))
         setReady(true)
+        // Server unreachable: try the rescue PUT (fails honestly to Offline),
+        // otherwise admit we cannot verify persistence.
+        if (!readOnlyRef.current && yArray.length > 0) schedulePut()
+        else if (alive) setSaveState("offline")
       })
 
     const wsUrl = typeof window !== "undefined" && window.location.hostname === "localhost" ? "ws://localhost:3200" : "wss://aivory.uk/yjs"
@@ -235,6 +304,7 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
       alive = false
       if (putTimer) clearTimeout(putTimer)
       yArray.unobserve(observer)
+      dbArray.unobserve(dbObserver)
       providerRef.current?.destroy()
       doc.destroy()
     }
@@ -279,9 +349,9 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
     if (type === "divider") {
       update(index, { type, text: "—" })
     } else if (type === "database") {
-      // Keep as p but signal table — database view is separate; slash creates a marker
-      update(index, { type: "p", text: "" })
-      // Could trigger database block insertion; for now treat as table placeholder
+      // Inline live table preview (same Y.Doc `database` array as the Data
+      // view), so picking Table visibly inserts something like AFFiNE.
+      update(index, { type: "database", text: "" })
     } else {
       const curText = blocks[index]?.text ?? ""
       const cleaned = curText.startsWith("/") ? "" : curText
@@ -402,17 +472,21 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
                     className="mt-2 h-4 w-4 shrink-0 rounded border border-white/20 bg-transparent accent-white"
                   />
                 )}
-                <BlockContent
-                  block={block}
-                  readOnly={readOnly}
-                  onInput={(e) => onInput(index, e)}
-                  onKeyDown={(e) => onKeyDown(e, index)}
-                  onContextMenu={(e) => {
-                    if (readOnly) return
-                    e.preventDefault()
-                    setOpenMenu(openMenu === index ? null : index)
-                  }}
-                />
+                {block.type === "database" ? (
+                  <DatabaseEmbed rows={dbRows} docId={docId} />
+                ) : (
+                  <BlockContent
+                    block={block}
+                    readOnly={readOnly}
+                    onInput={(e) => onInput(index, e)}
+                    onKeyDown={(e) => onKeyDown(e, index)}
+                    onContextMenu={(e) => {
+                      if (readOnly) return
+                      e.preventDefault()
+                      setOpenMenu(openMenu === index ? null : index)
+                    }}
+                  />
+                )}
               </div>
               {block.type === "divider" && <div className="mt-1 h-px w-full bg-white/10" />}
               {!readOnly && slash?.idx === index && visibleSlashGroups.length > 0 && (

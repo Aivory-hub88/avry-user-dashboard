@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import * as Y from "yjs"
 import { query } from "@/lib/db"
 import { workspaceCredential, collabAuthHeaders, unauthorized, forbidden, type WorkspaceCredential } from "@/lib/workspaceAuth"
+import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDoc"
 
 export const runtime = "nodejs"
 
@@ -31,8 +32,15 @@ async function loadDoc(id: string, cred: WorkspaceCredential): Promise<Y.Doc> {
   } catch (e) {
     if (e instanceof WorkspaceDenied) throw e
   }
-  const r = await query("SELECT yjs_update FROM dashboard.workspace_docs WHERE id = $1", [id])
-  if (r.rows.length > 0) Y.applyUpdate(doc, new Uint8Array(r.rows[0].yjs_update as Buffer))
+  const r = await query("SELECT id, yjs_update FROM dashboard.workspace_docs WHERE id = $1 OR id = $2", [
+    canonicalRoomId(id),
+    legacyDocId(id),
+  ])
+  if (r.rows.length > 0) {
+    const byId = new Map<string, Buffer>(r.rows.map((row) => [row.id as string, row.yjs_update as Buffer]))
+    const merged = mergeYjsUpdates([byId.get(canonicalRoomId(id)) ?? null, byId.get(legacyDocId(id)) ?? null])
+    if (merged) Y.applyUpdate(doc, new Uint8Array(merged))
+  }
   return doc
 }
 

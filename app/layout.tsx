@@ -12,6 +12,9 @@ import { SettingsModalProvider } from "@/contexts/SettingsModalContext"
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext"
 import "@/styles/globals.css"
 import "@/styles/workflow-nodes.css"
+// BlockSuite spike scope: CSS variables only (`--affine-*` on `:root` plus
+// `[data-theme=dark]` overrides). No existing dashboard styles are affected.
+import "@toeverything/theme/style.css"
 
 const nunito = Nunito({
   subsets: ["latin"],

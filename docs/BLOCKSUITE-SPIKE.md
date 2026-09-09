@@ -13,6 +13,14 @@ Next.js server render.
 ## Scope
 
 - Uses `@blocksuite/presets`, `@blocksuite/blocks`, and `@blocksuite/store` at `0.19.5`.
+- Loads `@toeverything/theme/style.css` in the root layout (CSS variables only;
+  no existing dashboard styling is affected) and scopes `data-theme="dark"`
+  while the spike is mounted, matching how AFFiNE/BlockSuite's `ThemeObserver`
+  resolves the theme. Without this the editor renders messy and the slash-menu
+  popup breaks.
+- The editor wrapper intentionally has no `overflow-hidden`: BlockSuite renders
+  the slash menu, drag handle, and format bar as overlays inside the editor
+  tree, and a clipping ancestor cuts them off.
 - Uses the existing document GET/PUT endpoint and `workspace:<id>` websocket room.
 - Initializes the minimal BlockSuite tree: page, surface, note, and paragraph.
 - Uses BlockSuite's stable block IDs and built-in page controls, slash menu, clipboard, and undo/redo surface.

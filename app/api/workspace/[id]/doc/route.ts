@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { workspaceCredential, collabAuthHeaders, authorizeDocFallback, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDoc"
 
 export const runtime = "nodejs"
 
@@ -39,13 +40,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       })
     }
   }
-  // collab down — pg BYTEA fallback, but only for still-authorized callers
+  // collab down — pg BYTEA fallback, but only for still-authorized callers.
+  // Read the canonical room row first, then merge the legacy bare-id snapshot
+  // so a fallback read never serves a partial half of a split-brain doc.
   if (!(await authorizeDocFallback(cred, id))) return forbidden()
   try {
-    const r = await query("SELECT yjs_update FROM dashboard.workspace_docs WHERE id = $1", [id])
+    const r = await query("SELECT id, yjs_update FROM dashboard.workspace_docs WHERE id = $1 OR id = $2", [
+      canonicalRoomId(id),
+      legacyDocId(id),
+    ])
     if (r.rows.length === 0) return new NextResponse(null, { status: 404 })
-    const upd: Buffer = r.rows[0].yjs_update
-    return new NextResponse(upd as unknown as BodyInit, {
+    const byId = new Map<string, Buffer>(r.rows.map((row) => [row.id as string, row.yjs_update as Buffer]))
+    const merged = mergeYjsUpdates([byId.get(canonicalRoomId(id)) ?? null, byId.get(legacyDocId(id)) ?? null])
+    if (!merged) return new NextResponse(null, { status: 404 })
+    return new NextResponse(merged as unknown as BodyInit, {
       status: 200,
       headers: { "Content-Type": "application/octet-stream", "Cache-Control": "no-store", "X-Source": "pg" },
     })
