@@ -106,7 +106,7 @@ export default function BlockSuitePageEditor({
   pageTitle = "",
   outlineOpen = false,
   onDocTextChange,
-  onInsertBlock,
+  onModeChange,
 }: {
   docId: string
   readOnly?: boolean
@@ -114,7 +114,7 @@ export default function BlockSuitePageEditor({
   pageTitle?: string
   outlineOpen?: boolean
   onDocTextChange?: (text: string) => void
-  onInsertBlock?: (text: string) => void
+  onModeChange?: (mode: EditorDocMode) => void
 }) {
   const router = useRouter()
   const mountRef = useRef<HTMLDivElement | null>(null)
@@ -141,7 +141,8 @@ export default function BlockSuitePageEditor({
     modeRef.current = initialMode
     modeAtRef.current = Date.now()
     setMode(initialMode)
-  }, [initialMode])
+    onModeChange?.(initialMode)
+  }, [initialMode, onModeChange])
 
   const persistMode = (next: EditorDocMode) => {
     fetch(`/api/workspace/${docId}`, {
@@ -158,6 +159,7 @@ export default function BlockSuitePageEditor({
     modeAtRef.current = at
     modeRef.current = next
     setMode(next)
+    onModeChange?.(next)
     try {
       providerRef.current?.awareness.setLocalStateField(MODE_STATE_KEY, { mode: next, at } satisfies AwarenessModeState)
     } catch {}
@@ -265,7 +267,10 @@ export default function BlockSuitePageEditor({
             if (remote && remote.mode !== modeRef.current && remote.at > modeAtRef.current) {
               modeAtRef.current = remote.at
               modeRef.current = remote.mode
-              if (alive) setMode(remote.mode)
+              if (alive) {
+                setMode(remote.mode)
+                onModeChange?.(remote.mode)
+              }
             }
           } catch {}
         }
@@ -300,28 +305,31 @@ export default function BlockSuitePageEditor({
   }, [docId, readOnly])
 
   // Hide the empty template gallery (vanilla BlockSuite ships with
-  // builtInTemplates = [] so the panel is just an empty card). The toolbar
-  // lives in light DOM (ShadowlessElement) but may be re-created on mode
-  // switches, so hide via JS *and* CSS.
+  // builtInTemplates = [] so the panel is just an empty card). The button
+  // lives inside shadow roots (edgeless toolbar is not light DOM), so we
+  // need a deep traversal that pierces shadowRoot.
   const hideEmptyTemplateUI = () => {
+    const deepHide = (root: Element | Document | ShadowRoot) => {
+      try {
+        const els = (root as Document).querySelectorAll?.("edgeless-template-button, edgeless-templates-panel") ?? []
+        for (const el of Array.from(els) as HTMLElement[]) el.style.display = "none"
+        // Traverse shadow roots
+        const all = (root as Element).querySelectorAll?.("*") ?? []
+        for (const el of Array.from(all) as HTMLElement[]) {
+          const shadow = (el as unknown as { shadowRoot?: ShadowRoot }).shadowRoot
+          if (shadow) deepHide(shadow)
+        }
+      } catch {}
+    }
     try {
-      for (const el of document.querySelectorAll("edgeless-template-button")) {
-        ;(el as HTMLElement).style.display = "none"
-      }
-      for (const el of document.querySelectorAll("edgeless-templates-panel")) {
-        ;(el as HTMLElement).style.display = "none"
-      }
+      deepHide(document)
     } catch {}
     try {
-      const root = containerRef.current as unknown as HTMLElement | null
-      if (root) {
-        for (const el of root.querySelectorAll("edgeless-template-button")) {
-          ;(el as HTMLElement).style.display = "none"
-        }
-        for (const el of root.querySelectorAll("edgeless-templates-panel")) {
-          ;(el as HTMLElement).style.display = "none"
-        }
-      }
+      const c = containerRef.current as unknown as HTMLElement | null
+      if (c) deepHide(c)
+      // Also check the edgeless root's shadow if it exists
+      const edgelessRoot = c?.querySelector("affine-edgeless-root") as unknown as { shadowRoot?: ShadowRoot } | null
+      if (edgelessRoot?.shadowRoot) deepHide(edgelessRoot.shadowRoot)
     } catch {}
   }
 
@@ -363,10 +371,24 @@ export default function BlockSuitePageEditor({
     let editor = containerRef.current
     if (!editor) {
       editor = document.createElement("affine-editor-container") as AffineEditorContainerElement
+      // Ensure Space → Hand and drag work: editor must be focusable and autofocus
+      try {
+        ;(editor as unknown as Record<string, unknown>).autofocus = true
+      } catch {}
       editor.doc = pageDoc
       editor.mode = modeRef.current
       containerRef.current = editor
       mount.replaceChildren(editor)
+      // Focus so Space/Hand and keyboard shortcuts are captured
+      try {
+        ;(editor as HTMLElement).setAttribute("tabindex", "0")
+        setTimeout(() => (editor as HTMLElement).focus(), 50)
+      } catch {}
+    } else {
+      // Reuse existing container (page already mounted) — ensure focus
+      try {
+        setTimeout(() => (editor as HTMLElement).focus(), 50)
+      } catch {}
     }
     // Theme: the container picks its page AND edgeless palettes from
     // ThemeService signals that default to Light and track the singleton
@@ -399,21 +421,30 @@ export default function BlockSuitePageEditor({
         service.edgeless$.value = ColorScheme.Dark
       } catch {}
       hideEmptyTemplateUI()
+      // Ensure edgeless default tool is Select (movable) — Hand is via Space.
+      try {
+        if (modeRef.current === "edgeless") {
+          const gfx = (editor.std as unknown as { get: (id: unknown) => unknown }).get?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
+          const tool = (gfx as unknown as { tool?: unknown })?.tool as { setTool?: (n: string) => void } | undefined
+          tool?.setTool?.("default")
+          // Fallback: try via getOptional
+          if (!tool) {
+            const alt = (editor.std as unknown as { getOptional?: (id: unknown) => unknown }).getOptional?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
+            alt?.tool?.setTool?.("default")
+          }
+        }
+      } catch {}
+      try {
+        // Focus again after theme flip so Space is captured
+        ;(editor as HTMLElement).focus()
+      } catch {}
     })()
-    // The toolbar lazily creates the template button a frame later; watch
-    // for it and hide as soon as it appears so there's no white-card flash.
-    let observer: MutationObserver | null = null
-    try {
-      observer = new MutationObserver(hideEmptyTemplateUI)
-      observer.observe(editor, { childList: true, subtree: true })
-    } catch {}
-    const timer = window.setTimeout(hideEmptyTemplateUI, 400)
+    const t1 = window.setTimeout(hideEmptyTemplateUI, 400)
+    const t2 = window.setTimeout(hideEmptyTemplateUI, 1200)
     return () => {
       cancelled = true
-      window.clearTimeout(timer)
-      try {
-        observer?.disconnect()
-      } catch {}
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
       mount.replaceChildren()
     }
   }, [pageDoc])
@@ -441,6 +472,23 @@ export default function BlockSuitePageEditor({
     // Toolbar is rebuilt on switch; hide the empty template entry again.
     hideEmptyTemplateUI()
     window.setTimeout(hideEmptyTemplateUI, 200)
+    window.setTimeout(hideEmptyTemplateUI, 800)
+    // Ensure Select is active in edgeless (movable), Hand via Space
+    try {
+      if (mode === "edgeless") {
+        const gfx = (editor.std as unknown as { get: (id: unknown) => unknown }).get?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
+        const tool = (gfx as unknown as { tool?: unknown })?.tool as { setTool?: (n: string) => void } | undefined
+        tool?.setTool?.("default")
+        if (!tool) {
+          const alt = (editor.std as unknown as { getOptional?: (id: unknown) => unknown }).getOptional?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
+          alt?.tool?.setTool?.("default")
+        }
+      }
+    } catch {}
+    // Focus so Space→Hand and drag work immediately after switch
+    try {
+      setTimeout(() => (editor as HTMLElement).focus(), 60)
+    } catch {}
   }, [mode])
 
   // Outline panel — mount `affine-outline-panel` next to the editor when toggled on.
@@ -504,8 +552,9 @@ export default function BlockSuitePageEditor({
     router.push("/console")
   }
 
+  const isEdgeless = mode === "edgeless"
   return (
-    <div className="mx-auto flex w-full max-w-[960px] flex-col gap-3">
+    <div className={isEdgeless ? "flex h-full w-full flex-1 flex-col gap-2" : "mx-auto flex w-full max-w-[960px] flex-col gap-3"}>
       {/* Hide the container's built-in doc-title: title is pg-backed (the
           collection meta it writes to never persists in 1-doc-1-room), so
           the Big Title in the page header is the single source of truth.
@@ -595,12 +644,18 @@ export default function BlockSuitePageEditor({
       {error ? (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>
       ) : (
-        // NOTE: no `overflow-hidden` here on purpose. BlockSuite renders the
-        // slash menu, drag handle, and format bar as overlays inside the
+        // NOTE: no `overflow-hidden` on the page wrapper on purpose — BlockSuite
+        // renders slash menu, drag handle, and format bar as overlays inside the
         // editor tree; a clipping ancestor cuts them off like AFFiNE would not.
-        <div className={`flex gap-3 ${outlineOpen && mode === "page" ? "" : ""}`}>
-          <div data-theme="dark" data-aivory-doc className={`min-h-[560px] flex-1 rounded-2xl border border-line bg-[#252522] ${readOnly ? "pointer-events-none" : ""}`} aria-readonly={readOnly}>
-            <div ref={mountRef} className="h-[min(72vh,760px)] min-h-[560px]" />
+        // For edgeless we let the canvas fill the available flex space.
+        <div className={`flex gap-3 ${isEdgeless ? "flex-1 min-h-0" : ""} ${outlineOpen && mode === "page" ? "" : ""}`}>
+          <div
+            data-theme="dark"
+            data-aivory-doc
+            className={`${isEdgeless ? "flex flex-1 flex-col min-h-0" : "min-h-[560px] flex-1"} rounded-2xl border border-line bg-[#252522] ${readOnly ? "pointer-events-none" : ""}`}
+            aria-readonly={readOnly}
+          >
+            <div ref={mountRef} className={isEdgeless ? "flex-1 min-h-0 h-full" : "h-[min(72vh,760px)] min-h-[560px]"} />
           </div>
           {outlineOpen && mode === "page" && (
             <div className="hidden w-[260px] shrink-0 overflow-hidden rounded-2xl border border-line bg-[#1e1e1c] lg:block">

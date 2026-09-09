@@ -68,6 +68,7 @@ export default function WorkspaceDocPage() {
   const [aiDocText, setAiDocText] = useState("")
   const [showExport, setShowExport] = useState(false)
   const [present, setPresent] = useState(false)
+  const [editorMode, setEditorMode] = useState<"page" | "edgeless">("page")
   const loginUrl = `${getMarketingUrl()}/login`
   const { setActiveWorkspaceId } = useWorkspaceContext()
 
@@ -105,6 +106,10 @@ export default function WorkspaceDocPage() {
   useEffect(() => {
     if (status === 'ok') setActiveWorkspaceId(id)
   }, [id, setActiveWorkspaceId, status])
+
+  useEffect(() => {
+    if (meta?.mode) setEditorMode(meta.mode)
+  }, [meta?.mode])
 
   // for locked, fetch owner info via separate? meta already 403, so need owner via other means
   // we show generic locked; request access still works
@@ -441,7 +446,7 @@ export default function WorkspaceDocPage() {
       )}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <WorkspaceNavigator currentId={id} />
-        <div className="min-w-0 flex-1 overflow-y-auto px-8 py-8 lg:px-10 xl:px-12">
+        <div className={`min-w-0 flex-1 ${view === "page" && editorMode === "edgeless" ? "overflow-hidden flex flex-col bg-[#0f0f0e] p-0" : "overflow-y-auto px-8 py-8 lg:px-10 xl:px-12"}`}>
           {view === "page" && (
             <>
               {meta?.cover_url && (
@@ -575,8 +580,25 @@ export default function WorkspaceDocPage() {
               />
             </div>
           )}
-          {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : editor === "blocksuite" ? <BlockSuitePageEditor key={id} docId={id} readOnly={!canWrite} initialMode={meta?.mode ?? "page"} pageTitle={meta?.title ?? ""} outlineOpen={showOutline} onDocTextChange={setAiDocText} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
-          {view === "page" && (
+          {view === "database" ? (
+            <WorkspaceDatabase docId={id} readOnly={!canWrite} />
+          ) : editor === "blocksuite" ? (
+            <div className={view === "page" && editorMode === "edgeless" ? "flex flex-1 flex-col min-h-0" : ""}>
+              <BlockSuitePageEditor
+                key={id}
+                docId={id}
+                readOnly={!canWrite}
+                initialMode={meta?.mode ?? "page"}
+                pageTitle={meta?.title ?? ""}
+                outlineOpen={showOutline}
+                onDocTextChange={setAiDocText}
+                onModeChange={setEditorMode}
+              />
+            </div>
+          ) : (
+            <WorkspaceEditor docId={id} readOnly={!canWrite} />
+          )}
+          {view === "page" && editorMode === "page" && (
             <>
               <div className="mx-auto mt-4 w-full max-w-[960px]">
                 <WorkspaceBacklinks docId={id} canWrite={canWrite} />
