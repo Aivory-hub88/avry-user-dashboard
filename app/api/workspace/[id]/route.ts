@@ -14,7 +14,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!cred) return unauthorized()
   const role = await getDocRole(cred, id)
   if (!canWrite(role)) return forbidden()
-  let body: { title?: unknown; mode?: unknown; favorite?: unknown } = {}
+  let body: { title?: unknown; mode?: unknown; favorite?: unknown; tags?: unknown; props?: unknown } = {}
   try {
     body = await req.json()
   } catch {
@@ -26,6 +26,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   let title: string | undefined
   let mode: string | undefined
   let favorite: boolean | undefined
+  let tags: Array<{ id: string; label: string; color: string }> | undefined
+  let props: Record<string, unknown> | undefined
   if (body.title !== undefined) {
     title = (body.title ?? '').toString().slice(0, 200).trim()
     if (!title) return NextResponse.json({ error: 'title required' }, { status: 400 })
@@ -48,6 +50,37 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     sets.push(`favorite = $${nextParam++}`)
     values.push(favorite)
   }
+  if (body.tags !== undefined) {
+    if (!Array.isArray(body.tags)) return NextResponse.json({ error: 'tags must be array' }, { status: 400 })
+    const cleaned: Array<{ id: string; label: string; color: string }> = []
+    const allowedColors = new Set(["gray","blue","green","yellow","red","purple","pink","orange"])
+    for (const t of body.tags.slice(0, 20)) {
+      if (!t || typeof t !== "object") continue
+      const label = (t as { label?: unknown }).label?.toString().slice(0, 24).trim()
+      if (!label) continue
+      const id = (t as { id?: unknown }).id?.toString().slice(0, 32) || `tag-${Math.random().toString(36).slice(2, 6)}`
+      const color = allowedColors.has((t as { color?: unknown }).color as string) ? (t as { color: string }).color : "gray"
+      cleaned.push({ id, label, color })
+    }
+    tags = cleaned
+    sets.push(`tags = $${nextParam++}::jsonb`)
+    values.push(JSON.stringify(tags))
+  }
+  if (body.props !== undefined) {
+    if (!body.props || typeof body.props !== "object" || Array.isArray(body.props)) {
+      return NextResponse.json({ error: 'props must be object' }, { status: 400 })
+    }
+    // Only allow known flags; strip everything else to avoid JSON bloat.
+    const allowed: Record<string, unknown> = {}
+    const src = body.props as Record<string, unknown>
+    if (typeof src.isJournal === "boolean") allowed.isJournal = src.isJournal
+    if (typeof src.isTemplate === "boolean") allowed.isTemplate = src.isTemplate
+    if (src.pageWidth === "full" || src.pageWidth === "standard") allowed.pageWidth = src.pageWidth
+    if (src.edgelessTheme === "light" || src.edgelessTheme === "dark") allowed.edgelessTheme = src.edgelessTheme
+    props = allowed
+    sets.push(`props = $${nextParam++}::jsonb`)
+    values.push(JSON.stringify(props))
+  }
   if (sets.length === 0) return NextResponse.json({ error: 'nothing to update' }, { status: 400 })
   const idParam = nextParam++
   try {
@@ -65,7 +98,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         targetId: id,
       })
     }
-    return NextResponse.json({ id, ...(title !== undefined ? { title } : {}), ...(mode !== undefined ? { mode } : {}), ...(favorite !== undefined ? { favorite } : {}) })
+    return NextResponse.json({ id, ...(title !== undefined ? { title } : {}), ...(mode !== undefined ? { mode } : {}), ...(favorite !== undefined ? { favorite } : {}), ...(tags !== undefined ? { tags } : {}), ...(props !== undefined ? { props } : {}) })
   } catch (e) {
     console.error('[workspace patch]', e)
     return NextResponse.json({ error: 'db' }, { status: 500 })

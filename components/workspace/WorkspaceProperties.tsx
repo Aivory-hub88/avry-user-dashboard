@@ -1,0 +1,199 @@
+"use client"
+
+import { useState } from "react"
+import { Tag, X, Plus, Calendar, User, Clock, FileText, Eye, LayoutTemplate, Palette } from "lucide-react"
+
+export type DocTag = { id: string; label: string; color: string }
+export type DocProps = { isJournal?: boolean; isTemplate?: boolean; pageWidth?: "standard" | "full"; edgelessTheme?: "light" | "dark" }
+
+const TAG_COLORS: Record<string, string> = {
+  gray: "bg-white/10 text-white/60 border-white/15",
+  blue: "bg-sky-500/15 text-sky-300 border-sky-500/25",
+  green: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
+  yellow: "bg-amber-500/15 text-amber-300 border-amber-500/25",
+  red: "bg-red-500/15 text-red-300 border-red-500/25",
+  purple: "bg-violet-500/15 text-violet-300 border-violet-500/25",
+  pink: "bg-pink-500/15 text-pink-300 border-pink-500/25",
+  orange: "bg-orange-500/15 text-orange-300 border-orange-500/25",
+}
+
+const COLOR_OPTIONS: Array<{ value: string; dot: string }> = [
+  { value: "gray", dot: "bg-white/40" },
+  { value: "blue", dot: "bg-sky-400" },
+  { value: "green", dot: "bg-emerald-400" },
+  { value: "yellow", dot: "bg-amber-400" },
+  { value: "red", dot: "bg-red-400" },
+  { value: "purple", dot: "bg-violet-400" },
+  { value: "pink", dot: "bg-pink-400" },
+  { value: "orange", dot: "bg-orange-400" },
+]
+
+function formatDate(value: string | null) {
+  if (!value) return "—"
+  try {
+    return new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+  } catch {
+    return "—"
+  }
+}
+
+export default function WorkspaceProperties({
+  docId,
+  tags,
+  props,
+  createdAt,
+  updatedAt,
+  ownerName,
+  ownerEmail,
+  canWrite,
+  onPatch,
+}: {
+  docId: string
+  tags: DocTag[]
+  props: DocProps
+  createdAt: string | null
+  updatedAt: string | null
+  ownerName: string | null
+  ownerEmail: string | null
+  canWrite: boolean
+  onPatch: (patch: { tags?: DocTag[]; props?: DocProps }) => Promise<void>
+}) {
+  void docId
+  const [newTag, setNewTag] = useState("")
+  const [newColor, setNewColor] = useState("gray")
+  const [busy, setBusy] = useState(false)
+
+  const addTag = async () => {
+    const label = newTag.trim().slice(0, 24)
+    if (!label || busy || !canWrite) return
+    setBusy(true)
+    const next = [...tags, { id: `tag-${Date.now().toString(36)}`, label, color: newColor }]
+    await onPatch({ tags: next })
+    setNewTag("")
+    setBusy(false)
+  }
+
+  const removeTag = async (id: string) => {
+    if (busy || !canWrite) return
+    setBusy(true)
+    await onPatch({ tags: tags.filter((t) => t.id !== id) })
+    setBusy(false)
+  }
+
+  const toggleProp = async (key: keyof DocProps, value: unknown) => {
+    if (busy || !canWrite) return
+    setBusy(true)
+    await onPatch({ props: { ...props, [key]: value } })
+    setBusy(false)
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-[960px] rounded-2xl border border-line bg-white/[0.025] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-[12px] font-medium text-white/50">
+          <FileText className="h-3.5 w-3.5" /> Properties
+        </div>
+        <span className="text-[11px] text-white/25">{tags.length} tags · {props.isJournal ? "Journal" : "Page"}</span>
+      </div>
+
+      {/* Tags */}
+      <div className="mt-3">
+        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-white/30">
+          <Tag className="h-3 w-3" /> Tags
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {tags.map((t) => (
+            <span key={t.id} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${TAG_COLORS[t.color] ?? TAG_COLORS.gray}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${COLOR_OPTIONS.find((c) => c.value === t.color)?.dot ?? "bg-white/40"}`} />
+              {t.label}
+              {canWrite && (
+                <button onClick={() => removeTag(t.id)} className="ml-0.5 rounded-full p-0.5 hover:bg-white/10">
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </span>
+          ))}
+          {canWrite ? (
+            <span className="inline-flex items-center gap-1">
+              <input
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addTag() }}
+                placeholder="New tag"
+                className="w-[120px] rounded-full border border-line bg-white/[0.04] px-3 py-1 text-[11px] text-white/80 placeholder:text-white/25 outline-none"
+              />
+              <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-line bg-white/[0.04] p-1">
+                {COLOR_OPTIONS.map((c) => (
+                  <button
+                    key={c.value}
+                    onClick={() => setNewColor(c.value)}
+                    title={c.value}
+                    className={`h-5 w-5 rounded-full border ${newColor === c.value ? "border-white/50" : "border-transparent"} flex items-center justify-center`}
+                  >
+                    <span className={`h-3 w-3 rounded-full ${c.dot}`} />
+                  </button>
+                ))}
+              </span>
+              <button onClick={addTag} disabled={!newTag.trim() || busy} className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-black hover:bg-white/90 disabled:opacity-40">
+                <Plus className="h-3 w-3 inline" /> Add
+              </button>
+            </span>
+          ) : tags.length === 0 ? (
+            <span className="text-[11px] text-white/25">No tags</span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-3 sm:grid-cols-4">
+        <div className="flex items-center gap-2 text-[11px] text-white/40">
+          <Calendar className="h-3 w-3" />
+          <span className="uppercase tracking-wider">Created</span>
+          <span className="text-white/60">{formatDate(createdAt)}</span>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-white/40">
+          <Clock className="h-3 w-3" />
+          <span className="uppercase tracking-wider">Updated</span>
+          <span className="text-white/60">{formatDate(updatedAt)}</span>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-white/40">
+          <User className="h-3 w-3" />
+          <span className="uppercase tracking-wider">By</span>
+          <span className="truncate text-white/60">{ownerName ?? ownerEmail ?? "—"}</span>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-white/40">
+          <Eye className="h-3 w-3" />
+          <span className="uppercase tracking-wider">Width</span>
+          <button
+            onClick={() => toggleProp("pageWidth", props.pageWidth === "full" ? "standard" : "full")}
+            disabled={!canWrite}
+            className="rounded-full border border-line bg-white/[0.04] px-2 py-0.5 text-[11px] text-white/60 hover:bg-white/[0.08] disabled:opacity-50"
+          >
+            {props.pageWidth === "full" ? "Full" : "Standard"}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+        <button
+          onClick={() => toggleProp("isJournal", !props.isJournal)}
+          disabled={!canWrite}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${props.isJournal ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "border-line bg-white/[0.04] text-white/40 hover:bg-white/[0.08] disabled:opacity-50"}`}
+        >
+          <Calendar className="h-3 w-3" /> Journal {props.isJournal ? "on" : "off"}
+        </button>
+        <button
+          onClick={() => toggleProp("isTemplate", !props.isTemplate)}
+          disabled={!canWrite}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${props.isTemplate ? "bg-violet-500/15 text-violet-300 border-violet-500/25" : "border-line bg-white/[0.04] text-white/40 hover:bg-white/[0.08] disabled:opacity-50"}`}
+        >
+          <LayoutTemplate className="h-3 w-3" /> Template {props.isTemplate ? "on" : "off"}
+        </button>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/40">
+          <Palette className="h-3 w-3" /> Edgeless
+          <button onClick={() => toggleProp("edgelessTheme", "dark")} disabled={!canWrite} className={`ml-1 rounded-full px-2 py-0.5 text-[10px] ${(!props.edgelessTheme || props.edgelessTheme === "dark") ? "bg-white text-black" : "bg-white/10 text-white/60"}`}>Dark</button>
+          <button onClick={() => toggleProp("edgelessTheme", "light")} disabled={!canWrite} className={`rounded-full px-2 py-0.5 text-[10px] ${props.edgelessTheme === "light" ? "bg-white text-black" : "bg-white/10 text-white/60"}`}>Light</button>
+        </span>
+      </div>
+    </div>
+  )
+}

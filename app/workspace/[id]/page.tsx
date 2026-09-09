@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import WorkspaceEditor from "@/components/workspace/WorkspaceEditor"
 import dynamic from "next/dynamic"
 import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
+import WorkspaceProperties, { type DocTag, type DocProps } from "@/components/workspace/WorkspaceProperties"
 import SharingPanel from "@/components/workspace/SharingPanel"
 import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
@@ -27,6 +28,10 @@ type Meta = {
   title: string
   mode: "page" | "edgeless"
   favorite: boolean
+  tags: DocTag[]
+  props: DocProps
+  created_at: string | null
+  updated_at: string | null
   myRole: string | null
   myRequest: { id: string; status: string; role_requested: string } | null
 }
@@ -64,11 +69,15 @@ export default function WorkspaceDocPage() {
       }
       if (r.ok) {
         const j = (await r.json()) as Meta
-        // Pre-migration servers omit mode/favorite — default, never crash.
+        // Pre-migration servers omit mode/favorite/tags/props — default, never crash.
         setMeta({
           ...j,
           mode: (j as Meta).mode === "edgeless" ? "edgeless" : "page",
           favorite: (j as Meta).favorite === true,
+          tags: Array.isArray((j as Meta).tags) ? (j as Meta).tags : [],
+          props: (j as Meta).props && typeof (j as Meta).props === "object" ? (j as Meta).props : {},
+          created_at: (j as Meta).created_at ?? null,
+          updated_at: (j as Meta).updated_at ?? null,
         })
         setStatus('ok')
       } else setStatus('locked')
@@ -197,6 +206,23 @@ export default function WorkspaceDocPage() {
     }
   }
 
+  const patchMeta = async (patch: { tags?: DocTag[]; props?: DocProps }) => {
+    if (!canWrite) return
+    const prev = meta
+    if (patch.tags) setMeta((m) => (m ? { ...m, tags: patch.tags! } : m))
+    if (patch.props) setMeta((m) => (m ? { ...m, props: patch.props! } : m))
+    try {
+      const r = await fetch(`/api/workspace/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+        body: JSON.stringify(patch),
+      })
+      if (!r.ok) setMeta(prev)
+    } catch {
+      setMeta(prev)
+    }
+  }
+
   const removeDoc = async () => {
     if (busy) return
     setBusy(true)
@@ -306,34 +332,49 @@ export default function WorkspaceDocPage() {
         <WorkspaceNavigator currentId={id} />
         <div className="min-w-0 flex-1 overflow-y-auto px-8 py-8 lg:px-10 xl:px-12">
           {view === "page" && (
-            <div className="mx-auto mb-2 w-full max-w-[960px]">
-              {editingTitle ? (
-                <input
-                  id="aivory-big-title"
-                  value={titleDraft}
-                  autoFocus
-                  disabled={busy}
-                  onChange={(e) => setTitleDraft(e.target.value)}
-                  onBlur={saveTitle}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveTitle()
-                    if (e.key === 'Escape') setEditingTitle(false)
-                  }}
-                  placeholder="Untitled"
-                  className="w-full bg-transparent text-[32px] font-bold leading-tight text-white/90 outline-none placeholder:text-white/20"
+            <>
+              <div className="mx-auto mb-2 w-full max-w-[960px]">
+                {editingTitle ? (
+                  <input
+                    id="aivory-big-title"
+                    value={titleDraft}
+                    autoFocus
+                    disabled={busy}
+                    onChange={(e) => setTitleDraft(e.target.value)}
+                    onBlur={saveTitle}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveTitle()
+                      if (e.key === 'Escape') setEditingTitle(false)
+                    }}
+                    placeholder="Untitled"
+                    className="w-full bg-transparent text-[32px] font-bold leading-tight text-white/90 outline-none placeholder:text-white/20"
+                  />
+                ) : canWrite ? (
+                  <button
+                    onClick={focusBigTitle}
+                    title="Rename"
+                    className="block w-full truncate text-left text-[32px] font-bold leading-tight text-white/90 hover:text-white"
+                  >
+                    {meta?.title || "Untitled"}
+                  </button>
+                ) : (
+                  <div className="truncate text-[32px] font-bold leading-tight text-white/90">{meta?.title || "Untitled"}</div>
+                )}
+              </div>
+              <div className="mx-auto mb-4 w-full max-w-[960px]">
+                <WorkspaceProperties
+                  docId={id}
+                  tags={meta?.tags ?? []}
+                  props={meta?.props ?? {}}
+                  createdAt={meta?.created_at ?? null}
+                  updatedAt={meta?.updated_at ?? null}
+                  ownerName={meta?.ownerName ?? null}
+                  ownerEmail={meta?.ownerEmail ?? null}
+                  canWrite={canWrite}
+                  onPatch={patchMeta}
                 />
-              ) : canWrite ? (
-                <button
-                  onClick={focusBigTitle}
-                  title="Rename"
-                  className="block w-full truncate text-left text-[32px] font-bold leading-tight text-white/90 hover:text-white"
-                >
-                  {meta?.title || "Untitled"}
-                </button>
-              ) : (
-                <div className="truncate text-[32px] font-bold leading-tight text-white/90">{meta?.title || "Untitled"}</div>
-              )}
-            </div>
+              </div>
+            </>
           )}
           {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : editor === "blocksuite" ? <BlockSuitePageEditor key={id} docId={id} readOnly={!canWrite} initialMode={meta?.mode ?? "page"} pageTitle={meta?.title ?? ""} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
           {!canWrite && (
