@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import type { Doc } from "@blocksuite/store"
 import { DocCollection } from "@blocksuite/store"
 import { createEmptyDoc } from "@blocksuite/presets"
-import { ThemeProvider } from "@blocksuite/blocks"
+import { getThemeObserver, ThemeProvider } from "@blocksuite/blocks"
 import { ColorScheme } from "@blocksuite/affine-model"
 import type { BlockStdScope } from "@blocksuite/block-std"
 import { effects as installBlockEffects } from "@blocksuite/blocks/effects"
@@ -276,24 +276,30 @@ export default function BlockSuitePageEditor({
       mount.replaceChildren(editor)
     }
     // Theme: the container picks its page AND edgeless palettes from
-    // ThemeService signals that default to Light. The singleton
-    // ThemeObserver only flips them on *mutations* of
-    // documentElement[data-theme] that happen AFTER it starts observing — a
-    // write issued before first render is silently missed, which is exactly
-    // the stuck-light-canvas / dark-text-on-dark-shell bug. So: wait for
-    // first render (observer exists by then), force a real mutation, then
-    // set both signals directly (deterministic, no timing luck).
+    // ThemeService signals that default to Light and track the singleton
+    // ThemeObserver (which only flips on *mutations* of
+    // documentElement[data-theme] after it exists). A write before first
+    // render is silently missed → stuck-light canvas + dark-text-on-dark
+    // shell + white template panel. Fix at two levels: the global observer
+    // (so every lazily-created panel/toolbar inherits dark) AND the current
+    // container's service (so the page that just mounted flips immediately).
     let cancelled = false
     void (async () => {
       try {
         await editor.updateComplete
       } catch {}
       if (cancelled) return
+      // 1) Global observer — future ThemeService instances (e.g. template
+      //    panel created on toolbar click) read this fallback.
+      try {
+        getThemeObserver().theme$.value = ColorScheme.Dark
+      } catch {}
       try {
         const root = document.documentElement
         delete root.dataset.theme
         root.dataset.theme = "dark"
       } catch {}
+      // 2) Current container's service — page + edgeless in this mount.
       try {
         const service = editor.std.get(ThemeProvider)
         service.app$.value = ColorScheme.Dark
@@ -313,6 +319,18 @@ export default function BlockSuitePageEditor({
     if (!editor) return
     try {
       if (editor.mode !== mode) editor.switchEditor(mode)
+    } catch {}
+    // A mode switch can spin up a new std/scope inside the container; its
+    // ThemeService is seeded from the (now-dark) observer, but re-assert
+    // dark on this container too so there's no one-frame flash of white.
+    try {
+      getThemeObserver().theme$.value = ColorScheme.Dark
+    } catch {}
+    try {
+      const service = editor.std.get(ThemeProvider)
+      service.app$.value = ColorScheme.Dark
+      service.edgeless$.value = ColorScheme.Dark
+      document.documentElement.dataset.theme = "dark"
     } catch {}
   }, [mode])
 
@@ -348,8 +366,11 @@ export default function BlockSuitePageEditor({
     <div className="mx-auto flex w-full max-w-[960px] flex-col gap-3">
       {/* Hide the container's built-in doc-title: title is pg-backed (the
           collection meta it writes to never persists in 1-doc-1-room), so
-          the Big Title in the page header is the single source of truth. */}
-      <style>{`[data-aivory-doc] doc-title{display:none!important}`}</style>
+          the Big Title in the page header is the single source of truth.
+          Hide the template-gallery button too — vanilla BlockSuite ships
+          with no built-in templates (builtInTemplates is empty) so the
+          panel would just be an empty white card. */}
+      <style>{`[data-aivory-doc] doc-title,[data-aivory-doc] edgeless-template-button{display:none!important}`}</style>
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-white/35">
         <div className="flex items-center gap-2">
           <span className="uppercase tracking-[0.16em]">Editor preview</span>
