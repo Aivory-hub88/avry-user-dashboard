@@ -35,7 +35,9 @@ export default function WorkspaceDocPage() {
   const router = useRouter()
   const id = (params?.id as string) ?? "demo"
   const view = search.get("view") === "database" ? "database" : "page"
-  const editor = search.get("editor") === "blocksuite" ? "blocksuite" : "legacy"
+  // BlockSuite PageEditor is the default Write surface (same editing core as
+  // AFFiNE). The legacy prototype editor stays one click away for rollback.
+  const editor = search.get("editor") === "legacy" ? "legacy" : "blocksuite"
 
   const [meta, setMeta] = useState<Meta | null>(null)
   const [status, setStatus] = useState<'loading' | 'ok' | 'locked' | 'unauth'>('loading')

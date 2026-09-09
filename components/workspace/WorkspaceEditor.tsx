@@ -174,6 +174,7 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
   const [slash, setSlash] = useState<SlashState>(null)
   const [openMenu, setOpenMenu] = useState<number | null>(null)
   const [ready, setReady] = useState(false)
+  const [upgraded, setUpgraded] = useState(false)
   // Start honest: nothing is confirmed on the server yet, so never claim
   // "Saved" before the first verified round-trip (the old initial "saved"
   // made local-only cache look persisted).
@@ -185,6 +186,23 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
 
   const storageKey = `aivory:workspace:yjs:v3:${docId}`
   const agentOrigin = () => (typeof window !== "undefined" ? localStorage.getItem("aivory:agentType") || "user" : "user")
+
+  // Rollback guard: pages already converted to BlockSuite carry their tree in
+  // a Y.Map under `blocks` (the prototype only understands the legacy Y.Array
+  // shape). Opening a converted doc here would show stale content and any edit
+  // would fork it, so refuse and point back to the block editor. Map size is
+  // the discriminator: Y.Array has no `.size`, and an unconverted doc never
+  // creates the map side. Declared before the effect so the linter sees the
+  // definition before its use inside the async loader.
+  const isConvertedDoc = () => {
+    const doc = docRef.current
+    if (!doc) return false
+    try {
+      return doc.getMap("blocks").size > 0
+    } catch {
+      return false
+    }
+  }
 
   useEffect(() => {
     const doc = new Y.Doc()
@@ -257,6 +275,13 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
         if (!alive) return
         const serverEmpty = !buffer || buffer.byteLength === 0
         if (!serverEmpty) Y.applyUpdate(doc, new Uint8Array(buffer as ArrayBuffer))
+        if (isConvertedDoc()) {
+          if (alive) {
+            setUpgraded(true)
+            setReady(true)
+          }
+          return
+        }
         const legacy = isLegacyPrototypeContent(toBlocks(yArray))
         if (legacy) clearLegacyPrototype()
         if (yArray.length === 0 && !readOnlyRef.current) {
@@ -276,6 +301,13 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
       })
       .catch(() => {
         if (!alive) return
+        if (isConvertedDoc()) {
+          if (alive) {
+            setUpgraded(true)
+            setReady(true)
+          }
+          return
+        }
         const legacy = isLegacyPrototypeContent(toBlocks(yArray))
         if (legacy) clearLegacyPrototype()
         if (yArray.length === 0 && !readOnlyRef.current) {
@@ -424,6 +456,22 @@ export default function WorkspaceEditor({ docId, readOnly = false }: { docId: st
   const SaveIcon = saveState === "saving" ? LoaderCircle : saveState === "offline" ? CloudOff : Check
 
   if (!ready) return <div className="mx-auto w-full max-w-[720px] py-12 text-center text-[13px] text-white/30">Loading page…</div>
+
+  if (upgraded) {
+    return (
+      <div className="mx-auto w-full max-w-[720px] py-8">
+        <div className="rounded-2xl border border-line bg-white/[0.03] p-8 text-center">
+          <div className="text-[15px] font-medium text-white/80">This page uses blocks now</div>
+          <div className="mt-2 text-[13px] leading-relaxed text-white/40">
+            It was converted to the block editor. The classic view can no longer open it.
+          </div>
+          <a href={`/workspace/${docId}`} className="mt-6 inline-block rounded-full bg-white px-5 py-2 text-[13px] font-medium text-black">
+            Open in block editor
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   if (blocks.length === 0) {
     return (

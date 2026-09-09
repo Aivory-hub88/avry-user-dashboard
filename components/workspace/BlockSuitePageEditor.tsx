@@ -9,6 +9,7 @@ import { effects as installPresetEffects } from "@blocksuite/presets/effects"
 import { WebsocketProvider } from "y-websocket"
 import { Check, CloudOff, LoaderCircle, Wifi } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
+import { buildMigratedDoc, extractLegacyDoc } from "@/lib/workspaceMigration"
 
 type SaveState = "loading" | "saving" | "saved" | "offline"
 type ConnectionState = "connecting" | "connected" | "disconnected"
@@ -27,17 +28,6 @@ function ensureBlockSuiteEffects() {
   blockSuiteEffectsInstalled = true
 }
 
-function isLegacyDocument(doc: Doc) {
-  // Do not use `instanceof Y.Map` here: the bundler may load a second copy
-  // of Yjs, which breaks constructor identity checks. The legacy prototype
-  // stores top-level `blocks` as a Y.Array (has `toArray`); BlockSuite stores
-  // it as a Y.Map (has `get`, no `toArray`).
-  const blocks = doc.spaceDoc.share.get("blocks") as unknown as
-    | { toArray?: unknown; get?: unknown }
-    | undefined
-  return blocks !== undefined && typeof blocks?.toArray === "function"
-}
-
 export default function BlockSuitePageEditor({ docId, readOnly = false }: { docId: string; readOnly?: boolean }) {
   const mountRef = useRef<HTMLDivElement | null>(null)
   const providerRef = useRef<WebsocketProvider | null>(null)
@@ -45,7 +35,7 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
   const [pageDoc, setPageDoc] = useState<Doc | null>(null)
   const [saveState, setSaveState] = useState<SaveState>("loading")
   const [connection, setConnection] = useState<ConnectionState>("connecting")
-  const [blocked, setBlocked] = useState(false)
+  const [migrated, setMigrated] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -86,20 +76,26 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
         doc.load()
 
         const response = await fetch(`/api/workspace/${docId}/doc`, { headers: collabAuthHeaders() })
+        let serverBytes: Uint8Array | null = null
         if (response.status !== 404) {
           if (!response.ok) throw new Error(response.status === 401 ? "Sign in required" : "Could not load this page")
           const update = new Uint8Array(await response.arrayBuffer())
-          if (update.byteLength > 0) DocCollection.Y.applyUpdate(doc.spaceDoc, update)
+          if (update.byteLength > 0) serverBytes = update
         }
 
-        if (isLegacyDocument(doc)) {
-          doc.dispose()
-          doc = null
-          if (alive) {
-            setBlocked(true)
-            setSaveState("offline")
+        if (serverBytes) {
+          // One-way legacy migration: flat prototype blocks become a real
+          // block tree (page → note → paragraph/heading/list) in a fresh doc,
+          // carrying database rows along. Already-migrated state carries no
+          // flat maps, so this never runs twice for the same doc.
+          const legacy = extractLegacyDoc(serverBytes)
+          if (legacy) {
+            doc.dispose()
+            doc = buildMigratedDoc(legacy)
+            if (alive) setMigrated(true)
+          } else {
+            DocCollection.Y.applyUpdate(doc.spaceDoc, serverBytes)
           }
-          return
         }
 
         if (!doc.root) empty.init()
@@ -158,15 +154,6 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
   const saveLabel = saveState === "loading" ? "Loading" : saveState === "saving" ? "Saving" : saveState === "offline" ? "Offline" : "Saved"
   const connectionLabel = connection === "connected" ? "Connected" : connection === "connecting" ? "Connecting" : "Offline"
 
-  if (blocked) {
-    return (
-      <div className="mx-auto w-full max-w-[720px] rounded-2xl border border-amber-500/20 bg-amber-500/10 p-6 text-center">
-        <div className="text-[13px] font-medium text-amber-100">This page needs migration before this editor can open it.</div>
-        <div className="mt-2 text-[12px] leading-relaxed text-amber-100/60">The preview is limited to new pages so the current editor and document data remain safe.</div>
-      </div>
-    )
-  }
-
   return (
     <div className="mx-auto flex w-full max-w-[960px] flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-white/35">
@@ -179,6 +166,11 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
           <span className="inline-flex items-center gap-1.5"><SaveIcon className={`h-3.5 w-3.5 ${saveState === "saving" || saveState === "loading" ? "animate-spin" : ""}`} />{saveLabel}</span>
         </div>
       </div>
+      {migrated && !error && (
+        <div className="rounded-xl border border-violet-400/20 bg-violet-500/10 px-4 py-2.5 text-[12px] text-violet-200/80">
+          Converted to blocks — your notes, headings, and tasks are preserved.
+        </div>
+      )}
       {error ? (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>
       ) : (
