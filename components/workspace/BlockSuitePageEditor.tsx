@@ -7,7 +7,7 @@ import { createEmptyDoc } from "@blocksuite/presets"
 import { effects as installBlockEffects } from "@blocksuite/blocks/effects"
 import { effects as installPresetEffects } from "@blocksuite/presets/effects"
 import { WebsocketProvider } from "y-websocket"
-import { Check, CloudOff, LoaderCircle, Wifi } from "lucide-react"
+import { Check, CheckSquare, CloudOff, Heading1, LoaderCircle, Table2, Wifi } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 import { buildMigratedDoc, extractLegacyDoc } from "@/lib/workspaceMigration"
 
@@ -17,6 +17,36 @@ type ConnectionState = "connecting" | "connected" | "disconnected"
 type PageEditorElement = HTMLElement & {
   doc: Doc
   hasViewport: boolean
+}
+
+type TextBearingModel = {
+  text?: { length?: number }
+}
+
+/** True once the doc holds any real content (hides the empty-state panel). */
+function docHasContent(doc: Doc): boolean {
+  try {
+    for (const flavour of ["affine:paragraph", "affine:list", "affine:code"]) {
+      const blocks = doc.getBlocksByFlavour(flavour) as Array<{ model: TextBearingModel }>
+      if (blocks.some((b) => (b.model.text?.length ?? 0) > 0)) return true
+    }
+    return false
+  } catch {
+    return true // never trap the user behind a broken check
+  }
+}
+
+function useDocHasContent(doc: Doc | null) {
+  // Re-render on every block change; the value itself is derived during
+  // render so no setState-in-effect is needed.
+  const [, force] = useState(0)
+  useEffect(() => {
+    if (!doc) return
+    const subscription = doc.slots.blockUpdated.on(() => force((x) => x + 1))
+    return () => subscription.dispose()
+  }, [doc])
+  if (!doc) return false
+  return docHasContent(doc)
 }
 
 let blockSuiteEffectsInstalled = false
@@ -157,6 +187,20 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
   const SaveIcon = saveState === "saving" ? LoaderCircle : saveState === "offline" ? CloudOff : Check
   const saveLabel = saveState === "loading" ? "Loading" : saveState === "saving" ? "Saving" : saveState === "offline" ? "Offline" : "Saved"
   const connectionLabel = connection === "connected" ? "Connected" : connection === "connecting" ? "Connecting" : "Offline"
+  const hasContent = useDocHasContent(pageDoc)
+  const showEmptyState = !!pageDoc && !hasContent && !error
+
+  const insertStarter = (kind: "heading" | "todo") => {
+    const doc = docRef.current
+    if (!doc || readOnly) return
+    const note = doc.getBlocksByFlavour("affine:note")[0]
+    if (!note) return
+    if (kind === "heading") {
+      doc.addBlock("affine:paragraph", { type: "h1", text: new doc.Text("") }, note.id)
+    } else {
+      doc.addBlock("affine:list", { type: "todo", text: new doc.Text(""), checked: false }, note.id)
+    }
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-[960px] flex-col gap-3">
@@ -173,6 +217,40 @@ export default function BlockSuitePageEditor({ docId, readOnly = false }: { docI
       {migrated && !error && (
         <div className="rounded-xl border border-violet-400/20 bg-violet-500/10 px-4 py-2.5 text-[12px] text-violet-200/80">
           Converted to blocks — your notes, headings, and tasks are preserved.
+        </div>
+      )}
+      {showEmptyState && (
+        <div className="rounded-2xl border border-line bg-white/[0.025] p-5">
+          {readOnly ? (
+            <div className="py-2 text-center text-[13px] text-white/35">This page is empty.</div>
+          ) : (
+            <>
+              <div className="text-[13px] font-medium text-white/70">Start with a simple idea</div>
+              <div className="mt-1 text-[12px] text-white/35">
+                Notes, tasks, and ideas live here. Type <span className="rounded bg-white/[0.07] px-1.5 py-0.5 font-mono text-[11px] text-white/60">/</span> anywhere for commands.
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  onClick={() => insertStarter("heading")}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
+                >
+                  <Heading1 className="h-3.5 w-3.5" />Add heading
+                </button>
+                <button
+                  onClick={() => insertStarter("todo")}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
+                >
+                  <CheckSquare className="h-3.5 w-3.5" />Add to-do
+                </button>
+                <a
+                  href={`/workspace/${docId}?view=database`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/60 hover:bg-white/[0.08] hover:text-white/85"
+                >
+                  <Table2 className="h-3.5 w-3.5" />Open data
+                </a>
+              </div>
+            </>
+          )}
         </div>
       )}
       {error ? (

@@ -11,7 +11,7 @@ import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 import { useWorkspaceContext } from "@/contexts/WorkspaceContext"
-import { Share2 } from "lucide-react"
+import { Share2, Trash2 } from "lucide-react"
 
 const BlockSuitePageEditor = dynamic(() => import("@/components/workspace/BlockSuitePageEditor"), {
   ssr: false,
@@ -235,7 +235,8 @@ export default function WorkspaceDocPage() {
              Share
            </button>
            {isOwner && !confirmDelete && (
-            <button onClick={() => setConfirmDelete(true)} className="rounded-full px-3 py-1.5 text-[12px] text-white/35 hover:bg-white/[0.06] hover:text-red-300">
+            <button onClick={() => setConfirmDelete(true)} title="Delete this page" className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/35 hover:bg-white/[0.06] hover:text-red-300">
+              <Trash2 className="h-3.5 w-3.5" />
               Delete
             </button>
           )}
