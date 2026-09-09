@@ -33,6 +33,7 @@ type Meta = {
   mode: "page" | "edgeless"
   favorite: boolean
   icon: string | null
+  cover_url: string | null
   tags: DocTag[]
   props: DocProps
   created_at: string | null
@@ -87,6 +88,7 @@ export default function WorkspaceDocPage() {
           mode: (j as Meta).mode === "edgeless" ? "edgeless" : "page",
           favorite: (j as Meta).favorite === true,
           icon: typeof (j as Meta).icon === "string" && (j as Meta).icon ? (j as Meta).icon : null,
+          cover_url: typeof (j as Meta).cover_url === "string" && (j as Meta).cover_url ? (j as Meta).cover_url : null,
           tags: Array.isArray((j as Meta).tags) ? (j as Meta).tags : [],
           props: (j as Meta).props && typeof (j as Meta).props === "object" ? (j as Meta).props : {},
           created_at: (j as Meta).created_at ?? null,
@@ -442,6 +444,50 @@ export default function WorkspaceDocPage() {
         <div className="min-w-0 flex-1 overflow-y-auto px-8 py-8 lg:px-10 xl:px-12">
           {view === "page" && (
             <>
+              {meta?.cover_url && (
+                <div className="mx-auto mb-3 w-full max-w-[960px] overflow-hidden rounded-2xl border border-line">
+                  <img src={meta.cover_url} alt="Cover" className="h-[200px] w-full object-cover" />
+                </div>
+              )}
+              {canWrite && (
+                <div className="mx-auto mb-3 flex w-full max-w-[960px] items-center gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/60 hover:bg-white/[0.08]">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0]
+                        if (!f) return
+                        const fd = new FormData()
+                        fd.append("file", f)
+                        try {
+                          const r = await fetch(`/api/workspace/${id}/cover`, { method: "POST", headers: collabAuthHeaders(), body: fd as unknown as BodyInit })
+                          if (r.ok) {
+                            const j = await r.json()
+                            setMeta((m) => (m ? { ...m, cover_url: j.cover_url } : m))
+                          }
+                        } catch {}
+                        e.target.value = ""
+                      }}
+                    />
+                    {meta?.cover_url ? "Change cover" : "Add cover"}
+                  </label>
+                  {meta?.cover_url && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          const r = await fetch(`/api/workspace/${id}/cover`, { method: "DELETE", headers: collabAuthHeaders() })
+                          if (r.ok) setMeta((m) => (m ? { ...m, cover_url: null } : m))
+                        } catch {}
+                      }}
+                      className="rounded-full border border-line bg-white/[0.04] px-3 py-1 text-[11px] text-white/40 hover:bg-white/[0.08]"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              )}
               <div className="mx-auto mb-2 w-full max-w-[960px]">
                 <div className="flex items-start gap-3">
                   <div className="shrink-0">

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!role) return forbidden()
   try {
     const r = await query(
-      `SELECT id, workspace_id, owner, title, mode, favorite, icon, tags, props, created_at, updated_at, deleted_at FROM dashboard.workspace_docs WHERE id = $1 OR id = $2 LIMIT 2`,
+      `SELECT id, workspace_id, owner, title, mode, favorite, icon, cover_url, tags, props, created_at, updated_at, deleted_at FROM dashboard.workspace_docs WHERE id = $1 OR id = $2 LIMIT 2`,
       [`workspace:${id}`, id],
     )
     const row = r.rows.find((x: any) => x.id === `workspace:${id}`) ?? r.rows[0] ?? null
@@ -44,6 +44,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       mode: row?.mode === 'edgeless' ? 'edgeless' : 'page',
       favorite: row?.favorite === true,
       icon: typeof row?.icon === 'string' && row.icon ? row.icon : null,
+      cover_url: typeof row?.cover_url === 'string' && row.cover_url ? row.cover_url : null,
       tags: Array.isArray(row?.tags) ? row.tags : [],
       props: row?.props && typeof row.props === 'object' ? row.props : {},
       created_at: row?.created_at ?? null,
