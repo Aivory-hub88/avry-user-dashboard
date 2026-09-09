@@ -76,15 +76,18 @@ export default function BlockSuitePageEditor({
   readOnly = false,
   initialMode = "page",
   pageTitle = "",
+  outlineOpen = false,
 }: {
   docId: string
   readOnly?: boolean
   initialMode?: EditorDocMode
   pageTitle?: string
+  outlineOpen?: boolean
 }) {
   const router = useRouter()
   const mountRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<AffineEditorContainerElement | null>(null)
+  const outlineMountRef = useRef<HTMLDivElement | null>(null)
   const providerRef = useRef<WebsocketProvider | null>(null)
   const docRef = useRef<Doc | null>(null)
   const [pageDoc, setPageDoc] = useState<Doc | null>(null)
@@ -376,6 +379,39 @@ export default function BlockSuitePageEditor({
     window.setTimeout(hideEmptyTemplateUI, 200)
   }, [mode])
 
+  // Outline panel — mount `affine-outline-panel` next to the editor when toggled on.
+  // The panel reads headings from the editor's doc and is already theme-aware (inherits
+  // the global dark observer we force above). No extra deps.
+  useEffect(() => {
+    if (!outlineOpen || !pageDoc || mode !== "page") return
+    const mount = outlineMountRef.current
+    const editor = containerRef.current
+    if (!mount || !editor) return
+    let cancelled = false
+    void (async () => {
+      try {
+        await editor.updateComplete
+      } catch {}
+      if (cancelled || !outlineOpen) return
+      try {
+        const panel = document.createElement("affine-outline-panel") as HTMLElement & { editor: AffineEditorContainerElement }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(panel as unknown as Record<string, unknown>).editor = editor
+        mount.replaceChildren(panel)
+        // Force dark inside the panel (it uses its own ThemeService seeded from observer).
+        try {
+          getThemeObserver().theme$.value = ColorScheme.Dark
+        } catch {}
+      } catch {}
+    })()
+    return () => {
+      cancelled = true
+      try {
+        mount.replaceChildren()
+      } catch {}
+    }
+  }, [outlineOpen, pageDoc, mode])
+
   const SaveIcon = saveState === "saving" ? LoaderCircle : saveState === "offline" ? CloudOff : Check
   const saveLabel = saveState === "loading" ? "Loading" : saveState === "saving" ? "Saving" : saveState === "offline" ? "Offline" : "Saved"
   const connectionLabel = connection === "connected" ? "Connected" : connection === "connecting" ? "Connecting" : "Offline"
@@ -413,6 +449,7 @@ export default function BlockSuitePageEditor({
           with no built-in templates (builtInTemplates is empty) so the
           panel would just be an empty white card. */}
       <style>{`[data-aivory-doc] doc-title,[data-aivory-doc] edgeless-template-button{display:none!important}`}</style>
+      <style>{`affine-outline-panel{--affine-background-primary-color:#252522;--affine-background-secondary-color:#1e1e1c;}`}</style>
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-white/35">
         <div className="flex items-center gap-2">
           <span className="uppercase tracking-[0.16em]">Editor preview</span>
@@ -497,8 +534,15 @@ export default function BlockSuitePageEditor({
         // NOTE: no `overflow-hidden` here on purpose. BlockSuite renders the
         // slash menu, drag handle, and format bar as overlays inside the
         // editor tree; a clipping ancestor cuts them off like AFFiNE would not.
-        <div data-theme="dark" data-aivory-doc className={`min-h-[560px] rounded-2xl border border-line bg-[#252522] ${readOnly ? "pointer-events-none" : ""}`} aria-readonly={readOnly}>
-          <div ref={mountRef} className="h-[min(72vh,760px)] min-h-[560px]" />
+        <div className={`flex gap-3 ${outlineOpen && mode === "page" ? "" : ""}`}>
+          <div data-theme="dark" data-aivory-doc className={`min-h-[560px] flex-1 rounded-2xl border border-line bg-[#252522] ${readOnly ? "pointer-events-none" : ""}`} aria-readonly={readOnly}>
+            <div ref={mountRef} className="h-[min(72vh,760px)] min-h-[560px]" />
+          </div>
+          {outlineOpen && mode === "page" && (
+            <div className="hidden w-[260px] shrink-0 overflow-hidden rounded-2xl border border-line bg-[#1e1e1c] lg:block">
+              <div ref={outlineMountRef} className="h-[min(72vh,760px)] min-h-[560px] overflow-y-auto" />
+            </div>
+          )}
         </div>
       )}
       {readOnly && <div className="text-[12px] text-amber-200/70">You have viewer access. This preview is read-only.</div>}

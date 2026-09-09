@@ -14,7 +14,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!cred) return unauthorized()
   const role = await getDocRole(cred, id)
   if (!canWrite(role)) return forbidden()
-  let body: { title?: unknown; mode?: unknown; favorite?: unknown; tags?: unknown; props?: unknown } = {}
+  let body: { title?: unknown; mode?: unknown; favorite?: unknown; tags?: unknown; props?: unknown; icon?: unknown } = {}
   try {
     body = await req.json()
   } catch {
@@ -28,6 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   let favorite: boolean | undefined
   let tags: Array<{ id: string; label: string; color: string }> | undefined
   let props: Record<string, unknown> | undefined
+  let icon: string | null | undefined
   if (body.title !== undefined) {
     title = (body.title ?? '').toString().slice(0, 200).trim()
     if (!title) return NextResponse.json({ error: 'title required' }, { status: 400 })
@@ -119,6 +120,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     sets.push(`props = $${nextParam++}::jsonb`)
     values.push(JSON.stringify(props))
   }
+  if (body.icon !== undefined) {
+    // Emoji icon — single grapheme, max 8 chars, nullable to clear.
+    if (body.icon === null || body.icon === "") {
+      icon = null
+      sets.push(`icon = $${nextParam++}`)
+      values.push(null)
+    } else {
+      const raw = body.icon.toString().trim().slice(0, 8)
+      // Very permissive: allow any emoji/short text, but cap length.
+      if (!raw) return NextResponse.json({ error: 'icon required' }, { status: 400 })
+      icon = raw
+      sets.push(`icon = $${nextParam++}`)
+      values.push(icon)
+    }
+  }
   if (sets.length === 0) return NextResponse.json({ error: 'nothing to update' }, { status: 400 })
   const idParam = nextParam++
   try {
@@ -136,7 +152,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         targetId: id,
       })
     }
-    return NextResponse.json({ id, ...(title !== undefined ? { title } : {}), ...(mode !== undefined ? { mode } : {}), ...(favorite !== undefined ? { favorite } : {}), ...(tags !== undefined ? { tags } : {}), ...(props !== undefined ? { props } : {}) })
+    return NextResponse.json({ id, ...(title !== undefined ? { title } : {}), ...(mode !== undefined ? { mode } : {}), ...(favorite !== undefined ? { favorite } : {}), ...(tags !== undefined ? { tags } : {}), ...(props !== undefined ? { props } : {}), ...(icon !== undefined ? { icon } : {}) })
   } catch (e) {
     console.error('[workspace patch]', e)
     return NextResponse.json({ error: 'db' }, { status: 500 })

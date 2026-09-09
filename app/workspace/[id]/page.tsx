@@ -28,6 +28,7 @@ type Meta = {
   title: string
   mode: "page" | "edgeless"
   favorite: boolean
+  icon: string | null
   tags: DocTag[]
   props: DocProps
   created_at: string | null
@@ -55,6 +56,8 @@ export default function WorkspaceDocPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
   const [showSharing, setShowSharing] = useState(false)
+  const [showIconPicker, setShowIconPicker] = useState(false)
+  const [showOutline, setShowOutline] = useState(false)
   const loginUrl = `${getMarketingUrl()}/login`
   const { setActiveWorkspaceId } = useWorkspaceContext()
 
@@ -69,11 +72,12 @@ export default function WorkspaceDocPage() {
       }
       if (r.ok) {
         const j = (await r.json()) as Meta
-        // Pre-migration servers omit mode/favorite/tags/props — default, never crash.
+        // Pre-migration servers omit mode/favorite/tags/props/icon — default, never crash.
         setMeta({
           ...j,
           mode: (j as Meta).mode === "edgeless" ? "edgeless" : "page",
           favorite: (j as Meta).favorite === true,
+          icon: typeof (j as Meta).icon === "string" && (j as Meta).icon ? (j as Meta).icon : null,
           tags: Array.isArray((j as Meta).tags) ? (j as Meta).tags : [],
           props: (j as Meta).props && typeof (j as Meta).props === "object" ? (j as Meta).props : {},
           created_at: (j as Meta).created_at ?? null,
@@ -206,11 +210,12 @@ export default function WorkspaceDocPage() {
     }
   }
 
-  const patchMeta = async (patch: { tags?: DocTag[]; props?: DocProps }) => {
+  const patchMeta = async (patch: { tags?: DocTag[]; props?: DocProps; icon?: string | null }) => {
     if (!canWrite) return
     const prev = meta
     if (patch.tags) setMeta((m) => (m ? { ...m, tags: patch.tags! } : m))
     if (patch.props) setMeta((m) => (m ? { ...m, props: patch.props! } : m))
+    if (patch.icon !== undefined) setMeta((m) => (m ? { ...m, icon: patch.icon ?? null } : m))
     try {
       const r = await fetch(`/api/workspace/${id}`, {
         method: "PATCH",
@@ -334,32 +339,59 @@ export default function WorkspaceDocPage() {
           {view === "page" && (
             <>
               <div className="mx-auto mb-2 w-full max-w-[960px]">
-                {editingTitle ? (
-                  <input
-                    id="aivory-big-title"
-                    value={titleDraft}
-                    autoFocus
-                    disabled={busy}
-                    onChange={(e) => setTitleDraft(e.target.value)}
-                    onBlur={saveTitle}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') saveTitle()
-                      if (e.key === 'Escape') setEditingTitle(false)
-                    }}
-                    placeholder="Untitled"
-                    className="w-full bg-transparent text-[32px] font-bold leading-tight text-white/90 outline-none placeholder:text-white/20"
-                  />
-                ) : canWrite ? (
-                  <button
-                    onClick={focusBigTitle}
-                    title="Rename"
-                    className="block w-full truncate text-left text-[32px] font-bold leading-tight text-white/90 hover:text-white"
-                  >
-                    {meta?.title || "Untitled"}
-                  </button>
-                ) : (
-                  <div className="truncate text-[32px] font-bold leading-tight text-white/90">{meta?.title || "Untitled"}</div>
+                <div className="flex items-start gap-3">
+                  <div className="shrink-0">
+                    {meta?.icon ? (
+                      <button onClick={() => canWrite && setShowIconPicker((v) => !v)} title={canWrite ? "Change icon" : undefined} className="flex h-12 w-12 items-center justify-center rounded-xl border border-line bg-white/[0.04] text-[26px] hover:bg-white/[0.08]">
+                        {meta.icon}
+                      </button>
+                    ) : canWrite ? (
+                      <button onClick={() => setShowIconPicker((v) => !v)} title="Add icon" className="flex h-12 w-12 items-center justify-center rounded-xl border border-dashed border-white/15 text-white/30 hover:bg-white/[0.04] hover:text-white/60">
+                        🙂
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    {editingTitle ? (
+                      <input
+                        id="aivory-big-title"
+                        value={titleDraft}
+                        autoFocus
+                        disabled={busy}
+                        onChange={(e) => setTitleDraft(e.target.value)}
+                        onBlur={saveTitle}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveTitle()
+                          if (e.key === 'Escape') setEditingTitle(false)
+                        }}
+                        placeholder="Untitled"
+                        className="w-full bg-transparent text-[32px] font-bold leading-tight text-white/90 outline-none placeholder:text-white/20"
+                      />
+                    ) : canWrite ? (
+                      <button onClick={focusBigTitle} title="Rename" className="block w-full truncate text-left text-[32px] font-bold leading-tight text-white/90 hover:text-white">
+                        {meta?.title || "Untitled"}
+                      </button>
+                    ) : (
+                      <div className="truncate text-[32px] font-bold leading-tight text-white/90">{meta?.title || "Untitled"}</div>
+                    )}
+                  </div>
+                </div>
+                {showIconPicker && canWrite && (
+                  <div className="mt-3 flex flex-wrap gap-1.5 rounded-2xl border border-line bg-[#1e1e1c] p-3">
+                    {["📄","✨","📌","🔥","💡","📚","🎯","🚀","🧠","💼","🌟","📝","🗂️","🔖","✅","❌"].map((emoji) => (
+                      <button key={emoji} onClick={() => { patchMeta({ icon: emoji }); setShowIconPicker(false) }} className="flex h-9 w-9 items-center justify-center rounded-xl border border-transparent bg-white/[0.04] text-[20px] hover:bg-white/[0.08]">
+                        {emoji}
+                      </button>
+                    ))}
+                    <button onClick={() => { patchMeta({ icon: null }); setShowIconPicker(false) }} className="rounded-full border border-line bg-white/[0.04] px-3 py-1 text-[11px] text-white/50 hover:bg-white/[0.08]">Remove</button>
+                  </div>
                 )}
+                <div className="mt-2 flex items-center gap-2">
+                  <button onClick={() => setShowOutline((v) => !v)} className={`rounded-full border px-3 py-1 text-[11px] ${showOutline ? "border-white bg-white text-black" : "border-line bg-white/[0.04] text-white/50 hover:text-white/80"}`}>
+                    Outline {showOutline ? "on" : "off"}
+                  </button>
+                  <span className="text-[11px] text-white/25">Headings &amp; lists outline (beta)</span>
+                </div>
               </div>
               <div className="mx-auto mb-4 w-full max-w-[960px]">
                 <WorkspaceProperties
@@ -376,7 +408,7 @@ export default function WorkspaceDocPage() {
               </div>
             </>
           )}
-          {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : editor === "blocksuite" ? <BlockSuitePageEditor key={id} docId={id} readOnly={!canWrite} initialMode={meta?.mode ?? "page"} pageTitle={meta?.title ?? ""} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
+          {view === "database" ? <WorkspaceDatabase docId={id} readOnly={!canWrite} /> : editor === "blocksuite" ? <BlockSuitePageEditor key={id} docId={id} readOnly={!canWrite} initialMode={meta?.mode ?? "page"} pageTitle={meta?.title ?? ""} outlineOpen={showOutline} /> : <WorkspaceEditor docId={id} readOnly={!canWrite} />}
           {!canWrite && (
             <div className="mx-auto mt-6 max-w-[720px] rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">
               You have viewer access — this document is read-only.
