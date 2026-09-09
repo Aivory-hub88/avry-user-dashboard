@@ -145,6 +145,17 @@ type SavedView = {
   sortDir: "asc" | "desc"
 }
 
+type DbTemplate = {
+  id: string
+  name: string
+  title: string
+  status: string
+  priority: "Low" | "Med" | "High"
+  assignee: string
+  due: string
+  description: string
+}
+
 export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: string; readOnly?: boolean }) {
   const docRef = useRef<Y.Doc | null>(null)
   const yRowsRef = useRef<Y.Array<Y.Map<unknown>> | null>(null)
@@ -167,25 +178,54 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   useEffect(() => {
     readOnlyRef.current = readOnly
   }, [readOnly])
-  // Load persisted saved views (tabs like “Current sprint”) from pg props.dbViews.
+  // Load persisted saved views + row templates from pg props.
+  const [templates, setTemplates] = useState<DbTemplate[]>([])
   useEffect(() => {
     let alive = true
     fetch(`/api/workspace/${docId}/meta`, { headers: collabAuthHeaders() })
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         if (!alive || !j) return
-        const raw = (j.props as Record<string, unknown> | undefined)?.dbViews
+        const props = j.props as Record<string, unknown> | undefined
+        const raw = props?.dbViews
         if (Array.isArray(raw)) {
           const cleaned = raw
             .filter((v): v is SavedView => !!v && typeof v === "object" && typeof (v as SavedView).id === "string" && typeof (v as SavedView).name === "string")
             .slice(0, 10) as SavedView[]
           setSavedViews(cleaned)
         }
+        const rawTpl = props?.dbTemplates
+        if (Array.isArray(rawTpl)) {
+          const cleanedTpl = rawTpl
+            .filter((t): t is DbTemplate => !!t && typeof t === "object" && typeof (t as DbTemplate).id === "string" && typeof (t as DbTemplate).name === "string")
+            .slice(0, 10) as DbTemplate[]
+          setTemplates(cleanedTpl)
+        }
         setViewsLoaded(true)
       })
       .catch(() => { if (alive) setViewsLoaded(true) })
     return () => { alive = false }
   }, [docId])
+
+  const persistTemplates = async (next: DbTemplate[]) => {
+    setTemplates(next)
+    try {
+      await fetch(`/api/workspace/${docId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+        body: JSON.stringify({ props: { dbTemplates: next } }),
+      })
+    } catch {}
+  }
+
+  const useTemplate = (tpl: DbTemplate) => {
+    if (readOnlyRef.current) return
+    const yRows = yRowsRef.current
+    const doc = docRef.current
+    if (!yRows || !doc) return
+    const r: Row = { id: uid(), title: tpl.title, status: tpl.status, priority: tpl.priority, assignee: tpl.assignee, due: tpl.due, description: tpl.description, comments: [] }
+    doc.transact(() => yRows.push([yMapFromRow(r)]), "user")
+  }
 
   const persistViews = async (next: SavedView[]) => {
     setSavedViews(next)
@@ -509,6 +549,23 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                 <ArrowUpNarrowWide className={`h-3.5 w-3.5 transition ${sortDir === "desc" ? "rotate-180" : ""}`} />
               </button>
             </div>
+            {!readOnly && templates.length > 0 && (
+              <select
+                onChange={(e) => {
+                  const tpl = templates.find((t) => t.id === e.target.value)
+                  if (tpl) useTemplate(tpl)
+                  e.target.selectedIndex = 0
+                }}
+                defaultValue=""
+                className="rounded-full border border-line bg-white/[0.04] px-3 py-2 text-[12px] text-white/60 outline-none"
+                title="Use template"
+              >
+                <option value="">Template…</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            )}
             {!readOnly && (
               <button
                 onClick={addRow}
@@ -824,6 +881,44 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                   <div className="mt-3 flex items-center gap-2">
                     <input value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addComment() } }} placeholder="Write a comment…" className="flex-1 rounded-full border border-line bg-white/[0.04] px-3 py-2 text-[12px] text-white/80 placeholder:text-white/25 outline-none" />
                     <button onClick={addComment} disabled={!commentDraft.trim()} className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40">Send</button>
+                  </div>
+                )}
+                {!readOnly && (
+                  <button
+                    onClick={async () => {
+                      const name = window.prompt("Template name", selectedRow.title ? `${selectedRow.title} template` : "My template")
+                      if (!name || !name.trim()) return
+                      const tpl: DbTemplate = { id: `tpl-${Date.now().toString(36)}`, name: name.trim().slice(0, 24), title: selectedRow.title, status: selectedRow.status, priority: selectedRow.priority, assignee: selectedRow.assignee, due: selectedRow.due, description: selectedRow.description }
+                      await persistTemplates([...templates, tpl].slice(0, 10))
+                    }}
+                    className="mt-4 w-full rounded-full border border-violet-500/20 bg-violet-500/10 py-2 text-[12px] text-violet-300 hover:bg-violet-500/15"
+                  >
+                    Save as template
+                  </button>
+                )}
+                {!readOnly && templates.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-[11px] uppercase tracking-wider text-white/30">Templates · {templates.length}</div>
+                    <div className="mt-1.5 flex flex-col gap-1">
+                      {templates.map((t) => (
+                        <div key={t.id} className="flex items-center justify-between rounded-xl border border-line bg-white/[0.03] px-3 py-2">
+                          <span className="truncate text-[12px] text-white/70">{t.name}</span>
+                          <span className="flex items-center gap-1">
+                            <button onClick={() => useTemplate(t)} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-black hover:bg-white/90">Use</button>
+                            <button
+                              onClick={async () => {
+                                const next = templates.filter((x) => x.id !== t.id)
+                                await persistTemplates(next)
+                              }}
+                              className="rounded-full p-1 text-white/30 hover:bg-white/[0.06] hover:text-white/60"
+                              title="Delete template"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {!readOnly && (

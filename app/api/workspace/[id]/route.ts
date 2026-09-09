@@ -102,6 +102,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     } else if (src.dbViews === undefined) {
       // No change — handled below via merge below; keep existing value by not touching.
     }
+    // Row templates for DB (AppFlowy-style): quick-create from saved row shape
+    if (Array.isArray(src.dbTemplates)) {
+      const cleanedTpl: unknown[] = []
+      for (const t of src.dbTemplates.slice(0, 10)) {
+        if (!t || typeof t !== "object") continue
+        const tt = t as Record<string, unknown>
+        const id = tt.id?.toString().slice(0, 32) || `tpl-${Math.random().toString(36).slice(2, 6)}`
+        const name = tt.name?.toString().slice(0, 24).trim() || "Template"
+        const title = typeof tt.title === "string" ? tt.title.slice(0, 100) : ""
+        const status = typeof tt.status === "string" ? tt.status.slice(0, 16) : "Todo"
+        const priority = ["Low","Med","High"].includes(tt.priority as string) ? (tt.priority as string) : "Med"
+        const assignee = typeof tt.assignee === "string" ? tt.assignee.slice(0, 64) : ""
+        const due = typeof tt.due === "string" ? tt.due.slice(0, 16) : ""
+        const description = typeof tt.description === "string" ? tt.description.slice(0, 800) : ""
+        cleanedTpl.push({ id, name, title, status, priority, assignee, due, description })
+      }
+      allowed.dbTemplates = cleanedTpl
+    }
     // Merge with existing row's props when caller only patches part of props:
     // fetch current props, shallow-merge, then write. This keeps other keys intact
     // when only dbViews is sent, and vice versa.
@@ -109,8 +127,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const existingProps = (existingPropsRow.rows[0]?.props as Record<string, unknown> | null) ?? {}
     // If caller sent props, merge allowed keys over existing; if they sent e.g. only dbViews, keep other flags.
     if (body.props !== undefined) {
-      // When dbViews not provided but existing has it, preserve it.
+      // When dbViews/dbTemplates not provided but existing has it, preserve it.
       if (allowed.dbViews === undefined && Array.isArray(existingProps.dbViews)) allowed.dbViews = existingProps.dbViews
+      if (allowed.dbTemplates === undefined && Array.isArray(existingProps.dbTemplates)) allowed.dbTemplates = existingProps.dbTemplates
       // Preserve other existing keys that weren't overwritten (e.g. isJournal when only dbViews patched).
       for (const k of ["isJournal","isTemplate","pageWidth","edgelessTheme"] as const) {
         if (allowed[k] === undefined && existingProps[k] !== undefined) allowed[k] = existingProps[k]
