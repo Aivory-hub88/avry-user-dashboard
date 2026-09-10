@@ -207,6 +207,14 @@ export default function BlockSuitePageEditor({
   useEffect(() => {
     let alive = true
     let persistTimer: ReturnType<typeof setTimeout> | null = null
+    // Full-state PUT storm guard: sustained dragging fires doc updates at
+    // pointermove rate; without pacing, ~100KB PUTs pile up (overlap and race
+    // each other) and the main thread + pg saturate — the "hang after a
+    // while". Coalesce: at most one timer + one in-flight PUT; bursts collapse
+    // into a trailing flush. Server REPLACES the blob (no merge), so every
+    // PUT must stay full-state — pacing, not diffing, is the fix.
+    let persistInFlight = false
+    let persistDirty = false
     let doc: Doc | null = null
     // Theme scope: capture only. The actual `data-theme="dark"` write happens
     // in the mount effect AFTER the editor connects — ThemeObserver only
@@ -216,13 +224,30 @@ export default function BlockSuitePageEditor({
 
     const persist = () => {
       if (!doc || readOnly) return
-      if (persistTimer) clearTimeout(persistTimer)
+      persistDirty = true
+      // A pending timer or an in-flight PUT already covers this change —
+      // it will flush trailing edits on completion instead of piling up.
+      if (persistTimer || persistInFlight) return
+      // Background tabs still receive WS updates; persist them rarely so a
+      // hidden tab never storms the server.
+      const delay = typeof document !== "undefined" && document.hidden ? 10000 : 2000
       setSaveState("saving")
       persistTimer = setTimeout(() => {
+        persistTimer = null
+        if (!alive || !doc || persistInFlight) return
+        persistInFlight = true
+        persistDirty = false
+        let body: Uint8Array | null = null
+        try {
+          body = DocCollection.Y.encodeStateAsUpdate(doc!.spaceDoc) as unknown as Uint8Array
+        } catch {
+          persistInFlight = false
+          return
+        }
         fetch(`/api/workspace/${docId}/doc`, {
           method: "PUT",
           headers: { "Content-Type": "application/octet-stream", ...collabAuthHeaders() },
-          body: DocCollection.Y.encodeStateAsUpdate(doc!.spaceDoc) as unknown as BodyInit,
+          body: body as unknown as BodyInit,
         })
           .then((response) => {
             if (alive) setSaveState(response.ok ? "saved" : "offline")
@@ -230,7 +255,12 @@ export default function BlockSuitePageEditor({
           .catch(() => {
             if (alive) setSaveState("offline")
           })
-      }, 500)
+          .finally(() => {
+            persistInFlight = false
+            // Edits that landed mid-flight get one trailing flush, then quiet.
+            if (alive && persistDirty) persist()
+          })
+      }, delay)
     }
 
     const load = async () => {
@@ -426,6 +456,11 @@ export default function BlockSuitePageEditor({
       // Reuse existing container (page already mounted) — do NOT focus here.
       // A blind focus steals the caret from an open text editor (see helper).
       // Native mousedown already focuses the container (tabindex=0) on click.
+      // Re-attach if the effect cleanup detached it (re-runs on theme toggle)
+      // — otherwise the canvas goes blank with a live-looking shell.
+      try {
+        if (!mount.contains(editor)) mount.replaceChildren(editor)
+      } catch {}
     }
     // Theme: the container picks its page AND edgeless palettes from
     // ThemeService signals that default to Light and track the singleton
@@ -737,7 +772,17 @@ export default function BlockSuitePageEditor({
                 const inTextUI = !!t?.closest?.(
                   "edgeless-shape-text-editor, edgeless-text-editor, edgeless-connector-label-editor, input, textarea, [contenteditable]",
                 )
-                if (!inTextUI) focusEditorIfOutside()
+                if (inTextUI) return
+                focusEditorIfOutside()
+                // Clear a stale native caret: window.getSelection() ranges
+                // survive canvas clicks (BlockSuite only resets them on
+                // empty-canvas clicks), painting a phantom cursor in the last
+                // edited note while another node is selected. Legit caret
+                // placement re-happens later on click/dblclick, so clearing
+                // here (pointerdown) is ordering-safe.
+                try {
+                  window.getSelection()?.removeAllRanges()
+                } catch {}
               } catch {}
             }}
             onPointerUp={() => {
