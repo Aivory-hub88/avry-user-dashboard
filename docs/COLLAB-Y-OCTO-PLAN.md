@@ -89,16 +89,15 @@ Next.js API (avry-user-dashboard, COLLAB_URL=http://aivory-collab:3200, timeout 
 - [x] Migrasi lazy (legacy BYTEA merge) — terbukti: restart container → `GET 200 174B` via lazy-load
 - [x] `MissionControl` + `AgentRail` tampil `agentType` collaborator (`Active in Workspace`)
 - [x] `wss://aivory.uk/yjs` `101` direct origin DAN via Cloudflare edge (Worker bypass, apex `200` + `www→301` intact)
-- [ ] Merge `feat/collab-y-octo` → `main` (root + dashboard) → stable
-- [ ] Drop `dashboard.workspace_docs` legacy rows + `y-websocket:3220` setelah 1 release stabil
+- [x] Merge `feat/collab-y-octo` → `main` (root + dashboard) → stable (`feat/collab-authz` `b8a0403` sudah di `main` `f13ed55`)
+- [x] Drop `dashboard.workspace_docs` legacy rows + `y-websocket:3220` setelah 1 release stabil — `2026-09-10` `DELETE 3` bare-id (`0` legacy tersisa, `5` workspace:* `154-19551`), `y-websocket` `rm -f` + `docker-compose.prod.yml` `aivory-collab:3201` single engine `WSS 101` verified
 
 ## Scope Tersisa (IN)
 
 1. **Merge → main.** Root `feat/collab-y-octo` (`999cb05`) + dashboard `feat/collab-y-octo` (`4a7241b`)
-   → `main` → redeploy VPS → `https://aivory.uk/dashboard` stabil.
-2. **Stabilisasi 1 release**, lalu drop legacy bare-id rows + hentikan `y-websocket:3220`.
-3. **AuthZ collab.** Enforce `JWT` + RBAC per `workspace_id` di WS upgrade & HTTP API
-   (sekarang `X-Agent-Type` trusted, tanpa verifikasi).
+   → `main` → redeploy VPS → `https://aivory.uk/dashboard` stabil — **done** `f13ed55`.
+2. **Stabilisasi 1 release**, lalu drop legacy bare-id rows + hentikan `y-websocket:3220` — **done** `2026-09-10` (`DELETE 3`, `y-websocket` removed).
+3. **AuthZ collab.** Enforce `JWT` + RBAC per `workspace_id` di WS upgrade & HTTP API — **done** `2026-09-10` (`401` tanpa token, `200` + `101` dengan `Authorization: Bearer <jwt>` / `?token=`, `viewer` `403`/`drop` verified, `X-Service-Token` untuk agent).
 4. **Rotasi token Cloudflare.** Token di chat terekspos → rotate di CF dashboard, update
    `CF_EDGE_TOKEN_USER` di VPS `.env`, hapus token lama. (`cfk_` tidak valid sebagai Bearer — klarifikasi/rotasi juga.)
 5. **Observabilitas.** Log `actor` per flush sudah ada; tambah `prometheus` metrics bila perlu.
