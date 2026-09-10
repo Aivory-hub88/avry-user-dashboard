@@ -128,6 +128,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     } else if (src.dbTemplates !== undefined) {
       return NextResponse.json({ error: 'props.dbTemplates must be array' }, { status: 400 })
     }
+    // Kanban WIP limits per status column: { Todo: 5, Doing: 3 }. Small ints
+    // so the column header can warn instead of silently overflowing.
+    if (src.dbWip !== undefined) {
+      if (!src.dbWip || typeof src.dbWip !== "object" || Array.isArray(src.dbWip)) {
+        return NextResponse.json({ error: 'props.dbWip must be object' }, { status: 400 })
+      }
+      const cleanedWip: Record<string, number> = {}
+      for (const [k, v] of Object.entries(src.dbWip as Record<string, unknown>).slice(0, 10)) {
+        const key = k.slice(0, 16).trim()
+        const n = typeof v === "number" ? Math.floor(v) : parseInt((v as string)?.toString?.() ?? "", 10)
+        if (!key || !Number.isFinite(n) || n < 1 || n > 50) continue
+        cleanedWip[key] = n
+      }
+      propsPatch.dbWip = cleanedWip
+    }
     if (Object.keys(propsPatch).length === 0) {
       return NextResponse.json({ error: 'props has no known keys' }, { status: 400 })
     }

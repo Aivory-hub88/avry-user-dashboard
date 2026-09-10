@@ -58,6 +58,10 @@ function PriorityPill({ p }: { p: Row["priority"] }) {
   return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>{p}</span>
 }
 
+function isOverdue(r: Row): boolean {
+  return !!r.due && r.status !== "Done" && r.due < new Date().toISOString().slice(0, 10)
+}
+
 function StatusPill({ s }: { s: string }) {
   const cls =
     s === "Doing"
@@ -173,6 +177,12 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [commentDraft, setCommentDraft] = useState("")
   const [ready, setReady] = useState(false)
+  // Kanban depth: per-column WIP limits (persisted in pg props.dbWip) +
+  // inline quick-add with the column's status (the old footer button always
+  // created Todo rows, even inside Done).
+  const [wip, setWip] = useState<Record<string, number>>({})
+  const [quickStatus, setQuickStatus] = useState<string | null>(null)
+  const [quickTitle, setQuickTitle] = useState("")
   const selectedRow = selectedId ? rows.find((r) => r.id === selectedId) ?? null : null
   const readOnlyRef = useRef(readOnly)
   useEffect(() => {
@@ -200,6 +210,15 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
             .filter((t): t is DbTemplate => !!t && typeof t === "object" && typeof (t as DbTemplate).id === "string" && typeof (t as DbTemplate).name === "string")
             .slice(0, 10) as DbTemplate[]
           setTemplates(cleanedTpl)
+        }
+        const rawWip = props?.dbWip
+        if (rawWip && typeof rawWip === "object" && !Array.isArray(rawWip)) {
+          const cleanedWip: Record<string, number> = {}
+          for (const [k, v] of Object.entries(rawWip as Record<string, unknown>).slice(0, 10)) {
+            const n = typeof v === "number" ? Math.floor(v) : parseInt(String(v ?? ""), 10)
+            if (k && Number.isFinite(n) && n >= 1 && n <= 50) cleanedWip[k.slice(0, 16)] = n
+          }
+          setWip(cleanedWip)
         }
         setViewsLoaded(true)
       })
@@ -236,6 +255,33 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
         body: JSON.stringify({ props: { dbViews: next } }),
       })
     } catch {}
+  }
+
+  const persistWip = async (next: Record<string, number>) => {
+    setWip(next)
+    try {
+      await fetch(`/api/workspace/${docId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+        body: JSON.stringify({ props: { dbWip: next } }),
+      })
+    } catch {}
+  }
+
+  const editWipLimit = (status: string) => {
+    if (readOnlyRef.current) return
+    const cur = wip[status]
+    const ans = window.prompt(`WIP limit for ${status} (1–50, empty = none)`, cur ? String(cur) : "")
+    if (ans === null) return
+    const next = { ...wip }
+    if (!ans.trim()) {
+      delete next[status]
+    } else {
+      const n = parseInt(ans.trim(), 10)
+      if (!Number.isFinite(n) || n < 1 || n > 50) return
+      next[status] = n
+    }
+    void persistWip(next)
   }
 
   const applyView = (v: SavedView) => {
@@ -286,6 +332,13 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     yRowsRef.current = yRows
     let alive = true
     let putTimer: ReturnType<typeof setTimeout> | null = null
+    // Same storm discipline as the page editor: incremental diffs off the
+    // last ACKed state vector (server merges), at most one timer + one
+    // in-flight PUT, trailing flush for mid-flight edits.
+    let putInFlight = false
+    let putDirty = false
+    let lastSV: Uint8Array | null = null
+    let putCount = 0
 
     const saved = localStorage.getItem(storageKey)
     if (saved) {
@@ -294,13 +347,43 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
       } catch {}
     }
 
+    const runPut = () => {
+      putTimer = null
+      if (!alive || putInFlight) return
+      putCount++
+      const wantFull = !lastSV || putCount % 25 === 0
+      let body: Uint8Array
+      try {
+        body = wantFull ? Y.encodeStateAsUpdate(doc) : Y.encodeStateAsUpdate(doc, lastSV!)
+      } catch {
+        return
+      }
+      if (!wantFull && body.byteLength <= 32) return
+      putInFlight = true
+      putDirty = false
+      fetch(`/api/workspace/${docId}/doc`, { method: "PUT", headers: { "Content-Type": "application/octet-stream", ...collabAuthHeaders() }, body: body as unknown as BodyInit })
+        .then((r) => {
+          if (!alive) return
+          if (r.ok) {
+            try {
+              lastSV = Y.encodeStateVector(doc)
+            } catch {}
+          } else if (r.status === 400) {
+            lastSV = null
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          putInFlight = false
+          if (alive && putDirty) schedulePut()
+        })
+    }
+
     const schedulePut = () => {
       if (readOnlyRef.current) return
-      if (putTimer) clearTimeout(putTimer)
-      putTimer = setTimeout(() => {
-        const upd = Y.encodeStateAsUpdate(doc)
-        fetch(`/api/workspace/${docId}/doc`, { method: "PUT", headers: { "Content-Type": "application/octet-stream", ...collabAuthHeaders() }, body: upd as unknown as BodyInit }).catch(() => {})
-      }, 500)
+      putDirty = true
+      if (putTimer || putInFlight) return
+      putTimer = setTimeout(runPut, 2000)
     }
 
     const obs = () => {
@@ -358,6 +441,19 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     if (!yRows || !doc) return
     const r: Row = { id: uid(), title: "", status: "Todo", priority: "Med", assignee: "", due: "", description: "", comments: [] }
     doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
+  }
+
+  const quickAddRow = () => {
+    if (!guard() || !quickStatus) return
+    const title = quickTitle.trim().slice(0, 100)
+    if (!title) return
+    const yRows = yRowsRef.current
+    const doc = docRef.current
+    if (!yRows || !doc) return
+    const r: Row = { id: uid(), title, status: quickStatus, priority: "Med", assignee: "", due: "", description: "", comments: [] }
+    doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
+    setQuickTitle("")
+    setQuickStatus(null)
   }
 
   const deleteRow = (id: string) => {
@@ -693,24 +789,31 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
         </div>
       ) : view === "kanban" ? (
         <div className="grid grid-cols-3 gap-4">
-          {STATUSES.map((s) => (
+          {STATUSES.map((s) => {
+            const inCol = filtered.filter((r) => r.status === s)
+            const limit = wip[s]
+            const over = limit !== undefined && inCol.length > limit
+            return (
             <div
               key={s}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => onDropKanban(e, s)}
-              className="rounded-[14px] border border-line bg-white/[0.02] p-3"
+              className={`rounded-[14px] border p-3 ${over ? "border-amber-500/30 bg-amber-500/[0.03]" : "border-line bg-white/[0.02]"}`}
             >
               <div className="mb-3 flex items-center gap-2 px-1">
                 <span className={`h-2 w-2 rounded-full ${STATUS_DOT[s]}`} />
                 <span className="text-[12px] font-medium uppercase tracking-wider text-white/60">{s}</span>
-                <span className="rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[11px] font-medium text-white/40">
-                  {filtered.filter((r) => r.status === s).length}
-                </span>
+                <button
+                  onClick={() => editWipLimit(s)}
+                  title={limit ? `WIP limit ${limit} — click to change` : "Set WIP limit"}
+                  className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium ${over ? "bg-amber-500/15 text-amber-300" : "bg-white/[0.06] text-white/40 hover:text-white/70"}`}
+                >
+                  {inCol.length}{limit ? `/${limit}` : ""}
+                </button>
+                {over && <span className="text-[10px] font-medium uppercase tracking-wider text-amber-300/80">over wip</span>}
               </div>
               <div className="flex flex-col gap-2.5">
-                {filtered
-                  .filter((r) => r.status === s)
-                  .map((r) => (
+                {inCol.map((r) => (
                     <div
                       key={r.id}
                       draggable={!readOnly}
@@ -744,25 +847,46 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                         )}
                       </div>
                       {r.due && (
-                        <div className="mt-2 flex items-center gap-1 text-[11px] text-white/35">
+                        <div className={`mt-2 flex items-center gap-1 text-[11px] ${isOverdue(r) ? "font-medium text-red-300" : "text-white/35"}`}>
                           <Calendar className="h-3 w-3" />
                           {new Date(r.due).toLocaleDateString("en-GB")}
+                          {isOverdue(r) && <span className="uppercase tracking-wider">· overdue</span>}
                         </div>
                       )}
                     </div>
                   ))}
                 {!readOnly && (
-                  <button
-                    onClick={addRow}
-                    className="flex items-center justify-center gap-1.5 rounded-[12px] border border-dashed border-white/10 py-2.5 text-[12px] text-white/30 hover:border-white/15 hover:bg-white/[0.02] hover:text-white/50"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    New
-                  </button>
+                  quickStatus === s ? (
+                    <div className="flex items-center gap-1.5 rounded-[12px] border border-white/15 bg-white/[0.03] p-2">
+                      <input
+                        autoFocus
+                        value={quickTitle}
+                        onChange={(e) => setQuickTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") quickAddRow()
+                          if (e.key === "Escape") { setQuickStatus(null); setQuickTitle("") }
+                        }}
+                        placeholder={`New in ${s}…`}
+                        className="min-w-0 flex-1 bg-transparent px-1.5 py-1 text-[12px] text-white/80 placeholder:text-white/25 outline-none"
+                      />
+                      <button onClick={quickAddRow} disabled={!quickTitle.trim()} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-black hover:bg-white/90 disabled:opacity-40">
+                        Add
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setQuickStatus(s); setQuickTitle("") }}
+                      className="flex items-center justify-center gap-1.5 rounded-[12px] border border-dashed border-white/10 py-2.5 text-[12px] text-white/30 hover:border-white/15 hover:bg-white/[0.02] hover:text-white/50"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      New
+                    </button>
+                  )
                 )}
               </div>
             </div>
-          ))}
+          )
+          })}
         </div>
       ) : (
         <div className="rounded-[14px] border border-line bg-surface-1 p-4">
