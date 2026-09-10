@@ -183,6 +183,9 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   const [wip, setWip] = useState<Record<string, number>>({})
   const [quickStatus, setQuickStatus] = useState<string | null>(null)
   const [quickTitle, setQuickTitle] = useState("")
+  // Board grouping: status (default kanban) | assignee (workload) | priority.
+  // Session-only; saved views keep controlling filters/sort.
+  const [groupBy, setGroupBy] = useState<"status" | "assignee" | "priority">("status")
   const selectedRow = selectedId ? rows.find((r) => r.id === selectedId) ?? null : null
   const readOnlyRef = useRef(readOnly)
   useEffect(() => {
@@ -450,10 +453,37 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
-    const r: Row = { id: uid(), title, status: quickStatus, priority: "Med", assignee: "", due: "", description: "", comments: [] }
+    const extra: Partial<Row> =
+      groupBy === "status"
+        ? { status: quickStatus }
+        : groupBy === "assignee"
+          ? { status: "Todo", assignee: quickStatus }
+          : { status: "Todo", priority: quickStatus as Row["priority"] }
+    const r: Row = { id: uid(), title, status: "Todo", priority: "Med", assignee: "", due: "", description: "", comments: [], ...extra }
     doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
     setQuickTitle("")
     setQuickStatus(null)
+  }
+
+  const groupKeyOf = (r: Row): string => {
+    if (groupBy === "assignee") return r.assignee.trim()
+    if (groupBy === "priority") return r.priority
+    return r.status
+  }
+
+  const boardColumns = (): Array<{ key: string; label: string }> => {
+    if (groupBy === "assignee") {
+      const names = Array.from(new Set(rows.map((r) => r.assignee.trim()).filter(Boolean))).sort().slice(0, 8)
+      return [...names.map((n) => ({ key: n, label: n })), { key: "", label: "Unassigned" }]
+    }
+    if (groupBy === "priority") return [...PRIORITIES].reverse().map((p) => ({ key: p, label: `${p} priority` }))
+    return STATUSES.map((s) => ({ key: s, label: s }))
+  }
+
+  const dropPatch = (key: string): Partial<Row> => {
+    if (groupBy === "assignee") return { assignee: key }
+    if (groupBy === "priority") return { priority: key as Row["priority"] }
+    return { status: key }
   }
 
   const deleteRow = (id: string) => {
@@ -479,9 +509,9 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     }, agentOrigin())
   }
 
-  const onDropKanban = (e: React.DragEvent, status: string) => {
+  const onDropKanban = (e: React.DragEvent, key: string) => {
     const id = e.dataTransfer.getData("text/plain")
-    if (id) updateRow(id, { status })
+    if (id) updateRow(id, dropPatch(key))
   }
 
   const addComment = () => {
@@ -788,28 +818,51 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
           )}
         </div>
       ) : view === "kanban" ? (
-        <div className="grid grid-cols-3 gap-4">
-          {STATUSES.map((s) => {
-            const inCol = filtered.filter((r) => r.status === s)
-            const limit = wip[s]
+        <>
+          <div className="mb-3 flex items-center gap-1 rounded-full bg-white/[0.04] p-1 self-start">
+            {(["status", "assignee", "priority"] as const).map((g) => (
+              <button
+                key={g}
+                onClick={() => { setGroupBy(g); setQuickStatus(null); setQuickTitle("") }}
+                title={g === "status" ? "Group by status" : g === "assignee" ? "Group by assignee (workload)" : "Group by priority"}
+                className={`rounded-full px-3 py-1 text-[12px] font-medium capitalize transition ${groupBy === g ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
+              >
+                {g === "assignee" ? "Workload" : g}
+              </button>
+            ))}
+          </div>
+          <div className="grid auto-cols-[minmax(220px,1fr)] grid-flow-col gap-4 overflow-x-auto pb-2">
+          {boardColumns().map(({ key: s, label }) => {
+            const inCol = filtered.filter((r) => groupKeyOf(r) === s)
+            const limit = groupBy === "status" ? wip[s] : undefined
             const over = limit !== undefined && inCol.length > limit
             return (
             <div
-              key={s}
+              key={s || "__unassigned__"}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => onDropKanban(e, s)}
-              className={`rounded-[14px] border p-3 ${over ? "border-amber-500/30 bg-amber-500/[0.03]" : "border-line bg-white/[0.02]"}`}
+              className={`min-w-[220px] rounded-[14px] border p-3 ${over ? "border-amber-500/30 bg-amber-500/[0.03]" : "border-line bg-white/[0.02]"}`}
             >
               <div className="mb-3 flex items-center gap-2 px-1">
-                <span className={`h-2 w-2 rounded-full ${STATUS_DOT[s]}`} />
-                <span className="text-[12px] font-medium uppercase tracking-wider text-white/60">{s}</span>
+                {groupBy === "status" ? (
+                  <span className={`h-2 w-2 rounded-full ${STATUS_DOT[s]}`} />
+                ) : groupBy === "assignee" ? (
+                  <User className="h-3 w-3 text-white/40" />
+                ) : null}
+                <span className="truncate text-[12px] font-medium uppercase tracking-wider text-white/60">{label}</span>
+                {groupBy === "status" ? (
                 <button
                   onClick={() => editWipLimit(s)}
                   title={limit ? `WIP limit ${limit} — click to change` : "Set WIP limit"}
-                  className={`rounded-full px-1.5 py-0.5 text-[11px] font-medium ${over ? "bg-amber-500/15 text-amber-300" : "bg-white/[0.06] text-white/40 hover:text-white/70"}`}
+                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${over ? "bg-amber-500/15 text-amber-300" : "bg-white/[0.06] text-white/40 hover:text-white/70"}`}
                 >
                   {inCol.length}{limit ? `/${limit}` : ""}
                 </button>
+                ) : (
+                <span className="shrink-0 rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[11px] font-medium text-white/40">
+                  {inCol.length}
+                </span>
+                )}
                 {over && <span className="text-[10px] font-medium uppercase tracking-wider text-amber-300/80">over wip</span>}
               </div>
               <div className="flex flex-col gap-2.5">
@@ -839,7 +892,8 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <PriorityPill p={r.priority} />
-                        {r.assignee && (
+                        {groupBy !== "status" && <StatusPill s={r.status} />}
+                        {r.assignee && groupBy !== "assignee" && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] text-white/50">
                             <User className="h-3 w-3" />
                             {r.assignee}
@@ -866,7 +920,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                           if (e.key === "Enter") quickAddRow()
                           if (e.key === "Escape") { setQuickStatus(null); setQuickTitle("") }
                         }}
-                        placeholder={`New in ${s}…`}
+                        placeholder={`New in ${s || "Unassigned"}…`}
                         className="min-w-0 flex-1 bg-transparent px-1.5 py-1 text-[12px] text-white/80 placeholder:text-white/25 outline-none"
                       />
                       <button onClick={quickAddRow} disabled={!quickTitle.trim()} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-black hover:bg-white/90 disabled:opacity-40">
@@ -888,6 +942,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
           )
           })}
         </div>
+        </>
       ) : (
         <div className="rounded-[14px] border border-line bg-surface-1 p-4">
           <div className="mb-3 flex items-center justify-between">
