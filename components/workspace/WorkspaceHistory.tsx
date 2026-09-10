@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react"
 import { Clock, RotateCcw, History, LoaderCircle } from "lucide-react"
 import { collabAuthHeaders } from "@/lib/collabClient"
+import WorkspaceCollapsible from "./WorkspaceCollapsible"
 
 type Hist = { id: string; doc_id: string; bytes: number; actor_id: string | null; created_at: string }
 
-export default function WorkspaceHistory({ docId, canWrite }: { docId: string; canWrite: boolean }) {
+export default function WorkspaceHistory({ docId, canWrite, defaultCollapsed = false }: { docId: string; canWrite: boolean; defaultCollapsed?: boolean }) {
   const [items, setItems] = useState<Hist[]>([])
   const [loading, setLoading] = useState(true)
   const [restoring, setRestoring] = useState<string | null>(null)
@@ -47,22 +48,21 @@ export default function WorkspaceHistory({ docId, canWrite }: { docId: string; c
   }
 
   return (
-    <div className="mx-auto w-full max-w-[960px] rounded-2xl border border-line bg-white/[0.025] p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[12px] font-medium text-white/60">
-          <History className="h-3.5 w-3.5" /> History
-          <span className="text-[11px] font-normal text-white/25">· {items.length} versions · auto every 60s</span>
-        </div>
-        {canWrite && (
-          <button onClick={snapshotNow} className="rounded-full border border-line bg-white/[0.04] px-3 py-1 text-[11px] text-white/50 hover:bg-white/[0.08]">Snapshot now</button>
-        )}
-      </div>
+    <WorkspaceCollapsible
+      title="History"
+      icon={<History className="h-3.5 w-3.5" />}
+      summary={`· ${items.length} versions · auto every 60s`}
+      defaultCollapsed={defaultCollapsed}
+      right={canWrite ? (
+        <button onClick={(e) => { e.stopPropagation(); void snapshotNow() }} className="rounded-full border border-line bg-white/[0.04] px-3 py-1 text-[11px] text-white/50 hover:bg-white/[0.08]">Snapshot now</button>
+      ) : undefined}
+    >
       {loading ? (
-        <div className="mt-3 text-[11px] text-white/25">Loading…</div>
+        <div className="text-[11px] text-white/25">Loading…</div>
       ) : items.length === 0 ? (
-        <div className="mt-3 rounded-xl border border-dashed border-white/10 py-6 text-center text-[11px] text-white/25">No history yet — edits are snapshotted automatically.</div>
+        <div className="rounded-xl border border-dashed border-white/10 py-6 text-center text-[11px] text-white/25">No history yet — edits are snapshotted automatically.</div>
       ) : (
-        <div className="mt-3 flex flex-col gap-1">
+        <div className="flex flex-col gap-1">
           {items.map((h) => (
             <div key={h.id} className="flex items-center justify-between rounded-xl border border-line bg-white/[0.03] px-3 py-2">
               <div className="flex items-center gap-2 text-[11px] text-white/50">
@@ -84,6 +84,6 @@ export default function WorkspaceHistory({ docId, canWrite }: { docId: string; c
           ))}
         </div>
       )}
-    </div>
+    </WorkspaceCollapsible>
   )
 }

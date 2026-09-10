@@ -67,6 +67,9 @@ export default function WorkspaceProperties({
   const [newColor, setNewColor] = useState("gray")
   const [busy, setBusy] = useState(false)
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
+  const [tagsOpen, setTagsOpen] = useState(true)
+  const [metaOpen, setMetaOpen] = useState(true)
+  const [flagsOpen, setFlagsOpen] = useState(true)
 
   useEffect(() => {
     setCollapsed(defaultCollapsed)
@@ -133,11 +136,17 @@ export default function WorkspaceProperties({
         </div>
       ) : (
         <>
-          {/* Tags */}
+          {/* Tags — collapsible sub-section */}
           <div className="mt-3">
-            <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-white/30">
+            <button
+              onClick={() => setTagsOpen((v) => !v)}
+              className="mb-1.5 flex cursor-pointer items-center gap-1.5 text-[11px] uppercase tracking-wider text-white/30 hover:text-white/60"
+            >
               <Tag className="h-3 w-3" /> Tags
-            </div>
+              {tagsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              {!tagsOpen && tags.length > 0 && <span className="normal-case text-white/25">· {tags.length}</span>}
+            </button>
+            {tagsOpen && (
             <div className="flex flex-wrap items-center gap-1.5">
               {tags.map((t) => (
                 <span key={t.id} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${TAG_COLORS[t.color] ?? TAG_COLORS.gray}`}>
@@ -179,9 +188,18 @@ export default function WorkspaceProperties({
                 <span className="text-[11px] text-white/25">No tags</span>
               ) : null}
             </div>
+            )}
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-3 sm:grid-cols-4">
+          <button
+            onClick={() => setMetaOpen((v) => !v)}
+            className="mt-4 flex w-full cursor-pointer items-center gap-1.5 border-t border-line pt-3 text-[11px] uppercase tracking-wider text-white/30 hover:text-white/60"
+          >
+            <Clock className="h-3 w-3" /> Dates & owner
+            {metaOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+          {metaOpen && (
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="flex items-center gap-2 text-[11px] text-white/40">
               <Calendar className="h-3 w-3" />
               <span className="uppercase tracking-wider">Created</span>
@@ -209,8 +227,17 @@ export default function WorkspaceProperties({
               </button>
             </div>
           </div>
+          )}
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+          <button
+            onClick={() => setFlagsOpen((v) => !v)}
+            className="mt-3 flex w-full cursor-pointer items-center gap-1.5 border-t border-line pt-3 text-[11px] uppercase tracking-wider text-white/30 hover:text-white/60"
+          >
+            <LayoutTemplate className="h-3 w-3" /> Journal · Template · Width · Edgeless
+            {flagsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+          {flagsOpen && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               onClick={() => toggleProp("isJournal", !props.isJournal)}
               disabled={!canWrite}
@@ -231,6 +258,7 @@ export default function WorkspaceProperties({
               <button onClick={() => toggleProp("edgelessTheme", "light")} disabled={!canWrite} className={`rounded-full px-2 py-0.5 text-[10px] ${props.edgelessTheme === "light" ? "bg-white text-black" : "bg-white/10 text-white/60"}`}>Light</button>
             </span>
           </div>
+          )}
         </>
       )}
     </div>

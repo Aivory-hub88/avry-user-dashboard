@@ -4,11 +4,12 @@ import { useEffect, useState } from "react"
 import { Link2, ArrowLeftRight, Plus, Trash2 } from "lucide-react"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { PeekableDocLink } from "./WorkspacePeek"
+import WorkspaceCollapsible from "./WorkspaceCollapsible"
 
 type DocBrief = { id: string; title: string }
 type LinkRow = { src: string; dst: string; created_at: string }
 
-export default function WorkspaceBacklinks({ docId, canWrite }: { docId: string; canWrite: boolean }) {
+export default function WorkspaceBacklinks({ docId, canWrite, defaultCollapsed = false }: { docId: string; canWrite: boolean; defaultCollapsed?: boolean }) {
   const [outgoing, setOutgoing] = useState<LinkRow[]>([])
   const [incoming, setIncoming] = useState<LinkRow[]>([])
   const [docs, setDocs] = useState<DocBrief[]>([])
@@ -70,13 +71,13 @@ export default function WorkspaceBacklinks({ docId, canWrite }: { docId: string;
   const candidates = docs.filter((d) => d.id !== docId && !outgoing.some((l) => l.dst === d.id))
 
   return (
-    <div className="mx-auto w-full max-w-[960px] rounded-2xl border border-line bg-white/[0.025] p-4">
-      <div className="flex items-center gap-2 text-[12px] font-medium text-white/60">
-        <ArrowLeftRight className="h-3.5 w-3.5" /> Bi-directional links
-        <span className="text-[11px] font-normal text-white/25">· {outgoing.length} outgoing · {incoming.length} backlinks</span>
-      </div>
-
-      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <WorkspaceCollapsible
+      title="Bi-directional links"
+      icon={<ArrowLeftRight className="h-3.5 w-3.5" />}
+      summary={`· ${outgoing.length} outgoing · ${incoming.length} backlinks`}
+      defaultCollapsed={defaultCollapsed}
+    >
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-white/30">
             <Link2 className="h-3 w-3" /> Linked to
@@ -129,6 +130,6 @@ export default function WorkspaceBacklinks({ docId, canWrite }: { docId: string;
           )}
         </div>
       </div>
-    </div>
+    </WorkspaceCollapsible>
   )
 }

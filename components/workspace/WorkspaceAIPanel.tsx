@@ -3,6 +3,7 @@
 import { useState, useRef } from "react"
 import { Sparkles, Send, LoaderCircle, FileText, Check, Copy, Wand2 } from "lucide-react"
 import { streamConsoleResponse } from "@/lib/streaming"
+import WorkspaceCollapsible from "./WorkspaceCollapsible"
 
 type Props = {
   docId: string
@@ -13,6 +14,7 @@ type Props = {
   // Optional: full block text extracted from editor (concatenated headings/paragraphs)
   docText?: string
   onInsertBlock?: (text: string) => void
+  defaultCollapsed?: boolean
 }
 
 const SESSION_KEY = "aivory:ai-panel:session"
@@ -27,7 +29,7 @@ function getSessionId() {
   return sid
 }
 
-export default function WorkspaceAIPanel({ docId, pageTitle, pageIcon, tags, canWrite, docText, onInsertBlock }: Props) {
+export default function WorkspaceAIPanel({ docId, pageTitle, pageIcon, tags, canWrite, docText, onInsertBlock, defaultCollapsed = false }: Props) {
   void docId
   const [prompt, setPrompt] = useState("")
   const [answer, setAnswer] = useState("")
@@ -92,12 +94,13 @@ export default function WorkspaceAIPanel({ docId, pageTitle, pageIcon, tags, can
   }
 
   return (
-    <div className="w-full rounded-2xl border border-line bg-white/[0.025] p-4">
-      <div className="flex items-center gap-2 text-[12px] font-medium text-white/60">
-        <Sparkles className="h-3.5 w-3.5 text-violet-300" /> Cerveau AI
-        <span className="text-[11px] font-normal text-white/25">· for this page</span>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
+    <WorkspaceCollapsible
+      title="Cerveau AI"
+      icon={<Sparkles className="h-3.5 w-3.5 text-violet-300" />}
+      summary="for this page"
+      defaultCollapsed={defaultCollapsed}
+    >
+      <div className="flex flex-wrap gap-1.5">
         <button onClick={onSummarise} disabled={busy} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/60 hover:bg-white/[0.08] disabled:opacity-40">
           {busy ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />} Summarise
         </button>
@@ -133,6 +136,6 @@ export default function WorkspaceAIPanel({ docId, pageTitle, pageIcon, tags, can
         </div>
       )}
       <div className="mt-2 text-[11px] text-white/25">Powered by Cerveau via <span className="text-white/40">/api/console/stream</span> · no extra deps</div>
-    </div>
+    </WorkspaceCollapsible>
   )
 }

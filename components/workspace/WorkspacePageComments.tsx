@@ -5,6 +5,7 @@ import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
 import { MessageCircle, Send, Trash2 } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
+import WorkspaceCollapsible from "./WorkspaceCollapsible"
 
 type PageComment = { id: string; text: string; author: string; at: string }
 
@@ -12,7 +13,7 @@ function uid() {
   return Math.random().toString(36).slice(2, 8)
 }
 
-export default function WorkspacePageComments({ docId, canWrite }: { docId: string; canWrite: boolean }) {
+export default function WorkspacePageComments({ docId, canWrite, defaultCollapsed = false }: { docId: string; canWrite: boolean; defaultCollapsed?: boolean }) {
   const docRef = useRef<Y.Doc | null>(null)
   const yCommentsRef = useRef<Y.Array<Y.Map<unknown>> | null>(null)
   const [comments, setComments] = useState<PageComment[]>([])
@@ -114,13 +115,14 @@ export default function WorkspacePageComments({ docId, canWrite }: { docId: stri
   }
 
   return (
-    <div className="mx-auto w-full max-w-[960px] rounded-2xl border border-line bg-white/[0.025] p-4">
-      <div className="flex items-center gap-2 text-[12px] font-medium text-white/60">
-        <MessageCircle className="h-3.5 w-3.5" /> Page comments
-        <span className="text-[11px] font-normal text-white/25">· {comments.length} · Yjs-native, live</span>
-      </div>
+    <WorkspaceCollapsible
+      title="Page comments"
+      icon={<MessageCircle className="h-3.5 w-3.5" />}
+      summary={`· ${comments.length} · Yjs-native, live`}
+      defaultCollapsed={defaultCollapsed}
+    >
       {!ready ? (
-        <div className="mt-3 text-[11px] text-white/25">Loading…</div>
+        <div className="text-[11px] text-white/25">Loading…</div>
       ) : (
         <>
           <div className="mt-3 flex flex-col gap-2">
@@ -160,6 +162,6 @@ export default function WorkspacePageComments({ docId, canWrite }: { docId: stri
           </div>
         </>
       )}
-    </div>
+    </WorkspaceCollapsible>
   )
 }

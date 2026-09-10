@@ -112,6 +112,8 @@ export default function WorkspaceDocPage() {
     if (meta?.mode) setEditorMode(meta.mode)
   }, [meta?.mode])
 
+  const isEdgeless = editorMode === "edgeless"
+
   // Auto-minimize all top panels when entering edgeless for a larger canvas
   useEffect(() => {
     if (editorMode === "edgeless") setTopCollapsed(true)
@@ -601,6 +603,7 @@ export default function WorkspaceDocPage() {
                 tags={meta?.tags ?? []}
                 canWrite={canWrite}
                 docText={aiDocText}
+                defaultCollapsed={view === "page" && editorMode === "edgeless"}
                 onInsertBlock={(text) => {
                   const el = document.querySelector("affine-editor-container") as unknown as Record<string, unknown> | null
                   const fn = el?.["__aivoryInsert"] as ((t: string) => void) | undefined
@@ -631,13 +634,13 @@ export default function WorkspaceDocPage() {
           {view === "page" && editorMode === "page" && (
             <>
               <div className="mx-auto mt-4 w-full max-w-[960px]">
-                <WorkspaceBacklinks docId={id} canWrite={canWrite} />
+                <WorkspaceBacklinks docId={id} canWrite={canWrite} defaultCollapsed={isEdgeless} />
               </div>
               <div className="mx-auto mt-4 w-full max-w-[960px]">
-                <WorkspacePageComments docId={id} canWrite={canWrite} />
+                <WorkspacePageComments docId={id} canWrite={canWrite} defaultCollapsed={isEdgeless} />
               </div>
               <div className="mx-auto mt-4 w-full max-w-[960px]">
-                <WorkspaceHistory docId={id} canWrite={canWrite} />
+                <WorkspaceHistory docId={id} canWrite={canWrite} defaultCollapsed={isEdgeless} />
               </div>
             </>
           )}
