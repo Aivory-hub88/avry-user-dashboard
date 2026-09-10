@@ -57,6 +57,7 @@ const AGENT_HEADER_IMAGES = {
 const AGENTS = [
   {
     agentType: 'autonomous' as TelegramAgentType,
+    name: 'Geno',
     titleKey: 'generalistTitle',
     descKey: 'generalistDesc',
     toolsKey: 'generalistTools',
@@ -69,6 +70,7 @@ const AGENTS = [
   },
   {
     agentType: 'customer_service' as TelegramAgentType,
+    name: 'Teo',
     titleKey: 'ticketOpsTitle',
     descKey: 'ticketOpsDesc',
     toolsKey: 'ticketOpsTools',
@@ -81,6 +83,7 @@ const AGENTS = [
   },
   {
     agentType: 'leads_qualifier' as TelegramAgentType,
+    name: 'Lex',
     titleKey: 'leadsTitle',
     descKey: 'leadsDesc',
     toolsKey: 'leadsTools',
@@ -93,6 +96,7 @@ const AGENTS = [
   },
   {
     agentType: 'finance_invoice_ops' as TelegramAgentType,
+    name: 'Finn',
     titleKey: 'financeTitle',
     descKey: 'financeDesc',
     toolsKey: 'financeTools',
@@ -105,6 +109,7 @@ const AGENTS = [
   },
   {
     agentType: 'office_assistant' as TelegramAgentType,
+    name: 'Ofira',
     titleKey: 'officeTitle',
     descKey: 'officeDesc',
     toolsKey: 'officeTools',
@@ -278,6 +283,7 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
   // backend catalog (dynamicAgents in AgentsPage) carry plain strings —
   // there's nothing to translate those against.
   const title = (agent as any).titleKey ? t((agent as any).titleKey) : (agent as any).title;
+  const name: string | undefined = (agent as any).name;
   const description = (agent as any).descKey ? t((agent as any).descKey) : (agent as any).description;
   const tools: string[] = (agent as any).toolsKey ? (t.raw((agent as any).toolsKey) as string[]) : ((agent as any).tools || []);
 
@@ -320,11 +326,21 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
             size={44}
             className="ring-2 ring-black/25 shadow-[0_2px_6px_rgba(0,0,0,0.35)]"
           />
-          <div
-            className="text-white font-semibold text-[15px] leading-snug tracking-wide drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)]"
-            style={{ fontFamily: "'Manrope', sans-serif" }}
-          >
-            {title}
+          <div className="min-w-0">
+            {name && (
+              <div
+                className="text-white font-bold text-[15px] leading-snug tracking-wide drop-shadow-[0_1px_3px_rgba(0,0,0,0.35)] truncate"
+                style={{ fontFamily: "'Manrope', sans-serif" }}
+              >
+                {name}
+              </div>
+            )}
+            <div
+              className="text-white/60 text-[10px] font-medium uppercase tracking-[0.1em] truncate"
+              style={{ fontFamily: "'Manrope', sans-serif" }}
+            >
+              {title}
+            </div>
           </div>
         </div>
       </div>
