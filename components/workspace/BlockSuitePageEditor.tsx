@@ -132,6 +132,18 @@ export default function BlockSuitePageEditor({
   const [mode, setMode] = useState<EditorDocMode>(initialMode)
   // Mirror of mode for use inside websocket/awareness callbacks.
   const modeRef = useRef<EditorDocMode>(initialMode)
+  // Last mode the canvas tool/focus was synced for. Tool reset ("default")
+  // must ONLY run on real mode transitions — re-running it on every
+  // edgelessTheme toggle yanks the tool mid-gesture and can strand an
+  // in-progress drag/selection (objects stuck together, clicks select nothing).
+  const toolSyncedModeRef = useRef<EditorDocMode | null>(null)
+  // True while the primary button is held on the canvas. A right-click in
+  // this window opens the OS context menu, breaks pointer capture, and the
+  // missed pointerup strands BlockSuite in persistent drag mode (upstream
+  // AFFiNE #5704 family: object glued to cursor, can't drop, all move
+  // together). Suppress the menu only in that window — normal right-click
+  // menus keep working.
+  const leftDownRef = useRef(false)
   const modeAtRef = useRef<number>(0)
   const appliedInitialMode = useRef(false)
 
@@ -154,6 +166,26 @@ export default function BlockSuitePageEditor({
     }).catch(() => {})
   }
 
+  /** Focus the canvas only when focus is outside it — never yank focus out
+   * of a mindmap/shape text editor mid-typing or mid-gesture. */
+  const focusEditorIfOutside = () => {
+    try {
+      const editor = containerRef.current as unknown as HTMLElement | null
+      if (!editor) return
+      const active = document.activeElement
+      if (active && editor.contains(active)) return
+      editor.focus()
+    } catch {}
+  }
+
+  /** Suppress the OS context menu only while a left-drag is in progress
+   * (see leftDownRef). Prevents the missed-pointerup stuck-drag strand. */
+  const guardDragContextMenu = (e: { preventDefault(): void; stopPropagation(): void }) => {
+    if (leftDownRef.current) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }
   /** User-initiated toggle: switch locally, broadcast, persist. */
   const switchMode = (next: EditorDocMode) => {
     if (next === modeRef.current || readOnly) return
@@ -384,12 +416,12 @@ export default function BlockSuitePageEditor({
       // Focus so Space/Hand and keyboard shortcuts are captured
       try {
         ;(editor as HTMLElement).setAttribute("tabindex", "0")
-        setTimeout(() => (editor as HTMLElement).focus(), 50)
+        setTimeout(() => focusEditorIfOutside(), 50)
       } catch {}
     } else {
       // Reuse existing container (page already mounted) — ensure focus
       try {
-        setTimeout(() => (editor as HTMLElement).focus(), 50)
+        setTimeout(() => focusEditorIfOutside(), 50)
       } catch {}
     }
     // Theme: the container picks its page AND edgeless palettes from
@@ -424,6 +456,7 @@ export default function BlockSuitePageEditor({
       } catch {}
       hideEmptyTemplateUI()
       // Ensure edgeless default tool is Select (movable) — Hand is via Space.
+      // Mount is fresh (no gesture in progress) so setting it here is safe.
       try {
         if (modeRef.current === "edgeless") {
           const gfx = (editor.std as unknown as { get: (id: unknown) => unknown }).get?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
@@ -434,11 +467,13 @@ export default function BlockSuitePageEditor({
             const alt = (editor.std as unknown as { getOptional?: (id: unknown) => unknown }).getOptional?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
             alt?.tool?.setTool?.("default")
           }
+          toolSyncedModeRef.current = "edgeless"
         }
       } catch {}
       try {
-        // Focus again after theme flip so Space is captured
-        ;(editor as HTMLElement).focus()
+        // Focus again after theme flip so Space is captured (guarded: never
+        // steal focus from an open text editor).
+        focusEditorIfOutside()
       } catch {}
     })()
     const t1 = window.setTimeout(hideEmptyTemplateUI, 400)
@@ -475,22 +510,29 @@ export default function BlockSuitePageEditor({
     hideEmptyTemplateUI()
     window.setTimeout(hideEmptyTemplateUI, 200)
     window.setTimeout(hideEmptyTemplateUI, 800)
+    // Reset to Select ONLY on a real mode transition into edgeless. A pure
+    // edgelessTheme toggle must not touch the tool or focus — the user may be
+    // mid-drag / mid-text-edit and yanking either strands the gesture.
+    const transitioned = toolSyncedModeRef.current !== mode
+    toolSyncedModeRef.current = mode
     // Ensure Select is active in edgeless (movable), Hand via Space
-    try {
-      if (mode === "edgeless") {
-        const gfx = (editor.std as unknown as { get: (id: unknown) => unknown }).get?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
-        const tool = (gfx as unknown as { tool?: unknown })?.tool as { setTool?: (n: string) => void } | undefined
-        tool?.setTool?.("default")
-        if (!tool) {
-          const alt = (editor.std as unknown as { getOptional?: (id: unknown) => unknown }).getOptional?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
-          alt?.tool?.setTool?.("default")
+    if (transitioned) {
+      try {
+        if (mode === "edgeless") {
+          const gfx = (editor.std as unknown as { get: (id: unknown) => unknown }).get?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
+          const tool = (gfx as unknown as { tool?: unknown })?.tool as { setTool?: (n: string) => void } | undefined
+          tool?.setTool?.("default")
+          if (!tool) {
+            const alt = (editor.std as unknown as { getOptional?: (id: unknown) => unknown }).getOptional?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
+            alt?.tool?.setTool?.("default")
+          }
         }
-      }
-    } catch {}
-    // Focus so Space→Hand and drag work immediately after switch
-    try {
-      setTimeout(() => (editor as HTMLElement).focus(), 60)
-    } catch {}
+      } catch {}
+      // Focus so Space→Hand and drag work immediately after switch
+      try {
+        setTimeout(() => focusEditorIfOutside(), 60)
+      } catch {}
+    }
   }, [mode, edgelessTheme])
 
   // React to edgelessTheme prop changes (from Properties panel) without remounting
@@ -510,7 +552,21 @@ export default function BlockSuitePageEditor({
   }, [edgelessTheme])
 
   // Outline panel — mount `affine-outline-panel` next to the editor when toggled on.
-  // The panel reads headings from the editor's doc and is already theme-aware (inherits
+  // Global reset for the left-drag flag (contextmenu guard): window-level
+  // pointerup/blur always fire even when the canvas misses them.
+  useEffect(() => {
+    const reset = () => {
+      leftDownRef.current = false
+    }
+    window.addEventListener("pointerup", reset, true)
+    window.addEventListener("pointercancel", reset, true)
+    window.addEventListener("blur", reset)
+    return () => {
+      window.removeEventListener("pointerup", reset, true)
+      window.removeEventListener("pointercancel", reset, true)
+      window.removeEventListener("blur", reset)
+    }
+  }, [])  // The panel reads headings from the editor's doc and is already theme-aware (inherits
   // the global dark observer we force above). No extra deps.
   useEffect(() => {
     if (!outlineOpen || !pageDoc || mode !== "page") return
@@ -672,6 +728,19 @@ export default function BlockSuitePageEditor({
             data-aivory-doc
             className={`${isEdgeless ? "flex flex-1 flex-col min-h-0" : "min-h-[560px] flex-1"} rounded-2xl border border-line bg-[#252522] ${readOnly ? "pointer-events-none" : ""}`}
             aria-readonly={readOnly}
+            onPointerDown={(e) => {
+              if (e.button === 0) leftDownRef.current = true
+            }}
+            onPointerUp={() => {
+              leftDownRef.current = false
+            }}
+            onPointerCancel={() => {
+              leftDownRef.current = false
+            }}
+            onPointerLeave={() => {
+              leftDownRef.current = false
+            }}
+            onContextMenu={guardDragContextMenu}
           >
             <div ref={mountRef} className={isEdgeless ? "flex-1 min-h-0 h-full" : "h-[min(72vh,760px)] min-h-[560px]"} />
           </div>
