@@ -12,7 +12,7 @@
 | `avry-user-dashboard` | `feat/collab-y-octo` | `4a7241b` | rebase `main` + Agent wiring + Calendar + API proxy + MissionControl/AgentRail awareness + doc ini |
 | `AVRY-V2-Main` | `feat/collab-y-octo` | `999cb05` | `services/collab` Rust + compose + dashboard bump |
 
-Live: `main` stabil dengan Workspace — `y-websocket:3220` tetap Up sebagai fallback.
+Live: `main` stabil dengan Workspace — `y-websocket:3220` sudah dihapus 2026-09-10, `aivory-collab:3201` single engine (`Up healthy`, `WSS 101` via `aivory.uk/yjs`).
 
 ## Goal
 
