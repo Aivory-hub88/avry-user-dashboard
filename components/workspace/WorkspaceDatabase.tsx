@@ -398,7 +398,12 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
       } catch {}
       schedulePut()
     }
-    yRows.observe(obs)
+    // Deep observation: card moves / drawer edits / comments all mutate
+    // NESTED row maps (m.set), which a shallow array observe never fires
+    // for — the board then neither re-renders nor schedules its persist
+    // PUT (the "drop doesn't move the card" bug). AFFiNE's data-view has
+    // the same requirement: every Yjs mutation must flow to the UI.
+    yRows.observeDeep(obs)
 
     // databases start empty — never seed demo rows; server is the source of truth
     fetch(`/api/workspace/${docId}/doc`, { headers: collabAuthHeaders() })
@@ -429,7 +434,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     return () => {
       alive = false
       if (putTimer) clearTimeout(putTimer)
-      yRows.unobserve(obs)
+      yRows.unobserveDeep(obs)
       provider?.destroy()
       doc.destroy()
     }
