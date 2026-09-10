@@ -105,6 +105,7 @@ export default function BlockSuitePageEditor({
   initialMode = "page",
   pageTitle = "",
   outlineOpen = false,
+  edgelessTheme = "dark",
   onDocTextChange,
   onModeChange,
 }: {
@@ -113,6 +114,7 @@ export default function BlockSuitePageEditor({
   initialMode?: EditorDocMode
   pageTitle?: string
   outlineOpen?: boolean
+  edgelessTheme?: "light" | "dark"
   onDocTextChange?: (text: string) => void
   onModeChange?: (mode: EditorDocMode) => void
 }) {
@@ -418,7 +420,7 @@ export default function BlockSuitePageEditor({
       try {
         const service = editor.std.get(ThemeProvider)
         service.app$.value = ColorScheme.Dark
-        service.edgeless$.value = ColorScheme.Dark
+        service.edgeless$.value = edgelessTheme === "light" ? ColorScheme.Light : ColorScheme.Dark
       } catch {}
       hideEmptyTemplateUI()
       // Ensure edgeless default tool is Select (movable) — Hand is via Space.
@@ -447,7 +449,7 @@ export default function BlockSuitePageEditor({
       window.clearTimeout(t2)
       mount.replaceChildren()
     }
-  }, [pageDoc])
+  }, [pageDoc, edgelessTheme])
 
   // Apply mode switches (user toggle, initial meta, remote awareness) to the
   // mounted container without remounting the whole editor.
@@ -466,7 +468,7 @@ export default function BlockSuitePageEditor({
     try {
       const service = editor.std.get(ThemeProvider)
       service.app$.value = ColorScheme.Dark
-      service.edgeless$.value = ColorScheme.Dark
+      service.edgeless$.value = edgelessTheme === "light" ? ColorScheme.Light : ColorScheme.Dark
       document.documentElement.dataset.theme = "dark"
     } catch {}
     // Toolbar is rebuilt on switch; hide the empty template entry again.
@@ -489,7 +491,23 @@ export default function BlockSuitePageEditor({
     try {
       setTimeout(() => (editor as HTMLElement).focus(), 60)
     } catch {}
-  }, [mode])
+  }, [mode, edgelessTheme])
+
+  // React to edgelessTheme prop changes (from Properties panel) without remounting
+  useEffect(() => {
+    const editor = containerRef.current
+    if (!editor) return
+    try {
+      const service = editor.std.get(ThemeProvider)
+      service.edgeless$.value = edgelessTheme === "light" ? ColorScheme.Light : ColorScheme.Dark
+      // Force a re-render of the edgeless viewport's data-theme attribute
+      // by toggling the mode briefly if currently in edgeless
+      if (modeRef.current === "edgeless") {
+        // No need to switchEditor, just ensure theme is applied; the
+        // edgeless viewport reads edgeless$ directly.
+      }
+    } catch {}
+  }, [edgelessTheme])
 
   // Outline panel — mount `affine-outline-panel` next to the editor when toggled on.
   // The panel reads headings from the editor's doc and is already theme-aware (inherits

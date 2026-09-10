@@ -559,6 +559,8 @@ export default function WorkspaceDocPage() {
                   ownerEmail={meta?.ownerEmail ?? null}
                   canWrite={canWrite}
                   onPatch={patchMeta}
+                  collapsible={view === "page"}
+                  defaultCollapsed={view === "page" && editorMode === "edgeless"}
                 />
               </div>
             </>
@@ -591,6 +593,7 @@ export default function WorkspaceDocPage() {
                 initialMode={meta?.mode ?? "page"}
                 pageTitle={meta?.title ?? ""}
                 outlineOpen={showOutline}
+                edgelessTheme={(meta?.props?.edgelessTheme as "light" | "dark") ?? "dark"}
                 onDocTextChange={setAiDocText}
                 onModeChange={setEditorMode}
               />

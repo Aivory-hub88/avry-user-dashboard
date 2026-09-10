@@ -122,10 +122,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     // Merge with existing row's props when caller only patches part of props:
     // fetch current props, shallow-merge, then write. This keeps other keys intact
-    // when only dbViews is sent, and vice versa.
-    const existingPropsRow = await query(`SELECT props FROM dashboard.workspace_docs WHERE id = $1 OR id = $2 LIMIT 1`, [`workspace:${id}`, id])
-    const existingProps = (existingPropsRow.rows[0]?.props as Record<string, unknown> | null) ?? {}
-    // If caller sent props, merge allowed keys over existing; if they sent e.g. only dbViews, keep other flags.
+    // when only dbViews is sent, and vice versa. Wrapped in try/catch so a
+    // transient DB read never turns a valid toggle into a 500.
+    let existingProps: Record<string, unknown> = {}
+    try {
+      const existingPropsRow = await query(`SELECT props FROM dashboard.workspace_docs WHERE id = $1 OR id = $2 LIMIT 1`, [`workspace:${id}`, id])
+      existingProps = (existingPropsRow.rows[0]?.props as Record<string, unknown> | null) ?? {}
+    } catch {}
     if (body.props !== undefined) {
       // When dbViews/dbTemplates not provided but existing has it, preserve it.
       if (allowed.dbViews === undefined && Array.isArray(existingProps.dbViews)) allowed.dbViews = existingProps.dbViews
