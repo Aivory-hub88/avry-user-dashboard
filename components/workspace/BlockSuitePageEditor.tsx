@@ -6,6 +6,7 @@ import type { Doc } from "@blocksuite/store"
 import { DocCollection } from "@blocksuite/store"
 import { createEmptyDoc } from "@blocksuite/presets"
 import { getThemeObserver, ThemeProvider } from "@blocksuite/blocks"
+import { GfxControllerIdentifier } from "@blocksuite/block-std/gfx"
 import { ColorScheme } from "@blocksuite/affine-model"
 import type { BlockStdScope } from "@blocksuite/block-std"
 import { effects as installBlockEffects } from "@blocksuite/blocks/effects"
@@ -564,13 +565,13 @@ export default function BlockSuitePageEditor({
       } | undefined
       try {
         if (modeRef.current === "edgeless") {
-          const gfx = (editor.std as unknown as { get: (id: unknown) => unknown }).get?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
+          const gfx = (editor.std as unknown as { get: (id: unknown) => unknown }).get?.(GfxControllerIdentifier) as unknown as { tool?: { setTool: (n: string) => void } } | null
           const tool = (gfx as unknown as { tool?: unknown })?.tool as { setTool?: (n: string) => void } | undefined
           gfxTool = tool as typeof gfxTool
           tool?.setTool?.("default")
           // Fallback: try via getOptional
           if (!tool) {
-            const alt = (editor.std as unknown as { getOptional?: (id: unknown) => unknown }).getOptional?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
+            const alt = (editor.std as unknown as { getOptional?: (id: unknown) => unknown }).getOptional?.(GfxControllerIdentifier) as unknown as { tool?: { setTool: (n: string) => void } } | null
             gfxTool = (alt?.tool as typeof gfxTool) ?? undefined
             alt?.tool?.setTool?.("default")
           }
@@ -651,11 +652,11 @@ export default function BlockSuitePageEditor({
     if (transitioned) {
       try {
         if (mode === "edgeless") {
-          const gfx = (editor.std as unknown as { get: (id: unknown) => unknown }).get?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
+          const gfx = (editor.std as unknown as { get: (id: unknown) => unknown }).get?.(GfxControllerIdentifier) as unknown as { tool?: { setTool: (n: string) => void } } | null
           const tool = (gfx as unknown as { tool?: unknown })?.tool as { setTool?: (n: string) => void } | undefined
           tool?.setTool?.("default")
           if (!tool) {
-            const alt = (editor.std as unknown as { getOptional?: (id: unknown) => unknown }).getOptional?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
+            const alt = (editor.std as unknown as { getOptional?: (id: unknown) => unknown }).getOptional?.(GfxControllerIdentifier) as unknown as { tool?: { setTool: (n: string) => void } } | null
             alt?.tool?.setTool?.("default")
           }
         }
@@ -689,13 +690,62 @@ export default function BlockSuitePageEditor({
     const reset = () => {
       leftDownRef.current = false
     }
+    // Escape-after-edit leaves a stale native caret (verified in vanilla
+    // 0.19.5 harness: Esc exits editing but the window Selection range stays,
+    // painting a phantom cursor; shape clicks don't clear it, only
+    // empty-canvas clicks do). Capture-phase so this runs before BlockSuite's
+    // own Esc handlers; clearing first is ordering-safe because legit caret
+    // placement always happens later (click/dblclick).
+    // Worse, Esc ALSO leaves gfx `editing=true` (harness-proven, vanilla):
+    // empty-canvas clicks never clear it, and while set, dragStart refuses
+    // EVERY canvas drag — the "can't move anything until reload" hang. Force
+    // the flag down (keeping the selection) unless a drag is in flight.
+    const clearStaleCaret = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return
+      const editor = containerRef.current as unknown as {
+        std?: { get: (id: unknown) => unknown }
+      } | null
+      if (!editor) return
+      const ae = document.activeElement as HTMLElement | null
+      if (!ae || !(editor as unknown as HTMLElement).contains?.(ae)) return
+      try {
+        window.getSelection()?.removeAllRanges()
+      } catch {}
+      try {
+        if (
+          ae.closest?.(
+            "edgeless-shape-text-editor, edgeless-text-editor, edgeless-connector-label-editor, [contenteditable], input, textarea",
+          )
+        ) {
+          ae.blur()
+        }
+      } catch {}
+      try {
+        const gfx = editor.std?.get?.(GfxControllerIdentifier) as unknown as {
+          tool?: { dragging$?: { value?: unknown } }
+          selection?: {
+            selectedElements?: Array<{ id?: string }>
+            set?: (v: { elements: string[]; editing: boolean }) => void
+          }
+        } | null
+        if (gfx?.tool?.dragging$?.value) return
+        const sel = gfx?.selection
+        if (!sel?.set) return
+        const ids = (sel.selectedElements ?? [])
+          .map((el) => el?.id)
+          .filter((v): v is string => typeof v === "string" && v.length > 0)
+        sel.set({ elements: ids, editing: false })
+      } catch {}
+    }
     window.addEventListener("pointerup", reset, true)
     window.addEventListener("pointercancel", reset, true)
     window.addEventListener("blur", reset)
+    window.addEventListener("keydown", clearStaleCaret, true)
     return () => {
       window.removeEventListener("pointerup", reset, true)
       window.removeEventListener("pointercancel", reset, true)
       window.removeEventListener("blur", reset)
+      window.removeEventListener("keydown", clearStaleCaret, true)
     }
   }, [])
 
@@ -707,7 +757,7 @@ export default function BlockSuitePageEditor({
         const editor = containerRef.current as unknown as {
           std?: { get: (id: unknown) => unknown }
         } | null
-        const gfx = editor?.std?.get?.("GfxController") as unknown as {
+        const gfx = editor?.std?.get?.(GfxControllerIdentifier) as unknown as {
           tool?: {
             currentToolName$?: { value?: unknown; peek?: () => unknown }
             dragging$?: { value?: unknown; peek?: () => unknown }
