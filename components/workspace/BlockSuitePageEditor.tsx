@@ -150,6 +150,9 @@ export default function BlockSuitePageEditor({
   // Unsubscribe for the canvas tool-change watcher below (same leak class as
   // awareness/doc-update listeners: must detach the exact subscription).
   const toolUnsubRef = useRef<(() => void) | null>(null)
+  // Unsubscribe for the canvas selection-change watcher (ghost-caret killer,
+  // selection variant — see mount effect below).
+  const selectionUnsubRef = useRef<(() => void) | null>(null)
   // Remote-diagnosis overlay, ONLY with ?debug=edgeless in the URL. Polls the
   // live gfx state (tool / selection / dragging / focus) into a corner badge
   // and mirrors transitions to the console, so a stuck canvas can be read
@@ -578,29 +581,42 @@ export default function BlockSuitePageEditor({
           toolSyncedModeRef.current = "edgeless"
         }
       } catch {}
-      // Ghost-caret killer: switching tools (H/V/E/M/… shortcuts, toolbar)
-      // clears BlockSuite selection but leaves the native range + DOM focus
-      // inside the last text editor — the caret keeps blinking in a note you
-      // are no longer editing. Reset both on every tool change. Safe: a
-      // genuine typing session never changes tools (keys go to the text).
+      // Ghost-caret killer: switching tools (H/V/E/M/… shortcuts, toolbar) or
+      // picking a different object (click-select while a note/shape text
+      // editor is open) clears BlockSuite selection but leaves the native
+      // range + DOM focus inside the last text editor — the caret keeps
+      // blinking in a block you are no longer editing, swallows the next
+      // keystrokes (so Space-to-pan and other shortcuts appear "broken"),
+      // and repeated stray input events into a detached editor are what
+      // eventually hang the canvas. Reset both on every tool change AND on
+      // every selection change. Safe: a genuine typing session never changes
+      // tools or selection (keys go to the text, not to gfx).
+      const killGhostCaret = () => {
+        try {
+          window.getSelection()?.removeAllRanges()
+        } catch {}
+        try {
+          const ae = document.activeElement as HTMLElement | null
+          const inCanvasText =
+            !!ae &&
+            !!containerRef.current?.contains(ae) &&
+            !!ae.closest?.(
+              "edgeless-shape-text-editor, edgeless-text-editor, edgeless-connector-label-editor, [contenteditable], input, textarea",
+            )
+          if (inCanvasText) ae.blur()
+        } catch {}
+      }
       try {
         toolUnsubRef.current?.()
-        toolUnsubRef.current =
-          gfxTool?.currentToolName$?.subscribe?.(() => {
-            try {
-              window.getSelection()?.removeAllRanges()
-            } catch {}
-            try {
-              const ae = document.activeElement as HTMLElement | null
-              const inCanvasText =
-                !!ae &&
-                !!containerRef.current?.contains(ae) &&
-                !!ae.closest?.(
-                  "edgeless-shape-text-editor, edgeless-text-editor, edgeless-connector-label-editor, [contenteditable], input, textarea",
-                )
-              if (inCanvasText) ae.blur()
-            } catch {}
-          }) ?? null
+        toolUnsubRef.current = gfxTool?.currentToolName$?.subscribe?.(killGhostCaret) ?? null
+      } catch {}
+      try {
+        selectionUnsubRef.current?.()
+        const gfxForSelection = (editor.std as unknown as { get: (id: unknown) => unknown }).get?.(
+          GfxControllerIdentifier,
+        ) as unknown as { selection?: { slots?: { updated?: { on: (fn: () => void) => { dispose: () => void } } } } } | null
+        const disposable = gfxForSelection?.selection?.slots?.updated?.on(killGhostCaret) ?? null
+        selectionUnsubRef.current = disposable ? () => disposable.dispose() : null
       } catch {}
       // No focus steal here (see helper): theme application must not touch
       // focus — the user may be typing in a node text editor right now.
@@ -615,6 +631,10 @@ export default function BlockSuitePageEditor({
         toolUnsubRef.current?.()
       } catch {}
       toolUnsubRef.current = null
+      try {
+        selectionUnsubRef.current?.()
+      } catch {}
+      selectionUnsubRef.current = null
       mount.replaceChildren()
     }
   }, [pageDoc, edgelessTheme])
