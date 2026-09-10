@@ -845,15 +845,54 @@ export default function BlockSuitePageEditor({
         sel.set({ elements: ids, editing: false })
       } catch {}
     }
+    // Click-transfer between text holders: while a note/shape text editor
+    // holds DOM focus, clicking a DIFFERENT canvas object must release the
+    // old editor first. BlockSuite's selection.set() never blurs the
+    // previous editor by itself, so the stale editor keeps DOM focus +
+    // native range: keystrokes keep landing in the old block and the new
+    // object never receives the caret — the "cursor locked, can't move to
+    // another object" report. Blur (+range removal) ONLY when the pointer
+    // lands on a canvas block outside the focused editor; clicks inside the
+    // live editor, toolbar, and panels are untouched, and gfx selection
+    // state is left alone so the incoming edit session (dblclick →
+    // editing:true) mounts undisturbed. Capture phase: legit focus
+    // placement always happens later (click/dblclick handlers).
+    const releaseStaleEditorOnPointerDown = (e: PointerEvent) => {
+      try {
+        const editor = containerRef.current as unknown as HTMLElement | null
+        const t = e.target as (HTMLElement & { closest?: (...args: unknown[]) => unknown }) | null
+        if (!editor || !t) return
+        if (!editor.contains?.(t as unknown as Node)) return
+        const ae = document.activeElement as HTMLElement | null
+        if (!ae || !editor.contains(ae)) return
+        const editorRoot = ae.closest?.(
+          "edgeless-shape-text-editor, edgeless-text-editor, edgeless-connector-label-editor, [contenteditable], input, textarea",
+        ) as HTMLElement | null
+        if (!editorRoot) return
+        if (editorRoot.contains(t as unknown as Node)) return
+        const onCanvasBlock =
+          typeof (t as HTMLElement).closest === "function" &&
+          !!(t as HTMLElement).closest("[data-block-id]")
+        if (!onCanvasBlock) return
+        try {
+          window.getSelection()?.removeAllRanges()
+        } catch {}
+        try {
+          ae.blur()
+        } catch {}
+      } catch {}
+    }
     window.addEventListener("pointerup", reset, true)
     window.addEventListener("pointercancel", reset, true)
     window.addEventListener("blur", reset)
     window.addEventListener("keydown", clearStaleCaret, true)
+    window.addEventListener("pointerdown", releaseStaleEditorOnPointerDown, true)
     return () => {
       window.removeEventListener("pointerup", reset, true)
       window.removeEventListener("pointercancel", reset, true)
       window.removeEventListener("blur", reset)
       window.removeEventListener("keydown", clearStaleCaret, true)
+      window.removeEventListener("pointerdown", releaseStaleEditorOnPointerDown, true)
     }
   }, [])
 
