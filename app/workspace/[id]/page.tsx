@@ -16,7 +16,7 @@ import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 import { useWorkspaceContext } from "@/contexts/WorkspaceContext"
-import { Share2, Star, Trash2, Sparkles, Download, FileDown, Presentation } from "lucide-react"
+import { Share2, Star, Trash2, Sparkles, Download, FileDown, Presentation, ChevronDown, ChevronUp, Minimize2, Maximize2 } from "lucide-react"
 
 const BlockSuitePageEditor = dynamic(() => import("@/components/workspace/BlockSuitePageEditor"), {
   ssr: false,
@@ -69,6 +69,7 @@ export default function WorkspaceDocPage() {
   const [showExport, setShowExport] = useState(false)
   const [present, setPresent] = useState(false)
   const [editorMode, setEditorMode] = useState<"page" | "edgeless">("page")
+  const [topCollapsed, setTopCollapsed] = useState(false)
   const loginUrl = `${getMarketingUrl()}/login`
   const { setActiveWorkspaceId } = useWorkspaceContext()
 
@@ -110,6 +111,12 @@ export default function WorkspaceDocPage() {
   useEffect(() => {
     if (meta?.mode) setEditorMode(meta.mode)
   }, [meta?.mode])
+
+  // Auto-minimize all top panels when entering edgeless for a larger canvas
+  useEffect(() => {
+    if (editorMode === "edgeless") setTopCollapsed(true)
+    else setTopCollapsed(false)
+  }, [editorMode])
 
   // for locked, fetch owner info via separate? meta already 403, so need owner via other means
   // we show generic locked; request access still works
@@ -449,6 +456,24 @@ export default function WorkspaceDocPage() {
         <div className={`min-w-0 flex-1 ${view === "page" && editorMode === "edgeless" ? "overflow-hidden flex flex-col bg-[#0f0f0e] p-0" : "overflow-y-auto px-8 py-8 lg:px-10 xl:px-12"}`}>
           {view === "page" && (
             <>
+              {topCollapsed ? (
+                <div className="mx-auto mb-2 flex w-full max-w-[960px] items-center justify-between rounded-2xl border border-line bg-white/[0.025] px-4 py-2">
+                  <span className="flex items-center gap-2 text-[12px] text-white/50">
+                    {meta?.icon && <span className="text-[16px]">{meta.icon}</span>}
+                    <span className="font-medium text-white/80">{meta?.title || "Untitled"}</span>
+                    <span className="hidden text-white/25 sm:inline">· {meta?.tags?.length ?? 0} tags · {meta?.props?.isJournal ? "Journal" : "Page"}</span>
+                  </span>
+                  <button onClick={() => setTopCollapsed(false)} className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-medium text-black hover:bg-white/90">
+                    <Maximize2 className="h-3 w-3" /> Expand header
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="mx-auto mb-2 flex w-full max-w-[960px] justify-end">
+                    <button onClick={() => setTopCollapsed(true)} className="inline-flex items-center gap-1 rounded-full border border-line bg-white/[0.04] px-3 py-1 text-[11px] text-white/40 hover:bg-white/[0.08] hover:text-white/70">
+                      <Minimize2 className="h-3 w-3" /> Minimize header — larger canvas
+                    </button>
+                  </div>
               {meta?.cover_url && (
                 <div className="mx-auto mb-3 w-full max-w-[960px] overflow-hidden rounded-2xl border border-line">
                   <img src={meta.cover_url} alt="Cover" className="h-[200px] w-full object-cover" />
@@ -563,6 +588,8 @@ export default function WorkspaceDocPage() {
                   defaultCollapsed={view === "page" && editorMode === "edgeless"}
                 />
               </div>
+                </>
+              )}
             </>
           )}
           {view === "page" && showAI && (
