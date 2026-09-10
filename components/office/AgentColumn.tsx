@@ -99,8 +99,14 @@ export default function AgentColumn({
   const [expanded, setExpanded] = useState<string>(agentTarget ?? "null")
   const [query, setQuery] = useState("")
   const [arrived, setArrived] = useState<Set<string>>(new Set())
+  const [, forceNow] = useState(0)
   const approvalsInitRef = useRef(false)
   const prevCountsRef = useRef<Record<string, number>>({})
+
+  useEffect(() => {
+    const id = setInterval(() => forceNow((n) => n + 1), 60000)
+    return () => clearInterval(id)
+  }, [])
 
   useEffect(() => {
     // Skip the pulse on the very first snapshot — that's existing work

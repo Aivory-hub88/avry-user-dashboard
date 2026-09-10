@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 const nextConfig: NextConfig = {
   output: "standalone",
   basePath: "/dashboard",
@@ -6,6 +7,20 @@ const nextConfig: NextConfig = {
   reactStrictMode: false,
   images: { unoptimized: true },
   typescript: { ignoreBuildErrors: false },
+  // Dedup yjs — MissionControl + AgentRail both import * as Y from "yjs" + y-websocket bundles its own copy.
+  // Duplicate copies break Yjs constructor checks ("Yjs was already imported").
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      yjs: path.resolve(__dirname, "node_modules/yjs"),
+    };
+    return config;
+  },
+  turbopack: {
+    resolveAlias: {
+      yjs: "./node_modules/yjs",
+    },
+  },
   experimental: {
     // Default staleTime for dynamic routes is 0s, so every re-intersection of a
     // sidebar <Link> (layout shifts, font loads, badge updates — all common in

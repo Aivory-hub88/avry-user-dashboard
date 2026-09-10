@@ -86,6 +86,11 @@ export default function MissionControl({
   const [activities, setActivities] = useState<Activity[]>([])
   const [wsBusy, setWsBusy] = useState<string | null>(null)
   const [awarenessPeers, setAwarenessPeers] = useState<Array<{ name: string; color: string; agentType: string }>>([])
+  const [, forceNow] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => forceNow((n) => n + 1), 60000)
+    return () => clearInterval(id)
+  }, [])
 
   useEffect(() => {
     let alive = true

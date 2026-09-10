@@ -197,42 +197,40 @@ export async function* streamConsoleResponse(
 }
 
 
-// TYPEWRITER — client-side animation for console streaming
-// Collect all chunk text, then re-emit with delay and accumulated content
-const TYPEWRITER_STEP_MS = 40  // delay between pieces (ms)
-const TYPEWRITER_CHARS = 10    // characters per piece
+// TYPEWRITER — incremental animation for console streaming (true streaming, not collect-then-animate)
+const TYPEWRITER_STEP_MS = 25
+const TYPEWRITER_CHARS = 12
 
 export async function* typewriterStream(
   source: AsyncIterable<StreamChunk>
 ): AsyncGenerator<StreamChunk> {
-  let fullText = ''
-  const nonChunkEvents: StreamChunk[] = []
-
-  // Collect all chunk text from source first
+  let displayed = ''
   for await (const ev of source) {
     if (ev.type === 'chunk' && typeof ev.content === 'string') {
-      fullText += ev.content
-    } else {
-      // Save non-chunk events (workflowspec, done, error) to emit after animation
-      nonChunkEvents.push(ev)
-      if (ev.type === 'error') {
-        // If error, forward immediately and stop
-        yield ev
-        return
+      // Stream incrementally: animate only the new delta, not the whole accumulated text at once
+      const delta = ev.content.slice(displayed.length)
+      if (delta.length === 0) {
+        displayed = ev.content
+        yield { type: 'chunk', content: displayed } as StreamChunk
+        continue
       }
+      for (let i = 0; i < delta.length; i += TYPEWRITER_CHARS) {
+        displayed += delta.slice(i, i + TYPEWRITER_CHARS)
+        yield { type: 'chunk', content: displayed } as StreamChunk
+        if (i + TYPEWRITER_CHARS < delta.length) {
+          await new Promise((r) => setTimeout(r, TYPEWRITER_STEP_MS))
+        }
+      }
+      continue
     }
-  }
-
-  // Animate fullText per TYPEWRITER_CHARS characters with delay
-  let displayed = ''
-  for (let i = 0; i < fullText.length; i += TYPEWRITER_CHARS) {
-    displayed += fullText.slice(i, i + TYPEWRITER_CHARS)
-    yield { type: 'chunk', content: displayed } as StreamChunk
-    await new Promise(resolve => setTimeout(resolve, TYPEWRITER_STEP_MS))
-  }
-
-  // Emit remaining events (workflowspec, done, etc) after animation
-  for (const ev of nonChunkEvents) {
+    if (ev.type === 'error') {
+      yield ev
+      return
+    }
+    if (ev.type === 'done') {
+      yield ev
+      return
+    }
     yield ev
   }
 }
