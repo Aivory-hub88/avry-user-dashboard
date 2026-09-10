@@ -748,30 +748,52 @@ export default function BlockSuitePageEditor({
     // empty-canvas clicks never clear it, and while set, dragStart refuses
     // EVERY canvas drag — the "can't move anything until reload" hang. Force
     // the flag down (keeping the selection) unless a drag is in flight.
+    //
+    // Beyond Escape: BlockSuite's own edgeless-keyboard.js refuses to
+    // switch tools AT ALL while gfx `selection.editing` is true —
+    // `_setEdgelessTool`/`_space` both silently no-op instead of activating
+    // Hand/Pan (see node_modules/@blocksuite/blocks .../edgeless-keyboard.js
+    // `_setEdgelessTool`: `if (!ignoreActiveState && gfx.selection.editing)
+    // return`, and `_space`: `if (currentTool.toolName === 'default' &&
+    // selection.editing) return`). So once `editing` gets stuck true as a
+    // ghost (no real text editor actually focused — the DOM caret already
+    // moved on, gfx just never heard about it), EVERY shortcut — Space to
+    // pan, H for Hand, any tool letter — goes dead forever, because the
+    // very state that lets these handlers self-heal (a tool actually
+    // switching, firing the ghost-caret killer above) can no longer occur.
+    // Pre-clear the stuck flag here, in capture phase, before BlockSuite's
+    // own handler sees the key. Gate on `inCanvasText`: only skip when a
+    // REAL text editor currently owns the keystroke, so an actual typing
+    // session (including its Space characters) is never touched.
     const clearStaleCaret = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return
       const editor = containerRef.current as unknown as {
         std?: { get: (id: unknown) => unknown }
       } | null
       if (!editor) return
       const ae = document.activeElement as HTMLElement | null
-      if (!ae || !(editor as unknown as HTMLElement).contains?.(ae)) return
+      const inEditor = !!ae && !!(editor as unknown as HTMLElement).contains?.(ae)
+      const inCanvasText =
+        inEditor &&
+        !!ae?.closest?.(
+          "edgeless-shape-text-editor, edgeless-text-editor, edgeless-connector-label-editor, [contenteditable], input, textarea",
+        )
+      const isEscape = e.key === "Escape"
+      if (isEscape) {
+        if (!inEditor) return
+      } else if (inCanvasText) {
+        return
+      }
       try {
         window.getSelection()?.removeAllRanges()
       } catch {}
       try {
-        if (
-          ae.closest?.(
-            "edgeless-shape-text-editor, edgeless-text-editor, edgeless-connector-label-editor, [contenteditable], input, textarea",
-          )
-        ) {
-          ae.blur()
-        }
+        if (inCanvasText) ae?.blur()
       } catch {}
       try {
         const gfx = editor.std?.get?.(GfxControllerIdentifier) as unknown as {
           tool?: { dragging$?: { value?: unknown } }
           selection?: {
+            editing?: boolean
             selectedElements?: Array<{ id?: string }>
             set?: (v: { elements: string[]; editing: boolean }) => void
           }
@@ -779,6 +801,10 @@ export default function BlockSuitePageEditor({
         if (gfx?.tool?.dragging$?.value) return
         const sel = gfx?.selection
         if (!sel?.set) return
+        // Off the Escape path, only act when something is actually stuck —
+        // don't fire `.set()` (and the selection-updated signal it emits)
+        // on every ordinary keystroke.
+        if (!isEscape && !sel.editing) return
         const ids = (sel.selectedElements ?? [])
           .map((el) => el?.id)
           .filter((v): v is string => typeof v === "string" && v.length > 0)
