@@ -129,6 +129,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       if (merged.length !== lastBytes && nowMs - lastAt > 60_000) {
         const actorId = cred?.kind === 'user' ? cred.user.user_id : 'service'
         await query(`INSERT INTO dashboard.workspace_doc_history (doc_id, yjs_update, actor_id) VALUES ($1,$2,$3)`, [id, merged, actorId])
+        // Retention cap: keep the newest 50 snapshots per doc so the table
+        // can't grow without bound on long-lived active docs.
+        try {
+          await query(
+            `DELETE FROM dashboard.workspace_doc_history WHERE doc_id = $1 AND id NOT IN (SELECT id FROM dashboard.workspace_doc_history WHERE doc_id = $1 ORDER BY created_at DESC, id DESC LIMIT 50)`,
+            [id],
+          )
+        } catch {}
       }
     } catch {}
   } catch (e) {
