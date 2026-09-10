@@ -500,6 +500,69 @@ export default function BlockSuitePageEditor({
     }
   }, [pageDoc, readOnly])
 
+  // Ghost-caret killer: switching tools (H/V/E/M/… shortcuts, toolbar) or
+  // picking a different object (click-select while a note/shape text editor
+  // is open) clears BlockSuite selection but leaves the native range + DOM
+  // focus inside the last text editor — the caret keeps blinking in a block
+  // you are no longer editing, swallows the next keystrokes (so
+  // Space-to-pan and other shortcuts appear "broken"), and repeated stray
+  // input events into a detached editor are what eventually hang the
+  // canvas. Reset both on every tool change AND on every selection change.
+  // Safe: a genuine typing session never changes tools or selection (keys
+  // go to the text, not to gfx).
+  //
+  // Switching page↔edgeless mode spins up a NEW std/scope inside the
+  // container (see the mode-switch effect below), which makes the gfx/tool
+  // instances captured here stale — so this must be (re-)wired both right
+  // after mount AND on every transition into edgeless, not just once.
+  const wireGhostCaretKillers = (editor: AffineEditorContainerElement) => {
+    const killGhostCaret = () => {
+      try {
+        window.getSelection()?.removeAllRanges()
+      } catch {}
+      try {
+        const ae = document.activeElement as HTMLElement | null
+        const inCanvasText =
+          !!ae &&
+          !!containerRef.current?.contains(ae) &&
+          !!ae.closest?.(
+            "edgeless-shape-text-editor, edgeless-text-editor, edgeless-connector-label-editor, [contenteditable], input, textarea",
+          )
+        if (inCanvasText) ae.blur()
+      } catch {}
+    }
+    try {
+      const std = editor.std as unknown as {
+        get?: (id: unknown) => unknown
+        getOptional?: (id: unknown) => unknown
+      }
+      const gfx = (std.get?.(GfxControllerIdentifier) ?? std.getOptional?.(GfxControllerIdentifier)) as unknown as {
+        tool?: { currentToolName$?: { subscribe?: (fn: () => void) => () => void } }
+        selection?: {
+          editing?: unknown
+          slots?: { updated?: { on: (fn: () => void) => { dispose: () => void } } }
+        }
+      } | null
+      toolUnsubRef.current?.()
+      toolUnsubRef.current = gfx?.tool?.currentToolName$?.subscribe?.(killGhostCaret) ?? null
+      selectionUnsubRef.current?.()
+      // Predicate: skip while the NEW state is editing. Entering edit mode
+      // (double-click → selection.set editing:true) fires updated BEFORE the
+      // text editor takes focus — an unconditional kill would blur/clear
+      // right as typing begins. Leaving edit (false) always kills. The
+      // stuck-true case is recovered by the Escape force-clear, which itself
+      // flips to false and re-triggers this watcher.
+      const onSelectionUpdated = () => {
+        try {
+          if (gfx?.selection?.editing) return
+        } catch {}
+        killGhostCaret()
+      }
+      const disposable = gfx?.selection?.slots?.updated?.on(onSelectionUpdated) ?? null
+      selectionUnsubRef.current = disposable ? () => disposable.dispose() : null
+    } catch {}
+  }
+
   useEffect(() => {
     if (!mountRef.current || !pageDoc) return
     const mount = mountRef.current
@@ -562,61 +625,19 @@ export default function BlockSuitePageEditor({
       hideEmptyTemplateUI()
       // Ensure edgeless default tool is Select (movable) — Hand is via Space.
       // Mount is fresh (no gesture in progress) so setting it here is safe.
-      let gfxTool: {
-        setTool?: (n: string) => void
-        currentToolName$?: { subscribe?: (fn: () => void) => () => void }
-      } | undefined
       try {
         if (modeRef.current === "edgeless") {
           const gfx = (editor.std as unknown as { get: (id: unknown) => unknown }).get?.(GfxControllerIdentifier) as unknown as { tool?: { setTool: (n: string) => void } } | null
           const tool = (gfx as unknown as { tool?: unknown })?.tool as { setTool?: (n: string) => void } | undefined
-          gfxTool = tool as typeof gfxTool
           tool?.setTool?.("default")
           // Fallback: try via getOptional
           if (!tool) {
             const alt = (editor.std as unknown as { getOptional?: (id: unknown) => unknown }).getOptional?.(GfxControllerIdentifier) as unknown as { tool?: { setTool: (n: string) => void } } | null
-            gfxTool = (alt?.tool as typeof gfxTool) ?? undefined
             alt?.tool?.setTool?.("default")
           }
           toolSyncedModeRef.current = "edgeless"
+          wireGhostCaretKillers(editor)
         }
-      } catch {}
-      // Ghost-caret killer: switching tools (H/V/E/M/… shortcuts, toolbar) or
-      // picking a different object (click-select while a note/shape text
-      // editor is open) clears BlockSuite selection but leaves the native
-      // range + DOM focus inside the last text editor — the caret keeps
-      // blinking in a block you are no longer editing, swallows the next
-      // keystrokes (so Space-to-pan and other shortcuts appear "broken"),
-      // and repeated stray input events into a detached editor are what
-      // eventually hang the canvas. Reset both on every tool change AND on
-      // every selection change. Safe: a genuine typing session never changes
-      // tools or selection (keys go to the text, not to gfx).
-      const killGhostCaret = () => {
-        try {
-          window.getSelection()?.removeAllRanges()
-        } catch {}
-        try {
-          const ae = document.activeElement as HTMLElement | null
-          const inCanvasText =
-            !!ae &&
-            !!containerRef.current?.contains(ae) &&
-            !!ae.closest?.(
-              "edgeless-shape-text-editor, edgeless-text-editor, edgeless-connector-label-editor, [contenteditable], input, textarea",
-            )
-          if (inCanvasText) ae.blur()
-        } catch {}
-      }
-      try {
-        toolUnsubRef.current?.()
-        toolUnsubRef.current = gfxTool?.currentToolName$?.subscribe?.(killGhostCaret) ?? null
-      } catch {}
-      try {
-        selectionUnsubRef.current?.()
-        const gfxForSelection = (editor.std as unknown as { get: (id: unknown) => unknown }).get?.(
-          GfxControllerIdentifier,
-        ) as unknown as { selection?: { slots?: { updated?: { on: (fn: () => void) => { dispose: () => void } } } } } | null
-        const disposable = gfxForSelection?.selection?.slots?.updated?.on(killGhostCaret) ?? null
-        selectionUnsubRef.current = disposable ? () => disposable.dispose() : null
       } catch {}
       // No focus steal here (see helper): theme application must not touch
       // focus — the user may be typing in a node text editor right now.
@@ -679,6 +700,13 @@ export default function BlockSuitePageEditor({
             const alt = (editor.std as unknown as { getOptional?: (id: unknown) => unknown }).getOptional?.(GfxControllerIdentifier) as unknown as { tool?: { setTool: (n: string) => void } } | null
             alt?.tool?.setTool?.("default")
           }
+          // The switch into edgeless just spun up a new std/scope — the
+          // ghost-caret killers wired at mount (or on a previous edgeless
+          // entry) are bound to a now-stale gfx instance. Re-wire against
+          // the fresh one, otherwise H/tool-change and object re-selection
+          // stop clearing the stranded caret after the very first mode
+          // switch (the common case: pages open in Page mode by default).
+          wireGhostCaretKillers(editor)
         }
       } catch {}
       // No focus steal here either (see helper) — a mode effect re-run must
