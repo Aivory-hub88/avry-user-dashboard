@@ -95,7 +95,10 @@ export default function WorkspaceProperties({
   const toggleProp = async (key: keyof DocProps, value: unknown) => {
     if (busy || !canWrite) return
     setBusy(true)
-    await onPatch({ props: { ...props, [key]: value } })
+    // Delta only — server merges atomically via COALESCE(props,'{}') || patch.
+    // Sending {...props, [key]: value} would overwrite sibling flags with stale
+    // values when the parent meta is outdated (the Properties revert bug).
+    await onPatch({ props: { [key]: value } as DocProps })
     setBusy(false)
   }
 
