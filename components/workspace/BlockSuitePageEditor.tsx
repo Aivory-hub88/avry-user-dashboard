@@ -166,8 +166,12 @@ export default function BlockSuitePageEditor({
     }).catch(() => {})
   }
 
-  /** Focus the canvas only when focus is outside it — never yank focus out
-   * of a mindmap/shape text editor mid-typing or mid-gesture. */
+  /** Focus the canvas only when focus is outside it — and only from direct
+   * canvas interaction or fresh mount. NEVER from timers/effects mid-session:
+   * yanking focus out of an open shape/mindmap text editor breaks its
+   * blur→unmount flow (upstream #9052 family) leaving a phantom cursor and a
+   * stuck `editing` flag that disables all canvas dragging. Space→Hand does
+   * not need this: BlockSuite listens for Space on `document`. */
   const focusEditorIfOutside = () => {
     try {
       const editor = containerRef.current as unknown as HTMLElement | null
@@ -419,10 +423,9 @@ export default function BlockSuitePageEditor({
         setTimeout(() => focusEditorIfOutside(), 50)
       } catch {}
     } else {
-      // Reuse existing container (page already mounted) — ensure focus
-      try {
-        setTimeout(() => focusEditorIfOutside(), 50)
-      } catch {}
+      // Reuse existing container (page already mounted) — do NOT focus here.
+      // A blind focus steals the caret from an open text editor (see helper).
+      // Native mousedown already focuses the container (tabindex=0) on click.
     }
     // Theme: the container picks its page AND edgeless palettes from
     // ThemeService signals that default to Light and track the singleton
@@ -470,11 +473,8 @@ export default function BlockSuitePageEditor({
           toolSyncedModeRef.current = "edgeless"
         }
       } catch {}
-      try {
-        // Focus again after theme flip so Space is captured (guarded: never
-        // steal focus from an open text editor).
-        focusEditorIfOutside()
-      } catch {}
+      // No focus steal here (see helper): theme application must not touch
+      // focus — the user may be typing in a node text editor right now.
     })()
     const t1 = window.setTimeout(hideEmptyTemplateUI, 400)
     const t2 = window.setTimeout(hideEmptyTemplateUI, 1200)
@@ -528,10 +528,9 @@ export default function BlockSuitePageEditor({
           }
         }
       } catch {}
-      // Focus so Space→Hand and drag work immediately after switch
-      try {
-        setTimeout(() => focusEditorIfOutside(), 60)
-      } catch {}
+      // No focus steal here either (see helper) — a mode effect re-run must
+      // never yank the caret out of an open text editor. Canvas mousedown
+      // focuses natively via tabindex; Space works via document listener.
     }
   }, [mode, edgelessTheme])
 
@@ -730,6 +729,16 @@ export default function BlockSuitePageEditor({
             aria-readonly={readOnly}
             onPointerDown={(e) => {
               if (e.button === 0) leftDownRef.current = true
+              // Interaction-driven focus only, and never when the press lands
+              // inside a text editor — stealing that focus breaks typing and
+              // the editor's blur→unmount flow (see helper).
+              try {
+                const t = e.target as unknown as HTMLElement | null
+                const inTextUI = !!t?.closest?.(
+                  "edgeless-shape-text-editor, edgeless-text-editor, edgeless-connector-label-editor, input, textarea, [contenteditable]",
+                )
+                if (!inTextUI) focusEditorIfOutside()
+              } catch {}
             }}
             onPointerUp={() => {
               leftDownRef.current = false
