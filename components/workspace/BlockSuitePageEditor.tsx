@@ -215,6 +215,16 @@ export default function BlockSuitePageEditor({
     // PUT must stay full-state — pacing, not diffing, is the fix.
     let persistInFlight = false
     let persistDirty = false
+    // Stored to detach the exact listener on cleanup (an inline arrow would
+    // leak one awareness subscription per effect re-run).
+    let awarenessHandler: (() => void) | null = null
+    let docUpdateHandler: (() => void) | null = null
+    // Incremental persist: state vector of the last ACKed write. Diffs are
+    // tiny and constant-ish during drags (vs full history each time); the
+    // server merge path accepts full-state and diff updates identically, so
+    // old and new clients interoperate with no protocol change.
+    let lastSV: Uint8Array | null = null
+    let persistCount = 0
     let doc: Doc | null = null
     // Theme scope: capture only. The actual `data-theme="dark"` write happens
     // in the mount effect AFTER the editor connects — ThemeObserver only
@@ -222,7 +232,55 @@ export default function BlockSuitePageEditor({
     const rootDataset = document.documentElement.dataset
     const previousTheme = rootDataset.theme
 
-    const persist = () => {
+    const runPersist = () => {
+      persistTimer = null
+      if (!alive || !doc || persistInFlight) return
+      persistCount++
+      // Full state on first write and periodically to self-heal any missed
+      // base (server restarts, wiped rows); diffs in between.
+      const wantFull = !lastSV || persistCount % 25 === 0
+      let body: Uint8Array
+      try {
+        body = wantFull
+          ? (DocCollection.Y.encodeStateAsUpdate(doc!.spaceDoc) as unknown as Uint8Array)
+          : (DocCollection.Y.encodeStateAsUpdate(doc!.spaceDoc, lastSV!) as unknown as Uint8Array)
+      } catch {
+        return
+      }
+      // An empty diff encodes to a few bytes — nothing new worth sending.
+      if (!wantFull && body.byteLength <= 32) return
+      persistInFlight = true
+      persistDirty = false
+      fetch(`/api/workspace/${docId}/doc`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/octet-stream", ...collabAuthHeaders() },
+        body: body as unknown as BodyInit,
+        keepalive: true,
+      })
+        .then((response) => {
+          if (!alive) return
+          setSaveState(response.ok ? "saved" : "offline")
+          if (response.ok) {
+            try {
+              lastSV = DocCollection.Y.encodeStateVector(doc!.spaceDoc) as unknown as Uint8Array
+            } catch {}
+          } else if (response.status === 400) {
+            // Server rejected the payload (e.g. corrupt) — fall back to a
+            // full state next time instead of repeating a bad diff.
+            lastSV = null
+          }
+        })
+        .catch(() => {
+          if (alive) setSaveState("offline")
+        })
+        .finally(() => {
+          persistInFlight = false
+          // Edits that landed mid-flight get one trailing flush, then quiet.
+          if (alive && persistDirty) persist()
+        })
+    }
+
+    const persist = (immediate = false) => {
       if (!doc || readOnly) return
       persistDirty = true
       // A pending timer or an in-flight PUT already covers this change —
@@ -230,37 +288,9 @@ export default function BlockSuitePageEditor({
       if (persistTimer || persistInFlight) return
       // Background tabs still receive WS updates; persist them rarely so a
       // hidden tab never storms the server.
-      const delay = typeof document !== "undefined" && document.hidden ? 10000 : 2000
+      const delay = immediate ? 0 : typeof document !== "undefined" && document.hidden ? 10000 : 2000
       setSaveState("saving")
-      persistTimer = setTimeout(() => {
-        persistTimer = null
-        if (!alive || !doc || persistInFlight) return
-        persistInFlight = true
-        persistDirty = false
-        let body: Uint8Array | null = null
-        try {
-          body = DocCollection.Y.encodeStateAsUpdate(doc!.spaceDoc) as unknown as Uint8Array
-        } catch {
-          persistInFlight = false
-          return
-        }
-        fetch(`/api/workspace/${docId}/doc`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/octet-stream", ...collabAuthHeaders() },
-          body: body as unknown as BodyInit,
-        })
-          .then((response) => {
-            if (alive) setSaveState(response.ok ? "saved" : "offline")
-          })
-          .catch(() => {
-            if (alive) setSaveState("offline")
-          })
-          .finally(() => {
-            persistInFlight = false
-            // Edits that landed mid-flight get one trailing flush, then quiet.
-            if (alive && persistDirty) persist()
-          })
-      }, delay)
+      persistTimer = setTimeout(runPersist, delay)
     }
 
     const load = async () => {
@@ -295,7 +325,12 @@ export default function BlockSuitePageEditor({
 
         if (!doc.root) empty.init()
         docRef.current = doc
-        doc.spaceDoc.on("update", persist)
+        // Stable wrapper: Yjs update handlers take (update, origin, doc, tr),
+        // so persist(immediate?) can't subscribe directly — and off() needs
+        // the identical reference or the listener leaks per effect re-run.
+        const handleDocUpdate = () => persist()
+        doc.spaceDoc.on("update", handleDocUpdate)
+        docUpdateHandler = handleDocUpdate
         if (!alive) return
         setPageDoc(doc)
         setSaveState("saved")
@@ -343,6 +378,7 @@ export default function BlockSuitePageEditor({
           } catch {}
         }
         provider.awareness.on("change", onAwarenessChange)
+        awarenessHandler = onAwarenessChange
       } catch (cause) {
         doc?.dispose()
         doc = null
@@ -354,18 +390,33 @@ export default function BlockSuitePageEditor({
     }
 
     void load()
+    // Flush trailing edits on tab hide/close (keepalive survives pagehide).
+    // Without this, up to one throttle window of edits only lives in the
+    // collab room's memory until the next visible change.
+    const flushOnHide = () => {
+      if (!doc || readOnly) return
+      if (persistTimer) {
+        clearTimeout(persistTimer)
+        persistTimer = null
+      }
+      if (!persistInFlight) persist(true)
+    }
+    window.addEventListener("pagehide", flushOnHide)
     return () => {
       alive = false
+      window.removeEventListener("pagehide", flushOnHide)
       if (previousTheme === undefined) delete rootDataset.theme
       else rootDataset.theme = previousTheme
       if (persistTimer) clearTimeout(persistTimer)
       try {
-        providerRef.current?.awareness.off("change", () => {})
+        if (awarenessHandler) providerRef.current?.awareness.off("change", awarenessHandler)
       } catch {}
+      awarenessHandler = null
       providerRef.current?.destroy()
       providerRef.current = null
       containerRef.current = null
-      if (doc) doc.spaceDoc.off("update", persist)
+      if (doc && docUpdateHandler) doc.spaceDoc.off("update", docUpdateHandler)
+      docUpdateHandler = null
       docRef.current?.dispose()
       docRef.current = null
       setPageDoc(null)

@@ -94,4 +94,77 @@ describe("mergeYjsUpdates", () => {
     expect(merged).not.toBeNull()
     expect(blockTexts(merged!)).toEqual(["p:hi"])
   })
+
+  it("unions divergent writers (two tabs / partial-slice peers), never clobbers", () => {
+    // Simulates the shared-room hazard: tab A (editor blocks) and tab B
+    // (comments slice) each persist their own partial view. Merge must keep
+    // both — the old REPLACE semantic lost one side on every interleave.
+    const base = new Y.Doc()
+    const baseArr = base.getArray<Y.Map<unknown>>("blocks")
+    base.transact(() => {
+      const m = new Y.Map<unknown>()
+      m.set("id", "a")
+      m.set("type", "p")
+      m.set("text", "shared")
+      baseArr.push([m])
+    })
+    const baseUpdate = Y.encodeStateAsUpdate(base)
+
+    const docA = new Y.Doc()
+    Y.applyUpdate(docA, baseUpdate)
+    docA.getArray<Y.Map<unknown>>("blocks").push([
+      (() => {
+        const m = new Y.Map<unknown>()
+        m.set("id", "b")
+        m.set("type", "p")
+        m.set("text", "from-tab-A")
+        return m
+      })(),
+    ])
+
+    const docB = new Y.Doc()
+    Y.applyUpdate(docB, baseUpdate)
+    docB.getArray<string>("page-comments").push(["comment-from-tab-B"])
+
+    const merged = mergeYjsUpdates([
+      Buffer.from(Y.encodeStateAsUpdate(docA)),
+      Buffer.from(Y.encodeStateAsUpdate(docB)),
+    ])
+    expect(merged).not.toBeNull()
+    const check = new Y.Doc()
+    Y.applyUpdate(check, merged!)
+    expect(blockTexts(merged!).sort()).toEqual(["p:from-tab-A", "p:shared"].sort())
+    expect(check.getArray<string>("page-comments").toArray()).toEqual(["comment-from-tab-B"])
+  })
+
+  it("applying the same diff twice is idempotent (echo-safe server merge)", () => {
+    const doc = new Y.Doc()
+    const arr = doc.getArray<Y.Map<unknown>>("blocks")
+    doc.transact(() => {
+      const m = new Y.Map<unknown>()
+      m.set("id", "a")
+      m.set("type", "p")
+      m.set("text", "x")
+      arr.push([m])
+    })
+    const sv = Y.encodeStateVector(doc)
+    doc.transact(() => {
+      const m = new Y.Map<unknown>()
+      m.set("id", "b")
+      m.set("type", "p")
+      m.set("text", "y")
+      arr.push([m])
+    })
+    const diff = Y.encodeStateAsUpdate(doc, sv)
+    // Small constant-ish size: a diff must stay tiny vs the full state.
+    expect(diff.byteLength).toBeLessThan(Y.encodeStateAsUpdate(doc).byteLength)
+    const stored = new Y.Doc()
+    Y.applyUpdate(stored, Y.encodeStateAsUpdate(doc, Y.encodeStateVector(new Y.Doc())))
+    Y.applyUpdate(stored, diff)
+    Y.applyUpdate(stored, diff) // duplicate delivery / echo
+    const texts = (Array.from(stored.getArray<Y.Map<unknown>>("blocks").toArray()) as Y.Map<unknown>[]).map(
+      (m) => `${m.get("type")}:${m.get("text")}`,
+    )
+    expect(texts.sort()).toEqual(["p:x", "p:y"].sort())
+  })
 })

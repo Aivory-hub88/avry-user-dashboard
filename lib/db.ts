@@ -37,3 +37,28 @@ function getPool(): Pool {
 export async function query(text: string, params?: unknown[]): Promise<QueryResult> {
   return getPool().query(text, params)
 }
+
+/**
+ * Run statements on a single pooled client inside BEGIN/COMMIT (ROLLBACK on
+ * throw). Required for read-modify-write cycles like the Yjs blob merge —
+ * without a row lock, concurrent PUTs from two tabs interleave (both read
+ * the same base, last writer silently drops the other's diff).
+ */
+export async function withTransaction<T>(fn: (tx: (text: string, params?: unknown[]) => Promise<QueryResult>) => Promise<T>): Promise<T> {
+  const client = await getPool().connect()
+  try {
+    await client.query("BEGIN")
+    try {
+      const out = await fn((text, params) => client.query(text, params))
+      await client.query("COMMIT")
+      return out
+    } catch (e) {
+      try {
+        await client.query("ROLLBACK")
+      } catch {}
+      throw e
+    }
+  } finally {
+    client.release()
+  }
+}

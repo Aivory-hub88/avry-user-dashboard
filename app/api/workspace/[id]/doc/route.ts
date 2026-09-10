@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { query } from "@/lib/db"
+import * as Y from "yjs"
+import { query, withTransaction } from "@/lib/db"
 import { workspaceCredential, collabAuthHeaders, authorizeDocFallback, unauthorized, forbidden } from "@/lib/workspaceAuth"
 import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDoc"
 
@@ -66,10 +67,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const buf = await req.arrayBuffer()
-  if (!buf.byteLength) return NextResponse.json({ error: "empty" }, { status: 400 })
+  if (!buf.byteLength) return NextResponse.json({ error: 'empty' }, { status: 400 })
+  // Bound a single write: the row is append-merged below, so a runaway
+  // client must not be able to bloat it without limit.
+  if (buf.byteLength > 20_000_000) return NextResponse.json({ error: 'too large' }, { status: 413 })
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
   const upd = Buffer.from(buf)
+  // Validate BEFORE touching storage: a corrupt update must 400, never poison
+  // the stored blob (mergeYjsUpdates would otherwise silently skip it and
+  // we'd ACK garbage as persisted).
+  try {
+    const probe = new Y.Doc()
+    Y.applyUpdate(probe, new Uint8Array(upd))
+    probe.destroy()
+  } catch {
+    return NextResponse.json({ error: 'invalid yjs update' }, { status: 400 })
+  }
   const agentType = req.headers.get("x-agent-type") || req.headers.get("X-Agent-Type") || "user"
 
   // proxy to collab (y-octo) — it enforces RBAC + rejects viewer writes
@@ -87,21 +101,34 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   try {
-    await query(
-      `INSERT INTO dashboard.workspace_docs (id, yjs_update, updated_at)
-       VALUES ($1, $2, now())
-       ON CONFLICT (id) DO UPDATE SET yjs_update = EXCLUDED.yjs_update, updated_at = now()`,
-      [id, upd],
-    )
-    // Best-effort history snapshot (throttled: at most one per minute, deduped by size)
+    // MERGE, never replace: the same room is written by partial-slice peers
+    // (comments/database share `workspace:{id}`) and by concurrent tabs. A
+    // plain overwrite lets a small comments-only PUT wipe editor content (and
+    // vice versa) and drops one tab's diff on interleave. CRDT union under a
+    // row lock is commutative-safe for all writers, full-state or diff alike.
+    const merged = await withTransaction(async (tx) => {
+      const cur = await tx(`SELECT yjs_update FROM dashboard.workspace_docs WHERE id = $1 FOR UPDATE`, [id])
+      const stored = (cur.rows[0]?.yjs_update as Buffer | null) ?? null
+      const out = mergeYjsUpdates([stored, upd])
+      if (!out) throw new Error("merge failed")
+      await tx(
+        `INSERT INTO dashboard.workspace_docs (id, yjs_update, updated_at)
+         VALUES ($1, $2, now())
+         ON CONFLICT (id) DO UPDATE SET yjs_update = EXCLUDED.yjs_update, updated_at = now()`,
+        [id, out],
+      )
+      return out
+    })
+    // Best-effort history snapshot (throttled: at most one per minute, deduped by size).
+    // Snapshots stay FULL-state (merged union) so any one of them restores standalone.
     try {
       const last = await query(`SELECT octet_length(yjs_update) as bytes, created_at FROM dashboard.workspace_doc_history WHERE doc_id = $1 ORDER BY created_at DESC LIMIT 1`, [id])
       const lastBytes = last.rows[0] ? Number(last.rows[0].bytes) : -1
       const lastAt = last.rows[0]?.created_at ? new Date(last.rows[0].created_at as string).getTime() : 0
       const nowMs = Date.now()
-      if (upd.length !== lastBytes && nowMs - lastAt > 60_000) {
+      if (merged.length !== lastBytes && nowMs - lastAt > 60_000) {
         const actorId = cred?.kind === 'user' ? cred.user.user_id : 'service'
-        await query(`INSERT INTO dashboard.workspace_doc_history (doc_id, yjs_update, actor_id) VALUES ($1,$2,$3)`, [id, upd, actorId])
+        await query(`INSERT INTO dashboard.workspace_doc_history (doc_id, yjs_update, actor_id) VALUES ($1,$2,$3)`, [id, merged, actorId])
       }
     } catch {}
   } catch (e) {
