@@ -241,7 +241,7 @@ export default function WorkspaceDocPage() {
     if (!canWrite) return
     const prev = meta
     if (patch.tags) setMeta((m) => (m ? { ...m, tags: patch.tags! } : m))
-    if (patch.props) setMeta((m) => (m ? { ...m, props: patch.props! } : m))
+    if (patch.props) setMeta((m) => (m ? { ...m, props: { ...(m?.props ?? {}), ...patch.props } as DocProps } : m))
     if (patch.icon !== undefined) setMeta((m) => (m ? { ...m, icon: patch.icon ?? null } : m))
     try {
       const r = await fetch(`/api/workspace/${id}`, {
@@ -249,8 +249,24 @@ export default function WorkspaceDocPage() {
         headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
         body: JSON.stringify(patch),
       })
-      if (!r.ok) setMeta(prev)
-    } catch {
+      if (!r.ok) {
+        const body = await r.text().catch(() => "")
+        console.error(`[workspace patch failed] PATCH /api/workspace/${id} → ${r.status} ${body.slice(0, 300)}`)
+        setMeta(prev)
+        return
+      }
+      // Reconcile with merged server truth (props come back merged via ||).
+      const j = await r.json().catch(() => ({}))
+      setMeta((m) => {
+        if (!m) return m
+        const next = { ...m }
+        if (j.tags !== undefined) next.tags = j.tags
+        if (j.props !== undefined) next.props = { ...(m.props ?? {}), ...j.props }
+        if (j.icon !== undefined) next.icon = j.icon
+        return next
+      })
+    } catch (e) {
+      console.error(`[workspace patch failed] PATCH /api/workspace/${id} threw`, e)
       setMeta(prev)
     }
   }

@@ -72,12 +72,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: 'props must be object' }, { status: 400 })
     }
     // Only allow known flags + persisted DB views; strip everything else to avoid JSON bloat.
-    const allowed: Record<string, unknown> = {}
+    // Atomic shallow merge in SQL (COALESCE(props,'{}') || patch): caller sends
+    // ONLY the keys it changes, Postgres preserves the rest. No read-then-write,
+    // so no 500 from a transient SELECT and no lost-update when Properties and
+    // Database panels PATCH concurrently (previous revert cause).
+    const propsPatch: Record<string, unknown> = {}
     const src = body.props as Record<string, unknown>
-    if (typeof src.isJournal === "boolean") allowed.isJournal = src.isJournal
-    if (typeof src.isTemplate === "boolean") allowed.isTemplate = src.isTemplate
-    if (src.pageWidth === "full" || src.pageWidth === "standard") allowed.pageWidth = src.pageWidth
-    if (src.edgelessTheme === "light" || src.edgelessTheme === "dark") allowed.edgelessTheme = src.edgelessTheme
+    if (typeof src.isJournal === "boolean") propsPatch.isJournal = src.isJournal
+    if (typeof src.isTemplate === "boolean") propsPatch.isTemplate = src.isTemplate
+    if (src.pageWidth === "full" || src.pageWidth === "standard") propsPatch.pageWidth = src.pageWidth
+    if (src.edgelessTheme === "light" || src.edgelessTheme === "dark") propsPatch.edgelessTheme = src.edgelessTheme
     // Persisted database views (saved filters/sorts) — array of lightweight view configs.
     // Kept inside props so one JSONB column holds all per-doc UI state, no extra table.
     if (Array.isArray(src.dbViews)) {
@@ -98,9 +102,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const sortDir = sortDirs.has(vv.sortDir as string) ? (vv.sortDir as string) : "asc"
         cleanedViews.push({ id, name, kind, statusFilter, priorityFilter, q, sortField, sortDir })
       }
-      allowed.dbViews = cleanedViews
+      propsPatch.dbViews = cleanedViews
     } else if (src.dbViews === undefined) {
-      // No change — handled below via merge below; keep existing value by not touching.
+      // No change — Postgres || preserves the existing value, no action needed.
+    } else {
+      return NextResponse.json({ error: 'props.dbViews must be array' }, { status: 400 })
     }
     // Row templates for DB (AppFlowy-style): quick-create from saved row shape
     if (Array.isArray(src.dbTemplates)) {
@@ -118,28 +124,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const description = typeof tt.description === "string" ? tt.description.slice(0, 800) : ""
         cleanedTpl.push({ id, name, title, status, priority, assignee, due, description })
       }
-      allowed.dbTemplates = cleanedTpl
+      propsPatch.dbTemplates = cleanedTpl
+    } else if (src.dbTemplates !== undefined) {
+      return NextResponse.json({ error: 'props.dbTemplates must be array' }, { status: 400 })
     }
-    // Merge with existing row's props when caller only patches part of props:
-    // fetch current props, shallow-merge, then write. This keeps other keys intact
-    // when only dbViews is sent, and vice versa. Wrapped in try/catch so a
-    // transient DB read never turns a valid toggle into a 500.
-    let existingProps: Record<string, unknown> = {}
-    try {
-      const existingPropsRow = await query(`SELECT props FROM dashboard.workspace_docs WHERE id = $1 OR id = $2 LIMIT 1`, [`workspace:${id}`, id])
-      existingProps = (existingPropsRow.rows[0]?.props as Record<string, unknown> | null) ?? {}
-    } catch {}
-    if (body.props !== undefined) {
-      // When dbViews/dbTemplates not provided but existing has it, preserve it.
-      if (allowed.dbViews === undefined && Array.isArray(existingProps.dbViews)) allowed.dbViews = existingProps.dbViews
-      if (allowed.dbTemplates === undefined && Array.isArray(existingProps.dbTemplates)) allowed.dbTemplates = existingProps.dbTemplates
-      // Preserve other existing keys that weren't overwritten (e.g. isJournal when only dbViews patched).
-      for (const k of ["isJournal","isTemplate","pageWidth","edgelessTheme"] as const) {
-        if (allowed[k] === undefined && existingProps[k] !== undefined) allowed[k] = existingProps[k]
-      }
+    if (Object.keys(propsPatch).length === 0) {
+      return NextResponse.json({ error: 'props has no known keys' }, { status: 400 })
     }
-    props = allowed
-    sets.push(`props = $${nextParam++}::jsonb`)
+    props = propsPatch
+    sets.push(`props = COALESCE(props, '{}'::jsonb) || $${nextParam++}::jsonb`)
     values.push(JSON.stringify(props))
   }
   if (body.icon !== undefined) {
@@ -160,10 +153,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (sets.length === 0) return NextResponse.json({ error: 'nothing to update' }, { status: 400 })
   const idParam = nextParam++
   try {
-    await query(
-      `UPDATE dashboard.workspace_docs SET ${sets.join(', ')}, updated_at = now() WHERE id = $1 OR id = $${idParam}`,
+    const upd = await query(
+      `UPDATE dashboard.workspace_docs SET ${sets.join(', ')}, updated_at = now() WHERE id = $1 OR id = $${idParam} RETURNING props`,
       [`workspace:${id}`, ...values, id],
     )
+    // Return the merged server truth so the client can reconcile instead of
+    // guessing — this is what the Network tab should show for the revert bug.
+    const mergedProps = (upd.rows[0]?.props as Record<string, unknown> | null) ?? props ?? undefined
     if (title !== undefined) {
       await recordWorkspaceActivity({
         docId: id,
@@ -174,7 +170,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         targetId: id,
       })
     }
-    return NextResponse.json({ id, ...(title !== undefined ? { title } : {}), ...(mode !== undefined ? { mode } : {}), ...(favorite !== undefined ? { favorite } : {}), ...(tags !== undefined ? { tags } : {}), ...(props !== undefined ? { props } : {}), ...(icon !== undefined ? { icon } : {}) })
+    return NextResponse.json({ id, ...(title !== undefined ? { title } : {}), ...(mode !== undefined ? { mode } : {}), ...(favorite !== undefined ? { favorite } : {}), ...(tags !== undefined ? { tags } : {}), ...(props !== undefined ? { props: mergedProps } : {}), ...(icon !== undefined ? { icon } : {}) })
   } catch (e) {
     console.error('[workspace patch]', e)
     return NextResponse.json({ error: 'db' }, { status: 500 })
