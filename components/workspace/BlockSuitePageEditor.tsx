@@ -762,9 +762,14 @@ export default function BlockSuitePageEditor({
     // very state that lets these handlers self-heal (a tool actually
     // switching, firing the ghost-caret killer above) can no longer occur.
     // Pre-clear the stuck flag here, in capture phase, before BlockSuite's
-    // own handler sees the key. Gate on `inCanvasText`: only skip when a
-    // REAL text editor currently owns the keystroke, so an actual typing
-    // session (including its Space characters) is never touched.
+    // own handler sees the key. The gate below is NOT "is some element
+    // focused" — a focused contenteditable does not prove a genuine edit
+    // session (see wireGhostCaretKillers above: selecting a different
+    // object never blurs the old editor by itself, proven directly against
+    // BlockSuite's GfxSelectionManager — the old editor's DOM focus can
+    // easily outlive the gfx state that supposedly ended it). The
+    // authoritative signal is whether gfx's own `editing` flag agrees with
+    // what is actually focused.
     const clearStaleCaret = (e: KeyboardEvent) => {
       const editor = containerRef.current as unknown as {
         std?: { get: (id: unknown) => unknown }
@@ -778,10 +783,31 @@ export default function BlockSuitePageEditor({
           "edgeless-shape-text-editor, edgeless-text-editor, edgeless-connector-label-editor, [contenteditable], input, textarea",
         )
       const isEscape = e.key === "Escape"
+      const gfx = editor.std?.get?.(GfxControllerIdentifier) as unknown as {
+        tool?: { dragging$?: { value?: unknown } }
+        selection?: {
+          editing?: boolean
+          selectedElements?: Array<{ id?: string }>
+          set?: (v: { elements: string[]; editing: boolean }) => void
+        }
+      } | null
+      const sel = gfx?.selection
       if (isEscape) {
         if (!inEditor) return
-      } else if (inCanvasText) {
-        return
+      } else {
+        // The two signals can disagree in both directions:
+        //  - editing stuck TRUE with nothing really focused blocks every
+        //    tool shortcut dead (see the block comment above).
+        //  - editing correctly FALSE but a contenteditable still holds DOM
+        //    focus is just as real, and just as stuck — e.g. type into a
+        //    shape, click a different object: gfx moves on immediately,
+        //    but the old shape's editor never hears about it and stays
+        //    mounted, caret blinking, swallowing the next keystrokes.
+        // Only skip when they agree: a genuine session (both true) must be
+        // left alone, and "nothing focused, nothing stuck" (both false)
+        // has nothing to clean up. No `sel` at all means plain Page mode —
+        // none of this applies, stay conservative.
+        if (!sel || sel.editing === inCanvasText) return
       }
       try {
         window.getSelection()?.removeAllRanges()
@@ -790,21 +816,8 @@ export default function BlockSuitePageEditor({
         if (inCanvasText) ae?.blur()
       } catch {}
       try {
-        const gfx = editor.std?.get?.(GfxControllerIdentifier) as unknown as {
-          tool?: { dragging$?: { value?: unknown } }
-          selection?: {
-            editing?: boolean
-            selectedElements?: Array<{ id?: string }>
-            set?: (v: { elements: string[]; editing: boolean }) => void
-          }
-        } | null
         if (gfx?.tool?.dragging$?.value) return
-        const sel = gfx?.selection
         if (!sel?.set) return
-        // Off the Escape path, only act when something is actually stuck —
-        // don't fire `.set()` (and the selection-updated signal it emits)
-        // on every ordinary keystroke.
-        if (!isEscape && !sel.editing) return
         const ids = (sel.selectedElements ?? [])
           .map((el) => el?.id)
           .filter((v): v is string => typeof v === "string" && v.length > 0)
