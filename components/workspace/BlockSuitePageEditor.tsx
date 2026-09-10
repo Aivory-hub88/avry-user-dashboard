@@ -146,6 +146,15 @@ export default function BlockSuitePageEditor({
   const leftDownRef = useRef(false)
   const modeAtRef = useRef<number>(0)
   const appliedInitialMode = useRef(false)
+  // Remote-diagnosis overlay, ONLY with ?debug=edgeless in the URL. Polls the
+  // live gfx state (tool / selection / dragging / focus) into a corner badge
+  // and mirrors transitions to the console, so a stuck canvas can be read
+  // without devtools. Zero overhead when the flag is absent.
+  const [debugOn] = useState(
+    () => typeof window !== "undefined" && window.location.search.includes("debug=edgeless"),
+  )
+  const [debugState, setDebugState] = useState("waiting for canvas…")
+  const debugPrevRef = useRef("")
 
   // Server is the source of truth for reloads (pg-backed mode column);
   // apply it once when meta arrives, never overriding the user's own toggle.
@@ -651,7 +660,44 @@ export default function BlockSuitePageEditor({
       window.removeEventListener("pointercancel", reset, true)
       window.removeEventListener("blur", reset)
     }
-  }, [])  // The panel reads headings from the editor's doc and is already theme-aware (inherits
+  }, [])
+
+  // Debug sampler (?debug=edgeless only): snapshot live gfx state for the badge.
+  useEffect(() => {
+    if (!debugOn) return
+    const id = window.setInterval(() => {
+      try {
+        const editor = containerRef.current as unknown as {
+          std?: { get: (id: unknown) => unknown }
+        } | null
+        const gfx = editor?.std?.get?.("GfxController") as unknown as {
+          tool?: {
+            currentToolName$?: { value?: unknown; peek?: () => unknown }
+            dragging$?: { value?: unknown; peek?: () => unknown }
+          }
+          selection?: { selectedElements?: unknown[]; editing?: unknown }
+        } | null
+        const tool = gfx?.tool
+        const toolName = tool?.currentToolName$?.value ?? tool?.currentToolName$?.peek?.() ?? "?"
+        const dragging = tool?.dragging$?.value ?? tool?.dragging$?.peek?.() ?? "?"
+        const sel = gfx?.selection
+        const n = Array.isArray(sel?.selectedElements) ? sel.selectedElements.length : "?"
+        const editing = (sel as { editing?: unknown } | null)?.editing ?? "?"
+        const ae = document.activeElement as HTMLElement | null
+        const focus = ae ? ae.tagName.toLowerCase() : "none"
+        const s = `tool=${String(toolName)} drag=${String(dragging)} sel=${String(n)} editing=${String(editing)} focus=${focus}`
+        if (s !== debugPrevRef.current) {
+          debugPrevRef.current = s
+          setDebugState(s)
+          // eslint-disable-next-line no-console
+          console.log(`[edgeless-debug] ${s}`)
+        }
+      } catch {}
+    }, 750)
+    return () => window.clearInterval(id)
+  }, [debugOn])
+
+  // The panel reads headings from the editor's doc and is already theme-aware (inherits
   // the global dark observer we force above). No extra deps.
   useEffect(() => {
     if (!outlineOpen || !pageDoc || mode !== "page") return
@@ -815,6 +861,14 @@ export default function BlockSuitePageEditor({
             aria-readonly={readOnly}
             onPointerDown={(e) => {
               if (e.button === 0) leftDownRef.current = true
+              if (debugOn) {
+                try {
+                  // eslint-disable-next-line no-console
+                  console.log(
+                    `[edgeless-debug] pointerdown button=${e.button} target=${(e.target as unknown as HTMLElement | null)?.tagName ?? "?"}`,
+                  )
+                } catch {}
+              }
               // Interaction-driven focus only, and never when the press lands
               // inside a text editor — stealing that focus breaks typing and
               // the editor's blur→unmount flow (see helper).
@@ -838,6 +892,12 @@ export default function BlockSuitePageEditor({
             }}
             onPointerUp={() => {
               leftDownRef.current = false
+              if (debugOn) {
+                try {
+                  // eslint-disable-next-line no-console
+                  console.log("[edgeless-debug] pointerup")
+                } catch {}
+              }
             }}
             onPointerCancel={() => {
               leftDownRef.current = false
@@ -847,6 +907,26 @@ export default function BlockSuitePageEditor({
             }}
             onContextMenu={guardDragContextMenu}
           >
+            {debugOn && (
+              <div
+                style={{
+                  position: "fixed",
+                  right: 12,
+                  bottom: 12,
+                  zIndex: 60,
+                  pointerEvents: "none",
+                  fontFamily: "monospace",
+                  fontSize: 11,
+                  background: "rgba(0,0,0,0.8)",
+                  color: "#7df0ff",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  borderRadius: 8,
+                  padding: "4px 8px",
+                }}
+              >
+                {debugState}
+              </div>
+            )}
             <div ref={mountRef} className={isEdgeless ? "flex-1 min-h-0 h-full" : "h-[min(72vh,760px)] min-h-[560px]"} />
           </div>
           {outlineOpen && mode === "page" && (
