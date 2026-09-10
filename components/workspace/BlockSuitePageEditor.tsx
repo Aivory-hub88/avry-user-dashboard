@@ -146,6 +146,9 @@ export default function BlockSuitePageEditor({
   const leftDownRef = useRef(false)
   const modeAtRef = useRef<number>(0)
   const appliedInitialMode = useRef(false)
+  // Unsubscribe for the canvas tool-change watcher below (same leak class as
+  // awareness/doc-update listeners: must detach the exact subscription).
+  const toolUnsubRef = useRef<(() => void) | null>(null)
   // Remote-diagnosis overlay, ONLY with ?debug=edgeless in the URL. Polls the
   // live gfx state (tool / selection / dragging / focus) into a corner badge
   // and mirrors transitions to the console, so a stuck canvas can be read
@@ -555,18 +558,48 @@ export default function BlockSuitePageEditor({
       hideEmptyTemplateUI()
       // Ensure edgeless default tool is Select (movable) — Hand is via Space.
       // Mount is fresh (no gesture in progress) so setting it here is safe.
+      let gfxTool: {
+        setTool?: (n: string) => void
+        currentToolName$?: { subscribe?: (fn: () => void) => () => void }
+      } | undefined
       try {
         if (modeRef.current === "edgeless") {
           const gfx = (editor.std as unknown as { get: (id: unknown) => unknown }).get?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
           const tool = (gfx as unknown as { tool?: unknown })?.tool as { setTool?: (n: string) => void } | undefined
+          gfxTool = tool as typeof gfxTool
           tool?.setTool?.("default")
           // Fallback: try via getOptional
           if (!tool) {
             const alt = (editor.std as unknown as { getOptional?: (id: unknown) => unknown }).getOptional?.("GfxController" as unknown) as unknown as { tool?: { setTool: (n: string) => void } } | null
+            gfxTool = (alt?.tool as typeof gfxTool) ?? undefined
             alt?.tool?.setTool?.("default")
           }
           toolSyncedModeRef.current = "edgeless"
         }
+      } catch {}
+      // Ghost-caret killer: switching tools (H/V/E/M/… shortcuts, toolbar)
+      // clears BlockSuite selection but leaves the native range + DOM focus
+      // inside the last text editor — the caret keeps blinking in a note you
+      // are no longer editing. Reset both on every tool change. Safe: a
+      // genuine typing session never changes tools (keys go to the text).
+      try {
+        toolUnsubRef.current?.()
+        toolUnsubRef.current =
+          gfxTool?.currentToolName$?.subscribe?.(() => {
+            try {
+              window.getSelection()?.removeAllRanges()
+            } catch {}
+            try {
+              const ae = document.activeElement as HTMLElement | null
+              const inCanvasText =
+                !!ae &&
+                !!containerRef.current?.contains(ae) &&
+                !!ae.closest?.(
+                  "edgeless-shape-text-editor, edgeless-text-editor, edgeless-connector-label-editor, [contenteditable], input, textarea",
+                )
+              if (inCanvasText) ae.blur()
+            } catch {}
+          }) ?? null
       } catch {}
       // No focus steal here (see helper): theme application must not touch
       // focus — the user may be typing in a node text editor right now.
@@ -577,6 +610,10 @@ export default function BlockSuitePageEditor({
       cancelled = true
       window.clearTimeout(t1)
       window.clearTimeout(t2)
+      try {
+        toolUnsubRef.current?.()
+      } catch {}
+      toolUnsubRef.current = null
       mount.replaceChildren()
     }
   }, [pageDoc, edgelessTheme])
