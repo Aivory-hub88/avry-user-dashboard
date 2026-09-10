@@ -18,8 +18,8 @@ export const SERVICES = {
   /** Payments Service — handles all Midtrans & wallet operations */
   PAYMENTS: process.env.NEXT_PUBLIC_PAYMENTS_URL || 'http://localhost:3030',
 
-  /** VPS Bridge — primary AI gateway */
-  VPS_BRIDGE: process.env.VPS_BRIDGE_URL || 'https://api.aivory.id',
+  /** VPS Bridge — primary AI gateway (local dev fallback; prod uses VPS_BRIDGE_URL=http://host.docker.internal:3003) */
+  VPS_BRIDGE: process.env.VPS_BRIDGE_URL || 'http://localhost:3003',
 
   /** @deprecated VPS Bridge runs in internal-only mode (network isolation) and no longer validates API keys. Kept for legacy callers; always empty. */
   VPS_BRIDGE_API_KEY: '',

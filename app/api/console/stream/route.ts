@@ -5,12 +5,24 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
+function userIdFromAuth(req: NextRequest): string | null {
+  const h = req.headers.get('authorization') || req.headers.get('Authorization')
+  if (!h) return null
+  const parts = h.split(' ')
+  if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') return null
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1].split('.')[1] || '', 'base64').toString())
+    return (payload.user_id || payload.sub || payload.id || null) as string | null
+  } catch { return null }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
-    const organization_id = body.organization_id ?? 'test-org'
-    const user_id = body.user_id ?? body.userId ?? 'console-user'
+    const headerUserId = userIdFromAuth(req)
+    const organization_id = body.organization_id ?? 'default'
+    const user_id = headerUserId ?? body.user_id ?? body.userId ?? 'console-user'
     const session_id = body.session_id ?? body.sessionId ?? 'console-session'
 
     const messages =
@@ -52,8 +64,9 @@ export async function POST(req: NextRequest) {
           user_state: body.user_state || null,
         },
       }
-      console.log('[debug] bridgeUrl:', bridgeUrl)
-      console.log('[debug] bridgePayload:', JSON.stringify(bridgePayload).substring(0, 500))
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[console/stream] bridgeUrl:', bridgeUrl)
+      }
 
       bridgeResponse = await fetch(bridgeUrl, {
         method: 'POST',

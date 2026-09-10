@@ -227,7 +227,7 @@ export default function ConsolePage() {
       }
       handleSend(text, atts)
     },
-    [tryWorkspaceCreate, handleSend],
+    [tryWorkspaceCreate, handleSend, setAttachments],
   )
 
   // Fetch connected integrations from store

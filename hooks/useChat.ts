@@ -11,6 +11,7 @@ import { resolveApproval } from '@/lib/agentApprovals'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
 import { useMode } from '@/contexts/ModeContext'
 import { useSession } from './useSession'
+import { getUser } from '@/lib/auth'
 import type { Attachment } from '@/components/UploadMenu'
 
 interface Message {
@@ -64,6 +65,7 @@ export function useChat({
   const [isClarification, setIsClarification] = useState(false)
   const messagesRef = useRef<Message[]>([])
   const currentSessionIdRef = useRef<string>("")
+  const streamingSessionRef = useRef<string>("")
   const session = useSession(addToast)
   const { agentTarget, setAgentTarget } = useMode()
 
@@ -131,6 +133,7 @@ export function useChat({
 
     setMessages(p => [...p, userMsg, placeholderMsg])
     clearAttachments()
+    streamingSessionRef.current = sentSessionId
     setIsStreaming(true)
     setStreamingAgentType(agentTarget)
     setFollowUpSuggestions([])
@@ -164,8 +167,11 @@ export function useChat({
         }
         streamError = true
       } finally {
-        setIsStreaming(false)
-        setStreamingAgentType(undefined)
+        if (streamingSessionRef.current === sentSessionId) {
+          streamingSessionRef.current = ""
+          setIsStreaming(false)
+          setStreamingAgentType(undefined)
+        }
         if (!streamError) {
           try {
             if (currentSessionIdRef.current === sentSessionId) {
@@ -197,9 +203,11 @@ export function useChat({
     }
 
     try {
+      const user = getUser()
       const baseStream = streamConsoleResponse("/api/console/stream", {
         session_id: sentSessionId,
         organization_id: "default",
+        user_id: user?.user_id ?? undefined,
         messages: allMessages,
         user_state: formatUserContextForAI(buildUserContextState()),
       })
@@ -237,8 +245,11 @@ export function useChat({
       }
       streamError = true
     } finally {
-      setIsStreaming(false)
-      setStreamingAgentType(undefined)
+      if (streamingSessionRef.current === sentSessionId) {
+        streamingSessionRef.current = ""
+        setIsStreaming(false)
+        setStreamingAgentType(undefined)
+      }
       if (!streamError) {
         try {
           if (currentSessionIdRef.current === sentSessionId) {
