@@ -762,21 +762,38 @@ export default function BlockSuitePageEditor({
     // very state that lets these handlers self-heal (a tool actually
     // switching, firing the ghost-caret killer above) can no longer occur.
     // Pre-clear the stuck flag here, in capture phase, before BlockSuite's
-    // own handler sees the key. The gate below is NOT "is some element
-    // focused" — a focused contenteditable does not prove a genuine edit
-    // session (see wireGhostCaretKillers above: selecting a different
-    // object never blurs the old editor by itself, proven directly against
-    // BlockSuite's GfxSelectionManager — the old editor's DOM focus can
-    // easily outlive the gfx state that supposedly ended it). The
-    // authoritative signal is whether gfx's own `editing` flag agrees with
-    // what is actually focused.
+    // own handler sees the key. The gate is NOT "does gfx.editing agree
+    // with DOM focus" — that raced and broke real typing (regression,
+    // fixed here): BlockSuite sets `editing: true` SYNCHRONOUSLY the
+    // instant a canvas-text editor mounts (mountShapeTextEditor et al.),
+    // but the editor's DOM focus lands ASYNCHRONOUSLY a moment later
+    // (`updateComplete.then(() => inlineEditor.focusEnd()/.selectAll())`).
+    // A keystroke landing in that gap looked like a "mismatch" and got
+    // force-cleared mid-mount — which is exactly what breaks BlockSuite's
+    // mindmap quick-type flow (edgeless-keyboard.js `_bindToggleHand`:
+    // typing a character while a mindmap node is merely selected deletes
+    // its text, inserts the key, and mounts the editor with select-all)
+    // by cancelling the just-started session, so the very next keystroke
+    // re-triggers the same quick-type path — the reported "locks, cursor
+    // jumps to the front" loop.
+    // Fix: for a canvas-text editor (shape/text/connector), compare the
+    // MOUNTED editor's own target id against the CURRENT selection instead
+    // of DOM focus — an id match means legitimate (whether focus has
+    // landed yet or not), sidestepping the race entirely. Only an id
+    // mismatch (gfx has moved on, the old editor is a true orphan — proven
+    // directly against GfxSelectionManager: selection.set()/.clear() never
+    // blur the previous editor by themselves) counts as stale. Note
+    // editing has no such dedicated custom element (it's a normal
+    // block-level contenteditable), so it keeps the DOM/gfx agreement
+    // check as a fallback.
     const clearStaleCaret = (e: KeyboardEvent) => {
       const editor = containerRef.current as unknown as {
         std?: { get: (id: unknown) => unknown }
       } | null
       if (!editor) return
+      const containerEl = editor as unknown as HTMLElement
       const ae = document.activeElement as HTMLElement | null
-      const inEditor = !!ae && !!(editor as unknown as HTMLElement).contains?.(ae)
+      const inEditor = !!ae && !!containerEl.contains?.(ae)
       const inCanvasText =
         inEditor &&
         !!ae?.closest?.(
@@ -787,27 +804,31 @@ export default function BlockSuitePageEditor({
         tool?: { dragging$?: { value?: unknown } }
         selection?: {
           editing?: boolean
+          selectedIds?: string[]
           selectedElements?: Array<{ id?: string }>
           set?: (v: { elements: string[]; editing: boolean }) => void
         }
       } | null
       const sel = gfx?.selection
+      const mountedEditor = containerEl.querySelector?.(
+        "edgeless-shape-text-editor, edgeless-text-editor, edgeless-connector-label-editor",
+      ) as (HTMLElement & { element?: { id?: string } }) | null
+      const mountedTargetId = mountedEditor?.element?.id ?? null
+      const selectedIds = sel?.selectedIds ?? (sel?.selectedElements ?? []).map((el) => el?.id)
+      const mountedMatchesSelection = !!mountedTargetId && !!selectedIds?.includes(mountedTargetId)
       if (isEscape) {
         if (!inEditor) return
       } else {
-        // The two signals can disagree in both directions:
-        //  - editing stuck TRUE with nothing really focused blocks every
-        //    tool shortcut dead (see the block comment above).
-        //  - editing correctly FALSE but a contenteditable still holds DOM
-        //    focus is just as real, and just as stuck — e.g. type into a
-        //    shape, click a different object: gfx moves on immediately,
-        //    but the old shape's editor never hears about it and stays
-        //    mounted, caret blinking, swallowing the next keystrokes.
-        // Only skip when they agree: a genuine session (both true) must be
-        // left alone, and "nothing focused, nothing stuck" (both false)
-        // has nothing to clean up. No `sel` at all means plain Page mode —
-        // none of this applies, stay conservative.
-        if (!sel || sel.editing === inCanvasText) return
+        if (!sel) return
+        if (mountedEditor) {
+          // A canvas-text editor is mounted: id-match is authoritative,
+          // race-free regardless of whether DOM focus has landed yet.
+          if (mountedMatchesSelection) return
+        } else if (sel.editing === inCanvasText) {
+          // No canvas-text editor in play (e.g. a note, or truly nothing
+          // going on) — fall back to the DOM/gfx agreement check.
+          return
+        }
       }
       try {
         window.getSelection()?.removeAllRanges()
