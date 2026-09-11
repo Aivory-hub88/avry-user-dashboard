@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
           workspace_id: row.workspace_id,
           owner: row.owner,
           title: row.title ?? bare,
-          mode: row.mode === 'edgeless' ? 'edgeless' : 'page',
+          mode: 'page',
           favorite: row.favorite === true,
           deleted_at: row.deleted_at ?? null,
           updated_at: row.updated_at,

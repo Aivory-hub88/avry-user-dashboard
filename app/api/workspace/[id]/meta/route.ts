@@ -41,7 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       ownerEmail,
       ownerName,
       title: row?.title ?? id,
-      mode: row?.mode === 'edgeless' ? 'edgeless' : 'page',
+      mode: 'page',
       favorite: row?.favorite === true,
       icon: typeof row?.icon === 'string' && row.icon ? row.icon : null,
       cover_url: typeof row?.cover_url === 'string' && row.cover_url ? row.cover_url : null,

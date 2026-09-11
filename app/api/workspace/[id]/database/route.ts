@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import * as Y from "yjs"
 import { query } from "@/lib/db"
 import { workspaceCredential, collabAuthHeaders, authorizeDocFallback, unauthorized, forbidden, type WorkspaceCredential } from "@/lib/workspaceAuth"
+import { checkAgentAccess } from "@/lib/workspaceAccess"
 import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDoc"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 
@@ -99,6 +100,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  // Agent gate: invited agents read per their grant; revoked/unknown agents 403
+  // (also covers the pg-fallback path when collab is down).
+  if (await checkAgentAccess(id, cred, req.headers.get("x-agent-type"), 'read')) return forbidden()
   try {
     const doc = await loadDoc(id, cred)
     const rows = rowsFromDoc(doc)
@@ -114,6 +118,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const assertedAgent = req.headers.get("x-agent-type") || req.headers.get("X-Agent-Type")
+  // Agent gate: only invited editor+ agents may write (also covers pg fallback).
+  if (await checkAgentAccess(id, cred, assertedAgent, 'write')) return forbidden()
   let body: Partial<Row>
   try {
     body = await req.json()

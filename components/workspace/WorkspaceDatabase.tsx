@@ -12,6 +12,21 @@ type Row = { id: string; title: string; status: string; priority: "Low" | "Med" 
 const STATUSES = ["Todo", "Doing", "Done"] as const
 const PRIORITIES = ["Low", "Med", "High"] as const
 
+// Invitable Cerveau agents (must match KNOWN_AGENT_TYPES server-side).
+// Stored as the agent_type string so ACL, skills, and filters agree.
+const AGENT_ASSIGNEES = [
+  { value: "autonomous", label: "Geno" },
+  { value: "customer_service", label: "Teo" },
+  { value: "leads_qualifier", label: "Lex" },
+  { value: "finance_invoice_ops", label: "Finn" },
+  { value: "office_assistant", label: "Ofira" },
+] as const
+
+function assigneeLabel(v: string): string {
+  const hit = AGENT_ASSIGNEES.find((a) => a.value === v)
+  return hit ? `${hit.label} · agent` : v
+}
+
 const STATUS_DOT: Record<string, string> = {
   Todo: "bg-white/40",
   Doing: "bg-amber-400",
@@ -401,8 +416,8 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     // Deep observation: card moves / drawer edits / comments all mutate
     // NESTED row maps (m.set), which a shallow array observe never fires
     // for — the board then neither re-renders nor schedules its persist
-    // PUT (the "drop doesn't move the card" bug). AFFiNE's data-view has
-    // the same requirement: every Yjs mutation must flow to the UI.
+    // PUT (the "drop doesn't move the card" bug). Every Yjs mutation must
+    // flow to the UI.
     yRows.observeDeep(obs)
 
     // databases start empty — never seed demo rows; server is the source of truth
@@ -558,6 +573,12 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
 
   return (
     <div className="mx-auto w-full max-w-[900px]">
+      {/* Assignee picker suggestions: invited Cerveau agents + free text */}
+      <datalist id={`aivory-assignees-${docId}`}>
+        {AGENT_ASSIGNEES.map((a) => (
+          <option key={a.value} value={a.value}>{`${a.label} (agent)`}</option>
+        ))}
+      </datalist>
       {/* Saved views tabs — AppFlowy-style: “All” + user saved views (persisted in pg props.dbViews) */}
       {viewsLoaded && (
         <div className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1">
@@ -607,7 +628,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
         </div>
       )}
 
-      {/* Header — AFFiNE-like database title + view switcher (LobeHub pill style) */}
+      {/* Header — database title + view switcher */}
       <div className="mb-4 flex flex-col gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
@@ -784,6 +805,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                         <input
                           value={r.assignee}
                           disabled={readOnly}
+                          list={`aivory-assignees-${docId}`}
                           onChange={(e) => updateRow(r.id, { assignee: e.target.value })}
                           placeholder="—"
                           className="w-full bg-transparent text-[13px] text-white/60 placeholder:text-white/25 outline-none disabled:opacity-80"
@@ -901,7 +923,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                         {r.assignee && groupBy !== "assignee" && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] text-white/50">
                             <User className="h-3 w-3" />
-                            {r.assignee}
+                            {assigneeLabel(r.assignee)}
                           </span>
                         )}
                       </div>
@@ -1029,7 +1051,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                 </label>
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-wider text-white/30">Assignee</span>
-                  <input value={selectedRow.assignee} disabled={readOnly} onChange={(e) => updateRow(selectedRow.id, { assignee: e.target.value })} placeholder="—" className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-3 py-2 text-[12px] text-white/60 outline-none placeholder:text-white/25 disabled:opacity-60" />
+                  <input value={selectedRow.assignee} disabled={readOnly} list={`aivory-assignees-${docId}`} onChange={(e) => updateRow(selectedRow.id, { assignee: e.target.value })} placeholder="—" className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-3 py-2 text-[12px] text-white/60 outline-none placeholder:text-white/25 disabled:opacity-60" />
                 </label>
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-wider text-white/30">Due</span>

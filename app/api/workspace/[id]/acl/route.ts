@@ -1,24 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { canManageDoc } from "@/lib/workspaceAccess"
 
 export const runtime = "nodejs"
 
 const ROLES = new Set(["editor", "viewer"])
-
-async function canManageDoc(docId: string, accountType?: string, userId?: string): Promise<boolean> {
-  if (accountType === "admin" || accountType === "superadmin") return true
-  if (!userId) return false
-  try {
-    const r = await query(
-      `SELECT 1 FROM dashboard.workspace_docs WHERE (id = $1 OR id = $2) AND owner = $3`,
-      [`workspace:${docId}`, docId, userId],
-    )
-    return (r.rowCount ?? 0) > 0
-  } catch {
-    return false
-  }
-}
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

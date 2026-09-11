@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Tag, X, Plus, Calendar, User, Clock, FileText, Eye, LayoutTemplate, Palette, ChevronDown, ChevronUp, Minimize2 } from "lucide-react"
+import { Tag, X, Plus, Calendar, User, Clock, FileText, Eye, LayoutTemplate, ChevronDown, ChevronUp, Minimize2 } from "lucide-react"
 
 export type DocTag = { id: string; label: string; color: string }
-export type DocProps = { isJournal?: boolean; isTemplate?: boolean; pageWidth?: "standard" | "full"; edgelessTheme?: "light" | "dark" }
+export type DocProps = { isJournal?: boolean; isTemplate?: boolean; pageWidth?: "standard" | "full" }
 
 const TAG_COLORS: Record<string, string> = {
   gray: "bg-white/10 text-white/60 border-white/15",
@@ -236,7 +236,7 @@ export default function WorkspaceProperties({
             onClick={() => setFlagsOpen((v) => !v)}
             className="mt-3 flex w-full cursor-pointer items-center gap-1.5 border-t border-line pt-3 text-[11px] uppercase tracking-wider text-white/30 hover:text-white/60"
           >
-            <LayoutTemplate className="h-3 w-3" /> Journal · Template · Width · Edgeless
+            <LayoutTemplate className="h-3 w-3" /> Journal · Template · Width
             {flagsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </button>
           {flagsOpen && (
@@ -255,11 +255,6 @@ export default function WorkspaceProperties({
             >
               <LayoutTemplate className="h-3 w-3" /> Template {props.isTemplate ? "on" : "off"}
             </button>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/40">
-              <Palette className="h-3 w-3" /> Edgeless
-              <button onClick={() => toggleProp("edgelessTheme", "dark")} disabled={!canWrite} className={`ml-1 rounded-full px-2 py-0.5 text-[10px] ${(!props.edgelessTheme || props.edgelessTheme === "dark") ? "bg-white text-black" : "bg-white/10 text-white/60"}`}>Dark</button>
-              <button onClick={() => toggleProp("edgelessTheme", "light")} disabled={!canWrite} className={`rounded-full px-2 py-0.5 text-[10px] ${props.edgelessTheme === "light" ? "bg-white text-black" : "bg-white/10 text-white/60"}`}>Light</button>
-            </span>
           </div>
           )}
         </>

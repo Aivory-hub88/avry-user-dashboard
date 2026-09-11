@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import * as Y from "yjs"
 import { query, withTransaction } from "@/lib/db"
 import { workspaceCredential, collabAuthHeaders, authorizeDocFallback, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { checkAgentAccess } from "@/lib/workspaceAccess"
 import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDoc"
 
 export const runtime = "nodejs"
@@ -27,6 +28,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  // Agent gate (read) — covers the pg-fallback path; collab enforces too.
+  if (await checkAgentAccess(id, cred, req.headers.get("x-agent-type"), 'read')) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 })
+  }
   // collab first (y-octo) — it enforces per-doc RBAC; forward its verdict
   const collab = await collabFetch(id, cred)
   if (collab) {
@@ -73,6 +78,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (buf.byteLength > 20_000_000) return NextResponse.json({ error: 'too large' }, { status: 413 })
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const agentType = req.headers.get("x-agent-type") || req.headers.get("X-Agent-Type") || "user"
+  // Agent gate (write) — covers the pg-fallback merge below; collab enforces too.
+  if (await checkAgentAccess(id, cred, req.headers.get("x-agent-type"), 'write')) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 })
+  }
   const upd = Buffer.from(buf)
   // Validate BEFORE touching storage: a corrupt update must 400, never poison
   // the stored blob (mergeYjsUpdates would otherwise silently skip it and
@@ -84,8 +94,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   } catch {
     return NextResponse.json({ error: 'invalid yjs update' }, { status: 400 })
   }
-  const agentType = req.headers.get("x-agent-type") || req.headers.get("X-Agent-Type") || "user"
-
   // proxy to collab (y-octo) — it enforces RBAC + rejects viewer writes
   const collabRes = await collabFetch(id, cred, {
     method: "PUT",

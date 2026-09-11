@@ -6,7 +6,7 @@ import { recordWorkspaceActivity } from '@/lib/workspaceActivity'
 
 export const runtime = 'nodejs'
 
-// PATCH /api/workspace/[id] — rename (title), doc mode (page/edgeless),
+// PATCH /api/workspace/[id] — rename (title),
 // favorite/star. Owner/editor only. Partial update: only present keys change.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -36,10 +36,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     values.push(title)
   }
   if (body.mode !== undefined) {
-    mode = (body.mode ?? '').toString().slice(0, 16).trim().toLowerCase()
-    if (mode !== 'page' && mode !== 'edgeless') {
-      return NextResponse.json({ error: 'mode must be page or edgeless' }, { status: 400 })
-    }
+    // Legacy clients may still send mode (page/edgeless era). Accept and
+    // normalize to page — canvas mode was removed.
+    mode = 'page'
     sets.push(`mode = $${nextParam++}`)
     values.push(mode)
   }
@@ -81,7 +80,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (typeof src.isJournal === "boolean") propsPatch.isJournal = src.isJournal
     if (typeof src.isTemplate === "boolean") propsPatch.isTemplate = src.isTemplate
     if (src.pageWidth === "full" || src.pageWidth === "standard") propsPatch.pageWidth = src.pageWidth
-    if (src.edgelessTheme === "light" || src.edgelessTheme === "dark") propsPatch.edgelessTheme = src.edgelessTheme
     // Persisted database views (saved filters/sorts) — array of lightweight view configs.
     // Kept inside props so one JSONB column holds all per-doc UI state, no extra table.
     if (Array.isArray(src.dbViews)) {

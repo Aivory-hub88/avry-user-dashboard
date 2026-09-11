@@ -4,7 +4,6 @@ import { useParams, useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import WorkspaceEditor from "@/components/workspace/WorkspaceEditor"
-import dynamic from "next/dynamic"
 import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
 import WorkspaceProperties, { type DocTag, type DocProps } from "@/components/workspace/WorkspaceProperties"
 import WorkspaceAIPanel from "@/components/workspace/WorkspaceAIPanel"
@@ -16,12 +15,7 @@ import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 import { useWorkspaceContext } from "@/contexts/WorkspaceContext"
-import { Share2, Star, Trash2, Sparkles, Download, FileDown, Presentation, ChevronDown, ChevronUp, Minimize2, Maximize2 } from "lucide-react"
-
-const BlockSuitePageEditor = dynamic(() => import("@/components/workspace/BlockSuitePageEditor"), {
-  ssr: false,
-  loading: () => <div className="mx-auto w-full max-w-[720px] py-12 text-center text-[13px] text-white/30">Loading editor preview...</div>,
-})
+import { Share2, Star, Trash2, Sparkles, Download, FileDown, Presentation } from "lucide-react"
 
 type Meta = {
   id: string
@@ -30,7 +24,7 @@ type Meta = {
   ownerEmail: string | null
   ownerName: string | null
   title: string
-  mode: "page" | "edgeless"
+  mode: "page"
   favorite: boolean
   icon: string | null
   cover_url: string | null
@@ -49,9 +43,6 @@ export default function WorkspaceDocPage() {
   const router = useRouter()
   const id = (params?.id as string) ?? "demo"
   const view = search.get("view") === "database" ? "database" : "page"
-  // BlockSuite PageEditor is the default Write surface (same editing core as
-  // AFFiNE). The legacy prototype editor stays one click away for rollback.
-  const editor = search.get("editor") === "legacy" ? "legacy" : "blocksuite"
 
   const [meta, setMeta] = useState<Meta | null>(null)
   const [status, setStatus] = useState<'loading' | 'ok' | 'locked' | 'unauth'>('loading')
@@ -63,13 +54,10 @@ export default function WorkspaceDocPage() {
   const [busy, setBusy] = useState(false)
   const [showSharing, setShowSharing] = useState(false)
   const [showIconPicker, setShowIconPicker] = useState(false)
-  const [showOutline, setShowOutline] = useState(false)
   const [showAI, setShowAI] = useState(false)
   const [aiDocText, setAiDocText] = useState("")
   const [showExport, setShowExport] = useState(false)
   const [present, setPresent] = useState(false)
-  const [editorMode, setEditorMode] = useState<"page" | "edgeless">("page")
-  const [topCollapsed, setTopCollapsed] = useState(false)
   const loginUrl = `${getMarketingUrl()}/login`
   const { setActiveWorkspaceId } = useWorkspaceContext()
 
@@ -77,17 +65,17 @@ export default function WorkspaceDocPage() {
     try {
       const r = await fetch(`/api/workspace/${id}/meta`, { headers: collabAuthHeaders() })
        if (r.status === 401) { clearClientAuthSession(); setStatus('unauth'); return }
-      if (r.status === 403) { setStatus('locked'); 
+      if (r.status === 403) { setStatus('locked');
         const j = await r.json().catch(()=>({}))
         // try to still get owner info via 403 body? fallback
         return
       }
       if (r.ok) {
         const j = (await r.json()) as Meta
-        // Pre-migration servers omit mode/favorite/tags/props/icon — default, never crash.
+        // Pre-migration servers omit favorite/tags/props/icon — default, never crash.
         setMeta({
           ...j,
-          mode: (j as Meta).mode === "edgeless" ? "edgeless" : "page",
+          mode: "page",
           favorite: (j as Meta).favorite === true,
           icon: typeof (j as Meta).icon === "string" && (j as Meta).icon ? (j as Meta).icon : null,
           cover_url: typeof (j as Meta).cover_url === "string" && (j as Meta).cover_url ? (j as Meta).cover_url : null,
@@ -107,18 +95,6 @@ export default function WorkspaceDocPage() {
   useEffect(() => {
     if (status === 'ok') setActiveWorkspaceId(id)
   }, [id, setActiveWorkspaceId, status])
-
-  useEffect(() => {
-    if (meta?.mode) setEditorMode(meta.mode)
-  }, [meta?.mode])
-
-  const isEdgeless = editorMode === "edgeless"
-
-  // Auto-minimize all top panels when entering edgeless for a larger canvas
-  useEffect(() => {
-    if (editorMode === "edgeless") setTopCollapsed(true)
-    else setTopCollapsed(false)
-  }, [editorMode])
 
   // for locked, fetch owner info via separate? meta already 403, so need owner via other means
   // we show generic locked; request access still works
@@ -471,69 +447,27 @@ export default function WorkspaceDocPage() {
       )}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <WorkspaceNavigator currentId={id} />
-        <div className={`min-w-0 flex-1 ${view === "page" && editorMode === "edgeless" ? "overflow-hidden flex flex-col bg-[#0f0f0e] p-0" : "overflow-y-auto px-8 py-8 lg:px-10 xl:px-12"}`}>
+        <div className="min-w-0 flex-1 overflow-y-auto px-8 py-8 lg:px-10 xl:px-12">
           {view === "page" && (
             <>
-              {topCollapsed ? (
-                <div className="mx-auto mb-2 flex w-full max-w-[960px] items-center justify-between rounded-2xl border border-line bg-white/[0.025] px-4 py-2">
-                  <span className="flex items-center gap-2 text-[12px] text-white/50">
-                    {meta?.icon && <span className="text-[16px]">{meta.icon}</span>}
-                    <span className="font-medium text-white/80">{meta?.title || "Untitled"}</span>
-                    <span className="hidden text-white/25 sm:inline">· {meta?.tags?.length ?? 0} tags · {meta?.props?.isJournal ? "Journal" : "Page"}</span>
-                  </span>
-                  <button onClick={() => setTopCollapsed(false)} className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-medium text-black hover:bg-white/90">
-                    <Maximize2 className="h-3 w-3" /> Expand header
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="mx-auto mb-2 flex w-full max-w-[960px] justify-end">
-                    <button onClick={() => setTopCollapsed(true)} className="inline-flex items-center gap-1 rounded-full border border-line bg-white/[0.04] px-3 py-1 text-[11px] text-white/40 hover:bg-white/[0.08] hover:text-white/70">
-                      <Minimize2 className="h-3 w-3" /> Minimize header — larger canvas
-                    </button>
-                  </div>
               {meta?.cover_url && (
                 <div className="mx-auto mb-3 w-full max-w-[960px] overflow-hidden rounded-2xl border border-line">
                   <img src={meta.cover_url} alt="Cover" className="h-[200px] w-full object-cover" />
                 </div>
               )}
-              {canWrite && (
+              {canWrite && meta?.cover_url && (
                 <div className="mx-auto mb-3 flex w-full max-w-[960px] items-center gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/60 hover:bg-white/[0.08]">
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const f = e.target.files?.[0]
-                        if (!f) return
-                        const fd = new FormData()
-                        fd.append("file", f)
-                        try {
-                          const r = await fetch(`/api/workspace/${id}/cover`, { method: "POST", headers: collabAuthHeaders(), body: fd as unknown as BodyInit })
-                          if (r.ok) {
-                            const j = await r.json()
-                            setMeta((m) => (m ? { ...m, cover_url: j.cover_url } : m))
-                          }
-                        } catch {}
-                        e.target.value = ""
-                      }}
-                    />
-                    {meta?.cover_url ? "Change cover" : "Add cover"}
-                  </label>
-                  {meta?.cover_url && (
-                    <button
-                      onClick={async () => {
-                        try {
-                          const r = await fetch(`/api/workspace/${id}/cover`, { method: "DELETE", headers: collabAuthHeaders() })
-                          if (r.ok) setMeta((m) => (m ? { ...m, cover_url: null } : m))
-                        } catch {}
-                      }}
-                      className="rounded-full border border-line bg-white/[0.04] px-3 py-1 text-[11px] text-white/40 hover:bg-white/[0.08]"
-                    >
-                      Remove
-                    </button>
-                  )}
+                  <button
+                    onClick={async () => {
+                      try {
+                        const r = await fetch(`/api/workspace/${id}/cover`, { method: "DELETE", headers: collabAuthHeaders() })
+                        if (r.ok) setMeta((m) => (m ? { ...m, cover_url: null } : m))
+                      } catch {}
+                    }}
+                    className="rounded-full border border-line bg-white/[0.04] px-3 py-1 text-[11px] text-white/40 hover:bg-white/[0.08]"
+                  >
+                    Remove cover
+                  </button>
                 </div>
               )}
               <div className="mx-auto mb-2 w-full max-w-[960px]">
@@ -584,12 +518,6 @@ export default function WorkspaceDocPage() {
                     <button onClick={() => { patchMeta({ icon: null }); setShowIconPicker(false) }} className="rounded-full border border-line bg-white/[0.04] px-3 py-1 text-[11px] text-white/50 hover:bg-white/[0.08]">Remove</button>
                   </div>
                 )}
-                <div className="mt-2 flex items-center gap-2">
-                  <button onClick={() => setShowOutline((v) => !v)} className={`rounded-full border px-3 py-1 text-[11px] ${showOutline ? "border-white bg-white text-black" : "border-line bg-white/[0.04] text-white/50 hover:text-white/80"}`}>
-                    Outline {showOutline ? "on" : "off"}
-                  </button>
-                  <span className="text-[11px] text-white/25">Headings &amp; lists outline (beta)</span>
-                </div>
               </div>
               <div className="mx-auto mb-4 w-full max-w-[960px]">
                 <WorkspaceProperties
@@ -603,11 +531,9 @@ export default function WorkspaceDocPage() {
                   canWrite={canWrite}
                   onPatch={patchMeta}
                   collapsible={view === "page"}
-                  defaultCollapsed={view === "page" && editorMode === "edgeless"}
+                  defaultCollapsed={false}
                 />
               </div>
-                </>
-              )}
             </>
           )}
           {view === "page" && showAI && (
@@ -619,44 +545,25 @@ export default function WorkspaceDocPage() {
                 tags={meta?.tags ?? []}
                 canWrite={canWrite}
                 docText={aiDocText}
-                defaultCollapsed={view === "page" && editorMode === "edgeless"}
-                onInsertBlock={(text) => {
-                  const el = document.querySelector("affine-editor-container") as unknown as Record<string, unknown> | null
-                  const fn = el?.["__aivoryInsert"] as ((t: string) => void) | undefined
-                  if (fn) fn(text)
-                }}
+                defaultCollapsed={false}
               />
             </div>
           )}
           {view === "database" ? (
             <WorkspaceDatabase docId={id} readOnly={!canWrite} />
-          ) : editor === "blocksuite" ? (
-            <div className={view === "page" && editorMode === "edgeless" ? "flex flex-1 flex-col min-h-0" : ""}>
-              <BlockSuitePageEditor
-                key={id}
-                docId={id}
-                readOnly={!canWrite}
-                initialMode={meta?.mode ?? "page"}
-                pageTitle={meta?.title ?? ""}
-                outlineOpen={showOutline}
-                edgelessTheme={(meta?.props?.edgelessTheme as "light" | "dark") ?? "dark"}
-                onDocTextChange={setAiDocText}
-                onModeChange={setEditorMode}
-              />
-            </div>
           ) : (
-            <WorkspaceEditor docId={id} readOnly={!canWrite} />
+            <WorkspaceEditor docId={id} readOnly={!canWrite} onTextChange={setAiDocText} />
           )}
-          {view === "page" && editorMode === "page" && (
+          {view === "page" && (
             <>
               <div className="mx-auto mt-4 w-full max-w-[960px]">
-                <WorkspaceBacklinks docId={id} canWrite={canWrite} defaultCollapsed={isEdgeless} />
+                <WorkspaceBacklinks docId={id} canWrite={canWrite} defaultCollapsed={false} />
               </div>
               <div className="mx-auto mt-4 w-full max-w-[960px]">
-                <WorkspacePageComments docId={id} canWrite={canWrite} defaultCollapsed={isEdgeless} />
+                <WorkspacePageComments docId={id} canWrite={canWrite} defaultCollapsed={false} />
               </div>
               <div className="mx-auto mt-4 w-full max-w-[960px]">
-                <WorkspaceHistory docId={id} canWrite={canWrite} defaultCollapsed={isEdgeless} />
+                <WorkspaceHistory docId={id} canWrite={canWrite} defaultCollapsed={false} />
               </div>
             </>
           )}
