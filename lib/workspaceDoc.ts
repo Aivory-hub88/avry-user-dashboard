@@ -19,6 +19,45 @@ export function legacyDocId(id: string): string {
 }
 
 /**
+ * Project room conventions (Fase 2 Opsi C).
+ *
+ * A project is a doc flagged `props.isProject` whose `props.projectDocs`
+ * lists member doc ids (bare ids, max 50). The project room
+ * (`workspace:room:{id}`) is the shared presence channel; each member doc
+ * keeps its own `workspace:{doc}` / `workspace:db:{doc}` CRDT rooms so
+ * per-doc ACL keeps enforcing. The aggregate board (F2-3) unions member
+ * databases server-side, gated per doc.
+ */
+export function canonicalProjectRoomId(id: string): string {
+  const bare = id
+    .replace(/^workspace:room:/, "")
+    .replace(/^workspace:/, "")
+  return `workspace:room:${bare}`
+}
+
+/** True when a collab room key is a project presence room. */
+export function isProjectRoom(roomKey: string): boolean {
+  return roomKey.startsWith("workspace:room:")
+}
+
+/** Member doc ids from a project doc's props (validated, deduped, capped). */
+export function projectMemberDocs(props: unknown): string[] {
+  if (!props || typeof props !== "object" || Array.isArray(props)) return []
+  const raw = (props as Record<string, unknown>).projectDocs
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const v of raw.slice(0, 50)) {
+    if (typeof v !== "string") continue
+    const bare = legacyDocId(v.trim()).slice(0, 64)
+    if (!bare || bare === "room" || seen.has(bare)) continue
+    seen.add(bare)
+    out.push(bare)
+  }
+  return out
+}
+
+/**
  * Yjs-merge several full-state updates into one. Union-only: blocks/rows that
  * exist in any input survive, which is exactly the crash-safe behavior we want
  * for fallback reads (never synthesize deletions across divergent snapshots).

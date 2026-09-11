@@ -59,7 +59,7 @@ export default function WorkspacePage() {
   useEffect(() => { load() }, [])
   useEffect(() => { if (showTrash) void loadTrash() }, [showTrash])
 
-  const create = async () => {
+  const create = async (asProject = false) => {
     if (creating) return
     setCreating(true)
     setError(null)
@@ -67,10 +67,23 @@ export default function WorkspacePage() {
       const r = await fetch('/api/workspace', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...collabAuthHeaders() },
-        body: JSON.stringify({ title: title.trim() || 'Untitled' }),
+        body: JSON.stringify({ title: title.trim() || (asProject ? 'Untitled project' : 'Untitled') }),
       })
       const j = await r.json().catch(() => ({}))
-      if (r.ok && j.id) router.push(`/workspace/${j.id}`)
+      if (r.ok && j.id) {
+        if (asProject) {
+          try {
+            await fetch(`/api/workspace/${j.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', ...collabAuthHeaders() },
+              body: JSON.stringify({ props: { isProject: true, projectDocs: [] } }),
+            })
+          } catch {}
+          router.push(`/workspace/${j.id}?view=board`)
+        } else {
+          router.push(`/workspace/${j.id}`)
+        }
+      }
       else if (r.status === 401) {
         setAuthRequired(true)
         setError('Your session has expired. Sign in again to create a page.')
@@ -153,8 +166,11 @@ export default function WorkspacePage() {
             placeholder="Page title"
             className="w-[140px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none sm:w-[180px]"
           />
-          <button onClick={create} disabled={creating} className="shrink-0 rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-50">
+          <button onClick={() => create()} disabled={creating} className="shrink-0 rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-50">
              {creating ? 'Creating…' : 'New page'}
+          </button>
+          <button onClick={() => create(true)} disabled={creating} title="Create a project board across docs" className="shrink-0 rounded-full border border-line bg-white/[0.04] px-4 py-1.5 text-[12px] font-medium text-white/70 hover:bg-white/[0.08] hover:text-white disabled:opacity-50">
+             New project
           </button>
         </div>
       </div>
@@ -189,7 +205,7 @@ export default function WorkspacePage() {
                <div className="text-[13px] text-white/40">Nothing here yet</div>
                <div className="mt-2 text-[11px] text-white/25">Create a page for a note, task list, or idea.</div>
               <div className="mt-4 flex justify-center">
-                 <button onClick={create} className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black">Create your first page</button>
+                 <button onClick={() => create()} className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black">Create your first page</button>
               </div>
             </div>
           ) : filtered.length === 0 ? (

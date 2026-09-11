@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest"
 import * as Y from "yjs"
-import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "./workspaceDoc"
+import {
+  canonicalRoomId,
+  legacyDocId,
+  mergeYjsUpdates,
+  canonicalProjectRoomId,
+  isProjectRoom,
+  projectMemberDocs,
+} from "./workspaceDoc"
 
 function stateWithBlocks(blocks: Array<{ id: string; type: string; text: string }>): Buffer {
   const doc = new Y.Doc()
@@ -166,5 +173,29 @@ describe("mergeYjsUpdates", () => {
       (m) => `${m.get("type")}:${m.get("text")}`,
     )
     expect(texts.sort()).toEqual(["p:x", "p:y"].sort())
+  })
+})
+
+describe("project room conventions (Fase 2)", () => {
+  it("canonicalizes project room keys", () => {
+    expect(canonicalProjectRoomId("proj-1")).toBe("workspace:room:proj-1")
+    expect(canonicalProjectRoomId("workspace:proj-1")).toBe("workspace:room:proj-1")
+    expect(canonicalProjectRoomId("workspace:room:proj-1")).toBe("workspace:room:proj-1")
+  })
+
+  it("detects project presence rooms", () => {
+    expect(isProjectRoom("workspace:room:proj-1")).toBe(true)
+    expect(isProjectRoom("workspace:proj-1")).toBe(false)
+    expect(isProjectRoom("workspace:db:proj-1")).toBe(false)
+  })
+
+  it("extracts validated member doc ids from project props", () => {
+    expect(projectMemberDocs({ isProject: true, projectDocs: ["doc-a", "workspace:doc-b", "doc-a", 42, ""] })).toEqual([
+      "doc-a",
+      "doc-b",
+    ])
+    expect(projectMemberDocs({})).toEqual([])
+    expect(projectMemberDocs(null)).toEqual([])
+    expect(projectMemberDocs({ projectDocs: "nope" })).toEqual([])
   })
 })

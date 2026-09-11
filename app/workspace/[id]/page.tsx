@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import WorkspaceEditor from "@/components/workspace/WorkspaceEditor"
 import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
+import ProjectBoard from "@/components/workspace/ProjectBoard"
 import WorkspaceProperties, { type DocTag, type DocProps } from "@/components/workspace/WorkspaceProperties"
 import WorkspaceAIPanel from "@/components/workspace/WorkspaceAIPanel"
 import WorkspaceBacklinks from "@/components/workspace/WorkspaceBacklinks"
@@ -42,7 +43,7 @@ export default function WorkspaceDocPage() {
   const search = useSearchParams()
   const router = useRouter()
   const id = (params?.id as string) ?? "demo"
-  const view = search.get("view") === "database" ? "database" : "page"
+  const view = search.get("view") === "database" ? "database" : search.get("view") === "board" ? "board" : "page"
 
   const [meta, setMeta] = useState<Meta | null>(null)
   const [status, setStatus] = useState<'loading' | 'ok' | 'locked' | 'unauth'>('loading')
@@ -170,6 +171,34 @@ export default function WorkspaceDocPage() {
   const isOwner = meta?.myRole === 'owner'
   const canWrite = meta?.myRole === 'owner' || meta?.myRole === 'editor'
   const isTrashed = !!meta?.deleted_at
+  const isProject = meta?.props?.isProject === true
+  const projectMembers = Array.isArray(meta?.props?.projectDocs)
+    ? (meta?.props?.projectDocs as string[]).filter((m) => typeof m === "string")
+    : []
+
+  const saveProjectMembers = async (next: string[]): Promise<boolean> => {
+    if (!canWrite) return false
+    try {
+      const r = await fetch(`/api/workspace/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+        body: JSON.stringify({ props: { isProject: true, projectDocs: next.slice(0, 50) } }),
+      })
+      if (!r.ok) return false
+      const j = await r.json().catch(() => ({}))
+      setMeta((m) => (m ? { ...m, props: { ...(m.props ?? {}), ...(j.props ?? { isProject: true, projectDocs: next }) } } : m))
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const flagAsProject = async () => {
+    if (!canWrite || busy) return
+    setBusy(true)
+    await saveProjectMembers(projectMembers)
+    setBusy(false)
+  }
 
   const saveTitle = async () => {
     const t = titleDraft.trim()
@@ -327,6 +356,14 @@ export default function WorkspaceDocPage() {
             >
                Data
             </Link>
+            {isProject && (
+              <Link
+                href={`/workspace/${id}?view=board`}
+                className={`rounded-full px-3 py-1 text-[12px] ${view === "board" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
+              >
+                 Board
+              </Link>
+            )}
           </div>
          </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -549,7 +586,30 @@ export default function WorkspaceDocPage() {
               />
             </div>
           )}
-          {view === "database" ? (
+          {view === "board" ? (
+            isProject ? (
+              <ProjectBoard
+                projectId={id}
+                members={projectMembers}
+                canWrite={canWrite}
+                onMembersChange={saveProjectMembers}
+              />
+            ) : (
+              <div className="mx-auto w-full max-w-[960px] rounded-2xl border border-line bg-white/[0.03] p-8 text-center">
+                <div className="text-[15px] font-medium text-white/80">Not a project yet</div>
+                <div className="mt-2 text-[13px] leading-relaxed text-white/40">
+                  Flag this doc as a project to union task boards across member docs.
+                </div>
+                {canWrite ? (
+                  <button onClick={flagAsProject} disabled={busy} className="mt-6 rounded-full bg-white px-5 py-2 text-[13px] font-medium text-black hover:bg-white/90 disabled:opacity-50">
+                    {busy ? "Saving…" : "Flag as project"}
+                  </button>
+                ) : (
+                  <div className="mt-4 text-[12px] text-white/30">Ask an editor to flag it.</div>
+                )}
+              </div>
+            )
+          ) : view === "database" ? (
             <WorkspaceDatabase docId={id} readOnly={!canWrite} />
           ) : (
             <WorkspaceEditor docId={id} readOnly={!canWrite} onTextChange={setAiDocText} />

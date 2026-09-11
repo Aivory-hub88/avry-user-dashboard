@@ -80,6 +80,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (typeof src.isJournal === "boolean") propsPatch.isJournal = src.isJournal
     if (typeof src.isTemplate === "boolean") propsPatch.isTemplate = src.isTemplate
     if (src.pageWidth === "full" || src.pageWidth === "standard") propsPatch.pageWidth = src.pageWidth
+    // Project docs (Fase 2): flags a doc as a project + its member doc ids.
+    if (typeof src.isProject === "boolean") propsPatch.isProject = src.isProject
+    if (Array.isArray(src.projectDocs)) {
+      const cleanedDocs: string[] = []
+      const seen = new Set<string>()
+      for (const v of src.projectDocs.slice(0, 50)) {
+        if (typeof v !== "string") continue
+        const bare = v.trim().replace(/^workspace:(room:)?/, "").slice(0, 64)
+        if (!bare || bare === "room" || seen.has(bare)) continue
+        seen.add(bare)
+        cleanedDocs.push(bare)
+      }
+      propsPatch.projectDocs = cleanedDocs
+    } else if (src.projectDocs !== undefined) {
+      return NextResponse.json({ error: 'props.projectDocs must be array' }, { status: 400 })
+    }
     // Persisted database views (saved filters/sorts) — array of lightweight view configs.
     // Kept inside props so one JSONB column holds all per-doc UI state, no extra table.
     if (Array.isArray(src.dbViews)) {

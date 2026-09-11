@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Tag, X, Plus, Calendar, User, Clock, FileText, Eye, LayoutTemplate, ChevronDown, ChevronUp, Minimize2 } from "lucide-react"
 
 export type DocTag = { id: string; label: string; color: string }
-export type DocProps = { isJournal?: boolean; isTemplate?: boolean; pageWidth?: "standard" | "full" }
+export type DocProps = { isJournal?: boolean; isTemplate?: boolean; pageWidth?: "standard" | "full"; isProject?: boolean; projectDocs?: string[] }
 
 const TAG_COLORS: Record<string, string> = {
   gray: "bg-white/10 text-white/60 border-white/15",

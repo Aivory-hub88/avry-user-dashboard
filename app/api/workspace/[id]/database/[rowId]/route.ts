@@ -1,94 +1,83 @@
 import { NextRequest, NextResponse } from "next/server"
 import * as Y from "yjs"
-import { query } from "@/lib/db"
-import { workspaceCredential, collabAuthHeaders, unauthorized, forbidden, type WorkspaceCredential } from "@/lib/workspaceAuth"
-import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDoc"
+import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { checkAgentAccess } from "@/lib/workspaceAccess"
+import {
+  WorkspaceDenied,
+  loadDbDoc,
+  saveDbDoc,
+  rowsFromDbDoc,
+  getWipLimits,
+  wipExceeded,
+  MAX_DESCRIPTION_LEN,
+} from "@/lib/workspaceDb"
+import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 
 export const runtime = "nodejs"
 
-const COLLAB_URL = process.env.COLLAB_URL || "http://aivory-collab:3200"
+const SCALAR_FIELDS = new Set(["title", "status", "priority", "assignee", "due", "description"])
 
-class WorkspaceDenied extends Error {
-  status: number
-  constructor(status: number) {
-    super("denied")
-    this.status = status
+function cleanPatch(patch: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(patch)) {
+    if (!SCALAR_FIELDS.has(k) || typeof v !== "string") continue
+    const cap = k === "title" ? 200 : k === "description" ? MAX_DESCRIPTION_LEN : k === "assignee" ? 100 : k === "due" ? 20 : 16
+    out[k] = v.slice(0, cap)
   }
+  if (out.priority !== undefined && out.priority !== "Low" && out.priority !== "Med" && out.priority !== "High") {
+    out.priority = "Med"
+  }
+  return out
 }
 
-async function loadDoc(id: string, cred: WorkspaceCredential): Promise<Y.Doc> {
-  const doc = new Y.Doc()
-  try {
-    const res = await fetch(`${COLLAB_URL}/api/workspace/${encodeURIComponent(id)}/doc`, {
-      headers: collabAuthHeaders(cred),
-      signal: AbortSignal.timeout(2000),
-    } as RequestInit)
-    if (res.status === 401 || res.status === 403) throw new WorkspaceDenied(res.status)
-    if (res.ok) {
-      const buf = await res.arrayBuffer()
-      if (buf.byteLength > 0) Y.applyUpdate(doc, new Uint8Array(buf))
-      return doc
-    }
-  } catch (e) {
-    if (e instanceof WorkspaceDenied) throw e
-  }
-  const r = await query("SELECT id, yjs_update FROM dashboard.workspace_docs WHERE id = $1 OR id = $2", [
-    canonicalRoomId(id),
-    legacyDocId(id),
-  ])
-  if (r.rows.length > 0) {
-    const byId = new Map<string, Buffer>(r.rows.map((row) => [row.id as string, row.yjs_update as Buffer]))
-    const merged = mergeYjsUpdates([byId.get(canonicalRoomId(id)) ?? null, byId.get(legacyDocId(id)) ?? null])
-    if (merged) Y.applyUpdate(doc, new Uint8Array(merged))
-  }
-  return doc
-}
-
-async function saveDoc(id: string, doc: Y.Doc, cred: WorkspaceCredential) {
-  const upd = Buffer.from(Y.encodeStateAsUpdate(doc))
-  try {
-    const res = await fetch(`${COLLAB_URL}/api/workspace/${encodeURIComponent(id)}/doc`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/octet-stream", ...collabAuthHeaders(cred) },
-      body: upd as unknown as BodyInit,
-      signal: AbortSignal.timeout(2000),
-    } as RequestInit)
-    // collab enforces RBAC — a viewer write must not leak into pg
-    if (res.status === 401 || res.status === 403) throw new WorkspaceDenied(res.status)
-  } catch (e) {
-    if (e instanceof WorkspaceDenied) throw e
-  }
-  await query(
-    `INSERT INTO dashboard.workspace_docs (id, yjs_update, updated_at) VALUES ($1, $2, now())
-     ON CONFLICT (id) DO UPDATE SET yjs_update = EXCLUDED.yjs_update, updated_at = now()`,
-    [id, upd],
-  )
+async function allowPg(cred: NonNullable<ReturnType<typeof workspaceCredential>>, id: string): Promise<boolean> {
+  return cred.kind === "service" ? true : authorizeDocFallback(cred, id)
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; rowId: string }> }) {
   const { id, rowId } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const assertedAgent = req.headers.get("x-agent-type") || req.headers.get("X-Agent-Type")
+  if (await checkAgentAccess(id, cred, assertedAgent, 'write')) return forbidden()
+  const agentType = assertedAgent || "user"
   let patch: Record<string, unknown>
   try {
     patch = await req.json()
   } catch {
     return NextResponse.json({ error: "invalid json" }, { status: 400 })
   }
-  const allowed = new Set(["title", "status", "priority", "assignee", "due"])
-  for (const k of Object.keys(patch)) if (!allowed.has(k)) delete patch[k]
+  const clean = cleanPatch(patch)
+  if (Object.keys(clean).length === 0) return NextResponse.json({ error: "nothing to update" }, { status: 400 })
 
   try {
-    const doc = await loadDoc(id, cred)
+    const doc = await loadDbDoc(id, cred, agentType, await allowPg(cred, id))
     const arr = doc.getArray<Y.Map<unknown>>("database")
     const idx = arr.toArray().findIndex((m) => (m.get("id") as string) === rowId)
     if (idx < 0) return NextResponse.json({ error: "not found" }, { status: 404 })
+    // WIP gate (F2-4): moving into a full column is rejected, not queued.
+    if (clean.status !== undefined) {
+      const limited = wipExceeded(rowsFromDbDoc(doc), clean.status, await getWipLimits(id), rowId)
+      if (limited !== null) {
+        return NextResponse.json({ error: "wip-exceeded", limit: limited }, { status: 409 })
+      }
+    }
     const m = arr.get(idx) as Y.Map<unknown>
     doc.transact(() => {
-      for (const [k, v] of Object.entries(patch)) m.set(k, v as string)
+      for (const [k, v] of Object.entries(clean)) m.set(k, v)
+    }, agentType)
+    await saveDbDoc(id, doc, cred, agentType)
+    await recordWorkspaceActivity({
+      docId: id,
+      credential: cred,
+      agentType,
+      action: "database.row_updated",
+      summary: `Updated task ${rowId}`,
+      targetType: "database-row",
+      targetId: rowId,
+      metadata: clean,
     })
-    await saveDoc(id, doc, cred)
-    return NextResponse.json({ id: rowId, patched: patch })
+    return NextResponse.json({ id: rowId, patched: clean })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
     console.error("[workspace/database PATCH]", e)
@@ -100,13 +89,25 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id, rowId } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const assertedAgent = req.headers.get("x-agent-type") || req.headers.get("X-Agent-Type")
+  if (await checkAgentAccess(id, cred, assertedAgent, 'write')) return forbidden()
+  const agentType = assertedAgent || "user"
   try {
-    const doc = await loadDoc(id, cred)
+    const doc = await loadDbDoc(id, cred, agentType, await allowPg(cred, id))
     const arr = doc.getArray<Y.Map<unknown>>("database")
     const idx = arr.toArray().findIndex((m) => (m.get("id") as string) === rowId)
     if (idx < 0) return NextResponse.json({ error: "not found" }, { status: 404 })
-    doc.transact(() => arr.delete(idx, 1))
-    await saveDoc(id, doc, cred)
+    doc.transact(() => arr.delete(idx, 1), agentType)
+    await saveDbDoc(id, doc, cred, agentType)
+    await recordWorkspaceActivity({
+      docId: id,
+      credential: cred,
+      agentType,
+      action: "database.row_deleted",
+      summary: `Deleted task ${rowId}`,
+      targetType: "database-row",
+      targetId: rowId,
+    })
     return NextResponse.json({ ok: true, id: rowId })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
