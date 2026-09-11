@@ -2,6 +2,22 @@ import * as Y from "yjs"
 import { query } from "@/lib/db"
 import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDoc"
 import { collabAuthHeaders, type WorkspaceCredential } from "@/lib/workspaceAuth"
+import { parseFieldDefs, type FieldDef, type CellValue } from "@/lib/workspaceDbModel"
+
+// Re-exported so existing importers keep working; the pure model lives in
+// workspaceDbModel.ts (client-safe: no pg/node imports, see its header).
+export {
+  parseFieldDefs,
+  cleanCells,
+  readCells,
+  MAX_FIELDS_PER_DOC,
+  MAX_FIELD_OPTIONS,
+  MAX_CELL_TEXT,
+  type FieldDef,
+  type FieldType,
+  type CellValue,
+} from "@/lib/workspaceDbModel"
+import { cleanCells, readCells } from "@/lib/workspaceDbModel"
 
 /**
  * Shared database-row plane (Fase 2 Opsi C).
@@ -22,12 +38,27 @@ export type DbRow = {
   due: string
   description: string
   comments: DbRowComment[]
+  cells: Record<string, CellValue>
 }
 
 export const MAX_COMMENTS_PER_ROW = 100
 export const MAX_COMMENT_LEN = 500
 export const MAX_DESCRIPTION_LEN = 4000
 const VALID_PRIORITIES = new Set(["Low", "Med", "High"])
+
+/** Field definitions for a doc (empty when none configured). */
+export async function getFieldDefs(docId: string): Promise<FieldDef[]> {
+  try {
+    const r = await query(`SELECT props FROM dashboard.workspace_docs WHERE id = $1 OR id = $2 LIMIT 1`, [
+      `workspace:${docId}`,
+      docId,
+    ])
+    const props = r.rows[0]?.props as Record<string, unknown> | undefined
+    return parseFieldDefs(props?.dbFields)
+  } catch {
+    return []
+  }
+}
 
 const COLLAB_URL = process.env.COLLAB_URL || "http://aivory-collab:3200"
 
@@ -64,6 +95,7 @@ export function parseDbRow(m: Y.Map<unknown>): DbRow {
     due: str(m.get("due")),
     description: str(m.get("description")).slice(0, MAX_DESCRIPTION_LEN),
     comments,
+    cells: readCells(m.get("cells")),
   }
 }
 
@@ -85,6 +117,7 @@ export function dbRowToYMap(r: DbRow): Y.Map<unknown> {
   m.set("due", r.due)
   m.set("description", r.description)
   m.set("comments", r.comments)
+  m.set("cells", r.cells)
   return m
 }
 

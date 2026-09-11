@@ -10,6 +10,8 @@ import {
   newDbRowId,
   dbRowToYMap,
   getWipLimits,
+  getFieldDefs,
+  cleanCells,
   wipExceeded,
   MAX_DESCRIPTION_LEN,
   type DbRow,
@@ -18,7 +20,7 @@ import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 
 export const runtime = "nodejs"
 
-function cleanRowInput(body: Partial<DbRow>): Omit<DbRow, "id" | "comments"> {
+function cleanRowInput(body: Partial<DbRow>): Omit<DbRow, "id" | "comments" | "cells"> {
   const status = (body.status ?? "Todo").toString().slice(0, 16)
   const priority = body.priority === "Low" || body.priority === "High" ? body.priority : "Med"
   return {
@@ -74,7 +76,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (limited !== null) {
       return NextResponse.json({ error: "wip-exceeded", limit: limited }, { status: 409 })
     }
-    const newRow: DbRow = { id: newDbRowId(), ...cleanRowInput(body), comments: [] }
+    const newRow: DbRow = {
+      id: newDbRowId(),
+      ...cleanRowInput(body),
+      comments: [],
+      cells: cleanCells(body.cells, await getFieldDefs(id)),
+    }
     doc.transact(() => doc.getArray<Y.Map<unknown>>("database").push([dbRowToYMap(newRow)]), agentType)
     await saveDbDoc(id, doc, cred, agentType)
     await recordWorkspaceActivity({

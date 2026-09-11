@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { workspaceCredential, unauthorized, forbidden } from '@/lib/workspaceAuth'
 import { getDocRole, canWrite } from '@/lib/workspaceAccess'
+import { parseFieldDefs } from '@/lib/workspaceDb'
 import { recordWorkspaceActivity } from '@/lib/workspaceActivity'
 
 export const runtime = 'nodejs'
@@ -96,6 +97,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     } else if (src.projectDocs !== undefined) {
       return NextResponse.json({ error: 'props.projectDocs must be array' }, { status: 400 })
     }
+    // Custom database fields (Fase 3b): validated via parseFieldDefs —
+    // [{id, name, type, options}]. Definitions live here in props; per-row
+    // values live in the Yjs row maps under `cells`.
+    if (Array.isArray(src.dbFields)) {
+      propsPatch.dbFields = parseFieldDefs(src.dbFields)
+    } else if (src.dbFields !== undefined) {
+      return NextResponse.json({ error: 'props.dbFields must be array' }, { status: 400 })
+    }
     // Persisted database views (saved filters/sorts) — array of lightweight view configs.
     // Kept inside props so one JSONB column holds all per-doc UI state, no extra table.
     if (Array.isArray(src.dbViews)) {
@@ -142,10 +151,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     } else if (src.dbTemplates !== undefined) {
       return NextResponse.json({ error: 'props.dbTemplates must be array' }, { status: 400 })
     }
-    // Kanban WIP limits per status column: { Todo: 5, Doing: 3 }. Small ints
+        // Kanban WIP limits per status column: { Todo: 5, Doing: 3 }. Small ints
     // so the column header can warn instead of silently overflowing.
-    if (src.dbWip !== undefined) {
-      if (!src.dbWip || typeof src.dbWip !== "object" || Array.isArray(src.dbWip)) {
+    if (src.dbWip !== undefined) {      if (!src.dbWip || typeof src.dbWip !== "object" || Array.isArray(src.dbWip)) {
         return NextResponse.json({ error: 'props.dbWip must be object' }, { status: 400 })
       }
       const cleanedWip: Record<string, number> = {}

@@ -7,6 +7,8 @@ import * as Y from "yjs"
 import {
   parseDbRow,
   wipExceeded,
+  parseFieldDefs,
+  cleanCells,
   MAX_COMMENTS_PER_ROW,
   type DbRow,
 } from "./workspaceDb"
@@ -34,6 +36,7 @@ function row(over: Partial<DbRow> = {}): DbRow {
     due: "",
     description: "",
     comments: [],
+    cells: {},
     ...over,
   }
 }
@@ -80,5 +83,51 @@ describe("wipExceeded", () => {
 
   it("excludes the moved row itself", () => {
     expect(wipExceeded(rows, "Todo", { Todo: 1 }, "a")).toBeNull()
+  })
+})
+
+describe("parseFieldDefs", () => {
+  it("accepts valid definitions and normalizes options", () => {
+    const defs = parseFieldDefs([
+      { id: "f1", name: "Dept", type: "select", options: ["A", "B", "A", 42, ""] },
+      { id: "f2", name: "Score", type: "number" },
+      { id: "f3", name: "Weird", type: "kanban" },
+    ])
+    expect(defs).toEqual([
+      { id: "f1", name: "Dept", type: "select", options: ["A", "B"] },
+      { id: "f2", name: "Score", type: "number", options: [] },
+      { id: "f3", name: "Weird", type: "text", options: [] },
+    ])
+  })
+
+  it("rejects nameless, duplicate, and non-array input", () => {
+    expect(parseFieldDefs([{ id: "f1", name: "a" }, { id: "f1", name: "b" }, { id: "f2", name: "" }, null])).toEqual([
+      { id: "f1", name: "a", type: "text", options: [] },
+    ])
+    expect(parseFieldDefs("nope")).toEqual([])
+    expect(parseFieldDefs(undefined)).toEqual([])
+  })
+})
+
+describe("cleanCells", () => {
+  const defs = parseFieldDefs([
+    { id: "t", name: "Note", type: "text" },
+    { id: "n", name: "Pts", type: "number" },
+    { id: "s", name: "Team", type: "select", options: ["A", "B"] },
+    { id: "m", name: "Tags", type: "multi", options: ["x", "y"] },
+    { id: "c", name: "Done?", type: "checkbox" },
+    { id: "d", name: "Day", type: "date" },
+  ])
+
+  it("validates each type and drops unknown fields", () => {
+    expect(
+      cleanCells({ t: "hi", n: "42", s: "A", m: ["x", "zzz"], c: true, d: "2026-09-30", ghost: 1 }, defs),
+    ).toEqual({ t: "hi", n: 42, s: "A", m: ["x"], c: true, d: "2026-09-30" })
+  })
+
+  it("rejects off-option selects, bad dates, and non-booleans", () => {
+    expect(cleanCells({ s: "Z", d: "tomorrow", c: "yes", n: "NaN!" }, defs)).toEqual({})
+    // multi with no valid picks collapses to an empty (but present) list
+    expect(cleanCells({ m: ["zzz"] }, defs)).toEqual({ m: [] })
   })
 })

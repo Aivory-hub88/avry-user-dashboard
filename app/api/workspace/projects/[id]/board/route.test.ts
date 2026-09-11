@@ -138,3 +138,35 @@ describe('GET /api/workspace/projects/[id]/board', () => {
     expect(res.status).toBe(404)
   })
 })
+
+describe('project self-inclusion', () => {
+  it('includes the project doc when pinned as its own member', async () => {
+    // member rows for solo: reuse doc-a bytes via param remap
+    queryMock.mockImplementation((sql: string, params: unknown[]) => {
+      if (sql.includes('SELECT id, title, props, workspace_id')) {
+        return Promise.resolve({
+          rows: [
+            {
+              id: 'workspace:solo',
+              title: 'Solo Project',
+              props: { isProject: true, projectDocs: ['solo'] },
+              workspace_id: 'default',
+            },
+          ],
+        })
+      }
+      if (sql.includes('SELECT id, yjs_update') && (params[0] as string).endsWith('solo')) {
+        return Promise.resolve({ rows: [{ id: 'workspace:solo', yjs_update: BYTES_A }] })
+      }
+      if (sql.includes('SELECT id, title') && sql.includes('ANY')) {
+        return Promise.resolve({ rows: [{ id: 'workspace:solo', title: 'Solo Project' }] })
+      }
+      return baseQuery(sql, params)
+    })
+    const res = await GET(getReq(svc), { params: Promise.resolve({ id: 'solo' }) })
+    expect(res.status).toBe(200)
+    const j = await res.json()
+    expect(j.docs.map((d: { doc_id: string }) => d.doc_id)).toEqual(['solo'])
+    expect(j.totalRows).toBe(2)
+  })
+})

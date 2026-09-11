@@ -7,7 +7,10 @@ import {
   loadDbDoc,
   saveDbDoc,
   rowsFromDbDoc,
+  parseDbRow,
   getWipLimits,
+  getFieldDefs,
+  cleanCells,
   wipExceeded,
   MAX_DESCRIPTION_LEN,
 } from "@/lib/workspaceDb"
@@ -48,7 +51,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "invalid json" }, { status: 400 })
   }
   const clean = cleanPatch(patch)
-  if (Object.keys(clean).length === 0) return NextResponse.json({ error: "nothing to update" }, { status: 400 })
+  const hasCells = patch.cells !== undefined
+  if (Object.keys(clean).length === 0 && !hasCells) return NextResponse.json({ error: "nothing to update" }, { status: 400 })
 
   try {
     const doc = await loadDbDoc(id, cred, agentType, await allowPg(cred, id))
@@ -63,8 +67,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
     const m = arr.get(idx) as Y.Map<unknown>
+    // Custom cells merge (never replace): concurrent editors on different
+    // fields must not clobber each other. Defs load BEFORE the transaction
+    // (yrs transactions are sync-only, no awaits inside).
+    let mergedCells: Record<string, string | number | boolean | string[]> | null = null
+    if (patch.cells !== undefined) {
+      mergedCells = { ...parseDbRow(m).cells, ...cleanCells(patch.cells, await getFieldDefs(id)) }
+    }
     doc.transact(() => {
       for (const [k, v] of Object.entries(clean)) m.set(k, v)
+      if (mergedCells) m.set("cells", mergedCells)
     }, agentType)
     await saveDbDoc(id, doc, cred, agentType)
     await recordWorkspaceActivity({
@@ -77,7 +89,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       targetId: rowId,
       metadata: clean,
     })
-    return NextResponse.json({ id: rowId, patched: clean })
+    return NextResponse.json({ id: rowId, patched: clean, ...(mergedCells ? { cells: mergedCells } : {}) })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
     console.error("[workspace/database PATCH]", e)

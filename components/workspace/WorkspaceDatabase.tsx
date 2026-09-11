@@ -5,9 +5,10 @@ import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
 import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
+import { readCells, type FieldDef, type CellValue } from "@/lib/workspaceDbModel"
 
 type RowComment = { id: string; text: string; author: string; at: string }
-type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; due: string; description: string; comments: RowComment[] }
+type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; due: string; description: string; comments: RowComment[]; cells: Record<string, CellValue> }
 
 const STATUSES = ["Todo", "Doing", "Done"] as const
 const PRIORITIES = ["Low", "Med", "High"] as const
@@ -40,6 +41,7 @@ function uid() {
 function yMapFromRow(r: Row): Y.Map<unknown> {
   const m = new Y.Map<unknown>()
   for (const [k, v] of Object.entries(r)) m.set(k, v)
+  if (!m.has("cells")) m.set("cells", {})
   return m
 }
 
@@ -59,12 +61,129 @@ function toRows(arr: Y.Array<Y.Map<unknown>>): Row[] {
       due: (m.get("due") as string) ?? "",
       description: (m.get("description") as string) ?? "",
       comments,
+      cells: readCells(m.get("cells")),
     }
   })
 }
 
-function PriorityPill({ p }: { p: Row["priority"] }) {
-  const cls =
+/** Inline editor for one custom-field cell (table + drawer share it). */
+function CellEditor({
+  def,
+  value,
+  readOnly,
+  onChange,
+}: {
+  def: FieldDef
+  value: CellValue | undefined
+  readOnly: boolean
+  onChange: (v: CellValue | undefined) => void
+}) {
+  const str = typeof value === "string" ? value : ""
+  if (def.type === "checkbox") {
+    return (
+      <input
+        type="checkbox"
+        checked={value === true}
+        disabled={readOnly}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 rounded border border-white/20 bg-transparent accent-white disabled:opacity-50"
+      />
+    )
+  }
+  if (def.type === "select") {
+    return (
+      <select
+        value={str}
+        disabled={readOnly}
+        onChange={(e) => onChange(e.target.value || undefined)}
+        className="max-w-full rounded-full border bg-surface-2 px-2.5 py-1 text-[12px] text-white/70 outline-none disabled:opacity-60"
+      >
+        <option value="">—</option>
+        {def.options.map((o) => (
+          <option key={o} value={o}>{o}</option>
+        ))}
+      </select>
+    )
+  }
+  if (def.type === "multi") {
+    const cur = Array.isArray(value) ? value.filter((x): x is string => typeof x === "string") : []
+    const toggle = (o: string) => {
+      const next = cur.includes(o) ? cur.filter((x) => x !== o) : [...cur, o]
+      onChange(next.length ? next : undefined)
+    }
+    return (
+      <span className="flex flex-wrap gap-1">
+        {def.options.map((o) => {
+          const on = cur.includes(o)
+          return (
+            <button
+              key={o}
+              disabled={readOnly}
+              onClick={() => toggle(o)}
+              className={`rounded-full border px-2 py-0.5 text-[11px] disabled:opacity-50 ${on ? "border-white/40 bg-white/[0.12] text-white/85" : "border-white/10 bg-transparent text-white/40 hover:text-white/70"}`}
+            >
+              {o}
+            </button>
+          )
+        })}
+        {def.options.length === 0 && <span className="text-[11px] text-white/25">no options</span>}
+      </span>
+    )
+  }
+  if (def.type === "number") {
+    return (
+      <input
+        type="number"
+        value={typeof value === "number" ? value : ""}
+        disabled={readOnly}
+        onChange={(e) => {
+          const t = e.target.value
+          onChange(t === "" ? undefined : Number(t))
+        }}
+        placeholder="—"
+        className="w-full bg-transparent text-[13px] text-white/70 placeholder:text-white/25 outline-none disabled:opacity-60"
+      />
+    )
+  }
+  if (def.type === "date") {
+    return (
+      <input
+        type="date"
+        value={str}
+        disabled={readOnly}
+        onChange={(e) => onChange(e.target.value || undefined)}
+        className="bg-transparent text-[13px] text-white/60 outline-none disabled:opacity-60"
+      />
+    )
+  }
+  if (def.type === "url") {
+    return (
+      <span className="flex min-w-0 items-center gap-1.5">
+        <input
+          value={str}
+          disabled={readOnly}
+          onChange={(e) => onChange(e.target.value.trim() ? e.target.value.slice(0, 500) : undefined)}
+          placeholder="https://…"
+          className="w-full min-w-0 bg-transparent text-[13px] text-white/60 placeholder:text-white/25 outline-none disabled:opacity-60"
+        />
+        {str && (
+          <a href={str} target="_blank" rel="noreferrer" title="Open link" className="shrink-0 text-[12px] text-white/35 hover:text-white/70">↗</a>
+        )}
+      </span>
+    )
+  }
+  return (
+    <input
+      value={str}
+      disabled={readOnly}
+      onChange={(e) => onChange(e.target.value ? e.target.value.slice(0, 500) : undefined)}
+      placeholder="—"
+      className="w-full bg-transparent text-[13px] text-white/60 placeholder:text-white/25 outline-none disabled:opacity-60"
+    />
+  )
+}
+
+function PriorityPill({ p }: { p: Row["priority"] }) {  const cls =
     p === "High"
       ? "bg-red-500/10 text-red-300 border-red-500/20"
       : p === "Med"
@@ -267,6 +386,12 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   }, [readOnly])
   // Load persisted saved views + row templates from pg props.
   const [templates, setTemplates] = useState<DbTemplate[]>([])
+  // Custom fields (Fase 3b): definitions in pg props.dbFields, values in row cells.
+  const [fields, setFields] = useState<FieldDef[]>([])
+  const [showFields, setShowFields] = useState(false)
+  const [newFieldName, setNewFieldName] = useState("")
+  const [newFieldType, setNewFieldType] = useState<FieldDef["type"]>("text")
+  const [newFieldOptions, setNewFieldOptions] = useState("")
   useEffect(() => {
     let alive = true
     fetch(`/api/workspace/${docId}/meta`, { headers: collabAuthHeaders() })
@@ -297,11 +422,64 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
           }
           setWip(cleanedWip)
         }
+        const rawFields = props?.dbFields
+        if (Array.isArray(rawFields)) {
+          const cleanedFields = rawFields
+            .filter(
+              (f): f is FieldDef =>
+                !!f &&
+                typeof f === "object" &&
+                typeof (f as FieldDef).id === "string" &&
+                typeof (f as FieldDef).name === "string",
+            )
+            .slice(0, 20)
+          setFields(cleanedFields)
+        }
         setViewsLoaded(true)
       })
       .catch(() => { if (alive) setViewsLoaded(true) })
     return () => { alive = false }
   }, [docId])
+
+  const persistFields = async (next: FieldDef[]) => {
+    setFields(next)
+    try {
+      await fetch(`/api/workspace/${docId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+        body: JSON.stringify({ props: { dbFields: next } }),
+      })
+    } catch {}
+  }
+
+  const addField = () => {
+    if (readOnlyRef.current || fields.length >= 20) return
+    const name = newFieldName.trim().slice(0, 24)
+    if (!name) return
+    const options =
+      newFieldType === "select" || newFieldType === "multi"
+        ? newFieldOptions.split(",").map((o) => o.trim().slice(0, 24)).filter(Boolean).filter((o, i, a) => a.indexOf(o) === i).slice(0, 20)
+        : []
+    const def: FieldDef = { id: `f-${uid()}`, name, type: newFieldType, options }
+    void persistFields([...fields, def])
+    setNewFieldName("")
+    setNewFieldOptions("")
+  }
+
+  const removeField = (fieldId: string) => {
+    if (readOnlyRef.current) return
+    void persistFields(fields.filter((f) => f.id !== fieldId))
+  }
+
+  const updateCell = (rowId: string, fieldId: string, value: CellValue | undefined) => {
+    if (readOnlyRef.current) return
+    const row = rows.find((r) => r.id === rowId)
+    if (!row) return
+    const cells = { ...row.cells }
+    if (value === undefined) delete cells[fieldId]
+    else cells[fieldId] = value
+    updateRow(rowId, { cells })
+  }
 
   const persistTemplates = async (next: DbTemplate[]) => {
     setTemplates(next)
@@ -319,7 +497,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
-    const r: Row = { id: uid(), title: tpl.title, status: tpl.status, priority: tpl.priority, assignee: tpl.assignee, due: tpl.due, description: tpl.description, comments: [] }
+    const r: Row = { id: uid(), title: tpl.title, status: tpl.status, priority: tpl.priority, assignee: tpl.assignee, due: tpl.due, description: tpl.description, comments: [], cells: {} }
     doc.transact(() => yRows.push([yMapFromRow(r)]), "user")
   }
 
@@ -521,7 +699,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
-    const r: Row = { id: uid(), title: "", status: "Todo", priority: "Med", assignee: "", due: "", description: "", comments: [] }
+    const r: Row = { id: uid(), title: "", status: "Todo", priority: "Med", assignee: "", due: "", description: "", comments: [], cells: {} }
     doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
   }
 
@@ -538,7 +716,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
         : groupBy === "assignee"
           ? { status: "Todo", assignee: quickStatus }
           : { status: "Todo", priority: quickStatus as Row["priority"] }
-    const r: Row = { id: uid(), title, status: "Todo", priority: "Med", assignee: "", due: "", description: "", comments: [], ...extra }
+    const r: Row = { id: uid(), title, status: "Todo", priority: "Med", assignee: "", due: "", description: "", comments: [], cells: {}, ...extra }
     doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
     setQuickTitle("")
     setQuickStatus(null)
@@ -896,6 +1074,13 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
             )}
             {!readOnly && (
               <>
+                <button
+                  onClick={() => setShowFields((v) => !v)}
+                  title="Manage custom fields"
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-[12.5px] font-medium ${showFields ? "border-white bg-white text-black" : "border-line bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white"}`}
+                >
+                  Fields{fields.length ? ` · ${fields.length}` : ""}
+                </button>
                 <input
                   ref={importRef}
                   type="file"
@@ -929,6 +1114,58 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
         </div>
       </div>
 
+      {showFields && !readOnly && (
+        <div className="mb-4 rounded-2xl border border-line bg-white/[0.025] p-4">
+          <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/30">
+            Custom fields · {fields.length}/20
+          </div>
+          {fields.length > 0 && (
+            <div className="mb-3 flex flex-col gap-1.5">
+              {fields.map((f) => (
+                <div key={f.id} className="group flex items-center justify-between gap-2 rounded-xl border border-line bg-white/[0.02] px-3 py-2">
+                  <span className="min-w-0 truncate text-[12px] text-white/70">
+                    {f.name} <span className="text-white/25">· {f.type}{f.options.length ? ` · ${f.options.join(", ")}` : ""}</span>
+                  </span>
+                  <button onClick={() => removeField(f.id)} title="Delete field (values stay on rows but hide)" className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-white/20 opacity-0 hover:text-red-300 group-hover:opacity-100">
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={newFieldName}
+              onChange={(e) => setNewFieldName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") addField() }}
+              placeholder="Field name"
+              className="w-[160px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none"
+            />
+            <select value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as FieldDef["type"])} className="rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70 outline-none">
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="select">Select</option>
+              <option value="multi">Multi-select</option>
+              <option value="checkbox">Checkbox</option>
+              <option value="date">Date</option>
+              <option value="url">URL</option>
+            </select>
+            {(newFieldType === "select" || newFieldType === "multi") && (
+              <input
+                value={newFieldOptions}
+                onChange={(e) => setNewFieldOptions(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addField() }}
+                placeholder="Options, comma separated"
+                className="w-[220px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none"
+              />
+            )}
+            <button onClick={addField} disabled={!newFieldName.trim() || fields.length >= 20} className="rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40">
+              Add field
+            </button>
+          </div>
+        </div>
+      )}
+
       {ready && rows.length === 0 ? (
         <div className="rounded-[14px] border border-dashed border-white/10 py-14 text-center">
           <div className="text-[13px] text-white/40">{readOnly ? "No rows yet." : "No rows yet — add the first one."}</div>
@@ -953,6 +1190,9 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Priority</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Assignee</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Due</th>
+                  {fields.map((f) => (
+                    <th key={f.id} className="max-w-[180px] truncate px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30" title={`${f.name} · ${f.type}`}>{f.name}</th>
+                  ))}
                   <th className="px-2 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30"></th>
                 </tr>
               </thead>
@@ -1022,6 +1262,11 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                         />
                       </div>
                     </td>
+                    {fields.map((f) => (
+                      <td key={f.id} className="max-w-[180px] px-3 py-3">
+                        <CellEditor def={f} value={r.cells[f.id]} readOnly={readOnly} onChange={(v) => updateCell(r.id, f.id, v)} />
+                      </td>
+                    ))}
                     <td className="px-2 py-3 text-right">
                       <button onClick={() => setSelectedId(r.id)} title="Open row detail" className="rounded-full bg-white/[0.06] px-2 py-1 text-[11px] text-white/50 hover:bg-white/[0.10] hover:text-white/80">
                         Open
@@ -1260,6 +1505,20 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                 <span className="text-[11px] uppercase tracking-wider text-white/30">Description</span>
                 <textarea value={selectedRow.description} disabled={readOnly} onChange={(e) => updateRow(selectedRow.id, { description: e.target.value })} placeholder="Add details…" rows={4} className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-3 py-2 text-[13px] text-white/70 outline-none placeholder:text-white/25 disabled:opacity-60" />
               </label>
+
+              {fields.length > 0 && (
+                <div className="mt-4">
+                  <span className="text-[11px] uppercase tracking-wider text-white/30">Custom fields</span>
+                  <div className="mt-2 flex flex-col gap-2.5">
+                    {fields.map((f) => (
+                      <label key={f.id} className="block rounded-xl border border-line bg-white/[0.02] px-3 py-2">
+                        <span className="mb-1 block text-[11px] text-white/40">{f.name} <span className="text-white/20">· {f.type}</span></span>
+                        <CellEditor def={f} value={selectedRow.cells[f.id]} readOnly={readOnly} onChange={(v) => updateCell(selectedRow.id, f.id, v)} />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-6 border-t border-line pt-4">
                 <div className="flex items-center justify-between">

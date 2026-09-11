@@ -52,7 +52,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
     if (!(await canReadDoc(id))) return forbidden()
 
-    let members = projectMemberDocs(props).filter((m) => m !== legacyDocId(id))
+    let members = projectMemberDocs(props)
     if (members.length === 0) {
       // No members pinned yet: fall back to sibling docs in the same workspace.
       try {
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         )
         members = sib.rows
           .map((r) => legacyDocId(r.id as string))
-          .filter((m: string) => m !== legacyDocId(id) && !m.startsWith("room:"))
+          .filter((m: string) => !m.startsWith("room:"))
           .slice(0, MAX_MEMBER_DOCS)
       } catch {
         members = []
