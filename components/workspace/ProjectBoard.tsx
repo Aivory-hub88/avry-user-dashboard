@@ -80,8 +80,8 @@ export default function ProjectBoard({
     setMovingId(row.id)
     setError(null)
     try {
-      const r = await fetch(`/api/workspace/${row.doc_id}/database/${row.id}`, {
-        method: "PATCH",
+      const r = await fetch(`/api/workspace/${row.doc_id}/database/${row.id}/move`, {
+        method: "POST",
         headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
         body: JSON.stringify({ status }),
       })

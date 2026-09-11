@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
-import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2 } from "lucide-react"
+import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 
 type RowComment = { id: string; text: string; author: string; at: string }
@@ -75,6 +75,55 @@ function PriorityPill({ p }: { p: Row["priority"] }) {
 
 function isOverdue(r: Row): boolean {
   return !!r.due && r.status !== "Done" && r.due < new Date().toISOString().slice(0, 10)
+}
+
+type HistoryItem = {
+  id: string
+  actor_type: string
+  actor_id: string
+  actor_name: string
+  action: string
+  summary: string
+  created_at: string
+}
+
+/** Per-row history from the workspace activity log (created/moved/commented…). */
+function RowHistory({ docId, rowId }: { docId: string; rowId: string }) {
+  const [items, setItems] = useState<HistoryItem[] | null>(null)
+  useEffect(() => {
+    let alive = true
+    setItems(null)
+    fetch(`/api/workspace/${docId}/activity?targetType=database-row&targetId=${encodeURIComponent(rowId)}`, {
+      headers: collabAuthHeaders(),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (alive) setItems(Array.isArray(j?.activities) ? j.activities : [])
+      })
+      .catch(() => {
+        if (alive) setItems([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [docId, rowId])
+  if (items === null || items.length === 0) return null
+  return (
+    <div className="mt-6 border-t border-line pt-4">
+      <div className="text-[11px] uppercase tracking-wider text-white/30">History · {items.length}</div>
+      <div className="mt-2 flex flex-col gap-1.5">
+        {items.slice(0, 10).map((h) => (
+          <div key={h.id} className="rounded-xl bg-white/[0.02] px-3 py-2">
+            <div className="text-[12px] leading-snug text-white/60">{h.summary}</div>
+            <div className="mt-0.5 text-[10px] text-white/25">
+              {h.actor_name || h.actor_id} · {h.action} ·{" "}
+              {new Date(h.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 function StatusPill({ s }: { s: string }) {
@@ -201,6 +250,16 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   // Board grouping: status (default kanban) | assignee (workload) | priority.
   // Session-only; saved views keep controlling filters/sort.
   const [groupBy, setGroupBy] = useState<"status" | "assignee" | "priority">("status")
+  // CSV import (via REST so WIP limits + activity apply per row).
+  const [importing, setImporting] = useState(false)
+  const importRef = useRef<HTMLInputElement | null>(null)
+  // Transient action notice (WIP blocks, import summary). Auto-clears.
+  const [notice, setNotice] = useState<string | null>(null)
+  useEffect(() => {
+    if (!notice) return
+    const t = setTimeout(() => setNotice(null), 5000)
+    return () => clearTimeout(t)
+  }, [notice])
   const selectedRow = selectedId ? rows.find((r) => r.id === selectedId) ?? null : null
   const readOnlyRef = useRef(readOnly)
   useEffect(() => {
@@ -531,7 +590,20 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
 
   const onDropKanban = (e: React.DragEvent, key: string) => {
     const id = e.dataTransfer.getData("text/plain")
-    if (id) updateRow(id, dropPatch(key))
+    if (!id) return
+    // WIP pre-check (mirrors the server 409 gate): block the drop locally
+    // with a notice instead of writing a move the server would reject.
+    if (groupBy === "status") {
+      const limit = wip[key]
+      if (limit !== undefined) {
+        const count = rows.filter((r) => r.status === key && r.id !== id).length
+        if (count + 1 > limit) {
+          setNotice(`WIP limit reached for ${key} (${limit}) — finish something first.`)
+          return
+        }
+      }
+    }
+    updateRow(id, dropPatch(key))
   }
 
   const addComment = () => {
@@ -540,6 +612,105 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     const next = [...selectedRow.comments, { id: `c-${Date.now().toString(36)}`, text: commentDraft.trim().slice(0, 500), author, at: new Date().toISOString() }]
     updateRow(selectedRow.id, { comments: next } as unknown as Partial<Row>)
     setCommentDraft("")
+  }
+
+  /** Minimal CSV parser (quotes + embedded commas/newlines). Returns rows of cells. */
+  const parseCsv = (text: string): string[][] => {
+    const rows: string[][] = []
+    let cur: string[] = []
+    let cell = ""
+    let quoted = false
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i]
+      if (quoted) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') {
+            cell += '"'
+            i++
+          } else {
+            quoted = false
+          }
+        } else {
+          cell += ch
+        }
+      } else if (ch === '"') {
+        quoted = true
+      } else if (ch === ",") {
+        cur.push(cell)
+        cell = ""
+      } else if (ch === "\n" || ch === "\r") {
+        if (ch === "\r" && text[i + 1] === "\n") i++
+        cur.push(cell)
+        cell = ""
+        if (cur.length > 1 || cur[0].trim() !== "") rows.push(cur)
+        cur = []
+      } else {
+        cell += ch
+      }
+    }
+    cur.push(cell)
+    if (cur.length > 1 || cur[0].trim() !== "") rows.push(cur)
+    return rows
+  }
+
+  const importCsv = async (file: File) => {
+    if (importing || readOnlyRef.current) return
+    setImporting(true)
+    setNotice(null)
+    try {
+      const text = await file.text()
+      const parsed = parseCsv(text).slice(0, 201)
+      if (parsed.length === 0) {
+        setNotice("CSV is empty.")
+        return
+      }
+      const KNOWN = new Set(["title", "status", "priority", "assignee", "due", "description"])
+      const first = parsed[0].map((c) => c.trim().toLowerCase())
+      const hasHeader = first.includes("title")
+      const idx: Record<string, number> = {}
+      if (hasHeader) {
+        first.forEach((h, i) => {
+          if (KNOWN.has(h) && idx[h] === undefined) idx[h] = i
+        })
+      } else {
+        ;["title", "status", "priority", "assignee", "due", "description"].forEach((h, i) => {
+          idx[h] = i
+        })
+      }
+      const body = hasHeader ? parsed.slice(1) : parsed
+      let ok = 0
+      let skipped = 0
+      for (const cells of body.slice(0, 200)) {
+        const at = (k: string) => (idx[k] !== undefined ? (cells[idx[k]] ?? "").trim() : "")
+        const title = at("title")
+        if (!title && !at("description")) {
+          skipped++
+          continue
+        }
+        try {
+          const r = await fetch(`/api/workspace/${docId}/database`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+            body: JSON.stringify({
+              title: title.slice(0, 200) || "Untitled",
+              status: at("status") || "Todo",
+              priority: ["Low", "Med", "High"].includes(at("priority")) ? at("priority") : "Med",
+              assignee: at("assignee").slice(0, 100),
+              due: at("due").slice(0, 20),
+              description: at("description").slice(0, 4000),
+            }),
+          })
+          if (r.ok) ok++
+          else skipped++
+        } catch {
+          skipped++
+        }
+      }
+      setNotice(`Imported ${ok} task${ok === 1 ? "" : "s"}${skipped ? ` · ${skipped} skipped` : ""}.`)
+    } catch {
+      setNotice("Could not read that CSV file.")
+    }
+    setImporting(false)
   }
 
   const baseFiltered = rows.filter((r) => {
@@ -614,6 +785,11 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
       )}
 
       {/* Insights — lightweight SVG charts (no extra deps): donut by status + bars by priority */}
+      {notice && (
+        <div className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-[12px] text-amber-200">
+          {notice}
+        </div>
+      )}
       {rows.length > 0 && (
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-line bg-white/[0.025] p-4">
@@ -719,13 +895,35 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
               </select>
             )}
             {!readOnly && (
-              <button
-                onClick={addRow}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[12.5px] font-medium text-black shadow-sm transition hover:bg-white/90"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                New
-              </button>
+              <>
+                <input
+                  ref={importRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    if (f) void importCsv(f)
+                    e.target.value = ""
+                  }}
+                />
+                <button
+                  onClick={() => importRef.current?.click()}
+                  disabled={importing}
+                  title="Import tasks from CSV (title,status,priority,assignee,due,description)"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-4 py-2 text-[12.5px] font-medium text-white/70 hover:bg-white/[0.08] hover:text-white disabled:opacity-40"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  {importing ? "Importing…" : "Import"}
+                </button>
+                <button
+                  onClick={addRow}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[12.5px] font-medium text-black shadow-sm transition hover:bg-white/90"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  New
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -1089,6 +1287,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                     <button onClick={addComment} disabled={!commentDraft.trim()} className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40">Send</button>
                   </div>
                 )}
+                <RowHistory docId={docId} rowId={selectedRow.id} />
                 {!readOnly && (
                   <button
                     onClick={async () => {

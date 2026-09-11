@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { getDocRole, canWrite } from "@/lib/workspaceAccess"
+import { getDocRole, canWrite, canRead, checkAgentAccess } from "@/lib/workspaceAccess"
 import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 
@@ -10,15 +10,30 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
-  if (!(await getDocRole(credential, id))) return forbidden()
+  // Agent gate (read) for asserted service agents; users via getDocRole.
+  if (await checkAgentAccess(id, credential, req.headers.get("x-agent-type"), 'read')) return forbidden()
+  if (!canRead(await getDocRole(credential, id))) return forbidden()
+  // Optional per-row history: ?targetType=database-row&targetId=<rowId>
+  const targetType = req.nextUrl.searchParams.get("targetType")?.slice(0, 32)
+  const targetId = req.nextUrl.searchParams.get("targetId")?.slice(0, 64)
   try {
+    const conds = ["doc_id = $1"]
+    const values: unknown[] = [id]
+    if (targetType) {
+      conds.push(`target_type = $${values.length + 1}`)
+      values.push(targetType)
+    }
+    if (targetId) {
+      conds.push(`target_id = $${values.length + 1}`)
+      values.push(targetId)
+    }
     const result = await query(
       `SELECT id, actor_type, actor_id, actor_name, action, target_type, target_id, summary, status, metadata, created_at
        FROM dashboard.workspace_activity
-       WHERE doc_id = $1
+       WHERE ${conds.join(" AND ")}
        ORDER BY created_at DESC
        LIMIT 30`,
-      [id],
+      values,
     )
     return NextResponse.json({ activities: result.rows })
   } catch (error) {

@@ -13,6 +13,7 @@ vi.mock('@/lib/db', () => ({ query: queryMock }))
 vi.mock('@/lib/serverAuth', () => ({ getAuthUserWithToken: () => null }))
 
 import { PATCH } from './route'
+import { POST as movePOST } from './move/route'
 import { GET as commentsGET, POST as commentsPOST } from './comments/route'
 
 process.env.COLLAB_SERVICE_TOKEN = 'test-service-token'
@@ -105,8 +106,7 @@ describe('PATCH /api/workspace/[id]/database/[rowId]', () => {
   })
 })
 
-describe('comments sub-resource', () => {
-  const cParams = (rowId: string) => ({ params: Promise.resolve({ id: 'doc-1', rowId }) })
+describe('comments sub-resource', () => {  const cParams = (rowId: string) => ({ params: Promise.resolve({ id: 'doc-1', rowId }) })
 
   it('appends a comment and reads it back', async () => {
     const post = await commentsPOST(
@@ -141,5 +141,40 @@ describe('comments sub-resource', () => {
       cParams('r0'),
     )
     expect(post.status).toBe(400)
+  })
+})
+
+describe('POST /api/workspace/[id]/database/[rowId]/move', () => {
+  const moveReq = (rowId: string, body: unknown): NextRequest =>
+    new NextRequest(`http://localhost/api/workspace/doc-1/database/${rowId}/move`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json', ...svc },
+    })
+  const moveParams = (rowId: string) => ({ params: Promise.resolve({ id: 'doc-1', rowId }) })
+
+  it('moves a card and records from/to', async () => {
+    const res = await movePOST(moveReq('r0', { status: 'Done' }), moveParams('r0'))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ id: 'r0', status: 'Done', moved: true, from: 'Doing' })
+  })
+
+  it('is a no-op when already in the target column', async () => {
+    const res = await movePOST(moveReq('r0', { status: 'Doing' }), moveParams('r0'))
+    expect(res.status).toBe(200)
+    expect((await res.json()).moved).toBe(false)
+  })
+
+  it('rejects moves into a full WIP column with 409', async () => {
+    const res = await movePOST(moveReq('r0', { status: 'Todo' }), moveParams('r0'))
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toBe('wip-exceeded')
+  })
+
+  it('requires a status with 400 and 404s unknown rows', async () => {
+    const bad = await movePOST(moveReq('r0', {}), moveParams('r0'))
+    expect(bad.status).toBe(400)
+    const missing = await movePOST(moveReq('nope', { status: 'Done' }), moveParams('nope'))
+    expect(missing.status).toBe(404)
   })
 })
