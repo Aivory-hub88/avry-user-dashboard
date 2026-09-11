@@ -21,6 +21,7 @@ export type AgentActionType =
   | 'workflow'
   | 'integration'
   | 'meeting'
+  | 'task'
 
 export interface AgentAction {
   action_id: string

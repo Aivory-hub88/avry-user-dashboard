@@ -763,7 +763,8 @@
     "actionAnomalyFlagged": "Anomali ditandai",
     "actionWorkflowTriggered": "Alur kerja dijalankan",
     "actionIntegration": "Tindakan integrasi",
-    "actionMeetingSummarised": "Meeting diringkas"
+    "actionMeetingSummarised": "Meeting diringkas",
+    "actionTask": "Tugas"
   },
   "templates": {
     "badgeLabel": "Template",

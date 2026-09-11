@@ -414,6 +414,7 @@ const ACTION_META: Record<string, { labelKey: string; emoji: string }> = {
   workflow: { labelKey: 'actionWorkflowTriggered', emoji: '⚡' },
   integration: { labelKey: 'actionIntegration', emoji: '🔗' },
   meeting: { labelKey: 'actionMeetingSummarised', emoji: '📝' },
+  task: { labelKey: 'actionTask', emoji: '📋' },
 };
 
 const AGENT_TITLE_KEYS: Record<string, string> = {
@@ -460,6 +461,11 @@ function actionSummary(action: AgentAction): string {
     }
     case 'integration':
       return pick('tool').replace(/_/g, ' ').toLowerCase();
+    case 'task': {
+      const status = pick('status');
+      const detail = status === 'blocked' ? pick('blocked_reason') : '';
+      return [pick('title'), status && `· ${status}`, detail && `— ${detail}`].filter(Boolean).join(' ');
+    }
     default:
       return '';
   }

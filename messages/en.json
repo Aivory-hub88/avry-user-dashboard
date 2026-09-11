@@ -763,7 +763,8 @@
     "actionAnomalyFlagged": "Anomaly flagged",
     "actionWorkflowTriggered": "Workflow triggered",
     "actionIntegration": "Integration action",
-    "actionMeetingSummarised": "Meeting summarised"
+    "actionMeetingSummarised": "Meeting summarised",
+    "actionTask": "Task"
   },
   "templates": {
     "badgeLabel": "Templates",
