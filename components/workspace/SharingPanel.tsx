@@ -218,27 +218,29 @@ export default function SharingPanel({ docId, isOwner }: { docId: string; isOwne
         viewers read only. Revoking cuts access immediately.
       </div>
       <div className="mt-3 flex flex-col gap-2">
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2">
           <select
             value={agentType}
             onChange={(e) => setAgentType(e.target.value)}
-            className="flex-1 rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70"
+            className="w-full rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70"
           >
             {AGENT_OPTIONS.map((a) => (
               <option key={a.type} value={a.type}>{a.name} · {a.type}</option>
             ))}
           </select>
-          <select
-            value={agentRole}
-            onChange={(e) => setAgentRole(e.target.value as any)}
-            className="rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70"
-          >
-            <option value="editor">editor</option>
-            <option value="viewer">viewer</option>
-          </select>
-          <button onClick={inviteAgent} className="rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90">
-            Invite
-          </button>
+          <div className="flex gap-2">
+            <select
+              value={agentRole}
+              onChange={(e) => setAgentRole(e.target.value as any)}
+              className="flex-1 rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70"
+            >
+              <option value="editor">editor</option>
+              <option value="viewer">viewer</option>
+            </select>
+            <button onClick={inviteAgent} className="shrink-0 rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90">
+              Invite
+            </button>
+          </div>
         </div>
       </div>
       {msg && <div className="mt-2 text-[11px] text-white/50">{msg}</div>}
