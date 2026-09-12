@@ -330,7 +330,7 @@ export default function WorkspaceDocPage() {
 
   return (
     <div className="flex h-full w-full flex-col bg-surface-1">
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-line px-6">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-black/10 px-6">
         <div className="flex min-w-0 items-center gap-2">
           <Link href="/workspace" className="shrink-0 text-[13px] text-white/40 hover:text-white/70">
             Workspace
@@ -532,7 +532,7 @@ export default function WorkspaceDocPage() {
       )}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <WorkspaceNavigator currentId={id} />
-        <div className="min-w-0 flex-1 overflow-y-auto px-8 py-8 lg:px-10 xl:px-12">
+        <div className="min-w-0 flex-1 overflow-y-auto bg-black/10 px-8 py-8 lg:px-10 xl:px-12">
           {view === "page" && (
             <>
               {meta?.cover_url && (

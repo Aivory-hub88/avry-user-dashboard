@@ -150,7 +150,7 @@ export default function WorkspacePage() {
 
   return (
     <div className="flex h-full w-full flex-col bg-surface-1">
-      <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line px-6">
+      <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-black/10 px-6">
         <span className="shrink-0 text-[13px] font-medium leading-none text-white/80">My workspace</span>
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
           <input
@@ -175,7 +175,7 @@ export default function WorkspacePage() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[860px] flex-1 overflow-y-auto px-8 py-8">
+      <div className="mx-auto w-full max-w-[860px] flex-1 overflow-y-auto bg-black/10 px-8 py-8">
         <div className="mb-4 flex items-center gap-2">
           <button onClick={() => setShowTrash(false)} className={`rounded-full px-3 py-1.5 text-[12px] ${!showTrash ? "bg-white text-black" : "bg-white/[0.06] text-white/50"}`}>Pages</button>
           <button onClick={() => setShowTrash(true)} className={`rounded-full px-3 py-1.5 text-[12px] ${showTrash ? "bg-white text-black" : "bg-white/[0.06] text-white/50"}`}>Trash {trashDocs.length ? `· ${trashDocs.length}` : ""}</button>
