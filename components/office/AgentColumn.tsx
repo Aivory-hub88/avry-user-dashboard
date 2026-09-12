@@ -9,16 +9,12 @@ import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import { ChevronRight, ChevronLeft, Lock, Plus, Trash2, LayoutGrid, Search } from "lucide-react"
 import { asset } from "@/lib/asset"
-import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
+import type { AgentDeployment } from "@/lib/agentChat"
 import type { ChatSession } from "@/hooks/useChat"
 import type { Notification } from "@/types/notifications"
 import { ThinkingDots } from "@/components/ui/ThinkingDots"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
-
-const CHANNEL_ICON: Record<string, string> = {
-  telegram: "/integrations/telegram.svg",
-  slack: "/integrations/slack.svg",
-}
+import { OFFICE_ROWS, CHANNEL_ICON, relativeTime, lastPreview } from "@/lib/officeRows"
 
 interface AgentColumnProps {
   sessionsByAgent: Record<string, ChatSession[]>
@@ -49,34 +45,8 @@ interface AgentColumnProps {
   onToggleCollapse?: () => void
 }
 
-interface Row {
-  key: string
-  type: string | null
-  title: string
-  enterprise?: boolean
-}
-
-const ROWS: Row[] = [
-  { key: "null", type: null, title: "Aivory Console" },
-  ...PREBUILT_AGENTS.map((a) => ({ key: a.type, type: a.type, title: a.title, enterprise: a.enterprise })),
-]
-
-function relativeTime(ts: number): string {
-  const diffMs = Date.now() - ts
-  const mins = Math.round(diffMs / 60_000)
-  if (mins < 1) return "now"
-  if (mins < 60) return `${mins}m`
-  const hours = Math.round(mins / 60)
-  if (hours < 24) return `${hours}h`
-  return `${Math.round(hours / 24)}d`
-}
-
-function lastPreview(session: ChatSession | undefined): string {
-  if (!session || session.messages.length === 0) return "No messages yet"
-  const last = session.messages[session.messages.length - 1]
-  const text = last.content.replace(/\s+/g, " ").trim()
-  return text.length > 44 ? `${text.slice(0, 44)}…` : text || "New chat"
-}
+type Row = (typeof OFFICE_ROWS)[number]
+const ROWS = OFFICE_ROWS
 
 export default function AgentColumn({
   sessionsByAgent,
@@ -173,6 +143,7 @@ export default function AgentColumn({
   const matchesQuery = (row: Row, threads: ChatSession[]) =>
     !q ||
     row.title.toLowerCase().includes(q) ||
+    row.role.toLowerCase().includes(q) ||
     threads.some((t) => (t.title || "").toLowerCase().includes(q))
 
   if (collapsed) {
@@ -205,7 +176,7 @@ export default function AgentColumn({
               <button
                 key={row.key}
                 onClick={() => openAgent(row)}
-                title={row.title}
+                title={row.title === row.role ? row.title : `${row.title} — ${row.role}`}
                 className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full transition-[background-color,box-shadow] ${
                   isConsole
                     ? ""
@@ -295,6 +266,7 @@ export default function AgentColumn({
             <div key={row.key} className="mb-0.5 w-full">
               <button
                 onClick={() => openAgent(row)}
+                title={row.title === row.role ? undefined : row.role}
                 className={`group flex w-full gap-[9px] rounded-[10px] px-[9px] text-left transition-colors ${
                   isActiveAgent ? "bg-[#414039]" : "hover:bg-white/[0.04]"
                 } ${isOpen ? "items-center py-[10px]" : "items-start py-[8px]"}`}
@@ -329,7 +301,7 @@ export default function AgentColumn({
                     </span>
                   ) : !isOpen ? (
                     <span className="mt-[2px] block truncate text-[12px] font-light leading-none text-white/35">
-                      {mostRecent ? lastPreview(mostRecent) : "No conversations yet"}
+                      {mostRecent ? lastPreview(mostRecent, { maxLen: 44, emptyText: "No messages yet" }) : "No conversations yet"}
                     </span>
                   ) : null}
                 </span>
@@ -383,7 +355,7 @@ export default function AgentColumn({
                               {t.title || "New chat"}
                             </span>
                             <span className="block truncate text-[11px] font-light text-white/25">
-                              {lastPreview(t)} · {relativeTime(t.updatedAt)}
+                              {lastPreview(t, { maxLen: 44, emptyText: "No messages yet" })} · {relativeTime(t.updatedAt)}
                             </span>
                           </button>
                           <button

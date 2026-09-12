@@ -31,8 +31,6 @@
  * anywhere yet" would be true-sounding but meaningless there.
  */
 import { useEffect, useState } from "react"
-import * as Y from "yjs"
-import { WebsocketProvider } from "y-websocket"
 import Image from "next/image"
 import Link from "next/link"
 import { ChevronLeft, ChevronRight, Brain } from "lucide-react"
@@ -51,22 +49,8 @@ import type { Notification } from "@/types/notifications"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { NotificationCard } from "@/components/office/NotificationCard"
 import { MemoryModal } from "@/components/office/MemoryModal"
-import { collabWsParams } from "@/lib/collabClient"
-
-function relativeTime(ts: number): string {
-  const diffMs = Date.now() - ts
-  const mins = Math.round(diffMs / 60_000)
-  if (mins < 1) return "now"
-  if (mins < 60) return `${mins}m`
-  const hours = Math.round(mins / 60)
-  if (hours < 24) return `${hours}h`
-  return `${Math.round(hours / 24)}d`
-}
-
-const CHANNEL_ICON: Record<string, string> = {
-  telegram: "/integrations/telegram.svg",
-  slack: "/integrations/slack.svg",
-}
+import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
+import { CHANNEL_ICON, relativeTime } from "@/lib/officeRows"
 
 /** The shared strip every status line in this rail is built from. */
 function Bar({ tone = "idle", children }: { tone?: "idle" | "warn"; children: React.ReactNode }) {
@@ -112,42 +96,12 @@ export default function AgentRail({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
   const [memoryOpen, setMemoryOpen] = useState(false)
-  const [awarenessPeers, setAwarenessPeers] = useState<Array<{ name: string; color: string; agentType: string }>>([])
+  const awarenessPeers = useWorkspaceAwareness(workspaceId)
   const [, forceNow] = useState(0)
   useEffect(() => {
     const id = setInterval(() => forceNow((n) => n + 1), 60000)
     return () => clearInterval(id)
   }, [])
-
-  useEffect(() => {
-    if (!workspaceId) {
-      // Reset presence when the active workspace is cleared.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAwarenessPeers([])
-      return
-    }
-    const wsUrl =
-      typeof window !== "undefined" && window.location.hostname === "localhost"
-        ? "ws://localhost:3200"
-        : "wss://aivory.uk/yjs"
-    const doc = new Y.Doc()
-    let provider: WebsocketProvider | null = null
-    try {
-      provider = new WebsocketProvider(wsUrl, `workspace:${workspaceId}`, doc, { connect: true, params: collabWsParams() })
-      const updatePeers = () => {
-        const peers = Array.from(provider!.awareness.getStates().values())
-          .map((s: unknown) => (s as { user?: { name: string; color: string; agentType: string } })?.user)
-          .filter(Boolean) as Array<{ name: string; color: string; agentType: string }>
-        setAwarenessPeers(peers)
-      }
-      provider.awareness.on("change", updatePeers)
-      updatePeers()
-    } catch {}
-    return () => {
-      provider?.destroy()
-      doc.destroy()
-    }
-  }, [workspaceId])
 
   const title = agentTarget
     ? PREBUILT_AGENTS.find((a) => a.type === agentTarget)?.name ?? agentTarget
@@ -225,7 +179,13 @@ export default function AgentRail({
       <MemoryModal agentType={agentTarget} agentTitle={title} open={memoryOpen} onClose={() => setMemoryOpen(false)} />
 
       <div className="flex-1 overflow-y-auto px-[14px] py-[14px]">
-        {agentTarget === null ? (
+        {/* Console itself isn't approval-gated, but an approval whose
+            `_agent_type` is missing (an older Cerveau) is grouped under this
+            same `null` key rather than a made-up bucket no row reads — see
+            listPendingApprovalsByAgent. So the placeholder only wins when
+            there's genuinely nothing to show; a real notification here still
+            gets the full list below instead of being hidden behind it. */}
+        {agentTarget === null && notifications.length === 0 ? (
           <Bar tone="idle">
             Aivory Console is the direct chat — it doesn&apos;t run behind an approval gate and isn&apos;t deployed
             anywhere on its own. Switch to one of your agents to see what it&apos;s waiting on.
@@ -257,7 +217,7 @@ export default function AgentRail({
                   tone="warn"
                   icon={<IoWarning className="h-[15px] w-[15px]" />}
                   title="Not deployed anywhere yet"
-                  subtitle="Connect it to Telegram, Slack, or WhatsApp to reach it outside Console."
+                  subtitle="Connect it to Telegram or Slack to reach it outside Console."
                   actions={
                     <Link
                       href="/agents"

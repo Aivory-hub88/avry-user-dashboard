@@ -91,11 +91,20 @@ export async function listPendingApprovals(): Promise<PendingApproval[]> {
   return data.approvals ?? []
 }
 
-/** Same list, grouped by `_agent_type` — 'unknown' for any row missing it. */
+/**
+ * Same list, grouped by `_agent_type`. A row missing it (an older Cerveau
+ * that predates the field) falls into the same `'null'` bucket the "Aivory
+ * Console" row already uses — not a made-up `'unknown'` key, which none of
+ * AgentColumn/AgentRail/MissionControl's `ROWS` ever match, so an approval
+ * landing there used to vanish from every per-agent badge while still
+ * counting toward the global nav total. `'null'` is always a real,
+ * always-rendered row, so the approval stays visible instead of silently
+ * disappearing.
+ */
 export async function listPendingApprovalsByAgent(): Promise<Record<string, PendingApproval[]>> {
   const approvals = await listPendingApprovals()
   return approvals.reduce<Record<string, PendingApproval[]>>((acc, a) => {
-    const key = a._agent_type ?? 'unknown'
+    const key = a._agent_type ?? 'null'
     ;(acc[key] ??= []).push(a)
     return acc
   }, {})

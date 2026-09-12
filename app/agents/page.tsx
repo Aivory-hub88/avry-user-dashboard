@@ -594,6 +594,12 @@ function CreditsPill() {
 export default function AgentsPage() {
   const t = useTranslations('agents');
   const [customizingAgent, setCustomizingAgent] = useState<{ title: string, agentType: TelegramAgentType } | null>(null);
+  // "Kustomisasi {name}" reads as the agent's own first-name identity
+  // everywhere else in the office (Console top bar, AgentRail header) — this
+  // modal used to be handed the long descriptive `title` instead ("Kustomisasi
+  // Ticket Ops Agent"), the one place first-name branding hadn't landed yet.
+  const customizingAgentFirstName =
+    AGENTS.find((a) => a.agentType === customizingAgent?.agentType)?.name ?? customizingAgent?.title ?? null;
   const [dynamicAgents, setDynamicAgents] = useState<any[]>([]);
   const [deployments, setDeployments] = useState<AgentDeployment[]>([]);
 
@@ -680,7 +686,7 @@ export default function AgentsPage() {
       <CustomizeAgentModal
         isOpen={!!customizingAgent}
         onClose={() => { setCustomizingAgent(null); refreshDeployments(); }}
-        agentName={customizingAgent?.title ?? null}
+        agentName={customizingAgentFirstName}
         agentType={customizingAgent?.agentType ?? null}
       />
     </div>

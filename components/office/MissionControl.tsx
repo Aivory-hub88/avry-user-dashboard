@@ -13,27 +13,18 @@ import Link from "next/link"
 import Image from "next/image"
 import { Lock } from "lucide-react"
 import { useEffect, useState } from "react"
-import * as Y from "yjs"
-import { WebsocketProvider } from "y-websocket"
 import { asset } from "@/lib/asset"
-import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
+import type { AgentDeployment } from "@/lib/agentChat"
 import type { ChatSession } from "@/hooks/useChat"
-import { readVerifierFinding, type PendingApproval } from "@/lib/agentApprovals"
-import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
+import { readVerifierFinding } from "@/lib/agentApprovals"
+import type { Notification } from "@/types/notifications"
+import { collabAuthHeaders } from "@/lib/collabClient"
+import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
 import { ThinkingDots } from "@/components/ui/ThinkingDots"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
+import { OFFICE_ROWS, CHANNEL_ICON, relativeTime, lastPreview as sharedLastPreview } from "@/lib/officeRows"
 
-const CHANNEL_ICON: Record<string, string> = {
-  telegram: "/integrations/telegram.svg",
-  slack: "/integrations/slack.svg",
-}
-
-interface Row {
-  key: string
-  type: string | null
-  title: string
-  enterprise?: boolean
-}
+type Row = (typeof OFFICE_ROWS)[number]
 
 type Activity = {
   id: number
@@ -43,32 +34,20 @@ type Activity = {
   created_at: string
 }
 
-const ROWS: Row[] = [
-  { key: "null", type: null, title: "Aivory Console" },
-  ...PREBUILT_AGENTS.map((a) => ({ key: a.type, type: a.type, title: a.title, enterprise: a.enterprise })),
-]
-
-function relativeTime(ts: number): string {
-  const diffMs = Date.now() - ts
-  const mins = Math.round(diffMs / 60_000)
-  if (mins < 1) return "now"
-  if (mins < 60) return `${mins}m`
-  const hours = Math.round(mins / 60)
-  if (hours < 24) return `${hours}h`
-  return `${Math.round(hours / 24)}d`
-}
+const ROWS = OFFICE_ROWS
 
 function lastPreview(session: ChatSession | undefined): string {
-  if (!session || session.messages.length === 0) return "No conversations yet"
-  const last = session.messages[session.messages.length - 1]
-  const text = last.content.replace(/\s+/g, " ").trim()
-  return text.length > 56 ? `${text.slice(0, 56)}…` : text || "New chat"
+  return sharedLastPreview(session, { maxLen: 56, emptyText: "No conversations yet" })
 }
 
 interface MissionControlProps {
   workspaceId: string | null
   sessionsByAgent: Record<string, ChatSession[]>
-  approvalsByAgent: Record<string, PendingApproval[]>
+  /** Approvals + missed-reply activity + schedule failures, merged — same
+   *  feed AgentColumn/AgentRail read from (see useNotificationFeed). Using
+   *  anything narrower here (e.g. approvals alone) makes a card say "Idle"
+   *  while the same agent shows a badge everywhere else in the office. */
+  notificationsByAgent: Record<string, Notification[]>
   deployments: AgentDeployment[]
   streamingAgentType: string | null | undefined
   onOpenAgent: (agentType: string | null) => void
@@ -77,7 +56,7 @@ interface MissionControlProps {
 export default function MissionControl({
   workspaceId,
   sessionsByAgent,
-  approvalsByAgent,
+  notificationsByAgent,
   deployments,
   streamingAgentType,
   onOpenAgent,
@@ -85,7 +64,7 @@ export default function MissionControl({
   const [wsRows, setWsRows] = useState<{ id: string; title: string; status: string; priority: string }[]>([])
   const [activities, setActivities] = useState<Activity[]>([])
   const [wsBusy, setWsBusy] = useState<string | null>(null)
-  const [awarenessPeers, setAwarenessPeers] = useState<Array<{ name: string; color: string; agentType: string }>>([])
+  const awarenessPeers = useWorkspaceAwareness(workspaceId)
   const [, forceNow] = useState(0)
   useEffect(() => {
     const id = setInterval(() => forceNow((n) => n + 1), 60000)
@@ -118,36 +97,6 @@ export default function MissionControl({
     return () => {
       alive = false
       clearInterval(t)
-    }
-  }, [workspaceId])
-
-  useEffect(() => {
-    if (!workspaceId) {
-      // Reset presence when the active workspace is cleared.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAwarenessPeers([])
-      return
-    }
-    const wsUrl =
-      typeof window !== "undefined" && window.location.hostname === "localhost"
-        ? "ws://localhost:3200"
-        : "wss://aivory.uk/yjs"
-    const doc = new Y.Doc()
-    let provider: WebsocketProvider | null = null
-    try {
-      provider = new WebsocketProvider(wsUrl, `workspace:${workspaceId}`, doc, { connect: true, params: collabWsParams() })
-      const updatePeers = () => {
-        const peers = Array.from(provider!.awareness.getStates().values())
-          .map((s: unknown) => (s as { user?: { name: string; color: string; agentType: string } })?.user)
-          .filter(Boolean) as Array<{ name: string; color: string; agentType: string }>
-        setAwarenessPeers(peers)
-      }
-      provider.awareness.on("change", updatePeers)
-      updatePeers()
-    } catch {}
-    return () => {
-      provider?.destroy()
-      doc.destroy()
     }
   }, [workspaceId])
 
@@ -191,15 +140,17 @@ export default function MissionControl({
           {ROWS.map((row) => {
             const threads = sessionsByAgent[row.key] ?? []
             const mostRecent = threads[0]
-            const approvals = approvalsByAgent[row.key] ?? []
-            const pending = approvals.length
+            const notifications = notificationsByAgent[row.key] ?? []
+            const pending = notifications.length
             // ADR-008 Phase 3a: an approval `verifier_brain` flagged is still
             // just one of the pending ones — the count badge already carries
             // "how many". What the glance view was missing is "is any of them
             // worth opening first", so the status line says that instead.
-            // Reading it off the approvals already passed in keeps this view's
-            // no-new-data-source rule intact.
-            const flagged = approvals.some((a) => readVerifierFinding(a)?.verdict === "flag")
+            // Reading it off the same merged feed AgentColumn/AgentRail use
+            // keeps every surface agreeing on what "needs you" means.
+            const flagged = notifications.some(
+              (n) => n.kind === "approval" && readVerifierFinding(n.approval)?.verdict === "flag",
+            )
             const channels = row.type
               ? [...new Set(deployments.filter((d) => d.agentType === row.type).map((d) => d.kind))]
               : []
@@ -217,6 +168,7 @@ export default function MissionControl({
               <button
                 key={row.key}
                 onClick={() => onOpenAgent(row.type)}
+                title={row.title === row.role ? undefined : row.role}
                 className="group flex flex-col gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5 text-left transition-colors hover:border-white/[0.14] hover:bg-white/[0.05]"
               >
                 <div className="flex items-center justify-between gap-2">

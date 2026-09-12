@@ -1467,18 +1467,23 @@ export default function CustomizeAgentModal({
                     </div>
                   </button>
 
-                  <button className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group">
+                  {/* No onClick on purpose: there is no WhatsApp deploy flow or
+                      backend endpoint yet (listDeployments()/deleteDeployment()
+                      in lib/agentChat.ts only know telegram/slack/api) — this
+                      used to render identically to the working buttons above
+                      it with no handler at all, a silent dead click. disabled
+                      + "Coming soon" copy makes the real state visible instead. */}
+                  <button
+                    disabled
+                    title={t('whatsappConnectDesc')}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-left opacity-50 cursor-not-allowed"
+                  >
                     <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
                       <Image src={asset('/integrations/icons/whatsapp.svg')} alt="WhatsApp" width={40} height={40} />
                     </div>
                     <div>
                       <div className="text-white/90 font-medium text-[14px]">{t('whatsapp')}</div>
                       <div className="text-white/40 text-[12px] mt-0.5">{t('whatsappConnectDesc')}</div>
-                    </div>
-                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-accent">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                      </svg>
                     </div>
                   </button>
                 </div>

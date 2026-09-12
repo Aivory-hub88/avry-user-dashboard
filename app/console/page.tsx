@@ -177,7 +177,6 @@ export default function ConsolePage() {
     .map((m) => m.pendingApproval!.id)
   const {
     byAgent: notificationsByAgent,
-    approvalsByAgent,
     approvalsLoaded,
     approvalsError,
     resolveApproval: resolveRailApproval,
@@ -392,7 +391,7 @@ export default function ConsolePage() {
           <MissionControl
             workspaceId={activeWorkspaceId}
             sessionsByAgent={sessionsByAgent}
-            approvalsByAgent={approvalsByAgent}
+            notificationsByAgent={notificationsByAgent}
             deployments={deployments}
             streamingAgentType={streamingAgentType}
             onOpenAgent={openAgentFromMissionControl}

@@ -35,23 +35,38 @@ export function MemoryModal({ agentType, agentTitle, open, onClose }: MemoryModa
   const [draft, setDraft] = useState("")
   const [busyKey, setBusyKey] = useState<string | null>(null)
 
-  const load = () => {
+  // Guards against a stale response overwriting a newer one — same
+  // `cancelled` pattern useScheduleAlerts.ts uses. Without it, opening the
+  // modal for one agent, then (without waiting for the fetch to land)
+  // reopening it for another agent while the first request is still in
+  // flight, could resolve out of order: the first agent's response,
+  // filtered against its own closure's `agentType`, would win last and
+  // show entries under the wrong agent's memory list.
+  const load = (forAgentType: string | null, onDone: () => boolean) => {
     setError(null)
     setEntries(null)
     listMemory()
-      .then((all) => setEntries(all.filter((e) => e._agent_type === agentType)))
-      .catch((e) => setError(e instanceof Error ? e.message : "Could not load memory."))
+      .then((all) => {
+        if (!onDone()) return
+        setEntries(all.filter((e) => e._agent_type === forAgentType))
+      })
+      .catch((e) => {
+        if (!onDone()) return
+        setError(e instanceof Error ? e.message : "Could not load memory.")
+      })
   }
 
   useEffect(() => {
+    if (!open) return
+    let cancelled = false
     // Fetch-on-open pattern, same documented convention as useChat.ts's own
     // mount effect — this is a deliberate external fetch triggered by the
     // modal opening, not state synchronized from a prop.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (open) load()
-    // Only re-fetch when the modal opens or targets a different agent —
-    // not on every render of the entries/error state this effect itself sets.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    load(agentType, () => !cancelled)
+    return () => {
+      cancelled = true
+    }
   }, [open, agentType])
 
   if (!open) return null
@@ -117,7 +132,7 @@ export function MemoryModal({ agentType, agentTitle, open, onClose }: MemoryModa
             <div className="flex items-center justify-between gap-3 rounded-lg border-l-2 border-l-amber bg-amber/6 px-3.5 py-2.5 text-[12.5px] text-white/70">
               <span>{error}</span>
               <button
-                onClick={load}
+                onClick={() => load(agentType, () => true)}
                 className="shrink-0 font-medium text-amber-light underline underline-offset-2 hover:text-amber-light-hover"
               >
                 Retry

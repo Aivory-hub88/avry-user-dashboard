@@ -19,9 +19,9 @@ export default function AgentDeployNotice({ agentName }: AgentDeployNoticeProps)
       className="w-full bg-amber/10 px-6 py-2.5 text-center text-[13px] font-light leading-[1.5] text-white/70 [animation:fadeUp_0.3s_cubic-bezier(0.23,1,0.32,1)_both]"
     >
       <Link href="/agents" className="font-medium text-amber-light underline underline-offset-2 hover:text-amber-light-hover">
-        {agentName} isn&apos;t deployed anywhere yet
+        {agentName}{" "}isn&apos;t deployed anywhere yet
       </Link>
-      {" — connect it to Telegram, Slack, or WhatsApp to reach it outside Console."}
+      {" — connect it to Telegram or Slack to reach it outside Console."}
     </div>
   )
 }
