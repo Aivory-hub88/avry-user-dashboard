@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { parseFieldDefs, cleanCells, computeRollups, parseMentions, matchesDueFilter, type RollupSubject } from "./workspaceDbModel"
+import { parseFieldDefs, cleanCells, computeRollups, parseMentions, matchesDueFilter, matchRules, parseAutomationRules, type RollupSubject } from "./workspaceDbModel"
 
 
 describe("parseFieldDefs relation/rollup", () => {
@@ -105,5 +105,26 @@ describe("matchesDueFilter", () => {
     expect(matchesDueFilter("2026-09-19", "Todo", "Next 7 days", T)).toBe(true)
     expect(matchesDueFilter("2026-09-20", "Todo", "Next 7 days", T)).toBe(false)
     expect(matchesDueFilter("", "Todo", "All", T)).toBe(true)
+  })
+})
+
+describe("parseAutomationRules", () => {
+  it("keeps valid rules and drops action-less or nameless ones", () => {
+    const rules = parseAutomationRules([
+      { id: "a1", name: "Welcome", whenStatus: "Todo", setAssignee: "lex" },
+      { id: "a2", name: "Empty", whenStatus: "Done" },
+      { id: "a3", name: "", whenStatus: "Todo", addComment: "x" },
+      { id: "a4", name: "Loop", whenStatus: "Doing", moveTo: "Doing" },
+      { id: "a5", name: "Bad", whenStatus: "Archived", addComment: "x" },
+    ])
+    expect(rules.map((r) => r.id)).toEqual(["a1"])
+  })
+
+  it("matches entries into the trigger status only", () => {
+    const rules = parseAutomationRules([{ id: "a1", name: "D", whenStatus: "Done", addComment: "nice" }])
+    expect(matchRules(rules, "Doing", "Done")).toHaveLength(1)
+    expect(matchRules(rules, "Done", "Done")).toHaveLength(0)
+    expect(matchRules(rules, null, "Done")).toHaveLength(1)
+    expect(matchRules(rules, "Todo", "Doing")).toHaveLength(0)
   })
 })

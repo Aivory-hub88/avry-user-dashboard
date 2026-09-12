@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
-import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload, LayoutTemplate } from "lucide-react"
+import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload, LayoutTemplate, Zap } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
-import { readCells, computeRollups, DUE_FILTERS, matchesDueFilter, type FieldDef, type CellValue } from "@/lib/workspaceDbModel"
+import { readCells, computeRollups, DUE_FILTERS, matchesDueFilter, parseAutomationRules, type FieldDef, type CellValue, type AutomationRule } from "@/lib/workspaceDbModel"
 
 type RowComment = { id: string; text: string; author: string; at: string }
 type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; due: string; description: string; comments: RowComment[]; cells: Record<string, CellValue> }
@@ -479,6 +479,14 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   const [newFieldRelation, setNewFieldRelation] = useState("")
   const [newFieldOp, setNewFieldOp] = useState<"count" | "donePct" | "sum">("count")
   const [newFieldNumber, setNewFieldNumber] = useState("")
+  // Automations (Fase 4e): status-entry rules in pg props.dbAutomations.
+  const [automations, setAutomations] = useState<AutomationRule[]>([])
+  const [showAutomations, setShowAutomations] = useState(false)
+  const [newRuleName, setNewRuleName] = useState("")
+  const [newRuleWhen, setNewRuleWhen] = useState("Done")
+  const [newRuleAssignee, setNewRuleAssignee] = useState("")
+  const [newRuleComment, setNewRuleComment] = useState("")
+  const [newRuleMoveTo, setNewRuleMoveTo] = useState("")
   // Target-doc rows for relation pickers (cached per doc; read-gated server-side).
   const [targetRows, setTargetRows] = useState<Record<string, Row[]>>({})
   const targetLoading = useRef<Set<string>>(new Set())
@@ -571,6 +579,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
             .slice(0, 20)
           setFields(cleanedFields)
         }
+        setAutomations(parseAutomationRules(props?.dbAutomations))
         setViewsLoaded(true)
       })
       .catch(() => { if (alive) setViewsLoaded(true) })
@@ -586,6 +595,42 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
         body: JSON.stringify({ props: { dbFields: next } }),
       })
     } catch {}
+  }
+
+  const persistAutomations = async (next: AutomationRule[]) => {
+    setAutomations(next)
+    try {
+      await fetch(`/api/workspace/${docId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+        body: JSON.stringify({ props: { dbAutomations: next } }),
+      })
+    } catch {}
+  }
+
+  const addAutomation = () => {
+    if (readOnlyRef.current || automations.length >= 20) return
+    const name = newRuleName.trim().slice(0, 40)
+    if (!name || !["Todo", "Doing", "Done"].includes(newRuleWhen)) return
+    const rule: AutomationRule = { id: `auto-${uid()}`, name, whenStatus: newRuleWhen }
+    const assignee = newRuleAssignee.trim().slice(0, 100)
+    if (assignee) rule.setAssignee = assignee
+    const comment = newRuleComment.trim().slice(0, 500)
+    if (comment) rule.addComment = comment
+    if (newRuleMoveTo && ["Todo", "Doing", "Done"].includes(newRuleMoveTo) && newRuleMoveTo !== newRuleWhen) {
+      rule.moveTo = newRuleMoveTo
+    }
+    if (rule.setAssignee === undefined && rule.addComment === undefined && rule.moveTo === undefined) return
+    void persistAutomations([...automations, rule])
+    setNewRuleName("")
+    setNewRuleAssignee("")
+    setNewRuleComment("")
+    setNewRuleMoveTo("")
+  }
+
+  const removeAutomation = (ruleId: string) => {
+    if (readOnlyRef.current) return
+    void persistAutomations(automations.filter((r) => r.id !== ruleId))
   }
 
   const addField = () => {
@@ -1302,6 +1347,14 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                 >
                   Fields{fields.length ? ` · ${fields.length}` : ""}
                 </button>
+                <button
+                  onClick={() => setShowAutomations((v) => !v)}
+                  title="Automate: when a card enters a status, assign, comment, or move it"
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-[12.5px] font-medium ${showAutomations ? "border-white bg-white text-black" : "border-line bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white"}`}
+                >
+                  <Zap className="h-3.5 w-3.5" />
+                  Automate{automations.length ? ` · ${automations.length}` : ""}
+                </button>
                 <input
                   ref={importRef}
                   type="file"
@@ -1435,6 +1488,81 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
             )}
             <button onClick={addField} disabled={!newFieldName.trim() || fields.length >= 20} className="rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40">
               Add field
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showAutomations && !readOnly && (
+        <div className="mb-4 rounded-2xl border border-line bg-white/[0.025] p-4">
+          <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/30">
+            Automations · {automations.length}/20
+          </div>
+          <div className="mb-3 text-[12px] leading-relaxed text-white/35">
+            When a card enters a status, assign it, comment, or move it on. Chained moves never re-trigger.
+          </div>
+          {automations.length > 0 && (
+            <div className="mb-3 flex flex-col gap-1.5">
+              {automations.map((r) => (
+                <div key={r.id} className="group flex items-center justify-between gap-2 rounded-xl border border-line bg-white/[0.02] px-3 py-2">
+                  <span className="min-w-0 truncate text-[12px] text-white/70">
+                    {r.name}{" "}
+                    <span className="text-white/25">
+                      · on {r.whenStatus}
+                      {r.setAssignee ? ` → ${r.setAssignee}` : ""}
+                      {r.addComment ? " + comment" : ""}
+                      {r.moveTo ? ` → ${r.moveTo}` : ""}
+                    </span>
+                  </span>
+                  <button onClick={() => removeAutomation(r.id)} title="Delete automation" className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-white/20 opacity-0 hover:text-red-300 group-hover:opacity-100">
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={newRuleName}
+              onChange={(e) => setNewRuleName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") addAutomation() }}
+              placeholder="Rule name"
+              className="w-[160px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none"
+            />
+            <span className="text-[12px] text-white/30">when entering</span>
+            <select value={newRuleWhen} onChange={(e) => setNewRuleWhen(e.target.value)} className="rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70 outline-none">
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            <input
+              value={newRuleAssignee}
+              onChange={(e) => setNewRuleAssignee(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") addAutomation() }}
+              placeholder="Assign to (optional)"
+              list={`workspace-assignees-${docId}`}
+              className="w-[160px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none"
+            />
+            <input
+              value={newRuleComment}
+              onChange={(e) => setNewRuleComment(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") addAutomation() }}
+              placeholder="Comment (optional)"
+              className="w-[200px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none"
+            />
+            <select
+              value={newRuleMoveTo}
+              onChange={(e) => setNewRuleMoveTo(e.target.value)}
+              title="Move to (optional)"
+              className="rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70 outline-none"
+            >
+              <option value="">No move</option>
+              {STATUSES.filter((s) => s !== newRuleWhen).map((s) => (
+                <option key={s} value={s}>Move to {s}</option>
+              ))}
+            </select>
+            <button onClick={addAutomation} disabled={!newRuleName.trim() || automations.length >= 20} className="rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40">
+              Add rule
             </button>
           </div>
         </div>

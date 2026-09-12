@@ -3,6 +3,7 @@ import { query } from '@/lib/db'
 import { workspaceCredential, unauthorized, forbidden } from '@/lib/workspaceAuth'
 import { getDocRole, canWrite } from '@/lib/workspaceAccess'
 import { parseFieldDefs } from '@/lib/workspaceDb'
+import { parseAutomationRules } from '@/lib/workspaceDbModel'
 import { recordWorkspaceActivity } from '@/lib/workspaceActivity'
 
 export const runtime = 'nodejs'
@@ -166,6 +167,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         cleanedWip[key] = n
       }
       propsPatch.dbWip = cleanedWip
+    }
+    // Automation rules (Fase 4e): validated structurally here; the runner
+    // enforces WIP + writes activity at execution time.
+    if (Array.isArray(src.dbAutomations)) {
+      propsPatch.dbAutomations = parseAutomationRules(src.dbAutomations)
+    } else if (src.dbAutomations !== undefined) {
+      return NextResponse.json({ error: 'props.dbAutomations must be array' }, { status: 400 })
     }
     if (Object.keys(propsPatch).length === 0) {
       return NextResponse.json({ error: 'props has no known keys' }, { status: 400 })

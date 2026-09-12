@@ -17,6 +17,7 @@ import {
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { syncDescriptionMentions } from "@/lib/workspaceMentions"
+import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
 import { indexRow, removeRowIndex, rowText, workspaceOf } from "@/lib/workspaceIndex"
 
 export const runtime = "nodejs"
@@ -70,6 +71,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
     const m = arr.get(idx) as Y.Map<unknown>
+    const prevStatus = (m.get("status") as string) ?? "Todo"
     // Custom cells merge (never replace): concurrent editors on different
     // fields must not clobber each other. Defs load BEFORE the transaction
     // (yrs transactions are sync-only, no awaits inside).
@@ -81,6 +83,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       for (const [k, v] of Object.entries(clean)) m.set(k, v)
       if (mergedCells) m.set("cells", mergedCells)
     }, agentType)
+    const actorName = cred.kind === "service" ? agentType.replace(/_/g, " ") : (cred.user.email ?? cred.user.user_id)
+    const automated = await runStatusAutomations({
+      doc,
+      rowId,
+      prevStatus,
+      wipLimits: await getWipLimits(id),
+      actorName,
+      origin: agentType,
+      getRules: () => getAutomationRules(id),
+    })
     await saveDbDoc(id, doc, cred, agentType)
     await recordWorkspaceActivity({
       docId: id,
@@ -92,6 +104,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       targetId: rowId,
       metadata: clean,
     })
+    if (automated.length > 0) {
+      await recordWorkspaceActivity({
+        docId: id,
+        credential: cred,
+        agentType,
+        action: "database.automation",
+        summary: `Automation ran on task ${rowId}: ${automated.map((a) => a.ruleName).join(", ")}`,
+        targetType: "database-row",
+        targetId: rowId,
+        metadata: { applied: automated },
+      })
+    }
     const updated = parseDbRow(arr.get(idx) as Y.Map<unknown>)
     const [resolved] = await withResolvedRollups([updated], await getFieldDefs(id), cred, agentType, await allowPg(cred, id))
     if (clean.description !== undefined) {

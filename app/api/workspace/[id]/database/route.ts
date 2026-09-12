@@ -19,6 +19,7 @@ import {
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { indexRow, rowText, workspaceOf } from "@/lib/workspaceIndex"
+import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
 
 export const runtime = "nodejs"
 
@@ -86,6 +87,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       cells: cleanCells(body.cells, await getFieldDefs(id)),
     }
     doc.transact(() => doc.getArray<Y.Map<unknown>>("database").push([dbRowToYMap(newRow)]), agentType)
+    const actorName = cred.kind === "service" ? agentType.replace(/_/g, " ") : (cred.user.email ?? cred.user.user_id)
+    const automated = await runStatusAutomations({
+      doc,
+      rowId: newRow.id,
+      prevStatus: null,
+      wipLimits: await getWipLimits(id),
+      actorName,
+      origin: agentType,
+      getRules: () => getAutomationRules(id),
+    })
     await saveDbDoc(id, doc, cred, agentType)
     await recordWorkspaceActivity({
       docId: id,
@@ -97,6 +108,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       targetId: newRow.id,
       metadata: { status: newRow.status, priority: newRow.priority, assignee: newRow.assignee, due: newRow.due },
     })
+    if (automated.length > 0) {
+      await recordWorkspaceActivity({
+        docId: id,
+        credential: cred,
+        agentType,
+        action: 'database.automation',
+        summary: `Automation ran on task ${newRow.id}: ${automated.map((a) => a.ruleName).join(", ")}`,
+        targetType: 'database-row',
+        targetId: newRow.id,
+        metadata: { applied: automated },
+      })
+    }
     const [resolved] = await withResolvedRollups([newRow], await getFieldDefs(id), cred, agentType, allowPg)
     // Semantic index (best-effort, never blocks the response).
     void indexRow(id, newRow.id, await workspaceOf(id), rowText(newRow)).catch(() => {})

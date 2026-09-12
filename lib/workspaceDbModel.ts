@@ -300,3 +300,52 @@ export function matchesDueFilter(due: string, status: string, filter: string, to
       return true;
   }
 }
+
+export type AutomationRule = {
+  id: string
+  name: string
+  whenStatus: string
+  setAssignee?: string
+  addComment?: string
+  moveTo?: string
+}
+
+export const MAX_AUTOMATIONS = 20
+const AUTOMATION_STATUSES: ReadonlySet<string> = new Set(["Todo", "Doing", "Done"])
+
+/** Validate raw props.dbAutomations (used by REST + PATCH). */
+export function parseAutomationRules(raw: unknown): AutomationRule[] {
+  if (!Array.isArray(raw)) return []
+  const out: AutomationRule[] = []
+  const seen = new Set<string>()
+  for (const v of raw.slice(0, MAX_AUTOMATIONS)) {
+    if (!v || typeof v !== "object") continue
+    const r = v as Record<string, unknown>
+    const id = typeof r.id === "string" ? r.id.slice(0, 32) : ""
+    if (!id || seen.has(id)) continue
+    const name = typeof r.name === "string" ? r.name.trim().slice(0, 40) : ""
+    if (!name) continue
+    const whenStatus = typeof r.whenStatus === "string" ? r.whenStatus.slice(0, 16) : ""
+    if (!AUTOMATION_STATUSES.has(whenStatus)) continue
+    const rule: AutomationRule = { id, name, whenStatus }
+    if (typeof r.setAssignee === "string" && r.setAssignee.trim()) {
+      rule.setAssignee = r.setAssignee.trim().slice(0, 100)
+    }
+    if (typeof r.addComment === "string" && r.addComment.trim()) {
+      rule.addComment = r.addComment.trim().slice(0, 500)
+    }
+    if (typeof r.moveTo === "string" && AUTOMATION_STATUSES.has(r.moveTo) && r.moveTo !== whenStatus) {
+      rule.moveTo = r.moveTo
+    }
+    if (rule.setAssignee === undefined && rule.addComment === undefined && rule.moveTo === undefined) continue
+    seen.add(id)
+    out.push(rule)
+  }
+  return out
+}
+
+/** Rules whose trigger matches a move into `next` (prev null = creation). */
+export function matchRules(rules: AutomationRule[], prevStatus: string | null, nextStatus: string): AutomationRule[] {
+  if (prevStatus === nextStatus) return []
+  return rules.filter((r) => r.whenStatus === nextStatus)
+}
