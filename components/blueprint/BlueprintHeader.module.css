@@ -243,10 +243,10 @@
   gap: 7px;
   height: 34px;
   padding: 0 16px;
-  background: #fff;
+  background: var(--color-accent);
   border: none;
-  border-radius: 999px;
-  color: #000;
+  border-radius: 8px;
+  color: #26301f;
   font-size: 0.8125rem;
   font-weight: 700;
   cursor: pointer;
@@ -256,7 +256,7 @@
 }
 
 .generateRoadmapBtn:hover:not(:disabled) {
-  background: rgba(255,255,255,0.9);
+  background: #c6d8b5;
 }
 
 .generateRoadmapBtn:active:not(:disabled) {

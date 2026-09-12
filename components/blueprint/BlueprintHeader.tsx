@@ -72,7 +72,6 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
 
           <div className={styles.titleRow}>
             <h1 className={styles.blueprintTitle}>{t("title")}</h1>
-            <span className={styles.blueprintId}>{blueprintId}</span>
           </div>
 
           <div className={styles.versionRow}>
@@ -91,6 +90,8 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
             ) : (
               <span className={styles.versionText}>{t("versionLabel", { version })}</span>
             )}
+            <span className={styles.versionDot} aria-hidden="true" />
+            <span className={styles.versionText}>{blueprintId}</span>
             <span className={styles.versionDot} aria-hidden="true" />
             <span className={styles.draftPill}>{status}</span>
           </div>
