@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
 import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload, LayoutTemplate } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
-import { readCells, type FieldDef, type CellValue } from "@/lib/workspaceDbModel"
+import { readCells, computeRollups, type FieldDef, type CellValue } from "@/lib/workspaceDbModel"
 
 type RowComment = { id: string; text: string; author: string; at: string }
 type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; due: string; description: string; comments: RowComment[]; cells: Record<string, CellValue> }
@@ -72,13 +72,79 @@ function CellEditor({
   value,
   readOnly,
   onChange,
+  relationRows,
+  onEnsureRelationRows,
 }: {
   def: FieldDef
   value: CellValue | undefined
   readOnly: boolean
   onChange: (v: CellValue | undefined) => void
+  relationRows?: Array<{ id: string; title: string; status: string }>
+  onEnsureRelationRows?: () => void
 }) {
   const str = typeof value === "string" ? value : ""
+  if (def.type === "relation") {
+    const linked = Array.isArray(value) ? value.filter((x): x is string => typeof x === "string") : []
+    const titleOf = (id: string) => relationRows?.find((r) => r.id === id)?.title || id
+    return (
+      <span className="flex min-w-0 flex-col gap-1" onFocus={onEnsureRelationRows} onClick={onEnsureRelationRows}>
+        {linked.length === 0 ? (
+          <span className="text-[12px] text-white/25">{readOnly ? "—" : "Pick rows…"}</span>
+        ) : (
+          linked.map((id) => (
+            <span key={id} className="group/rel inline-flex max-w-full items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] text-white/70">
+              <span className="min-w-0 flex-1 truncate">{titleOf(id)}</span>
+              {!readOnly && (
+                <button
+                  onClick={() => onChange(linked.filter((x) => x !== id).length ? linked.filter((x) => x !== id) : undefined)}
+                  title="Unlink"
+                  className="shrink-0 rounded text-white/25 opacity-0 hover:text-red-300 group-hover/rel:opacity-100"
+                >
+                  ✕
+                </button>
+              )}
+            </span>
+          ))
+        )}
+        {!readOnly && relationRows && relationRows.length > 0 && (
+          <select
+            value=""
+            onChange={(e) => {
+              const id = e.target.value
+              if (id && !linked.includes(id)) onChange([...linked, id].slice(0, 50))
+              e.target.selectedIndex = 0
+            }}
+            className="w-full rounded-full border border-dashed border-white/15 bg-transparent px-2 py-1 text-[11px] text-white/50 outline-none"
+            title={def.targetDocId ? `Link rows from ${def.targetDocId}` : "Link rows"}
+          >
+            <option value="">+ Link…</option>
+            {relationRows
+              .filter((r) => !linked.includes(r.id))
+              .slice(0, 50)
+              .map((r) => (
+                <option key={r.id} value={r.id}>{r.title || "Untitled"}</option>
+              ))}
+          </select>
+        )}
+      </span>
+    )
+  }
+  if (def.type === "rollup") {
+    if (typeof value !== "number") {
+      return <span className="text-[12px] text-white/25">—</span>
+    }
+    if (def.rollupOp === "donePct") {
+      return (
+        <span className="flex min-w-[90px] items-center gap-1.5" title={`${value}% done`}>
+          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
+            <span className="block h-full rounded-full bg-emerald-400" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+          </span>
+          <span className="text-[11px] font-medium text-white/60">{value}%</span>
+        </span>
+      )
+    }
+    return <span className="text-[13px] font-medium tabular-nums text-white/75">{value}</span>
+  }
   if (def.type === "checkbox") {
     return (
       <input
@@ -393,7 +459,6 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     const t = setTimeout(() => setNotice(null), 5000)
     return () => clearTimeout(t)
   }, [notice])
-  const selectedRow = selectedId ? rows.find((r) => r.id === selectedId) ?? null : null
   const readOnlyRef = useRef(readOnly)
   useEffect(() => {
     readOnlyRef.current = readOnly
@@ -407,6 +472,59 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   const [newFieldName, setNewFieldName] = useState("")
   const [newFieldType, setNewFieldType] = useState<FieldDef["type"]>("text")
   const [newFieldOptions, setNewFieldOptions] = useState("")
+  const [newFieldTarget, setNewFieldTarget] = useState("")
+  const [newFieldRelation, setNewFieldRelation] = useState("")
+  const [newFieldOp, setNewFieldOp] = useState<"count" | "donePct" | "sum">("count")
+  const [newFieldNumber, setNewFieldNumber] = useState("")
+  // Target-doc rows for relation pickers (cached per doc; read-gated server-side).
+  const [targetRows, setTargetRows] = useState<Record<string, Row[]>>({})
+  const targetLoading = useRef<Set<string>>(new Set())
+
+  const ensureTargetRows = (targetDocId: string | undefined) => {
+    if (!targetDocId || targetRows[targetDocId] || targetLoading.current.has(targetDocId)) return
+    targetLoading.current.add(targetDocId)
+    fetch(`/api/workspace/${targetDocId}/database`, { headers: collabAuthHeaders() })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (Array.isArray(j?.rows)) setTargetRows((prev) => ({ ...prev, [targetDocId]: j.rows as Row[] }))
+      })
+      .catch(() => {})
+      .finally(() => {
+        targetLoading.current.delete(targetDocId)
+      })
+  }
+
+  // Preload relation targets when fields (or doc) change so pickers show titles.
+  useEffect(() => {
+    for (const f of fields) {
+      if (f.type === "relation" && f.targetDocId) ensureTargetRows(f.targetDocId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docId, fields])
+
+  // Display rows: stored rows + locally computed rollups (same pure function
+  // the server uses, over readable target caches). Ids stable, writes still
+  // go through updateRow on stored state.
+  const displayRows: Row[] = useMemo(() => {
+    if (fields.every((f) => f.type !== "rollup")) return rows
+    const computed = computeRollups(rows, fields, (id) => targetRows[id] ?? null)
+    if (Object.keys(computed).length === 0) return rows
+    // Nulls (unreadable links) are omitted — the cell renders as empty.
+    return rows.map((r) => {
+      const c = computed[r.id]
+      if (!c) return r
+      const cells: Row["cells"] = { ...r.cells }
+      for (const [k, v] of Object.entries(c)) {
+        if (v === null) delete cells[k]
+        else cells[k] = v
+      }
+      return { ...r, cells }
+    })
+  }, [rows, fields, targetRows])
+
+  // Drawer row resolves against display rows (local rollups included); all
+  // edits address stored state by stable id via updateRow/updateCell.
+  const selectedRow = selectedId ? displayRows.find((r) => r.id === selectedId) ?? null : null
   useEffect(() => {
     let alive = true
     fetch(`/api/workspace/${docId}/meta`, { headers: collabAuthHeaders() })
@@ -476,9 +594,28 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
         ? newFieldOptions.split(",").map((o) => o.trim().slice(0, 24)).filter(Boolean).filter((o, i, a) => a.indexOf(o) === i).slice(0, 20)
         : []
     const def: FieldDef = { id: `f-${uid()}`, name, type: newFieldType, options }
+    if (newFieldType === "relation") {
+      const target = newFieldTarget.trim().replace(/^workspace:(room:|db:)?/, "").slice(0, 64)
+      if (!target) return
+      def.targetDocId = target
+    }
+    if (newFieldType === "rollup") {
+      const rel = fields.find((f) => f.id === newFieldRelation && f.type === "relation")
+      if (!rel || (newFieldOp !== "count" && newFieldOp !== "donePct" && newFieldOp !== "sum")) return
+      def.relationFieldId = rel.id
+      def.rollupOp = newFieldOp
+      if (newFieldOp === "sum") {
+        const numField = newFieldNumber.trim().slice(0, 16)
+        if (!numField) return
+        def.rollupFieldId = numField
+      }
+    }
     void persistFields([...fields, def])
     setNewFieldName("")
     setNewFieldOptions("")
+    setNewFieldTarget("")
+    setNewFieldRelation("")
+    setNewFieldNumber("")
   }
 
   const removeField = (fieldId: string) => {
@@ -948,7 +1085,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     setImporting(false)
   }
 
-  const baseFiltered = rows.filter((r) => {
+  const baseFiltered = displayRows.filter((r) => {
     const statusOk = statusFilter === "All" || r.status === statusFilter
     const prioOk = priorityFilter === "All" || r.priority === priorityFilter
     const needle = q.trim().toLowerCase()
@@ -1191,7 +1328,13 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
               {fields.map((f) => (
                 <div key={f.id} className="group flex items-center justify-between gap-2 rounded-xl border border-line bg-white/[0.02] px-3 py-2">
                   <span className="min-w-0 truncate text-[12px] text-white/70">
-                    {f.name} <span className="text-white/25">· {f.type}{f.options.length ? ` · ${f.options.join(", ")}` : ""}</span>
+                    {f.name}{" "}
+                    <span className="text-white/25">
+                      · {f.type}
+                      {f.type === "relation" && f.targetDocId ? ` → ${f.targetDocId}` : ""}
+                      {f.type === "rollup" && f.relationFieldId ? ` · ${f.rollupOp}` : ""}
+                      {f.options.length ? ` · ${f.options.join(", ")}` : ""}
+                    </span>
                   </span>
                   <button onClick={() => removeField(f.id)} title="Delete field (values stay on rows but hide)" className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-white/20 opacity-0 hover:text-red-300 group-hover:opacity-100">
                     ✕
@@ -1216,6 +1359,8 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
               <option value="checkbox">Checkbox</option>
               <option value="date">Date</option>
               <option value="url">URL</option>
+              <option value="relation">Relation</option>
+              <option value="rollup">Rollup</option>
             </select>
             {(newFieldType === "select" || newFieldType === "multi") && (
               <input
@@ -1225,6 +1370,51 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                 placeholder="Options, comma separated"
                 className="w-[220px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none"
               />
+            )}
+            {newFieldType === "relation" && (
+              <input
+                value={newFieldTarget}
+                onChange={(e) => setNewFieldTarget(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addField() }}
+                placeholder="Target doc id"
+                className="w-[180px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none"
+              />
+            )}
+            {newFieldType === "rollup" && (
+              <>
+                <select
+                  value={newFieldRelation}
+                  onChange={(e) => setNewFieldRelation(e.target.value)}
+                  className="rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70 outline-none"
+                  title="Relation to aggregate"
+                >
+                  <option value="">Relation…</option>
+                  {fields
+                    .filter((f) => f.type === "relation")
+                    .map((f) => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                </select>
+                <select
+                  value={newFieldOp}
+                  onChange={(e) => setNewFieldOp(e.target.value as "count" | "donePct" | "sum")}
+                  className="rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70 outline-none"
+                  title="Aggregation"
+                >
+                  <option value="count">Count</option>
+                  <option value="donePct">% Done</option>
+                  <option value="sum">Sum</option>
+                </select>
+                {newFieldOp === "sum" && (
+                  <input
+                    value={newFieldNumber}
+                    onChange={(e) => setNewFieldNumber(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") addField() }}
+                    placeholder="Number field id in target"
+                    className="w-[180px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none"
+                  />
+                )}
+              </>
             )}
             <button onClick={addField} disabled={!newFieldName.trim() || fields.length >= 20} className="rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40">
               Add field
@@ -1358,7 +1548,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                     </td>
                     {fields.map((f) => (
                       <td key={f.id} className="max-w-[180px] px-3 py-3">
-                        <CellEditor def={f} value={r.cells[f.id]} readOnly={readOnly} onChange={(v) => updateCell(r.id, f.id, v)} />
+                        <CellEditor def={f} value={r.cells[f.id]} readOnly={readOnly} onChange={(v) => updateCell(r.id, f.id, v)} relationRows={f.targetDocId ? targetRows[f.targetDocId] : undefined} onEnsureRelationRows={() => ensureTargetRows(f.targetDocId)} />
                       </td>
                     ))}
                     <td className="px-2 py-3 text-right">
@@ -1658,7 +1848,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                     {fields.map((f) => (
                       <label key={f.id} className="block rounded-xl border border-line bg-white/[0.02] px-3 py-2">
                         <span className="mb-1 block text-[11px] text-white/40">{f.name} <span className="text-white/20">· {f.type}</span></span>
-                        <CellEditor def={f} value={selectedRow.cells[f.id]} readOnly={readOnly} onChange={(v) => updateCell(selectedRow.id, f.id, v)} />
+                        <CellEditor def={f} value={selectedRow.cells[f.id]} readOnly={readOnly} onChange={(v) => updateCell(selectedRow.id, f.id, v)} relationRows={f.targetDocId ? targetRows[f.targetDocId] : undefined} onEnsureRelationRows={() => ensureTargetRows(f.targetDocId)} />
                       </label>
                     ))}
                   </div>

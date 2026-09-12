@@ -13,6 +13,7 @@ import {
   getFieldDefs,
   cleanCells,
   wipExceeded,
+  withResolvedRollups,
   MAX_DESCRIPTION_LEN,
   type DbRow,
 } from "@/lib/workspaceDb"
@@ -44,7 +45,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const allowPg = cred.kind === "service" ? true : await authorizeDocFallback(cred, id)
     const doc = await loadDbDoc(id, cred, agent ?? undefined, allowPg)
-    return NextResponse.json({ id, rows: rowsFromDbDoc(doc) })
+    const rows = await withResolvedRollups(rowsFromDbDoc(doc), await getFieldDefs(id), cred, agent ?? undefined, allowPg)
+    return NextResponse.json({ id, rows })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
     console.error("[workspace/database GET]", e)
@@ -94,7 +96,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       targetId: newRow.id,
       metadata: { status: newRow.status, priority: newRow.priority, assignee: newRow.assignee, due: newRow.due },
     })
-    return NextResponse.json({ id: newRow.id, row: newRow, agentType }, { status: 201 })
+    const [resolved] = await withResolvedRollups([newRow], await getFieldDefs(id), cred, agentType, allowPg)
+    return NextResponse.json({ id: newRow.id, row: resolved ?? newRow, agentType }, { status: 201 })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
     console.error("[workspace/database POST]", e)

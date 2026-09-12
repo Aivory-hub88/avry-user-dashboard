@@ -12,6 +12,7 @@ import {
   getFieldDefs,
   cleanCells,
   wipExceeded,
+  withResolvedRollups,
   MAX_DESCRIPTION_LEN,
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
@@ -89,7 +90,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       targetId: rowId,
       metadata: clean,
     })
-    return NextResponse.json({ id: rowId, patched: clean, ...(mergedCells ? { cells: mergedCells } : {}) })
+    const updated = parseDbRow(arr.get(idx) as Y.Map<unknown>)
+    const [resolved] = await withResolvedRollups([updated], await getFieldDefs(id), cred, agentType, await allowPg(cred, id))
+    return NextResponse.json({ id: rowId, patched: clean, ...(mergedCells ? { cells: mergedCells } : {}), rollups: resolved?.cells ?? {} })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
     console.error("[workspace/database PATCH]", e)
