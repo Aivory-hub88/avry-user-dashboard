@@ -25,7 +25,7 @@ const AGENT_ASSIGNEES = [
 
 function assigneeLabel(v: string): string {
   const hit = AGENT_ASSIGNEES.find((a) => a.value === v)
-  return hit ? `${hit.label} · agent` : v
+  return hit ? `${hit.label} (agent)` : v
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -377,6 +377,9 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   // Board grouping: status (default kanban) | assignee (workload) | priority.
   // Session-only; saved views keep controlling filters/sort.
   const [groupBy, setGroupBy] = useState<"status" | "assignee" | "priority">("status")
+  // Table assignee cell is display-first ("Geno (agent)"); click to edit.
+  const [editingAssigneeId, setEditingAssigneeId] = useState<string | null>(null)
+  const [assigneeDraft, setAssigneeDraft] = useState("")
   // Swimlanes (status board only): second dimension splitting columns into lanes.
   const [laneBy, setLaneBy] = useState<"none" | "assignee" | "priority">("none")
   const [quickLane, setQuickLane] = useState<string | null>(null)
@@ -765,7 +768,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   const boardColumns = (): Array<{ key: string; label: string }> => {
     if (groupBy === "assignee") {
       const names = Array.from(new Set(rows.map((r) => r.assignee.trim()).filter(Boolean))).sort().slice(0, 8)
-      return [...names.map((n) => ({ key: n, label: n })), { key: "", label: "Unassigned" }]
+      return [...names.map((n) => ({ key: n, label: assigneeLabel(n) })), { key: "", label: "Unassigned" }]
     }
     if (groupBy === "priority") return [...PRIORITIES].reverse().map((p) => ({ key: p, label: `${p} priority` }))
     return STATUSES.map((s) => ({ key: s, label: s }))
@@ -1303,15 +1306,42 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-1.5">
-                        <User className="h-3 w-3 text-white/25" />
-                        <input
-                          value={r.assignee}
-                          disabled={readOnly}
-                          list={`aivory-assignees-${docId}`}
-                          onChange={(e) => updateRow(r.id, { assignee: e.target.value })}
-                          placeholder="—"
-                          className="w-full bg-transparent text-[13px] text-white/60 placeholder:text-white/25 outline-none disabled:opacity-80"
-                        />
+                        <User className="h-3 w-3 shrink-0 text-white/25" />
+                        {editingAssigneeId === r.id ? (
+                          <input
+                            autoFocus
+                            value={assigneeDraft}
+                            list={`workspace-assignees-${docId}`}
+                            disabled={readOnly}
+                            onChange={(e) => setAssigneeDraft(e.target.value)}
+                            onBlur={() => {
+                              updateRow(r.id, { assignee: assigneeDraft.trim().slice(0, 100) })
+                              setEditingAssigneeId(null)
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                updateRow(r.id, { assignee: assigneeDraft.trim().slice(0, 100) })
+                                setEditingAssigneeId(null)
+                              }
+                              if (e.key === "Escape") setEditingAssigneeId(null)
+                            }}
+                            placeholder="—"
+                            className="w-full bg-transparent text-[13px] text-white/80 placeholder:text-white/25 outline-none disabled:opacity-80"
+                          />
+                        ) : (
+                          <button
+                            disabled={readOnly}
+                            onClick={() => {
+                              if (readOnly) return
+                              setAssigneeDraft(r.assignee)
+                              setEditingAssigneeId(r.id)
+                            }}
+                            title={readOnly ? undefined : "Click to change assignee"}
+                            className={`min-w-0 flex-1 truncate text-left text-[13px] ${r.assignee ? "text-white/60" : "text-white/25"} ${readOnly ? "" : "hover:text-white/85"}`}
+                          >
+                            {r.assignee ? assigneeLabel(r.assignee) : "—"}
+                          </button>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-3">
