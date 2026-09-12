@@ -77,6 +77,7 @@ describe('GET /api/workspace/search', () => {
     expect(res.status).toBe(200)
     const j = await res.json()
     expect(j.q).toBe('launch')
+    expect(j.semantic).toBe(false)
     const kinds = j.hits.map((h: { kind: string }) => h.kind)
     expect(kinds[0]).toBe('doc')
     expect(kinds).toContain('row')

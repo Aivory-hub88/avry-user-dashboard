@@ -3,6 +3,7 @@ import { query } from "@/lib/db"
 import { workspaceCredential, authorizeDocFallback, unauthorized } from "@/lib/workspaceAuth"
 import { canReadDocId, isKnownAgentType } from "@/lib/workspaceAccess"
 import { loadDbDoc, rowsFromDbDoc, WorkspaceDenied } from "@/lib/workspaceDb"
+import { embed, embeddingsConfigured } from "@/lib/embeddings"
 
 export const runtime = "nodejs"
 
@@ -68,10 +69,12 @@ export async function GET(req: NextRequest) {
 
     // 2. Gate + decode, title hits first.
     const hits: SearchHit[] = []
+    const readableIds: string[] = []
     const allowPgBase = cred.kind === "service" ? true : null
     let decoded = 0
     for (const [bare, title] of titles) {
       if (!(await canReadDocId(cred, bare, assertedAgent))) continue
+      readableIds.push(bare)
       if (title.toLowerCase().includes(q.toLowerCase())) {
         hits.push({ kind: "doc", doc_id: bare, doc_title: title, title, snippet: snippetOf(title, q), score: 2 })
       }
@@ -102,8 +105,48 @@ export async function GET(req: NextRequest) {
       }
       if (hits.length >= MAX_RESULTS) break
     }
+    // Semantic boost (Fase 4c2): when embeddings are configured, rank indexed
+    // rows by cosine similarity and merge unseen ones below lexical hits.
+    // Without a key this whole block is skipped — lexical ranking stands alone.
+    let semantic = false
+    if (embeddingsConfigured() && hits.length < MAX_RESULTS && readableIds.length > 0) {
+      const qvec = await embed(q)
+      if (qvec) {
+        try {
+          const seen = new Set(hits.filter((h) => h.kind === "row" && h.row_id).map((h) => `${h.doc_id}:${h.row_id}`))
+          const sem = await query(
+            `SELECT c.doc_id, c.row_id, c.text, 1 - (c.embedding <=> $1::vector) AS sim
+             FROM dashboard.workspace_chunks c
+             WHERE c.doc_id = ANY($2::text[]) AND c.embedding IS NOT NULL
+             ORDER BY c.embedding <=> $1::vector
+             LIMIT 20`,
+            [`[${qvec.join(",")}]`, readableIds],
+          )
+          for (const row of sem.rows) {
+            if (hits.length >= MAX_RESULTS) break
+            const key = `${row.doc_id}:${row.row_id}`
+            if (seen.has(key)) continue
+            const sim = Number(row.sim ?? 0)
+            if (!(sim > 0.25)) continue
+            seen.add(key)
+            hits.push({
+              kind: "row",
+              doc_id: row.doc_id as string,
+              doc_title: titles.get(row.doc_id as string) ?? (row.doc_id as string),
+              row_id: row.row_id as string,
+              title: (row.text as string).split("\n")[0].slice(0, 100) || "Untitled",
+              snippet: snippetOf(row.text as string, q),
+              score: 1.1 + Math.min(0.4, Math.max(0, sim) * 0.4),
+            })
+            semantic = true
+          }
+        } catch {
+          // Semantic is best-effort; lexical results stand on their own.
+        }
+      }
+    }
     hits.sort((a, b) => b.score - a.score)
-    return NextResponse.json({ q, hits: hits.slice(0, limit) })
+    return NextResponse.json({ q, hits: hits.slice(0, limit), semantic })
   } catch (e) {
     console.error("[workspace/search GET]", e)
     return NextResponse.json({ error: "db" }, { status: 500 })

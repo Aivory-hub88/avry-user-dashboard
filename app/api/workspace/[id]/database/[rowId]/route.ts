@@ -17,6 +17,7 @@ import {
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { syncDescriptionMentions } from "@/lib/workspaceMentions"
+import { indexRow, removeRowIndex, rowText, workspaceOf } from "@/lib/workspaceIndex"
 
 export const runtime = "nodejs"
 
@@ -96,6 +97,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (clean.description !== undefined) {
       await syncDescriptionMentions({ docId: id, rowId, credential: cred, agentType, source: "description", text: clean.description })
     }
+    // Semantic reindex on text-affecting edits (best-effort, non-blocking).
+    if (clean.title !== undefined || clean.description !== undefined || clean.assignee !== undefined) {
+      const fresh = parseDbRow(arr.get(idx) as Y.Map<unknown>)
+      void indexRow(id, rowId, await workspaceOf(id), rowText(fresh)).catch(() => {})
+    }
     return NextResponse.json({ id: rowId, patched: clean, ...(mergedCells ? { cells: mergedCells } : {}), rollups: resolved?.cells ?? {} })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
@@ -118,6 +124,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (idx < 0) return NextResponse.json({ error: "not found" }, { status: 404 })
     doc.transact(() => arr.delete(idx, 1), agentType)
     await saveDbDoc(id, doc, cred, agentType)
+    void removeRowIndex(id, rowId).catch(() => {})
     await recordWorkspaceActivity({
       docId: id,
       credential: cred,

@@ -234,6 +234,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       await query(`DELETE FROM dashboard.workspace_doc_links WHERE src = $1 OR dst = $1`, [id])
       await query(`DELETE FROM dashboard.workspace_agent_acl WHERE doc_id = $1`, [id])
       await query(`DELETE FROM dashboard.workspace_mentions WHERE doc_id = $1`, [id])
+      await query(`DELETE FROM dashboard.workspace_chunks WHERE doc_id = $1`, [id])
     } else {
       await query(`UPDATE dashboard.workspace_docs SET deleted_at = now() WHERE id = ANY($1::text[]) AND deleted_at IS NULL`, [[id, `workspace:${id}`, `workspace:db:${id}`, `db:${id}`]])
     }

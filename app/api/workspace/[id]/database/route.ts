@@ -18,6 +18,7 @@ import {
   type DbRow,
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
+import { indexRow, rowText, workspaceOf } from "@/lib/workspaceIndex"
 
 export const runtime = "nodejs"
 
@@ -97,6 +98,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       metadata: { status: newRow.status, priority: newRow.priority, assignee: newRow.assignee, due: newRow.due },
     })
     const [resolved] = await withResolvedRollups([newRow], await getFieldDefs(id), cred, agentType, allowPg)
+    // Semantic index (best-effort, never blocks the response).
+    void indexRow(id, newRow.id, await workspaceOf(id), rowText(newRow)).catch(() => {})
     return NextResponse.json({ id: newRow.id, row: resolved ?? newRow, agentType }, { status: 201 })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
