@@ -261,3 +261,42 @@ export function parseMentions(text: unknown): ParsedMentions {
   }
   return { agents: [...agents], emails: [...emails] }
 }
+
+export type DueFilter = "All" | "Overdue" | "Today" | "This week" | "Next 7 days" | "No date";
+export const DUE_FILTERS: DueFilter[] = ["All", "Overdue", "Today", "This week", "Next 7 days", "No date"];
+
+function isoDaysFrom(todayISO: string, delta: number): string {
+  const d = new Date(`${todayISO}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+function weekStartISO(todayISO: string): string {
+  const d = new Date(`${todayISO}T00:00:00Z`);
+  const dow = (d.getUTCDay() + 6) % 7; // Monday = 0
+  d.setUTCDate(d.getUTCDate() - dow);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Relative due-date predicate (pure; todayISO = YYYY-MM-DD). */
+export function matchesDueFilter(due: string, status: string, filter: string, todayISO: string): boolean {
+  switch (filter) {
+    case "Overdue":
+      return !!due && due < todayISO && status !== "Done";
+    case "Today":
+      return due === todayISO;
+    case "This week": {
+      const start = weekStartISO(todayISO);
+      const end = isoDaysFrom(start, 6);
+      return !!due && due >= start && due <= end;
+    }
+    case "Next 7 days": {
+      const end = isoDaysFrom(todayISO, 7);
+      return !!due && due >= todayISO && due <= end;
+    }
+    case "No date":
+      return !due;
+    default:
+      return true;
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { parseFieldDefs, cleanCells, computeRollups, parseMentions, type RollupSubject } from "./workspaceDbModel"
+import { parseFieldDefs, cleanCells, computeRollups, parseMentions, matchesDueFilter, type RollupSubject } from "./workspaceDbModel"
 
 
 describe("parseFieldDefs relation/rollup", () => {
@@ -89,5 +89,21 @@ describe("parseMentions", () => {
     expect(parseMentions("@lex @lex @nobody")).toEqual({ agents: ["leads_qualifier"], emails: [] })
     expect(parseMentions("")).toEqual({ agents: [], emails: [] })
     expect(parseMentions(null)).toEqual({ agents: [], emails: [] })
+  })
+})
+
+describe("matchesDueFilter", () => {
+  const T = "2026-09-12"; // a Saturday
+  it("matches each relative window", () => {
+    expect(matchesDueFilter("", "Todo", "No date", T)).toBe(true)
+    expect(matchesDueFilter("2026-09-10", "Todo", "Overdue", T)).toBe(true)
+    expect(matchesDueFilter("2026-09-10", "Done", "Overdue", T)).toBe(false)
+    expect(matchesDueFilter(T, "Todo", "Today", T)).toBe(true)
+    expect(matchesDueFilter("2026-09-07", "Todo", "This week", T)).toBe(true) // Monday
+    expect(matchesDueFilter("2026-09-13", "Todo", "This week", T)).toBe(true) // Sunday
+    expect(matchesDueFilter("2026-09-14", "Todo", "This week", T)).toBe(false) // next Monday
+    expect(matchesDueFilter("2026-09-19", "Todo", "Next 7 days", T)).toBe(true)
+    expect(matchesDueFilter("2026-09-20", "Todo", "Next 7 days", T)).toBe(false)
+    expect(matchesDueFilter("", "Todo", "All", T)).toBe(true)
   })
 })

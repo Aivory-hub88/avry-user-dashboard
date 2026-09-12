@@ -5,7 +5,7 @@ import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
 import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload, LayoutTemplate } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
-import { readCells, computeRollups, type FieldDef, type CellValue } from "@/lib/workspaceDbModel"
+import { readCells, computeRollups, DUE_FILTERS, matchesDueFilter, type FieldDef, type CellValue } from "@/lib/workspaceDbModel"
 
 type RowComment = { id: string; text: string; author: string; at: string }
 type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; due: string; description: string; comments: RowComment[]; cells: Record<string, CellValue> }
@@ -396,6 +396,7 @@ type SavedView = {
   q: string
   sortField: string
   sortDir: "asc" | "desc"
+  dueFilter?: string
 }
 
 type DbTemplate = {
@@ -424,6 +425,8 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   const [view, setView] = useState<"table" | "kanban" | "calendar">("table")
   const [statusFilter, setStatusFilter] = useState<string>("All")
   const [priorityFilter, setPriorityFilter] = useState<string>("All")
+  const [dueFilter, setDueFilter] = useState<string>("All")
+  const [hideEmpty, setHideEmpty] = useState(false)
   const [q, setQ] = useState("")
   const [sortField, setSortField] = useState<string>("title")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc")
@@ -699,6 +702,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     setQ(v.q)
     setSortField(v.sortField)
     setSortDir(v.sortDir)
+    setDueFilter(typeof v.dueFilter === "string" && (DUE_FILTERS as string[]).includes(v.dueFilter) ? v.dueFilter : "All")
   }
 
   const saveCurrentAsView = async () => {
@@ -715,6 +719,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
       q: q.slice(0, 64),
       sortField,
       sortDir,
+      dueFilter,
     }
     await persistViews([...savedViews, next])
     setActiveViewId(next.id)
@@ -1090,7 +1095,8 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     const prioOk = priorityFilter === "All" || r.priority === priorityFilter
     const needle = q.trim().toLowerCase()
     const searchOk = !needle || r.title.toLowerCase().includes(needle) || r.assignee.toLowerCase().includes(needle) || r.id.toLowerCase().includes(needle)
-    return statusOk && prioOk && searchOk
+    const dueOk = dueFilter === "All" || matchesDueFilter(r.due, r.status, dueFilter, new Date().toISOString().slice(0, 10))
+    return statusOk && prioOk && searchOk && dueOk
   })
 
   const priorityRank: Record<string, number> = { High: 3, Med: 2, Low: 1 }
@@ -1126,7 +1132,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
       {viewsLoaded && (
         <div className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1">
           <button
-            onClick={() => { setActiveViewId(null); setView("table"); setStatusFilter("All"); setPriorityFilter("All"); setQ(""); setSortField("title"); setSortDir("asc") }}
+            onClick={() => { setActiveViewId(null); setView("table"); setStatusFilter("All"); setPriorityFilter("All"); setDueFilter("All"); setQ(""); setSortField("title"); setSortDir("asc") }}
             className={`shrink-0 rounded-full border px-3 py-1 text-[12px] ${activeViewId === null ? "border-white bg-white text-black" : "border-line bg-white/[0.04] text-white/50 hover:text-white/80"}`}
           >
             All
@@ -1235,6 +1241,17 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                   <option key={p} value={p}>
                     {p}
                   </option>
+                ))}
+              </select>
+              <span className="text-white/10">|</span>
+              <select
+                value={dueFilter}
+                onChange={(e) => setDueFilter(e.target.value)}
+                title="Filter by due date"
+                className="bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none"
+              >
+                {DUE_FILTERS.map((d) => (
+                  <option key={d} value={d}>{d === "All" ? "All dates" : d}</option>
                 ))}
               </select>
               <span className="text-white/10">|</span>
@@ -1599,6 +1616,15 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
             ))}
           </div>
           )}
+          <div className="mb-3 flex items-center gap-2 self-start">
+            <button
+              onClick={() => setHideEmpty((v) => !v)}
+              title="Hide empty columns (slim drop zones remain)"
+              className={`rounded-full border px-3 py-1 text-[12px] transition ${hideEmpty ? "border-white bg-white font-medium text-black" : "border-line bg-white/[0.04] text-white/40 hover:text-white/70"}`}
+            >
+              Hide empty
+            </button>
+          </div>
           {swimlanes().map((lane) => {
             const laneRows = laneBy === "none" || groupBy !== "status" ? filtered : filtered.filter((r) => laneOf(r) === lane.key)
             return (
@@ -1615,6 +1641,49 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
             const inCol = laneRows.filter((r) => groupKeyOf(r) === s)
             const limit = groupBy === "status" ? wip[s] : undefined
             const over = limit !== undefined && inCol.length > limit
+            // Hide-empty: collapse zero-card columns to a slim drop zone so
+            // cards can still be dragged in and WIP state stays visible.
+            if (hideEmpty && inCol.length === 0) {
+              return (
+                <div
+                  key={s || "__unassigned__"}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => onDropKanban(e, s)}
+                  title={`Drop here for ${label}`}
+                  className="flex min-w-[64px] flex-col items-center gap-2 rounded-[14px] border border-dashed border-white/10 bg-transparent p-2"
+                >
+                  <span className="truncate text-[10px] font-medium uppercase tracking-wider text-white/25" style={{ writingMode: "vertical-rl" }}>{label}</span>
+                  {!readOnly && (
+                    quickStatus === s && (laneBy === "none" || groupBy !== "status" || quickLane === lane.key) ? (
+                      <div className="flex w-full flex-col gap-1.5 rounded-[12px] border border-white/15 bg-white/[0.03] p-2">
+                        <input
+                          autoFocus
+                          value={quickTitle}
+                          onChange={(e) => setQuickTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") quickAddRow()
+                            if (e.key === "Escape") { setQuickStatus(null); setQuickTitle(""); setQuickLane(null) }
+                          }}
+                          placeholder={`New…`}
+                          className="w-full bg-transparent px-1 py-1 text-[12px] text-white/80 placeholder:text-white/25 outline-none"
+                        />
+                        <button onClick={quickAddRow} disabled={!quickTitle.trim()} className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-black hover:bg-white/90 disabled:opacity-40">
+                          Add
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setQuickStatus(s); setQuickTitle(""); setQuickLane(lane.key) }}
+                        title={`Add in ${label}`}
+                        className="rounded-full bg-white/[0.06] p-1 text-white/40 hover:text-white/70"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    )
+                  )}
+                </div>
+              )
+            }
             return (
             <div
               key={s || "__unassigned__"}

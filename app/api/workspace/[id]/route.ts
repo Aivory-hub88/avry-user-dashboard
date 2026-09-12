@@ -111,6 +111,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const kinds = new Set(["table","kanban","calendar"])
       const sortFields = new Set(["title","status","priority","due","assignee"])
       const sortDirs = new Set(["asc","desc"])
+      const dueFilters = new Set(["All","Overdue","Today","This week","Next 7 days","No date"])
       const cleanedViews: unknown[] = []
       for (const v of src.dbViews.slice(0, 10)) {
         if (!v || typeof v !== "object") continue
@@ -123,7 +124,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const q = typeof vv.q === "string" ? vv.q.slice(0, 64) : ""
         const sortField = sortFields.has(vv.sortField as string) ? (vv.sortField as string) : "title"
         const sortDir = sortDirs.has(vv.sortDir as string) ? (vv.sortDir as string) : "asc"
-        cleanedViews.push({ id, name, kind, statusFilter, priorityFilter, q, sortField, sortDir })
+        const dueFilter = dueFilters.has(vv.dueFilter as string) ? (vv.dueFilter as string) : "All"
+        cleanedViews.push({ id, name, kind, statusFilter, priorityFilter, q, sortField, sortDir, dueFilter })
       }
       propsPatch.dbViews = cleanedViews
     } else if (src.dbViews === undefined) {
