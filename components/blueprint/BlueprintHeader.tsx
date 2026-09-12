@@ -1,4 +1,5 @@
 import { useTranslations } from 'next-intl'
+import { ArrowRight, Download } from 'lucide-react'
 import styles from './BlueprintHeader.module.css'
 
 interface BlueprintVersion {
@@ -118,9 +119,7 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
                 title={t("generateRoadmapTooltip")}
               >
                 <span>{generatingRoadmap ? t("generatingRoadmap") : t("generateRoadmap")}</span>
-                <svg className={styles.generateRoadmapArrow} width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M3 8h10M9 3.5 13.5 8 9 12.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <ArrowRight className={styles.generateRoadmapArrow} size={14} aria-hidden="true" />
               </button>
             )}
             {onSaveVersion && (
@@ -130,10 +129,7 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
             )}
             {onDownloadPDF || onDownloadDOCX ? (
               <button onClick={onDownloadPDF} className={styles.headerActionBtn} disabled={downloadLoading} title={t("downloadBlueprintTooltip")}>
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M8 2v8m0 0 3-3m-3 3L5 7" />
-                  <path d="M2.5 11.5v1a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5v-1" />
-                </svg>
+                <Download size={14} strokeWidth={1.5} aria-hidden="true" />
                 {t("download")}
               </button>
             ) : null}

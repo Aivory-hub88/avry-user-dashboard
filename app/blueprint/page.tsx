@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client'
 
 import React, { useEffect, useState, useRef } from 'react'
@@ -20,43 +19,8 @@ import { generateRoadmapAsync } from '@/lib/roadmapGeneration'
 import { selectSoftwareRecommendations, formatPickPrice } from '@/lib/softwareCatalog'
 import { getRate } from '@/lib/liveRates'
 
-// ── Lucide-style inline SVG icons ────────────────────────────────────────────
-function IconDatabase() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <ellipse cx="12" cy="5" rx="9" ry="3"/>
-      <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
-      <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/>
-    </svg>
-  )
-}
-function IconSettings() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-    </svg>
-  )
-}
-function IconCpu() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="4" y="4" width="16" height="16" rx="2"/>
-      <rect x="9" y="9" width="6" height="6"/>
-      <line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/>
-      <line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>
-      <line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/>
-      <line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
-    </svg>
-  )
-}
-function IconZap() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-    </svg>
-  )
-}
+// ── Lucide icons (repo standard; no hand-rolled SVGs) ─────────────────────────
+import { Database, Settings, Cpu, Zap, Map as MapIcon, ArrowRight } from "lucide-react"
 
 // ── Static blueprint insights data ───────────────────────────────────────────
 const BLUEPRINT_INSIGHTS = {
@@ -321,7 +285,7 @@ function boldProducts(text: string): React.ReactNode {
   if (parts.length === 1) return text
   return parts.map((part, i) =>
     PRODUCT_TERMS.includes(part)
-      ? <strong key={i} style={{ color: '#e8e8e2', fontWeight: 600 }}>{part}</strong>
+      ? <strong key={i} className={styles.goalStrong}>{part}</strong>
       : part
   )
 }
@@ -450,7 +414,7 @@ function stripMarkdown(text: string, maxLength = 280): string {
 // system message's "match the user's language" rule: the LLM's own fields
 // are correctly localized now, but these three sentences wrap around them
 // client-side and were never locale-aware in the first place.
-function mapBlueprintToInsights(bp: any, t: (key: string, values?: Record<string, unknown>) => string) {
+function mapBlueprintToInsights(bp: any, t: (key: string, values?: Record<string, any>) => string) {
   if (!bp) return BLUEPRINT_INSIGHTS
   const score = coerceScore(bp.diagnostic_summary?.ai_readiness_score, BLUEPRINT_INSIGHTS.score)
   const maturity = coerceToString(bp.diagnostic_summary?.maturity_level, BLUEPRINT_INSIGHTS.maturity)
@@ -611,10 +575,10 @@ function BlueprintInsightsSection({
   }, [])
 
   function ArchIcon({ type }: { type: string }) {
-    if (type === 'database') return <IconDatabase />
-    if (type === 'settings') return <IconSettings />
-    if (type === 'cpu') return <IconCpu />
-    return <IconZap />
+    if (type === 'database') return <Database size={20} strokeWidth={1.5} aria-hidden="true" />
+    if (type === 'settings') return <Settings size={20} strokeWidth={1.5} aria-hidden="true" />
+    if (type === 'cpu') return <Cpu size={20} strokeWidth={1.5} aria-hidden="true" />
+    return <Zap size={20} strokeWidth={1.5} aria-hidden="true" />
   }
 
   return (
@@ -653,7 +617,7 @@ function BlueprintInsightsSection({
       <div className={styles.insightCard}>
         <h3 className={styles.insightCardTitle}>{t("strategicObjectiveTitle")}</h3>
         <div className={styles.insightCardBody}>
-          <p className={styles.insightParagraph}><strong style={{ color: '#f0f0f0', fontWeight: 600 }}>{s.strategicObjective.goal}</strong></p>
+          <p className={styles.insightParagraph}><strong className={styles.goalStrong}>{s.strategicObjective.goal}</strong></p>
           <p className={styles.insightParagraph}>{s.strategicObjective.rationale}</p>
         </div>
       </div>
@@ -674,9 +638,9 @@ function BlueprintInsightsSection({
             <tbody>
               {s.metrics.map((row: any, i: number) => (
                 <tr key={i}>
-                  <td style={{ color: '#ccc' }}>{row.metric}</td>
+                  <td className={styles.cellMuted}>{row.metric}</td>
                   <td>{row.current}</td>
-                  <td style={{ color: 'var(--color-accent)', fontWeight: 600 }}>{row.target}</td>
+                  <td className={styles.accentStrong}>{row.target}</td>
                   <td>{row.impact}</td>
                 </tr>
               ))}
@@ -691,10 +655,9 @@ function BlueprintInsightsSection({
         <div className={styles.insightCardBody}>
           <p className={styles.insightParagraph}>{s.currentState.summary}</p>
           <span className={styles.insightSubheading}>{t("highlights")}</span>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <ul className={styles.hlList}>
             {s.currentState.highlights.map((h, i) => (
-              <li key={i} style={{ fontSize: '0.875rem', color: '#c6c6bf', paddingLeft: 14, position: 'relative', lineHeight: 1.5 }}>
-                <span style={{ position: 'absolute', left: 0, color: 'var(--color-accent)' }}>•</span>
+              <li key={i} className={styles.hlItem}>
                 {typeof h === 'string' ? h : coerceToString(h, 'Highlight')}
               </li>
             ))}
@@ -726,7 +689,7 @@ function BlueprintInsightsSection({
               </div>
             ))}
           </div>
-          <p className={styles.insightParagraph} style={{ fontSize: '0.8125rem', color: '#555', fontStyle: 'italic' }}>
+          <p className={styles.finePrint}>
             {s.architecture.reference}
           </p>
         </div>
@@ -751,17 +714,17 @@ function BlueprintInsightsSection({
                   ? `Sejalan dengan hasil diagnostik: ${trainingOpp.title} diurai menjadi jalur pelatihan berikut — keterampilan dulu, tool kemudian.`
                   : `Aligned with your diagnostic result: ${trainingOpp.title} breaks down into the following tracks — skills first, tools second.`}
               </p>
-              <div style={{ display: 'grid', gap: 12 }}>
+              <div className={styles.trackGrid}>
                 {trainingOpp.trainingTracks!.map((track: any, i: number) => (
-                  <div key={i} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px' }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#f0f0f0' }}>
+                  <div key={i} className={styles.trackCard}>
+                    <div className={styles.trackTitle}>
                       {locale === 'id' ? `${track.headline} untuk ${track.audience}` : `${track.headline} for ${track.audience}`}
                     </div>
-                    <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: '0.88rem', color: '#c6c6bf' }}>
+                    <ul className={styles.trackTopics}>
                       {(track.topics || []).map((tp: string, j: number) => <li key={j}>{tp}</li>)}
                     </ul>
                     {Array.isArray(track.tools) && track.tools.length > 0 && (
-                      <div style={{ marginTop: 8, fontSize: '0.82rem', color: '#9a9a92' }}>
+                      <div className={styles.trackTools}>
                         {locale === 'id' ? 'Tool: ' : 'Tools: '}{track.tools.join(', ')}
                       </div>
                     )}
@@ -802,31 +765,31 @@ function BlueprintInsightsSection({
                   ? 'Dicocokkan dengan jawaban diagnostik Anda — dipilih agar transformasi bisa dimulai dari implementasi yang paling simpel dulu, baru ditingkatkan sesuai kebutuhan.'
                   : 'Matched to your diagnostic answers — chosen so your transformation can start with the simplest possible implementation first, then scale as needed.'}
               </p>
-              <div style={{ display: 'grid', gap: 10 }}>
+              <div className={styles.trackGridTight}>
                 {picks.map((pick) => (
-                  <div key={pick.name} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                      <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#f0f0f0' }}>{pick.name}</div>
-                      <div style={{ fontSize: '0.82rem', color: '#9a9a92' }}>{formatPickPrice(pick.priceUSD, currencyCode, rate, locale, pick.priceBasis)}<span> *</span></div>
+                  <div key={pick.name} className={styles.trackCard}>
+                    <div className={styles.trackRow}>
+                      <div className={styles.trackTitle}>{pick.name}</div>
+                      <div className={styles.trackTools}>{formatPickPrice(pick.priceUSD, currencyCode, rate, locale, pick.priceBasis)}<span> *</span></div>
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: '#9a9a92', marginTop: 2 }}>
+                    <div className={styles.trackTools}>
                       {locale === 'id' ? pick.category.id : pick.category.en}
                     </div>
-                    <div style={{ fontSize: '0.88rem', color: '#c6c6bf', marginTop: 6 }}>
+                    <div className={styles.trackBody}>
                       {locale === 'id' ? pick.reason.id : pick.reason.en}
                     </div>
                     <a
                       href={pick.vendorUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ fontSize: '0.82rem', color: '#8fa683', display: 'inline-block', marginTop: 6 }}
+                      className={styles.vendorLink}
                     >
                       {pick.vendorUrl.replace('https://', '')} ↗
                     </a>
                   </div>
                 ))}
               </div>
-              <p style={{ margin: '10px 0 0', fontSize: '0.8rem', fontWeight: 600, color: '#9a9a92' }}>
+              <p className={styles.priceNote}>
                 {locale === 'id'
                   ? '* Harga entry-tier publik dan belum termasuk biaya implementasi. Satuannya tertera pada tiap harga: /pengguna/bln dihitung per satu pengguna (kalikan jumlah pengguna Anda), /karyawan/bln per satu karyawan, dan (paket tim) sudah mencakup satu tim. Harga dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
                   : '* Public entry-tier prices, implementation cost not included. The unit is stated on each price: /user/mo is per single user (multiply by your user count), /employee/mo is per employee, and (team plan) already covers a team. Prices change at any time — always verify with the official vendor before purchasing.'}
@@ -858,7 +821,7 @@ function BlueprintInsightsSection({
                 const integrations = coerceList(dynWf.integrations_required)
                 return (
                   <div key={id} className={styles.workflowModuleCard}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                    <div className={styles.wfRow}>
                       <h4 className={styles.workflowModuleName}>{dynWf.name}</h4>
                       <button
                         className={styles.generateWorkflowBtn}
@@ -878,9 +841,9 @@ function BlueprintInsightsSection({
                     {steps.length > 0 && (
                       <div className={styles.workflowModuleNext}>
                         <span className={styles.workflowModuleNextLabel}>{t("stepsCount", { count: steps.length })}: </span>
-                        <ol style={{ margin: '4px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <ol className={styles.wfSteps}>
                           {steps.map((st, j) => (
-                            <li key={j} style={{ lineHeight: 1.45 }}>{coerceToString((st as any)?.action, '')}</li>
+                            <li key={j} className={styles.wfStep}>{coerceToString((st as any)?.action, '')}</li>
                           ))}
                         </ol>
                       </div>
@@ -917,7 +880,7 @@ function BlueprintInsightsSection({
               }
               return (
                 <div key={i} className={styles.workflowModuleCard}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                  <div className={styles.wfRow}>
                     <h4 className={styles.workflowModuleName}>{staticWf.name}</h4>
                     <button
                       className={styles.generateWorkflowBtn}
@@ -931,11 +894,11 @@ function BlueprintInsightsSection({
                     </button>
                   </div>
                   <span className={styles.workflowModuleStatus}>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} aria-hidden="true" />
+                    <span className={styles.wfStatusDot} aria-hidden="true" />
                     {staticWf.status}
                   </span>
                   <p className={styles.workflowModuleText}>{staticWf.value}</p>
-                  <p className={styles.workflowModuleText} style={{ color: '#666' }}>{staticWf.maturity}</p>
+                  <p className={styles.finePrint}>{staticWf.maturity}</p>
                   <p className={styles.workflowModuleNext}>
                     <span className={styles.workflowModuleNextLabel}>{t("nextStepLabel")}: </span>
                     {staticWf.next}
@@ -992,7 +955,7 @@ function BlueprintInsightsSection({
               </div>
               <div className={styles.deployMetaItem}>
                 <span className={styles.deployMetaLabel}>{t("estimatedRoiLabel")}</span>
-                <span className={styles.deployMetaValue} style={{ color: 'var(--color-accent)', fontWeight: 600 }}>{t("monthsCount", { count: deploymentPlan.estimated_roi_months })}</span>
+                <span className={`${styles.deployMetaValue} ${styles.accentStrong}`}>{t("monthsCount", { count: deploymentPlan.estimated_roi_months })}</span>
               </div>
             </div>
             <p className={styles.insightParagraph}>{deploymentPlan.estimated_impact}</p>
@@ -1006,7 +969,7 @@ function BlueprintInsightsSection({
                     </div>
                     {wave.included_workflows && wave.included_workflows.length > 0 && (
                       <div className={styles.deployWaveTags}>
-                        {wave.included_workflows.map((wf, j) => {
+                        {wave.included_workflows.map((wf: any, j: number) => {
                           // Older blueprints reference workflows by id (e.g.
                           // "wfm-001") — meaningless to the reader, so resolve
                           // to the workflow's human-readable name.
@@ -1032,7 +995,7 @@ function BlueprintInsightsSection({
         <div className={styles.insightCardBody}>
           <div className={styles.riskThemes}>
             {s.risks.length === 0 ? (
-              <p style={{ color: '#888', fontStyle: 'italic', padding: '1rem 0' }}>{t("noRisksFlagged")}</p>
+              <p className={`${styles.trackBody} ${styles.italicNote}`}>{t("noRisksFlagged")}</p>
             ) : (
               s.risks.map((risk, i) => (
                 <div key={i} className={styles.riskTheme}>
@@ -1108,9 +1071,7 @@ function BlueprintInsightsSection({
             aria-busy={generatingRoadmap}
           >
             <span>{generatingRoadmap ? t("generatingRoadmap") : t("generateRoadmap")}</span>
-            <svg className={styles.roadmapCtaArrow} width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M3 8h10M9 3.5 13.5 8 9 12.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <ArrowRight className={styles.roadmapCtaArrow} size={15} aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -1535,7 +1496,7 @@ export default function BlueprintPage() {
         <div className={styles.emptyBody}>
           <div className={styles.emptyContent}>
             <p className={styles.emptyIcon}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+              <MapIcon size={40} strokeWidth={1.5} aria-hidden="true" />
             </p>
             <h1 className={styles.emptyTitle}>{t("noBlueprint")}</h1>
             <p className={styles.emptyText}>
@@ -1572,7 +1533,7 @@ export default function BlueprintPage() {
     )
   }
 
-  const { organisation, diagnostic_summary } = blueprint
+  const { organization, diagnostic_summary } = blueprint
 
   return (
     <div className={`${styles.page} font-manrope`}>
@@ -1581,41 +1542,16 @@ export default function BlueprintPage() {
       )}
       {/* Cloud sync warning banner (Req 4.3): shown when Supabase save fails but localStorage succeeds */}
       {cloudSyncWarning && (
-        <div
-          role="alert"
-          style={{
-            position: 'sticky', top: 0, zIndex: 50,
-            background: '#78350f', color: '#fef3c7',
-            padding: '10px 16px', display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between', gap: 12, fontSize: '0.875rem',
-            borderBottom: '1px solid #92400e',
-          }}
-        >
+        <div role="alert" className={styles.bannerWarn}>
           <span>{t("cloudSyncWarningText")}</span>
-          <button
-            onClick={() => setCloudSyncWarning(false)}
-            aria-label={t("dismissCloudSyncWarning")}
-            style={{
-              background: 'transparent', border: 'none', color: '#fef3c7',
-              cursor: 'pointer', fontSize: '1rem', padding: '0 4px', lineHeight: 1,
-            }}
-          >✕</button>
+          <button onClick={() => setCloudSyncWarning(false)} aria-label={t("dismissCloudSyncWarning")}>✕</button>
         </div>
       )}
       {/* Fallback-generation notice: the AI didn't return a complete
           blueprint, so this one was assembled from a simplified template.
           The user should know it's not a full AI result and can regenerate. */}
       {(blueprint as any).fallback_generated && (
-        <div
-          role="alert"
-          style={{
-            position: 'sticky', top: 0, zIndex: 50,
-            background: '#78350f', color: '#fef3c7',
-            padding: '10px 16px', display: 'flex', alignItems: 'center',
-            justifyContent: 'space-between', gap: 12, fontSize: '0.875rem',
-            borderBottom: '1px solid #92400e',
-          }}
-        >
+        <div role="alert" className={styles.bannerWarn}>
           <span>{t("fallbackGeneratedWarning")}</span>
         </div>
       )}
@@ -1626,7 +1562,7 @@ export default function BlueprintPage() {
         {/* ── Header ─────────────────────────────────────────── */}
         <BlueprintHeader
           blueprintId={blueprint.blueprint_id || 'BP-001'}
-          companyName={organisation?.name || t("companyFallback")}
+          companyName={organization?.name || t("companyFallback")}
           version={currentVersionLabel || blueprint.version || '1'}
           status={blueprint.status || 'draft'}
           maturityLevel={diagnostic_summary?.maturity_level || 'Emerging'}
@@ -1666,9 +1602,9 @@ export default function BlueprintPage() {
                     </span>
                   </div>
                   <div className={styles.versionActions}>
-                    <button className={`${styles.versionLoadBtn} btn-style-a`} onClick={() => handleLoadVersion(v)}>{t("load")}</button>
-                    <button className={`${styles.versionCompareBtn} btn-style-b`} disabled title={t("compare")}>{t("compare")}</button>
-                    <button className={`${styles.versionDeleteBtn} btn-style-a`} onClick={() => handleDeleteVersion(v.version)}>{t("deleteVersion")}</button>
+                    <button className={`${styles.versionLoadBtn}`} onClick={() => handleLoadVersion(v)}>{t("load")}</button>
+                    <button className={`${styles.versionCompareBtn}`} disabled title={t("compare")}>{t("compare")}</button>
+                    <button className={`${styles.versionDeleteBtn}`} onClick={() => handleDeleteVersion(v.version)}>{t("deleteVersion")}</button>
                   </div>
                 </div>
               ))}
@@ -1718,9 +1654,9 @@ export default function BlueprintPage() {
               placeholder={t("saveVersionPlaceholder")}
             />
             <div className={styles.modalActions}>
-              <button className={`${styles.modalCancel} btn-style-a`} onClick={() => setShowSaveModal(false)}>{tCommon("cancel")}</button>
+              <button className={`${styles.modalCancel}`} onClick={() => setShowSaveModal(false)}>{tCommon("cancel")}</button>
               <button
-                className={`${styles.modalSave} btn-style-b`}
+                className={`${styles.modalSave}`}
                 onClick={handleSaveVersion}
                 disabled={!saveVersionName.trim()}
               >
