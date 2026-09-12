@@ -488,9 +488,32 @@ function AgentActivity() {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    listAgentActions(20)
-      .then(setActions)
-      .catch(() => setFailed(true));
+    let alive = true;
+    let hasLoadedOnce = false;
+    const load = () => {
+      listAgentActions(20)
+        .then((a) => {
+          if (!alive) return;
+          hasLoadedOnce = true;
+          setActions(a);
+        })
+        .catch(() => {
+          // Only hide the feed on the very first failed load (log truly
+          // unreachable). A later poll hiccup must not wipe an already-
+          // shown list -- it just retries again in 5s.
+          if (alive && !hasLoadedOnce) setFailed(true);
+        });
+    };
+    load();
+    // Phase 4 (Agent Task Ledger): fetch-on-mount alone meant a blocked/done
+    // task only appeared on the next full page load. Same 5s poll interval
+    // MissionControl already uses for workspace activity -- no new socket,
+    // just this feed no longer going stale until the visitor reloads.
+    const t = setInterval(load, 5000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
   }, []);
 
   if (failed) return null; // quietly hide the feed if the log isn't reachable
