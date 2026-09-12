@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { Trash2 } from "lucide-react"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
+import WorkspaceBell from "@/components/workspace/WorkspaceBell"
 
 type DocItem = { id: string; title: string; workspace_id: string; owner: string | null; updated_at: string | null; myRole: string }
 
@@ -153,6 +154,7 @@ export default function WorkspacePage() {
       <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-black/10 px-6">
         <span className="shrink-0 text-[13px] font-medium leading-none text-white/80">My workspace</span>
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+          <WorkspaceBell />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}

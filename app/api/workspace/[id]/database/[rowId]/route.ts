@@ -16,6 +16,7 @@ import {
   MAX_DESCRIPTION_LEN,
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
+import { syncDescriptionMentions } from "@/lib/workspaceMentions"
 
 export const runtime = "nodejs"
 
@@ -92,6 +93,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     })
     const updated = parseDbRow(arr.get(idx) as Y.Map<unknown>)
     const [resolved] = await withResolvedRollups([updated], await getFieldDefs(id), cred, agentType, await allowPg(cred, id))
+    if (clean.description !== undefined) {
+      await syncDescriptionMentions({ docId: id, rowId, credential: cred, agentType, source: "description", text: clean.description })
+    }
     return NextResponse.json({ id: rowId, patched: clean, ...(mergedCells ? { cells: mergedCells } : {}), rollups: resolved?.cells ?? {} })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { parseFieldDefs, cleanCells, computeRollups, type RollupSubject } from "./workspaceDbModel"
+import { parseFieldDefs, cleanCells, computeRollups, parseMentions, type RollupSubject } from "./workspaceDbModel"
 
 
 describe("parseFieldDefs relation/rollup", () => {
@@ -67,5 +67,27 @@ describe("computeRollups", () => {
   it("ignores rows without links", () => {
     const out = computeRollups([rows[1]], defs, get)
     expect(out).toEqual({})
+  })
+})
+
+describe("parseMentions", () => {
+  it("resolves agent names and types case-insensitively", () => {
+    expect(parseMentions("Hey @Lex and @GENO, see @office_assistant")).toEqual({
+      agents: ["leads_qualifier", "autonomous", "office_assistant"],
+      emails: [],
+    })
+  })
+
+  it("extracts emails without confusing them for agents", () => {
+    expect(parseMentions("cc @boss@example.com, @teo?")).toEqual({
+      agents: ["customer_service"],
+      emails: ["boss@example.com"],
+    })
+  })
+
+  it("dedupes, caps, and ignores non-text", () => {
+    expect(parseMentions("@lex @lex @nobody")).toEqual({ agents: ["leads_qualifier"], emails: [] })
+    expect(parseMentions("")).toEqual({ agents: [], emails: [] })
+    expect(parseMentions(null)).toEqual({ agents: [], emails: [] })
   })
 })

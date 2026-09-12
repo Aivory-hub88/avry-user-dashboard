@@ -227,3 +227,37 @@ export function computeRollups(
   }
   return out
 }
+
+/** Known Cerveau agents for @mention resolution (display name + type id). */
+export const MENTIONABLE_AGENTS: ReadonlyArray<{ type: string; names: string[] }> = [
+  { type: "autonomous", names: ["geno", "autonomous"] },
+  { type: "customer_service", names: ["teo", "customer_service", "customer-service"] },
+  { type: "leads_qualifier", names: ["lex", "leads_qualifier", "leads-qualifier"] },
+  { type: "finance_invoice_ops", names: ["finn", "finance_invoice_ops", "finance-invoice-ops"] },
+  { type: "office_assistant", names: ["ofira", "office_assistant", "office-assistant"] },
+]
+
+export type ParsedMentions = { agents: string[]; emails: string[] }
+
+/**
+ * Parse @mentions from free text (pure): @Geno/@autonomous → agent type,
+ * @user@example.com → user email. Case-insensitive, deduped, capped.
+ */
+export function parseMentions(text: unknown): ParsedMentions {
+  if (typeof text !== "string" || text.length === 0) return { agents: [], emails: [] }
+  const agents = new Set<string>()
+  const emails = new Set<string>()
+  const emailRe = /@([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g
+  let m: RegExpExecArray | null
+  while ((m = emailRe.exec(text)) !== null) {
+    if (emails.size < 20) emails.add(m[1].toLowerCase())
+  }
+  const stripped = text.replace(emailRe, " ")
+  const tokenRe = /@([A-Za-z][A-Za-z0-9_-]*)/g
+  while ((m = tokenRe.exec(stripped)) !== null) {
+    const tok = m[1].toLowerCase()
+    const hit = MENTIONABLE_AGENTS.find((a) => a.names.includes(tok))
+    if (hit && agents.size < 20) agents.add(hit.type)
+  }
+  return { agents: [...agents], emails: [...emails] }
+}
