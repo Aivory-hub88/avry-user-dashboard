@@ -194,6 +194,7 @@
   font-weight: 600;
   color: rgba(255,255,255,0.85);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* right side: actions — one primary, the rest quiet */
