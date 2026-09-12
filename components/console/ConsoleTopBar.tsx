@@ -16,7 +16,7 @@ export default function ConsoleTopBar({ onNewChat }: ConsoleTopBarProps) {
     <div className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-surface-1 px-6 sticky top-0 z-10">
       <div className="flex items-center gap-2 text-[13px] font-medium text-white/80">
         {activeAgent ? <Bot className="w-3.5 h-3.5 text-accent" /> : <Terminal className="w-3.5 h-3.5 text-accent" />}
-        {activeAgent ? activeAgent.title : "Aivory Console"}
+        {activeAgent ? activeAgent.name : "Aivory Console"}
         {agentTarget && (
           <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-accent-dim text-accent border border-accent/20 uppercase tracking-wider">
             Agent

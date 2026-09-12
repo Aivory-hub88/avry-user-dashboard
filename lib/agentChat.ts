@@ -16,17 +16,19 @@ const BACKEND_URL =
 
 export interface PrebuiltAgent {
   type: TelegramAgentType
+  /** First name shown in the Console/rail — see docs/AGENT-NAMING (11 Sep 2026). */
+  name: string
   title: string
   enterprise?: boolean
 }
 
 /** Must stay in sync with the AGENTS card list and backend AGENT_TYPES. */
 export const PREBUILT_AGENTS: PrebuiltAgent[] = [
-  { type: 'autonomous', title: 'Generalist Agent' },
-  { type: 'customer_service', title: 'Ticket Ops Agent' },
-  { type: 'leads_qualifier', title: 'Leads Qualifier Agent' },
-  { type: 'finance_invoice_ops', title: 'Finance & Invoice Ops Agent' },
-  { type: 'office_assistant', title: 'Office Assistant', enterprise: true },
+  { type: 'autonomous', name: 'Geno', title: 'Generalist Agent' },
+  { type: 'customer_service', name: 'Teo', title: 'Ticket Ops Agent' },
+  { type: 'leads_qualifier', name: 'Lex', title: 'Leads Qualifier Agent' },
+  { type: 'finance_invoice_ops', name: 'Finn', title: 'Finance & Invoice Ops Agent' },
+  { type: 'office_assistant', name: 'Ofira', title: 'Office Assistant', enterprise: true },
 ]
 
 /** Minimal shape Cerveau's own /webhook response carries — no `arguments`,

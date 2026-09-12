@@ -188,7 +188,7 @@ export default function ConsolePage() {
   // Whoever is actually answering — named in the thinking indicator so a
   // room with several agents says who's busy, not just "Aivory".
   const activeAgentName = agentTarget
-    ? PREBUILT_AGENTS.find((a) => a.type === agentTarget)?.title ?? agentTarget
+    ? PREBUILT_AGENTS.find((a) => a.type === agentTarget)?.name ?? agentTarget
     : "Aivory"
 
   // Shown immediately in the chat pane the moment an undeployed agent is
