@@ -111,7 +111,7 @@ export default function SharingPanel({ docId, isOwner }: { docId: string; isOwne
 
   if (!isOwner) {
     return (
-      <div className="rounded-xl border border-line bg-white/[0.03] p-4">
+      <div className="rounded-xl bg-white/[0.08] p-4">
         <div className="text-[12px] font-medium text-white/70">Shared with</div>
         <div className="mt-2 text-[12px] text-white/40">
           {acl.length === 0 && agents.length === 0
