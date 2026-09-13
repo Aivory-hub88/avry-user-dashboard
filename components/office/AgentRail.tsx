@@ -44,13 +44,20 @@ import { ChevronLeft, ChevronRight, Brain } from "lucide-react"
 import { IoWarning, IoCheckmarkCircle, IoCheckmark, IoChatbubbleEllipses } from "react-icons/io5"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
+import type { ActiveAgentRun } from "@/lib/agentRuns"
 import { describeTool, toolkitIconPath, readVerifierFinding, type PendingApproval } from "@/lib/agentApprovals"
 import type { Notification } from "@/types/notifications"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { NotificationCard } from "@/components/office/NotificationCard"
 import { MemoryModal } from "@/components/office/MemoryModal"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
-import { CHANNEL_ICON, relativeTime } from "@/lib/officeRows"
+import { CHANNEL_ICON, relativeTime, formatBadgeCount } from "@/lib/officeRows"
+
+const CHANNEL_LABEL: Record<string, string> = {
+  console: "Console",
+  telegram: "Telegram",
+  slack: "Slack",
+}
 
 /** The shared strip every status line in this rail is built from. */
 function Bar({ tone = "idle", children }: { tone?: "idle" | "warn"; children: React.ReactNode }) {
@@ -75,6 +82,10 @@ interface AgentRailProps {
   onRetryApprovals: () => void
   onOpenThread: (sessionId: string) => void
   deployments: AgentDeployment[]
+  /** Present when this agent has a turn in flight right now (Console chat,
+   *  Telegram, or Slack) — see hooks/useActiveRuns.ts. `undefined` means
+   *  not running, not "unknown". */
+  activeRun?: ActiveAgentRun
   /** Controlled by OfficeShell — it owns the grid track sizing, this
    *  component just renders itself accordingly. */
   collapsed?: boolean
@@ -90,6 +101,7 @@ export default function AgentRail({
   onRetryApprovals,
   onOpenThread,
   deployments,
+  activeRun,
   collapsed = false,
   onToggleCollapse,
 }: AgentRailProps) {
@@ -140,7 +152,7 @@ export default function AgentRail({
         <AgentAvatar type={agentTarget} size={30} />
         {notifications.length > 0 && (
           <span className="mt-2 rounded-full bg-amber/13 px-[6px] py-[2px] text-[11px] font-bold text-amber">
-            {notifications.length}
+            {formatBadgeCount(notifications.length)}
           </span>
         )}
       </div>
@@ -383,7 +395,25 @@ export default function AgentRail({
 
             <section className="mt-[20px] flex flex-col gap-[8px]">
               <span className="px-0.5 text-[12px] font-semibold leading-none text-white/65">Running now</span>
-              <Bar tone="idle">Not running anything right now.</Bar>
+              {activeRun ? (
+                <Bar tone="idle">
+                  <span className="flex items-center gap-[7px]">
+                    <span className="h-[7px] w-[7px] shrink-0 animate-pulse rounded-full bg-emerald-400" />
+                    <span className="text-white/70">
+                      {(() => {
+                        const channelName = CHANNEL_LABEL[activeRun.channel ?? ""]
+                        const label = channelName ? `a ${channelName} message` : "a message"
+                        const since = activeRun.started_at ? relativeTime(new Date(activeRun.started_at).getTime()) : null
+                        return since && since !== "now"
+                          ? `Working on ${label} — started ${since} ago`
+                          : `Working on ${label} right now`
+                      })()}
+                    </span>
+                  </span>
+                </Bar>
+              ) : (
+                <Bar tone="idle">Not running anything right now.</Bar>
+              )}
             </section>
 
             {channels.length > 0 && (

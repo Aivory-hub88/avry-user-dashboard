@@ -18,6 +18,7 @@ import { useFileUpload } from "@/hooks/useFileUpload"
 import { useChat } from "@/hooks/useChat"
 import { useNotificationFeed } from "@/hooks/useNotificationFeed"
 import { useAgentDeployments } from "@/hooks/useAgentDeployments"
+import { useActiveRuns } from "@/hooks/useActiveRuns"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
 import { collabAuthHeaders } from "@/lib/collabClient"
@@ -183,6 +184,7 @@ export default function ConsolePage() {
     retryApprovals: refetchApprovals,
   } = useNotificationFeed({ sessionsByAgent, currentSessionId, excludeApprovalIds: inlineApprovalIds })
   const { deployments } = useAgentDeployments()
+  const { byAgentType: activeRunsByAgentType } = useActiveRuns()
 
   // Whoever is actually answering — named in the thinking indicator so a
   // room with several agents says who's busy, not just "Aivory".
@@ -348,6 +350,7 @@ export default function ConsolePage() {
           currentSessionId={currentSessionId}
           agentTarget={agentTarget}
           streamingAgentType={streamingAgentType}
+          activeRunsByAgentType={activeRunsByAgentType}
           setAgentTarget={setAgentTarget}
           switchSession={switchSession}
           deleteThread={deleteThread}
@@ -370,6 +373,7 @@ export default function ConsolePage() {
             switchSession(sessionId)
           }}
           deployments={deployments}
+          activeRun={agentTarget ? activeRunsByAgentType[agentTarget] : undefined}
         />
       }
     >
@@ -394,6 +398,7 @@ export default function ConsolePage() {
             notificationsByAgent={notificationsByAgent}
             deployments={deployments}
             streamingAgentType={streamingAgentType}
+            activeRunsByAgentType={activeRunsByAgentType}
             onOpenAgent={openAgentFromMissionControl}
           />
         ) : messages.length === 0 ? (

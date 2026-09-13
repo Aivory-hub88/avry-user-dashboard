@@ -55,6 +55,14 @@ export function relativeTime(ts: number): string {
   return `${Math.round(hours / 24)}d`
 }
 
+/** Caps a pending/notification badge at "99+" — the badge chips this feeds
+ *  (AgentColumn's rail avatar and thread-row badges, MissionControl's card
+ *  badge) are sized in single-digit px padding for a 1-2 digit count; a raw
+ *  3+ digit number stretched or clipped the pill instead of wrapping. */
+export function formatBadgeCount(n: number): string {
+  return n > 99 ? "99+" : String(n)
+}
+
 export function lastPreview(
   session: ChatSession | undefined,
   { maxLen, emptyText }: { maxLen: number; emptyText: string },

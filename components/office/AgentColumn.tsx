@@ -10,11 +10,12 @@ import Image from "next/image"
 import { ChevronRight, ChevronLeft, Lock, Plus, Trash2, LayoutGrid, Search } from "lucide-react"
 import { asset } from "@/lib/asset"
 import type { AgentDeployment } from "@/lib/agentChat"
+import type { ActiveAgentRun } from "@/lib/agentRuns"
 import type { ChatSession } from "@/hooks/useChat"
 import type { Notification } from "@/types/notifications"
 import { ThinkingDots } from "@/components/ui/ThinkingDots"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
-import { OFFICE_ROWS, CHANNEL_ICON, relativeTime, lastPreview } from "@/lib/officeRows"
+import { OFFICE_ROWS, CHANNEL_ICON, relativeTime, lastPreview, formatBadgeCount } from "@/lib/officeRows"
 
 interface AgentColumnProps {
   sessionsByAgent: Record<string, ChatSession[]>
@@ -27,6 +28,10 @@ interface AgentColumnProps {
   currentSessionId: string
   agentTarget: string | null
   streamingAgentType: string | null | undefined
+  /** Turns in flight right now across every channel — see
+   *  hooks/useActiveRuns.ts. Same "this tab's stream isn't the only place
+   *  an agent can be busy" gap MissionControl's isRunningElsewhere fixes. */
+  activeRunsByAgentType: Record<string, ActiveAgentRun>
   setAgentTarget: (agent: string | null) => void
   switchSession: (sessionId: string) => void
   handleNewChat: () => void
@@ -56,6 +61,7 @@ export default function AgentColumn({
   currentSessionId,
   agentTarget,
   streamingAgentType,
+  activeRunsByAgentType,
   setAgentTarget,
   switchSession,
   handleNewChat,
@@ -192,13 +198,16 @@ export default function AgentColumn({
                 ) : (
                   <AgentAvatar type={row.type} size={36} />
                 )}
+                {row.type !== streamingAgentType && row.type !== null && activeRunsByAgentType[row.type] && (
+                  <span className="absolute bottom-0 right-0 h-[9px] w-[9px] animate-pulse rounded-full border-2 border-surface-1 bg-emerald-400" />
+                )}
                 {pending > 0 && (
                   <span
                     className={`absolute -right-0.5 -top-0.5 rounded-full bg-amber px-[4px] text-[9px] font-bold leading-[13px] text-[#2b2b28] ${
                       arrived.has(row.key) ? "pending-badge-arrived" : ""
                     }`}
                   >
-                    {pending}
+                    {formatBadgeCount(pending)}
                   </span>
                 )}
               </button>
@@ -262,6 +271,7 @@ export default function AgentColumn({
           const pending = notificationsByAgent[row.key]?.length ?? 0
           const mostRecent = threads[0]
           const isThinkingHere = row.type === streamingAgentType
+          const isRunningElsewhere = !isThinkingHere && row.type !== null && !!activeRunsByAgentType[row.type]
           return (
             <div key={row.key} className="mb-0.5 w-full">
               <button
@@ -274,7 +284,12 @@ export default function AgentColumn({
                 <ChevronRight
                   className={`h-[12px] w-[12px] shrink-0 text-white/25 transition-transform ${isOpen ? "rotate-90" : ""}`}
                 />
-                <AgentAvatar type={row.type} size={30} className="shrink-0" />
+                <span className="relative shrink-0">
+                  <AgentAvatar type={row.type} size={30} />
+                  {isRunningElsewhere && (
+                    <span className="absolute bottom-0 right-0 h-[8px] w-[8px] animate-pulse rounded-full border-2 border-surface-1 bg-emerald-400" />
+                  )}
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-[6px]">
                     <span
@@ -299,6 +314,11 @@ export default function AgentColumn({
                       <ThinkingDots size={9} dotSize={1.6} />
                       <span className="truncate text-[12px] font-light text-white/45">thinking…</span>
                     </span>
+                  ) : isRunningElsewhere ? (
+                    <span className="mt-[2px] flex items-center gap-[5px]">
+                      <span className="h-[6px] w-[6px] shrink-0 animate-pulse rounded-full bg-emerald-400" />
+                      <span className="truncate text-[12px] font-light text-white/45">running…</span>
+                    </span>
                   ) : !isOpen ? (
                     <span className="mt-[2px] block truncate text-[12px] font-light leading-none text-white/35">
                       {mostRecent ? lastPreview(mostRecent, { maxLen: 44, emptyText: "No messages yet" }) : "No conversations yet"}
@@ -312,7 +332,7 @@ export default function AgentColumn({
                         arrived.has(row.key) ? "pending-badge-arrived" : ""
                       }`}
                     >
-                      {pending}
+                      {formatBadgeCount(pending)}
                     </span>
                   )}
                   <span

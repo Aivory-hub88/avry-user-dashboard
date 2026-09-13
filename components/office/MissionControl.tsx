@@ -15,6 +15,7 @@ import { Lock } from "lucide-react"
 import { useEffect, useState } from "react"
 import { asset } from "@/lib/asset"
 import type { AgentDeployment } from "@/lib/agentChat"
+import type { ActiveAgentRun } from "@/lib/agentRuns"
 import type { ChatSession } from "@/hooks/useChat"
 import { readVerifierFinding } from "@/lib/agentApprovals"
 import type { Notification } from "@/types/notifications"
@@ -22,7 +23,7 @@ import { collabAuthHeaders } from "@/lib/collabClient"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
 import { ThinkingDots } from "@/components/ui/ThinkingDots"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
-import { OFFICE_ROWS, CHANNEL_ICON, relativeTime, lastPreview as sharedLastPreview } from "@/lib/officeRows"
+import { OFFICE_ROWS, CHANNEL_ICON, relativeTime, lastPreview as sharedLastPreview, formatBadgeCount } from "@/lib/officeRows"
 
 type Row = (typeof OFFICE_ROWS)[number]
 
@@ -50,6 +51,11 @@ interface MissionControlProps {
   notificationsByAgent: Record<string, Notification[]>
   deployments: AgentDeployment[]
   streamingAgentType: string | null | undefined
+  /** Turns actually in flight right now, across every channel — see
+   *  hooks/useActiveRuns.ts. `streamingAgentType` alone only ever reflects
+   *  this browser tab's own open SSE stream, so a card could sit on "Idle"
+   *  while that same agent was mid-turn on Telegram or Slack. */
+  activeRunsByAgentType: Record<string, ActiveAgentRun>
   onOpenAgent: (agentType: string | null) => void
 }
 
@@ -59,6 +65,7 @@ export default function MissionControl({
   notificationsByAgent,
   deployments,
   streamingAgentType,
+  activeRunsByAgentType,
   onOpenAgent,
 }: MissionControlProps) {
   const [wsRows, setWsRows] = useState<{ id: string; title: string; status: string; priority: string }[]>([])
@@ -155,14 +162,23 @@ export default function MissionControl({
               ? [...new Set(deployments.filter((d) => d.agentType === row.type).map((d) => d.kind))]
               : []
             const isThinking = row.type === streamingAgentType
+            // `streamingAgentType` only ever reflects this tab's own open SSE
+            // stream. `activeRunsByAgentType` catches the same agent mid-turn
+            // on a channel this tab isn't watching (Telegram, Slack, or this
+            // agent's Console thread open in a different tab) — without it a
+            // card sat on "Idle" while the agent was genuinely busy elsewhere.
+            const isRunningElsewhere = !isThinking && row.type !== null && !!activeRunsByAgentType[row.type]
             const status = isThinking
               ? "Thinking…"
-              : flagged
-                ? "Flagged"
-                : pending > 0
-                  ? "Needs you"
-                  : "Idle"
-            const statusColor = pending > 0 ? "text-amber" : isThinking ? "text-white/60" : "text-white/35"
+              : isRunningElsewhere
+                ? "Running"
+                : flagged
+                  ? "Flagged"
+                  : pending > 0
+                    ? "Needs you"
+                    : "Idle"
+            const statusColor =
+              pending > 0 ? "text-amber" : isThinking || isRunningElsewhere ? "text-white/60" : "text-white/35"
 
             return (
               <button
@@ -178,7 +194,12 @@ export default function MissionControl({
                         <ThinkingDots size={12} dotSize={2} />
                       </div>
                     ) : (
-                      <AgentAvatar type={row.type} size={38} />
+                      <div className="relative shrink-0">
+                        <AgentAvatar type={row.type} size={38} />
+                        {isRunningElsewhere && (
+                          <span className="absolute -right-0.5 -top-0.5 h-[10px] w-[10px] animate-pulse rounded-full border-2 border-surface-1 bg-emerald-400" />
+                        )}
+                      </div>
                     )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-[6px]">
@@ -190,7 +211,7 @@ export default function MissionControl({
                   </div>
                   {pending > 0 && (
                     <span className="shrink-0 rounded-full bg-amber/15 px-[8px] py-[3px] text-[11px] font-semibold text-amber">
-                      {pending}
+                      {formatBadgeCount(pending)}
                     </span>
                   )}
                 </div>

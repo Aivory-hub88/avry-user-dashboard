@@ -32,6 +32,10 @@ const STUB_WIDTH = "56px"
 const AGENT_COL_TRACK = "minmax(220px, 18%)"
 const RAIL_TRACK = "minmax(280px, 20%)"
 const MIN_WIDTH = 1100
+// A short-but-wide window (small floating browser window, laptop lid barely
+// open) passed the width-only guard untouched with almost no usable chat
+// height left above the composer — see useMinWidth.ts.
+const MIN_HEIGHT = 480
 
 export default function OfficeShell({
   agentColumn,
@@ -44,7 +48,7 @@ export default function OfficeShell({
 }) {
   const agentCol = useAgentColumnCollapse()
   const railCol = useRailCollapse()
-  const { ref, tooNarrow } = useMinWidth<HTMLDivElement>(MIN_WIDTH)
+  const { ref, tooNarrow } = useMinWidth<HTMLDivElement>(MIN_WIDTH, MIN_HEIGHT)
 
   // Narrow office: force both side panels to stubs so the conversation keeps
   // the room. Manual collapse state is untouched and applies again once wide.
