@@ -51,7 +51,7 @@ beforeEach(() => {
 
 describe('GET /api/workspace/notifications', () => {
   it('returns unread mentions for the asserted agent', async () => {
-    const res = await GET(new NextRequest('http://localhost/api/workspace/notifications', { headers: svcAgent }), {})
+    const res = await GET(new NextRequest('http://localhost/api/workspace/notifications', { headers: svcAgent }))
     expect(res.status).toBe(200)
     const j = await res.json()
     expect(j.unread).toBe(1)
@@ -59,7 +59,7 @@ describe('GET /api/workspace/notifications', () => {
   })
 
   it('requires an agent identity for service callers', async () => {
-    const res = await GET(new NextRequest('http://localhost/api/workspace/notifications', { headers: svcNoAgent }), {})
+    const res = await GET(new NextRequest('http://localhost/api/workspace/notifications', { headers: svcNoAgent }))
     expect(res.status).toBe(400)
   })
 
@@ -70,7 +70,6 @@ describe('GET /api/workspace/notifications', () => {
         body: JSON.stringify({ markRead: true }),
         headers: { 'Content-Type': 'application/json', ...svcAgent },
       }),
-      {},
     )
     expect(res.status).toBe(200)
     const upsert = queryMock.mock.calls.find((c) => String(c[0]).includes('workspace_mention_reads'))
