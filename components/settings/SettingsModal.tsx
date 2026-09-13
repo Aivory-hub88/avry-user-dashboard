@@ -1,10 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { logout } from '@/lib/auth'
 import { getMarketingUrl } from '@/lib/config'
 import { useSettingsModal, SettingsTab } from '@/contexts/SettingsModalContext'
 import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
+import {
+  listMcpImageTokens,
+  createMcpImageToken,
+  revokeMcpImageToken,
+  McpImageToken,
+  CreatedMcpImageToken,
+} from '@/lib/mcpImageTokens'
 
 export interface User {
   user_id: string
@@ -30,6 +37,33 @@ export function SettingsModal({ user }: SettingsModalProps) {
   
   // Credits State
   const [isAddingCredits, setIsAddingCredits] = useState(false)
+
+  // MCP image download-credentials state (see lib/mcpImageTokens.ts).
+  // `od-mcp` is the only image today — this list stays hardcoded until a
+  // second Aivory-built MCP server needs the same distribution path.
+  const DOWNLOADABLE_IMAGES = ['od-mcp'] as const
+  const [imageTokens, setImageTokens] = useState<McpImageToken[]>([])
+  const [imageTokensLoading, setImageTokensLoading] = useState(false)
+  const [imageTokensError, setImageTokensError] = useState<string | null>(null)
+  const [creatingTokenFor, setCreatingTokenFor] = useState<string | null>(null)
+  const [newTokenLabel, setNewTokenLabel] = useState('')
+  const [tokenCreateLoading, setTokenCreateLoading] = useState(false)
+  const [createdToken, setCreatedToken] = useState<CreatedMcpImageToken | null>(null)
+  const [tokenCopied, setTokenCopied] = useState(false)
+  const [revokingTokenId, setRevokingTokenId] = useState<string | null>(null)
+
+  const loadImageTokens = useCallback(async () => {
+    setImageTokensLoading(true)
+    setImageTokensError(null)
+    try {
+      const tokens = await listMcpImageTokens()
+      setImageTokens(tokens)
+    } catch (err) {
+      setImageTokensError(err instanceof Error ? err.message : 'Failed to load download credentials')
+    } finally {
+      setImageTokensLoading(false)
+    }
+  }, [])
   // Must match CREDIT_PACKS_USD in avry-payments' app/services/pricing.py and
   // CREDIT_PACK_DEFINITIONS in the landing site's src/lib/pricing.ts. The
   // gateway prices every order from its own table and accepts no amount from
@@ -67,6 +101,37 @@ export function SettingsModal({ user }: SettingsModalProps) {
     localStorage.setItem(`settings_${key}`, String(value))
   }
 
+  useEffect(() => {
+    if (activeTab === 'downloads') loadImageTokens()
+  }, [activeTab, loadImageTokens])
+
+  const handleCreateToken = async (imageName: string) => {
+    setTokenCreateLoading(true)
+    setImageTokensError(null)
+    try {
+      const created = await createMcpImageToken(imageName, newTokenLabel || undefined)
+      setCreatedToken(created)
+      setNewTokenLabel('')
+      await loadImageTokens()
+    } catch (err) {
+      setImageTokensError(err instanceof Error ? err.message : 'Failed to create download credential')
+    } finally {
+      setTokenCreateLoading(false)
+    }
+  }
+
+  const handleRevokeToken = async (id: string) => {
+    setRevokingTokenId(id)
+    try {
+      await revokeMcpImageToken(id)
+      setImageTokens((prev) => prev.filter((tk) => tk.id !== id))
+    } catch (err) {
+      setImageTokensError(err instanceof Error ? err.message : 'Failed to revoke download credential')
+    } finally {
+      setRevokingTokenId(null)
+    }
+  }
+
   const handleLogout = async () => {
     try {
       await logout()
@@ -102,6 +167,7 @@ export function SettingsModal({ user }: SettingsModalProps) {
       title: 'Other',
       items: [
         { id: 'upgrade', label: 'Upgrade to Enterprise', icon: <><path d="M21.5 12H16c-.7 2-2 3-4 3s-3.3-1-4-3H2.5"/><path d="M5.5 5.1L2 12v6c0 1.1.9 2 2 2h16a2 2 0 002-2v-6l-3.4-6.9A2 2 0 0016.8 4H7.2a2 2 0 00-1.8 1.1z"/></> },
+        { id: 'downloads', label: 'Downloads', icon: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></> },
         { id: 'about', label: 'API Platform', icon: <><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></> },
       ]
     }
@@ -358,6 +424,143 @@ export function SettingsModal({ user }: SettingsModalProps) {
             </div>
           )}
 
+          {/* TAB: DOWNLOADS (self-hosted MCP server image credentials) */}
+          {activeTab === 'downloads' && (
+            <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
+              <h2 className="text-2xl font-semibold mb-8 pb-4 border-b border-white/5">
+                Downloads
+                <span className="block mt-1 text-[13px] font-normal text-white/60">
+                  Credentials for self-hosting Aivory&apos;s own MCP server images. These are proprietary builds, not published to a public registry — a credential here is how your own infrastructure fetches them.
+                </span>
+              </h2>
+
+              {imageTokensError && (
+                <div className="mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300/90 text-[12px]">
+                  {imageTokensError}
+                </div>
+              )}
+
+              {DOWNLOADABLE_IMAGES.map((imageName) => {
+                const tokensForImage = imageTokens.filter((tk) => tk.image_name === imageName)
+                const isCreatingHere = creatingTokenFor === imageName
+
+                return (
+                  <div key={imageName} className="mb-10">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-base font-semibold font-mono">{imageName}</h3>
+                      {!isCreatingHere && !(createdToken && createdToken.image_name === imageName) && (
+                        <button
+                          onClick={() => { setCreatingTokenFor(imageName); setCreatedToken(null); setImageTokensError(null) }}
+                          className="px-4 py-2 text-[13px] font-medium bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] rounded-md border border-accent/30 transition-colors"
+                        >
+                          Generate credential
+                        </button>
+                      )}
+                    </div>
+
+                    {isCreatingHere && !createdToken && (
+                      <div className="bg-white/5 border border-white/10 rounded-xl p-5 mb-4">
+                        <label className="block text-white/70 text-[12px] font-medium mb-1.5">Label (optional)</label>
+                        <input
+                          type="text"
+                          value={newTokenLabel}
+                          onChange={(e) => setNewTokenLabel(e.target.value.slice(0, 200))}
+                          placeholder="e.g. production VPS"
+                          className="w-full px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 text-white/90 text-[13px] placeholder-white/25 focus:outline-none focus:border-accent/40 transition-colors mb-4"
+                        />
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleCreateToken(imageName)}
+                            disabled={tokenCreateLoading}
+                            className="px-4 py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50"
+                          >
+                            {tokenCreateLoading ? 'Creating…' : 'Create credential'}
+                          </button>
+                          <button
+                            onClick={() => { setCreatingTokenFor(null); setNewTokenLabel('') }}
+                            className="px-4 py-2.5 rounded-lg text-white/50 hover:text-white text-[13px] transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {createdToken && createdToken.image_name === imageName && (
+                      <div className="bg-white/5 border border-white/10 rounded-xl p-5 mb-4">
+                        <p className="text-white/60 text-[13px] leading-relaxed mb-3">
+                          Store this somewhere safe — Aivory never stores or shows the plaintext credential again.
+                        </p>
+                        <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 mb-2">
+                          <code className="flex-1 text-[12px] text-[#dbe5d3] break-all">{createdToken.token}</code>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(createdToken.token)
+                              setTokenCopied(true)
+                              setTimeout(() => setTokenCopied(false), 2000)
+                            }}
+                            className="shrink-0 px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/10 text-white/70 text-[11px] transition-colors"
+                          >
+                            {tokenCopied ? 'Copied ✓' : 'Copy'}
+                          </button>
+                        </div>
+
+                        <label className="block text-white/70 text-[12px] font-medium mt-4 mb-1.5">Download command</label>
+                        <pre className="w-full px-3.5 py-3 rounded-lg bg-black/30 border border-white/10 text-white/60 text-[10.5px] overflow-x-auto whitespace-pre-wrap break-all">
+{`curl -H "X-Aivory-Download-Key: ${createdToken.token}" \\
+  ${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'}/api/v1/mcp-images/${imageName}/download \\
+  -o ${imageName}.tar.gz
+docker load -i ${imageName}.tar.gz`}
+                        </pre>
+
+                        <button
+                          onClick={() => { setCreatedToken(null); setCreatingTokenFor(null) }}
+                          className="mt-4 text-white/50 hover:text-white text-[12px] transition-colors"
+                        >
+                          Done
+                        </button>
+                      </div>
+                    )}
+
+                    {imageTokensLoading ? (
+                      <div className="py-6 text-center text-white/40 text-[13px]">Loading…</div>
+                    ) : tokensForImage.length > 0 ? (
+                      <div className="space-y-2">
+                        {tokensForImage.map((tk) => (
+                          <div key={tk.id} className="px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-white/80 text-[13px] font-medium truncate">
+                                  {tk.label || tk.key_prefix}
+                                </div>
+                                <div className="text-white/35 text-[11px] truncate">
+                                  {tk.key_prefix}… · created {new Date(tk.created_at).toLocaleDateString()}
+                                  {tk.last_pulled_at && ` · last used ${new Date(tk.last_pulled_at).toLocaleDateString()}`}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={revokingTokenId === tk.id}
+                                onClick={() => handleRevokeToken(tk.id)}
+                                className="shrink-0 text-red-300/60 hover:text-red-300/90 text-[11.5px] disabled:opacity-40"
+                              >
+                                {revokingTokenId === tk.id ? 'Revoking…' : 'Revoke'}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      !isCreatingHere && !createdToken && (
+                        <p className="text-white/40 text-[13px]">No download credentials yet.</p>
+                      )
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
           {/* TAB: PURCHASES (one-time feature unlocks) */}
           {activeTab === 'purchases' && (
             <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
@@ -367,7 +570,7 @@ export function SettingsModal({ user }: SettingsModalProps) {
           )}
 
           {/* GENERIC EMPTY STATE FOR OTHER TABS */}
-          {!['account', 'usage', 'memory', 'purchases'].includes(activeTab) && (
+          {!['account', 'usage', 'memory', 'purchases', 'downloads'].includes(activeTab) && (
             <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
                <h2 className="text-2xl font-semibold mb-8 pb-4 border-b border-white/5 capitalize">{activeTab}</h2>
                <p className="text-white/50 text-sm">Content for {activeTab} is not available yet.</p>

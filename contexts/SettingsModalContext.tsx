@@ -3,7 +3,7 @@ import { createContext, useContext, useState, ReactNode } from 'react'
 
 export type SettingsTab =
   | 'account' | 'memory' | 'notifications' | 'usage' | 'purchases'
-  | 'upgrade' | 'about'
+  | 'upgrade' | 'about' | 'downloads'
 
 interface SettingsModalContextValue {
   isOpen: boolean
