@@ -36,6 +36,7 @@ export type DbRow = {
   status: string
   priority: "Low" | "Med" | "High"
   assignee: string
+  start: string
   due: string
   description: string
   comments: DbRowComment[]
@@ -93,6 +94,7 @@ export function parseDbRow(m: Y.Map<unknown>): DbRow {
     status: str(m.get("status"), "Todo"),
     priority: (VALID_PRIORITIES.has(priority) ? priority : "Med") as DbRow["priority"],
     assignee: str(m.get("assignee")),
+    start: str(m.get("start")),
     due: str(m.get("due")),
     description: str(m.get("description")).slice(0, MAX_DESCRIPTION_LEN),
     comments,
@@ -115,6 +117,7 @@ export function dbRowToYMap(r: DbRow): Y.Map<unknown> {
   m.set("status", r.status)
   m.set("priority", r.priority)
   m.set("assignee", r.assignee)
+  m.set("start", r.start)
   m.set("due", r.due)
   m.set("description", r.description)
   m.set("comments", r.comments)

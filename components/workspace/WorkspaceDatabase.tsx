@@ -9,7 +9,7 @@ import { readCells, computeRollups, DUE_FILTERS, matchesDueFilter, parseAutomati
 import { AGENT_ROSTER } from "@/lib/agentRoster"
 
 type RowComment = { id: string; text: string; author: string; at: string }
-type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; due: string; description: string; comments: RowComment[]; cells: Record<string, CellValue> }
+type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; start: string; due: string; description: string; comments: RowComment[]; cells: Record<string, CellValue> }
 
 const STATUSES = ["Todo", "Doing", "Done"] as const
 const PRIORITIES = ["Low", "Med", "High"] as const
@@ -53,6 +53,7 @@ function toRows(arr: Y.Array<Y.Map<unknown>>): Row[] {
       status: (m.get("status") as string) ?? "Todo",
       priority: (m.get("priority") as Row["priority"]) ?? "Med",
       assignee: (m.get("assignee") as string) ?? "",
+      start: (m.get("start") as string) ?? "",
       due: (m.get("due") as string) ?? "",
       description: (m.get("description") as string) ?? "",
       comments,
@@ -401,16 +402,17 @@ type DbTemplate = {
   status: string
   priority: "Low" | "Med" | "High"
   assignee: string
+  start: string
   due: string
   description: string
 }
 
 // Built-in starter templates for the gallery (stateless — always available).
 const BUILT_IN_TEMPLATES: DbTemplate[] = [
-  { id: "builtin-bug", name: "Bug report", title: "", status: "Todo", priority: "High", assignee: "", due: "", description: "Steps to reproduce:\n1. \n2. \n\nExpected:\n\nActual:" },
-  { id: "builtin-sprint", name: "Sprint task", title: "", status: "Todo", priority: "Med", assignee: "", due: "", description: "Goal:\n\nAcceptance criteria:\n- " },
-  { id: "builtin-action", name: "Meeting action", title: "", status: "Todo", priority: "Med", assignee: "", due: "", description: "Context:\n\nOwner:\n\nDeadline:" },
-  { id: "builtin-spike", name: "Research spike", title: "", status: "Todo", priority: "Low", assignee: "", due: "", description: "Question:\n\nTimebox:\n\nFindings:\n" },
+  { id: "builtin-bug", name: "Bug report", title: "", status: "Todo", priority: "High", assignee: "", start: "", due: "", description: "Steps to reproduce:\n1. \n2. \n\nExpected:\n\nActual:" },
+  { id: "builtin-sprint", name: "Sprint task", title: "", status: "Todo", priority: "Med", assignee: "", start: "", due: "", description: "Goal:\n\nAcceptance criteria:\n- " },
+  { id: "builtin-action", name: "Meeting action", title: "", status: "Todo", priority: "Med", assignee: "", start: "", due: "", description: "Context:\n\nOwner:\n\nDeadline:" },
+  { id: "builtin-spike", name: "Research spike", title: "", status: "Todo", priority: "Low", assignee: "", start: "", due: "", description: "Question:\n\nTimebox:\n\nFindings:\n" },
 ]
 
 export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: string; readOnly?: boolean }) {
@@ -692,7 +694,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
-    const r: Row = { id: uid(), title: tpl.title, status: tpl.status, priority: tpl.priority, assignee: tpl.assignee, due: tpl.due, description: tpl.description, comments: [], cells: {} }
+    const r: Row = { id: uid(), title: tpl.title, status: tpl.status, priority: tpl.priority, assignee: tpl.assignee, start: tpl.start ?? "", due: tpl.due, description: tpl.description, comments: [], cells: {} }
     doc.transact(() => yRows.push([yMapFromRow(r)]), "user")
   }
 
@@ -896,7 +898,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
-    const r: Row = { id: uid(), title: "", status: "Todo", priority: "Med", assignee: "", due: "", description: "", comments: [], cells: {} }
+    const r: Row = { id: uid(), title: "", status: "Todo", priority: "Med", assignee: "", start: "", due: "", description: "", comments: [], cells: {} }
     doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
   }
 
@@ -918,7 +920,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
         : groupBy === "assignee"
           ? { status: "Todo", assignee: quickStatus }
           : { status: "Todo", priority: quickStatus as Row["priority"] }
-    const r: Row = { id: uid(), title, status: "Todo", priority: "Med", assignee: "", due: "", description: "", comments: [], cells: {}, ...extra }
+    const r: Row = { id: uid(), title, status: "Todo", priority: "Med", assignee: "", start: "", due: "", description: "", comments: [], cells: {}, ...extra }
     doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
     setQuickTitle("")
     setQuickStatus(null)
@@ -1003,15 +1005,36 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     updateRow(id, dropPatch(key))
   }
 
+  // Days (ISO) a row occupies on the calendar: the full start→due span when
+  // both are set, otherwise the single set date. Capped to avoid runaways.
+  const spanDays = (r: Row): string[] => {
+    if (r.start && r.due && r.start < r.due) {
+      const out: string[] = []
+      let cur = r.start
+      while (cur <= r.due && out.length < 62) {
+        out.push(cur)
+        const d = new Date(cur + "T00:00:00")
+        d.setDate(d.getDate() + 1)
+        cur = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+      }
+      return out
+    }
+    if (r.due) return [r.due]
+    if (r.start) return [r.start]
+    return []
+  }
+
   // Calendar drag: drop a card on a day to (re)schedule it. Same Yjs path
   // as the date input — no server round-trip needed for the move itself.
+  // Dropping before start pulls the whole span (keeps start <= due).
   const onDropDay = (e: React.DragEvent, iso: string) => {
     e.preventDefault()
     const id = e.dataTransfer.getData("text/plain")
     if (!id || !guard()) return
     const row = rows.find((r) => r.id === id)
     if (!row || row.due === iso) return
-    updateRow(id, { due: iso })
+    if (row.start && iso < row.start) updateRow(id, { due: iso, start: iso })
+    else updateRow(id, { due: iso })
   }
 
   const onDropUndated = (e: React.DragEvent) => {
@@ -1081,7 +1104,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
         setNotice("CSV is empty.")
         return
       }
-      const KNOWN = new Set(["title", "status", "priority", "assignee", "due", "description"])
+      const KNOWN = new Set(["title", "status", "priority", "assignee", "start", "due", "description"])
       const first = parsed[0].map((c) => c.trim().toLowerCase())
       const hasHeader = first.includes("title")
       const idx: Record<string, number> = {}
@@ -1090,7 +1113,8 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
           if (KNOWN.has(h) && idx[h] === undefined) idx[h] = i
         })
       } else {
-        ;["title", "status", "priority", "assignee", "due", "description"].forEach((h, i) => {
+        // NOTE: start appended LAST so legacy headerless CSVs keep their order.
+        ;["title", "status", "priority", "assignee", "due", "description", "start"].forEach((h, i) => {
           idx[h] = i
         })
       }
@@ -1113,6 +1137,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
               status: at("status") || "Todo",
               priority: ["Low", "Med", "High"].includes(at("priority")) ? at("priority") : "Med",
               assignee: at("assignee").slice(0, 100),
+              start: at("start").slice(0, 20),
               due: at("due").slice(0, 20),
               description: at("description").slice(0, 4000),
             }),
@@ -1145,6 +1170,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     const dir = sortDir === "asc" ? 1 : -1
     if (sortField === "priority") return (priorityRank[a.priority] - priorityRank[b.priority]) * dir
     if (sortField === "status") return (statusRank[a.status] - statusRank[b.status]) * dir
+    if (sortField === "start") return ((a.start || "") < (b.start || "") ? -1 : (a.start || "") > (b.start || "") ? 1 : 0) * dir
     if (sortField === "due") return ((a.due || "") < (b.due || "") ? -1 : (a.due || "") > (b.due || "") ? 1 : 0) * dir
     if (sortField === "assignee") return a.assignee.localeCompare(b.assignee) * dir
     // title default
@@ -1299,6 +1325,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                 <option value="title">Title</option>
                 <option value="status">Status</option>
                 <option value="priority">Priority</option>
+                <option value="start">Start</option>
                 <option value="due">Due</option>
                 <option value="assignee">Assignee</option>
               </select>
@@ -1364,7 +1391,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                 <button
                   onClick={() => importRef.current?.click()}
                   disabled={importing}
-                  title="Import tasks from CSV (title,status,priority,assignee,due,description)"
+                  title="Import tasks from CSV (title,status,priority,assignee,due,description,start)"
                   className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-4 py-2 text-[12.5px] font-medium text-white/70 hover:bg-white/[0.08] hover:text-white disabled:opacity-40"
                 >
                   <Upload className="h-3.5 w-3.5" />
@@ -1586,6 +1613,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Status</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Priority</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Assignee</th>
+                  <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Start</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Due</th>
                   {fields.map((f) => (
                     <th key={f.id} className="max-w-[180px] truncate px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30" title={`${f.name} · ${f.type}`}>{f.name}</th>
@@ -1679,9 +1707,29 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                         <Calendar className="h-3 w-3 text-white/25" />
                         <input
                           type="date"
+                          value={r.start}
+                          disabled={readOnly}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            if (v && r.due && v > r.due) updateRow(r.id, { start: v, due: v })
+                            else updateRow(r.id, { start: v })
+                          }}
+                          className="bg-transparent text-[13px] text-white/60 outline-none disabled:opacity-60"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="h-3 w-3 text-white/25" />
+                        <input
+                          type="date"
                           value={r.due}
                           disabled={readOnly}
-                          onChange={(e) => updateRow(r.id, { due: e.target.value })}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            if (v && r.start && v < r.start) updateRow(r.id, { due: v, start: v })
+                            else updateRow(r.id, { due: v })
+                          }}
                           className="bg-transparent text-[13px] text-white/60 outline-none disabled:opacity-60"
                         />
                       </div>
@@ -1871,10 +1919,12 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                           </span>
                         )}
                       </div>
-                      {r.due && (
+                      {(r.due || r.start) && (
                         <div className={`mt-2 flex items-center gap-1 text-[11px] ${isOverdue(r) ? "font-medium text-red-300" : "text-white/35"}`}>
                           <Calendar className="h-3 w-3" />
-                          {new Date(r.due).toLocaleDateString("en-GB")}
+                          {r.start && r.due && r.start !== r.due
+                            ? `${new Date(r.start).toLocaleDateString("en-GB")} → ${new Date(r.due).toLocaleDateString("en-GB")}`
+                            : new Date(r.due || r.start).toLocaleDateString("en-GB")}
                           {isOverdue(r) && <span className="uppercase tracking-wider">· overdue</span>}
                         </div>
                       )}
@@ -1921,7 +1971,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
         <div className="rounded-[14px] border border-line bg-surface-1 p-4">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-[13px] font-medium text-white/80">{monthName}</span>
-            <span className="text-[11px] text-white/30">{filtered.filter((r) => r.due).length} dated</span>
+            <span className="text-[11px] text-white/30">{filtered.filter((r) => r.due || r.start).length} dated</span>
           </div>
           <div className="grid grid-cols-7 gap-1 text-[11px]">
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
@@ -1934,7 +1984,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
             ))}
             {days.map((d) => {
               const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`
-              const items = filtered.filter((r) => r.due === iso)
+              const items = filtered.filter((r) => spanDays(r).includes(iso))
               return (
                 <div
                   key={d}
@@ -1944,24 +1994,39 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                 >
                   <div className="text-[11px] font-medium text-white/40">{d}</div>
                   <div className="mt-1 flex flex-col gap-1">
-                    {items.map((r) => (
-                      <div
-                        key={r.id}
-                        draggable={!readOnly}
-                        onDragStart={(e) => e.dataTransfer.setData("text/plain", r.id)}
-                        onClick={() => setSelectedId(r.id)}
-                        title="Open row detail"
-                        className="truncate rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-black hover:bg-white/85"
-                      >
-                        {r.title || "Untitled"}
-                      </div>
-                    ))}
+                    {items.map((r) => {
+                      const span = spanDays(r)
+                      const isFirst = span[0] === iso
+                      // First day shows the title pill; continuation days show
+                      // a slim status bar so multi-day spans read as one block.
+                      return isFirst ? (
+                        <div
+                          key={r.id}
+                          draggable={!readOnly}
+                          onDragStart={(e) => e.dataTransfer.setData("text/plain", r.id)}
+                          onClick={() => setSelectedId(r.id)}
+                          title={span.length > 1 ? `Open row detail · ${span.length}-day span` : "Open row detail"}
+                          className="truncate rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-black hover:bg-white/85"
+                        >
+                          {r.title || "Untitled"}{span.length > 1 ? ` · ${span.length}d` : ""}
+                        </div>
+                      ) : (
+                        <div
+                          key={r.id}
+                          draggable={!readOnly}
+                          onDragStart={(e) => e.dataTransfer.setData("text/plain", r.id)}
+                          onClick={() => setSelectedId(r.id)}
+                          title={`${r.title || "Untitled"} (continues)`}
+                          className={`h-1.5 rounded-full opacity-70 ${STATUS_DOT[r.status] ?? "bg-white/40"}`}
+                        />
+                      )
+                    })}
                   </div>
                 </div>
               )
             })}
           </div>
-          {filtered.filter((r) => !r.due).length > 0 && (
+          {filtered.filter((r) => !r.due && !r.start).length > 0 && (
             <div
               className="mt-4 border-t border-line pt-3"
               onDragOver={(e) => e.preventDefault()}
@@ -1970,7 +2035,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
               <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/30">Undated — drop here to unschedule</div>
               <div className="flex flex-wrap gap-1.5">
                 {filtered
-                  .filter((r) => !r.due)
+                  .filter((r) => !r.due && !r.start)
                   .map((r) => (
                     <span
                       key={r.id}
@@ -2024,8 +2089,34 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                   <input value={selectedRow.assignee} disabled={readOnly} list={`aivory-assignees-${docId}`} onChange={(e) => updateRow(selectedRow.id, { assignee: e.target.value })} placeholder="—" className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-3 py-2 text-[12px] text-white/60 outline-none placeholder:text-white/25 disabled:opacity-60" />
                 </label>
                 <label className="block">
+                  <span className="text-[11px] uppercase tracking-wider text-white/30">Start</span>
+                  <input
+                    type="date"
+                    value={selectedRow.start}
+                    disabled={readOnly}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      // Invariant start <= due: push due forward when start overtakes it.
+                      if (v && selectedRow.due && v > selectedRow.due) updateRow(selectedRow.id, { start: v, due: v })
+                      else updateRow(selectedRow.id, { start: v })
+                    }}
+                    className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-3 py-2 text-[12px] text-white/60 outline-none disabled:opacity-60"
+                  />
+                </label>
+                <label className="block">
                   <span className="text-[11px] uppercase tracking-wider text-white/30">Due</span>
-                  <input type="date" value={selectedRow.due} disabled={readOnly} onChange={(e) => updateRow(selectedRow.id, { due: e.target.value })} className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-3 py-2 text-[12px] text-white/60 outline-none disabled:opacity-60" />
+                  <input
+                    type="date"
+                    value={selectedRow.due}
+                    disabled={readOnly}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      // Invariant start <= due: pull start back when due moves before it.
+                      if (v && selectedRow.start && v < selectedRow.start) updateRow(selectedRow.id, { due: v, start: v })
+                      else updateRow(selectedRow.id, { due: v })
+                    }}
+                    className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-3 py-2 text-[12px] text-white/60 outline-none disabled:opacity-60"
+                  />
                 </label>
               </div>
               <label className="mt-4 block">
@@ -2079,7 +2170,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                     onClick={async () => {
                       const name = window.prompt("Template name", selectedRow.title ? `${selectedRow.title} template` : "My template")
                       if (!name || !name.trim()) return
-                      const tpl: DbTemplate = { id: `tpl-${Date.now().toString(36)}`, name: name.trim().slice(0, 24), title: selectedRow.title, status: selectedRow.status, priority: selectedRow.priority, assignee: selectedRow.assignee, due: selectedRow.due, description: selectedRow.description }
+                      const tpl: DbTemplate = { id: `tpl-${Date.now().toString(36)}`, name: name.trim().slice(0, 24), title: selectedRow.title, status: selectedRow.status, priority: selectedRow.priority, assignee: selectedRow.assignee, start: selectedRow.start, due: selectedRow.due, description: selectedRow.description }
                       await persistTemplates([...templates, tpl].slice(0, 10))
                     }}
                     className="mt-4 w-full rounded-full border border-violet-500/20 bg-violet-500/10 py-2 text-[12px] text-violet-300 hover:bg-violet-500/15"

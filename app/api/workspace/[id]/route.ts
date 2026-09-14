@@ -110,7 +110,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // Kept inside props so one JSONB column holds all per-doc UI state, no extra table.
     if (Array.isArray(src.dbViews)) {
       const kinds = new Set(["table","kanban","calendar"])
-      const sortFields = new Set(["title","status","priority","due","assignee"])
+      const sortFields = new Set(["title","status","priority","start","due","assignee"])
       const sortDirs = new Set(["asc","desc"])
       const dueFilters = new Set(["All","Overdue","Today","This week","Next 7 days","No date"])
       const cleanedViews: unknown[] = []
@@ -147,8 +147,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const priority = ["Low","Med","High"].includes(tt.priority as string) ? (tt.priority as string) : "Med"
         const assignee = typeof tt.assignee === "string" ? tt.assignee.slice(0, 64) : ""
         const due = typeof tt.due === "string" ? tt.due.slice(0, 16) : ""
+        let start = typeof tt.start === "string" ? tt.start.slice(0, 16) : ""
+        if (start && due && start > due) start = due
         const description = typeof tt.description === "string" ? tt.description.slice(0, 800) : ""
-        cleanedTpl.push({ id, name, title, status, priority, assignee, due, description })
+        cleanedTpl.push({ id, name, title, status, priority, assignee, start, due, description })
       }
       propsPatch.dbTemplates = cleanedTpl
     } else if (src.dbTemplates !== undefined) {

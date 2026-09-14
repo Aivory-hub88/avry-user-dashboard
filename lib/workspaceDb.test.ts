@@ -33,6 +33,7 @@ function row(over: Partial<DbRow> = {}): DbRow {
     status: "Todo",
     priority: "Med",
     assignee: "",
+    start: "",
     due: "",
     description: "",
     comments: [],
@@ -62,6 +63,14 @@ describe("parseDbRow", () => {
   it("caps description length", () => {
     const r = parseDbRow(rowMap({ id: "a", description: "x".repeat(9000) }))
     expect(r.description.length).toBeLessThanOrEqual(4000)
+  })
+
+  it("round-trips start date (empty for legacy rows)", () => {
+    expect(parseDbRow(rowMap({ id: "a" })).start).toBe("")
+    expect(parseDbRow(rowMap({ id: "a", start: "2026-09-01", due: "2026-09-05" }))).toMatchObject({
+      start: "2026-09-01",
+      due: "2026-09-05",
+    })
   })
 })
 

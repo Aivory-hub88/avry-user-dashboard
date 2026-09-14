@@ -22,13 +22,13 @@ import { indexRow, removeRowIndex, rowText, workspaceOf } from "@/lib/workspaceI
 
 export const runtime = "nodejs"
 
-const SCALAR_FIELDS = new Set(["title", "status", "priority", "assignee", "due", "description"])
+const SCALAR_FIELDS = new Set(["title", "status", "priority", "assignee", "start", "due", "description"])
 
 function cleanPatch(patch: Record<string, unknown>): Record<string, string> {
   const out: Record<string, string> = {}
   for (const [k, v] of Object.entries(patch)) {
     if (!SCALAR_FIELDS.has(k) || typeof v !== "string") continue
-    const cap = k === "title" ? 200 : k === "description" ? MAX_DESCRIPTION_LEN : k === "assignee" ? 100 : k === "due" ? 20 : 16
+    const cap = k === "title" ? 200 : k === "description" ? MAX_DESCRIPTION_LEN : k === "assignee" ? 100 : k === "start" || k === "due" ? 20 : 16
     out[k] = v.slice(0, cap)
   }
   if (out.priority !== undefined && out.priority !== "Low" && out.priority !== "Med" && out.priority !== "High") {
@@ -71,6 +71,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
     const m = arr.get(idx) as Y.Map<unknown>
+    // Invariant start <= due (mirrors client clamp): prefer the just-patched side.
+    const mergedStart = clean.start ?? ((m.get("start") as string) ?? "")
+    const mergedDue = clean.due ?? ((m.get("due") as string) ?? "")
+    if (mergedStart && mergedDue && mergedStart > mergedDue) {
+      if (clean.start !== undefined) clean.start = mergedDue
+      else if (clean.due !== undefined) clean.due = mergedStart
+    }
     const prevStatus = (m.get("status") as string) ?? "Todo"
     // Custom cells merge (never replace): concurrent editors on different
     // fields must not clobber each other. Defs load BEFORE the transaction

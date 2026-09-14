@@ -26,12 +26,17 @@ export const runtime = "nodejs"
 function cleanRowInput(body: Partial<DbRow>): Omit<DbRow, "id" | "comments" | "cells"> {
   const status = (body.status ?? "Todo").toString().slice(0, 16)
   const priority = body.priority === "Low" || body.priority === "High" ? body.priority : "Med"
+  const due = (body.due ?? "").toString().slice(0, 20)
+  let start = (body.start ?? "").toString().slice(0, 20)
+  // Invariant: start <= due. Clamp instead of rejecting (client enforces too).
+  if (start && due && start > due) start = due
   return {
     title: (body.title ?? "Untitled").toString().slice(0, 200),
     status,
     priority,
     assignee: (body.assignee ?? "").toString().slice(0, 100),
-    due: (body.due ?? "").toString().slice(0, 20),
+    start,
+    due,
     description: (body.description ?? "").toString().slice(0, MAX_DESCRIPTION_LEN),
   }
 }
@@ -106,7 +111,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       summary: `Created task “${newRow.title}”`,
       targetType: 'database-row',
       targetId: newRow.id,
-      metadata: { status: newRow.status, priority: newRow.priority, assignee: newRow.assignee, due: newRow.due },
+      metadata: { status: newRow.status, priority: newRow.priority, assignee: newRow.assignee, start: newRow.start, due: newRow.due },
     })
     if (automated.length > 0) {
       await recordWorkspaceActivity({
