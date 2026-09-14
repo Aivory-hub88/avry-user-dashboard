@@ -73,6 +73,45 @@ function Bar({ tone = "idle", children }: { tone?: "idle" | "warn"; children: Re
   )
 }
 
+/**
+ * Room membership as a real notification card, not a grey strip — the strip
+ * blended into the rail background and read as inert copy. This uses the
+ * macOS Notification Center language the feed already speaks (neutral card,
+ * colour carried by the glyph + badge only, never a tint wash): `info` tone
+ * = Apple's dark-mode systemBlue, which no other rail state uses — approvals
+ * are orange, failures are red — so the Room reads as its own category at a
+ * glance, exactly how different apps' notifications separate in the Center.
+ */
+function RoomCard({ members }: { members: MentionCandidate[] }) {
+  return (
+    <NotificationCard
+      tone="info"
+      badge="Room"
+      icon={<IoAt className="h-[15px] w-[15px]" />}
+      title={
+        members.length > 0
+          ? `Room · ${members.map((m) => m.name).join(", ")}`
+          : "Room · no deployed agents"
+      }
+      subtitle={
+        members.length > 0
+          ? "Type @ to mention — mentioned agents answer side by side. No @mention goes to the direct console brain."
+          : "Deploy an agent first — @ only lists agents running somewhere."
+      }
+      actions={
+        members.length === 0 ? (
+          <Link
+            href="/agents"
+            className="text-[12px] font-medium text-[#5AA9FF] underline underline-offset-2 transition-colors hover:text-[#8ac2ff]"
+          >
+            Deploy an agent
+          </Link>
+        ) : undefined
+      }
+    />
+  )
+}
+
 interface AgentRailProps {
   workspaceId: string | null
   agentTarget: string | null
@@ -206,11 +245,16 @@ export default function AgentRail({
             there's genuinely nothing to show; a real notification here still
             gets the full list below instead of being hidden behind it. */}
         {agentTarget === null && notifications.length === 0 ? (
-          <Bar tone="idle">
-            {inRoom
-              ? "Mission Control Room — type @ to mention a deployed agent; mentioned agents answer side by side. A message with no @mention goes to the direct console brain."
-              : "Aivory Console is the direct chat — it doesn't run behind an approval gate and isn't deployed anywhere on its own. Switch to one of your agents to see what it's waiting on."}
-          </Bar>
+          // Room gets the card, not the grey strip — same reason as below:
+          // the strip is invisible-in-plain-sight, the card isn't.
+          inRoom ? (
+            <RoomCard members={roomMembers} />
+          ) : (
+            <Bar tone="idle">
+              Aivory Console is the direct chat — it doesn&apos;t run behind an approval gate and isn&apos;t deployed
+              anywhere on its own. Switch to one of your agents to see what it&apos;s waiting on.
+            </Bar>
+          )
         ) : (
           <>
             <section className="flex flex-col gap-[8px]">
@@ -224,33 +268,7 @@ export default function AgentRail({
               {/* Room membership lives here, not in a top toast — the toast
                   overlapped the header and scrolled away with nothing. Same
                   card language as every other notification (info tone). */}
-              {inRoom && (
-                <NotificationCard
-                  tone="info"
-                  badge="Room"
-                  icon={<IoAt className="h-[15px] w-[15px]" />}
-                  title={
-                    roomMembers.length > 0
-                      ? `Room · ${roomMembers.map((m) => m.name).join(", ")}`
-                      : "Room · no deployed agents"
-                  }
-                  subtitle={
-                    roomMembers.length > 0
-                      ? "Type @ to mention — every mentioned agent answers in parallel."
-                      : "Deploy an agent first — @ only lists agents running somewhere."
-                  }
-                  actions={
-                    roomMembers.length === 0 ? (
-                      <Link
-                        href="/agents"
-                        className="text-[12px] font-medium text-[#5AA9FF] underline underline-offset-2 transition-colors hover:text-[#8ac2ff]"
-                      >
-                        Deploy an agent
-                      </Link>
-                    ) : undefined
-                  }
-                />
-              )}
+              {inRoom && <RoomCard members={roomMembers} />}
 
               {approvalsError && (
                 <NotificationCard
