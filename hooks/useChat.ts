@@ -431,7 +431,9 @@ export function useChat({
     setMessages(p => p.map(m => m.id === messageId ? { ...m, approvalBusy: true } : m))
     try {
       const result = await resolveApproval(
-        { id: approval.id, _agent_type: agentTarget ?? undefined },
+        // Room threads park approvals under the answering agent, not the
+        // global column selection — resolve against the message's own agent.
+        { id: approval.id, _agent_type: target.agentType ?? agentTarget ?? undefined },
         decision,
       )
       const outcome: 'approved' | 'denied' = decision === 'approve' ? 'approved' : 'denied'
@@ -442,9 +444,18 @@ export function useChat({
             : m
         )
         if (result.reply) {
+          // Room threads: the continuation belongs to whichever agent parked
+          // the approval (e.g. Teo's delegate pull), so it keeps that
+          // bubble's attribution instead of falling back to the global target.
           updated = [
             ...updated,
-            { id: (Date.now() + 2).toString(), role: 'assistant' as const, content: result.reply },
+            {
+              id: (Date.now() + 2).toString(),
+              role: 'assistant' as const,
+              content: result.reply,
+              agentType: target.agentType,
+              agentName: target.agentName,
+            },
           ]
         }
         saveSessionMessages(currentSessionId, updated, agentTarget)
