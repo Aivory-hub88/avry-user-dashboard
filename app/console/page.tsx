@@ -574,6 +574,8 @@ export default function ConsolePage() {
                     activeIndex={emptyMention.mentionIndex}
                     onSelect={selectEmptyMention}
                     onHover={emptyMention.setMentionIndex}
+                    totalCandidates={mentionCandidates.length}
+                    query={emptyMention.mentionQuery}
                   />
                 )}
                 <div className="console-input-card w-full overflow-hidden">

@@ -225,6 +225,8 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
           activeIndex={mention.mentionIndex}
           onSelect={selectMention}
           onHover={mention.setMentionIndex}
+          totalCandidates={mentionCandidates.length}
+          query={mention.mentionQuery}
         />
       )}
       <div className="bg-surface-3 border border-line rounded-[20px] overflow-hidden">

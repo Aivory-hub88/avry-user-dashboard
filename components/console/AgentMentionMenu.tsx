@@ -14,6 +14,12 @@ interface AgentMentionMenuProps {
   activeIndex: number
   onSelect: (candidate: MentionCandidate) => void
   onHover: (index: number) => void
+  /** Total deployeds before query filtering — distinguishes "nobody
+   *  deployed" from "query matched nothing" (e.g. @all, which is a valid
+   *  broadcast keyword, not an agent name). */
+  totalCandidates: number
+  /** Current @query, shown in the no-match hint. */
+  query: string
 }
 
 const CHANNEL_DOT: Record<string, string> = {
@@ -27,14 +33,31 @@ export default function AgentMentionMenu({
   activeIndex,
   onSelect,
   onHover,
+  totalCandidates,
+  query,
 }: AgentMentionMenuProps) {
   if (candidates.length === 0) {
+    // Deliberately NOT offering a selectable "@all" row here: with an empty
+    // filtered list, Enter falls through and sends the raw text, which the
+    // parser expands to a broadcast. A selectable row would hijack Enter
+    // into inserting a single agent instead — the exact trap to avoid.
     return (
       <div className="absolute bottom-full left-0 z-30 mb-2 w-[280px] rounded-2xl border border-white/10 bg-[#2b2b28] p-4 shadow-2xl">
-        <div className="text-[13px] font-medium text-white/85">No deployed agents yet</div>
-        <div className="mt-1 text-[12px] font-light leading-relaxed text-white/45">
-          Deploy an agent first — mentions only list agents that are actually running somewhere.
-        </div>
+        {totalCandidates > 0 ? (
+          <>
+            <div className="text-[13px] font-medium text-white/85">No match for &ldquo;@{query || ""}&rdquo;</div>
+            <div className="mt-1 text-[12px] font-light leading-relaxed text-white/45">
+              Press Enter to send anyway — @all, @everyone and @team mention everyone in the room.
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-[13px] font-medium text-white/85">No deployed agents yet</div>
+            <div className="mt-1 text-[12px] font-light leading-relaxed text-white/45">
+              Deploy an agent first — mentions only list agents that are actually running somewhere.
+            </div>
+          </>
+        )}
       </div>
     )
   }
