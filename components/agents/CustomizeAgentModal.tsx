@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { isAdmin } from '@/lib/auth';
 import QRCode from 'react-qr-code';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -1333,7 +1334,19 @@ export default function CustomizeAgentModal({
                       type="button"
                       onClick={() => {
                         setMcpFormError(null);
-                        setMcpForm((f) => ({ ...f, name: 'odoo', transport: 'streamable-http' }));
+                        setMcpForm((f) => ({
+                          ...f,
+                          name: 'odoo',
+                          transport: 'streamable-http',
+                          // Aivory's own internal Od-MCP instance
+                          // (odoo-mcp.aivory.uk) only ever serves Aivory's own
+                          // Odoo data -- pre-filling it for every tenant would
+                          // connect a customer's agent to OUR company data, not
+                          // theirs. Safe to pre-fill only for internal/admin
+                          // accounts; every other tenant still supplies their
+                          // own self-hosted server URL (see ODOO-MCP-SETUP-GUIDE.md).
+                          url: isAdmin() ? 'https://odoo-mcp.aivory.uk/mcp' : f.url,
+                        }));
                         setMcpTemplate('odoo');
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-left transition-colors"
