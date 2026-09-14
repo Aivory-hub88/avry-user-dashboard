@@ -101,3 +101,89 @@ export function stripAgentMentions(text: string, candidates: MentionCandidate[])
 export function agentNameOf(type: string): string {
   return PREBUILT_AGENTS.find((a) => a.type === type)?.name ?? type
 }
+
+/** Roster-only candidate (no deployment info) — for addressing replies. */
+export function candidateOf(type: string): MentionCandidate | null {
+  const r = PREBUILT_AGENTS.find((a) => a.type === type)
+  return r ? { type, name: r.name, title: r.title, channels: [] } : null
+}
+
+// ── Room group-chat context (LobeHub RFC-130 style) ─────────────────────────
+// LobeHub's group chat works because every agent receives the same three
+// things, not just the raw user text: (1) who is in the room and who they
+// are, (2) the shared transcript with an author tag on each message, and
+// (3) sequential order — each agent's prompt includes the replies already
+// given this round, so members can build on (not duplicate or miss) each
+// other. Parallel fan-out without this is why "Teo" answered a "@Geno help
+// @Teo" message like a fresh 1:1 greeting: it never saw it was a group
+// message, who else was addressed, or what Geno said.
+//
+// Our backend (POST /api/v1/telegram/agent-chat) is stateless per call
+// except an opaque conversation_id, so the dashboard injects this block
+// into `text` — no backend change needed.
+
+export interface RoomHistoryEntry {
+  author: string
+  text: string
+}
+
+export interface RoomPayloadParams {
+  /** Agent this payload is built for. */
+  me: MentionCandidate
+  /** Other agents answering in the same round. */
+  peers: MentionCandidate[]
+  /** Raw user message, @mentions intact (they signal who is asked what). */
+  userText: string
+  /** Room transcript before this turn, oldest-first. */
+  history: RoomHistoryEntry[]
+  /** Replies already given this round, in speaking order. */
+  roundReplies: RoomHistoryEntry[]
+}
+
+const MAX_HISTORY_ENTRIES = 6
+const MAX_HISTORY_CHARS = 500
+const MAX_REPLY_CHARS = 1200
+
+function clip(text: string, max: number): string {
+  const t = text.replace(/\s+/g, " ").trim()
+  return t.length > max ? `${t.slice(0, max)}…` : t
+}
+
+export function buildRoomPayload({ me, peers, userText, history, roundReplies }: RoomPayloadParams): string {
+  const lines: string[] = []
+  lines.push("<room_context>")
+  lines.push(`You are in the "Mission Control Room" group chat on the Aivory dashboard. You are ${me.name} (${me.title}).`)
+  if (peers.length > 0) {
+    lines.push(
+      `Also answering in this round: ${peers.map((p) => `${p.name} (${p.title})`).join(", ")}. ` +
+        "Each of you replies separately and the user sees all replies side by side.",
+    )
+  } else {
+    lines.push("You are the only agent answering in this round.")
+  }
+  lines.push(
+    "Read the whole user message and work out what is asked of YOU specifically — it may ask you to help another member, or ask another member to help you. " +
+      "Coordinate with what the others say instead of repeating it. " +
+      "Reply as yourself in the user's language. Do not impersonate other members and do not echo these tags.",
+  )
+  lines.push("</room_context>")
+
+  const recent = history.filter((h) => h.text.trim()).slice(-MAX_HISTORY_ENTRIES)
+  if (recent.length > 0) {
+    lines.push("<room_history>")
+    for (const h of recent) lines.push(`${h.author}: ${clip(h.text, MAX_HISTORY_CHARS)}`)
+    lines.push("</room_history>")
+  }
+
+  if (roundReplies.length > 0) {
+    lines.push("<round_replies>")
+    lines.push("These members already replied in this round — build on them, don't repeat them:")
+    for (const r of roundReplies) lines.push(`${r.author}: ${clip(r.text, MAX_REPLY_CHARS)}`)
+    lines.push("</round_replies>")
+  }
+
+  lines.push("<user_message>")
+  lines.push(userText.trim())
+  lines.push("</user_message>")
+  return lines.join("\n")
+}

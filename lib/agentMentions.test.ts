@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest"
 import {
+  buildRoomPayload,
+  candidateOf,
   getMentionCandidates,
   parseAgentMentions,
   stripAgentMentions,
@@ -75,5 +77,65 @@ describe("stripAgentMentions", () => {
 
   it("removes @all", () => {
     expect(stripAgentMentions("@all daily status", candidates)).toBe("daily status")
+  })
+})
+
+describe("candidateOf", () => {
+  it("resolves roster entries", () => {
+    expect(candidateOf("customer_service")).toMatchObject({ name: "Teo" })
+  })
+
+  it("returns null for unknown types", () => {
+    expect(candidateOf("ghost")).toBeNull()
+  })
+})
+
+describe("buildRoomPayload", () => {
+  const teo = candidateOf("customer_service")!
+  const lex = candidateOf("leads_qualifier")!
+
+  const base = {
+    me: teo,
+    peers: [lex],
+    userText: "Hi @Teo, can you help @Lex?",
+    history: [] as { author: string; text: string }[],
+    roundReplies: [] as { author: string; text: string }[],
+  }
+
+  it("names the recipient, peers, and keeps the raw message", () => {
+    const p = buildRoomPayload(base)
+    expect(p).toContain("You are Teo (Ticket Ops Agent)")
+    expect(p).toContain("Lex (Leads Qualifier Agent)")
+    expect(p).toContain("<user_message>\nHi @Teo, can you help @Lex?\n</user_message>")
+  })
+
+  it("carries author-tagged history and earlier round replies", () => {
+    const p = buildRoomPayload({
+      ...base,
+      history: [{ author: "User", text: "morning" }],
+      roundReplies: [{ author: "Lex", text: "I qualified 3 leads" }],
+    })
+    expect(p).toContain("<room_history>\nUser: morning\n</room_history>")
+    expect(p).toContain("Lex: I qualified 3 leads")
+  })
+
+  it("omits empty sections", () => {
+    const p = buildRoomPayload(base)
+    expect(p).not.toContain("<room_history>")
+    expect(p).not.toContain("<round_replies>")
+  })
+
+  it("handles solo rounds", () => {
+    const p = buildRoomPayload({ ...base, peers: [] })
+    expect(p).toContain("only agent answering")
+  })
+
+  it("clips long texts to bound tokens", () => {
+    const p = buildRoomPayload({
+      ...base,
+      history: [{ author: "User", text: "x".repeat(5000) }],
+    })
+    expect(p.length).toBeLessThan(2000)
+    expect(p).toContain("…")
   })
 })

@@ -7,7 +7,7 @@ import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
 import { sendAgentMessage, type ConsolePendingApproval } from '@/lib/agentChat'
-import { agentNameOf } from '@/lib/agentMentions'
+import { agentNameOf, buildRoomPayload, candidateOf, type RoomHistoryEntry } from '@/lib/agentMentions'
 import { resolveApproval } from '@/lib/agentApprovals'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
 import { useMode } from '@/contexts/ModeContext'
@@ -285,12 +285,14 @@ export function useChat({
     }
   }, [currentSessionId, agentTarget, addToast, processEvent, triggerClassification, clearAttachments])
 
-  // Room mode (Mission Control chat room): fan out one message to every
-  // @mentioned deployed agent in parallel, one reply bubble per agent —
-  // like mentioning members in a group chat. Each bubble carries its own
-  // agentType/agentName so ChatMessage renders the right avatar even though
-  // the thread itself stays under the current session. Empty target list
-  // falls back to the direct console path.
+  // Room mode (Mission Control chat room): LobeHub-style group orchestration
+  // in "sequential" mode. Mentioned agents answer one after another in
+  // mention order, and each prompt carries (1) the room membership, (2) the
+  // shared room transcript with author tags, and (3) the replies already
+  // given this round — so "@Geno help @Teo" reaches Teo as a group message
+  // where Geno has already spoken, not as a fresh 1:1 greeting. Pure
+  // parallel fan-out could not do this: no agent ever saw the others.
+  // Empty target list falls back to the direct console path.
   const handleSendRoom = useCallback(async (displayText: string, atts: Attachment[], agentTypes: string[]) => {
     const targets = [...new Set(agentTypes)]
     if (targets.length === 0) {
@@ -304,9 +306,17 @@ export function useChat({
       ...textAtts.map(a => `[Attached file: ${a.filename}]\n${a.content}`),
       ...imageAtts.map(a => `[Attached image: ${a.filename} — image preview shown above]`),
     ].join('\n\n')
-    // Raw text (with @mentions intact) goes to every agent — each reply
-    // sees who else was addressed, same as a group-chat transcript.
-    const payload = attachmentText ? `${displayText}\n\n${attachmentText}` : displayText
+    const userText = attachmentText ? `${displayText}\n\n${attachmentText}` : displayText
+
+    // Shared transcript, oldest-first — author-tagged like LobeHub's
+    // <author_name> history markers. Placeholders carry no content yet.
+    const history: RoomHistoryEntry[] = messagesRef.current
+      .filter(m => !m.isStreaming && m.content.trim())
+      .slice(-12)
+      .map(m => ({
+        author: m.role === "user" ? "User" : (m.agentName ?? (m.agentType ? agentNameOf(m.agentType) : "Aivory")),
+        text: m.content,
+      }))
 
     const ts = Date.now()
     const userMsg: Message = { id: `${ts}-room-user`, role: "user", content: displayText, attachments: atts.length > 0 ? atts : undefined }
@@ -327,24 +337,42 @@ export function useChat({
     setIsStreaming(true)
     setStreamingAgentType(targets[0] ?? null)
 
-    const settled = await Promise.allSettled(
-      targets.map(t => sendAgentMessage(t as TelegramAgentType, payload, sentSessionId)),
-    )
-    settled.forEach((r, i) => {
-      if (r.status === "rejected") {
-        addToast("error", `${agentNameOf(targets[i])} is unavailable right now.`)
+    // Sequential: each speaker sees this round's earlier replies. A failure
+    // drops that bubble but never blocks the rest of the round.
+    const roundReplies: RoomHistoryEntry[] = []
+    const outcomes = new Map<string, { reply: string; pendingApproval: ConsolePendingApproval | null }>()
+    for (const t of targets) {
+      const me = candidateOf(t) ?? { type: t, name: agentNameOf(t), title: t, channels: [] as string[] }
+      const peers = targets.filter(x => x !== t).map(x => candidateOf(x) ?? { type: x, name: agentNameOf(x), title: x, channels: [] as string[] })
+      const payload = buildRoomPayload({ me, peers, userText, history, roundReplies })
+      try {
+        const result = await sendAgentMessage(t as TelegramAgentType, payload, sentSessionId)
+        outcomes.set(t, { reply: result.reply, pendingApproval: result.pendingApproval })
+        roundReplies.push({ author: me.name, text: result.reply })
+        // Paint progressively — the room feels alive while later agents
+        // are still thinking, instead of going quiet for the whole chain.
+        const done = { ...outcomes }
+        if (currentSessionIdRef.current === sentSessionId) {
+          setMessages(p => p.map(m => {
+            const idx = placeholders.findIndex(ph => ph.id === m.id)
+            if (idx === -1 || targets[idx] !== t) return m
+            const o = done.get(t)!
+            return { ...m, content: o.reply, isStreaming: false, pendingApproval: o.pendingApproval }
+          }))
+        }
+        setStreamingAgentType(targets[targets.indexOf(t) + 1] ?? undefined)
+      } catch {
+        addToast("error", `${me.name} is unavailable right now.`)
       }
-    })
+    }
 
     // Pure merge: successes fill their bubble, failures drop theirs.
     const applyRoomResults = (list: Message[]): Message[] =>
       list.flatMap(m => {
         const idx = placeholders.findIndex(ph => ph.id === m.id)
         if (idx === -1) return [m]
-        const r = settled[idx]
-        if (r.status === "fulfilled") {
-          return [{ ...m, content: r.value.reply, isStreaming: false, pendingApproval: r.value.pendingApproval }]
-        }
+        const o = outcomes.get(targets[idx])
+        if (o) return [{ ...m, content: o.reply, isStreaming: false, pendingApproval: o.pendingApproval }]
         return []
       })
 
