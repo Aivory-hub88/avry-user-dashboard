@@ -408,7 +408,11 @@ export default function CustomizeAgentModal({
   // shared Aivory-hosted instance yet (that's ADR-012, still draft) -- so
   // this template still needs the tenant's own server URL, it just spares
   // them a blank generic form for a system we already know the shape of.
-  const [mcpTemplate, setMcpTemplate] = useState<'odoo' | 'custom' | null>(null);
+  // 'aivory-mail' points at the shared Aivory Mail MCP
+  // (https://mail.aivory.uk/mcp) for every tenant -- safe, because the
+  // pasted capability token (not the URL) scopes which mailbox the agent
+  // may read/draft/send in.
+  const [mcpTemplate, setMcpTemplate] = useState<'odoo' | 'aivory-mail' | 'custom' | null>(null);
 
   // Deploy tab — was a separate modal (app/agents/page.tsx's DeployModal),
   // merged in so identity/connections/tools/MCP are configured before a
@@ -1359,6 +1363,27 @@ export default function CustomizeAgentModal({
                     </button>
                     <button
                       type="button"
+                      onClick={() => {
+                        setMcpFormError(null);
+                        setMcpForm((f) => ({
+                          ...f,
+                          name: 'aivory-mail',
+                          transport: 'streamable-http',
+                          url: 'https://mail.aivory.uk/mcp',
+                          authHeaderName: 'Authorization',
+                        }));
+                        setMcpTemplate('aivory-mail');
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-left transition-colors"
+                    >
+                      <Image src={asset('/Aivory_icon_2026.svg')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
+                      <div className="min-w-0">
+                        <div className="text-white/85 text-[13px] font-medium">{t('mcpTemplateMailName')}</div>
+                        <div className="text-white/40 text-[11.5px] truncate">{t('mcpTemplateMailDesc')}</div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => { setMcpFormError(null); setMcpTemplate('custom'); }}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-left transition-colors"
                     >
@@ -1394,6 +1419,16 @@ export default function CustomizeAgentModal({
                         <div className="min-w-0">
                           <div className="text-white/85 text-[13px] font-medium">{t('mcpTemplateOdooName')}</div>
                           <div className="text-white/40 text-[11.5px] leading-relaxed">{t('mcpOdooSetupNote')}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {mcpTemplate === 'aivory-mail' && (
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                        <Image src={asset('/Aivory_icon_2026.svg')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
+                        <div className="min-w-0">
+                          <div className="text-white/85 text-[13px] font-medium">{t('mcpTemplateMailName')}</div>
+                          <div className="text-white/40 text-[11.5px] leading-relaxed">{t('mcpMailSetupNote')}</div>
                         </div>
                       </div>
                     )}
