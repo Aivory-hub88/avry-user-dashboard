@@ -3,26 +3,26 @@
  * first names, titles. Everywhere else in this repo that used to hardcode
  * its own copy of this list (workspaceAccess, agentChat, workspaceDbModel,
  * telegramDeploy/discordDeploy's type unions, the agents page, workspace
- * assignee/sharing pickers, agent avatars) now derives from here instead.
+ * assignee/sharing pickers, agent avatars) derives from here instead.
  *
- * See docs/CERVEAU-ODOO-UI-WIDGET-PLAN.md for the cross-repo version of
- * this same drift problem -- the Python backend's GET /api/v1/agent-roster
- * is a separate, not-yet-unified copy; this file only reconciles the
- * dashboard's own internal duplication, not the backend's.
+ * The underlying id/name/title data comes from lib/agentRoster.generated.ts,
+ * regenerated at build time from the live Aivory backend's own roster
+ * (GET /api/v1/agent-roster, backend/avry-backend/app/routes/agent_roster.py
+ * -- see scripts/generate-agent-roster.mjs). This file is the stable,
+ * hand-maintained public API on top of that generated data: types, derived
+ * lookup maps, and small dashboard-only additions (like `enterprise`) that
+ * aren't part of Cerveau's own roster metadata and so can't come from the
+ * generated file.
  *
- * No imports, no side effects: safe to use from both server and client
- * components.
+ * No non-generated imports, no side effects: safe to use from both server
+ * and client components.
  */
 
-export const AGENT_TYPE_IDS = [
-  'autonomous',
-  'customer_service',
-  'leads_qualifier',
-  'finance_invoice_ops',
-  'office_assistant',
-] as const
+import { AGENT_ROSTER_RAW } from './agentRoster.generated'
 
-export type AgentType = (typeof AGENT_TYPE_IDS)[number]
+export type AgentType = (typeof AGENT_ROSTER_RAW)[number]['type']
+
+export const AGENT_TYPE_IDS: readonly AgentType[] = AGENT_ROSTER_RAW.map((a) => a.type)
 
 export interface AgentRosterEntry {
   type: AgentType
@@ -32,13 +32,14 @@ export interface AgentRosterEntry {
   enterprise?: boolean
 }
 
-export const AGENT_ROSTER: readonly AgentRosterEntry[] = [
-  { type: 'autonomous', name: 'Geno', title: 'Generalist Agent' },
-  { type: 'customer_service', name: 'Teo', title: 'Ticket Ops Agent' },
-  { type: 'leads_qualifier', name: 'Lex', title: 'Leads Qualifier Agent' },
-  { type: 'finance_invoice_ops', name: 'Finn', title: 'Finance & Invoice Ops Agent' },
-  { type: 'office_assistant', name: 'Ofira', title: 'Office Assistant', enterprise: true },
-]
+// Dashboard-only tier gating — not part of Cerveau's own roster metadata,
+// so it can't be generated from the backend endpoint. Update by hand if a
+// new agent needs an Enterprise-only gate.
+const ENTERPRISE_AGENT_TYPES = new Set<AgentType>(['office_assistant'])
+
+export const AGENT_ROSTER: readonly AgentRosterEntry[] = AGENT_ROSTER_RAW.map((a) =>
+  ENTERPRISE_AGENT_TYPES.has(a.type) ? { ...a, enterprise: true } : { ...a },
+)
 
 export const AGENT_NAMES: Record<AgentType, string> = Object.fromEntries(
   AGENT_ROSTER.map((a) => [a.type, a.name]),

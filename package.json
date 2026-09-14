@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "generate:agent-roster": "node scripts/generate-agent-roster.mjs",
+    "predev": "npm run generate:agent-roster",
+    "prebuild": "npm run generate:agent-roster",
     "dev": "next dev -p 9000",
     "build": "next build",
     "start": "next start -p 9000",
