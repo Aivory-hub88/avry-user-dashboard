@@ -400,6 +400,14 @@ export default function CustomizeAgentModal({
   // Server cards default collapsed (name + status only); expanding one is
   // an explicit choice, so N servers doesn't mean N walls of tool toggles.
   const [mcpExpandedId, setMcpExpandedId] = useState<string | null>(null);
+  // null = the picker (known connectors + "custom server"); 'odoo' pre-fills
+  // name/transport for our own supported connector and only asks for what
+  // actually varies per tenant (URL, auth key); 'custom' is the raw form.
+  // Odoo is still BYO-server (docs/ODOO-MCP-SETUP-GUIDE.md) -- there is no
+  // shared Aivory-hosted instance yet (that's ADR-012, still draft) -- so
+  // this template still needs the tenant's own server URL, it just spares
+  // them a blank generic form for a system we already know the shape of.
+  const [mcpTemplate, setMcpTemplate] = useState<'odoo' | 'custom' | null>(null);
 
   // Deploy tab — was a separate modal (app/agents/page.tsx's DeployModal),
   // merged in so identity/connections/tools/MCP are configured before a
@@ -458,6 +466,8 @@ export default function CustomizeAgentModal({
     setMcpForm({ name: '', url: '', transport: 'streamable-http', authHeaderName: '', authHeaderValue: '' });
     setMcpFormError(null);
     setMcpFormOpen(false);
+    setMcpAdvancedOpen(false);
+    setMcpTemplate(null);
     if (deployPollRef.current) { clearInterval(deployPollRef.current); deployPollRef.current = null; }
     setDeployView('channels');
     setDeployLink(null);
@@ -768,6 +778,7 @@ export default function CustomizeAgentModal({
       setMcpForm({ name: '', url: '', transport: 'streamable-http', authHeaderName: '', authHeaderValue: '' });
       setMcpFormOpen(false);
       setMcpAdvancedOpen(false);
+      setMcpTemplate(null);
     } catch (e) {
       if (e instanceof TenantMcpServerError && e.server) {
         // Verification failed, but the row WAS persisted — show it in the
@@ -775,6 +786,7 @@ export default function CustomizeAgentModal({
         setMcpServers((prev) => [e.server as TenantMcpServer, ...prev]);
         setMcpForm({ name: '', url: '', transport: 'streamable-http', authHeaderName: '', authHeaderValue: '' });
         setMcpAdvancedOpen(false);
+        setMcpTemplate(null);
         setMcpFormError(t('mcpSavedButFailed', { message: e.message }));
       } else {
         setMcpFormError(e instanceof TenantMcpServerError ? e.message : t('mcpRegisterFailed'));
@@ -1304,27 +1316,84 @@ export default function CustomizeAgentModal({
                 {mcpServers.length > 0 && !mcpFormOpen && (
                   <button
                     type="button"
-                    onClick={() => { setMcpFormError(null); setMcpFormOpen(true); }}
+                    onClick={() => { setMcpFormError(null); setMcpTemplate(null); setMcpFormOpen(true); }}
                     className="w-full py-2.5 rounded-lg bg-white/[0.05] hover:bg-white/10 border border-white/10 text-white/70 hover:text-white/90 text-[13px] font-medium transition-colors"
                   >
                     {t('mcpAddServer')}
                   </button>
                 )}
 
-                {(mcpServers.length === 0 || mcpFormOpen) && (
+                {(mcpServers.length === 0 || mcpFormOpen) && mcpTemplate === null && (
+                  // Picker first, generic form second: a known system (Odoo
+                  // today) gets a recognizable icon + one click instead of an
+                  // unlabeled URL/transport/header form nobody but us can read.
+                  <div className="space-y-2">
+                    <div className="text-white/50 text-[12px] font-medium px-0.5">{t('mcpChooseConnector')}</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMcpFormError(null);
+                        setMcpForm((f) => ({ ...f, name: 'odoo', transport: 'streamable-http' }));
+                        setMcpTemplate('odoo');
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-left transition-colors"
+                    >
+                      <Image src={asset('/integrations/odoo.svg')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
+                      <div className="min-w-0">
+                        <div className="text-white/85 text-[13px] font-medium">{t('mcpTemplateOdooName')}</div>
+                        <div className="text-white/40 text-[11.5px] truncate">{t('mcpTemplateOdooDesc')}</div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setMcpFormError(null); setMcpTemplate('custom'); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-left transition-colors"
+                    >
+                      <div className="shrink-0 w-7 h-7 rounded-md bg-white/[0.06] flex items-center justify-center text-white/40 text-[15px] font-medium">+</div>
+                      <div className="min-w-0">
+                        <div className="text-white/85 text-[13px] font-medium">{t('mcpTemplateCustomName')}</div>
+                        <div className="text-white/40 text-[11.5px] truncate">{t('mcpTemplateCustomDesc')}</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+
+                {(mcpServers.length === 0 || mcpFormOpen) && mcpTemplate !== null && (
                   <>
+                    <button
+                      type="button"
+                      onClick={() => { setMcpFormError(null); setMcpAdvancedOpen(false); setMcpTemplate(null); setMcpForm({ name: '', url: '', transport: 'streamable-http', authHeaderName: '', authHeaderValue: '' }); }}
+                      className="flex items-center gap-1 text-white/45 hover:text-white/70 text-[12px] font-medium transition-colors"
+                    >
+                      <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+                      {t('mcpBack')}
+                    </button>
+
                     {mcpFormError && (
                       <div className="px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300/90 text-[12px]">
                         {mcpFormError}
                       </div>
                     )}
-                    <Field
-                      label={t('mcpNameLabel')}
-                      value={mcpForm.name}
-                      limit={40}
-                      onChange={(v) => setMcpForm((f) => ({ ...f, name: v.replace(/[^a-zA-Z0-9_-]/g, '') }))}
-                      placeholder={t('mcpNamePlaceholder')}
-                    />
+
+                    {mcpTemplate === 'odoo' && (
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                        <Image src={asset('/integrations/odoo.svg')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
+                        <div className="min-w-0">
+                          <div className="text-white/85 text-[13px] font-medium">{t('mcpTemplateOdooName')}</div>
+                          <div className="text-white/40 text-[11.5px] leading-relaxed">{t('mcpOdooSetupNote')}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {mcpTemplate === 'custom' && (
+                      <Field
+                        label={t('mcpNameLabel')}
+                        value={mcpForm.name}
+                        limit={40}
+                        onChange={(v) => setMcpForm((f) => ({ ...f, name: v.replace(/[^a-zA-Z0-9_-]/g, '') }))}
+                        placeholder={t('mcpNamePlaceholder')}
+                      />
+                    )}
                     <Field
                       label={t('mcpUrlLabel')}
                       value={mcpForm.url}
@@ -1346,25 +1415,27 @@ export default function CustomizeAgentModal({
                     </button>
                     {mcpAdvancedOpen && (
                       <>
-                        <div>
-                          <label className="text-white/70 text-[12px] font-medium mb-1.5 block">{t('mcpTransportLabel')}</label>
-                          <div className="flex gap-2">
-                            {(['streamable-http', 'sse'] as const).map((transportOption) => (
-                              <button
-                                key={transportOption}
-                                type="button"
-                                onClick={() => setMcpForm((f) => ({ ...f, transport: transportOption }))}
-                                className={`px-3.5 py-2 rounded-lg border text-[12.5px] transition-colors ${
-                                  mcpForm.transport === transportOption
-                                    ? 'bg-accent/15 border-accent/30 text-[#dbe5d3]'
-                                    : 'bg-white/[0.04] border-white/10 text-white/50 hover:text-white/75'
-                                }`}
-                              >
-                                {transportOption}
-                              </button>
-                            ))}
+                        {mcpTemplate === 'custom' && (
+                          <div>
+                            <label className="text-white/70 text-[12px] font-medium mb-1.5 block">{t('mcpTransportLabel')}</label>
+                            <div className="flex gap-2">
+                              {(['streamable-http', 'sse'] as const).map((transportOption) => (
+                                <button
+                                  key={transportOption}
+                                  type="button"
+                                  onClick={() => setMcpForm((f) => ({ ...f, transport: transportOption }))}
+                                  className={`px-3.5 py-2 rounded-lg border text-[12.5px] transition-colors ${
+                                    mcpForm.transport === transportOption
+                                      ? 'bg-accent/15 border-accent/30 text-[#dbe5d3]'
+                                      : 'bg-white/[0.04] border-white/10 text-white/50 hover:text-white/75'
+                                  }`}
+                                >
+                                  {transportOption}
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        </div>
+                        )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <Field
                             label={t('mcpAuthNameLabel')}
