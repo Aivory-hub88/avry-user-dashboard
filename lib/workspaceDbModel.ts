@@ -6,6 +6,8 @@
  * browser bundle (Turbopack build failure otherwise).
  */
 
+import { AGENT_ROSTER } from './agentRoster'
+
 export type FieldType = "text" | "number" | "select" | "multi" | "checkbox" | "date" | "url" | "relation" | "rollup"
 export type RollupOp = "count" | "donePct" | "sum"
 export type FieldDef = {
@@ -228,14 +230,13 @@ export function computeRollups(
   return out
 }
 
-/** Known Cerveau agents for @mention resolution (display name + type id). */
-export const MENTIONABLE_AGENTS: ReadonlyArray<{ type: string; names: string[] }> = [
-  { type: "autonomous", names: ["geno", "autonomous"] },
-  { type: "customer_service", names: ["teo", "customer_service", "customer-service"] },
-  { type: "leads_qualifier", names: ["lex", "leads_qualifier", "leads-qualifier"] },
-  { type: "finance_invoice_ops", names: ["finn", "finance_invoice_ops", "finance-invoice-ops"] },
-  { type: "office_assistant", names: ["ofira", "office_assistant", "office-assistant"] },
-]
+/** Known Cerveau agents for @mention resolution (display name + type id).
+ *  Derived from lib/agentRoster.ts — each agent matches on its first name,
+ *  its type id, and the type id hyphenated. */
+export const MENTIONABLE_AGENTS: ReadonlyArray<{ type: string; names: string[] }> = AGENT_ROSTER.map((a) => ({
+  type: a.type,
+  names: [...new Set([a.name.toLowerCase(), a.type, a.type.replace(/_/g, "-")])],
+}))
 
 export type ParsedMentions = { agents: string[]; emails: string[] }
 

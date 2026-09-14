@@ -7,16 +7,12 @@
  */
 
 import { authedFetch } from './deployAuth'
+import type { AgentType } from './agentRoster'
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'
 
-export type TelegramAgentType =
-  | 'autonomous'
-  | 'customer_service'
-  | 'leads_qualifier'
-  | 'finance_invoice_ops'
-  | 'office_assistant'
+export type TelegramAgentType = AgentType
 
 export interface DeployLink {
   token: string

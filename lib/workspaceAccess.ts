@@ -1,30 +1,17 @@
 import { query } from '@/lib/db'
 import type { WorkspaceCredential } from '@/lib/workspaceAuth'
+import { AGENT_TYPE_IDS, AGENT_NAMES, isAgentType, type AgentType } from '@/lib/agentRoster'
 
 export type DocRole = 'owner' | 'editor' | 'viewer' | null
 
 /** Cerveau agent types that can be invited to a doc (Fase 1 Opsi C). */
-export const KNOWN_AGENT_TYPES = [
-  'autonomous',
-  'customer_service',
-  'leads_qualifier',
-  'finance_invoice_ops',
-  'office_assistant',
-] as const
+export const KNOWN_AGENT_TYPES = AGENT_TYPE_IDS
 
-export type KnownAgentType = (typeof KNOWN_AGENT_TYPES)[number]
+export type KnownAgentType = AgentType
 
-export const AGENT_DISPLAY_NAMES: Record<string, string> = {
-  autonomous: 'Geno',
-  customer_service: 'Teo',
-  leads_qualifier: 'Lex',
-  finance_invoice_ops: 'Finn',
-  office_assistant: 'Ofira',
-}
+export const AGENT_DISPLAY_NAMES: Record<string, string> = AGENT_NAMES
 
-export function isKnownAgentType(v: unknown): v is KnownAgentType {
-  return typeof v === 'string' && (KNOWN_AGENT_TYPES as readonly string[]).includes(v)
-}
+export const isKnownAgentType = isAgentType
 
 /** Role granted to an agent on a doc, or null when not invited / revoked. */
 export async function getAgentDocRole(docId: string, agentType: string): Promise<DocRole> {

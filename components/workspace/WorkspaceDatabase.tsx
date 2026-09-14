@@ -6,6 +6,7 @@ import { WebsocketProvider } from "y-websocket"
 import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload, LayoutTemplate, Zap } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 import { readCells, computeRollups, DUE_FILTERS, matchesDueFilter, parseAutomationRules, type FieldDef, type CellValue, type AutomationRule } from "@/lib/workspaceDbModel"
+import { AGENT_ROSTER } from "@/lib/agentRoster"
 
 type RowComment = { id: string; text: string; author: string; at: string }
 type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; due: string; description: string; comments: RowComment[]; cells: Record<string, CellValue> }
@@ -15,13 +16,7 @@ const PRIORITIES = ["Low", "Med", "High"] as const
 
 // Invitable Cerveau agents (must match KNOWN_AGENT_TYPES server-side).
 // Stored as the agent_type string so ACL, skills, and filters agree.
-const AGENT_ASSIGNEES = [
-  { value: "autonomous", label: "Geno" },
-  { value: "customer_service", label: "Teo" },
-  { value: "leads_qualifier", label: "Lex" },
-  { value: "finance_invoice_ops", label: "Finn" },
-  { value: "office_assistant", label: "Ofira" },
-] as const
+const AGENT_ASSIGNEES = AGENT_ROSTER.map((a) => ({ value: a.type, label: a.name }))
 
 function assigneeLabel(v: string): string {
   const hit = AGENT_ASSIGNEES.find((a) => a.value === v)

@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import { TelegramAgentType } from '@/lib/telegramDeploy';
+import { AGENT_NAMES } from '@/lib/agentRoster';
 import { buildSlackOpenUrl } from '@/lib/slackDeploy';
 import { listAgentActions, AgentAction } from '@/lib/agentActions';
 import { listDeployments, deleteDeployment, AgentDeployment } from '@/lib/agentChat';
@@ -57,7 +58,7 @@ const AGENT_HEADER_IMAGES = {
 const AGENTS = [
   {
     agentType: 'autonomous' as TelegramAgentType,
-    name: 'Geno',
+    name: AGENT_NAMES.autonomous,
     titleKey: 'generalistTitle',
     descKey: 'generalistDesc',
     toolsKey: 'generalistTools',
@@ -70,7 +71,7 @@ const AGENTS = [
   },
   {
     agentType: 'customer_service' as TelegramAgentType,
-    name: 'Teo',
+    name: AGENT_NAMES.customer_service,
     titleKey: 'ticketOpsTitle',
     descKey: 'ticketOpsDesc',
     toolsKey: 'ticketOpsTools',
@@ -83,7 +84,7 @@ const AGENTS = [
   },
   {
     agentType: 'leads_qualifier' as TelegramAgentType,
-    name: 'Lex',
+    name: AGENT_NAMES.leads_qualifier,
     titleKey: 'leadsTitle',
     descKey: 'leadsDesc',
     toolsKey: 'leadsTools',
@@ -96,7 +97,7 @@ const AGENTS = [
   },
   {
     agentType: 'finance_invoice_ops' as TelegramAgentType,
-    name: 'Finn',
+    name: AGENT_NAMES.finance_invoice_ops,
     titleKey: 'financeTitle',
     descKey: 'financeDesc',
     toolsKey: 'financeTools',
@@ -109,7 +110,7 @@ const AGENTS = [
   },
   {
     agentType: 'office_assistant' as TelegramAgentType,
-    name: 'Ofira',
+    name: AGENT_NAMES.office_assistant,
     titleKey: 'officeTitle',
     descKey: 'officeDesc',
     toolsKey: 'officeTools',
@@ -417,13 +418,10 @@ const ACTION_META: Record<string, { labelKey: string; emoji: string }> = {
   task: { labelKey: 'actionTask', emoji: '📋' },
 };
 
-const AGENT_TITLE_KEYS: Record<string, string> = {
-  autonomous: 'generalistTitle',
-  customer_service: 'ticketOpsTitle',
-  leads_qualifier: 'leadsTitle',
-  finance_invoice_ops: 'financeTitle',
-  office_assistant: 'officeTitle',
-};
+// Derived from AGENTS above instead of duplicating each titleKey again.
+const AGENT_TITLE_KEYS: Record<string, string> = Object.fromEntries(
+  AGENTS.map((a) => [a.agentType, a.titleKey]),
+);
 
 function actionSummary(action: AgentAction): string {
   const p = action.payload || {};

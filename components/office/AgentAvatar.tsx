@@ -14,6 +14,7 @@
  */
 import Image from "next/image"
 import { asset } from "@/lib/asset"
+import type { AgentType } from "@/lib/agentRoster"
 
 const CONSOLE_ICON_SRC = "/Aivory_Avatar.svg"
 
@@ -24,7 +25,10 @@ export interface AgentVisual {
   portraitSrc?: string
 }
 
-export const AGENT_VISUALS: Record<string, AgentVisual> = {
+// Portrait asset paths, one per agent type (aesthetic/vibe-based mapping,
+// not derived from anything in lib/agentRoster.ts) — plus "null" for Aivory
+// Console, which isn't a deployable agent and has no roster entry.
+export const AGENT_VISUALS: Record<AgentType | "null", AgentVisual> = {
   null: {}, // Aivory Console — brand mark, not a portrait
   autonomous: { portraitSrc: "/agents/autonomous.svg" }, // Generalist Agent
   customer_service: { portraitSrc: "/agents/customer_service.svg" }, // Ticket Ops Agent
@@ -34,7 +38,7 @@ export const AGENT_VISUALS: Record<string, AgentVisual> = {
 }
 
 export function getAgentVisual(type: string | null | undefined): AgentVisual {
-  return AGENT_VISUALS[type ?? "null"] ?? AGENT_VISUALS.autonomous
+  return AGENT_VISUALS[(type ?? "null") as AgentType | "null"] ?? AGENT_VISUALS.autonomous
 }
 
 interface AgentAvatarProps {

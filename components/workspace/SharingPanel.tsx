@@ -2,18 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { collabAuthHeaders } from '@/lib/collabClient'
+import { AGENT_ROSTER, type AgentType } from '@/lib/agentRoster'
 
 type AclRow = { user_id: string; role: string; email?: string; full_name?: string }
 type AgentRow = { agent_type: string; display_name?: string; role: string; granted_by?: string }
 type ReqRow = { id: string; requester_id: string; requester_email?: string; user_email?: string; full_name?: string; role_requested: string; status: string; created_at: string }
 
-const AGENT_OPTIONS = [
-  { type: 'autonomous', name: 'Geno' },
-  { type: 'customer_service', name: 'Teo' },
-  { type: 'leads_qualifier', name: 'Lex' },
-  { type: 'finance_invoice_ops', name: 'Finn' },
-  { type: 'office_assistant', name: 'Ofira' },
-]
+const AGENT_OPTIONS = AGENT_ROSTER.map((a) => ({ type: a.type, name: a.name }))
 
 export default function SharingPanel({ docId, isOwner }: { docId: string; isOwner: boolean }) {
   const [tab, setTab] = useState<'people' | 'agents'>('people')
@@ -221,7 +216,7 @@ export default function SharingPanel({ docId, isOwner }: { docId: string; isOwne
         <div className="flex flex-col gap-2">
           <select
             value={agentType}
-            onChange={(e) => setAgentType(e.target.value)}
+            onChange={(e) => setAgentType(e.target.value as AgentType)}
             className="w-full rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70"
           >
             {AGENT_OPTIONS.map((a) => (

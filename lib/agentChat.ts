@@ -9,27 +9,15 @@
  */
 
 import { authedFetch } from './deployAuth'
-import type { TelegramAgentType } from './telegramDeploy'
+import { AGENT_ROSTER, type AgentRosterEntry, type AgentType } from './agentRoster'
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'
 
-export interface PrebuiltAgent {
-  type: TelegramAgentType
-  /** First name shown in the Console/rail — see docs/AGENT-NAMING (11 Sep 2026). */
-  name: string
-  title: string
-  enterprise?: boolean
-}
+export type PrebuiltAgent = AgentRosterEntry
 
-/** Must stay in sync with the AGENTS card list and backend AGENT_TYPES. */
-export const PREBUILT_AGENTS: PrebuiltAgent[] = [
-  { type: 'autonomous', name: 'Geno', title: 'Generalist Agent' },
-  { type: 'customer_service', name: 'Teo', title: 'Ticket Ops Agent' },
-  { type: 'leads_qualifier', name: 'Lex', title: 'Leads Qualifier Agent' },
-  { type: 'finance_invoice_ops', name: 'Finn', title: 'Finance & Invoice Ops Agent' },
-  { type: 'office_assistant', name: 'Ofira', title: 'Office Assistant', enterprise: true },
-]
+/** Sourced from lib/agentRoster.ts's single AGENT_ROSTER. */
+export const PREBUILT_AGENTS: PrebuiltAgent[] = [...AGENT_ROSTER]
 
 /** Minimal shape Cerveau's own /webhook response carries — no `arguments`,
  *  unlike the dashboard Approvals page's richer PendingApproval (that one
@@ -47,7 +35,7 @@ export interface AgentChatResult {
 }
 
 export async function sendAgentMessage(
-  agentType: TelegramAgentType,
+  agentType: AgentType,
   text: string,
   conversationId?: string
 ): Promise<AgentChatResult> {
