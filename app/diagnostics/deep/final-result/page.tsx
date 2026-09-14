@@ -1097,6 +1097,20 @@ export default function FinalResultPage() {
                   ? `Kisaran mencerminkan efisiensi otomasi 50%–90%; skenario dasar menggunakan ${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%.`
                   : `Range reflects 50%–90% automation efficiency; base case uses ${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%.`}
               </span>
+              {/* Without this line, "Dasar" here (net, after ongoing cost)
+                  and the "ROI N Tahun" hero tile + Methodology Step 6 (gross,
+                  before ongoing cost) read as two contradictory numbers for
+                  the same 75%-efficiency case — the gap between this card
+                  and the financial-terms note above (right after the ROI
+                  tile grid) is long enough that a reader lands here having
+                  forgotten it, and this card alone offers no reason the two
+                  don't match. Repeating the actual gross figure right here
+                  closes that gap without requiring a scroll back up. */}
+              <span className={styles.scenarioNote}>
+                {locale === 'id'
+                  ? `Skenario di atas bersifat bersih (NET, setelah biaya operasional berjalan). ${roiLabel(roiYears, 'id')} kotor (sebelum biaya berjalan, lihat Metodologi Langkah 6 di bawah) = ${fmtRoi(calculations.threeYearROIPercent)} — bukan kesalahan, dua ukuran yang berbeda.`
+                  : `The scenarios above are NET (after ongoing running costs). The gross ${roiLabel(roiYears, 'en')} (before ongoing costs, see Methodology Step 6 below) = ${fmtRoi(calculations.threeYearROIPercent)} — not an error, just a different measure.`}
+              </span>
             </div>
           )}
 

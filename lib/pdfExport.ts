@@ -2024,6 +2024,7 @@ function renderScenarioRange(
   effPct: number,
   locale: Locale = 'en',
   horizonYears: number = 3,
+  grossRoiPercent?: number | null,
 ): number {
   const roiFmt = (v: number | null | undefined): string =>
     v == null || !isFinite(v) ? '—' : v >= 999 ? '>999%' : `${Math.round(v)}%`
@@ -2061,9 +2062,17 @@ function renderScenarioRange(
   setC(pdf, LABEL, 'text')
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(6.4)
+  // Names the actual gross figure (not just "different from the tile
+  // above") so a reader landing on this card alone — without having just
+  // read the financial-terms note earlier on the page — sees why "Dasar"
+  // and the Methodology's Step 6 ROI don't match, instead of reading it as
+  // a calculation error.
+  const grossRoiFmt = grossRoiPercent == null || !isFinite(grossRoiPercent)
+    ? null
+    : grossRoiPercent >= 999 ? '>999%' : `${Math.round(grossRoiPercent)}%`
   const scenarioCaption = locale === 'id'
-    ? `Kisaran mencerminkan efisiensi otomasi 50%–90%; skenario dasar menggunakan ${effPct}%. Angka ini sudah dikurangi biaya operasional berjalan — berbeda dari ROI ${horizonYears} Tahun di atas, yang belum dikurangi biaya tersebut.`
-    : `Range reflects 50%–90% automation efficiency; base case uses ${effPct}%. These figures are net of ongoing operating costs — different from the ${horizonYears}-Year ROI above, which is not.`
+    ? `Kisaran mencerminkan efisiensi otomasi 50%–90%; skenario dasar menggunakan ${effPct}%. Angka ini sudah dikurangi biaya operasional berjalan — berbeda dari ROI ${horizonYears} Tahun di atas${grossRoiFmt ? ` (kotor, sebelum biaya berjalan, = ${grossRoiFmt})` : ''}, yang belum dikurangi biaya tersebut.`
+    : `Range reflects 50%–90% automation efficiency; base case uses ${effPct}%. These figures are net of ongoing operating costs — different from the ${horizonYears}-Year ROI above${grossRoiFmt ? ` (gross, before ongoing costs, = ${grossRoiFmt})` : ''}, which is not.`
   const scenarioCapLines = pdf.splitTextToSize(scenarioCaption, CW)
   pdf.text(scenarioCapLines, ML, y)
   return y + scenarioCapLines.length * 3.2 + 3
@@ -3103,7 +3112,7 @@ export async function exportReportToPdf(
   const scenario = cAny.scenarioThreeYearROI
   if (scenario && [scenario.low, scenario.base, scenario.high].some((v: unknown) => v != null)) {
     y += 2
-    y = renderScenarioRange(pdf, y, scenario, effPct, locale, roiYears)
+    y = renderScenarioRange(pdf, y, scenario, effPct, locale, roiYears, calculations.threeYearROIPercent)
   }
 
   // ── Investment thresholds — the "so what do we do about it" table ──
