@@ -3,23 +3,26 @@ import { asset } from "@/lib/asset";
 
 import { useRouter } from "next/navigation"
 import { useTranslations } from "next-intl"
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo, type KeyboardEvent as ReactKeyboardEvent } from "react"
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import ChatMessage from "@/components/ChatMessage"
 import ChatInput from "@/components/ChatInput"
-import ConsoleTopBar from "@/components/console/ConsoleTopBar"
+import ConsoleTopBar, { type ConsoleChatMode } from "@/components/console/ConsoleTopBar"
+import AgentMentionMenu from "@/components/console/AgentMentionMenu"
 import SuggestionChips from "@/components/chat/SuggestionChips"
 import ActionList from "@/components/chat/ActionList"
 import { RoutingSuggestBanner } from "@/components/chat/RoutingSuggestBanner"
 import { useAgenticStream } from "@/hooks/useAgenticStream"
 import { useIntentRouter } from "@/hooks/useIntentRouter"
 import { useFileUpload } from "@/hooks/useFileUpload"
+import { useAgentMention } from "@/hooks/useAgentMention"
 import { useChat } from "@/hooks/useChat"
 import { useNotificationFeed } from "@/hooks/useNotificationFeed"
 import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { useActiveRuns } from "@/hooks/useActiveRuns"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
+import { getMentionCandidates, parseAgentMentions, type MentionCandidate } from "@/lib/agentMentions"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import type { Attachment } from "@/components/UploadMenu"
@@ -96,6 +99,31 @@ const CHIPS: ChipData[] = [
 
 const MAX_VISIBLE_INTEGRATIONS = 4
 
+/** Room member strip — who @ can reach in this room (deployed agents only). */
+function RoomMembers({ candidates }: { candidates: MentionCandidate[] }) {
+  if (candidates.length === 0) {
+    return (
+      <div className="mb-2 flex w-full items-center justify-center gap-2 text-[12px] font-light text-white/35">
+        Room — no deployed agents yet · deploy one from Agents to @mention it here
+      </div>
+    )
+  }
+  return (
+    <div className="mb-2 flex w-full flex-wrap items-center justify-center gap-2 text-[12px] font-light text-white/45">
+      <span className="flex items-center -space-x-1.5">
+        {candidates.map((c) => (
+          <span key={c.type} className="rounded-full ring-2 ring-surface-1">
+            <AgentAvatar type={c.type} size={20} />
+          </span>
+        ))}
+      </span>
+      <span>
+        Room · {candidates.map((c) => c.name).join(", ")} · type @ to mention
+      </span>
+    </div>
+  )
+}
+
 export default function ConsolePage() {
   const t = useTranslations('console')
   const router = useRouter()
@@ -108,6 +136,7 @@ export default function ConsolePage() {
   // (Phase 1's exit gate) — Mission Control is one click away, not the
   // thing that overrides that guarantee.
   const [showMissionControl, setShowMissionControl] = useState(false)
+  const [chatMode, setChatMode] = useState<ConsoleChatMode>("direct")
   const [toasts, setToasts] = useState<Toast[]>([])
   const [activeChip, setActiveChip] = useState<string | null>(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
@@ -158,6 +187,7 @@ export default function ConsolePage() {
     setFollowUpSuggestions,
     isClarification,
     handleSend,
+    handleSendRoom,
     resolveConsoleApproval,
     handleNewChat,
     switchSession,
@@ -185,6 +215,77 @@ export default function ConsolePage() {
   } = useNotificationFeed({ sessionsByAgent, currentSessionId, excludeApprovalIds: inlineApprovalIds })
   const { deployments } = useAgentDeployments()
   const { byAgentType: activeRunsByAgentType } = useActiveRuns()
+
+  // Room mode (Mission Control chat room): only deployed agents are
+  // mentionable — @ expands to this list, sends fan out in parallel.
+  const mentionCandidates = useMemo(() => getMentionCandidates(deployments), [deployments])
+  const inRoom = chatMode === "room"
+
+  const changeChatMode = useCallback((mode: ConsoleChatMode) => {
+    setChatMode(mode)
+    if (mode === "room") {
+      addToast("success", mentionCandidates.length > 0
+        ? `Room — @mention ${mentionCandidates.map((c) => c.name).join(", ")} to get answers`
+        : "Room — no deployed agents yet, @ will list nothing until you deploy one")
+    }
+  }, [addToast, mentionCandidates])
+
+  // @mention tracking for the empty-state composer (the threaded view uses
+  // ChatInput's own built-in mention support).
+  const emptyMention = useAgentMention({
+    textareaRef,
+    candidates: mentionCandidates,
+    enabled: inRoom,
+  })
+
+  const selectEmptyMention = useCallback((c: MentionCandidate) => {
+    const el = textareaRef.current
+    const caret = el?.selectionStart ?? inputValue.length
+    const applied = emptyMention.applyMention(c, inputValue, caret)
+    if (!applied) {
+      emptyMention.closeMenu()
+      return
+    }
+    setInputValue(applied.text)
+    emptyMention.closeMenu()
+    emptyMention.focusAndRestore(applied.caret)
+  }, [emptyMention, inputValue])
+
+  // Empty-state composer keys: mention menu first (↑/↓/Enter/Tab/Esc),
+  // plain Enter sends (room-aware via handleSendWithWorkspace).
+  const handleEmptyKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (emptyMention.menuOpen) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault()
+        const n = emptyMention.mentionList.length
+        if (n > 0) {
+          emptyMention.setMentionIndex(
+            (emptyMention.mentionIndex + (e.key === "ArrowDown" ? 1 : -1) + n) % n,
+          )
+        }
+        return
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        const pick = emptyMention.mentionList[emptyMention.mentionIndex]
+        if (pick) {
+          e.preventDefault()
+          selectEmptyMention(pick)
+          return
+        }
+      }
+      if (e.key === "Escape") {
+        e.preventDefault()
+        emptyMention.closeMenu()
+        return
+      }
+    }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      if (inputValue.trim() || attachments.length > 0) {
+        handleSendWithWorkspace(inputValue, attachments)
+      }
+    }
+  }
 
   // Whoever is actually answering — named in the thinking indicator so a
   // room with several agents says who's busy, not just "Aivory".
@@ -220,15 +321,31 @@ export default function ConsolePage() {
 
   const handleSendWithWorkspace = useCallback(
     async (text: string, atts: Attachment[]) => {
-      if (await tryWorkspaceCreate(text)) {
+      const clearComposer = () => {
         setInputValue("")
         if (textareaRef.current) textareaRef.current.style.height = "auto"
         setAttachments([])
+      }
+      if (await tryWorkspaceCreate(text)) {
+        clearComposer()
+        return
+      }
+      if (inRoom) {
+        emptyMention.closeMenu()
+        const mentioned = parseAgentMentions(text, mentionCandidates)
+        if (mentioned.length > 0) {
+          await handleSendRoom(text, atts, mentioned)
+        } else {
+          // No @mention — plain message still goes to the direct console
+          // brain so the room never eats a message silently.
+          handleSend(text, atts)
+        }
+        clearComposer()
         return
       }
       handleSend(text, atts)
     },
-    [tryWorkspaceCreate, handleSend, setAttachments],
+    [tryWorkspaceCreate, inRoom, emptyMention, mentionCandidates, handleSendRoom, handleSend, setAttachments],
   )
 
   // Fetch connected integrations from store
@@ -385,7 +502,12 @@ export default function ConsolePage() {
           <span className="text-[13px] font-medium leading-none text-white/55">{t('missionControl')}</span>
         </div>
       ) : (
-        <ConsoleTopBar onNewChat={handleNewChat} />
+        <ConsoleTopBar
+          onNewChat={handleNewChat}
+          chatMode={chatMode}
+          onChatModeChange={changeChatMode}
+          roomCount={mentionCandidates.length}
+        />
       )}
 
       {!showMissionControl && showDeployNotice && <AgentDeployNotice agentName={activeAgentName} />}
@@ -446,6 +568,15 @@ export default function ConsolePage() {
               </div>
 
               <div className="relative w-full [animation:fadeUp_0.55s_0.13s_cubic-bezier(0.22,1,0.36,1)_both]">
+                {inRoom && <RoomMembers candidates={mentionCandidates} />}
+                {emptyMention.menuOpen && (
+                  <AgentMentionMenu
+                    candidates={emptyMention.mentionList}
+                    activeIndex={emptyMention.mentionIndex}
+                    onSelect={selectEmptyMention}
+                    onHover={emptyMention.setMentionIndex}
+                  />
+                )}
                 <div className="console-input-card w-full overflow-hidden">
                 {/* Attachment cards from drag & drop */}
                 {attachments.length > 0 && (
@@ -465,21 +596,15 @@ export default function ConsolePage() {
                     rows={2}
                     value={inputValue}
                     onChange={(e) => {
-                      setInputValue(e.target.value)
+                      const next = e.target.value
+                      const caret = e.target.selectionStart ?? next.length
+                      setInputValue(next)
+                      emptyMention.checkForMention(next, caret)
                       e.target.style.height = "auto"
                       e.target.style.height = `${Math.min(e.target.scrollHeight, 180)}px`
                     }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault()
-                        if (inputValue.trim() || attachments.length > 0) {
-                          handleSendWithWorkspace(inputValue, attachments)
-                          setInputValue("")
-                          if (textareaRef.current) textareaRef.current.style.height = "auto"
-                        }
-                      }
-                    }}
-                    placeholder={t('sendPlaceholder')}
+                    onKeyDown={handleEmptyKeyDown}
+                    placeholder={inRoom ? t('sendPlaceholderRoom') : t('sendPlaceholder')}
                     className="console-textarea w-full"
                     disabled={isStreaming}
                   />
@@ -632,8 +757,8 @@ export default function ConsolePage() {
                         approvalBusy={m.approvalBusy}
                         onApproveAction={() => resolveConsoleApproval(m.id, 'approve')}
                         onDenyAction={() => resolveConsoleApproval(m.id, 'deny')}
-                        agentName={activeAgentName}
-                        agentType={agentTarget}
+                        agentName={m.agentName ?? activeAgentName}
+                        agentType={m.agentType ?? agentTarget}
                       />
                     </div>
                   )
@@ -675,12 +800,16 @@ export default function ConsolePage() {
             </div>
             <div className="sticky bottom-0 z-10 px-8 pt-2 pb-4" style={{ background: 'linear-gradient(to bottom, transparent, var(--color-surface-1) 24px)' }}>
               <div className="max-w-[800px] mx-auto">
+                {inRoom && <RoomMembers candidates={mentionCandidates} />}
                 <ChatInput
                   onSend={(text: string, atts: Attachment[]) => handleSendWithWorkspace(text, atts)}
                   disabled={isStreaming}
                   pendingAttachments={attachments}
                   onClearPendingAttachments={() => setAttachments([])}
                   onRemoveAttachment={(i) => setAttachments(prev => prev.filter((_, idx) => idx !== i))}
+                  enableMentions={inRoom}
+                  mentionCandidates={mentionCandidates}
+                  placeholder={inRoom ? t('sendPlaceholderRoom') : undefined}
                 />
               </div>
             </div>

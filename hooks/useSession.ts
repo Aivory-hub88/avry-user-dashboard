@@ -2,7 +2,7 @@
 import { useCallback } from 'react'
 import { saveSessionMessages as _save, loadSessionMessages as _load, listSessions as _list, getSession as _getSession, ChatStorageError } from '@/lib/chatPersistence'
 
-interface Message { id: string; role: "user" | "assistant"; content: string; isStreaming?: boolean }
+interface Message { id: string; role: "user" | "assistant"; content: string; isStreaming?: boolean; agentType?: string | null; agentName?: string }
 
 export function useSession(addToast: (type: "error" | "success", msg: string) => void) {
   const save = useCallback((sessionId: string, messages: Message[], agentType: string | null = null) => {

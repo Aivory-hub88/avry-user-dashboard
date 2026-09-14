@@ -169,6 +169,7 @@
     "uploadFile": "Upload File",
     "uploadFileTitle": "Upload file",
     "sendPlaceholder": "Send Message to Aivory...",
+    "sendPlaceholderRoom": "Message the room — @ to mention an agent...",
     "send": "Send",
     "connectToolsTo": "connect your tools to",
     "dropFilesToAttach": "Drop files to attach",

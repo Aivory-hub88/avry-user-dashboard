@@ -169,6 +169,7 @@
     "uploadFile": "Unggah File",
     "uploadFileTitle": "Unggah file",
     "sendPlaceholder": "Kirim pesan ke Aivory...",
+    "sendPlaceholderRoom": "Kirim ke room — @ untuk mention agent...",
     "send": "Kirim",
     "connectToolsTo": "hubungkan tool Anda ke",
     "dropFilesToAttach": "Lepas file untuk melampirkan",

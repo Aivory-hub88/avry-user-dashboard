@@ -4,6 +4,9 @@ import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from "react"
 import UploadMenu, { Attachment } from "./UploadMenu"
 import ContextToolbar from "./input/ContextToolbar"
 import { AttachmentCard } from "./AttachmentCard"
+import AgentMentionMenu from "./console/AgentMentionMenu"
+import { useAgentMention } from "@/hooks/useAgentMention"
+import type { MentionCandidate } from "@/lib/agentMentions"
 
 interface ChatInputProps {
   onSend: (message: string, attachments: Attachment[]) => void
@@ -13,12 +16,19 @@ interface ChatInputProps {
   pendingAttachments?: Attachment[]
   onClearPendingAttachments?: () => void
   onRemoveAttachment?: (index: number) => void
+  /** Room mode: @mention deployed agents (Mission Control chat room). */
+  enableMentions?: boolean
+  mentionCandidates?: MentionCandidate[]
+  placeholder?: string
 }
 
 export default function ChatInput({ onSend, disabled = false, prefill, hasPendingFiles = false,
   pendingAttachments = [],
   onClearPendingAttachments,
   onRemoveAttachment,
+  enableMentions = false,
+  mentionCandidates = [],
+  placeholder,
 }: ChatInputProps) {
   const [message, setMessage] = useState(prefill ?? "")
   const [activeTool, setActiveTool] = useState<string | null>(null)
@@ -46,6 +56,30 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
   const [extracting, setExtracting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  const mention = useAgentMention({
+    textareaRef,
+    candidates: mentionCandidates,
+    enabled: enableMentions && !disabled,
+  })
+
+  const selectMention = (c: { type: string; name: string; title: string; channels: string[] }) => {
+    const el = textareaRef.current
+    const caret = el?.selectionStart ?? message.length
+    const applied = mention.applyMention(c, message, caret)
+    if (!applied) {
+      mention.closeMenu()
+      return
+    }
+    setMessage(applied.text)
+    mention.closeMenu()
+    mention.focusAndRestore(applied.caret)
+    // Re-check in case another @token precedes the new caret (chained mentions).
+    requestAnimationFrame(() => {
+      const el2 = textareaRef.current
+      mention.checkForMention(applied.text, el2?.selectionStart ?? applied.caret)
+    })
+  }
+
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(""), 3000)
@@ -56,13 +90,13 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
     const trimmed = message.trim()
     if (!trimmed && !attachment && pendingAttachments.length === 0 && !hasPendingFiles) return
     if (disabled) return
-
     const allAttachments = [
       ...(attachment ? [attachment] : []),
       ...pendingAttachments,
     ]
     const finalMessage = trimmed || `Please analyse this file`
     console.log('[INPUT DEBUG] calling onSend with message:', finalMessage)
+    mention.closeMenu()
     onSend(finalMessage, allAttachments)
     setMessage("")
     setAttachment(null)
@@ -80,6 +114,33 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Mention menu takes precedence while open — ↑/↓ navigate, Enter/Tab
+    // picks, Esc dismisses. Only plain Enter sends.
+    if (mention.menuOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        const n = mention.mentionList.length
+        if (n > 0) {
+          mention.setMentionIndex(
+            (mention.mentionIndex + (e.key === 'ArrowDown' ? 1 : -1) + n) % n,
+          )
+        }
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        const pick = mention.mentionList[mention.mentionIndex]
+        if (pick) {
+          e.preventDefault()
+          selectMention(pick)
+          return
+        }
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        mention.closeMenu()
+        return
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
@@ -87,7 +148,10 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
   }
 
   const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value)
+    const next = e.target.value
+    const caret = e.target.selectionStart ?? next.length
+    setMessage(next)
+    mention.checkForMention(next, caret)
     if (textareaRef.current) {
       // Same as handleSend above — standard imperative ref usage in a
       // user-action handler, flagged only due to the prefill effect also
@@ -155,11 +219,19 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
 
       {/* Input card — single composer language, sama seperti hero.
           radius-lg (20px), border-line, textarea px-5 pt-[14px], bar px-4. */}
+      {mention.menuOpen && (
+        <AgentMentionMenu
+          candidates={mention.mentionList}
+          activeIndex={mention.mentionIndex}
+          onSelect={selectMention}
+          onHover={mention.setMentionIndex}
+        />
+      )}
       <div className="bg-surface-3 border border-line rounded-[20px] overflow-hidden">
         {/* Textarea area */}
         <textarea
           ref={textareaRef}
-          placeholder="Send Message to Aivory..."
+          placeholder={placeholder ?? "Send Message to Aivory..."}
           value={message}
           onChange={handleChange}
           onKeyDown={handleKeyDown}

@@ -11,6 +11,10 @@ export interface Message {
   role: "user" | "assistant"
   content: string
   isStreaming?: boolean
+  /** Room-mode attribution — survives reloads so multi-agent threads keep
+   *  the right avatar per bubble. Absent = direct thread (global target). */
+  agentType?: string | null
+  agentName?: string
 }
 
 export interface PersistedSession {

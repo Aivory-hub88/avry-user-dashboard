@@ -7,6 +7,7 @@ import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
 import { sendAgentMessage, type ConsolePendingApproval } from '@/lib/agentChat'
+import { agentNameOf } from '@/lib/agentMentions'
 import { resolveApproval } from '@/lib/agentApprovals'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
 import { useMode } from '@/contexts/ModeContext'
@@ -24,6 +25,11 @@ interface Message {
   /** Set once the user acts on pendingApproval — hides the buttons, no re-resolve. */
   approvalOutcome?: 'approved' | 'denied' | null
   approvalBusy?: boolean
+  /** Room mode (Mission Control chat): which deployed agent answered this
+   *  bubble. Undefined = direct thread, falls back to the global agentTarget.
+   *  Carried per message so one thread can hold several agents' replies. */
+  agentType?: string | null
+  agentName?: string
 }
 export interface ChatSession { id: string; title: string; messages: Message[]; createdAt: number; updatedAt: number; pinned?: boolean; agentType: string | null }
 
@@ -279,6 +285,95 @@ export function useChat({
     }
   }, [currentSessionId, agentTarget, addToast, processEvent, triggerClassification, clearAttachments])
 
+  // Room mode (Mission Control chat room): fan out one message to every
+  // @mentioned deployed agent in parallel, one reply bubble per agent —
+  // like mentioning members in a group chat. Each bubble carries its own
+  // agentType/agentName so ChatMessage renders the right avatar even though
+  // the thread itself stays under the current session. Empty target list
+  // falls back to the direct console path.
+  const handleSendRoom = useCallback(async (displayText: string, atts: Attachment[], agentTypes: string[]) => {
+    const targets = [...new Set(agentTypes)]
+    if (targets.length === 0) {
+      return handleSend(displayText, atts)
+    }
+    if (!displayText.trim() && atts.length === 0) return
+
+    const imageAtts = atts.filter(a => a.content?.startsWith('data:image/'))
+    const textAtts = atts.filter(a => a.content && !a.content.startsWith('data:image/'))
+    const attachmentText = [
+      ...textAtts.map(a => `[Attached file: ${a.filename}]\n${a.content}`),
+      ...imageAtts.map(a => `[Attached image: ${a.filename} — image preview shown above]`),
+    ].join('\n\n')
+    // Raw text (with @mentions intact) goes to every agent — each reply
+    // sees who else was addressed, same as a group-chat transcript.
+    const payload = attachmentText ? `${displayText}\n\n${attachmentText}` : displayText
+
+    const ts = Date.now()
+    const userMsg: Message = { id: `${ts}-room-user`, role: "user", content: displayText, attachments: atts.length > 0 ? atts : undefined }
+    const placeholders: Message[] = targets.map((t, i) => ({
+      id: `${ts}-room-${t}-${i}`,
+      role: "assistant",
+      content: "",
+      isStreaming: true,
+      agentType: t,
+      agentName: agentNameOf(t),
+    }))
+    const sentSessionId = currentSessionId
+    const sentMessagesSnapshot = [...messagesRef.current, userMsg, ...placeholders]
+
+    setMessages(p => [...p, userMsg, ...placeholders])
+    clearAttachments()
+    streamingSessionRef.current = sentSessionId
+    setIsStreaming(true)
+    setStreamingAgentType(targets[0] ?? null)
+
+    const settled = await Promise.allSettled(
+      targets.map(t => sendAgentMessage(t as TelegramAgentType, payload, sentSessionId)),
+    )
+    settled.forEach((r, i) => {
+      if (r.status === "rejected") {
+        addToast("error", `${agentNameOf(targets[i])} is unavailable right now.`)
+      }
+    })
+
+    // Pure merge: successes fill their bubble, failures drop theirs.
+    const applyRoomResults = (list: Message[]): Message[] =>
+      list.flatMap(m => {
+        const idx = placeholders.findIndex(ph => ph.id === m.id)
+        if (idx === -1) return [m]
+        const r = settled[idx]
+        if (r.status === "fulfilled") {
+          return [{ ...m, content: r.value.reply, isStreaming: false, pendingApproval: r.value.pendingApproval }]
+        }
+        return []
+      })
+
+    try {
+      if (currentSessionIdRef.current === sentSessionId) {
+        setMessages(prev => {
+          const updated = applyRoomResults(prev)
+          saveSessionMessages(sentSessionId, updated, agentTarget)
+          setSessions(listSessions())
+          return updated
+        })
+      } else {
+        const finalList = applyRoomResults(sentMessagesSnapshot)
+        saveSessionMessages(sentSessionId, finalList, agentTarget)
+        setSessions(listSessions())
+      }
+    } catch (e) {
+      if (e instanceof ChatStorageError) {
+        addToast("error", "Chat history storage is full. Messages may not be saved.")
+      }
+    } finally {
+      if (streamingSessionRef.current === sentSessionId) {
+        streamingSessionRef.current = ""
+        setIsStreaming(false)
+        setStreamingAgentType(undefined)
+      }
+    }
+  }, [currentSessionId, agentTarget, handleSend, addToast, clearAttachments])
+
   // Resolves a pending F-1 approval surfaced inline in the console, reusing
   // the same /api/v1/agent-approvals endpoint the dashboard Approvals page
   // calls. On success, Cerveau's durable-resume continuation (if any) is
@@ -382,6 +477,7 @@ export function useChat({
     setFollowUpSuggestions,
     isClarification,
     handleSend,
+    handleSendRoom,
     resolveConsoleApproval,
     handleNewChat,
     switchSession,
