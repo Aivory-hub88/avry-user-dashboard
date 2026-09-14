@@ -460,7 +460,7 @@
     "agentNameLabel": "Agent name",
     "businessNameLabel": "Business name",
     "businessNamePlaceholder": "e.g. Toko Baju Melati",
-    "fixedIdentityNote": "Your agent is always introduced as Aivory — that stays fixed. Business name, knowledge, and everything below is what you customise.",
+    "fixedIdentityNote": "Your agent is always introduced as {name} — that stays fixed. Business name, knowledge, and everything below is what you customise.",
     "toneLabel": "Tone of voice",
     "tonePlaceholder": "Default tone (warm & helpful)",
     "languagesLabel": "Preferred languages",

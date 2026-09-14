@@ -460,7 +460,7 @@
     "agentNameLabel": "Nama agen",
     "businessNameLabel": "Nama bisnis",
     "businessNamePlaceholder": "cth. Toko Baju Melati",
-    "fixedIdentityNote": "Agen Anda selalu diperkenalkan sebagai Aivory — itu tetap. Nama bisnis, pengetahuan, dan semua di bawah ini yang Anda kustomisasi.",
+    "fixedIdentityNote": "Agen Anda selalu diperkenalkan sebagai {name} — itu tetap. Nama bisnis, pengetahuan, dan semua di bawah ini yang Anda kustomisasi.",
     "toneLabel": "Gaya bicara",
     "tonePlaceholder": "Gaya default (hangat & suka membantu)",
     "languagesLabel": "Bahasa yang disukai",

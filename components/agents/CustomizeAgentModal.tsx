@@ -965,13 +965,13 @@ export default function CustomizeAgentModal({
                       <label className="text-white/70 text-[12px] font-medium">{t('agentNameLabel')}</label>
                     </div>
                     <div className={`${inputClass} flex items-center text-white/45 cursor-not-allowed`}>
-                      Aivory
+                      {agentName || 'Aivory'}
                     </div>
                   </div>
                   <Field label={t('businessNameLabel')} value={fields.business_name} limit={FIELD_LIMITS.business_name} onChange={set('business_name')} placeholder={t('businessNamePlaceholder')} />
                 </div>
                 <p className="text-white/60 text-[12px] leading-relaxed -mt-2">
-                  <strong className="text-white/90 font-semibold">{t('fixedIdentityNote')}</strong>
+                  <strong className="text-white/90 font-semibold">{t('fixedIdentityNote', { name: agentName || 'Aivory' })}</strong>
                 </p>
                 <MultiSelect
                   label={t('toneLabel')}
