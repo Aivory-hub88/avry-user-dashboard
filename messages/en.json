@@ -530,6 +530,7 @@
     "mcpNamePlaceholder": "e.g. inventory-system",
     "mcpUrlLabel": "MCP server URL",
     "mcpUrlPlaceholder": "https://your-system.example.com/mcp",
+    "mcpAdvancedSettings": "Advanced settings",
     "mcpTransportLabel": "Transport",
     "mcpAuthNameLabel": "Auth header name (optional)",
     "mcpAuthNamePlaceholder": "e.g. X-Api-Key",

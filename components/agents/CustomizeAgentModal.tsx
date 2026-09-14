@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -391,6 +392,14 @@ export default function CustomizeAgentModal({
   // registered one server sees the MCP tab as if it were locked to that
   // single server, with no way to add another after removing it.
   const [mcpFormOpen, setMcpFormOpen] = useState(false);
+  // Transport + auth headers are advanced/rare (most servers are plain
+  // streamable-http with no custom header) -- collapsed by default so the
+  // add flow reads as "paste a URL", matching Claude's own custom-connector
+  // form instead of dumping 5 fields on the user at once.
+  const [mcpAdvancedOpen, setMcpAdvancedOpen] = useState(false);
+  // Server cards default collapsed (name + status only); expanding one is
+  // an explicit choice, so N servers doesn't mean N walls of tool toggles.
+  const [mcpExpandedId, setMcpExpandedId] = useState<string | null>(null);
 
   // Deploy tab — was a separate modal (app/agents/page.tsx's DeployModal),
   // merged in so identity/connections/tools/MCP are configured before a
@@ -758,12 +767,14 @@ export default function CustomizeAgentModal({
       setMcpServers((prev) => [result, ...prev]);
       setMcpForm({ name: '', url: '', transport: 'streamable-http', authHeaderName: '', authHeaderValue: '' });
       setMcpFormOpen(false);
+      setMcpAdvancedOpen(false);
     } catch (e) {
       if (e instanceof TenantMcpServerError && e.server) {
         // Verification failed, but the row WAS persisted — show it in the
         // list (status: verification_failed) rather than just an error.
         setMcpServers((prev) => [e.server as TenantMcpServer, ...prev]);
         setMcpForm({ name: '', url: '', transport: 'streamable-http', authHeaderName: '', authHeaderValue: '' });
+        setMcpAdvancedOpen(false);
         setMcpFormError(t('mcpSavedButFailed', { message: e.message }));
       } else {
         setMcpFormError(e instanceof TenantMcpServerError ? e.message : t('mcpRegisterFailed'));
@@ -1198,71 +1209,92 @@ export default function CustomizeAgentModal({
                           : s.status === 'verification_failed'
                             ? { label: t('mcpVerificationFailed'), className: 'bg-red-500/10 border-red-500/20 text-red-300/90' }
                             : { label: t('mcpVerifying'), className: 'bg-amber-warn/15 border-amber-warn/25 text-amber-warn' };
+                      // Collapsed by default -- a card only opens into its tool
+                      // list/toggles/actions when the user clicks it, so N
+                      // connected servers reads as N short rows, not N walls
+                      // of switches (matches Claude's own Connectors list).
+                      const expanded = mcpExpandedId === s.id;
                       return (
-                        <div key={s.id} className="px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="text-white/80 text-[13px] font-medium truncate">{s.name}</div>
-                              <div className="text-white/35 text-[11px] truncate">{s.url}</div>
+                        <div key={s.id} className="rounded-xl bg-white/[0.03] border border-white/[0.06] overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => setMcpExpandedId(expanded ? null : s.id)}
+                            className="w-full px-4 py-3 flex items-center justify-between gap-2 text-left hover:bg-white/[0.02] transition-colors"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              {expanded ? (
+                                <ChevronDown className="h-3.5 w-3.5 text-white/30 shrink-0" />
+                              ) : (
+                                <ChevronRight className="h-3.5 w-3.5 text-white/30 shrink-0" />
+                              )}
+                              <div className="min-w-0">
+                                <div className="text-white/80 text-[13px] font-medium truncate">{s.name}</div>
+                                {!expanded && <div className="text-white/35 text-[11px] truncate">{s.url}</div>}
+                              </div>
                             </div>
                             <span className={`shrink-0 px-2.5 py-1 rounded-full border text-[11px] font-medium ${style.className}`}>
                               {style.label}
                             </span>
-                          </div>
-                          {s.status === 'verification_failed' && s.last_verify_error && (
-                            <div className="mt-2 text-red-300/70 text-[11.5px]">{s.last_verify_error}</div>
-                          )}
-                          {s.status === 'verified' && s.tools.length > 0 && (
-                            <div className="mt-2.5 space-y-1 border-t border-white/[0.06] pt-2.5">
-                              {s.tools.map((tool) => {
-                                const toolEnabled = !s.disabled_tools.includes(tool.name);
-                                return (
-                                  <div key={tool.name} className="flex items-center justify-between gap-3 py-0.5">
-                                    <div className="min-w-0">
-                                      <div className="text-white/70 text-[12px] font-medium truncate">{tool.name}</div>
-                                      {tool.description && (
-                                        <div className="text-white/35 text-[11px] truncate">{tool.description}</div>
-                                      )}
-                                    </div>
-                                    <button
-                                      type="button"
-                                      role="switch"
-                                      aria-checked={toolEnabled}
-                                      disabled={mcpBusyId === s.id}
-                                      onClick={() => handleToggleMcpTool(s, tool.name, !toolEnabled)}
-                                      className={`relative w-9 h-5 rounded-full shrink-0 transition-colors disabled:opacity-30 ${
-                                        toolEnabled ? 'bg-accent/70' : 'bg-white/10'
-                                      }`}
-                                    >
-                                      <span
-                                        className={`absolute left-[3px] top-[3px] w-3.5 h-3.5 rounded-full bg-white transition-transform ${
-                                          toolEnabled ? 'translate-x-[14px]' : 'translate-x-0'
-                                        }`}
-                                      />
-                                    </button>
-                                  </div>
-                                );
-                              })}
+                          </button>
+                          {expanded && (
+                            <div className="px-4 pb-3.5">
+                              <div className="text-white/35 text-[11px] truncate mb-2.5">{s.url}</div>
+                              {s.status === 'verification_failed' && s.last_verify_error && (
+                                <div className="mb-2.5 text-red-300/70 text-[11.5px]">{s.last_verify_error}</div>
+                              )}
+                              {s.status === 'verified' && s.tools.length > 0 && (
+                                <div className="space-y-1 border-t border-white/[0.06] pt-2.5">
+                                  {s.tools.map((tool) => {
+                                    const toolEnabled = !s.disabled_tools.includes(tool.name);
+                                    return (
+                                      <div key={tool.name} className="flex items-center justify-between gap-3 py-0.5">
+                                        <div className="min-w-0">
+                                          <div className="text-white/70 text-[12px] font-medium truncate">{tool.name}</div>
+                                          {tool.description && (
+                                            <div className="text-white/35 text-[11px] truncate">{tool.description}</div>
+                                          )}
+                                        </div>
+                                        <button
+                                          type="button"
+                                          role="switch"
+                                          aria-checked={toolEnabled}
+                                          disabled={mcpBusyId === s.id}
+                                          onClick={() => handleToggleMcpTool(s, tool.name, !toolEnabled)}
+                                          className={`relative w-9 h-5 rounded-full shrink-0 transition-colors disabled:opacity-30 ${
+                                            toolEnabled ? 'bg-accent/70' : 'bg-white/10'
+                                          }`}
+                                        >
+                                          <span
+                                            className={`absolute left-[3px] top-[3px] w-3.5 h-3.5 rounded-full bg-white transition-transform ${
+                                              toolEnabled ? 'translate-x-[14px]' : 'translate-x-0'
+                                            }`}
+                                          />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              <div className="mt-2.5 flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  disabled={mcpBusyId === s.id}
+                                  onClick={() => handleReverifyMcpServer(s.id)}
+                                  className="text-[#dbe5d3]/70 hover:text-[#dbe5d3] text-[11.5px] disabled:opacity-40"
+                                >
+                                  {mcpBusyId === s.id ? t('mcpReverifyWorking') : t('mcpReverify')}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={mcpBusyId === s.id}
+                                  onClick={() => handleDeleteMcpServer(s.id, s.name)}
+                                  className="text-red-300/60 hover:text-red-300/90 text-[11.5px] disabled:opacity-40"
+                                >
+                                  {t('mcpRemove')}
+                                </button>
+                              </div>
                             </div>
                           )}
-                          <div className="mt-2.5 flex items-center gap-3">
-                            <button
-                              type="button"
-                              disabled={mcpBusyId === s.id}
-                              onClick={() => handleReverifyMcpServer(s.id)}
-                              className="text-[#dbe5d3]/70 hover:text-[#dbe5d3] text-[11.5px] disabled:opacity-40"
-                            >
-                              {mcpBusyId === s.id ? t('mcpReverifyWorking') : t('mcpReverify')}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={mcpBusyId === s.id}
-                              onClick={() => handleDeleteMcpServer(s.id, s.name)}
-                              className="text-red-300/60 hover:text-red-300/90 text-[11.5px] disabled:opacity-40"
-                            >
-                              {t('mcpRemove')}
-                            </button>
-                          </div>
                         </div>
                       );
                     })}
@@ -1300,41 +1332,57 @@ export default function CustomizeAgentModal({
                       onChange={(v) => setMcpForm((f) => ({ ...f, url: v }))}
                       placeholder={t('mcpUrlPlaceholder')}
                     />
-                    <div>
-                      <label className="text-white/70 text-[12px] font-medium mb-1.5 block">{t('mcpTransportLabel')}</label>
-                      <div className="flex gap-2">
-                        {(['streamable-http', 'sse'] as const).map((transportOption) => (
-                          <button
-                            key={transportOption}
-                            type="button"
-                            onClick={() => setMcpForm((f) => ({ ...f, transport: transportOption }))}
-                            className={`px-3.5 py-2 rounded-lg border text-[12.5px] transition-colors ${
-                              mcpForm.transport === transportOption
-                                ? 'bg-accent/15 border-accent/30 text-[#dbe5d3]'
-                                : 'bg-white/[0.04] border-white/10 text-white/50 hover:text-white/75'
-                            }`}
-                          >
-                            {transportOption}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <Field
-                        label={t('mcpAuthNameLabel')}
-                        value={mcpForm.authHeaderName}
-                        limit={200}
-                        onChange={(v) => setMcpForm((f) => ({ ...f, authHeaderName: v }))}
-                        placeholder={t('mcpAuthNamePlaceholder')}
-                      />
-                      <Field
-                        label={t('mcpAuthValueLabel')}
-                        value={mcpForm.authHeaderValue}
-                        limit={4000}
-                        onChange={(v) => setMcpForm((f) => ({ ...f, authHeaderValue: v }))}
-                        placeholder={t('mcpAuthValuePlaceholder')}
-                      />
-                    </div>
+                    {/* Transport + auth header are rare (most servers are plain
+                        streamable-http, no custom header) -- collapsed behind
+                        one disclosure so the default add flow is just
+                        name + URL, matching Claude's own custom-connector form. */}
+                    <button
+                      type="button"
+                      onClick={() => setMcpAdvancedOpen((v) => !v)}
+                      className="flex items-center gap-1.5 text-white/45 hover:text-white/70 text-[12px] font-medium transition-colors"
+                    >
+                      {mcpAdvancedOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                      {t('mcpAdvancedSettings')}
+                    </button>
+                    {mcpAdvancedOpen && (
+                      <>
+                        <div>
+                          <label className="text-white/70 text-[12px] font-medium mb-1.5 block">{t('mcpTransportLabel')}</label>
+                          <div className="flex gap-2">
+                            {(['streamable-http', 'sse'] as const).map((transportOption) => (
+                              <button
+                                key={transportOption}
+                                type="button"
+                                onClick={() => setMcpForm((f) => ({ ...f, transport: transportOption }))}
+                                className={`px-3.5 py-2 rounded-lg border text-[12.5px] transition-colors ${
+                                  mcpForm.transport === transportOption
+                                    ? 'bg-accent/15 border-accent/30 text-[#dbe5d3]'
+                                    : 'bg-white/[0.04] border-white/10 text-white/50 hover:text-white/75'
+                                }`}
+                              >
+                                {transportOption}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <Field
+                            label={t('mcpAuthNameLabel')}
+                            value={mcpForm.authHeaderName}
+                            limit={200}
+                            onChange={(v) => setMcpForm((f) => ({ ...f, authHeaderName: v }))}
+                            placeholder={t('mcpAuthNamePlaceholder')}
+                          />
+                          <Field
+                            label={t('mcpAuthValueLabel')}
+                            value={mcpForm.authHeaderValue}
+                            limit={4000}
+                            onChange={(v) => setMcpForm((f) => ({ ...f, authHeaderValue: v }))}
+                            placeholder={t('mcpAuthValuePlaceholder')}
+                          />
+                        </div>
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={handleRegisterMcpServer}

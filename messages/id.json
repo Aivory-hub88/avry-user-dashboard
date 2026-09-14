@@ -530,6 +530,7 @@
     "mcpNamePlaceholder": "cth. inventory-system",
     "mcpUrlLabel": "URL MCP server",
     "mcpUrlPlaceholder": "https://sistem-anda.example.com/mcp",
+    "mcpAdvancedSettings": "Pengaturan lanjutan",
     "mcpTransportLabel": "Transport",
     "mcpAuthNameLabel": "Nama auth header (opsional)",
     "mcpAuthNamePlaceholder": "cth. X-Api-Key",
