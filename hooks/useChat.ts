@@ -158,8 +158,13 @@ export function useChat({
           userContent,
           sentSessionId
         )
+        // Same guard as the room path: a non-string reply would throw
+        // during ChatMessage render and unmount the page.
+        if (typeof result.reply !== "string" || !result.reply.trim()) {
+          throw new Error("Agent returned an empty reply.")
+        }
         finalContent = result.reply
-        pendingApproval = result.pendingApproval
+        pendingApproval = result.pendingApproval ?? null
         // Only touch the live thread if it's still the one on screen — if
         // the user switched away, this would otherwise patch whatever
         // thread they're now looking at instead of the one that answered.
@@ -347,16 +352,27 @@ export function useChat({
       const payload = buildRoomPayload({ me, peers, userText, history, roundReplies })
       try {
         const result = await sendAgentMessage(t as TelegramAgentType, payload, sentSessionId)
-        outcomes.set(t, { reply: result.reply, pendingApproval: result.pendingApproval })
+        // Backend reply is unvalidated (Cerveau may return null/a non-string
+        // on odd turns) — a non-string here used to flow into ChatMessage and
+        // throw during render, killing the whole page. Treat it as a failed
+        // turn instead: toast + drop the bubble, keep the round going.
+        if (typeof result.reply !== "string" || !result.reply.trim()) {
+          throw new Error("empty reply")
+        }
+        outcomes.set(t, { reply: result.reply, pendingApproval: result.pendingApproval ?? null })
         roundReplies.push({ author: me.name, text: result.reply })
         // Paint progressively — the room feels alive while later agents
         // are still thinking, instead of going quiet for the whole chain.
-        const done = { ...outcomes }
+        // NOTE: read `outcomes` directly. Spreading a Map ({...outcomes})
+        // yields a plain object without .get — that TypeError fired inside
+        // the updater on the first reply and unmounted the page (the ~5s
+        // crash). Never spread a Map for this.
         if (currentSessionIdRef.current === sentSessionId) {
           setMessages(p => p.map(m => {
             const idx = placeholders.findIndex(ph => ph.id === m.id)
             if (idx === -1 || targets[idx] !== t) return m
-            const o = done.get(t)!
+            const o = outcomes.get(t)
+            if (!o) return m
             return { ...m, content: o.reply, isStreaming: false, pendingApproval: o.pendingApproval }
           }))
         }
