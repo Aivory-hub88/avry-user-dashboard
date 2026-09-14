@@ -222,13 +222,10 @@ export default function ConsolePage() {
   const inRoom = chatMode === "room"
 
   const changeChatMode = useCallback((mode: ConsoleChatMode) => {
+    // No toast here — entering Room is announced by the Room card in the
+    // rail notification feed instead (a top toast overlapped the header).
     setChatMode(mode)
-    if (mode === "room") {
-      addToast("success", mentionCandidates.length > 0
-        ? `Room — @mention ${mentionCandidates.map((c) => c.name).join(", ")} to get answers`
-        : "Room — no deployed agents yet, @ will list nothing until you deploy one")
-    }
-  }, [addToast, mentionCandidates])
+  }, [])
 
   // @mention tracking for the empty-state composer (the threaded view uses
   // ChatInput's own built-in mention support).
@@ -491,6 +488,8 @@ export default function ConsolePage() {
           }}
           deployments={deployments}
           activeRun={agentTarget ? activeRunsByAgentType[agentTarget] : undefined}
+          inRoom={inRoom}
+          roomMembers={mentionCandidates}
         />
       }
     >
@@ -817,10 +816,11 @@ export default function ConsolePage() {
         )}
       </div>
 
-      {/* Toast container */}
-      <div className="fixed top-4 right-4 z-50 space-y-2">
+      {/* Toast container — capped width so a long message can never span
+          the header like the old room-mode toast did. */}
+      <div className="fixed top-4 right-4 z-50 max-w-[min(400px,calc(100vw-2rem))] space-y-2">
         {toasts.map(toast => (
-          <div key={toast.id} className={`px-4 py-2 rounded-lg text-sm ${
+          <div key={toast.id} className={`px-4 py-2 rounded-lg text-sm break-words ${
             toast.type === "success"
               ? "bg-green-900/50 border border-green-700 text-green-300"
               : "bg-red-900/50 border border-red-700 text-red-300"
