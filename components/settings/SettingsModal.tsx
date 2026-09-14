@@ -50,6 +50,7 @@ export function SettingsModal({ user }: SettingsModalProps) {
   const [tokenCreateLoading, setTokenCreateLoading] = useState(false)
   const [createdToken, setCreatedToken] = useState<CreatedMcpImageToken | null>(null)
   const [tokenCopied, setTokenCopied] = useState(false)
+  const [userIdCopied, setUserIdCopied] = useState(false)
   const [revokingTokenId, setRevokingTokenId] = useState<string | null>(null)
 
   const loadImageTokens = useCallback(async () => {
@@ -254,6 +255,30 @@ export function SettingsModal({ user }: SettingsModalProps) {
                     <p className="text-[13px] text-white/60">{displayUsername}</p>
                   </div>
                   <button className="px-4 py-2 text-[13px] font-medium border border-white/10 rounded-md hover:bg-white/5 transition-colors">Change username</button>
+                </div>
+
+                <div className="flex items-center justify-between py-4 border-b border-white/5">
+                  <div className="min-w-0 flex-1 mr-4">
+                    <h4 className="text-sm font-medium mb-1">Account User ID</h4>
+                    <p className="text-[13px] text-white/60 mb-2">
+                      Identifies this account to external integrations (e.g. the Cerveau Odoo widget) that need to share this account&apos;s Cerveau memory and history.
+                    </p>
+                    <code className="block text-[12px] text-[#dbe5d3] break-all bg-white/[0.04] border border-white/10 rounded-lg px-3.5 py-2.5">
+                      {user?.user_id || '—'}
+                    </code>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (!user?.user_id) return
+                      navigator.clipboard.writeText(user.user_id)
+                      setUserIdCopied(true)
+                      setTimeout(() => setUserIdCopied(false), 2000)
+                    }}
+                    disabled={!user?.user_id}
+                    className="shrink-0 px-4 py-2 text-[13px] font-medium border border-white/10 rounded-md hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {userIdCopied ? 'Copied ✓' : 'Copy'}
+                  </button>
                 </div>
               </div>
 
