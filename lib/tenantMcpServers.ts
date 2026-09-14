@@ -103,6 +103,29 @@ export async function registerTenantMcpServer(input: RegisterServerInput): Promi
   return res.json()
 }
 
+export interface ConnectOdooInput {
+  agent_type: string
+  odoo_url: string
+  odoo_db: string
+  api_key: string
+}
+
+/**
+ * Self-serve Odoo connect: no MCP URL, no server to run — the tenant's own
+ * Odoo URL + API key against Aivory's shared Od-MCP server
+ * (Aivory-hub88/Od-MCP, odoo-mcp.aivory.uk). Same success/failure shape as
+ * `registerTenantMcpServer` (201 verified, 422 verification_failed with
+ * `.server` set) since it ends in the exact same verify-and-persist path.
+ */
+export async function connectOdoo(input: ConnectOdooInput): Promise<RegisterResult> {
+  const res = await authedFetch(`${BACKEND_URL}/api/v1/tenant-mcp-servers/odoo/connect`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) await parseErrorAndThrow(res)
+  return res.json()
+}
+
 export async function reverifyTenantMcpServer(id: string): Promise<RegisterResult> {
   const res = await authedFetch(`${BACKEND_URL}/api/v1/tenant-mcp-servers/${encodeURIComponent(id)}/reverify`, {
     method: 'POST',
