@@ -38,9 +38,13 @@ export async function canManageDoc(docId: string, accountType?: string, userId?:
   if (accountType === 'admin' || accountType === 'superadmin') return true
   if (!userId) return false
   try {
+    // 4-form id match (bare, workspace:, workspace:db:, db:) — 2 forms missed
+    // database-type docs and could wrongly deny the real owner. See the same
+    // fix in workspaceAuth.ts's authorizeDocFallback for the fail-open sibling
+    // of this bug.
     const r = await query(
-      `SELECT 1 FROM dashboard.workspace_docs WHERE (id = $1 OR id = $2) AND owner = $3`,
-      [`workspace:${docId}`, docId, userId],
+      `SELECT 1 FROM dashboard.workspace_docs WHERE id = ANY($1::text[]) AND owner = $2`,
+      [[docId, `workspace:${docId}`, `workspace:db:${docId}`, `db:${docId}`], userId],
     )
     return (r.rowCount ?? 0) > 0
   } catch {

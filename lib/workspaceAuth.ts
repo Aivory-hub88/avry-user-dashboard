@@ -54,9 +54,15 @@ export async function authorizeDocFallback(
   if (cred.kind === 'service') return true
   if (cred.user.account_type === 'admin' || cred.user.account_type === 'superadmin') return true
   try {
+    // Must match every id form a doc can be stored under (bare, workspace:,
+    // workspace:db:, db: — see app/api/workspace/[id]/route.ts's delete/restore
+    // for the same 4-form list). Checking only 2 forms let a database-type doc
+    // (`workspace:db:{id}`) read back as "0 rows" during a collab outage and
+    // fail OPEN — an existing, owned doc getting treated as brand new and
+    // claimable by whoever asked.
     const r = await query(
-      'SELECT owner FROM dashboard.workspace_docs WHERE id = $1 OR id = $2',
-      [`workspace:${id}`, id],
+      'SELECT owner FROM dashboard.workspace_docs WHERE id = ANY($1::text[])',
+      [[id, `workspace:${id}`, `workspace:db:${id}`, `db:${id}`]],
     )
     if (r.rows.length === 0) return true // new doc — first writer claims owner
     return r.rows.some((row) => row.owner === cred.user.user_id)
