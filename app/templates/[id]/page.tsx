@@ -188,7 +188,7 @@ export default function TemplateDetailPage() {
                 background: [
                   'radial-gradient(ellipse 70% 60% at 25% 15%, rgb(from var(--color-accent) r g b / 0.05) 0%, transparent 55%)',
                   'radial-gradient(ellipse 60% 50% at 85% 85%, rgba(221,218,197,0.04) 0%, transparent 55%)',
-                  'linear-gradient(160deg, #2f312b 0%, #26271f 100%)',
+                  'linear-gradient(160deg, #27272a 0%, #18181b 100%)',
                 ].join(', '),
               }}
             >

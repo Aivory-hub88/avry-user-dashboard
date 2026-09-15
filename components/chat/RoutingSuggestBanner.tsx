@@ -91,7 +91,7 @@ export function RoutingSuggestBanner({ intent: originalIntent, onAccept, onDismi
 
   return (
     <div className="flex justify-center mx-4 mt-2 mb-4 animate-in slide-in-from-bottom-2 duration-300" style={{ fontFamily: 'var(--font-manrope), sans-serif' }}>
-      <div className="flex items-center gap-6 px-6 py-3 bg-[#4A4A4A] rounded-full shadow-lg border border-white/10">
+      <div className="flex items-center gap-6 px-6 py-3 bg-zinc-700 rounded-full shadow-lg border border-white/10">
         
         <div className="flex items-center gap-4">
           <span className="text-white/90 text-sm md:text-base font-medium tracking-wide">

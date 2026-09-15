@@ -49,11 +49,11 @@ const CategoryIcons: Record<string, React.ReactNode> = {
 // ── Category config ──────────────────────────────────────
 const categoryConfig: Record<string, { label: string; accent: string; labelColor: string }> = {
   trigger:   { label: 'Trigger',    accent: 'var(--color-accent)', labelColor: 'var(--color-accent)' },
-  action:    { label: 'Action',     accent: 'rgba(255,255,255,0.12)', labelColor: '#a8a6a2' },
+  action:    { label: 'Action',     accent: 'rgba(255,255,255,0.12)', labelColor: '#a1a1aa' },
   ai:        { label: 'AI',         accent: 'var(--color-accent)', labelColor: 'var(--color-accent)' },
   condition: { label: 'Condition',  accent: 'rgba(251,191,36,0.5)', labelColor: '#fbbf24' },
-  channel:   { label: 'Channel',    accent: 'rgba(255,255,255,0.12)', labelColor: '#a8a6a2' },
-  system:    { label: 'System',     accent: 'rgba(255,255,255,0.12)', labelColor: '#a8a6a2' },
+  channel:   { label: 'Channel',    accent: 'rgba(255,255,255,0.12)', labelColor: '#a1a1aa' },
+  system:    { label: 'System',     accent: 'rgba(255,255,255,0.12)', labelColor: '#a1a1aa' },
   app:       { label: 'App',        accent: '#818cf8', labelColor: '#818cf8' },
 };
 
@@ -158,7 +158,7 @@ function WorkflowStepNodeBase({ data, selected }: NodeProps & { data: WorkflowNo
                 position={Position.Right}
                 style={{ ...handleStyle, position: 'relative', right: 0 }}
               />
-              <span style={{ fontSize: 9, color: '#a8a6a2', marginLeft: 4, whiteSpace: 'nowrap' }}>{out.label}</span>
+              <span style={{ fontSize: 9, color: '#a1a1aa', marginLeft: 4, whiteSpace: 'nowrap' }}>{out.label}</span>
             </div>
           ))}
         </div>

@@ -33,7 +33,7 @@ export default function ActionList({ items, onSelect }: ActionListProps) {
             flex items-center gap-4
             w-full
             px-4 py-3.5
-            bg-[#2d2d2a]
+            bg-surface-3
             border border-white/10
             rounded-lg
             text-left

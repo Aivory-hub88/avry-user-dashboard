@@ -42,7 +42,7 @@ export default function AgentMentionMenu({
     // parser expands to a broadcast. A selectable row would hijack Enter
     // into inserting a single agent instead — the exact trap to avoid.
     return (
-      <div className="absolute bottom-full left-0 z-30 mb-2 w-[280px] rounded-2xl border border-white/10 bg-[#2b2b28] p-4 shadow-2xl">
+      <div className="absolute bottom-full left-0 z-30 mb-2 w-[280px] rounded-2xl border border-white/10 bg-surface-2 p-4 shadow-2xl">
         {totalCandidates > 0 ? (
           <>
             <div className="text-[13px] font-medium text-white/85">No match for &ldquo;@{query || ""}&rdquo;</div>
@@ -66,7 +66,7 @@ export default function AgentMentionMenu({
     <div
       role="listbox"
       aria-label="Mention an agent"
-      className="absolute bottom-full left-0 z-30 mb-2 max-h-[280px] w-[300px] overflow-y-auto rounded-2xl border border-white/10 bg-[#2b2b28] p-1.5 shadow-2xl [animation:dropIn_0.18s_cubic-bezier(0.22,1,0.36,1)_both]"
+      className="absolute bottom-full left-0 z-30 mb-2 max-h-[280px] w-[300px] overflow-y-auto rounded-2xl border border-white/10 bg-surface-2 p-1.5 shadow-2xl [animation:dropIn_0.18s_cubic-bezier(0.22,1,0.36,1)_both]"
     >
       {candidates.map((c, i) => (
         <button

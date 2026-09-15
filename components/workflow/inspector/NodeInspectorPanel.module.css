@@ -27,11 +27,11 @@
   overflow: hidden; text-overflow: ellipsis;
 }
 .nameInput:hover { border-color: rgba(255,255,255,0.1); }
-.nameInput:focus { border-color: #666864; background: rgba(255,255,255,0.02); }
+.nameInput:focus { border-color: #52525b; background: rgba(255,255,255,0.02); }
 .typeBadge {
   font-size: 9px; font-weight: 600; color: #dddac5; text-transform: uppercase;
   letter-spacing: 0.5px; padding: 1px 6px; border-radius: 4px;
-  background: #282827; border: 1px solid #666864;
+  background: var(--bg-elevated); border: 1px solid #52525b;
   width: fit-content;
 }
 .closeBtn {
@@ -53,7 +53,7 @@
   letter-spacing: 0.3px;
 }
 .tab:hover { color: var(--text-secondary, #a8a6a2); }
-.tabActive { color: #dddac5; border-bottom-color: #666864; }
+.tabActive { color: #dddac5; border-bottom-color: #52525b; }
 
 /* Body */
 .body {
@@ -72,11 +72,11 @@
 .footerButtons { display: flex; gap: 8px; }
 .updateBtn {
   flex: 1; padding: 9px 12px; border-radius: 7px;
-  background: #282827; border: 1px solid #666864;
+  background: var(--bg-elevated); border: 1px solid #52525b;
   color: #dddac5; font-size: 12px; font-weight: 600; cursor: pointer;
   font-family: inherit; transition: all 0.15s;
 }
-.updateBtn:hover { background: #3a3d3a; }
+.updateBtn:hover { background: rgba(255,255,255,0.08); }
 .testBtn {
   flex: 1; padding: 9px 12px; border-radius: 7px;
   background: var(--surface-tertiary, #262520); border: 1px solid var(--border-subtle, rgba(255,255,255,0.07));

@@ -86,7 +86,7 @@ function formatDuration(ms: number): string {
 
 export default function SubStepIndicator({ icon, label, duration }: SubStepIndicatorProps) {
   return (
-    <div className="inline-flex items-center gap-2 bg-[#5A5A5A] rounded-md px-3 py-2 text-sm font-medium text-zinc-200">
+    <div className="inline-flex items-center gap-2 bg-zinc-600 rounded-md px-3 py-2 text-sm font-medium text-zinc-200">
       <span className="flex-shrink-0 text-zinc-300">{getSubStepSvgIcon(icon)}</span>
       <span>{label}</span>
       {duration != null && (

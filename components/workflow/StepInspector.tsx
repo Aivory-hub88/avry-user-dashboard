@@ -33,7 +33,7 @@ const collapseBtn: React.CSSProperties = {
   background: 'transparent',
   border: '1px solid rgba(255,255,255,0.08)',
   borderRadius: 7,
-  color: '#a8a6a2',
+  color: '#a1a1aa',
   cursor: 'pointer',
   flexShrink: 0,
   transition: 'all 0.15s',

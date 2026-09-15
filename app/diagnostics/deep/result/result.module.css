@@ -233,7 +233,7 @@
   align-self: flex-start;
   background-color: var(--bg-main);
   color: var(--text-secondary, #f7f7f7);
-  border: 1px solid #666864;
+  border: 1px solid #52525b;
   border-radius: 20px;
   padding: 13px 28px;
   font-size: 1rem;
@@ -248,7 +248,7 @@
 }
 
 .blueprintButton:hover:not(:disabled) {
-  background-color: #444440;
+  background-color: rgba(255,255,255,0.08);
 }
 
 .blueprintButton:disabled {

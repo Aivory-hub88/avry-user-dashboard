@@ -80,7 +80,7 @@
 }
 
 .ctaButton {
-  background: #3b3a35;
+  background: var(--color-surface-3);
   border: none;
   border-radius: 20px;
   padding: 14px 32px;
@@ -93,7 +93,7 @@
 }
 
 .ctaButton:hover {
-  background: #4a4944;
+  background: #52525b;
 }
 
 .ctaButton:active {

@@ -203,7 +203,7 @@ export default function AgentColumn({
                 )}
                 {pending > 0 && (
                   <span
-                    className={`absolute -right-0.5 -top-0.5 rounded-full bg-amber px-[4px] text-[9px] font-bold leading-[13px] text-[#2b2b28] ${
+                    className={`absolute -right-0.5 -top-0.5 rounded-full bg-amber px-[4px] text-[9px] font-bold leading-[13px] text-[#18181b] ${
                       arrived.has(row.key) ? "pending-badge-arrived" : ""
                     }`}
                   >
@@ -219,7 +219,7 @@ export default function AgentColumn({
   }
 
   return (
-    <div className="flex h-full w-full flex-col border-r border-line bg-surface-1">
+    <div className="flex h-full w-full flex-col border-r border-line bg-surface-2">
       <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-line px-4">
         {/* Not <h2> — a global `main h2` style overrides Tailwind's own
             font-size on any heading tag, forcing this to 24px regardless of
@@ -238,7 +238,7 @@ export default function AgentColumn({
         <button
           onClick={onOpenMissionControl}
           className={`flex w-full items-center gap-[9px] rounded-full px-[13px] py-[8px] text-left transition-colors ${
-            missionControlActive ? "bg-[#414039]" : "bg-white/[0.045] hover:bg-white/[0.08]"
+            missionControlActive ? "bg-white/[0.09]" : "bg-white/[0.045] hover:bg-white/[0.08]"
           }`}
         >
           <LayoutGrid className={`h-[15px] w-[15px] shrink-0 ${missionControlActive ? "text-white" : "text-white/45"}`} />
@@ -278,7 +278,7 @@ export default function AgentColumn({
                 onClick={() => openAgent(row)}
                 title={row.title === row.role ? undefined : row.role}
                 className={`group flex w-full gap-[9px] rounded-[10px] px-[9px] text-left transition-colors ${
-                  isActiveAgent ? "bg-[#414039]" : "hover:bg-white/[0.04]"
+                  isActiveAgent ? "bg-white/[0.09]" : "hover:bg-white/[0.04]"
                 } ${isOpen ? "items-center py-[10px]" : "items-start py-[8px]"}`}
               >
                 <ChevronRight

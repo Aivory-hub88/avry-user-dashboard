@@ -88,9 +88,9 @@ const pillStyle = (active: boolean): React.CSSProperties => ({
   fontSize: 11,
   fontWeight: 500,
   cursor: active ? 'pointer' : 'default',
-  background: active ? '#282827' : 'rgba(255,255,255,0.04)',
-  color: active ? '#dddac5' : '#a8a6a2',
-  border: `1px solid ${active ? '#666864' : 'rgba(255,255,255,0.06)'}`,
+  background: active ? 'var(--bg-elevated)' : 'rgba(255,255,255,0.04)',
+  color: active ? '#dddac5' : '#a1a1aa',
+  border: `1px solid ${active ? '#52525b' : 'rgba(255,255,255,0.06)'}`,
   transition: 'all 0.15s',
   fontFamily: 'inherit',
   whiteSpace: 'nowrap' as const,
@@ -907,7 +907,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
           {!isActive && (
             <span style={{
               fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 5,
-              background: 'rgba(255,255,255,0.04)', color: '#a8a6a2',
+              background: 'rgba(255,255,255,0.04)', color: '#a1a1aa',
               border: '1px solid rgba(255,255,255,0.07)', letterSpacing: '0.2px', whiteSpace: 'nowrap',
             }}>
               Preview
@@ -958,9 +958,9 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                 }}
                 disabled={copilotLoading || isEmpty}
                 style={{
-                  borderRadius: 7, background: '#282827', padding: '5px 14px',
+                  borderRadius: 7, background: 'var(--bg-elevated)', padding: '5px 14px',
                   fontSize: 11, fontWeight: 600, color: '#dddac5',
-                  border: '1px solid #666864', cursor: copilotLoading || isEmpty ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                  border: '1px solid #52525b', cursor: copilotLoading || isEmpty ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
                   opacity: (copilotLoading || isEmpty) ? 0.5 : 1,
                   transition: 'all 0.15s',
                 }}
@@ -973,9 +973,9 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                 onClick={handleSave}
                 disabled={syncState === 'saving' || syncState === 'loading'}
                 style={{
-                  borderRadius: 7, background: '#282827', padding: '5px 14px',
+                  borderRadius: 7, background: 'var(--bg-elevated)', padding: '5px 14px',
                   fontSize: 11, fontWeight: 600, color: '#dddac5',
-                  border: '1px solid #666864', cursor: 'pointer', fontFamily: 'inherit',
+                  border: '1px solid #52525b', cursor: 'pointer', fontFamily: 'inherit',
                   opacity: (syncState === 'saving' || syncState === 'loading') ? 0.5 : 1,
                   transition: 'all 0.15s',
                 }}
@@ -1041,7 +1041,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
             <div style={{ position: 'absolute', inset: 0 }} onDragOver={onDragOver} onDrop={onDrop}>
               {syncState === 'loading' ? (
                 <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: 13, color: '#a8a6a2' }}>Loading workflow…</span>
+                  <span style={{ fontSize: 13, color: '#a1a1aa' }}>Loading workflow…</span>
                 </div>
               ) : syncState === 'error' ? (
                 <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1056,7 +1056,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                         : errorMsg}
                     </p>
                     {!errorMsg?.includes('502') && !errorMsg?.includes('404') && (
-                      <button onClick={() => window.location.reload()} style={{ fontSize: 11, color: '#a8a6a2', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                      <button onClick={() => window.location.reload()} style={{ fontSize: 11, color: '#a1a1aa', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
                         Retry
                       </button>
                     )}
@@ -1124,11 +1124,11 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
           ) : (
             <div style={{ height: '100%', overflowY: 'auto', padding: 16 }}>
               {execLoading ? (
-                <p style={{ fontSize: 13, color: '#a8a6a2' }}>Loading executions…</p>
+                <p style={{ fontSize: 13, color: '#a1a1aa' }}>Loading executions…</p>
               ) : execError ? (
                 <p style={{ fontSize: 13, color: '#f87171' }}>{execError}</p>
               ) : executions.length === 0 ? (
-                <p style={{ fontSize: 13, color: '#a8a6a2' }}>No executions found.</p>
+                <p style={{ fontSize: 13, color: '#a1a1aa' }}>No executions found.</p>
               ) : (
                 <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                   <thead>
@@ -1141,19 +1141,19 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                   <tbody>
                     {executions.map((exec: any) => (
                       <tr key={exec.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                        <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 11, color: '#a8a6a2' }}>{exec.id}</td>
+                        <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 11, color: '#a1a1aa' }}>{exec.id}</td>
                         <td style={{ padding: '7px 12px' }}>
                           <span style={{
                             display: 'inline-block', borderRadius: 5, padding: '2px 8px', fontSize: 10, fontWeight: 600,
-                            background: exec.status === 'success' ? '#282827' : exec.status === 'error' ? 'rgba(248,113,113,0.1)' : 'rgba(251,191,36,0.1)',
+                            background: exec.status === 'success' ? 'var(--bg-elevated)' : exec.status === 'error' ? 'rgba(248,113,113,0.1)' : 'rgba(251,191,36,0.1)',
                             color: exec.status === 'success' ? '#dddac5' : exec.status === 'error' ? '#f87171' : '#fbbf24',
-                            border: `1px solid ${exec.status === 'success' ? '#666864' : exec.status === 'error' ? 'rgba(248,113,113,0.2)' : 'rgba(251,191,36,0.2)'}`,
+                            border: `1px solid ${exec.status === 'success' ? '#52525b' : exec.status === 'error' ? 'rgba(248,113,113,0.2)' : 'rgba(251,191,36,0.2)'}`,
                           }}>
                             {exec.status}
                           </span>
                         </td>
-                        <td style={{ padding: '7px 12px', fontSize: 11, color: '#a8a6a2' }}>{new Date(exec.startedAt || exec.startTime).toLocaleString()}</td>
-                        <td style={{ padding: '7px 12px', fontSize: 11, color: '#a8a6a2' }}>{exec.stoppedAt || exec.endTime ? new Date(exec.stoppedAt || exec.endTime).toLocaleString() : '—'}</td>
+                        <td style={{ padding: '7px 12px', fontSize: 11, color: '#a1a1aa' }}>{new Date(exec.startedAt || exec.startTime).toLocaleString()}</td>
+                        <td style={{ padding: '7px 12px', fontSize: 11, color: '#a1a1aa' }}>{exec.stoppedAt || exec.endTime ? new Date(exec.stoppedAt || exec.endTime).toLocaleString() : '—'}</td>
                         <td style={{ padding: '7px 12px', display: 'flex', gap: 6 }}>
                           <button
                             type="button"
@@ -1161,7 +1161,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                             disabled={capturingExecId === String(exec.id)}
                             style={{
                               background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6,
-                              color: '#a8a6a2', fontSize: 10, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
+                              color: '#a1a1aa', fontSize: 10, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
                             }}
                           >
                             {capturingExecId === String(exec.id) ? 'Saving…' : 'Save as fixture'}
@@ -1172,7 +1172,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                             disabled={comparingExecId === String(exec.id)}
                             style={{
                               background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6,
-                              color: '#a8a6a2', fontSize: 10, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
+                              color: '#a1a1aa', fontSize: 10, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
                             }}
                           >
                             {comparingExecId === String(exec.id) ? 'Comparing…' : 'Compare to latest fixture'}
@@ -1197,7 +1197,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                               disabled={replayingExecId === String(exec.id)}
                               style={{
                                 background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6,
-                                color: '#a8a6a2', fontSize: 10, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
+                                color: '#a1a1aa', fontSize: 10, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
                               }}
                             >
                               {replayingExecId === String(exec.id) ? 'Pinning…' : 'Replay against fixture'}

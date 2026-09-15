@@ -105,7 +105,7 @@ export function StepCopilotEditModal({
             style={{
               background: 'none',
               border: 'none',
-              color: '#a8a6a2',
+              color: '#a1a1aa',
               cursor: 'pointer',
               fontSize: 18,
               padding: 0,
@@ -116,13 +116,13 @@ export function StepCopilotEditModal({
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: '#a8a6a2', marginBottom: 8 }}>Current step:</div>
+          <div style={{ fontSize: 12, color: '#a1a1aa', marginBottom: 8 }}>Current step:</div>
           <div style={{ fontSize: 13, color: '#f1f5f9', marginBottom: 4 }}>{stepAction}</div>
           {stepTool && <div style={{ fontSize: 11, color: '#94a3b8' }}>{stepTool}</div>}
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', fontSize: 12, color: '#a8a6a2', marginBottom: 8 }}>
+          <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 8 }}>
             How should Aivory improve this step?
           </label>
           <textarea
@@ -165,7 +165,7 @@ export function StepCopilotEditModal({
               border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 8,
               padding: '8px 16px',
-              color: '#a8a6a2',
+              color: '#a1a1aa',
               cursor: loading ? 'not-allowed' : 'pointer',
               fontSize: 13,
               fontFamily: 'inherit',
@@ -182,7 +182,7 @@ export function StepCopilotEditModal({
             onMouseLeave={(e) => {
               const btn = e.currentTarget as HTMLButtonElement
               btn.style.background = 'rgba(255,255,255,0.04)'
-              btn.style.color = '#a8a6a2'
+              btn.style.color = '#a1a1aa'
             }}
           >
             Cancel
@@ -192,7 +192,7 @@ export function StepCopilotEditModal({
             disabled={loading || !instruction.trim()}
             style={{
               background: 'var(--bg-main)',
-              border: '1px solid #666864',
+              border: '1px solid #52525b',
               borderRadius: 20,
               padding: '8px 16px',
               color: '#f7f7f7',
@@ -206,7 +206,7 @@ export function StepCopilotEditModal({
             onMouseEnter={(e) => {
               if (!loading && instruction.trim()) {
                 const btn = e.currentTarget as HTMLButtonElement
-                btn.style.background = '#444440'
+                btn.style.background = 'rgba(255,255,255,0.1)'
               }
             }}
             onMouseLeave={(e) => {

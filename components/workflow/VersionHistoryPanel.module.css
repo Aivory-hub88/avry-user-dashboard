@@ -126,7 +126,7 @@
 .restoreBtn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.07);
   color: #e8e6e1;
-  border-color: #666864;
+  border-color: #52525b;
 }
 
 .restoreBtn:disabled {

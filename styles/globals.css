@@ -50,12 +50,14 @@
      Semua panel console harus pakai ini, bukan border-white/[0.045..0.12]
      acak atau radius 8/9/10/12/14/16/20/24/28 sebar. */
   --color-line: rgba(255, 255, 255, 0.06);
-  /* Dark neutral surface scale, matched to the reference dashboard's canvas,
-     panels, controls, and inset editor areas. */
-  --color-surface-1: #1c1c1f;
-  --color-surface-2: #242427;
-  --color-surface-3: #2d2d31;
-  --color-surface-inset: #17171a;
+  /* Dark neutral surface scale, matched to Aivory Mail's dark UI:
+     zinc-900 #18181b main canvas, zinc-800 #27272a side panels/elevated,
+     zinc-700 #3f3f46 active controls/inputs, near-black inset. Side panels
+     sit one level lighter than the main canvas, like Mail. */
+  --color-surface-1: #18181b;
+  --color-surface-2: #27272a;
+  --color-surface-3: #3f3f46;
+  --color-surface-inset: #101013;
   --radius-sm: 12px;
   --radius-md: 16px;
   --radius-lg: 20px;
@@ -305,7 +307,7 @@ body {
 }
 
 .add-btn:hover {
-  background: #3a3833;
+  background: var(--color-surface-3);
   border-color: rgba(255,255,255,0.1);
 }
 
@@ -345,7 +347,7 @@ body {
   padding: 10px 18px;
   border-radius: 14px;
   border: none;
-  background: #3b3a35;
+  background: var(--color-surface-3);
   color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -356,7 +358,7 @@ body {
 }
 
 .send-btn:hover {
-  background: #4a4944;
+  background: #52525b;
 }
 
 .send-btn:active {
@@ -373,7 +375,7 @@ body {
   bottom: 70px;
   left: 0;
   width: 230px;
-  background: linear-gradient(145deg, #2a2926, #252420);
+  background: var(--color-surface-2);
   border: 1px solid var(--border-soft);
   border-radius: 20px;
   overflow: hidden;
@@ -404,18 +406,18 @@ body {
 }
 
 .upload-item:hover {
-  background: #32312d;
+  background: rgba(255,255,255,0.06);
 }
 
 .upload-item:active {
-  background: #3a3833;
+  background: var(--color-surface-3);
 }
 
 .upload-menu-hint {
   padding: 10px 14px;
   font-size: 12px;
   color: #a1a1aa;
-  border-bottom: 1px solid #2e2e2e;
+  border-bottom: 1px solid var(--color-line);
   letter-spacing: 0.02em;
 }
 
@@ -508,7 +510,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #2f2e2a;
+  background: var(--color-surface-3);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 10px;
   padding: 4px 10px;
@@ -549,7 +551,7 @@ body {
   bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  background: #3a3833;
+  background: var(--color-surface-3);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px;
   padding: 8px 16px;
@@ -572,7 +574,7 @@ body {
 }
 
 .blueprint-modal {
-  background: #252420;
+  background: var(--bg-elevated);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 18px;
   width: 360px;
@@ -633,7 +635,7 @@ body {
 }
 
 .blueprint-modal-item:hover {
-  background: #2f2e2a;
+  background: var(--color-surface-3);
 }
 
 .bmi-version {
@@ -1067,7 +1069,7 @@ body {
 .console-dropdown {
   position: absolute;
   width: 320px;
-  background: #2a2926;
+  background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
@@ -1111,7 +1113,7 @@ body {
 }
 
 .btn-style-a:hover:not(:disabled) {
-  background: #4e4e4b;
+  background: #52525b;
   border-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -1121,7 +1123,7 @@ body {
 }
 
 .btn-style-b {
-  background: #666864;
+  background: var(--color-surface-3);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   color: rgba(255, 255, 255, 0.75);
@@ -1133,7 +1135,7 @@ body {
 }
 
 .btn-style-b:hover:not(:disabled) {
-  background: #757875;
+  background: #52525b;
   border-color: rgba(255, 255, 255, 0.12);
 }
 

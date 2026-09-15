@@ -117,7 +117,7 @@ export function CopilotTogglePanel({ onApplyWorkflow, onApplySuggestion }: Copil
 function CopilotBarCollapsed({ onClick }: { onClick: () => void }) {
   return (
     <button
-      className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#2d2d2a] border border-white/10 text-[#f7f7f7] text-[13px] font-medium cursor-pointer shadow-lg hover:border-[#666864] hover:shadow-xl transition-all duration-150 select-none"
+      className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-3 border border-white/10 text-[#f7f7f7] text-[13px] font-medium cursor-pointer shadow-lg hover:border-zinc-600 hover:shadow-xl transition-all duration-150 select-none"
       onClick={onClick}
       aria-label="Open Aivory Copilot"
     >
@@ -349,7 +349,7 @@ function CopilotPanelExpanded({
 
       {/* ── Apply banner — shown only when server says canApply (workflow ready) ── */}
       {canApply && workflow && onApplyWorkflow && !appliedToCanvas && (
-        <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-[var(--bg-main)]/60 border-t border-[#666864]/40 shrink-0 rounded-xl mx-3 mb-2">
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-[var(--bg-main)]/60 border-t border-zinc-600/40 shrink-0 rounded-xl mx-3 mb-2">
           <div className="flex flex-col text-left">
             <span className="text-[13px] text-[#f7f7f7] font-medium">
               Workflow ready — {workflow.steps.length} steps
@@ -435,7 +435,7 @@ function CopilotPanelExpanded({
           </svg>
         </button>
         <button
-          className={`w-9 h-9 rounded-[20px] flex items-center justify-center transition-colors shrink-0 ${hasContent ? 'bg-[var(--bg-main)] border border-[#666864] hover:bg-[#444440]' : 'bg-[#555552]'}`}
+          className={`w-9 h-9 rounded-[20px] flex items-center justify-center transition-colors shrink-0 ${hasContent ? 'bg-[var(--bg-main)] border border-zinc-600 hover:bg-white/10' : 'bg-zinc-600'}`}
           onClick={handleSend}
           disabled={!hasContent || busy}
           aria-label="Send"

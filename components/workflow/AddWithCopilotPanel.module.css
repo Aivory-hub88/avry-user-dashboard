@@ -200,7 +200,7 @@
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   padding: 8px 16px; border-radius: 9px;
   font-size: 12px; font-weight: 700; font-family: inherit;
-  color: #23231f; background: #dddac5;
+  color: #18181b; background: #dddac5;
   border: 1px solid #dddac5; cursor: pointer;
   transition: all 0.15s;
 }
@@ -221,7 +221,7 @@
 .spinner {
   width: 12px; height: 12px; border-radius: 99px;
   border: 2px solid rgba(35, 35, 31, 0.25);
-  border-top-color: #23231f;
+  border-top-color: #18181b;
   animation: cpSpin 0.7s linear infinite;
 }
 @keyframes cpSpin { to { transform: rotate(360deg); } }

@@ -7,7 +7,7 @@
   outline: none; font-family: inherit; transition: all 0.15s ease;
 }
 .select:hover, .input:hover, .textarea:hover { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); }
-.select:focus, .input:focus, .textarea:focus { border-color: #666864; background: rgba(255,255,255,0.02); }
+.select:focus, .input:focus, .textarea:focus { border-color: #52525b; background: rgba(255,255,255,0.02); }
 .select { cursor: pointer; }
 .textarea { resize: vertical; min-height: 60px; }
 .errorBorder { border-color: rgba(248,113,113,0.5) !important; }
@@ -21,7 +21,7 @@
   width: 36px; height: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);
   background: rgba(255,255,255,0.06); cursor: pointer; position: relative; transition: all 0.2s; padding: 0; flex-shrink: 0;
 }
-.toggleOn { background: #282827; border-color: #666864; }
+.toggleOn { background: var(--bg-elevated); border-color: #52525b; }
 .toggleThumb {
   position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
   border-radius: 50%; background: #a8a6a2; transition: all 0.2s;
@@ -41,7 +41,7 @@
   border-radius: 5px; color: var(--text-primary, #e8e6e3); font-size: 11px; padding: 6px 8px; outline: none; font-family: inherit;
   transition: border-color 0.15s;
 }
-.kvInput:focus { border-color: #666864; }
+.kvInput:focus { border-color: #52525b; }
 .kvRemove {
   width: 24px; height: 24px; border-radius: 4px; background: rgba(248,113,113,0.1);
   border: 1px solid rgba(248,113,113,0.2); color: #f87171; font-size: 14px;
@@ -54,12 +54,12 @@
   color: #dddac5; font-size: 11px; padding: 6px; cursor: pointer; font-family: inherit;
   transition: all 0.15s;
 }
-.kvAdd:hover { border-color: #666864; background: #282827; }
+.kvAdd:hover { border-color: #52525b; background: var(--bg-elevated); }
 
 /* Info Box */
 .infoBox {
   display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px;
-  background: #282827; border: 1px solid #666864;
+  background: var(--bg-elevated); border: 1px solid #52525b;
   border-radius: 6px; font-size: 11px; color: #a8a6a2; line-height: 1.5;
 }
 .infoBoxWarning { background: rgba(251,191,36,0.04); border-color: rgba(251,191,36,0.15); }

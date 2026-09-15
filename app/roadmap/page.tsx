@@ -18,13 +18,13 @@ const T = {
   cardSolid:    '#242320',
   cardHover:    'rgba(255,255,255,0.05)',
   border:       'rgba(255,255,255,0.07)',
-  borderGreen:  '#666864',
+  borderGreen:  '#52525b',
   green:        'var(--color-accent)',
-  greenDim:     '#282827',
+  greenDim:     'var(--bg-elevated)',
   greenGlow:    'rgba(255,255,255,0.08)',
   purple:       'var(--color-accent)',
-  purpleDim:    '#282827',
-  purpleBorder: '#666864',
+  purpleDim:    'var(--bg-elevated)',
+  purpleBorder: '#52525b',
   text:         '#f0ede9',
   // Derived from `text` at reduced opacity (was a separate hardcoded
   // cream hex, #dddac5, which read as visibly yellow/off-white next to
@@ -318,7 +318,7 @@ function RoadmapTimeline({ phases, activeIdx, onNodeClick }: {
                   right: 'calc(-50% + 17px)',
                   height: 2,
                   background: i < activeIdx
-                    ? `linear-gradient(to right, ${T.green}, #666864)`
+                    ? `linear-gradient(to right, ${T.green}, #52525b)`
                     : 'rgba(255,255,255,0.06)',
                   zIndex: 0,
                 }} />
@@ -331,7 +331,7 @@ function RoadmapTimeline({ phases, activeIdx, onNodeClick }: {
                   width: isActive ? 38 : 34,
                   height: isActive ? 38 : 34,
                   borderRadius: '50%',
-                  background: isActive ? '#282827' : 'rgba(255,255,255,0.04)',
+                  background: isActive ? 'var(--bg-elevated)' : 'rgba(255,255,255,0.04)',
                   border: `2px solid ${isActive ? T.green : 'rgba(255,255,255,0.12)'}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   position: 'relative', zIndex: 1, flexShrink: 0,
@@ -441,7 +441,7 @@ function MilestoneRow({ m, checked, onToggle, onWorkflow }: {
           {m.linkedWorkflowIds?.map(id => (
             <button key={id} onClick={() => onWorkflow(id)} style={{
               fontSize: 11, padding: '2px 9px', borderRadius: 20,
-              background: '#282827', color: '#dddac5',
+              background: 'var(--bg-elevated)', color: '#dddac5',
               border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', fontFamily: 'inherit',
             }}>{id}</button>
           ))}
@@ -552,8 +552,8 @@ function PhaseSection({ phase, index, open, phaseRef, onToggle, onWorkflow, chec
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <span style={{
             width: 40, height: 40, borderRadius: 11, flexShrink: 0,
-            background: phaseComplete ? '#282827' : T.greenDim,
-            border: `1px solid ${phaseComplete ? '#666864' : T.borderGreen}`,
+            background: phaseComplete ? 'var(--bg-elevated)' : T.greenDim,
+            border: `1px solid ${phaseComplete ? '#52525b' : T.borderGreen}`,
             color: T.green, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>{icon}</span>
           <div>
@@ -584,7 +584,7 @@ function PhaseSection({ phase, index, open, phaseRef, onToggle, onWorkflow, chec
       <div style={{ height: 3, background: 'rgba(255,255,255,0.04)' }}>
         <div style={{
           height: '100%', width: `${pct}%`,
-          background: `linear-gradient(to right, ${T.green}, #555553)`,
+          background: `linear-gradient(to right, ${T.green}, #52525b)`,
           transition: 'width 0.4s ease', borderRadius: '0 2px 2px 0',
         }} />
       </div>
@@ -671,7 +671,7 @@ function BtnAivory({ onClick, children }: { onClick: () => void; children: React
     <button onClick={onClick} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{
         fontSize: 12, fontWeight: 500, padding: '7px 14px', borderRadius: 8,
-        border: `1px solid ${h ? '#666864' : T.purpleBorder}`,
+        border: `1px solid ${h ? '#52525b' : T.purpleBorder}`,
         background: h ? 'rgba(255,255,255,0.06)' : T.purpleDim,
         color: T.purple, cursor: 'pointer', fontFamily: 'inherit',
         transition: 'all 0.15s', whiteSpace: 'nowrap',

@@ -40,7 +40,7 @@
 
 .emptyMsg {
   font-size: 0.875rem;
-  color: #7a7875;
+  color: #71717a;
   padding: 12px 0;
   margin: 0;
 }
@@ -62,7 +62,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #7a7875;
+  color: #71717a;
   gap: 12px;
 }
 
@@ -150,7 +150,7 @@
 }
 
 .actionBtn:hover {
-  border-color: #7a7875;
+  border-color: #71717a;
   color: #ccc;
 }
 
@@ -197,9 +197,9 @@
 }
 
 .statusConnected {
-  background: #282827;
+  background: var(--bg-elevated);
   color: #dddac5;
-  border: 1px solid #666864;
+  border: 1px solid #52525b;
 }
 
 .statusConnected::before {
@@ -337,8 +337,8 @@
 }
 
 .connectBtn:hover {
-  background: #3a3d3a;
-  border-color: #7a7a78;
+  background: rgba(255,255,255,0.08);
+  border-color: #71717a;
 }
 
 /* ── Modal ── */
@@ -511,8 +511,8 @@
   font-size: 0.75rem;
   font-weight: 600;
   border-radius: 6px;
-  border: 1px solid #666864;
-  background: #282827;
+  border: 1px solid #52525b;
+  background: var(--bg-elevated);
   color: #dddac5;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
@@ -522,7 +522,7 @@
 
 .providerBtn:hover {
   background: var(--bg-main);
-  border-color: #7a7a78;
+  border-color: #71717a;
 }
 
 .providerBtn:disabled {

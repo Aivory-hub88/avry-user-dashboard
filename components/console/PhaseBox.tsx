@@ -121,7 +121,7 @@ export default function PhaseBox({ phase, defaultExpanded = false }: PhaseBoxPro
     <div>
       <button
         onClick={handleToggle}
-        className="flex items-center gap-3 w-full bg-[#3A3A3A] rounded-lg py-4 px-6 text-left"
+        className="flex items-center gap-3 w-full bg-surface-3 rounded-lg py-4 px-6 text-left"
       >
         {/* Animated Chevron */}
         <svg

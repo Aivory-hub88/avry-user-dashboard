@@ -115,7 +115,7 @@ export default function ContextToolbar({ onToolSelect }: ContextToolbarProps) {
         {/* Dropdown menu — opens upward */}
         {dropdownOpen && (
           <div
-            className="absolute bottom-full left-0 mb-1.5 w-48 rounded-lg border border-white/10 bg-[#2d2d2a] shadow-xl z-50 overflow-hidden"
+            className="absolute bottom-full left-0 mb-1.5 w-48 rounded-lg border border-white/10 bg-surface-3 shadow-xl z-50 overflow-hidden"
             role="listbox"
             aria-label="Select mode"
           >

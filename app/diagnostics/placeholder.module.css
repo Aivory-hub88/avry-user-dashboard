@@ -51,7 +51,7 @@
 }
 
 .primaryButton:hover {
-  background: #3a3833;
+  background: var(--color-surface-3);
   border-color: rgba(255,255,255,0.1);
 }
 

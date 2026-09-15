@@ -910,7 +910,7 @@ export default function ConsolePage() {
                   setConnectorsOpen(false)
                   router.push("/integrations")
                 }}
-                className="rounded-[20px] bg-[var(--bg-main)] px-5 py-2.5 text-sm font-medium text-[#f7f7f7] border border-[#666864] transition hover:bg-[#444440]"
+                className="rounded-[20px] bg-[var(--bg-main)] px-5 py-2.5 text-sm font-medium text-[#f7f7f7] border border-zinc-600 transition hover:bg-white/10"
               >
                 {t('manageIntegrations')}
               </button>

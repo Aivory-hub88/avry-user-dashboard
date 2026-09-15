@@ -56,7 +56,7 @@
 }
 
 .backButton {
-  background: #3b3a35;
+  background: var(--color-surface-3);
   border: none;
   border-radius: 20px;
   padding: 12px 28px;
@@ -69,7 +69,7 @@
 }
 
 .backButton:hover {
-  background: #4a4944;
+  background: #52525b;
 }
 
 /* Breadcrumbs */
@@ -320,7 +320,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: #3b3a35;
+  background: var(--color-surface-3);
   border: none;
   border-radius: 20px;
   padding: 12px 20px;

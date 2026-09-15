@@ -56,7 +56,7 @@ export class DiagnosticErrorBoundary extends React.Component<Props, State> {
         >
           <div
             style={{
-              backgroundColor: '#2a2926',
+              backgroundColor: 'var(--bg-elevated)',
               borderRadius: '12px',
               padding: '2.5rem',
               maxWidth: '480px',

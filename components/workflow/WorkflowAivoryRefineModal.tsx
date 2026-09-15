@@ -80,12 +80,12 @@ export function WorkflowAivoryRefineModal({
   const handleMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
     const btn = e.currentTarget
     btn.style.background = 'rgba(255,255,255,0.04)'
-    btn.style.color = '#a8a6a2'
+    btn.style.color = '#a1a1aa'
   }
 
   const handleApplyMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
     const btn = e.currentTarget
-    btn.style.background = '#444440'
+    btn.style.background = 'rgba(255,255,255,0.1)'
   }
 
   const handleApplyMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -135,7 +135,7 @@ export function WorkflowAivoryRefineModal({
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#a8a6a2',
+                  color: '#a1a1aa',
                   cursor: 'pointer',
                   fontSize: 18,
                   padding: 0,
@@ -146,7 +146,7 @@ export function WorkflowAivoryRefineModal({
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#a8a6a2', marginBottom: 8 }}>
+              <label style={{ display: 'block', fontSize: 12, color: '#a1a1aa', marginBottom: 8 }}>
                 Describe how you want Aivory to improve this workflow
               </label>
               <textarea
@@ -189,7 +189,7 @@ export function WorkflowAivoryRefineModal({
                   border: '1px solid rgba(255,255,255,0.08)',
                   borderRadius: 8,
                   padding: '8px 16px',
-                  color: '#a8a6a2',
+                  color: '#a1a1aa',
                   cursor: loading ? 'not-allowed' : 'pointer',
                   fontSize: 13,
                   fontFamily: 'inherit',
@@ -206,7 +206,7 @@ export function WorkflowAivoryRefineModal({
                 disabled={loading || !instruction.trim()}
                 style={{
                   background: 'var(--bg-main)',
-                  border: '1px solid #666864',
+                  border: '1px solid #52525b',
                   borderRadius: 20,
                   padding: '8px 16px',
                   color: '#f7f7f7',
@@ -235,7 +235,7 @@ export function WorkflowAivoryRefineModal({
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#a8a6a2',
+                  color: '#a1a1aa',
                   cursor: 'pointer',
                   fontSize: 18,
                   padding: 0,
@@ -246,7 +246,7 @@ export function WorkflowAivoryRefineModal({
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: '#a8a6a2', marginBottom: 8 }}>Changes:</div>
+              <div style={{ fontSize: 12, color: '#a1a1aa', marginBottom: 8 }}>Changes:</div>
               <ul style={{ margin: 0, paddingLeft: 20, color: '#f1f5f9', fontSize: 13, lineHeight: 1.6 }}>
                 {preview.summary.map((item, i) => (
                   <li key={i}>{item}</li>
@@ -266,7 +266,7 @@ export function WorkflowAivoryRefineModal({
                   border: '1px solid rgba(255,255,255,0.08)',
                   borderRadius: 8,
                   padding: '8px 16px',
-                  color: '#a8a6a2',
+                  color: '#a1a1aa',
                   cursor: 'pointer',
                   fontSize: 13,
                   fontFamily: 'inherit',
@@ -281,7 +281,7 @@ export function WorkflowAivoryRefineModal({
                 onClick={handleApply}
                 style={{
                   background: 'var(--bg-main)',
-                  border: '1px solid #666864',
+                  border: '1px solid #52525b',
                   borderRadius: 20,
                   padding: '8px 16px',
                   color: '#f7f7f7',

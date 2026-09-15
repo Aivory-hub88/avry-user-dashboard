@@ -212,9 +212,9 @@ function ModeBadge({ wf }: { wf: SavedWorkflow }) {
       borderRadius: 4,
       whiteSpace: 'nowrap',
       letterSpacing: '0.2px',
-      background: active ? '#282827' : 'rgba(255,255,255,0.04)',
-      color: active ? '#a8a6a2' : '#a8a6a2',
-      border: `1px solid ${active ? '#666864' : 'rgba(255,255,255,0.07)'}`,
+      background: active ? 'var(--bg-elevated)' : 'rgba(255,255,255,0.04)',
+      color: active ? '#a1a1aa' : '#a1a1aa',
+      border: `1px solid ${active ? '#52525b' : 'rgba(255,255,255,0.07)'}`,
     }}>
       {active ? 'Active' : 'Preview'}
     </span>
@@ -1859,7 +1859,7 @@ function WorkflowsPageInner() {
                   padding: '3px 8px',
                   borderRadius: 5,
                   background: 'rgba(255,255,255,0.04)',
-                  color: '#a8a6a2',
+                  color: '#a1a1aa',
                   border: '1px solid rgba(255,255,255,0.07)',
                   letterSpacing: '0.3px',
                   whiteSpace: 'nowrap',

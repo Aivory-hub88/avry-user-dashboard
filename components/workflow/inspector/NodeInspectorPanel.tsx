@@ -169,7 +169,7 @@ function AdvancedTab({ config }: { config: NodeConfig }) {
   return (
     <details style={{ cursor: 'pointer' }}>
       <summary style={{ fontSize: 11, color: '#5a5a58', marginBottom: 8 }}>Developer view</summary>
-      <pre style={{ fontSize: 10, color: '#a8a6a2', background: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 6, overflow: 'auto', maxHeight: 300, border: '1px solid rgba(255,255,255,0.04)' }}>
+      <pre style={{ fontSize: 10, color: '#a1a1aa', background: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 6, overflow: 'auto', maxHeight: 300, border: '1px solid rgba(255,255,255,0.04)' }}>
         {JSON.stringify(config, null, 2)}
       </pre>
     </details>
@@ -195,7 +195,7 @@ function OutputTab({ testResult }: { testResult: import('@/types/workflow-node')
       )}
       {testResult.error && <p style={{ fontSize: 11, color: '#f87171', marginTop: 6 }}>{testResult.error}</p>}
       {testResult.output != null && (
-        <pre style={{ fontSize: 10, color: '#a8a6a2', background: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 6, overflow: 'auto', maxHeight: 300, marginTop: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
+        <pre style={{ fontSize: 10, color: '#a1a1aa', background: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 6, overflow: 'auto', maxHeight: 300, marginTop: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
           {typeof testResult.output === 'string' ? testResult.output : JSON.stringify(testResult.output, null, 2)}
         </pre>
       )}

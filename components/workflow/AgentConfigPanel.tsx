@@ -95,7 +95,7 @@ export function AgentConfigPanel({
           <h2 style={{ fontSize: 18, fontWeight: 600, color: '#e8e6e3', margin: 0 }}>
             Configure Agent
           </h2>
-          <p style={{ fontSize: 13, color: '#a8a6a2', margin: '4px 0 0 0' }}>
+          <p style={{ fontSize: 13, color: '#a1a1aa', margin: '4px 0 0 0' }}>
             Select an active agent for this node
           </p>
         </div>
@@ -117,7 +117,7 @@ export function AgentConfigPanel({
                 <path d="M12 2a10 10 0 0 1 10 10" />
               </svg>
             </div>
-            <p style={{ fontSize: 13, color: '#a8a6a2', marginTop: 8 }}>Loading agents...</p>
+            <p style={{ fontSize: 13, color: '#a1a1aa', marginTop: 8 }}>Loading agents...</p>
           </div>
         )}
 
@@ -148,7 +148,7 @@ export function AgentConfigPanel({
               border: '1px solid rgba(255,255,255,0.05)',
             }}
           >
-            <p style={{ fontSize: 13, color: '#a8a6a2', margin: 0 }}>
+            <p style={{ fontSize: 13, color: '#a1a1aa', margin: 0 }}>
               No active agents found
             </p>
             <p style={{ fontSize: 12, color: '#5a5a58', margin: '4px 0 0 0' }}>
@@ -232,7 +232,7 @@ export function AgentConfigPanel({
                     <div
                       style={{
                         fontSize: 12,
-                        color: '#a8a6a2',
+                        color: '#a1a1aa',
                         marginBottom: 4,
                       }}
                     >
@@ -287,7 +287,7 @@ export function AgentConfigPanel({
               padding: '8px 16px',
               background: selectedAgentId ? 'var(--bg-main)' : 'rgba(53,53,50,0.5)',
               color: selectedAgentId ? '#f7f7f7' : '#5a5a58',
-              border: '1px solid #666864',
+              border: '1px solid #52525b',
               borderRadius: 20,
               fontSize: 13,
               fontWeight: 600,
@@ -296,7 +296,7 @@ export function AgentConfigPanel({
             }}
             onMouseEnter={(e) => {
               if (selectedAgentId) {
-                e.currentTarget.style.background = '#444440';
+                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
               }
             }}
             onMouseLeave={(e) => {
@@ -313,7 +313,7 @@ export function AgentConfigPanel({
               flex: 1,
               padding: '8px 16px',
               background: 'rgba(255,255,255,0.05)',
-              color: '#a8a6a2',
+              color: '#a1a1aa',
               border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 8,
               fontSize: 13,
@@ -327,7 +327,7 @@ export function AgentConfigPanel({
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-              e.currentTarget.style.color = '#a8a6a2';
+              e.currentTarget.style.color = '#a1a1aa';
             }}
           >
             Cancel

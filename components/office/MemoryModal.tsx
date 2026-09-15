@@ -111,7 +111,7 @@ export function MemoryModal({ agentType, agentTitle, open, onClose }: MemoryModa
     >
       <div
         className="relative flex max-h-[80vh] w-full max-w-[560px] flex-col rounded-2xl border border-white/10 p-6 shadow-2xl"
-        style={{ background: "#2f2f2c" }}
+        style={{ background: "var(--bg-elevated)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <button

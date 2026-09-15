@@ -436,7 +436,7 @@ export default function AivoryAssistant() {
               <button
                 onClick={() => { if (hasContent && !isLoading) handleSend(input) }}
                 disabled={!hasContent || isLoading}
-                className={`w-8 h-8 rounded-[20px] flex items-center justify-center transition-all ${hasContent ? 'bg-[var(--bg-main)] text-white border border-[#666864] hover:bg-[#444440]' : 'bg-[#555550] text-white/60'}`}
+                className={`w-8 h-8 rounded-[20px] flex items-center justify-center transition-all ${hasContent ? 'bg-[var(--bg-main)] text-white border border-zinc-600 hover:bg-white/10' : 'bg-zinc-600 text-white/60'}`}
                 aria-label="Send"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -470,7 +470,7 @@ export default function AivoryAssistant() {
           background: 'rgba(53,53,50,0.85)',
           backdropFilter: 'blur(8px)',
           WebkitBackdropFilter: 'blur(8px)',
-          border: '1px solid #666864',
+          border: '1px solid #52525b',
         }}
         onClick={() => setOpen(o => !o)}
         aria-label={open ? "Close Aivory assistant" : "Open Aivory assistant"}

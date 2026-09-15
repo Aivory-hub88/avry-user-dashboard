@@ -141,7 +141,7 @@ const AiSubConnectionEdge = memo((props: EdgeProps) => {
     <BaseEdge
       path={edgePath}
       style={{
-        stroke: selected ? '#a8a6a2' : '#6b6b68',
+        stroke: selected ? '#a1a1aa' : '#6b6b68',
         strokeWidth: 1.5,
         strokeDasharray: '4 4',
       }}

@@ -27,7 +27,7 @@ export default function ErrorHandlingSection({ value, onChange }: Props) {
 
   return (
     <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <span style={{ fontSize: 10, fontWeight: 600, color: '#a8a6a2', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      <span style={{ fontSize: 10, fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 0.5 }}>
         Error handling
       </span>
       <InspectorToggle
