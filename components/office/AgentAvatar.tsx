@@ -23,6 +23,9 @@ export interface AgentVisual {
    *  with object-fit: cover, no tinted backdrop needed. Absent for Aivory
    *  Console, which renders the bare brand mark instead. */
   portraitSrc?: string
+  /** Optional crop anchor for portraits whose source canvas has extra
+   * whitespace. CSS object-position keeps the original artwork intact. */
+  objectPosition?: string
 }
 
 // Portrait asset paths, one per agent type (aesthetic/vibe-based mapping,
@@ -35,7 +38,7 @@ export const AGENT_VISUALS: Record<AgentType | "null", AgentVisual> = {
   leads_qualifier: { portraitSrc: "/agents/leads_qualifier.svg" }, // Leads Qualifier Agent
   finance_invoice_ops: { portraitSrc: "/agents/finance_invoice_ops.svg" }, // Finance & Invoice Ops Agent
   office_assistant: { portraitSrc: "/agents/office_assistant.svg" },
-  chief_of_staff: { portraitSrc: "/agents/chief_of_staff.svg" },
+  chief_of_staff: { portraitSrc: "/agents/chief_of_staff.svg", objectPosition: "50% 0%" },
 }
 
 export function getAgentVisual(type: string | null | undefined): AgentVisual {
@@ -57,7 +60,13 @@ export function AgentAvatar({ type, size = 32, className = "" }: AgentAvatarProp
         className={`relative shrink-0 overflow-hidden rounded-full ${className}`}
         style={{ width: size, height: size }}
       >
-        <Image src={asset(v.portraitSrc)} alt="" fill sizes={`${size}px`} style={{ objectFit: "cover" }} />
+        <Image
+          src={asset(v.portraitSrc)}
+          alt=""
+          fill
+          sizes={`${size}px`}
+          style={{ objectFit: "cover", objectPosition: v.objectPosition ?? "50% 50%" }}
+        />
       </div>
     )
   }
