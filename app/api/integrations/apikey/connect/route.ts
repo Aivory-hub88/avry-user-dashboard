@@ -23,10 +23,44 @@ import { resolveIntegrationUser } from '@/lib/integration-auth'
 // Frappe instance URL + API key/secret (Frappe User Settings → API Access).
 const ERPNEXT_AUTH_CONFIG_ID = 'ac_ILn9zmSA5cqN'
 
+// docs/CERVEAU-TIER2-BYO-PLAN.md — Tier-2 Lex outbound (BYO API keys).
+// Auth configs provisioned Composio-side 2026-09-16 (custom API_KEY scheme,
+// same shape as ERPNext, both ENABLED). IDs are non-secret (like
+// ac_ILn9zmSA5cqN) — committed as defaults, env overrides for rotation.
+const SMARTLEAD_AUTH_CONFIG_ID = process.env.SMARTLEAD_AUTH_CONFIG_ID || 'ac_pwZitMOtelgi'
+const PROSPEO_AUTH_CONFIG_ID = process.env.PROSPEO_AUTH_CONFIG_ID || 'ac_gKHRfgGyaHpc'
+// Verifier picked 2026-09-16 (MillionVerifier has no Composio toolkit):
+// emaillistverify → ac_BVyjHFnrtPi3 (custom, API_KEY, ENABLED).
+// Live MCP server: aivory-emaillistverify,
+// https://backend.composio.dev/v3/mcp/1b6387f0-898f-400d-95f2-2c846081c686
+const EMAILLISTVERIFY_AUTH_CONFIG_ID =
+  process.env.EMAILLISTVERIFY_AUTH_CONFIG_ID || 'ac_BVyjHFnrtPi3'
+// MillionVerifier has NO Composio toolkit (verified 2026-09-16: toolkit 404).
+// Placeholder stays fail-closed until the verify-provider decision lands
+// (alt Composio verifier toolkit vs direct API) — see CERVEAU-TIER2-BYO-PLAN.
+const MILLIONVERIFIER_AUTH_CONFIG_ID =
+  process.env.MILLIONVERIFIER_AUTH_CONFIG_ID || 'ac_REPLACE_MILLIONVERIFIER'
+
 const SUPPORTED_API_KEY_TOOLKITS: Record<string, { authConfigId: string; requiredFields: string[] }> = {
   erpnext: {
     authConfigId: ERPNEXT_AUTH_CONFIG_ID,
     requiredFields: ['full', 'generic_api_key', 'generic_token'],
+  },
+  smartlead: {
+    authConfigId: SMARTLEAD_AUTH_CONFIG_ID,
+    requiredFields: ['generic_api_key'],
+  },
+  prospeo: {
+    authConfigId: PROSPEO_AUTH_CONFIG_ID,
+    requiredFields: ['generic_api_key'],
+  },
+  emaillistverify: {
+    authConfigId: EMAILLISTVERIFY_AUTH_CONFIG_ID,
+    requiredFields: ['generic_api_key'],
+  },
+  millionverifier: {
+    authConfigId: MILLIONVERIFIER_AUTH_CONFIG_ID,
+    requiredFields: ['generic_api_key'],
   },
 }
 

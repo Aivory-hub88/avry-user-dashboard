@@ -119,6 +119,10 @@ const TOOLKIT_LABELS: Record<string, string> = {
   googlecalendar: 'Google Calendar',
   trello: 'Trello',
   linear: 'Linear',
+  smartlead: 'Smartlead',
+  prospeo: 'Prospeo',
+  millionverifier: 'MillionVerifier',
+  emaillistverify: 'EmailListVerify',
 };
 
 const TOOLKIT_ICONS: Record<string, string> = {
@@ -354,11 +358,15 @@ export default function CustomizeAgentModal({
   // scheme, so the Connections tab renders an inline credential form and
   // submits it to /api/integrations/apikey/connect instead.
   const [apiKeyFormOpen, setApiKeyFormOpen] = useState(false);
+  const [apiKeyFormSlug, setApiKeyFormSlug] = useState<string | null>(null);
   const [apiKeyBusy, setApiKeyBusy] = useState(false);
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
   const [erpnextBaseUrl, setErpNextBaseUrl] = useState('');
   const [erpnextApiKey, setErpNextApiKey] = useState('');
   const [erpnextApiSecret, setErpNextApiSecret] = useState('');
+  // Tier-2 Lex outbound (docs/CERVEAU-TIER2-BYO-PLAN.md): single API key
+  // per provider, same Composio custom-auth shape as ERPNext.
+  const [tier2ApiKey, setTier2ApiKey] = useState('');
 
   const handleErpNextConnect = async () => {
     if (apiKeyBusy) return;
@@ -378,6 +386,29 @@ export default function CustomizeAgentModal({
       setErpNextApiKey('');
       setErpNextApiSecret('');
       setApiKeyFormOpen(false);
+      setApiKeyFormSlug(null);
+      setConnectFeedback({ type: 'success', message: t('erpnextConnected') });
+      refetchConnections();
+    } catch (e: unknown) {
+      setApiKeyError(e instanceof Error ? e.message : t('erpnextConnectFailed'));
+    } finally {
+      setApiKeyBusy(false);
+    }
+  };
+
+  const handleTier2Connect = async (slug: string) => {
+    if (apiKeyBusy) return;
+    setApiKeyError(null);
+    if (!tier2ApiKey.trim()) {
+      setApiKeyError(t('erpnextRequired'));
+      return;
+    }
+    setApiKeyBusy(true);
+    try {
+      await startApiKeyConnect(slug, { generic_api_key: tier2ApiKey.trim() });
+      setTier2ApiKey('');
+      setApiKeyFormOpen(false);
+      setApiKeyFormSlug(null);
       setConnectFeedback({ type: 'success', message: t('erpnextConnected') });
       refetchConnections();
     } catch (e: unknown) {
@@ -1145,7 +1176,9 @@ export default function CustomizeAgentModal({
                   const connected = conn?.status === 'connected';
                   const style = CONNECTION_STATUS_STYLES[conn?.status ?? 'revoked'];
                   const busy = connectBusyId === slug || savingToolkit === slug;
-                  const isApiKey = slug === 'erpnext';
+                  const isApiKey = slug === 'erpnext' || slug === 'smartlead' || slug === 'prospeo' || slug === 'millionverifier' || slug === 'emaillistverify';
+                  const isTier2 = slug === 'smartlead' || slug === 'prospeo' || slug === 'millionverifier' || slug === 'emaillistverify';
+                  const formOpenForRow = isApiKey && apiKeyFormOpen && apiKeyFormSlug === slug;
                   const app = connectableApps.find((a) => a.id === slug);
                   const iconPath = app?.iconPath || TOOLKIT_ICONS[slug];
                   const label = TOOLKIT_LABELS[slug] || slug;
@@ -1183,10 +1216,15 @@ export default function CustomizeAgentModal({
                           {isApiKey && (
                             <button
                               type="button"
-                              onClick={() => { setApiKeyFormOpen((v) => !v); setApiKeyError(null); }}
+                              onClick={() => {
+                                const next = !(apiKeyFormOpen && apiKeyFormSlug === slug);
+                                setApiKeyFormOpen(next);
+                                setApiKeyFormSlug(next ? slug : null);
+                                setApiKeyError(null);
+                              }}
                               className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/25 text-[var(--color-accent-text)] hover:bg-accent/25 text-[11px] font-medium transition-colors"
                             >
-                              {apiKeyFormOpen ? t('close') : t('connect')}
+                              {formOpenForRow ? t('close') : t('connect')}
                             </button>
                           )}
                           {connected && conn && (
@@ -1218,7 +1256,7 @@ export default function CustomizeAgentModal({
                           </button>
                         </span>
                       </div>
-                      {isApiKey && apiKeyFormOpen && (
+                      {isApiKey && formOpenForRow && !isTier2 && (
                         <div className="mt-3 space-y-2">
                           <p className="text-white/40 text-[11.5px] leading-relaxed">
                             {t('erpnextInstructions')}
@@ -1251,6 +1289,31 @@ export default function CustomizeAgentModal({
                             type="button"
                             disabled={apiKeyBusy}
                             onClick={handleErpNextConnect}
+                            className="w-full px-3 py-2 rounded-lg bg-accent/15 border border-accent/25 text-[var(--color-accent-text)] hover:bg-accent/25 text-[12px] font-medium disabled:opacity-40 transition-colors"
+                          >
+                            {apiKeyBusy ? t('connecting') : t('saveAndConnect')}
+                          </button>
+                        </div>
+                      )}
+                      {isApiKey && formOpenForRow && isTier2 && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-white/40 text-[11.5px] leading-relaxed">
+                            {t('erpnextInstructions')}
+                          </p>
+                          <input
+                            type="password"
+                            value={tier2ApiKey}
+                            onChange={(e) => setTier2ApiKey(e.target.value)}
+                            placeholder={t('apiKeyPlaceholder')}
+                            className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-accent/50"
+                          />
+                          {apiKeyError && (
+                            <p className="text-red-300/80 text-[11.5px]">{apiKeyError}</p>
+                          )}
+                          <button
+                            type="button"
+                            disabled={apiKeyBusy}
+                            onClick={() => handleTier2Connect(slug)}
                             className="w-full px-3 py-2 rounded-lg bg-accent/15 border border-accent/25 text-[var(--color-accent-text)] hover:bg-accent/25 text-[12px] font-medium disabled:opacity-40 transition-colors"
                           >
                             {apiKeyBusy ? t('connecting') : t('saveAndConnect')}
