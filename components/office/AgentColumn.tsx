@@ -237,7 +237,7 @@ export default function AgentColumn({
       <div className="px-4 pt-4 pb-3">
         <button
           onClick={onOpenMissionControl}
-          className={`flex w-full items-center gap-[9px] rounded-full px-[13px] py-[8px] text-left transition-colors ${
+          className={`flex h-11 w-full items-center gap-[9px] rounded-full px-[13px] text-left transition-colors ${
             missionControlActive ? "bg-white/[0.09]" : "bg-white/[0.045] hover:bg-white/[0.08]"
           }`}
         >
@@ -257,7 +257,7 @@ export default function AgentColumn({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search agents and threads"
             aria-label="Search agents and threads"
-            className="w-full rounded-[9px] border border-line bg-white/[0.04] py-[7px] pl-9 pr-[11px] text-[12.5px] font-light text-white placeholder:text-white/30 focus:border-accent/40 focus:bg-white/[0.06] focus:outline-none"
+            className="w-full h-11 rounded-[9px] border border-line bg-white/[0.04] pl-9 pr-[11px] text-[12.5px] font-light text-white placeholder:text-white/30 focus:border-accent/40 focus:bg-white/[0.06] focus:outline-none"
           />
         </div>
       </div>
@@ -277,8 +277,15 @@ export default function AgentColumn({
               <button
                 onClick={() => openAgent(row)}
                 title={row.title === row.role ? undefined : row.role}
-                className={`group flex w-full gap-[9px] rounded-[10px] px-[9px] text-left transition-colors ${
-                  isActiveAgent ? "bg-white/[0.09]" : "hover:bg-white/[0.04]"
+                className={`group flex min-h-11 w-full gap-[9px] rounded-[10px] px-[9px] text-left transition-colors ${
+                  // The Aivory Console row stays transparent (same as the
+                  // column background) so it reads as invisible — only the
+                  // other agents get the selected highlight.
+                  row.type === null
+                    ? "hover:bg-white/[0.04]"
+                    : isActiveAgent
+                      ? "bg-white/[0.09]"
+                      : "hover:bg-white/[0.04]"
                 } ${isOpen ? "items-center py-[10px]" : "items-start py-[8px]"}`}
               >
                 <ChevronRight
