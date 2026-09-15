@@ -36,6 +36,27 @@ export const OFFICE_ROWS: OfficeRow[] = [
   ...PREBUILT_AGENTS.map((a) => ({ key: a.type, type: a.type, title: a.name, role: a.title, enterprise: a.enterprise })),
 ]
 
+/** Per-agent glow color for the active/interacting ring (AgentColumn,
+ *  and anywhere else that wants the same "who's busy" glow) — reuses the
+ *  brand color each agent already owns on its Agents-page card header
+ *  (public/agent-card-headers/), so the glow never introduces a color
+ *  that isn't already "that agent's color" somewhere else in the product. */
+export const AGENT_GLOW_COLOR: Record<string, string> = {
+  autonomous: "#de1f5b", // Geno — pink card header
+  customer_service: "#6962a5", // Teo — purple card header
+  leads_qualifier: "#2dafac", // Lex — teal card header
+  finance_invoice_ops: "#8faf82", // Finn — green card header
+  office_assistant: "#e86936", // Ofira — orange card header
+  chief_of_staff: "#d6c2ad", // Aira — Silver card header
+}
+
+/** `#rrggbb` -> `rgba(r, g, b, alpha)`, for the glow's box-shadow — a bare
+ *  hex can't carry the transparency the pulse keyframe needs. */
+export function hexToRgba(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
+}
+
 export const CHANNEL_ICON: Record<string, string> = {
   telegram: "/integrations/telegram.svg",
   slack: "/integrations/slack.svg",

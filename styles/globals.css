@@ -1232,6 +1232,19 @@ body {
   animation: pendingBadgeArrived 1.4s ease-in-out 2;
 }
 
+/* A per-agent glow ring for whoever is actively answering or has a run in
+   flight elsewhere — sits alongside ThinkingDots/the running-dot, not a
+   replacement for either. Color comes from --glow-color (set inline per
+   agent, see AgentColumn.tsx's AGENT_GLOW map) so one keyframe serves every
+   agent's own brand color instead of six near-duplicate animations. */
+@keyframes agentGlowPulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--glow-color), 0 0 0 0 var(--glow-color); }
+  50%      { box-shadow: 0 0 8px 2px var(--glow-color), 0 0 0 3px var(--glow-color); }
+}
+.agent-glow-ring {
+  animation: agentGlowPulse 1.8s ease-in-out infinite;
+}
+
 /* A notification card mounting into the rail — a quiet fade + rise, never
    a restart-from-zero pop. One-shot on mount only, not retriggered while
    the card is on screen. */

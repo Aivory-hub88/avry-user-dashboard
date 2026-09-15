@@ -15,7 +15,7 @@ import type { ChatSession } from "@/hooks/useChat"
 import type { Notification } from "@/types/notifications"
 import { ThinkingDots } from "@/components/ui/ThinkingDots"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
-import { OFFICE_ROWS, CHANNEL_ICON, relativeTime, lastPreview, formatBadgeCount } from "@/lib/officeRows"
+import { OFFICE_ROWS, CHANNEL_ICON, AGENT_GLOW_COLOR, hexToRgba, relativeTime, lastPreview, formatBadgeCount } from "@/lib/officeRows"
 
 interface AgentColumnProps {
   sessionsByAgent: Record<string, ChatSession[]>
@@ -52,6 +52,13 @@ interface AgentColumnProps {
 
 type Row = (typeof OFFICE_ROWS)[number]
 const ROWS = OFFICE_ROWS
+
+/** CSS custom property feeding the `.agent-glow-ring` keyframe (see
+ *  globals.css) — undefined for Aivory Console, which has no card color. */
+function glowStyle(type: string | null): React.CSSProperties | undefined {
+  const color = type ? AGENT_GLOW_COLOR[type] : undefined
+  return color ? ({ "--glow-color": hexToRgba(color, 0.5) } as React.CSSProperties) : undefined
+}
 
 export default function AgentColumn({
   sessionsByAgent,
@@ -178,12 +185,18 @@ export default function AgentColumn({
             const isActiveAgent = !missionControlActive && row.type === agentTarget
             const pending = notificationsByAgent[row.key]?.length ?? 0
             const isConsole = row.type === null
+            const isThinkingHere = row.type === streamingAgentType
+            const isRunningElsewhere = !isThinkingHere && row.type !== null && !!activeRunsByAgentType[row.type]
+            const isInteracting = isThinkingHere || isRunningElsewhere
             return (
               <button
                 key={row.key}
                 onClick={() => openAgent(row)}
                 title={row.title === row.role ? row.title : `${row.title} — ${row.role}`}
+                style={isInteracting ? glowStyle(row.type) : undefined}
                 className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full transition-[background-color,box-shadow] ${
+                  isInteracting ? "agent-glow-ring" : ""
+                } ${
                   isConsole
                     ? ""
                     : isActiveAgent
@@ -191,14 +204,14 @@ export default function AgentColumn({
                       : "hover:ring-2 hover:ring-white/10"
                 }`}
               >
-                {row.type === streamingAgentType ? (
+                {isThinkingHere ? (
                   <div className="grid h-full w-full place-items-center rounded-full bg-white/[0.06]">
                     <ThinkingDots size={11} dotSize={1.8} />
                   </div>
                 ) : (
                   <AgentAvatar type={row.type} size={36} />
                 )}
-                {row.type !== streamingAgentType && row.type !== null && activeRunsByAgentType[row.type] && (
+                {isRunningElsewhere && (
                   <span className="absolute bottom-0 right-0 h-[9px] w-[9px] animate-pulse rounded-full border-2 border-surface-1 bg-emerald-400" />
                 )}
                 {pending > 0 && (
@@ -291,7 +304,10 @@ export default function AgentColumn({
                 <ChevronRight
                   className={`h-[12px] w-[12px] shrink-0 text-white/25 transition-transform ${isOpen ? "rotate-90" : ""}`}
                 />
-                <span className="relative shrink-0">
+                <span
+                  className={`relative shrink-0 rounded-full ${isThinkingHere || isRunningElsewhere ? "agent-glow-ring" : ""}`}
+                  style={isThinkingHere || isRunningElsewhere ? glowStyle(row.type) : undefined}
+                >
                   <AgentAvatar type={row.type} size={30} />
                   {isRunningElsewhere && (
                     <span className="absolute bottom-0 right-0 h-[8px] w-[8px] animate-pulse rounded-full border-2 border-surface-1 bg-emerald-400" />
