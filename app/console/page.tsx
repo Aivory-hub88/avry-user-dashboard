@@ -359,8 +359,10 @@ export default function ConsolePage() {
           // No @mention: continue with whoever holds the floor in this
           // thread (e.g. answering Lex's questions goes back to Lex), else
           // the thread's own agent (direct-origin threads carry no
-          // per-bubble attribution), else a recent room sticky, else the
-          // direct console brain so the room never eats a message silently.
+          // per-bubble attribution), else a recent room sticky, else treat it
+          // like @all — the room stays the room. The console brain is only
+          // ever reached via the explicit @aivory/@console escape hatch
+          // above (isConsoleMention), never as a silent fallback.
           // Deployed-only: a disconnected agent fails loudly via toast
           // instead of hanging a bubble.
           const isDeployed = (t: string) => mentionCandidates.some((c) => c.type === t)
@@ -371,6 +373,9 @@ export default function ConsolePage() {
           }
           if (targets.length === 0) {
             targets = loadRoomSticky().filter(isDeployed)
+          }
+          if (targets.length === 0 && mentionCandidates.length > 0) {
+            targets = mentionCandidates.map((c) => c.type)
           }
           if (targets.length > 0) {
             saveRoomSticky(targets)

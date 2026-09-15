@@ -559,12 +559,22 @@ export function useChat({
     setSessions(listSessions())
   }, [currentSessionId, resetAgentic])
 
-  // Threads nested under the agent that held them — one entry per agentType,
-  // 'null' (Aivory Console) included. Sessions are already updatedAt-desc
-  // from listSessions(), so each group stays most-recent-first too.
+  // Threads nested under every agent that held them — one entry per
+  // agentType, 'null' (Aivory Console) included. A Room thread never carries
+  // a session-level agentType (it's multi-agent, see PersistedSession), so
+  // clicking a room member's avatar would otherwise find nothing and start a
+  // disconnected new thread — index it under each agentType its bubbles
+  // actually carry too, not just the session-level stamp. Sessions are
+  // already updatedAt-desc from listSessions(), so each group stays
+  // most-recent-first too.
   const sessionsByAgent = sessions.reduce<Record<string, ChatSession[]>>((acc, s) => {
-    const key = s.agentType ?? 'null'
-    ;(acc[key] ??= []).push(s)
+    const keys = new Set<string>([s.agentType ?? 'null'])
+    for (const m of s.messages) {
+      if (m.agentType) keys.add(m.agentType)
+    }
+    for (const key of keys) {
+      (acc[key] ??= []).push(s)
+    }
     return acc
   }, {})
 
