@@ -187,7 +187,7 @@ export default function AgentRail({
 
   if (collapsed) {
     return (
-      <div className="flex h-full w-full flex-col items-center border-l border-line bg-surface-1 pt-4">
+      <div className="flex h-full w-full flex-col items-center bg-surface-1 pt-4">
         <button
           onClick={onToggleCollapse}
           aria-label="Expand agent panel"
@@ -207,7 +207,7 @@ export default function AgentRail({
   }
 
   return (
-    <div className="flex h-full w-full flex-col border-l border-line bg-surface-1">
+    <div className="flex h-full w-full flex-col bg-surface-1">
       <div className="flex h-12 shrink-0 items-center gap-[10px] border-b border-transparent bg-surface-1/70 px-4 backdrop-blur-xl">
         <button
           onClick={onToggleCollapse}
