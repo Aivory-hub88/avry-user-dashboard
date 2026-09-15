@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { workspaceCredential, unauthorized } from '@/lib/workspaceAuth'
+import {
+  groupIntoOrchestrations,
+  CHILD_SLA_MINUTES,
+  PARENT_SLA_MINUTES,
+  type LedgerTask,
+  type EnrichedTask,
+} from '@/lib/airaTasks'
 
 /**
  * GET /api/aira/tasks — Aira task ledger for kanban render.
@@ -8,6 +15,15 @@ import { workspaceCredential, unauthorized } from '@/lib/workspaceAuth'
  * Reads the agent-owned task rows zeroclaw persists in cerveau.agent_tasks
  * (task_create / task_update_status / task_list tools). Response is already
  * grouped into kanban columns so the client can render without reshaping.
+ *
+ * Phase 3B contract (no migration — the task tools have fixed schemas, so
+ * the contract is convention + derivation, see services/cerveau/
+ * TASK-CONTRACT.md):
+ * - orchestrations[] nests each room session's chief_of_staff parent with
+ *   its specialist children (role-based; title prefix `AIRA-orch:` optional).
+ * - every task carries is_parent, overdue, elapsed_ms. overdue is derived
+ *   from created_at against CHILD_SLA_MINUTES (15) / PARENT_SLA_MINUTES (60)
+ *   — surfacing for human-driven enforcement, no background canceller.
  *
  * Query params:
  *   agent_type  filter to one agent (default: all — Aira + specialists)
@@ -18,8 +34,7 @@ import { workspaceCredential, unauthorized } from '@/lib/workspaceAuth'
  * Auth: user JWT is tenant-isolated to their own user_id; service token
  * may pass an explicit tenant_id (Cerveau → dashboard server-side calls).
  *
- * Response: { tasks: Task[], columns: { todo, in_progress, blocked, done },
- *             counts: {...} }
+ * Response: { tasks, columns, counts, orchestrations, sla: {...} }
  */
 
 export const runtime = 'nodejs'
@@ -30,20 +45,7 @@ type Status = (typeof VALID_STATUSES)[number]
 const MAX_LIMIT = 500
 const DEFAULT_LIMIT = 100
 
-interface TaskRow {
-  task_id: string
-  tenant_id: string
-  agent_type: string
-  session_id: string | null
-  title: string
-  status: string
-  priority: string
-  blocked_reason: string | null
-  created_at: string
-  updated_at: string
-}
-
-function emptyColumns(): Record<Status, TaskRow[]> {
+function emptyColumns(): Record<Status, EnrichedTask[]> {
   return { todo: [], in_progress: [], blocked: [], done: [] }
 }
 
@@ -107,24 +109,38 @@ export async function GET(req: NextRequest) {
        LIMIT $${values.length}`,
       values,
     )
-    const tasks = r.rows as TaskRow[]
+    const tasks = r.rows as LedgerTask[]
+    const now = Date.now()
+    // Enrichment needs parent context (SLA differs), so group first, then
+    // flatten back into the legacy column shape — same objects, no copies.
+    const orchestrations = groupIntoOrchestrations(tasks, now)
+    const enriched: EnrichedTask[] = orchestrations.flatMap((o) => [
+      ...(o.parent ? [o.parent] : []),
+      ...o.children,
+    ])
+    // Preserve recency order for the flat list.
+    enriched.sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    )
     const columns = emptyColumns()
-    for (const t of tasks) {
+    for (const t of enriched) {
       const key = (VALID_STATUSES as readonly string[]).includes(t.status)
         ? (t.status as Status)
         : 'todo'
       columns[key].push(t)
     }
     return NextResponse.json({
-      tasks,
+      tasks: enriched,
       columns,
       counts: {
         todo: columns.todo.length,
         in_progress: columns.in_progress.length,
         blocked: columns.blocked.length,
         done: columns.done.length,
-        total: tasks.length,
+        total: enriched.length,
       },
+      orchestrations,
+      sla: { child_minutes: CHILD_SLA_MINUTES, parent_minutes: PARENT_SLA_MINUTES },
     })
   } catch (err) {
     console.error('[api/aira/tasks] query failed:', err)
