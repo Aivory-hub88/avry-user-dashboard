@@ -72,6 +72,11 @@ export function useChat({
   const messagesRef = useRef<Message[]>([])
   const currentSessionIdRef = useRef<string>("")
   const streamingSessionRef = useRef<string>("")
+  // Abort handle for the in-flight turn (console SSE, single agent call, or
+  // room chain alike). stopStreaming() aborts it; every send path below
+  // treats an aborted turn as a user stop — partial content kept, no error
+  // toast — rather than a failure.
+  const abortRef = useRef<AbortController | null>(null)
   const session = useSession(addToast)
   const { agentTarget, setAgentTarget } = useMode()
 
@@ -85,6 +90,16 @@ export function useChat({
   useEffect(() => {
     currentSessionIdRef.current = currentSessionId
   }, [currentSessionId])
+
+  /**
+   * Cancel the in-flight turn. The running request aborts; whatever content
+   * already arrived stays in the bubble (marked done, persisted normally).
+   * No-op when nothing is streaming. Safe to call after a thread switch —
+   * it stops the background turn, not whatever is on screen.
+   */
+  const stopStreaming = useCallback(() => {
+    abortRef.current?.abort()
+  }, [])
 
   // Session init
   useEffect(() => {
@@ -144,6 +159,11 @@ export function useChat({
     setStreamingAgentType(agentTarget)
     setFollowUpSuggestions([])
     setIsClarification(false)
+    // Fresh abort handle per turn. Cleared in each finally below (guarded so
+    // a newer turn's controller is never nuked by an older turn settling).
+    const controller = new AbortController()
+    abortRef.current = controller
+    const signal = controller.signal
 
     let finalContent = ""
     let streamError = false
@@ -156,7 +176,8 @@ export function useChat({
         const result = await sendAgentMessage(
           sentAgentTarget as TelegramAgentType,
           userContent,
-          sentSessionId
+          sentSessionId,
+          signal
         )
         // Same guard as the room path: a non-string reply would throw
         // during ChatMessage render and unmount the page.
@@ -172,12 +193,21 @@ export function useChat({
           setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, pendingApproval } : m))
         }
       } catch (error) {
-        addToast("error", error instanceof Error ? error.message : "Agent is unavailable right now.")
-        if (currentSessionIdRef.current === sentSessionId) {
-          setMessages(p => p.filter(m => m.id !== assistantId))
+        if (signal.aborted) {
+          // User stop: keep the (empty) bubble as a stopped turn and let
+          // the finally below persist it — no error toast, no removal.
+          if (currentSessionIdRef.current === sentSessionId) {
+            setMessages(p => p.map(m => m.id === assistantId ? { ...m, isStreaming: false } : m))
+          }
+        } else {
+          addToast("error", error instanceof Error ? error.message : "Agent is unavailable right now.")
+          if (currentSessionIdRef.current === sentSessionId) {
+            setMessages(p => p.filter(m => m.id !== assistantId))
+          }
+          streamError = true
         }
-        streamError = true
       } finally {
+        if (abortRef.current === controller) abortRef.current = null
         if (streamingSessionRef.current === sentSessionId) {
           streamingSessionRef.current = ""
           setIsStreaming(false)
@@ -221,8 +251,8 @@ export function useChat({
         user_id: user?.user_id ?? undefined,
         messages: allMessages,
         user_state: formatUserContextForAI(buildUserContextState()),
-      })
-      const stream = typewriterStream(baseStream)
+      }, { signal })
+      const stream = typewriterStream(baseStream, signal)
       for await (const chunk of stream) {
         processEvent(chunk as any)
         if (chunk.type === "chunk" && chunk.content) {
@@ -250,12 +280,20 @@ export function useChat({
         }
       }
     } catch (error) {
-      addToast("error", "Something went wrong. Please try again.")
-      if (currentSessionIdRef.current === sentSessionId) {
-        setMessages(p => p.filter(m => m.id !== assistantId))
+      // User stop ends the generator silently (see streamConsoleResponse),
+      // so reaching here with an aborted signal means: keep partial content,
+      // persist normally below, no error toast, no placeholder removal.
+      if (!signal.aborted) {
+        addToast("error", "Something went wrong. Please try again.")
+        if (currentSessionIdRef.current === sentSessionId) {
+          setMessages(p => p.filter(m => m.id !== assistantId))
+        }
+        streamError = true
+      } else if (currentSessionIdRef.current === sentSessionId) {
+        setMessages(p => p.map(m => m.id === assistantId ? { ...m, isStreaming: false } : m))
       }
-      streamError = true
     } finally {
+      if (abortRef.current === controller) abortRef.current = null
       if (streamingSessionRef.current === sentSessionId) {
         streamingSessionRef.current = ""
         setIsStreaming(false)
@@ -341,17 +379,23 @@ export function useChat({
     streamingSessionRef.current = sentSessionId
     setIsStreaming(true)
     setStreamingAgentType(targets[0] ?? null)
+    const controller = new AbortController()
+    abortRef.current = controller
+    const signal = controller.signal
 
     // Sequential: each speaker sees this round's earlier replies. A failure
-    // drops that bubble but never blocks the rest of the round.
+    // drops that bubble but never blocks the rest of the round. A user stop
+    // breaks the chain: answered bubbles stay, unanswered ones are dropped
+    // by the merge below, no error toast.
     const roundReplies: RoomHistoryEntry[] = []
     const outcomes = new Map<string, { reply: string; pendingApproval: ConsolePendingApproval | null }>()
     for (const t of targets) {
+      if (signal.aborted) break
       const me = candidateOf(t) ?? { type: t, name: agentNameOf(t), title: t, channels: [] as string[] }
       const peers = targets.filter(x => x !== t).map(x => candidateOf(x) ?? { type: x, name: agentNameOf(x), title: x, channels: [] as string[] })
       const payload = buildRoomPayload({ me, peers, userText, history, roundReplies })
       try {
-        const result = await sendAgentMessage(t as TelegramAgentType, payload, sentSessionId)
+        const result = await sendAgentMessage(t as TelegramAgentType, payload, sentSessionId, signal)
         // Backend reply is unvalidated (Cerveau may return null/a non-string
         // on odd turns) — a non-string here used to flow into ChatMessage and
         // throw during render, killing the whole page. Treat it as a failed
@@ -378,6 +422,8 @@ export function useChat({
         }
         setStreamingAgentType(targets[targets.indexOf(t) + 1] ?? undefined)
       } catch {
+        // Stopped turns break the chain quietly; failures toast per agent.
+        if (signal.aborted) break
         addToast("error", `${me.name} is unavailable right now.`)
       }
     }
@@ -410,6 +456,7 @@ export function useChat({
         addToast("error", "Chat history storage is full. Messages may not be saved.")
       }
     } finally {
+      if (abortRef.current === controller) abortRef.current = null
       if (streamingSessionRef.current === sentSessionId) {
         streamingSessionRef.current = ""
         setIsStreaming(false)
@@ -533,6 +580,7 @@ export function useChat({
     isClarification,
     handleSend,
     handleSendRoom,
+    stopStreaming,
     resolveConsoleApproval,
     handleNewChat,
     switchSession,

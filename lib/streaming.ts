@@ -21,6 +21,12 @@ export function validateFileSize(sizeBytes: number, filename: string): string | 
  * Streams console responses from the API endpoint using SSE.
  * Yields StreamChunk objects. The final chunk will always be type 'done'
  * (with receivedContent=true if tokens were streamed) or type 'error'.
+ *
+ * Pass opts.signal to allow user-initiated stop: an external abort ends the
+ * generator SILENTLY (no error yield) so the caller can finalize partial
+ * content as a stopped turn. The internal idle-timeout abort keeps yielding
+ * its timeout error — the two aborts are deliberately distinguished by
+ * checking the *external* signal.
  */
 export async function* streamConsoleResponse(
   endpoint: string,
@@ -30,7 +36,8 @@ export async function* streamConsoleResponse(
     user_id?: string
     messages: Array<{ role: 'user' | 'assistant'; content: string }>
     user_state?: string
-  }
+  },
+  opts?: { signal?: AbortSignal },
 ): AsyncGenerator<StreamChunk, void, unknown> {
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
   let receivedContent = false
@@ -38,9 +45,18 @@ export async function* streamConsoleResponse(
   // Client-side idle timeout: if no data arrives for 30s, abort
   let idleTimer: ReturnType<typeof setTimeout> | null = null
   let abortController: AbortController | null = null
+  const externalSignal = opts?.signal ?? null
+  if (externalSignal?.aborted) return
+  // Declared outside try: finally must see it (block-scoped const inside
+  // try is invisible there).
+  let onExternalAbort: (() => void) | null = null
 
   try {
     abortController = new AbortController()
+    // User stop → abort the fetch; the catch below recognises the external
+    // signal and ends silently (see docstring).
+    onExternalAbort = () => abortController?.abort()
+    externalSignal?.addEventListener('abort', onExternalAbort, { once: true })
 
     const resetIdleTimer = () => {
       if (idleTimer) clearTimeout(idleTimer)
@@ -179,6 +195,9 @@ export async function* streamConsoleResponse(
   } catch (error) {
     if (idleTimer) clearTimeout(idleTimer)
 
+    // User-initiated stop: end silently with whatever was received.
+    if (externalSignal?.aborted) return
+
     const isAbort = error instanceof Error && error.name === 'AbortError'
     const errorMessage = isAbort
       ? 'Response timed out — no data received for 120 seconds. Try a shorter message.'
@@ -190,6 +209,7 @@ export async function* streamConsoleResponse(
 
     yield { type: 'error', error: errorMessage }
   } finally {
+    if (onExternalAbort) externalSignal?.removeEventListener('abort', onExternalAbort)
     if (reader) {
       try { await reader.cancel() } catch { /* ignore */ }
     }
@@ -202,10 +222,12 @@ const TYPEWRITER_STEP_MS = 25
 const TYPEWRITER_CHARS = 12
 
 export async function* typewriterStream(
-  source: AsyncIterable<StreamChunk>
+  source: AsyncIterable<StreamChunk>,
+  signal?: AbortSignal,
 ): AsyncGenerator<StreamChunk> {
   let displayed = ''
   for await (const ev of source) {
+    if (signal?.aborted) return
     if (ev.type === 'chunk' && typeof ev.content === 'string') {
       // Stream incrementally: animate only the new delta, not the whole accumulated text at once
       const delta = ev.content.slice(displayed.length)
@@ -215,6 +237,7 @@ export async function* typewriterStream(
         continue
       }
       for (let i = 0; i < delta.length; i += TYPEWRITER_CHARS) {
+        if (signal?.aborted) return
         displayed += delta.slice(i, i + TYPEWRITER_CHARS)
         yield { type: 'chunk', content: displayed } as StreamChunk
         if (i + TYPEWRITER_CHARS < delta.length) {

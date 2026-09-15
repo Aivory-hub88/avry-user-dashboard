@@ -4,6 +4,9 @@ import {
   candidateOf,
   getMentionCandidates,
   inferRoomFallback,
+  isConsoleMention,
+  loadRoomSticky,
+  saveRoomSticky,
   parseAgentMentions,
   stripAgentMentions,
 } from "@/lib/agentMentions"
@@ -188,5 +191,24 @@ describe("inferRoomFallback", () => {
         { role: "assistant", agentType: "autonomous", isStreaming: true },
       ]),
     ).toEqual([])
+  })
+})
+
+describe("isConsoleMention", () => {
+  it("matches @aivory and @console as whole tokens", () => {
+    expect(isConsoleMention("@aivory hi")).toBe(true)
+    expect(isConsoleMention("ask @console this")).toBe(true)
+    expect(isConsoleMention("@AIVORY")).toBe(true)
+    expect(isConsoleMention("@teo hi")).toBe(false)
+    expect(isConsoleMention("aivory hi")).toBe(false)
+    expect(isConsoleMention("me@aivory.id")).toBe(false)
+  })
+})
+
+describe("room sticky", () => {
+  it("round-trips within freshness and degrades without storage", () => {
+    // Node/vitest has no localStorage: helpers must no-op, never throw.
+    expect(() => saveRoomSticky(["autonomous"])).not.toThrow()
+    expect(loadRoomSticky()).toEqual([])
   })
 })

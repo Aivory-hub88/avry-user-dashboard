@@ -157,6 +157,54 @@ export function inferRoomFallback(messages: ThreadMessage[]): string[] {
   return reversed.reverse()
 }
 
+// ── Room sticky participants ────────────────────────────────────────────
+// The toggle is global while threads come and go: a user mid-conversation
+// with Lex who hits New chat (or reloads into a fresh thread) and types a
+// bare follow-up still means Lex, not the console. So every room send
+// records its targets; a bare message with no thread history falls back to
+// the sticky set while fresh. Recency-bounded (30 min) so a new day starts
+// clean instead of resurrecting yesterday's room.
+const ROOM_STICKY_KEY = "aivory:room:lastAgents"
+export const ROOM_STICKY_MAX_AGE_MS = 30 * 60_000
+
+function readSticky(): { agents: string[]; ts: number } | null {
+  try {
+    if (typeof localStorage === "undefined") return null
+    const raw = localStorage.getItem(ROOM_STICKY_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { agents?: unknown; ts?: unknown }
+    if (!Array.isArray(parsed.agents) || typeof parsed.ts !== "number") return null
+    const agents = parsed.agents.filter((a): a is string => typeof a === "string")
+    return { agents, ts: parsed.ts }
+  } catch {
+    return null
+  }
+}
+
+export function saveRoomSticky(agentTypes: string[]): void {
+  try {
+    if (typeof localStorage === "undefined") return
+    const agents = [...new Set(agentTypes)].filter(Boolean)
+    if (agents.length === 0) return
+    localStorage.setItem(ROOM_STICKY_KEY, JSON.stringify({ agents, ts: Date.now() }))
+  } catch {
+    // Storage full/blocked — stickiness is a nicety, never load-bearing.
+  }
+}
+
+/** Sticky room participants, fresh only. Empty when none or expired. */
+export function loadRoomSticky(now = Date.now()): string[] {
+  const stored = readSticky()
+  if (!stored) return []
+  if (now - stored.ts > ROOM_STICKY_MAX_AGE_MS) return []
+  return stored.agents
+}
+
+/** Explicit escape hatch back to the console brain inside a sticky room. */
+export function isConsoleMention(text: string): boolean {
+  return /(^|\s)@(aivory|console)\b/i.test(text)
+}
+
 export interface RoomPayloadParams {
   /** Agent this payload is built for. */
   me: MentionCandidate

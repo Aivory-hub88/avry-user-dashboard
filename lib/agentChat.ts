@@ -37,16 +37,21 @@ export interface AgentChatResult {
 export async function sendAgentMessage(
   agentType: AgentType,
   text: string,
-  conversationId?: string
+  conversationId?: string,
+  signal?: AbortSignal,
 ): Promise<AgentChatResult> {
-  const res = await authedFetch(`${BACKEND_URL}/api/v1/telegram/agent-chat`, {
+  const init: RequestInit = {
     method: 'POST',
     body: JSON.stringify({
       agent_type: agentType,
       text,
       conversation_id: conversationId,
     }),
-  })
+  }
+  // AbortSignal survives authedFetch's init spread (and its 401 retry),
+  // so user-initiated stop cancels the in-flight agent call.
+  if (signal) init.signal = signal
+  const res = await authedFetch(`${BACKEND_URL}/api/v1/telegram/agent-chat`, init)
   if (!res.ok) {
     const detail = await res.json().then((d) => d?.detail).catch(() => null)
     throw new Error(detail || `Agent chat failed (${res.status})`)

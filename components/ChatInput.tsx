@@ -20,6 +20,9 @@ interface ChatInputProps {
   enableMentions?: boolean
   mentionCandidates?: MentionCandidate[]
   placeholder?: string
+  /** When a turn is in flight, the send button morphs into stop. */
+  isStreaming?: boolean
+  onStop?: () => void
 }
 
 export default function ChatInput({ onSend, disabled = false, prefill, hasPendingFiles = false,
@@ -29,6 +32,8 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
   enableMentions = false,
   mentionCandidates = [],
   placeholder,
+  isStreaming = false,
+  onStop,
 }: ChatInputProps) {
   const [message, setMessage] = useState(prefill ?? "")
   const [activeTool, setActiveTool] = useState<string | null>(null)
@@ -258,17 +263,30 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
             </button>
           </div>
 
-          {/* Send button */}
-          <button
-            className="console-send-btn"
-            onClick={handleSend}
-            disabled={!canSend}
-            aria-label="Send"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 19V5M5 12l7-7 7 7"/>
-            </svg>
-          </button>
+          {/* Send button — morphs into stop while a turn is in flight */}
+          {isStreaming && onStop ? (
+            <button
+              className="console-send-btn"
+              onClick={onStop}
+              aria-label="Stop generating"
+              title="Stop generating"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              className="console-send-btn"
+              onClick={handleSend}
+              disabled={!canSend}
+              aria-label="Send"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 

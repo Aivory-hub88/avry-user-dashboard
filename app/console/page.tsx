@@ -22,7 +22,7 @@ import { useNotificationFeed } from "@/hooks/useNotificationFeed"
 import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { useActiveRuns } from "@/hooks/useActiveRuns"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
-import { getMentionCandidates, parseAgentMentions, inferRoomFallback, type MentionCandidate } from "@/lib/agentMentions"
+import { getMentionCandidates, parseAgentMentions, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import type { Attachment } from "@/components/UploadMenu"
@@ -194,6 +194,7 @@ export default function ConsolePage() {
   const { attachments, setAttachments, isDragging, handleFileSelect } = useFileUpload(addToast)
   const {
     messages,
+    sessions,
     sessionsByAgent,
     currentSessionId,
     isStreaming,
@@ -203,6 +204,7 @@ export default function ConsolePage() {
     isClarification,
     handleSend,
     handleSendRoom,
+    stopStreaming,
     resolveConsoleApproval,
     handleNewChat,
     switchSession,
@@ -344,17 +346,35 @@ export default function ConsolePage() {
       }
       if (inRoom) {
         emptyMention.closeMenu()
+        if (isConsoleMention(text)) {
+          handleSend(text, atts)
+          clearComposer()
+          return
+        }
         const mentioned = parseAgentMentions(text, mentionCandidates)
         if (mentioned.length > 0) {
+          saveRoomSticky(mentioned)
           await handleSendRoom(text, atts, mentioned)
         } else {
           // No @mention: continue with whoever holds the floor in this
-          // thread (e.g. answering Lex's questions goes back to Lex).
-          // Truly fresh threads still fall back to the direct console brain
-          // so the room never eats a message silently.
-          const fallback = inferRoomFallback(messages)
-          if (fallback.length > 0) {
-            await handleSendRoom(text, atts, fallback)
+          // thread (e.g. answering Lex's questions goes back to Lex), else
+          // the thread's own agent (direct-origin threads carry no
+          // per-bubble attribution), else a recent room sticky, else the
+          // direct console brain so the room never eats a message silently.
+          // Deployed-only: a disconnected agent fails loudly via toast
+          // instead of hanging a bubble.
+          const isDeployed = (t: string) => mentionCandidates.some((c) => c.type === t)
+          let targets = inferRoomFallback(messages).filter(isDeployed)
+          if (targets.length === 0) {
+            const threadAgent = sessions.find((s) => s.id === currentSessionId)?.agentType ?? null
+            if (threadAgent && isDeployed(threadAgent)) targets = [threadAgent]
+          }
+          if (targets.length === 0) {
+            targets = loadRoomSticky().filter(isDeployed)
+          }
+          if (targets.length > 0) {
+            saveRoomSticky(targets)
+            await handleSendRoom(text, atts, targets)
           } else {
             handleSend(text, atts)
           }
@@ -364,7 +384,7 @@ export default function ConsolePage() {
       }
       handleSend(text, atts)
     },
-    [tryWorkspaceCreate, inRoom, emptyMention, mentionCandidates, handleSendRoom, handleSend, setAttachments, messages],
+    [tryWorkspaceCreate, inRoom, emptyMention, mentionCandidates, handleSendRoom, handleSend, setAttachments, messages, sessions, currentSessionId],
   )
 
   // Fetch connected integrations from store
@@ -651,6 +671,10 @@ export default function ConsolePage() {
                   </div>
                   <button
                     onClick={() => {
+                      if (isStreaming) {
+                        stopStreaming()
+                        return
+                      }
                       if (inputValue.trim() || attachments.length > 0) {
                         handleSendWithWorkspace(inputValue, attachments)
                         setInputValue("")
@@ -658,10 +682,16 @@ export default function ConsolePage() {
                       }
                     }}
                     className="console-send-btn"
-                    aria-label={t('send')}
-                    disabled={isStreaming}
+                    aria-label={isStreaming ? t('stop') : t('send')}
+                    title={isStreaming ? t('stop') : undefined}
                   >
-                    ↑
+                    {isStreaming ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <rect x="6" y="6" width="12" height="12" rx="2" />
+                      </svg>
+                    ) : (
+                      "↑"
+                    )}
                   </button>
                 </div>
                 <button
@@ -838,6 +868,8 @@ export default function ConsolePage() {
                   enableMentions={inRoom}
                   mentionCandidates={mentionCandidates}
                   placeholder={inRoom ? t('sendPlaceholderRoom') : undefined}
+                  isStreaming={isStreaming}
+                  onStop={stopStreaming}
                 />
               </div>
             </div>

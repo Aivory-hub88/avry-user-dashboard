@@ -175,6 +175,7 @@
     "sendPlaceholder": "Send Message to Aivory...",
     "sendPlaceholderRoom": "Message the room — @ to mention an agent...",
     "send": "Send",
+    "stop": "Stop",
     "connectToolsTo": "connect your tools to",
     "dropFilesToAttach": "Drop files to attach",
     "connectorsTitle": "Connectors",
