@@ -115,9 +115,23 @@ const TOOLKIT_LABELS: Record<string, string> = {
   asana: 'Asana',
   erpnext: 'ERPNext',
   gmail: 'Gmail',
+  outlook: 'Outlook',
   googlecalendar: 'Google Calendar',
   trello: 'Trello',
   linear: 'Linear',
+};
+
+const TOOLKIT_ICONS: Record<string, string> = {
+  zendesk: '/integrations/zendesk.svg',
+  hubspot: '/integrations/hubspot.svg',
+  slack: '/integrations/slack.svg',
+  asana: '/integrations/asana.svg',
+  erpnext: '/integrations/erpnext.svg',
+  gmail: '/integrations/gmail.svg',
+  outlook: '/integrations/outlook.svg',
+  googlecalendar: '/integrations/icons/google-calendar.svg',
+  trello: '/integrations/trello.svg',
+  linear: '/integrations/linear.svg',
 };
 
 const CONNECTION_STATUS_STYLES: Record<ConnectedApp['status'], { label: string; className: string }> = {
@@ -1127,18 +1141,28 @@ export default function CustomizeAgentModal({
                   </div>
                 )}
                 {Object.entries(toolScope?.tools ?? {}).map(([slug, enabled]) => {
-                  const conn = (connections || []).find((c) => c.appId === slug && c.status === 'connected');
-                  const style = CONNECTION_STATUS_STYLES[conn ? 'connected' : 'revoked'];
+                  const conn = (connections || []).find((c) => c.appId === slug);
+                  const connected = conn?.status === 'connected';
+                  const style = CONNECTION_STATUS_STYLES[conn?.status ?? 'revoked'];
                   const busy = connectBusyId === slug || savingToolkit === slug;
                   const isApiKey = slug === 'erpnext';
                   const app = connectableApps.find((a) => a.id === slug);
+                  const iconPath = app?.iconPath || TOOLKIT_ICONS[slug];
+                  const label = TOOLKIT_LABELS[slug] || slug;
                   return (
                     <div key={slug} className="px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                       <div className="flex items-center justify-between gap-3">
                         <span className="flex items-center gap-2.5 text-white/80 text-[13px]">
-                          {TOOLKIT_LABELS[slug] || slug}
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06]">
+                            {iconPath ? (
+                              <Image src={asset(iconPath)} alt="" width={18} height={18} className="object-contain" />
+                            ) : (
+                              <span className="text-[11px] font-semibold text-white/60">{label.slice(0, 1)}</span>
+                            )}
+                          </span>
+                          <span>{label}</span>
                           <span className={`px-2 py-[2px] rounded-full border text-[10.5px] font-medium ${style.className}`}>
-                            {conn ? t('connected') : t('notConnected')}
+                            {connected ? t('connected') : t('notConnected')}
                           </span>
                         </span>
                         <span className="flex items-center gap-2 shrink-0">
@@ -1147,12 +1171,13 @@ export default function CustomizeAgentModal({
                               type="button"
                               disabled={busy}
                               onClick={() => {
-                                if (app) handleConnect(app);
+                                if (conn?.status === 'needs_reauth') handleReconnect(conn);
+                                else if (app) handleConnect(app);
                                 else setConnectFeedback({ type: 'error', message: t('connectStartError', { toolkit: TOOLKIT_LABELS[slug] || slug }) });
                               }}
                               className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/25 text-[var(--color-accent-text)] hover:bg-accent/25 text-[11px] font-medium disabled:opacity-40 transition-colors"
                             >
-                              {busy ? '…' : t('connect')}
+                              {busy ? '…' : conn?.status === 'needs_reauth' ? t('reconnect') : t('connect')}
                             </button>
                           )}
                           {isApiKey && (
@@ -1164,7 +1189,7 @@ export default function CustomizeAgentModal({
                               {apiKeyFormOpen ? t('close') : t('connect')}
                             </button>
                           )}
-                          {conn && (
+                          {connected && conn && (
                             <button
                               type="button"
                               disabled={connectBusyId === slug}
@@ -1178,8 +1203,8 @@ export default function CustomizeAgentModal({
                             type="button"
                             role="switch"
                             aria-checked={enabled}
-                            disabled={!conn || savingToolkit === slug}
-                            title={conn ? undefined : t('connectFirst')}
+                            disabled={!connected || savingToolkit === slug}
+                            title={connected ? undefined : t('connectFirst')}
                             onClick={() => toggleToolkit(slug, !enabled)}
                             className={`relative w-10 h-[22px] rounded-full transition-colors disabled:opacity-30 ${
                               enabled ? 'bg-accent/70' : 'bg-white/10'
