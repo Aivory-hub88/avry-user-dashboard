@@ -110,10 +110,15 @@ function RoomMembers({ candidates }: { candidates: MentionCandidate[] }) {
   }
   return (
     <div className="mb-2 flex w-full flex-wrap items-center justify-center gap-2 text-[12px] font-light text-white/45">
-      <span className="flex items-center -space-x-1.5">
+      {/* Gap, not overlap — these portraits aren't uniformly face-centered
+          (chief_of_staff needs its own objectPosition crop, see
+          AgentAvatar.tsx), so overlapping them let one neighbour's edge
+          swallow most of another's face. An evenly spaced row keeps every
+          portrait fully legible regardless of how each was cropped. */}
+      <span className="flex items-center gap-1">
         {candidates.map((c) => (
-          <span key={c.type} className="rounded-full ring-2 ring-surface-1">
-            <AgentAvatar type={c.type} size={20} />
+          <span key={c.type} className="rounded-full ring-1 ring-surface-1">
+            <AgentAvatar type={c.type} size={22} />
           </span>
         ))}
       </span>
