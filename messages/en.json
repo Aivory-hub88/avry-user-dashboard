@@ -756,13 +756,14 @@
       "Web search",
       "SLA workflows"
     ],
-    "leadsTitle": "Leads Qualifier Agent",
-    "leadsDesc": "Filter inbound leads using the BANT framework. Qualified leads are automatically routed to sales.",
+    "leadsTitle": "Sales and Lead Agent",
+    "leadsDesc": "Qualify inbound leads with BANT and run outbound sales plays — ICP, copy, list quality — routed to sales.",
     "leadsTools": [
       "BANT scoring",
       "Lead capture",
-      "Sales routing",
-      "Web search"
+      "Outbound copy",
+      "ICP & lists",
+      "Sales routing"
     ],
     "financeTitle": "Finance & Invoice Ops Agent",
     "financeDesc": "Automate invoice processing, anomaly detection, and multi-tier approval routing - end to end.",

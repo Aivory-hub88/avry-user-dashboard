@@ -756,13 +756,14 @@
       "Pencarian web",
       "Alur kerja SLA"
     ],
-    "leadsTitle": "Leads Qualifier Agent",
-    "leadsDesc": "Menyaring lead masuk menggunakan kerangka BANT. Lead yang memenuhi syarat otomatis diarahkan ke sales.",
+    "leadsTitle": "Sales and Lead Agent",
+    "leadsDesc": "Kualifikasi lead masuk dengan BANT dan jalankan playbook outbound sales — ICP, copy, kualitas list — ke sales.",
     "leadsTools": [
       "Skor BANT",
       "Penangkapan lead",
-      "Routing sales",
-      "Pencarian web"
+      "Copy outbound",
+      "ICP & list",
+      "Routing sales"
     ],
     "financeTitle": "Finance & Invoice Ops Agent",
     "financeDesc": "Otomatiskan pemrosesan invoice, deteksi anomali, dan routing persetujuan multi-tingkat - dari awal sampai akhir.",
