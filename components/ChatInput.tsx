@@ -25,6 +25,18 @@ interface ChatInputProps {
   onStop?: () => void
 }
 
+/** Shared send-button glyph: an enter/return arrow (corner-up-left). One
+ *  definition so the empty-state composer (console/page.tsx) and the
+ *  threaded input here can't drift apart. */
+export function SendArrowIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="9 14 4 9 9 4" />
+      <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+    </svg>
+  )
+}
+
 export default function ChatInput({ onSend, disabled = false, prefill, hasPendingFiles = false,
   pendingAttachments = [],
   onClearPendingAttachments,
@@ -282,9 +294,7 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
               disabled={!canSend}
               aria-label="Send"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 19V5M5 12l7-7 7 7" />
-              </svg>
+              <SendArrowIcon size={16} />
             </button>
           )}
         </div>

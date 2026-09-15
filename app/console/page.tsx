@@ -7,7 +7,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, type KeyboardEvent a
 import dynamic from "next/dynamic"
 import Image from "next/image"
 import ChatMessage from "@/components/ChatMessage"
-import ChatInput from "@/components/ChatInput"
+import ChatInput, { SendArrowIcon } from "@/components/ChatInput"
 import ConsoleTopBar, { type ConsoleChatMode } from "@/components/console/ConsoleTopBar"
 import AgentMentionMenu from "@/components/console/AgentMentionMenu"
 import SuggestionChips from "@/components/chat/SuggestionChips"
@@ -700,7 +700,7 @@ export default function ConsolePage() {
                         <rect x="6" y="6" width="12" height="12" rx="2" />
                       </svg>
                     ) : (
-                      "↑"
+                      <SendArrowIcon size={16} />
                     )}
                   </button>
                 </div>
