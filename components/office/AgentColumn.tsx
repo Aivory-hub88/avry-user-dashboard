@@ -154,7 +154,7 @@ export default function AgentColumn({
 
   if (collapsed) {
     return (
-      <div className="flex h-full w-full flex-col items-center border-r border-line bg-surface-1 pt-4">
+      <div className="flex h-full w-full flex-col items-center bg-surface-1 pt-4">
         <button
           onClick={onToggleCollapse}
           aria-label="Expand agent column"
