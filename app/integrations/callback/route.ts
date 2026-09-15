@@ -20,7 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveIntegrationUser } from '@/lib/integration-auth'
-import { getComposioClient } from '@/lib/composio'
+import { getComposioClient, getComposioRedirectUrl } from '@/lib/composio'
 import {
   classifyCallbackParams,
   buildIntegrationsRedirect,
@@ -108,7 +108,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   // The origin to build an absolute redirect against. `nextUrl` is preferred;
   // `url` is a robust fallback. `buildIntegrationsRedirect` degrades gracefully
   // to a relative `/integrations` path if neither yields a valid absolute URL.
-  const base = req.nextUrl?.origin ?? req.url
+  // Do not derive the public redirect from the container's request origin.
+  // Behind Traefik this can be `http://0.0.0.0:9001`; use the same explicit
+  // public callback URL registered with Composio instead. It also preserves
+  // Next's `/dashboard` base path when returning to the page.
+  const base = getComposioRedirectUrl()
 
   // 1. Gate the callback. On AuthError, redirect (do NOT return JSON) and
   //    perform no Composio work.

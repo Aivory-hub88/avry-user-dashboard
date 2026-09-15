@@ -218,7 +218,13 @@ export function buildIntegrationsRedirect(result: CallbackResult, base: string):
 
   try {
     const url = new URL(base)
-    url.pathname = '/integrations'
+    // The dashboard is mounted at `/dashboard` in production. Derive the
+    // return path from the registered callback instead of dropping that base
+    // path or hardcoding an internal origin.
+    const callbackSuffix = '/integrations/callback'
+    url.pathname = url.pathname.endsWith(callbackSuffix)
+      ? url.pathname.slice(0, -'/callback'.length)
+      : '/integrations'
     url.search = qs
     url.hash = ''
     return url.toString()
