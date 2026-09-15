@@ -88,11 +88,11 @@ export function NotificationCard({ icon, title, subtitle, meta, tone = "info", b
             </span>
           )}
           <div className="flex items-baseline gap-2">
-            <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold leading-snug text-white/90">{title}</span>
-            {meta && <span className="shrink-0 text-[11px] font-light tabular-nums text-white/35">{meta}</span>}
+            <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold leading-snug text-white">{title}</span>
+            {meta && <span className="shrink-0 text-[11px] font-light tabular-nums text-white/50">{meta}</span>}
           </div>
           {subtitle && (
-            <div className="mt-0.5 line-clamp-2 text-[12.5px] font-normal leading-[1.4] text-white/55">{subtitle}</div>
+            <div className="mt-0.5 line-clamp-2 text-[12.5px] font-normal leading-[1.4] text-white/75">{subtitle}</div>
           )}
         </div>
       </div>

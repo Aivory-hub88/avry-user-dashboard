@@ -65,7 +65,7 @@ function Bar({ tone = "idle", children }: { tone?: "idle" | "warn"; children: Re
   return (
     <div
       className={`w-full rounded-lg px-3.5 py-2.5 text-[12.5px] font-light leading-[1.55] ${
-        tone === "warn" ? "bg-amber/10 text-white/70" : "bg-white/[0.035] text-white/45"
+        tone === "warn" ? "bg-amber/10 text-white/70" : "bg-white/[0.035] text-white/80"
       }`}
     >
       {children}
@@ -187,7 +187,7 @@ export default function AgentRail({
 
   if (collapsed) {
     return (
-      <div className="flex h-full w-full flex-col items-center border-l border-line bg-surface-2 pt-4">
+      <div className="flex h-full w-full flex-col items-center border-l border-line bg-[#0f0f11] pt-4">
         <button
           onClick={onToggleCollapse}
           aria-label="Expand agent panel"
@@ -207,8 +207,8 @@ export default function AgentRail({
   }
 
   return (
-    <div className="flex h-full w-full flex-col border-l border-line bg-surface-2">
-      <div className="flex h-12 shrink-0 items-center gap-[10px] border-b border-line px-4">
+    <div className="flex h-full w-full flex-col border-l border-line bg-[#0f0f11]">
+      <div className="flex h-12 shrink-0 items-center gap-[10px] border-b border-transparent bg-[#0f0f11]/70 px-4 backdrop-blur-xl">
         <button
           onClick={onToggleCollapse}
           aria-label="Collapse agent panel"
@@ -222,7 +222,7 @@ export default function AgentRail({
             font-size on any heading tag, which is what made this render at
             24px regardless of the class here. This is chrome, not a page
             heading. */}
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-none text-white/55">{title}</span>
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-none text-white">{title}</span>
         {agentTarget !== null && (
           <button
             onClick={() => setMemoryOpen(true)}
@@ -260,7 +260,7 @@ export default function AgentRail({
             <section className="flex flex-col gap-[8px]">
               <div className="flex items-baseline gap-[7px] px-0.5">
                 <span className="text-[12px] font-semibold leading-none text-white/65">Notifications</span>
-                <span className={`text-[11px] ${notifications.length > 0 ? "text-amber" : "text-white/30"}`}>
+                <span className={`text-[11px] ${notifications.length > 0 ? "text-amber" : "text-white/50"}`}>
                   {notifications.length}
                 </span>
               </div>
@@ -299,7 +299,7 @@ export default function AgentRail({
                 />
               )}
               {!approvalsError && notifications.length === 0 && !notDeployed && (
-                <div className="px-0.5 text-[12.5px] font-light text-white/35">Nothing new right now.</div>
+                <div className="px-0.5 text-[12.5px] font-light text-white/70">Nothing new right now.</div>
               )}
 
               {approvalItems.map(({ approval: a }) => {
@@ -425,11 +425,11 @@ export default function AgentRail({
 
              {visibleAwarenessPeers.length > 0 && (
               <section className="mt-[20px] flex flex-col gap-[8px]">
-                <span className="px-0.5 text-[12px] font-semibold leading-none text-white/65">Active in Workspace</span>
+                <span className="px-0.5 text-[12px] font-semibold leading-none text-white">Active in Workspace</span>
                 <Bar tone="idle">
                   <span className="flex flex-wrap items-center gap-1.5">
                     <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
-                    <span className="text-white/60">
+                    <span className="text-white/85">
                        {visibleAwarenessPeers.map((p) => p.name).join(" · ")} · {visibleAwarenessPeers.length} active collaborator
                       {visibleAwarenessPeers.length !== 1 ? "s" : ""}
                     </span>
@@ -452,12 +452,12 @@ export default function AgentRail({
             )}
 
             <section className="mt-[20px] flex flex-col gap-[8px]">
-              <span className="px-0.5 text-[12px] font-semibold leading-none text-white/65">Running now</span>
+              <span className="px-0.5 text-[12px] font-semibold leading-none text-white">Running now</span>
               {activeRun ? (
                 <Bar tone="idle">
                   <span className="flex items-center gap-[7px]">
                     <span className="h-[7px] w-[7px] shrink-0 animate-pulse rounded-full bg-emerald-400" />
-                    <span className="text-white/70">
+                    <span className="text-white/85">
                       {(() => {
                         const channelName = CHANNEL_LABEL[activeRun.channel ?? ""]
                         const label = channelName ? `a ${channelName} message` : "a message"
@@ -476,7 +476,7 @@ export default function AgentRail({
 
             {channels.length > 0 && (
               <section className="mt-[20px] flex flex-col gap-[8px]">
-                <span className="px-0.5 text-[12px] font-semibold leading-none text-white/65">Connected channels</span>
+                <span className="px-0.5 text-[12px] font-semibold leading-none text-white">Connected channels</span>
                 {channels.map((c) => (
                   <Bar key={c.id} tone="idle">
                     <span className="flex items-center gap-[7px]">
@@ -485,7 +485,7 @@ export default function AgentRail({
                       ) : (
                         <span className="h-[6px] w-[6px] shrink-0 rounded-full bg-accent" />
                       )}
-                      <span className="truncate text-white/75">{c.label}</span>
+                      <span className="truncate text-white/90">{c.label}</span>
                     </span>
                   </Bar>
                 ))}

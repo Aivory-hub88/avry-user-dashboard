@@ -23,7 +23,7 @@ export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, r
   const inRoom = chatMode === "room"
 
   return (
-    <div className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-surface-1 px-6 sticky top-0 z-10">
+    <div className="flex h-12 shrink-0 items-center justify-between border-b border-transparent bg-surface-1/70 px-6 sticky top-0 z-10 backdrop-blur-xl">
       <div className="flex items-center gap-2 text-[13px] font-medium text-white/80">
         {inRoom ? (
           <span className="text-[13px] font-medium text-white/80">Mission Control Room</span>
