@@ -3,6 +3,7 @@ import {
   buildRoomPayload,
   candidateOf,
   getMentionCandidates,
+  inferRoomFallback,
   parseAgentMentions,
   stripAgentMentions,
 } from "@/lib/agentMentions"
@@ -80,8 +81,7 @@ describe("stripAgentMentions", () => {
   })
 })
 
-describe("candidateOf", () => {
-  it("resolves roster entries", () => {
+describe("candidateOf", () => {  it("resolves roster entries", () => {
     expect(candidateOf("customer_service")).toMatchObject({ name: "Teo" })
   })
 
@@ -137,5 +137,56 @@ describe("buildRoomPayload", () => {
     })
     expect(p.length).toBeLessThan(2000)
     expect(p).toContain("…")
+  })
+})
+
+describe("inferRoomFallback", () => {
+  it("returns the agent holding the floor after its questions", () => {
+    expect(
+      inferRoomFallback([
+        { role: "user" },
+        { role: "assistant", agentType: "leads_qualifier" },
+      ]),
+    ).toEqual(["leads_qualifier"])
+  })
+
+  it("returns the whole latest round in speaking order", () => {
+    expect(
+      inferRoomFallback([
+        { role: "user" },
+        { role: "assistant", agentType: "autonomous" },
+        { role: "assistant", agentType: "customer_service" },
+      ]),
+    ).toEqual(["autonomous", "customer_service"])
+  })
+
+  it("stops at the previous round's user message", () => {
+    expect(
+      inferRoomFallback([
+        { role: "user" },
+        { role: "assistant", agentType: "autonomous" },
+        { role: "user" },
+        { role: "assistant", agentType: "leads_qualifier" },
+      ]),
+    ).toEqual(["leads_qualifier"])
+  })
+
+  it("ignores console replies and empty threads", () => {
+    expect(inferRoomFallback([])).toEqual([])
+    expect(
+      inferRoomFallback([
+        { role: "user" },
+        { role: "assistant", agentType: null },
+      ]),
+    ).toEqual([])
+  })
+
+  it("stops at in-flight placeholders", () => {
+    expect(
+      inferRoomFallback([
+        { role: "user" },
+        { role: "assistant", agentType: "autonomous", isStreaming: true },
+      ]),
+    ).toEqual([])
   })
 })

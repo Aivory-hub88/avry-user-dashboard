@@ -22,7 +22,7 @@ import { useNotificationFeed } from "@/hooks/useNotificationFeed"
 import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { useActiveRuns } from "@/hooks/useActiveRuns"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
-import { getMentionCandidates, parseAgentMentions, type MentionCandidate } from "@/lib/agentMentions"
+import { getMentionCandidates, parseAgentMentions, inferRoomFallback, type MentionCandidate } from "@/lib/agentMentions"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import type { Attachment } from "@/components/UploadMenu"
@@ -348,16 +348,23 @@ export default function ConsolePage() {
         if (mentioned.length > 0) {
           await handleSendRoom(text, atts, mentioned)
         } else {
-          // No @mention — plain message still goes to the direct console
-          // brain so the room never eats a message silently.
-          handleSend(text, atts)
+          // No @mention: continue with whoever holds the floor in this
+          // thread (e.g. answering Lex's questions goes back to Lex).
+          // Truly fresh threads still fall back to the direct console brain
+          // so the room never eats a message silently.
+          const fallback = inferRoomFallback(messages)
+          if (fallback.length > 0) {
+            await handleSendRoom(text, atts, fallback)
+          } else {
+            handleSend(text, atts)
+          }
         }
         clearComposer()
         return
       }
       handleSend(text, atts)
     },
-    [tryWorkspaceCreate, inRoom, emptyMention, mentionCandidates, handleSendRoom, handleSend, setAttachments],
+    [tryWorkspaceCreate, inRoom, emptyMention, mentionCandidates, handleSendRoom, handleSend, setAttachments, messages],
   )
 
   // Fetch connected integrations from store

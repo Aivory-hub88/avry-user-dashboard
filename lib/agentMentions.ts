@@ -108,6 +108,15 @@ export function candidateOf(type: string): MentionCandidate | null {
   return r ? { type, name: r.name, title: r.title, channels: [] } : null
 }
 
+// ── Room continuity ─────────────────────────────────────────────────────
+// A bare follow-up (no @mention) must continue with whoever is active in
+// this thread — not fall back to the console brain. The open thread just
+// asked Lex three questions; answering them without "@Lex" must still reach
+// Lex. So: take the agent types off the latest assistant round (assistant
+// bubbles since the last user message), oldest-first for speaking order.
+// Empty thread, console-only history, or in-flight placeholders yield []
+// and the caller keeps the direct-console fallback.
+
 // ── Room group-chat context (LobeHub RFC-130 style) ─────────────────────────
 // LobeHub's group chat works because every agent receives the same three
 // things, not just the raw user text: (1) who is in the room and who they
@@ -125,6 +134,27 @@ export function candidateOf(type: string): MentionCandidate | null {
 export interface RoomHistoryEntry {
   author: string
   text: string
+}
+
+export interface ThreadMessage {
+  role: "user" | "assistant"
+  agentType?: string | null
+  isStreaming?: boolean
+}
+
+/**
+ * Agent types holding the floor in this thread's latest round. Walks back
+ * from the newest message while it keeps seeing finished assistant bubbles;
+ * stops at the first user message (previous round) or streaming placeholder.
+ */
+export function inferRoomFallback(messages: ThreadMessage[]): string[] {
+  const reversed: string[] = []
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (m.role !== "assistant" || m.isStreaming) break
+    if (m.agentType && !reversed.includes(m.agentType)) reversed.push(m.agentType)
+  }
+  return reversed.reverse()
 }
 
 export interface RoomPayloadParams {
