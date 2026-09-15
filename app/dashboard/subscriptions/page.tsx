@@ -126,7 +126,7 @@ export default function SubscriptionsPage() {
             {Object.entries(PLANS).filter(([key]) => key !== currentTier).map(([key, plan]) => (
               <div
                 key={key}
-                className="rounded-lg border border-white/[0.07] bg-[#353531]/50 p-4 hover:bg-[#353531] transition-colors"
+                className="rounded-lg border border-white/[0.07] bg-[var(--bg-main)]/50 p-4 hover:bg-[var(--bg-main)] transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div>

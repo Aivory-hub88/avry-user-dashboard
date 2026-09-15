@@ -168,7 +168,7 @@
 .textarea:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px rgba(178, 204, 162, 0.1);
+  box-shadow: 0 0 0 2px rgb(from var(--color-accent-workflow) r g b / 0.1);
 }
 
 .textarea:disabled {
@@ -311,7 +311,7 @@
 
 .askAivoryBtn:hover:not(:disabled) {
   background: #00d48a;
-  box-shadow: 0 2px 8px rgba(178, 204, 162, 0.2);
+  box-shadow: 0 2px 8px rgb(from var(--color-accent-workflow) r g b / 0.2);
 }
 
 .askAivoryBtn:disabled {
@@ -326,7 +326,7 @@
 
 .applyBtn:hover {
   background: #00d48a;
-  box-shadow: 0 2px 8px rgba(178, 204, 162, 0.2);
+  box-shadow: 0 2px 8px rgb(from var(--color-accent-workflow) r g b / 0.2);
 }
 
 .manualBtn {

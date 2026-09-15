@@ -446,17 +446,17 @@ export default function FinalResultPage() {
   const riskRegisterCaption = buildRiskRegisterCaption(risks, locale)
 
   const assessmentBullets: { icon: string; color: string; text: string }[] = locale === 'id' ? [
-    { icon: '▲', color: '#afd199', text: `Perusahaan/organisasi Anda memperoleh skor ${displayScores.composite}/100, berada pada kematangan ${maturityLevelLabel(displayScores.maturityLevel, locale)}.${_llmScore != null ? ' (komposit gabungan 70% deterministik + 30% asesmen AI)' : ''}` },
-    { icon: '▲', color: '#afd199', text: `Dimensi terkuat: ${humanizeDimensionKey(scores.strongestDimension, locale)}.` },
+    { icon: '▲', color: 'var(--color-accent-report)', text: `Perusahaan/organisasi Anda memperoleh skor ${displayScores.composite}/100, berada pada kematangan ${maturityLevelLabel(displayScores.maturityLevel, locale)}.${_llmScore != null ? ' (komposit gabungan 70% deterministik + 30% asesmen AI)' : ''}` },
+    { icon: '▲', color: 'var(--color-accent-report)', text: `Dimensi terkuat: ${humanizeDimensionKey(scores.strongestDimension, locale)}.` },
     { icon: '▽', color: '#fbbf24', text: `Kesenjangan terbesar: ${humanizeDimensionKey(scores.weakestDimension, locale)}.` },
     { icon: '▽', color: '#fbbf24', text: `${highRiskCount} risiko tingkat tinggi teridentifikasi.` },
-    { icon: '▶', color: '#afd199', text: `${quickWinCount} peluang quick win tersedia.` },
+    { icon: '▶', color: 'var(--color-accent-report)', text: `${quickWinCount} peluang quick win tersedia.` },
   ] : [
-    { icon: '▲', color: '#afd199', text: `Your company / organisation scores ${displayScores.composite}/100, placing it at ${maturityLevelLabel(displayScores.maturityLevel, locale)} maturity.${_llmScore != null ? ' (composite blended 70% deterministic + 30% AI assessment)' : ''}` },
-    { icon: '▲', color: '#afd199', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension, locale)}.` },
+    { icon: '▲', color: 'var(--color-accent-report)', text: `Your company / organisation scores ${displayScores.composite}/100, placing it at ${maturityLevelLabel(displayScores.maturityLevel, locale)} maturity.${_llmScore != null ? ' (composite blended 70% deterministic + 30% AI assessment)' : ''}` },
+    { icon: '▲', color: 'var(--color-accent-report)', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension, locale)}.` },
     { icon: '▽', color: '#fbbf24', text: `Greatest gap: ${humanizeDimensionKey(scores.weakestDimension, locale)}.` },
     { icon: '▽', color: '#fbbf24', text: `${highRiskCount} high-severity risk${highRiskCount !== 1 ? 's' : ''} identified.` },
-    { icon: '▶', color: '#afd199', text: `${quickWinCount} quick-win opportunit${quickWinCount !== 1 ? 'ies' : 'y'} available.` },
+    { icon: '▶', color: 'var(--color-accent-report)', text: `${quickWinCount} quick-win opportunit${quickWinCount !== 1 ? 'ies' : 'y'} available.` },
   ]
 
   const sortedRisks = [...risks].sort((a, b) => {
@@ -600,7 +600,7 @@ export default function FinalResultPage() {
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>{locale === 'id' ? 'Terkuat' : 'Strongest'}</span>
                 <span className={styles.summaryValue}>{humanizeDimensionKey(scores.strongestDimension, locale)}</span>
-                <span className={styles.summaryBar} style={{ background: '#afd199' }} />
+                <span className={styles.summaryBar} style={{ background: 'var(--color-accent-report)' }} />
               </div>
               <div className={styles.summaryItem}>
                 <span className={styles.summaryLabel}>{locale === 'id' ? 'Terlemah' : 'Weakest'}</span>

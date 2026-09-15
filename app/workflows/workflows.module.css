@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────
    AIVORY WORKFLOW EDITOR — unified dark warm theme
    Color system:
-     Canvas bg:      var(--bg-main, #353531)
+     Canvas bg:      var(--bg-main)
      Sidebar bg:     rgba(255,255,255,0.02)
      Card surface:   rgba(255,255,255,0.055)
      Header bg:      rgba(255,255,255,0.025)
@@ -16,7 +16,7 @@
   display: flex;
   height: 100vh;
   overflow: hidden;
-  background: var(--bg-main, #353531);
+  background: var(--bg-main);
   font-family: 'Manrope', 'Manrope', system-ui, sans-serif;
 }
 
@@ -27,7 +27,7 @@
   justify-content: center;
   width: 100%;
   height: 100vh;
-  background: var(--bg-main, #353531);
+  background: var(--bg-main);
 }
 .emptyContent {
   text-align: center;
@@ -60,7 +60,7 @@
   margin: 0 0 28px;
 }
 .emptyCTA {
-  background: #353532;
+  background: var(--bg-main);
   color: var(--text-secondary);
   border: 1px solid #666864;
   border-radius: 10px;
@@ -293,7 +293,7 @@
   min-height: 0;
   height: 100%;
   position: relative;
-  background-color: var(--bg-main, #353531);
+  background-color: var(--bg-main);
   background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
   background-size: 24px 24px;
 }
@@ -404,7 +404,7 @@
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  background: #353531;
+  background: var(--bg-main);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px;
   padding: 6px;
@@ -561,7 +561,7 @@
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  background: #353531;
+  background: var(--bg-main);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px;
   padding: 6px;
@@ -1033,7 +1033,7 @@
   backdrop-filter: blur(2px);
 }
 .aiModal {
-  background: var(--bg-main, #353531);
+  background: var(--bg-main);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 16px;
   padding: 28px;
@@ -1094,7 +1094,7 @@
 }
 .aiModalCancel:hover { background: rgba(255,255,255,0.07); color: #e8e6e1; }
 .aiModalSubmit {
-  background: #353532;
+  background: var(--bg-main);
   border: 1px solid #666864;
   border-radius: 9px;
   color: #1a1a1a;
@@ -1152,7 +1152,7 @@
 
 /* ── Save Workflow modal ─────────────────────────────────── */
 .saveModal {
-  background: var(--bg-main, #353531);
+  background: var(--bg-main);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 16px;
   padding: 28px;
@@ -1265,7 +1265,7 @@
 
 /* ── React Flow customisation ────────────────────────────── */
 .canvasBody :global(.react-flow__container) {
-  background-color: var(--bg-main, #353531);
+  background-color: var(--bg-main);
   background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
   background-size: 24px 24px;
 }
@@ -1292,7 +1292,7 @@
 }
 .canvasBody :global(.react-flow__handle) {
   background: #a8a6a2;
-  border: 2px solid var(--bg-main, #353531);
+  border: 2px solid var(--bg-main);
   width: 10px;
   height: 10px;
 }
@@ -1785,7 +1785,7 @@
   justify-content: center;
   width: 100%;
   height: 100vh;
-  background-color: var(--bg-main, #353531);
+  background-color: var(--bg-main);
   background-image: radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px);
   background-size: 24px 24px;
   overflow: hidden;

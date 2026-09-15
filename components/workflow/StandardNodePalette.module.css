@@ -117,5 +117,5 @@
 .searchInput:focus {
   outline: none;
   background: rgba(255, 255, 255, 0.045);
-  border-color: rgba(183, 203, 166, 0.35);
+  border-color: rgb(from var(--color-accent) r g b / 0.35);
 }

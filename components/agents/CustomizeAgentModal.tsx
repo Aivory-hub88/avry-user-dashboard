@@ -121,7 +121,7 @@ const TOOLKIT_LABELS: Record<string, string> = {
 };
 
 const CONNECTION_STATUS_STYLES: Record<ConnectedApp['status'], { label: string; className: string }> = {
-  connected: { label: 'Connected', className: 'bg-accent/15 border-accent/25 text-[#dbe5d3]' },
+  connected: { label: 'Connected', className: 'bg-accent/15 border-accent/25 text-[var(--color-accent-text)]' },
   needs_reauth: { label: 'Needs reconnect', className: 'bg-amber-warn/15 border-amber-warn/25 text-amber-warn' },
   revoked: { label: 'Revoked', className: 'bg-white/[0.06] border-white/10 text-white/40' },
 };
@@ -256,7 +256,7 @@ function MultiSelect({
             {selected.map((v) => (
               <span
                 key={v}
-                className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-accent/15 border border-accent/25 text-[#dbe5d3] text-[11px]"
+                className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full bg-accent/15 border border-accent/25 text-[var(--color-accent-text)] text-[11px]"
               >
                 {v}
                 <span
@@ -264,7 +264,7 @@ function MultiSelect({
                   tabIndex={0}
                   onClick={(e) => { e.stopPropagation(); toggle(v); }}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); toggle(v); } }}
-                  className="text-[#dbe5d3]/60 hover:text-white leading-none cursor-pointer"
+                  className="text-[var(--color-accent-text)]/60 hover:text-white leading-none cursor-pointer"
                   aria-label={t('removeSelection', { value: v })}
                 >
                   ×
@@ -1008,7 +1008,7 @@ export default function CustomizeAgentModal({
                   tabKey === 'mcp' ? '' : 'capitalize'
                 } ${
                   tab === tabKey
-                    ? 'text-[#dbe5d3] border-accent'
+                    ? 'text-[var(--color-accent-text)] border-accent'
                     : 'text-white/40 hover:text-white/65 border-transparent'
                 }`}
               >
@@ -1150,7 +1150,7 @@ export default function CustomizeAgentModal({
                                 if (app) handleConnect(app);
                                 else setConnectFeedback({ type: 'error', message: t('connectStartError', { toolkit: TOOLKIT_LABELS[slug] || slug }) });
                               }}
-                              className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/25 text-[#dbe5d3] hover:bg-accent/25 text-[11px] font-medium disabled:opacity-40 transition-colors"
+                              className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/25 text-[var(--color-accent-text)] hover:bg-accent/25 text-[11px] font-medium disabled:opacity-40 transition-colors"
                             >
                               {busy ? '…' : t('connect')}
                             </button>
@@ -1159,7 +1159,7 @@ export default function CustomizeAgentModal({
                             <button
                               type="button"
                               onClick={() => { setApiKeyFormOpen((v) => !v); setApiKeyError(null); }}
-                              className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/25 text-[#dbe5d3] hover:bg-accent/25 text-[11px] font-medium transition-colors"
+                              className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/25 text-[var(--color-accent-text)] hover:bg-accent/25 text-[11px] font-medium transition-colors"
                             >
                               {apiKeyFormOpen ? t('close') : t('connect')}
                             </button>
@@ -1226,7 +1226,7 @@ export default function CustomizeAgentModal({
                             type="button"
                             disabled={apiKeyBusy}
                             onClick={handleErpNextConnect}
-                            className="w-full px-3 py-2 rounded-lg bg-accent/15 border border-accent/25 text-[#dbe5d3] hover:bg-accent/25 text-[12px] font-medium disabled:opacity-40 transition-colors"
+                            className="w-full px-3 py-2 rounded-lg bg-accent/15 border border-accent/25 text-[var(--color-accent-text)] hover:bg-accent/25 text-[12px] font-medium disabled:opacity-40 transition-colors"
                           >
                             {apiKeyBusy ? t('connecting') : t('saveAndConnect')}
                           </button>
@@ -1259,7 +1259,7 @@ export default function CustomizeAgentModal({
                     {mcpServers.map((s) => {
                       const style =
                         s.status === 'verified'
-                          ? { label: s.tool_count != null ? t('mcpVerifiedTools', { count: s.tool_count }) : t('mcpVerified'), className: 'bg-accent/15 border-accent/25 text-[#dbe5d3]' }
+                          ? { label: s.tool_count != null ? t('mcpVerifiedTools', { count: s.tool_count }) : t('mcpVerified'), className: 'bg-accent/15 border-accent/25 text-[var(--color-accent-text)]' }
                           : s.status === 'verification_failed'
                             ? { label: t('mcpVerificationFailed'), className: 'bg-red-500/10 border-red-500/20 text-red-300/90' }
                             : { label: t('mcpVerifying'), className: 'bg-amber-warn/15 border-amber-warn/25 text-amber-warn' };
@@ -1334,7 +1334,7 @@ export default function CustomizeAgentModal({
                                   type="button"
                                   disabled={mcpBusyId === s.id}
                                   onClick={() => handleReverifyMcpServer(s.id)}
-                                  className="text-[#dbe5d3]/70 hover:text-[#dbe5d3] text-[11.5px] disabled:opacity-40"
+                                  className="text-[var(--color-accent-text)]/70 hover:text-[var(--color-accent-text)] text-[11.5px] disabled:opacity-40"
                                 >
                                   {mcpBusyId === s.id ? t('mcpReverifyWorking') : t('mcpReverify')}
                                 </button>
@@ -1470,7 +1470,7 @@ export default function CustomizeAgentModal({
                           type="button"
                           onClick={handleConnectOdoo}
                           disabled={mcpRegistering}
-                          className="w-full py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50"
+                          className="w-full py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[var(--color-accent-text)] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50"
                         >
                           {mcpRegistering ? t('mcpRegistering') : t('mcpRegisterButton')}
                         </button>
@@ -1530,7 +1530,7 @@ export default function CustomizeAgentModal({
                                       onClick={() => setMcpForm((f) => ({ ...f, transport: transportOption }))}
                                       className={`px-3.5 py-2 rounded-lg border text-[12.5px] transition-colors ${
                                         mcpForm.transport === transportOption
-                                          ? 'bg-accent/15 border-accent/30 text-[#dbe5d3]'
+                                          ? 'bg-accent/15 border-accent/30 text-[var(--color-accent-text)]'
                                           : 'bg-white/[0.04] border-white/10 text-white/50 hover:text-white/75'
                                       }`}
                                     >
@@ -1562,7 +1562,7 @@ export default function CustomizeAgentModal({
                           type="button"
                           onClick={handleRegisterMcpServer}
                           disabled={mcpRegistering}
-                          className="w-full py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50"
+                          className="w-full py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[var(--color-accent-text)] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50"
                         >
                           {mcpRegistering ? t('mcpRegistering') : t('mcpRegisterButton')}
                         </button>
@@ -1961,7 +1961,7 @@ export default function CustomizeAgentModal({
                     <button
                       onClick={startApiKeyCreate}
                       disabled={deployLoading}
-                      className="w-full py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50"
+                      className="w-full py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[var(--color-accent-text)] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50"
                     >
                       {deployLoading ? t('creating') : t('createApiKey')}
                     </button>
@@ -1969,7 +1969,7 @@ export default function CustomizeAgentModal({
                 ) : (
                   <>
                     <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 mb-2">
-                      <code className="flex-1 text-[12px] text-[#dbe5d3] break-all">{createdKey.key}</code>
+                      <code className="flex-1 text-[12px] text-[var(--color-accent-text)] break-all">{createdKey.key}</code>
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText(createdKey.key);
@@ -2010,7 +2010,7 @@ export default function CustomizeAgentModal({
             <button
               onClick={handleSave}
               disabled={saving || loading}
-              className="flex-1 py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[var(--color-accent-text)] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? t('saving') : saved ? t('saved') : t('saveIdentity')}
             </button>

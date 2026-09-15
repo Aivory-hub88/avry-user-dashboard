@@ -39,7 +39,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${manrope.variable} ${nunito.variable}`}>
-      <body className={`flex h-screen bg-[#353531] overflow-hidden ${manrope.className}`}>
+      <body className={`flex h-screen bg-[var(--bg-main)] overflow-hidden ${manrope.className}`}>
         <TokenInitializer />
         <LocaleWrapper>
           <ModeProvider>

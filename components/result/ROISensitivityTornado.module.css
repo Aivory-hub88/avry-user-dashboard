@@ -44,7 +44,7 @@
   position: absolute;
   inset: 0;
   border-radius: 5px;
-  background: linear-gradient(90deg, #fbbf24, #afd199 55%, #60a5fa);
+  background: linear-gradient(90deg, #fbbf24, var(--color-accent-report) 55%, #60a5fa);
   opacity: 0.85;
 }
 

@@ -235,7 +235,7 @@
 
 /* FIX: padding lebih lega, gap antar elemen lebih proporsional */
 .appCard {
-  background: #353532;
+  background: var(--bg-main);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 9px;
   padding: 20px 16px 16px;
@@ -521,7 +521,7 @@
 }
 
 .providerBtn:hover {
-  background: #353532;
+  background: var(--bg-main);
   border-color: #7a7a78;
 }
 

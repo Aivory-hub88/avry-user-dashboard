@@ -12,7 +12,7 @@
 }
 
 .modal {
-  background: var(--bg-main, #353531);
+  background: var(--bg-main);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   width: 480px;

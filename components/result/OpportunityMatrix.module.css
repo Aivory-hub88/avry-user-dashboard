@@ -63,7 +63,7 @@
 .labelThankless { fill: #e08a8a; }
 .labelNeutral { fill: #8f9089; }
 
-.quadQuickWin { fill: rgba(175, 209, 153, 0.06); }
+.quadQuickWin { fill: rgb(from var(--color-accent-report) r g b / 0.06); }
 .quadMajorProject { fill: rgba(96, 165, 250, 0.04); }
 .quadFillIn { fill: rgba(255, 255, 255, 0.015); }
 .quadThankless { fill: rgba(248, 113, 113, 0.05); }

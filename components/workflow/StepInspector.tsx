@@ -128,7 +128,7 @@ export function StepInspector({ selectedNodeId, nodeData, onChange, collapsed = 
                     placeholder="Describe what happens in this step."
                     value={localTitle}
                     onChange={(e) => setLocalTitle(e.target.value)}
-                    onFocus={(e) => { (e.target as HTMLTextAreaElement).style.borderColor = 'rgba(178, 204, 162,0.4)' }}
+                    onFocus={(e) => { (e.target as HTMLTextAreaElement).style.borderColor = 'rgb(from var(--color-accent-workflow) r g b / 0.4)' }}
                     onBlur={(e) => { (e.target as HTMLTextAreaElement).style.borderColor = 'rgba(255,255,255,0.08)' }}
                   />
                 </div>
@@ -140,7 +140,7 @@ export function StepInspector({ selectedNodeId, nodeData, onChange, collapsed = 
                     placeholder="e.g. Salesforce REST API"
                     value={localSubtitle}
                     onChange={(e) => setLocalSubtitle(e.target.value)}
-                    onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = 'rgba(178, 204, 162,0.4)' }}
+                    onFocus={(e) => { (e.target as HTMLInputElement).style.borderColor = 'rgb(from var(--color-accent-workflow) r g b / 0.4)' }}
                     onBlur={(e) => { (e.target as HTMLInputElement).style.borderColor = 'rgba(255,255,255,0.08)' }}
                   />
                 </div>
@@ -153,7 +153,7 @@ export function StepInspector({ selectedNodeId, nodeData, onChange, collapsed = 
                     placeholder="What data or result does this step produce?"
                     value={localDescription}
                     onChange={(e) => setLocalDescription(e.target.value)}
-                    onFocus={(e) => { (e.target as HTMLTextAreaElement).style.borderColor = 'rgba(178, 204, 162,0.4)' }}
+                    onFocus={(e) => { (e.target as HTMLTextAreaElement).style.borderColor = 'rgb(from var(--color-accent-workflow) r g b / 0.4)' }}
                     onBlur={(e) => { (e.target as HTMLTextAreaElement).style.borderColor = 'rgba(255,255,255,0.08)' }}
                   />
                 </div>
@@ -163,9 +163,9 @@ export function StepInspector({ selectedNodeId, nodeData, onChange, collapsed = 
                 <button
                   type="button"
                   onClick={handleApply}
-                  style={{ width: '100%', background: 'rgba(178, 204, 162,0.1)', border: '1px solid rgba(178, 204, 162,0.3)', borderRadius: 8, padding: '9px 12px', fontSize: 12, fontWeight: 600, color: 'var(--color-accent)', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
-                  onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.background = 'rgba(178, 204, 162,0.16)' }}
-                  onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.background = 'rgba(178, 204, 162,0.1)' }}
+                  style={{ width: '100%', background: 'rgb(from var(--color-accent-workflow) r g b / 0.1)', border: '1px solid rgb(from var(--color-accent-workflow) r g b / 0.3)', borderRadius: 8, padding: '9px 12px', fontSize: 12, fontWeight: 600, color: 'var(--color-accent)', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
+                  onMouseEnter={(e) => { (e.target as HTMLButtonElement).style.background = 'rgb(from var(--color-accent-workflow) r g b / 0.16)' }}
+                  onMouseLeave={(e) => { (e.target as HTMLButtonElement).style.background = 'rgb(from var(--color-accent-workflow) r g b / 0.1)' }}
                 >
                   Update Step
                 </button>

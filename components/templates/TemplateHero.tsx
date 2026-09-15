@@ -8,7 +8,7 @@ export default function TemplateHero() {
       className="relative w-full rounded-2xl overflow-hidden p-6 md:p-8 mb-8 border border-white/[0.06] shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
       style={{
         background: [
-          'radial-gradient(ellipse 90% 120% at 10% 0%, rgba(183,203,166,0.14) 0%, transparent 55%)',
+          'radial-gradient(ellipse 90% 120% at 10% 0%, rgb(from var(--color-accent) r g b / 0.14) 0%, transparent 55%)',
           'radial-gradient(ellipse 70% 90% at 92% 100%, rgba(221,218,197,0.09) 0%, transparent 55%)',
           'linear-gradient(135deg, #46483f 0%, #3a3c34 55%, #2c2e27 100%)',
         ].join(', '),

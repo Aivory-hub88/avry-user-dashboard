@@ -993,7 +993,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
         <div style={{
           flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative',
           background: [
-            'radial-gradient(ellipse 70% 60% at 20% 10%, rgba(183,203,166,0.035) 0%, transparent 55%)',
+            'radial-gradient(ellipse 70% 60% at 20% 10%, rgb(from var(--color-accent) r g b / 0.035) 0%, transparent 55%)',
             'radial-gradient(ellipse 60% 50% at 90% 90%, rgba(221,218,197,0.03) 0%, transparent 55%)',
           ].join(', '),
         }}>
@@ -1011,7 +1011,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
               zIndex: 10,
               width: 20,
               height: 48,
-              background: 'var(--surface-secondary, #353531)',
+              background: 'var(--surface-secondary, var(--bg-main))',
               border: '1px solid var(--border-subtle, rgba(255,255,255,0.07))',
               borderRight: 'none',
               borderRadius: '6px 0 0 6px',
@@ -1031,7 +1031,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
               e.currentTarget.style.color = 'var(--text-primary, #e8e6e3)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'var(--surface-secondary, #353531)';
+              e.currentTarget.style.background = 'var(--surface-secondary, var(--bg-main))';
               e.currentTarget.style.color = 'var(--text-secondary, #a8a6a2)';
             }}
           >

@@ -37,7 +37,7 @@
 
 .arcTip {
   fill: #eef6e6;
-  filter: drop-shadow(0 0 4px rgba(183, 203, 166, 0.9));
+  filter: drop-shadow(0 0 4px rgb(from var(--color-accent) r g b / 0.9));
   transition: opacity 0.4s ease-out 0.9s;
 }
 

@@ -51,7 +51,7 @@ export default function TemplateDetailPage() {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-white/60">
         <p className="text-[13px]">{t("notFound")}</p>
-        <Link href="/templates" className="text-[12px] text-[#c9dab8] hover:underline">
+        <Link href="/templates" className="text-[12px] text-[var(--color-accent-soft)] hover:underline">
           {t("backToTemplates")}
         </Link>
       </div>
@@ -93,7 +93,7 @@ export default function TemplateDetailPage() {
               <button
                 onClick={handleTryIt}
                 disabled={applying}
-                className="flex-1 h-8 rounded-lg bg-gradient-to-b from-[#c9dab8] to-accent text-on-accent font-semibold text-[12px] hover:brightness-105 active:brightness-95 transition-all shadow-[0_1px_0_rgba(255,255,255,0.4)_inset,0_4px_14px_rgba(183,203,166,0.25)] disabled:opacity-60"
+                className="flex-1 h-8 rounded-lg bg-gradient-to-b from-[var(--color-accent-soft)] to-accent text-on-accent font-semibold text-[12px] hover:brightness-105 active:brightness-95 transition-all shadow-[0_1px_0_rgba(255,255,255,0.4)_inset,0_4px_14px_rgb(from var(--color-accent) r g b / 0.25)] disabled:opacity-60"
               >
                 {applying ? t("opening") : t("tryIt")}
               </button>
@@ -146,7 +146,7 @@ export default function TemplateDetailPage() {
               <div>
                 <div className="text-[9px] font-semibold text-white/35 uppercase tracking-wider mb-1.5">{t("categoriesLabel")}</div>
                 <div className="flex flex-wrap gap-1.5">
-                  <div className="px-2 py-1 rounded-full bg-accent/[0.12] border border-accent/20 text-[10px] text-[#c9dab8] font-medium">
+                  <div className="px-2 py-1 rounded-full bg-accent/[0.12] border border-accent/20 text-[10px] text-[var(--color-accent-soft)] font-medium">
                     {template.category}
                   </div>
                   {template.apps.map(app => (
@@ -186,7 +186,7 @@ export default function TemplateDetailPage() {
               className="w-full h-[400px] rounded-xl border border-white/[0.06] overflow-hidden mb-6 relative shadow-[0_8px_28px_rgba(0,0,0,0.3)]"
               style={{
                 background: [
-                  'radial-gradient(ellipse 70% 60% at 25% 15%, rgba(183,203,166,0.05) 0%, transparent 55%)',
+                  'radial-gradient(ellipse 70% 60% at 25% 15%, rgb(from var(--color-accent) r g b / 0.05) 0%, transparent 55%)',
                   'radial-gradient(ellipse 60% 50% at 85% 85%, rgba(221,218,197,0.04) 0%, transparent 55%)',
                   'linear-gradient(160deg, #2f312b 0%, #26271f 100%)',
                 ].join(', '),

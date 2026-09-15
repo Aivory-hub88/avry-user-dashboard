@@ -247,7 +247,7 @@ export default function Sidebar() {
   ].filter((item) => canAccessNavKey(accountType, item.key, allowedModules))
 
   return (
-    <aside className={`flex flex-col h-full bg-[#353531] border-r border-white/5 transition-all duration-300 ${collapsed ? "w-12" : "w-[220px]"}`}>
+    <aside className={`flex flex-col h-full bg-[var(--bg-main)] border-r border-white/5 transition-all duration-300 ${collapsed ? "w-12" : "w-[220px]"}`}>
       {/* Logo / Header */}
       <div className="flex items-center gap-2 px-4 pt-8 pb-4">
         {!collapsed ? (
@@ -294,8 +294,8 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={`flex items-center rounded-lg text-sm transition-colors cursor-pointer group
-                ${collapsed 
-                  ? "justify-center w-9 h-9 mx-auto" 
+                ${collapsed
+                  ? "justify-center w-9 h-9 mx-auto"
                   : "gap-2 px-3 py-2"
                 }
                 ${isActive

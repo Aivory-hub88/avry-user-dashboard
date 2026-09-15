@@ -263,7 +263,7 @@ export function SettingsModal({ user }: SettingsModalProps) {
                     <p className="text-[13px] text-white/60 mb-2">
                       Identifies this account to external integrations (e.g. the Cerveau Odoo widget) that need to share this account&apos;s Cerveau memory and history.
                     </p>
-                    <code className="block text-[12px] text-[#dbe5d3] break-all bg-white/[0.04] border border-white/10 rounded-lg px-3.5 py-2.5">
+                    <code className="block text-[12px] text-[var(--color-accent-text)] break-all bg-white/[0.04] border border-white/10 rounded-lg px-3.5 py-2.5">
                       {user?.user_id || '—'}
                     </code>
                   </div>
@@ -476,7 +476,7 @@ export function SettingsModal({ user }: SettingsModalProps) {
                       {!isCreatingHere && !(createdToken && createdToken.image_name === imageName) && (
                         <button
                           onClick={() => { setCreatingTokenFor(imageName); setCreatedToken(null); setImageTokensError(null) }}
-                          className="px-4 py-2 text-[13px] font-medium bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] rounded-md border border-accent/30 transition-colors"
+                          className="px-4 py-2 text-[13px] font-medium bg-accent/20 hover:bg-accent/30 text-[var(--color-accent-text)] rounded-md border border-accent/30 transition-colors"
                         >
                           Generate credential
                         </button>
@@ -497,7 +497,7 @@ export function SettingsModal({ user }: SettingsModalProps) {
                           <button
                             onClick={() => handleCreateToken(imageName)}
                             disabled={tokenCreateLoading}
-                            className="px-4 py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50"
+                            className="px-4 py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[var(--color-accent-text)] text-[13px] font-medium transition-all border border-accent/30 disabled:opacity-50"
                           >
                             {tokenCreateLoading ? 'Creating…' : 'Create credential'}
                           </button>
@@ -517,7 +517,7 @@ export function SettingsModal({ user }: SettingsModalProps) {
                           Store this somewhere safe — Aivory never stores or shows the plaintext credential again.
                         </p>
                         <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 mb-2">
-                          <code className="flex-1 text-[12px] text-[#dbe5d3] break-all">{createdToken.token}</code>
+                          <code className="flex-1 text-[12px] text-[var(--color-accent-text)] break-all">{createdToken.token}</code>
                           <button
                             onClick={() => {
                               navigator.clipboard.writeText(createdToken.token)

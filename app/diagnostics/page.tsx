@@ -81,7 +81,7 @@ export default function DiagnosticsPage() {
               <div className={styles.completedState}>
                 <div className={styles.scoreDisplay}>
                   <span className={styles.scoreLabel}>Status:</span>
-                  <span className={styles.scoreValue} style={{ color: '#afd199', fontSize: '0.9rem' }}>Report Ready</span>
+                  <span className={styles.scoreValue} style={{ color: 'var(--color-accent-report)', fontSize: '0.9rem' }}>Report Ready</span>
                 </div>
                 <div className={styles.completedActions}>
                   <Link href="/diagnostics/deep/final-result" className={styles.diagnosticCta}>

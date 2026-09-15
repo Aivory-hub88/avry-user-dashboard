@@ -119,7 +119,7 @@ export default function AgentDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#353531] p-8 flex items-center justify-center overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+      <div className="min-h-screen bg-[var(--bg-main)] p-8 flex items-center justify-center overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         <div className="text-center">
           <div className="inline-block animate-spin mb-4">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
@@ -135,7 +135,7 @@ export default function AgentDetailPage() {
 
   if (!agent) {
     return (
-      <div className="min-h-screen bg-[#353531] p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+      <div className="min-h-screen bg-[var(--bg-main)] p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         <div className="max-w-2xl mx-auto overflow-x-hidden">
           <Link href="/agents" className="text-accent hover:text-accent-link-hover text-sm font-medium mb-4 inline-block">
             ← Back to Agents
@@ -149,7 +149,7 @@ export default function AgentDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#353531] p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+    <div className="min-h-screen bg-[var(--bg-main)] p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
       <div className="max-w-2xl mx-auto overflow-x-hidden">
         {/* Header */}
         <div className="mb-8">
@@ -207,7 +207,7 @@ export default function AgentDetailPage() {
               <div className="pt-4 border-t border-white/10 flex gap-3">
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="flex-1 px-4 py-2 bg-[#353532] text-[#f7f7f7] font-semibold rounded-[20px] border border-[#666864] hover:bg-[#444440] transition-colors"
+                  className="flex-1 px-4 py-2 bg-[var(--bg-main)] text-[#f7f7f7] font-semibold rounded-[20px] border border-[#666864] hover:bg-[#444440] transition-colors"
                 >
                   Edit
                 </button>
@@ -252,7 +252,7 @@ export default function AgentDetailPage() {
                     name="model"
                     value={formData.model || ''}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-[#2E2E2A] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-white/30 transition-colors"
+                    className="w-full px-3 py-2 bg-[var(--bg-inset)] border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-white/30 transition-colors"
                   >
                     {MODELS.map(m => (
                       <option key={m.value} value={m.value} className="bg-[#2a2a26]">
@@ -315,7 +315,7 @@ export default function AgentDetailPage() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1 px-4 py-2 bg-[#353532] text-[#f7f7f7] font-semibold rounded-[20px] border border-[#666864] hover:bg-[#444440] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 px-4 py-2 bg-[var(--bg-main)] text-[#f7f7f7] font-semibold rounded-[20px] border border-[#666864] hover:bg-[#444440] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {saving ? 'Saving...' : 'Save Changes'}
                 </button>

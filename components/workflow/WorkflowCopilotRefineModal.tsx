@@ -90,7 +90,7 @@ export function WorkflowCopilotRefineModal({
 
   const handleApplyMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
     const btn = e.currentTarget
-    btn.style.background = '#353532'
+    btn.style.background = 'var(--bg-main)'
   }
 
   return (
@@ -112,7 +112,7 @@ export function WorkflowCopilotRefineModal({
     >
       <div
         style={{
-          background: '#353531',
+          background: 'var(--bg-main)',
           border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 12,
           padding: 24,
@@ -205,7 +205,7 @@ export function WorkflowCopilotRefineModal({
                 onClick={handleRefine}
                 disabled={loading || !instruction.trim()}
                 style={{
-                  background: '#353532',
+                  background: 'var(--bg-main)',
                   border: '1px solid #666864',
                   borderRadius: 20,
                   padding: '8px 16px',
@@ -280,7 +280,7 @@ export function WorkflowCopilotRefineModal({
               <button
                 onClick={handleApply}
                 style={{
-                  background: '#353532',
+                  background: 'var(--bg-main)',
                   border: '1px solid #666864',
                   borderRadius: 20,
                   padding: '8px 16px',

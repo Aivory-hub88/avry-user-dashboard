@@ -75,7 +75,7 @@
   align-items: center;
   gap: 10px;
   padding: 0.875rem 1.125rem;
-  background: #353532;
+  background: var(--bg-main);
   border: 1px solid #666864;
   border-radius: 20px;
   font-family: var(--font-manrope), sans-serif;

@@ -432,7 +432,7 @@ export default function SchedulesTab({ agentType }: SchedulesTabProps) {
                   onClick={() => setShape((s) => ({ ...s, cadence: option }))}
                   className={`px-3.5 py-2 rounded-lg border text-[12.5px] transition-colors duration-150 ease-out active:scale-[0.98] ${
                     shape.cadence === option
-                      ? 'bg-accent/15 border-accent/30 text-[#dbe5d3]'
+                      ? 'bg-accent/15 border-accent/30 text-[var(--color-accent-text)]'
                       : 'bg-white/[0.04] border-white/10 text-white/50 hover:text-white/75'
                   }`}
                 >
@@ -535,7 +535,7 @@ export default function SchedulesTab({ agentType }: SchedulesTabProps) {
               type="button"
               onClick={handleSubmit}
               disabled={submitting}
-              className="flex-1 py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[#dbe5d3] text-[13px] font-medium border border-accent/30 transition-colors duration-150 ease-out active:scale-[0.99] disabled:opacity-50 disabled:active:scale-100"
+              className="flex-1 py-2.5 rounded-lg bg-accent/20 hover:bg-accent/30 text-[var(--color-accent-text)] text-[13px] font-medium border border-accent/30 transition-colors duration-150 ease-out active:scale-[0.99] disabled:opacity-50 disabled:active:scale-100"
             >
               {submitting
                 ? t('scheduleSaving')
@@ -582,7 +582,7 @@ function ScheduleRow({
   // is real and is exactly what a tenant needs to see.
   const pill =
     run.status === 'active'
-      ? { label: t('scheduleStatusActive'), className: 'bg-accent/15 border-accent/25 text-[#dbe5d3]' }
+      ? { label: t('scheduleStatusActive'), className: 'bg-accent/15 border-accent/25 text-[var(--color-accent-text)]' }
       : run.status === 'failed'
         ? { label: t('scheduleStatusFailed'), className: 'bg-red-500/10 border-red-500/20 text-red-300/90' }
         : run.status === 'paused'
@@ -642,7 +642,7 @@ function ScheduleRow({
           type="button"
           disabled={busy}
           onClick={onToggle}
-          className="text-[#dbe5d3]/70 hover:text-[#dbe5d3] text-[11.5px] transition-colors duration-150 ease-out disabled:opacity-40"
+          className="text-[var(--color-accent-text)]/70 hover:text-[var(--color-accent-text)] text-[11.5px] transition-colors duration-150 ease-out disabled:opacity-40"
         >
           {busy ? t('scheduleWorking') : run.enabled ? t('schedulePause') : t('scheduleResume')}
         </button>

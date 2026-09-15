@@ -152,8 +152,8 @@
 }
 
 .select:focus {
-  border-color: rgba(178, 204, 162, 0.4);
-  background: rgba(178, 204, 162, 0.02);
+  border-color: rgb(from var(--color-accent-workflow) r g b / 0.4);
+  background: rgb(from var(--color-accent-workflow) r g b / 0.02);
 }
 
 /* Warning */
@@ -223,8 +223,8 @@
 
 .input:focus,
 .textarea:focus {
-  border-color: rgba(178, 204, 162, 0.4);
-  background: rgba(178, 204, 162, 0.02);
+  border-color: rgb(from var(--color-accent-workflow) r g b / 0.4);
+  background: rgb(from var(--color-accent-workflow) r g b / 0.02);
 }
 
 .textarea {
@@ -263,8 +263,8 @@
   flex: 1;
   padding: 8px 12px;
   border-radius: 6px;
-  background: rgba(178, 204, 162, 0.1);
-  border: 1px solid rgba(178, 204, 162, 0.2);
+  background: rgb(from var(--color-accent-workflow) r g b / 0.1);
+  border: 1px solid rgb(from var(--color-accent-workflow) r g b / 0.2);
   color: var(--color-accent);
   font-size: 11px;
   font-weight: 600;
@@ -273,8 +273,8 @@
 }
 
 .closeButtonFooter:hover {
-  background: rgba(178, 204, 162, 0.2);
-  border-color: rgba(178, 204, 162, 0.4);
+  background: rgb(from var(--color-accent-workflow) r g b / 0.2);
+  border-color: rgb(from var(--color-accent-workflow) r g b / 0.4);
 }
 
 /* Scrollbar Styling */

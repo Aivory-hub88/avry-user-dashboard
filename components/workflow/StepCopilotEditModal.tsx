@@ -86,7 +86,7 @@ export function StepCopilotEditModal({
     >
       <div
         style={{
-          background: '#353531',
+          background: 'var(--bg-main)',
           border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 12,
           padding: 24,
@@ -191,7 +191,7 @@ export function StepCopilotEditModal({
             onClick={handleEdit}
             disabled={loading || !instruction.trim()}
             style={{
-              background: '#353532',
+              background: 'var(--bg-main)',
               border: '1px solid #666864',
               borderRadius: 20,
               padding: '8px 16px',
@@ -211,7 +211,7 @@ export function StepCopilotEditModal({
             }}
             onMouseLeave={(e) => {
               const btn = e.currentTarget as HTMLButtonElement
-              btn.style.background = '#353532'
+              btn.style.background = 'var(--bg-main)'
             }}
           >
             {loading ? 'Editing…' : 'Ask Aivory to edit this step'}

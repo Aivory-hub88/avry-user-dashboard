@@ -12,14 +12,14 @@
 }
 
 .line {
-  stroke: #afd199;
+  stroke: var(--color-accent-report);
   stroke-width: 1.75;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .dot {
-  fill: #afd199;
+  fill: var(--color-accent-report);
 }
 
 .caption {

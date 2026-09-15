@@ -847,7 +847,7 @@ export default function ConsolePage() {
         >
           <div 
             className="relative w-full max-w-[680px] rounded-2xl border border-white/10 p-8 shadow-2xl"
-            style={{ background: "#42423f" }}
+            style={{ background: "var(--bg-input)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -910,7 +910,7 @@ export default function ConsolePage() {
                   setConnectorsOpen(false)
                   router.push("/integrations")
                 }}
-                className="rounded-[20px] bg-[#353532] px-5 py-2.5 text-sm font-medium text-[#f7f7f7] border border-[#666864] transition hover:bg-[#444440]"
+                className="rounded-[20px] bg-[var(--bg-main)] px-5 py-2.5 text-sm font-medium text-[#f7f7f7] border border-[#666864] transition hover:bg-[#444440]"
               >
                 {t('manageIntegrations')}
               </button>

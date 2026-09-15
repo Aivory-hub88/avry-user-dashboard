@@ -13,7 +13,7 @@ import { generateRoadmapAsync } from '@/lib/roadmapGeneration'
 
 // ─── colour tokens ────────────────────────────────────────────
 const T = {
-  bg:           '#353531',
+  bg:           'var(--bg-main)',
   card:         'rgba(255,255,255,0.03)',
   cardSolid:    '#242320',
   cardHover:    'rgba(255,255,255,0.05)',
@@ -219,7 +219,7 @@ function OverallProgressBar({ phases, allChecked, activeIdx, onNodeClick }: {
   return (
     <div style={{
       position: 'sticky', top: 0, zIndex: 20,
-      background: 'rgba(53,53,49,0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+      background: 'rgb(from var(--bg-main) r g b / 0.92)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
       borderBottom: `1px solid ${T.border}`,
       padding: '12px 20px',
       display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
@@ -232,7 +232,7 @@ function OverallProgressBar({ phases, allChecked, activeIdx, onNodeClick }: {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <div style={{
-            width: 28, height: 28, borderRadius: '50%', background: '#353531',
+            width: 28, height: 28, borderRadius: '50%', background: 'var(--bg-main)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 10, fontWeight: 700, color: T.green,
           }}>{overallPct}%</div>
@@ -701,13 +701,13 @@ function BtnPrimary({ onClick, disabled, loading, children }: {
     <button onClick={onClick} disabled={disabled}
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{
-        background: disabled ? T.green : `linear-gradient(to bottom, ${h ? '#d3e2c4' : '#c9dab8'}, ${h ? '#c2d5af' : 'var(--color-accent)'})`,
+        background: disabled ? T.green : `linear-gradient(to bottom, ${h ? 'var(--color-accent-hover-start)' : 'var(--color-accent-soft)'}, ${h ? 'var(--color-accent-hover-end)' : 'var(--color-accent)'})`,
         color: 'var(--color-on-accent)', border: 'none', borderRadius: 9,
         padding: '9px 22px', fontSize: '0.8125rem', fontWeight: 600,
         fontFamily: 'inherit', cursor: disabled ? 'not-allowed' : 'pointer',
         display: 'flex', alignItems: 'center', gap: 8,
         transition: 'all 0.15s', opacity: disabled ? 0.6 : 1,
-        boxShadow: disabled ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.4), 0 4px 14px rgba(183,203,166,0.25)',
+        boxShadow: disabled ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.4), 0 4px 14px rgb(from var(--color-accent) r g b / 0.25)',
       }}>
       {loading && (
         <span style={{
@@ -728,8 +728,8 @@ function BtnSecondary({ onClick, children }: { onClick: () => void; children: Re
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{
         fontSize: 12, fontWeight: 500, padding: '8px 16px', borderRadius: 8,
-        border: `1px solid ${h ? 'rgba(183,203,166,0.35)' : 'rgba(255,255,255,0.08)'}`,
-        background: h ? 'rgba(183,203,166,0.08)' : 'rgba(255,255,255,0.02)',
+        border: `1px solid ${h ? 'rgb(from var(--color-accent) r g b / 0.35)' : 'rgba(255,255,255,0.08)'}`,
+        background: h ? 'rgb(from var(--color-accent) r g b / 0.08)' : 'rgba(255,255,255,0.02)',
         color: h ? T.green : T.textSub,
         cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s',
       }}
@@ -925,7 +925,7 @@ function EmptyState({ generating, error, onGenerate, router }: {
   return (
     <div style={{
       background: [
-        'radial-gradient(ellipse 80% 100% at 15% 0%, rgba(183,203,166,0.06) 0%, transparent 55%)',
+        'radial-gradient(ellipse 80% 100% at 15% 0%, rgb(from var(--color-accent) r g b / 0.06) 0%, transparent 55%)',
         'radial-gradient(ellipse 70% 90% at 90% 100%, rgba(221,218,197,0.04) 0%, transparent 55%)',
         `linear-gradient(160deg, ${T.cardSolid} 0%, #1e1d1a 100%)`,
       ].join(', '),
@@ -939,7 +939,7 @@ function EmptyState({ generating, error, onGenerate, router }: {
         <line x1="25" y1="28" x2="175" y2="28" stroke="rgba(255,255,255,0.1)" strokeWidth="2" strokeDasharray="1 7" strokeLinecap="round"/>
         {([25, 100, 175] as const).map((cx, i) => (
           <g key={cx}>
-            <circle cx={cx} cy="28" r="13" fill={i === 0 ? 'rgba(183,203,166,0.14)' : 'rgba(255,255,255,0.04)'} stroke={i === 0 ? T.green : 'rgba(255,255,255,0.14)'} strokeWidth="1.5"/>
+            <circle cx={cx} cy="28" r="13" fill={i === 0 ? 'rgb(from var(--color-accent) r g b / 0.14)' : 'rgba(255,255,255,0.04)'} stroke={i === 0 ? T.green : 'rgba(255,255,255,0.14)'} strokeWidth="1.5"/>
             <text x={cx} y="32.5" textAnchor="middle" fontSize="10" fontWeight="700"
               fill={i === 0 ? T.green : 'rgba(255,255,255,0.5)'} fontFamily="var(--font-manrope), Manrope, sans-serif">{i + 1}</text>
             <text x={cx} y="52" textAnchor="middle" fontSize="9" fontWeight="500" fill="rgba(255,255,255,0.4)" fontFamily="var(--font-manrope), Manrope, sans-serif">

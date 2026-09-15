@@ -69,8 +69,8 @@
 .textarea:focus {
   outline: none;
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(178, 204, 162, 0.3);
-  box-shadow: 0 0 0 2px rgba(178, 204, 162, 0.1);
+  border-color: rgb(from var(--color-accent-workflow) r g b / 0.3);
+  box-shadow: 0 0 0 2px rgb(from var(--color-accent-workflow) r g b / 0.1);
 }
 
 .textarea:disabled {
@@ -167,14 +167,14 @@
 
 .generateBtn {
   flex: 1;
-  background: rgba(178, 204, 162, 0.15);
+  background: rgb(from var(--color-accent-workflow) r g b / 0.15);
   color: var(--color-accent);
-  border: 1px solid rgba(178, 204, 162, 0.3);
+  border: 1px solid rgb(from var(--color-accent-workflow) r g b / 0.3);
 }
 
 .generateBtn:hover:not(:disabled) {
-  background: rgba(178, 204, 162, 0.25);
-  border-color: rgba(178, 204, 162, 0.5);
+  background: rgb(from var(--color-accent-workflow) r g b / 0.25);
+  border-color: rgb(from var(--color-accent-workflow) r g b / 0.5);
 }
 
 .generateBtn:disabled {
@@ -214,8 +214,8 @@
 
 .info {
   padding: 10px 12px;
-  background: rgba(178, 204, 162, 0.05);
-  border: 1px solid rgba(178, 204, 162, 0.1);
+  background: rgb(from var(--color-accent-workflow) r g b / 0.05);
+  border: 1px solid rgb(from var(--color-accent-workflow) r g b / 0.1);
   border-radius: 6px;
   font-size: 11px;
   color: #a1a1aa;

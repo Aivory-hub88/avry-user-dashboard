@@ -45,8 +45,8 @@
 }
 
 .lifecycleCard:hover .cardIcon {
-  background: rgba(178, 204, 162, 0.08);
-  border-color: rgba(178, 204, 162, 0.2);
+  background: rgb(from var(--color-accent-workflow) r g b / 0.08);
+  border-color: rgb(from var(--color-accent-workflow) r g b / 0.2);
   color: var(--color-accent);
 }
 
@@ -100,9 +100,9 @@
 }
 
 .statusBadge.completed {
-  background: rgba(178, 204, 162, 0.1);
+  background: rgb(from var(--color-accent-workflow) r g b / 0.1);
   color: var(--color-accent);
-  border: 1px solid rgba(178, 204, 162, 0.2);
+  border: 1px solid rgb(from var(--color-accent-workflow) r g b / 0.2);
 }
 
 .statusBadge.in_progress {

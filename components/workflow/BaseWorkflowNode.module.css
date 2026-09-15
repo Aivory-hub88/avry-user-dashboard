@@ -19,8 +19,8 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: rgba(178, 204, 162, 0.25);
-  border: 2px solid rgba(178, 204, 162, 0.45);
+  background: rgb(from var(--color-accent-workflow) r g b / 0.25);
+  border: 2px solid rgb(from var(--color-accent-workflow) r g b / 0.45);
   opacity: 0;
   transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
   cursor: crosshair;
@@ -117,8 +117,8 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: rgba(178, 204, 162, 0.12);
-  border: 1px solid rgba(178, 204, 162, 0.3);
+  background: rgb(from var(--color-accent-workflow) r g b / 0.12);
+  border: 1px solid rgb(from var(--color-accent-workflow) r g b / 0.3);
   color: var(--color-accent);
   font-size: 14px;
   font-weight: 600;
@@ -138,6 +138,6 @@
 }
 
 .addBtn:hover {
-  background: rgba(178, 204, 162, 0.25);
-  border-color: rgba(178, 204, 162, 0.5);
+  background: rgb(from var(--color-accent-workflow) r g b / 0.25);
+  border-color: rgb(from var(--color-accent-workflow) r g b / 0.5);
 }

@@ -1,7 +1,7 @@
 /* ─── Page shell ─────────────────────────────────────────────────────────── */
 .page {
   min-height: 100vh;
-  background: #353532;
+  background: var(--bg-main);
   color: #e5e5e3;
   font-family: var(--font-manrope), sans-serif;
 }
@@ -50,13 +50,13 @@
 }
 
 .languageSwitcher:focus-visible {
-  outline: 2px solid #afd199;
+  outline: 2px solid var(--color-accent-report);
   outline-offset: 1px;
 }
 
 /* ─── Card wrapper (shared by every section) ─────────────────────────────── */
 .card {
-  background: #3a3a36;
+  background: var(--bg-elevated);
   border-radius: 12px;
   padding: 28px 32px;
   border: 1px solid #4a4a46;
@@ -280,8 +280,8 @@
   color: #c8c8c4;
   margin: 14px 0 0;
   padding: 12px 16px;
-  border-left: 3px solid #afd199;
-  background: rgba(175, 209, 153, 0.06);
+  border-left: 3px solid var(--color-accent-report);
+  background: rgb(from var(--color-accent-report) r g b / 0.06);
   border-radius: 0 6px 6px 0;
 }
 
@@ -501,9 +501,9 @@
 .blueprintCta {
   position: relative;
   background:
-    radial-gradient(120% 160% at 100% 0%, rgba(175, 209, 153, 0.09) 0%, rgba(175, 209, 153, 0) 55%),
-    linear-gradient(180deg, #3d3d39 0%, #37372f 100%);
-  border: 1px solid rgba(175, 209, 153, 0.22);
+    radial-gradient(120% 160% at 100% 0%, rgb(from var(--color-accent-report) r g b / 0.09) 0%, rgb(from var(--color-accent-report) r g b / 0) 55%),
+    linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-main) 100%);
+  border: 1px solid rgb(from var(--color-accent-report) r g b / 0.22);
   border-radius: 14px;
   padding: 30px 32px;
   display: flex;
@@ -535,7 +535,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.09em;
-  color: #afd199;
+  color: var(--color-accent-report);
 }
 
 .blueprintCtaTitle {
@@ -603,7 +603,7 @@
 .blueprintProgressFill {
   height: 100%;
   border-radius: 2px;
-  background: #afd199;
+  background: var(--color-accent-report);
   transition: width 5s linear;
 }
 
@@ -620,7 +620,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background-color: #afd199;
+  background-color: var(--color-accent-report);
   color: #202b17;
   border: none;
   border-radius: 10px;
@@ -689,7 +689,7 @@
 }
 
 .advisoryLink:hover {
-  color: #d0e0af;
+  color: var(--color-accent-report-hover);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -705,8 +705,8 @@
 .assumptionsNote {
   margin-top: 20px;
   padding: 16px 18px;
-  border-left: 3px solid #afd199;
-  background: rgba(175, 209, 153, 0.06);
+  border-left: 3px solid var(--color-accent-report);
+  background: rgb(from var(--color-accent-report) r g b / 0.06);
   border-radius: 6px;
 }
 .assumptionsTitle { margin: 0 0 10px; font-size: 14px; font-weight: 700; color: #e8e8e6; }
@@ -729,7 +729,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #afd199;
+  background: var(--color-accent-report);
 }
 .stepLabel { font-size: 14px; font-weight: 600; color: #e8e8e6; }
 .stepValue { font-size: 14px; line-height: 1.6; color: #c8c8c4; }
@@ -746,7 +746,7 @@
 .improvementBadge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 3px 8px; border-radius: 999px; }
 .priority_high { background: rgba(248, 113, 113, 0.15); color: #f87171; }
 .priority_medium { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
-.priority_low { background: rgba(175, 209, 153, 0.15); color: #afd199; }
+.priority_low { background: rgb(from var(--color-accent-report) r g b / 0.15); color: var(--color-accent-report); }
 .improvementArea { margin-left: auto; font-size: 11px; font-weight: 600; color: #a3a39c; text-transform: uppercase; letter-spacing: 0.06em; }
 .improvementBody { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 .improvementField { font-size: 15px; color: #b8b8b4; line-height: 1.6; margin: 0; }
@@ -755,10 +755,10 @@
 @media (max-width: 639px) { .beforeAfter { grid-template-columns: 1fr; } .baArrow { transform: rotate(90deg); justify-self: center; } }
 .baCell { border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
 .baBefore { background: rgba(248, 113, 113, 0.07); border: 1px solid rgba(248, 113, 113, 0.25); }
-.baAfter { background: rgba(175, 209, 153, 0.07); border: 1px solid rgba(175, 209, 153, 0.25); }
+.baAfter { background: rgb(from var(--color-accent-report) r g b / 0.07); border: 1px solid rgb(from var(--color-accent-report) r g b / 0.25); }
 .baLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
 .baBefore .baLabel { color: #f87171; }
-.baAfter .baLabel { color: #afd199; }
+.baAfter .baLabel { color: var(--color-accent-report); }
 .baText { font-size: 14px; color: #c8c8c4; line-height: 1.55; }
 .baArrow { display: flex; align-items: center; color: #a3a39c; font-size: 18px; font-weight: 700; }
 
@@ -776,9 +776,9 @@
 .roiNegativeList { list-style: none; grid-column: 1 / -1; margin-top: 4px; }
 .roiNegativeList > li { font-size: 13px; color: #c8c8c4; line-height: 1.6; margin: 0; padding: 0; }
 .roiNegativeReason { background: rgba(248, 113, 113, 0.07); border-radius: 6px; padding: 8px 12px; }
-.roiFixItem { background: rgba(175, 209, 153, 0.06); border-radius: 6px; padding: 8px 12px; }
+.roiFixItem { background: rgb(from var(--color-accent-report) r g b / 0.06); border-radius: 6px; padding: 8px 12px; }
 .roiNegativeLabel { display: block; font-size: 12px; font-weight: 700; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-.roiFixLabel { display: block; font-size: 12px; font-weight: 700; color: #afd199; margin-bottom: 3px; }
+.roiFixLabel { display: block; font-size: 12px; font-weight: 700; color: var(--color-accent-report); margin-bottom: 3px; }
 
 
 /* ── Executive Operational Diagnosis section ── */
@@ -806,15 +806,15 @@
   display: flex;
   gap: 16px;
   align-items: flex-start;
-  background: rgba(175, 209, 153, 0.05);
-  border: 1px solid rgba(175, 209, 153, 0.18);
+  background: rgb(from var(--color-accent-report) r g b / 0.05);
+  border: 1px solid rgb(from var(--color-accent-report) r g b / 0.18);
   border-radius: 8px;
   padding: 14px 16px;
 }
 .verdictMoveNum {
   font-size: 1.05rem;
   font-weight: 700;
-  color: #afd199;
+  color: var(--color-accent-report);
   line-height: 1.4;
   flex-shrink: 0;
 }
@@ -868,9 +868,9 @@
 .aiNextStep {
   font-size: 0.92rem;
   line-height: 1.6;
-  background: rgba(175, 209, 153, 0.07);
-  border: 1px solid rgba(175, 209, 153, 0.25);
-  border-left: 3px solid #afd199;
+  background: rgb(from var(--color-accent-report) r g b / 0.07);
+  border: 1px solid rgb(from var(--color-accent-report) r g b / 0.25);
+  border-left: 3px solid var(--color-accent-report);
   border-radius: 8px;
   padding: 12px 14px;
   margin: 0 0 0.75rem;
@@ -905,8 +905,8 @@
 .scenarioCellValue { font-size: 1.2rem; font-weight: 700; }
 .scenarioCellLow  { background: rgba(251, 191, 36, 0.08);  border: 1px solid rgba(251, 191, 36, 0.22); }
 .scenarioCellLow  .scenarioCellLabel, .scenarioCellLow  .scenarioCellValue { color: #fbbf24; }
-.scenarioCellBase { background: rgba(175, 209, 153, 0.08); border: 1px solid rgba(175, 209, 153, 0.22); }
-.scenarioCellBase .scenarioCellLabel, .scenarioCellBase .scenarioCellValue { color: #afd199; }
+.scenarioCellBase { background: rgb(from var(--color-accent-report) r g b / 0.08); border: 1px solid rgb(from var(--color-accent-report) r g b / 0.22); }
+.scenarioCellBase .scenarioCellLabel, .scenarioCellBase .scenarioCellValue { color: var(--color-accent-report); }
 .scenarioCellHigh { background: rgba(96, 165, 250, 0.08);  border: 1px solid rgba(96, 165, 250, 0.22); }
 .scenarioCellHigh .scenarioCellLabel, .scenarioCellHigh .scenarioCellValue { color: #60a5fa; }
 .scenarioNote { font-size: .75rem; color: var(--dd-muted,#9ca3af); }
@@ -915,7 +915,7 @@
    Reuses the .aiNextStep bordered-accent-callout visual language rather than
    inventing a new one. */
 .executiveSummaryCard {
-  background: linear-gradient(180deg, rgba(175, 209, 153, 0.08) 0%, rgba(175, 209, 153, 0.02) 100%);
+  background: linear-gradient(180deg, rgb(from var(--color-accent-report) r g b / 0.08) 0%, rgb(from var(--color-accent-report) r g b / 0.02) 100%);
 }
 .executiveSummaryText {
   font-size: 1rem;
@@ -929,8 +929,8 @@
 .glossaryBox {
   margin-top: 18px;
   padding: 14px 18px;
-  border-left: 3px solid #afd199;
-  background: rgba(175, 209, 153, 0.06);
+  border-left: 3px solid var(--color-accent-report);
+  background: rgb(from var(--color-accent-report) r g b / 0.06);
   border-radius: 6px;
 }
 .glossaryTitle { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: #e8e8e6; }
@@ -946,9 +946,9 @@
 .executiveInsight {
   font-size: 0.92rem;
   line-height: 1.6;
-  background: rgba(175, 209, 153, 0.07);
-  border: 1px solid rgba(175, 209, 153, 0.25);
-  border-left: 3px solid #afd199;
+  background: rgb(from var(--color-accent-report) r g b / 0.07);
+  border: 1px solid rgb(from var(--color-accent-report) r g b / 0.25);
+  border-left: 3px solid var(--color-accent-report);
   border-radius: 8px;
   padding: 12px 14px;
   margin: 1rem 0 0;
@@ -959,7 +959,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #afd199;
+  color: var(--color-accent-report);
   margin-bottom: 4px;
 }
 .consequenceChain {

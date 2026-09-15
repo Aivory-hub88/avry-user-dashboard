@@ -257,7 +257,7 @@
 }
 
 .generateRoadmapBtn:hover:not(:disabled) {
-  background: #c6d8b5;
+  background: var(--color-accent-roadmap-hover);
 }
 
 .generateRoadmapBtn:active:not(:disabled) {

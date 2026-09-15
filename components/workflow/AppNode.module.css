@@ -9,7 +9,7 @@
   width: 100%;
   height: auto;
   min-height: 56px;
-  background: #3a3a37;
+  background: var(--bg-elevated);
   border: 1.5px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
   padding: 10px 16px;
@@ -27,8 +27,8 @@
 }
 
 .appNode.selected {
-  border-color: rgba(178, 204, 162, 0.5);
-  box-shadow: 0 0 0 2px rgba(178, 204, 162, 0.15), 0 4px 16px rgba(0, 0, 0, 0.3);
+  border-color: rgb(from var(--color-accent-workflow) r g b / 0.5);
+  box-shadow: 0 0 0 2px rgb(from var(--color-accent-workflow) r g b / 0.15), 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 /* ── TOP SECTION (always visible) ── */

@@ -89,7 +89,7 @@
 }
 
 .raised {
-  color: #afd199;
+  color: var(--color-accent-report);
 }
 
 .lowered {

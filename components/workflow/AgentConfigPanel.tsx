@@ -183,11 +183,11 @@ export function AgentConfigPanel({
                     padding: 12,
                     background:
                       selectedAgentId === agent.id
-                        ? 'rgba(178, 204, 162,0.1)'
+                        ? 'rgb(from var(--color-accent-workflow) r g b / 0.1)'
                         : 'rgba(255,255,255,0.02)',
                     border:
                       selectedAgentId === agent.id
-                        ? '1px solid rgba(178, 204, 162,0.3)'
+                        ? '1px solid rgb(from var(--color-accent-workflow) r g b / 0.3)'
                         : '1px solid rgba(255,255,255,0.05)',
                     borderRadius: 8,
                     cursor: 'pointer',
@@ -262,8 +262,8 @@ export function AgentConfigPanel({
           <div
             style={{
               padding: 12,
-              background: 'rgba(178, 204, 162,0.05)',
-              border: '1px solid rgba(178, 204, 162,0.2)',
+              background: 'rgb(from var(--color-accent-workflow) r g b / 0.05)',
+              border: '1px solid rgb(from var(--color-accent-workflow) r g b / 0.2)',
               borderRadius: 8,
               marginBottom: 20,
             }}
@@ -285,7 +285,7 @@ export function AgentConfigPanel({
             style={{
               flex: 1,
               padding: '8px 16px',
-              background: selectedAgentId ? '#353532' : 'rgba(53,53,50,0.5)',
+              background: selectedAgentId ? 'var(--bg-main)' : 'rgba(53,53,50,0.5)',
               color: selectedAgentId ? '#f7f7f7' : '#5a5a58',
               border: '1px solid #666864',
               borderRadius: 20,
@@ -301,7 +301,7 @@ export function AgentConfigPanel({
             }}
             onMouseLeave={(e) => {
               if (selectedAgentId) {
-                e.currentTarget.style.background = '#353532';
+                e.currentTarget.style.background = 'var(--bg-main)';
               }
             }}
           >

@@ -8,7 +8,7 @@
 .page {
   height: 100%;
   overflow-y: auto;
-  background-color: var(--bg-main, #353531);
+  background-color: var(--bg-main);
   color: var(--text-primary, rgba(255,255,255,0.85));
 }
 
@@ -55,7 +55,7 @@
 
 .loadingContainer {
   height: 100%;
-  background-color: var(--bg-main, #353531);
+  background-color: var(--bg-main);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -78,7 +78,7 @@
 
 .emptyContainer {
   height: 100%;
-  background-color: var(--bg-main, #353531);
+  background-color: var(--bg-main);
   display: flex;
   flex-direction: column;
   padding: 0 0 24px;
@@ -358,7 +358,7 @@
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  background: #353531;
+  background: var(--bg-main);
   border: 1px solid var(--color-line);
   border-radius: 12px;
   padding: 6px;
@@ -1199,7 +1199,7 @@
 }
 
 .modal {
-  background: #353531;
+  background: var(--bg-main);
   border: 1px solid var(--color-line);
   border-radius: 14px;
   padding: 24px 24px 20px;
@@ -2040,7 +2040,7 @@
 .roadmapCta {
   background:
     radial-gradient(120% 160% at 100% 0%, color-mix(in srgb, var(--color-accent) 9%, transparent) 0%, color-mix(in srgb, var(--color-accent) 0%, transparent) 55%),
-    linear-gradient(180deg, #3d3d39 0%, #383834 100%);
+    linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-elevated) 100%);
   border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
   border-radius: 14px;
   padding: 28px 30px;
@@ -2108,7 +2108,7 @@
 }
 
 .roadmapCtaButton:hover:not(:disabled) {
-  background-color: #c6d8b5;
+  background-color: var(--color-accent-roadmap-hover);
 }
 
 .roadmapCtaButton:active:not(:disabled) {

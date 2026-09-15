@@ -436,7 +436,7 @@ export default function AivoryAssistant() {
               <button
                 onClick={() => { if (hasContent && !isLoading) handleSend(input) }}
                 disabled={!hasContent || isLoading}
-                className={`w-8 h-8 rounded-[20px] flex items-center justify-center transition-all ${hasContent ? 'bg-[#353532] text-white border border-[#666864] hover:bg-[#444440]' : 'bg-[#555550] text-white/60'}`}
+                className={`w-8 h-8 rounded-[20px] flex items-center justify-center transition-all ${hasContent ? 'bg-[var(--bg-main)] text-white border border-[#666864] hover:bg-[#444440]' : 'bg-[#555550] text-white/60'}`}
                 aria-label="Send"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

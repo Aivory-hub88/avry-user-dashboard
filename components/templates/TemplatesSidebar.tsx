@@ -30,7 +30,7 @@ export default function TemplatesSidebar({
               onClick={() => setActiveCategory(category)}
               className={`text-left px-3.5 py-2.5 rounded-lg text-[13.5px] transition-all border ${
                 isActive
-                  ? "bg-accent/[0.12] border-accent/25 text-[#c9dab8] font-medium"
+                  ? "bg-accent/[0.12] border-accent/25 text-[var(--color-accent-soft)] font-medium"
                   : "border-transparent text-[#a1a1aa] font-light hover:bg-white/[0.04] hover:text-white"
               }`}
             >

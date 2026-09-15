@@ -2,7 +2,7 @@
 .page {
   height: 100%;
   overflow-y: auto;
-  background: var(--bg-main, #353531);
+  background: var(--bg-main);
   color: var(--text-primary, #e8e6e3);
   font-family: 'Manrope', 'Manrope', system-ui, sans-serif;
 }
@@ -523,7 +523,7 @@
 }
 
 .btnPrimary {
-  background: #353532;
+  background: var(--bg-main);
   color: var(--text-secondary, #f7f7f7);
   border: 1px solid #666864;
   border-radius: 20px;
@@ -591,7 +591,7 @@
 /* ── Loading ─────────────────────────────────────────────────── */
 .loadingWrap {
   height: 100%;
-  background: var(--bg-main, #353531);
+  background: var(--bg-main);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -61,7 +61,7 @@ const handleStyle: React.CSSProperties = {
   background: 'var(--color-accent)',
   width: 8,
   height: 8,
-  border: '2px solid #353531',
+  border: '2px solid var(--bg-main)',
 };
 
 function WorkflowStepNodeBase({ data, selected }: NodeProps & { data: WorkflowNodeData }) {

@@ -50,7 +50,7 @@
 .fill {
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, #5f8f52, #afd199);
+  background: linear-gradient(90deg, #5f8f52, var(--color-accent-report));
 }
 
 /* C3 — median marker is a DIAMOND, not a thin coloured line. Your-score

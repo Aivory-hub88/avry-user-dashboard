@@ -2,8 +2,8 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  background: #3a3a37;
-  border-bottom: 1px solid #3a3a36;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--bg-elevated);
   padding: 0.875rem 1.5rem;
   display: flex;
   align-items: center;

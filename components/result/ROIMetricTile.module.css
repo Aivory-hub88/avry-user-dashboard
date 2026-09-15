@@ -50,7 +50,7 @@
 .valueHero {
   font-size: clamp(22px, 3.6vw, 28px);
   line-height: 1.15;
-  color: #d0e0af;
+  color: var(--color-accent-report-hover);
 }
 
 .labelHero {

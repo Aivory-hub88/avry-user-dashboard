@@ -27,8 +27,18 @@
    --color-accent-badge-hover on the chat action-list number badge.
    Tokenized as the same three verbatim values, not merged into one. */
 @theme {
+  /* Brand tokens: keep the existing visual palette while giving each legacy
+     interface family a stable, semantic source for future rebrands. */
   --color-accent: #b7cba6;
-  --color-accent-dim: rgba(183, 203, 166, 0.12);
+  --color-accent-report: #afd199;
+  --color-accent-workflow: #b2cca2;
+  --color-accent-soft: #c9dab8;
+  --color-accent-text: #dbe5d3;
+  --color-accent-hover-start: #d3e2c4;
+  --color-accent-hover-end: #c2d5af;
+  --color-accent-report-hover: #d0e0af;
+  --color-accent-roadmap-hover: #c6d8b5;
+  --color-accent-dim: rgb(from var(--color-accent) r g b / 0.12);
   --color-amber: #d9ab6e;
   --color-amber-warn: #e8b96a;
   --color-amber-light: #e8c088;
@@ -40,10 +50,12 @@
      Semua panel console harus pakai ini, bukan border-white/[0.045..0.12]
      acak atau radius 8/9/10/12/14/16/20/24/28 sebar. */
   --color-line: rgba(255, 255, 255, 0.06);
-  --color-surface-1: #353531;
-  --color-surface-2: #3a3a36;
-  --color-surface-3: #42423f;
-  --color-surface-inset: #2d2d2b;
+  /* Dark neutral surface scale, matched to the reference dashboard's canvas,
+     panels, controls, and inset editor areas. */
+  --color-surface-1: #1c1c1f;
+  --color-surface-2: #242427;
+  --color-surface-3: #2d2d31;
+  --color-surface-inset: #17171a;
   --radius-sm: 12px;
   --radius-md: 16px;
   --radius-lg: 20px;
@@ -84,20 +96,22 @@
 }
 
 :root {
-  --bg-main: #353531;
-  --bg-elevated: #3a3a36;
-  --bg-soft: #353531;
-  --bg-card: #3a3a36;
+  --bg-main: var(--color-surface-1);
+  --bg-elevated: var(--color-surface-2);
+  --bg-input: var(--color-surface-3);
+  --bg-inset: var(--color-surface-inset);
+  --bg-soft: var(--color-surface-1);
+  --bg-card: var(--color-surface-2);
   --border-soft: rgba(255,255,255,0.07);
   --border-card: rgba(255,255,255,0.05);
   --text-primary: #f7f7f7;
   --text-secondary: #f7f7f7;
   --text-tertiary: #a1a1aa;
-  --accent: #b7cba6;
-  --accent-dim: rgba(183, 203, 166, 0.12);
+  --accent: var(--color-accent);
+  --accent-dim: var(--color-accent-dim);
 
-  --surface-secondary: #353531;
-  --surface-tertiary: #3a3a36;
+  --surface-secondary: var(--bg-main);
+  --surface-tertiary: var(--bg-elevated);
   --border-subtle: rgba(255, 255, 255, 0.06);
   /* Alias token tunggal — semua border hairline console mengacu ke sini.
      Jangan perkenalkan opacity border baru (0.045/0.05/0.07/0.08/0.10/0.12)
@@ -124,7 +138,7 @@
   display: inline-block;
   width: 3px;
   height: 1.125em;
-  background-color: #b7cba6;
+  background-color: var(--color-accent);
   border-radius: 1px;
   vertical-align: middle;
   margin-left: 2px;
@@ -138,7 +152,7 @@ html {
 
 body {
   font-family: var(--font-manrope), 'Manrope', Manrope, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #353531;
+  background: var(--bg-main);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -243,10 +257,10 @@ body {
   padding: 24px 20px 30px;
   background: linear-gradient(
     to top,
-    #353531 0%,
-    rgba(53,53,49,0.98) 50%,
-    rgba(53,53,49,0.85) 80%,
-    rgba(53,53,49,0) 100%
+    var(--bg-main) 0%,
+    rgb(from var(--bg-main) r g b / 0.98) 50%,
+    rgb(from var(--bg-main) r g b / 0.85) 80%,
+    rgb(from var(--bg-main) r g b / 0) 100%
   );
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -824,7 +838,7 @@ body {
 .prose-aivory blockquote {
   margin: 1.25rem 0;
   padding-left: 1rem;
-  border-left: 2px solid rgba(183, 203, 166, 0.4);
+  border-left: 2px solid rgb(from var(--color-accent) r g b / 0.4);
   color: var(--text-tertiary);
   font-style: italic;
 }
@@ -1045,9 +1059,9 @@ body {
    hanya state aktif. Jangan divergenkan padding/radius lagi. */
 
 .console-chip--active {
-  background: rgba(178, 204, 162, 0.12);
-  border-color: rgba(178, 204, 162, 0.3);
-  color: rgba(178, 204, 162, 0.95);
+  background: rgb(from var(--color-accent-workflow) r g b / 0.12);
+  border-color: rgb(from var(--color-accent-workflow) r g b / 0.3);
+  color: rgb(from var(--color-accent-workflow) r g b / 0.95);
 }
 
 .console-dropdown {

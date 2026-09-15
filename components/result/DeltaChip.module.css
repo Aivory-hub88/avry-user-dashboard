@@ -16,9 +16,9 @@
 }
 
 .up {
-  color: #afd199;
-  background: rgba(175, 209, 153, 0.12);
-  border: 1px solid rgba(175, 209, 153, 0.3);
+  color: var(--color-accent-report);
+  background: rgb(from var(--color-accent-report) r g b / 0.12);
+  border: 1px solid rgb(from var(--color-accent-report) r g b / 0.3);
 }
 
 .down {
