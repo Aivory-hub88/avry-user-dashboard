@@ -9,7 +9,22 @@ import * as Y from 'yjs'
 
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }))
 
-vi.mock('@/lib/db', () => ({ query: queryMock }))
+vi.mock('@/lib/db', () => ({
+  query: queryMock,
+  // recordWorkspaceEvent's audit-log writes (dual-written alongside
+  // recordWorkspaceActivity / recordCommentMentions) run through
+  // withTransaction. This gives it a minimal, self-contained tx so route
+  // tests don't need to model the event log's own queries in their
+  // `queryMock` branching — without it, withTransaction is undefined and
+  // recordWorkspaceEvent's own try/catch silently swallows the failure,
+  // which is harmless but prints noise on every write-path test.
+  withTransaction: async (fn: (tx: (sql: string) => Promise<{ rows: unknown[] }>) => Promise<unknown>) =>
+    fn(async (sql: string) =>
+      sql.includes('INSERT INTO dashboard.workspace_events')
+        ? { rows: [{ id: 1, created_at: '2026-01-01 00:00:00+00', payload: '{}' }] }
+        : { rows: [] },
+    ),
+}))
 
 vi.mock('@/lib/serverAuth', () => ({ getAuthUserWithToken: () => null }))
 
