@@ -268,19 +268,21 @@ export async function withResolvedRollups(
     if (rel?.targetDocId) needTargets.add(rel.targetDocId)
   }
   if (needTargets.size === 0 || rows.length === 0) return rows
-  const cache = new Map<string, DbRow[] | null>()
-  for (const t of needTargets) {
-    if (!(await canReadDocId(cred, t, agentType))) {
-      cache.set(t, null)
-      continue
-    }
-    try {
-      const doc = await loadDbDoc(t, cred, agentType, allowPgFallback)
-      cache.set(t, rowsFromDbDoc(doc))
-    } catch {
-      cache.set(t, null)
-    }
-  }
+  // Fan out target-doc loads concurrently instead of one at a time — each
+  // loadDbDoc can itself take up to 2s on a collab timeout, so N rollup
+  // targets used to multiply straight into this request's latency.
+  const entries = await Promise.all(
+    Array.from(needTargets).map(async (t): Promise<[string, DbRow[] | null]> => {
+      if (!(await canReadDocId(cred, t, agentType))) return [t, null]
+      try {
+        const doc = await loadDbDoc(t, cred, agentType, allowPgFallback)
+        return [t, rowsFromDbDoc(doc)]
+      } catch {
+        return [t, null]
+      }
+    }),
+  )
+  const cache = new Map<string, DbRow[] | null>(entries)
   const computed = computeRollups(rows, defs, (docId) => cache.get(docId) ?? null)
   if (Object.keys(computed).length === 0) return rows
   // Nulls (unreadable links) are omitted from cells — renderers show empty.
