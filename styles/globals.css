@@ -934,7 +934,7 @@ body {
 }
 
 .console-input-card {
-  background: var(--color-surface-3);
+  background: #1f1f22;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
