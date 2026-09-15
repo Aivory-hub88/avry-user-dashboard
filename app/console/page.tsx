@@ -144,6 +144,21 @@ export default function ConsolePage() {
   const [connectorsOpen, setConnectorsOpen] = useState(false)
   const [uploadMenuOpen, setUploadMenuOpen] = useState(false)
 
+  // Time-aware hero greeting — resolved on mount from the viewer's local
+  // clock, never during render, so SSR and hydration always agree on the
+  // neutral fallback first and only the client personalizes it.
+  const [welcomeKey, setWelcomeKey] = useState("welcomeHeading")
+  useEffect(() => {
+    const h = new Date().getHours()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setWelcomeKey(
+      h >= 5 && h < 12 ? "welcomeMorning"
+      : h >= 12 && h < 17 ? "welcomeAfternoon"
+      : h >= 17 && h < 22 ? "welcomeEvening"
+      : "welcomeNight",
+    )
+  }, [])
+
   // Refs
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -528,7 +543,12 @@ export default function ConsolePage() {
               <div
                 className="mb-8 flex items-center justify-center gap-3 [animation:fadeUp_0.55s_0s_cubic-bezier(0.22,1,0.36,1)_both]"
               >
-                <AgentAvatar type={agentTarget} size={40} />
+                {/* The brand mark's artwork sits high in its viewBox, so it
+                    renders above the text's optical center — nudge it down
+                    to sit on the same line. */}
+                <span className="inline-flex translate-y-[3px]">
+                  <AgentAvatar type={agentTarget} size={40} />
+                </span>
                 <h1
                   className="font-light"
                   style={{
@@ -541,7 +561,7 @@ export default function ConsolePage() {
                     margin: 0,
                   }}
                 >
-                  {t('welcomeHeading')}
+                  {t(welcomeKey)}
                 </h1>
               </div>
 
