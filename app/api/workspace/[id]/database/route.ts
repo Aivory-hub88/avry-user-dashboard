@@ -80,8 +80,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const allowPg = cred.kind === "service" ? true : await authorizeDocFallback(cred, id)
     const doc = await loadDbDoc(id, cred, agentType, allowPg)
     const rows = rowsFromDbDoc(doc)
+    // Fetched once, reused below — both were previously awaited twice each
+    // in this same handler (getWipLimits, getFieldDefs), each its own
+    // round trip to the same doc's props for the same request.
+    const wipLimits = await getWipLimits(id)
+    const fieldDefs = await getFieldDefs(id)
     // WIP gate (F2-4): creating into a full column is rejected, not queued.
-    const limited = wipExceeded(rows, (body.status ?? "Todo").toString().slice(0, 16), await getWipLimits(id))
+    const limited = wipExceeded(rows, (body.status ?? "Todo").toString().slice(0, 16), wipLimits)
     if (limited !== null) {
       return NextResponse.json({ error: "wip-exceeded", limit: limited }, { status: 409 })
     }
@@ -89,7 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       id: newDbRowId(),
       ...cleanRowInput(body),
       comments: [],
-      cells: cleanCells(body.cells, await getFieldDefs(id)),
+      cells: cleanCells(body.cells, fieldDefs),
     }
     doc.transact(() => doc.getArray<Y.Map<unknown>>("database").push([dbRowToYMap(newRow)]), agentType)
     const actorName = cred.kind === "service" ? agentType.replace(/_/g, " ") : (cred.user.email ?? cred.user.user_id)
@@ -97,7 +102,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       doc,
       rowId: newRow.id,
       prevStatus: null,
-      wipLimits: await getWipLimits(id),
+      wipLimits,
       actorName,
       origin: agentType,
       getRules: () => getAutomationRules(id),
@@ -125,7 +130,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         metadata: { applied: automated },
       })
     }
-    const [resolved] = await withResolvedRollups([newRow], await getFieldDefs(id), cred, agentType, allowPg)
+    const [resolved] = await withResolvedRollups([newRow], fieldDefs, cred, agentType, allowPg)
     // Semantic index (best-effort, never blocks the response).
     void indexRow(id, newRow.id, await workspaceOf(id), rowText(newRow)).catch(() => {})
     return NextResponse.json({ id: newRow.id, row: resolved ?? newRow, agentType }, { status: 201 })

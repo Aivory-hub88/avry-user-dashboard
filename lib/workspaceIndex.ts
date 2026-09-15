@@ -40,6 +40,9 @@ export async function removeRowIndex(docId: string, rowId: string): Promise<void
   } catch {}
 }
 
+// Shared with workspaceMentions.ts (imported from here, not duplicated) —
+// this module isn't a natural home for it, but it was already exported and
+// used by 4 route files, so consolidating here avoided touching those imports.
 export async function workspaceOf(docId: string): Promise<string> {
   try {
     const r = await query(`SELECT workspace_id FROM dashboard.workspace_docs WHERE id = $1 OR id = $2 LIMIT 1`, [

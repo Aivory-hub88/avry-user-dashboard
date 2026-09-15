@@ -2,6 +2,7 @@ import { query } from "@/lib/db"
 import { parseMentions } from "@/lib/workspaceDbModel"
 import type { WorkspaceCredential } from "@/lib/workspaceAuth"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
+import { workspaceOf } from "@/lib/workspaceIndex"
 
 /**
  * Mention fan-out (Fase 4b): @agent / @email tokens in written text become
@@ -27,18 +28,6 @@ function actorOf(credential: WorkspaceCredential, agentType: string) {
     actorType: "user",
     actorId: credential.user.user_id,
     actorName: credential.user.email ?? credential.user.user_id,
-  }
-}
-
-async function workspaceOf(docId: string): Promise<string> {
-  try {
-    const r = await query(`SELECT workspace_id FROM dashboard.workspace_docs WHERE id = $1 OR id = $2 LIMIT 1`, [
-      docId,
-      `workspace:${docId}`,
-    ])
-    return (r.rows[0]?.workspace_id as string | undefined) ?? "default"
-  } catch {
-    return "default"
   }
 }
 
