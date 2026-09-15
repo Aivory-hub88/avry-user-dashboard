@@ -10,14 +10,51 @@ function newId(): string {
   return `doc-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`
 }
 
+type ListCursor = { u: string; id: string }
+
+function decodeCursor(raw: string | null): ListCursor | null {
+  if (!raw) return null
+  try {
+    const decoded = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'))
+    if (typeof decoded?.u === 'string' && typeof decoded?.id === 'string') return decoded
+  } catch {}
+  return null
+}
+
+function encodeCursor(c: ListCursor): string {
+  return Buffer.from(JSON.stringify(c)).toString('base64url')
+}
+
 export async function GET(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
   const showTrash = req.nextUrl.searchParams.get('trash') === '1'
+  // Page size the caller sees after ACL filtering + dedup. Default 100 keeps
+  // the old single-page behavior for workspaces under the old hard cap.
+  const limit = Math.min(200, Math.max(1, parseInt(req.nextUrl.searchParams.get('limit') ?? '100', 10) || 100))
+  const cursor = decodeCursor(req.nextUrl.searchParams.get('cursor'))
+  // A doc can have both a bare and workspace:-prefixed row (dedup shrinks
+  // the count), and ACL filtering drops rows the caller can't see (also
+  // shrinks it) — so the raw fetch is padded above `limit`, and pagination
+  // continues from the LAST RAW row regardless of how many survive both
+  // filters. Without the padding, a plain LIMIT 100 (with no continuation)
+  // silently hid every doc past the 100th with no "there's more" signal —
+  // very plausible for a team active over months.
+  const rawLimit = limit + 20
   try {
+    const params: unknown[] = []
+    let cursorSql = ''
+    if (cursor) {
+      params.push(cursor.u, cursor.id)
+      cursorSql = `AND (updated_at, id) < ($${params.length - 1}::timestamptz, $${params.length})`
+    }
+    params.push(rawLimit)
     const r = await query(
       `SELECT id, workspace_id, owner, title, mode, favorite, deleted_at, updated_at, octet_length(yjs_update) as bytes
-       FROM dashboard.workspace_docs WHERE deleted_at IS ${showTrash ? 'NOT NULL' : 'NULL'} ORDER BY updated_at DESC LIMIT 100`,
+       FROM dashboard.workspace_docs
+       WHERE deleted_at IS ${showTrash ? 'NOT NULL' : 'NULL'} ${cursorSql}
+       ORDER BY updated_at DESC, id DESC LIMIT $${params.length}`,
+      params,
     )
     const visible: any[] = []
     // Batch role resolution (3 queries total, was N×3) — see getDocRolesBatch.
@@ -52,7 +89,13 @@ export async function GET(req: NextRequest) {
       seen.add(v.id)
       return true
     })
-    return NextResponse.json({ docs: deduped })
+    // Cursor from the last RAW row fetched (not the deduped/visible output) —
+    // the raw window may hold more rows even when this page's deduped/visible
+    // count is small or zero (e.g. a run of docs the caller can't read).
+    const lastRaw = r.rows[r.rows.length - 1]
+    const nextCursor =
+      r.rows.length === rawLimit && lastRaw ? encodeCursor({ u: String(lastRaw.updated_at), id: String(lastRaw.id) }) : null
+    return NextResponse.json({ docs: deduped.slice(0, limit), nextCursor })
   } catch (e) {
     console.error('[workspace list]', e)
     return NextResponse.json({ error: 'db' }, { status: 500 })
