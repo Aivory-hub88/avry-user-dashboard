@@ -219,7 +219,7 @@ export default function AgentColumn({
   }
 
   return (
-    <div className="flex h-full w-full flex-col border-r border-line bg-surface-1">
+    <div className="flex h-full w-full flex-col bg-surface-1">
       <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-transparent bg-surface-1/70 px-4 backdrop-blur-xl">
         {/* Not <h2> — a global `main h2` style overrides Tailwind's own
             font-size on any heading tag, forcing this to 24px regardless of
