@@ -52,38 +52,94 @@ export async function getDocRole(
   cred: WorkspaceCredential,
   docId: string,
 ): Promise<DocRole> {
-  if (cred.kind === 'service') return 'owner'
+  const batch = await getDocRolesBatch(cred, [docId])
+  return batch.get(docId) ?? null
+}
+
+/**
+ * Batched role resolution — replaces N×getDocRole sequential calls in
+ * GET /api/workspace (was up to 3 queries per doc → 300 queries for 100 docs).
+ * Now exactly 3 queries total regardless of doc count:
+ *   1. all doc rows (bare + room-keyed), 2. all ACL rows, 3. workspace members.
+ * Precedence per doc mirrors getDocRole: owner → doc ACL → workspace member.
+ */
+export async function getDocRolesBatch(
+  cred: WorkspaceCredential,
+  docIds: string[],
+): Promise<Map<string, DocRole>> {
+  const out = new Map<string, DocRole>()
+  if (docIds.length === 0) return out
+  if (cred.kind === 'service') {
+    for (const id of docIds) out.set(id, 'owner')
+    return out
+  }
   const userId = cred.user.user_id
-  if (cred.user.account_type === 'admin' || cred.user.account_type === 'superadmin') return 'owner'
-  const roomKey = `workspace:${docId}`
-  const rows = await query(
-    'SELECT id, owner, workspace_id FROM dashboard.workspace_docs WHERE id = $1 OR id = $2',
-    [roomKey, docId],
-  )
-  const row = rows.rows.find((r: any) => r.id === roomKey) ?? rows.rows[0]
-  if (!row) return 'editor' // new doc claimable
-  if (row.owner === userId) return 'owner'
-  if (!row.owner) return 'editor' // ownerless claimable
-  const workspaceId: string = row.workspace_id || 'default'
-  // doc ACL wins
-  const acl = await query(
-    'SELECT role FROM dashboard.workspace_doc_acl WHERE doc_id = $1 AND user_id = $2',
-    [docId, userId],
-  )
-  if (acl.rows.length > 0) {
-    const r = acl.rows[0].role as string
-    if (r === 'editor' || r === 'viewer' || r === 'owner') return r as DocRole
+  if (cred.user.account_type === 'admin' || cred.user.account_type === 'superadmin') {
+    for (const id of docIds) out.set(id, 'owner')
+    return out
   }
-  const mem = await query(
-    'SELECT role FROM dashboard.workspace_members WHERE workspace_id = $1 AND user_id = $2',
-    [workspaceId, userId],
-  )
-  if (mem.rows.length > 0) {
-    const r = mem.rows[0].role as string
-    if (r === 'owner' || r === 'editor') return 'editor'
-    if (r === 'viewer') return 'viewer'
+  const uniq = Array.from(new Set(docIds))
+  const keys: string[] = []
+  for (const id of uniq) keys.push(id, `workspace:${id}`)
+  try {
+    const docs = await query(
+      `SELECT id, owner, workspace_id FROM dashboard.workspace_docs WHERE id = ANY($1)`,
+      [keys],
+    )
+    const byBare = new Map<string, { owner: string | null; workspace_id: string }>()
+    for (const r of docs.rows as any[]) {
+      const bare = String(r.id).replace(/^workspace:/, '').replace(/^db:/, '')
+      if (String(r.id).startsWith('workspace:')) {
+        byBare.set(bare, { owner: r.owner ?? null, workspace_id: r.workspace_id || 'default' })
+      } else if (!byBare.has(bare)) {
+        byBare.set(bare, { owner: r.owner ?? null, workspace_id: r.workspace_id || 'default' })
+      }
+    }
+    const needAcl: string[] = []
+    const needMemWs = new Set<string>()
+    for (const id of uniq) {
+      const row = byBare.get(id)
+      if (!row) continue // new/claimable doc — resolved below, no query needed
+      if (row.owner === userId) { out.set(id, 'owner'); continue }
+      if (!row.owner) continue // ownerless claimable — resolved below
+      needAcl.push(id)
+      needMemWs.add(row.workspace_id || 'default')
+    }
+    const aclByDoc = new Map<string, string>()
+    if (needAcl.length > 0) {
+      const acl = await query(
+        `SELECT doc_id, role FROM dashboard.workspace_doc_acl WHERE doc_id = ANY($1) AND user_id = $2`,
+        [needAcl, userId],
+      )
+      for (const r of acl.rows as any[]) aclByDoc.set(String(r.doc_id), String(r.role))
+    }
+    const memByWs = new Map<string, string>()
+    if (needMemWs.size > 0) {
+      const wsList = Array.from(needMemWs)
+      const mem = await query(
+        `SELECT workspace_id, role FROM dashboard.workspace_members WHERE workspace_id = ANY($1) AND user_id = $2`,
+        [wsList, userId],
+      )
+      for (const r of mem.rows as any[]) memByWs.set(String(r.workspace_id), String(r.role))
+    }
+    for (const id of uniq) {
+      if (out.has(id)) continue
+      const row = byBare.get(id)
+      if (!row) { out.set(id, 'editor'); continue } // new doc claimable
+      if (!row.owner) { out.set(id, 'editor'); continue } // ownerless claimable
+      const aclRole = aclByDoc.get(id)
+      if (aclRole === 'editor' || aclRole === 'viewer' || aclRole === 'owner') {
+        out.set(id, aclRole as DocRole); continue
+      }
+      const memRole = memByWs.get(row.workspace_id || 'default')
+      if (memRole === 'owner' || memRole === 'editor') { out.set(id, 'editor'); continue }
+      if (memRole === 'viewer') { out.set(id, 'viewer'); continue }
+      // null = no access → omitted (caller filters)
+    }
+  } catch {
+    // on DB error return whatever resolved — caller treats empty as no access
   }
-  return null
+  return out
 }
 
 export function canRead(role: DocRole): boolean {

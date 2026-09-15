@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { workspaceCredential, unauthorized } from '@/lib/workspaceAuth'
-import { getDocRole } from '@/lib/workspaceAccess'
+import { getDocRolesBatch } from '@/lib/workspaceAccess'
 import { recordWorkspaceActivity } from '@/lib/workspaceActivity'
 
 export const runtime = 'nodejs'
@@ -20,10 +20,15 @@ export async function GET(req: NextRequest) {
        FROM dashboard.workspace_docs WHERE deleted_at IS ${showTrash ? 'NOT NULL' : 'NULL'} ORDER BY updated_at DESC LIMIT 100`,
     )
     const visible: any[] = []
+    // Batch role resolution (3 queries total, was N×3) — see getDocRolesBatch.
+    const bareIds = r.rows.map((row: any) =>
+      String(row.id).replace(/^workspace:/, '').replace(/^db:/, ''),
+    )
+    const roles = await getDocRolesBatch(cred, bareIds)
     for (const row of r.rows) {
       const bare = (row.id as string).replace(/^workspace:/, '').replace(/^db:/, '')
       // skip the room-keyed dupe if bare also exists? keep both but dedupe by bare
-      const role = await getDocRole(cred, bare)
+      const role = roles.get(bare) ?? null
       if (role) {
         visible.push({
           id: bare,
