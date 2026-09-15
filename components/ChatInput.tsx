@@ -229,7 +229,7 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
           query={mention.mentionQuery}
         />
       )}
-      <div className="bg-surface-3 border border-line rounded-[20px] overflow-hidden">
+      <div className="bg-[#1f1f22] border border-line rounded-[20px] overflow-hidden">
         {/* Textarea area */}
         <textarea
           ref={textareaRef}
