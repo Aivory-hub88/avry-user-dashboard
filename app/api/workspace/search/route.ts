@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { workspaceCredential, authorizeDocFallback, unauthorized } from "@/lib/workspaceAuth"
-import { canReadDocId, isKnownAgentType } from "@/lib/workspaceAccess"
+import { getDocRolesBatch, canRead, isKnownAgentType } from "@/lib/workspaceAccess"
 import { loadDbDoc, rowsFromDbDoc, WorkspaceDenied } from "@/lib/workspaceDb"
 import { embed, embeddingsConfigured } from "@/lib/embeddings"
 
@@ -67,43 +67,76 @@ export async function GET(req: NextRequest) {
       bareIds.push(bare)
     }
 
-    // 2. Gate + decode, title hits first.
+    // 2. Gate: one batched resolution instead of an N-await loop (was up to
+    // 50 sequential canReadDocId calls). Service+agent still needs an ACL
+    // lookup, but it's now a single ANY($1) query rather than one per doc.
+    let readableIds: string[]
+    if (cred.kind === "service") {
+      if (!isKnownAgentType(assertedAgent)) {
+        readableIds = bareIds
+      } else {
+        const acl = await query(
+          `SELECT doc_id, role FROM dashboard.workspace_agent_acl WHERE doc_id = ANY($1) AND agent_type = $2`,
+          [bareIds, assertedAgent],
+        )
+        const readable = new Set(
+          acl.rows.filter((r) => r.role === "editor" || r.role === "viewer").map((r) => String(r.doc_id)),
+        )
+        readableIds = bareIds.filter((id) => readable.has(id))
+      }
+    } else {
+      const roles = await getDocRolesBatch(cred, bareIds)
+      readableIds = bareIds.filter((id) => canRead(roles.get(id) ?? null))
+    }
+
     const hits: SearchHit[] = []
-    const readableIds: string[] = []
-    const allowPgBase = cred.kind === "service" ? true : null
-    let decoded = 0
-    for (const [bare, title] of titles) {
-      if (!(await canReadDocId(cred, bare, assertedAgent))) continue
-      readableIds.push(bare)
+    for (const bare of readableIds) {
+      const title = titles.get(bare) ?? bare
       if (title.toLowerCase().includes(q.toLowerCase())) {
         hits.push({ kind: "doc", doc_id: bare, doc_title: title, title, snippet: snippetOf(title, q), score: 2 })
       }
-      if (decoded >= MAX_DOCS_DECODED || hits.length >= MAX_RESULTS) break
-      try {
-        const allowPg = allowPgBase ?? (await authorizeDocFallback(cred, bare))
-        const doc = await loadDbDoc(bare, cred, assertedAgent, allowPg)
-        decoded++
-        const rows = rowsFromDbDoc(doc).slice(0, MAX_ROWS_SCANNED)
-        for (const r of rows) {
-          if (hits.length >= MAX_RESULTS) break
-          const hay = [r.title, r.description, r.assignee, ...r.comments.map((c) => c.text)].join("\n")
-          if (!hay.toLowerCase().includes(q.toLowerCase())) continue
-          const titleHit = r.title.toLowerCase().includes(q.toLowerCase())
-          hits.push({
-            kind: "row",
-            doc_id: bare,
-            doc_title: title,
-            row_id: r.id,
-            title: r.title || "Untitled",
-            snippet: snippetOf(titleHit ? r.title : hay, q),
-            score: titleHit ? 1.5 : 1,
-          })
+    }
+
+    // 3. Decode candidates concurrently — was a sequential await loop where
+    // each loadDbDoc can itself take up to 2s on a collab timeout, so a slow
+    // or down collab turned every search into a many-second serial stall.
+    // MAX_DOCS_DECODED already bounds the fan-out; no extra concurrency cap
+    // needed. Trade-off: unlike the old early-exit-once-MAX_RESULTS-hits
+    // loop, this always decodes up to the cap even once enough hits exist —
+    // acceptable since the decode now happens in parallel, not stacked.
+    const allowPgBase = cred.kind === "service" ? true : null
+    const toDecode = readableIds.slice(0, MAX_DOCS_DECODED)
+    const decoded = await Promise.all(
+      toDecode.map(async (bare) => {
+        try {
+          const allowPg = allowPgBase ?? (await authorizeDocFallback(cred, bare))
+          const doc = await loadDbDoc(bare, cred, assertedAgent, allowPg)
+          return { bare, rows: rowsFromDbDoc(doc).slice(0, MAX_ROWS_SCANNED) }
+        } catch (e) {
+          if (e instanceof WorkspaceDenied) return null
+          throw e
         }
-      } catch (e) {
-        if (e instanceof WorkspaceDenied) continue
-        throw e
+      }),
+    )
+    for (const result of decoded) {
+      if (!result || hits.length >= MAX_RESULTS) continue
+      const { bare, rows } = result
+      const title = titles.get(bare) ?? bare
+      for (const r of rows) {
+        if (hits.length >= MAX_RESULTS) break
+        const hay = [r.title, r.description, r.assignee, ...r.comments.map((c) => c.text)].join("\n")
+        if (!hay.toLowerCase().includes(q.toLowerCase())) continue
+        const titleHit = r.title.toLowerCase().includes(q.toLowerCase())
+        hits.push({
+          kind: "row",
+          doc_id: bare,
+          doc_title: title,
+          row_id: r.id,
+          title: r.title || "Untitled",
+          snippet: snippetOf(titleHit ? r.title : hay, q),
+          score: titleHit ? 1.5 : 1,
+        })
       }
-      if (hits.length >= MAX_RESULTS) break
     }
     // Semantic boost (Fase 4c2): when embeddings are configured, rank indexed
     // rows by cosine similarity and merge unseen ones below lexical hits.

@@ -70,9 +70,12 @@ beforeEach(() => {
       return Promise.resolve({ rows: [{ props: {} }] })
     }
     // Agent granted on doc-launch only — doc-private must be filtered out.
+    // Batched: params[0] is the full candidate id array (doc_id = ANY($1)).
     if (sql.includes('FROM dashboard.workspace_agent_acl')) {
-      const granted = (params[0] as string) === 'doc-launch'
-      return Promise.resolve(granted ? { rows: [{ role: 'editor' }] } : { rows: [] })
+      const ids = params[0] as string[]
+      return Promise.resolve({
+        rows: ids.filter((id) => id === 'doc-launch').map((id) => ({ doc_id: id, role: 'editor' })),
+      })
     }
     if (sql.includes('FROM dashboard.workspace_docs')) {
       return Promise.resolve({ rows: [{ id: 'workspace:doc-launch', owner: 'owner-1', workspace_id: 'default' }] })
