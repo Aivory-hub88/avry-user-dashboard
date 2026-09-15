@@ -777,6 +777,14 @@
       "Slack alerts",
       "Sheets log"
     ],
+    "chiefOfStaffTitle": "Chief of Staff Agent",
+    "chiefOfStaffDesc": "Coordinate your AI team, route work to the right specialist, and receive one coherent outcome with approvals kept in the loop.",
+    "chiefOfStaffTools": [
+      "Task planning",
+      "Agent delegation",
+      "Progress tracking",
+      "Cross-agent synthesis"
+    ],
     "actionLeadSaved": "Lead saved",
     "actionTicketCreated": "Ticket created",
     "actionEscalated": "Escalated to human",

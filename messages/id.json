@@ -777,6 +777,14 @@
       "Alert Slack",
       "Log Sheets"
     ],
+    "chiefOfStaffTitle": "Chief of Staff Agent",
+    "chiefOfStaffDesc": "Mengatur tim AI, meneruskan pekerjaan ke spesialis yang tepat, dan memberi satu hasil terpadu dengan approval tetap terjaga.",
+    "chiefOfStaffTools": [
+      "Perencanaan tugas",
+      "Delegasi agent",
+      "Pelacakan progres",
+      "Sintesis lintas agent"
+    ],
     "actionLeadSaved": "Lead disimpan",
     "actionTicketCreated": "Tiket dibuat",
     "actionEscalated": "Dieskalasi ke manusia",

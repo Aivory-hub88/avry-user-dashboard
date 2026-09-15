@@ -121,6 +121,19 @@ const AGENTS = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
       </svg>
     )
+  },
+  {
+    agentType: 'chief_of_staff' as TelegramAgentType,
+    name: AGENT_NAMES.chief_of_staff,
+    titleKey: 'chiefOfStaffTitle',
+    descKey: 'chiefOfStaffDesc',
+    toolsKey: 'chiefOfStaffTools',
+    headerImage: AGENT_HEADER_IMAGES.autonomous,
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M6.75 3.75v16.5m10.5-16.5v16.5M3.75 17.25h16.5" />
+      </svg>
+    )
   }
 ];
 
@@ -142,7 +155,7 @@ function HeroBanner() {
       className="rounded-2xl p-6 md:p-8 mb-8 shadow-lg relative overflow-hidden border border-white/[0.06]"
       style={{
         background: [
-          'radial-gradient(ellipse 90% 120% at 12% 0%, rgba(183,203,166,0.16) 0%, transparent 55%)',
+          'radial-gradient(ellipse 90% 120% at 12% 0%, rgb(from var(--color-accent) r g b / 0.16) 0%, transparent 55%)',
           'radial-gradient(ellipse 70% 90% at 92% 100%, rgba(221,218,197,0.10) 0%, transparent 55%)',
           'linear-gradient(135deg, #46483f 0%, #3a3c34 55%, #2c2e27 100%)',
         ].join(', '),

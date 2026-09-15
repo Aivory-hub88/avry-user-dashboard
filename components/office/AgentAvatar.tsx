@@ -35,6 +35,9 @@ export const AGENT_VISUALS: Record<AgentType | "null", AgentVisual> = {
   leads_qualifier: { portraitSrc: "/agents/leads_qualifier.svg" }, // Leads Qualifier Agent
   finance_invoice_ops: { portraitSrc: "/agents/finance_invoice_ops.svg" }, // Finance & Invoice Ops Agent
   office_assistant: { portraitSrc: "/agents/office_assistant.svg" },
+  // Aira uses the generalist portrait until the dedicated Chief of Staff
+  // illustration is added; the identity/name remain distinct everywhere.
+  chief_of_staff: { portraitSrc: "/agents/autonomous.svg" },
 }
 
 export function getAgentVisual(type: string | null | undefined): AgentVisual {
