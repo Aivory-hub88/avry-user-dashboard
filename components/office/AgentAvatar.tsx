@@ -38,7 +38,7 @@ export const AGENT_VISUALS: Record<AgentType | "null", AgentVisual> = {
   leads_qualifier: { portraitSrc: "/agents/leads_qualifier.svg" }, // Leads Qualifier Agent
   finance_invoice_ops: { portraitSrc: "/agents/finance_invoice_ops.svg" }, // Finance & Invoice Ops Agent
   office_assistant: { portraitSrc: "/agents/office_assistant.svg" },
-  chief_of_staff: { portraitSrc: "/agents/chief_of_staff.svg", objectPosition: "50% 0%" },
+  chief_of_staff: { portraitSrc: "/agents/chief_of_staff.svg", objectPosition: "50% 4px" },
 }
 
 export function getAgentVisual(type: string | null | undefined): AgentVisual {
