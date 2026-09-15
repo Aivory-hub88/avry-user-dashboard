@@ -128,7 +128,7 @@ const AGENTS = [
     titleKey: 'chiefOfStaffTitle',
     descKey: 'chiefOfStaffDesc',
     toolsKey: 'chiefOfStaffTools',
-    headerImage: AGENT_HEADER_IMAGES.autonomous,
+    headerImage: '/agent-card-headers/Silver.svg',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M6.75 3.75v16.5m10.5-16.5v16.5M3.75 17.25h16.5" />
@@ -657,7 +657,7 @@ export default function AgentsPage() {
   const allAgents = [...AGENTS, ...dynamicAgents];
 
   return (
-    <div className="min-h-screen bg-[#353531] text-white p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+    <div className="min-h-screen bg-[var(--bg-main)] text-white p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
       <div className="max-w-6xl mx-auto overflow-x-hidden pb-20">
         
         {/* Header Title */}
