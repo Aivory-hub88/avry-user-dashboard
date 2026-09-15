@@ -35,7 +35,9 @@ export interface AgentVisual {
    * repositioning alone can't add headroom — the beige backdrop starts at
    * canvas y=0 and the hair at y~59, leaving ~1% margin at any full-bleed
    * anchor. Scaling about the top-center pulls the whole framing back
-   * instead (~13% hair clearance at 0.89, matching the siblings' look).
+   * instead. Tuned so the head fills ~40% of the circle like the sibling
+   * portraits (measured from the artwork geometry + live screenshots, not
+   * guessed — 0.89 still rendered clearly oversized).
    * The leftover ring shows `backdrop`, which must equal the portrait's
    * own backdrop colour for a seamless edge. */
   scale?: number
@@ -55,7 +57,7 @@ export const AGENT_VISUALS: Record<AgentType | "null", AgentVisual> = {
   chief_of_staff: {
     portraitSrc: "/agents/chief_of_staff.svg",
     objectPosition: "50% 0%",
-    scale: 0.89,
+    scale: 0.72,
     backdrop: "#fbe6df", // beige portrait circle (st12) — seamless with the ring the scale leaves
   },
 }
