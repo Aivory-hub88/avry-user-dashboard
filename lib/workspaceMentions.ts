@@ -51,25 +51,21 @@ export async function recordCommentMentions(input: MentionInput): Promise<void> 
     const workspaceId = await workspaceOf(docId)
     const actor = actorOf(credential, agentType)
     const excerpt = text.trim().slice(0, 200)
-    const labels: string[] = []
-    for (const a of agents) {
+    // One multi-row insert (parseMentions caps agents+emails at 20 each, so
+    // at most 40 rows) instead of up to 40 sequential awaited INSERTs — this
+    // blocked the comment/description save until every one finished.
+    const kinds = [...agents.map(() => "agent"), ...emails.map(() => "user")]
+    const ids = [...agents, ...emails]
+    if (kinds.length > 0) {
       await query(
         `INSERT INTO dashboard.workspace_mentions
           (workspace_id, doc_id, row_id, actor_type, actor_id, actor_name, mentioned_kind, mentioned_id, source, excerpt)
-         VALUES ($1,$2,$3,$4,$5,$6,'agent',$7,$8,$9)`,
-        [workspaceId, docId, rowId ?? null, actor.actorType, actor.actorId, actor.actorName, a, source, excerpt],
+         SELECT $1, $2, $3, $4, $5, $6, m.kind, m.id, $7, $8
+         FROM unnest($9::text[], $10::text[]) AS m(kind, id)`,
+        [workspaceId, docId, rowId ?? null, actor.actorType, actor.actorId, actor.actorName, source, excerpt, kinds, ids],
       )
-      labels.push(`@${a}`)
     }
-    for (const e of emails) {
-      await query(
-        `INSERT INTO dashboard.workspace_mentions
-          (workspace_id, doc_id, row_id, actor_type, actor_id, actor_name, mentioned_kind, mentioned_id, source, excerpt)
-         VALUES ($1,$2,$3,$4,$5,$6,'user',$7,$8,$9)`,
-        [workspaceId, docId, rowId ?? null, actor.actorType, actor.actorId, actor.actorName, e, source, excerpt],
-      )
-      labels.push(`@${e}`)
-    }
+    const labels = [...agents.map((a) => `@${a}`), ...emails.map((e) => `@${e}`)]
     await recordWorkspaceActivity({
       docId,
       credential,

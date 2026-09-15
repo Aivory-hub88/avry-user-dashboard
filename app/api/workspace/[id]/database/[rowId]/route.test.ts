@@ -209,6 +209,9 @@ describe('comment mention fan-out', () => {
     expect(post.status).toBe(201)
     const insert = queryMock.mock.calls.find((c) => String(c[0]).includes('INSERT INTO dashboard.workspace_mentions'))
     expect(insert).toBeTruthy()
-    expect(insert?.[1]).toContain('leads_qualifier')
+    // Batched insert (one row per mention via unnest) — the mentioned agent
+    // type lands in the `ids` array param, not as its own flat param.
+    const params = insert?.[1] as unknown[]
+    expect(params.some((p) => Array.isArray(p) && p.includes('leads_qualifier'))).toBe(true)
   })
 })
