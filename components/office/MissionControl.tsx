@@ -23,6 +23,7 @@ import { collabAuthHeaders } from "@/lib/collabClient"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
 import { ThinkingDots } from "@/components/ui/ThinkingDots"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
+import MissionTimeline from "@/components/office/MissionTimeline"
 import { OFFICE_ROWS, CHANNEL_ICON, relativeTime, lastPreview as sharedLastPreview, formatBadgeCount } from "@/lib/officeRows"
 
 type Row = (typeof OFFICE_ROWS)[number]
@@ -252,7 +253,16 @@ export default function MissionControl({
           })}
         </div>
 
-         {/* Workspace activity and active collaborators */}
+         {/* Mission Timeline (Phase 3C) — read-only kanban over the Aira task
+             ledger. Compact here (top cards per column); the full board lives
+             at /console/missions. Placed below the agent grid so "who" stays
+             above "what's running", above activity/workspace which are older
+             surfaces. */}
+        <div className="mt-8">
+          <MissionTimeline variant="compact" />
+        </div>
+
+          {/* Workspace activity and active collaborators */}
         {visibleAwarenessPeers.length > 0 && (
           <div className="mt-8">
             <div className="mb-2 flex items-center gap-1.5 text-[11px] text-white/30">
