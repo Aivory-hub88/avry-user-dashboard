@@ -327,7 +327,7 @@ export default function Sidebar() {
       <div className="mt-auto shrink-0 pt-4 border-t border-white/5">
         <UserProfile />
         <div className="px-2">
-          <LanguagePill />
+          <LanguagePill collapsed={collapsed} />
           <Link
             href="/"
             className={`flex items-center rounded-lg text-sm transition-colors cursor-pointer group
