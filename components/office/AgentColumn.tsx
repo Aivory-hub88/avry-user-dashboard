@@ -261,7 +261,7 @@ export default function AgentColumn({
           />
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-[10px] pb-4 pt-1">
+      <div className="flex-1 overflow-y-auto px-[10px] pb-4 pt-1 scrollbar-invisible">
         {ROWS.map((row) => {
           const threads = sessionsByAgent[row.key] ?? []
           if (!matchesQuery(row, threads)) return null

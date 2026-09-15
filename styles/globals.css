@@ -202,6 +202,16 @@ body {
   scrollbar-color: rgba(255,255,255,0.08) transparent;
 }
 
+/* Invisible scrollbar — scrollable, but no visible rail/thumb (agent list). */
+.scrollbar-invisible {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-invisible::-webkit-scrollbar {
+  display: none;
+}
+
 .chat-area::-webkit-scrollbar {
   width: 8px;
 }
