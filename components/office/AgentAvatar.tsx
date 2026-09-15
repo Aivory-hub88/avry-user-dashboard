@@ -24,7 +24,10 @@ export interface AgentVisual {
    *  Console, which renders the bare brand mark instead. */
   portraitSrc?: string
   /** Optional crop anchor for portraits whose source canvas has extra
-   * whitespace. CSS object-position keeps the original artwork intact. */
+   * whitespace. CSS object-position keeps the original artwork intact.
+   * Use a percentage, not a px offset — with object-fit: cover the crop
+   * window scales with the rendered size, so a fixed px value frames
+   * differently at a 22px facepile avatar than at a 38px sidebar one. */
   objectPosition?: string
 }
 
@@ -38,7 +41,7 @@ export const AGENT_VISUALS: Record<AgentType | "null", AgentVisual> = {
   leads_qualifier: { portraitSrc: "/agents/leads_qualifier.svg" }, // Leads Qualifier Agent
   finance_invoice_ops: { portraitSrc: "/agents/finance_invoice_ops.svg" }, // Finance & Invoice Ops Agent
   office_assistant: { portraitSrc: "/agents/office_assistant.svg" },
-  chief_of_staff: { portraitSrc: "/agents/chief_of_staff.svg", objectPosition: "50% 4px" },
+  chief_of_staff: { portraitSrc: "/agents/chief_of_staff.svg", objectPosition: "50% 22%" },
 }
 
 export function getAgentVisual(type: string | null | undefined): AgentVisual {
