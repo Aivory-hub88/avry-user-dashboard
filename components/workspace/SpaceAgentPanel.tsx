@@ -51,8 +51,8 @@ export default function SpaceAgentPanel({
   const [tasks, setTasks] = useState<SpaceAgentTask[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [findings, setFindings] = useState<Record<string, PendingApproval>>({})
-  const seenRef = useRef<Set<string>>(new Set())
-  const firstLoadRef = useRef(true)
+  const runningRef = useRef<Set<string>>(new Set())
+  const prevStatusRef = useRef<Map<string, string>>(new Map())
 
   const load = useCallback(async () => {
     try {
@@ -63,7 +63,17 @@ export default function SpaceAgentPanel({
       if (!r.ok) return
       const j = await r.json()
       const list: SpaceAgentTask[] = Array.isArray(j.tasks) ? j.tasks : []
+      // Thread refresh saat status flip (balasan agent server-triggered).
+      const prev = prevStatusRef.current
+      const flipped = list.some(
+        (t) =>
+          prev.has(t.id) &&
+          prev.get(t.id) !== t.status &&
+          (t.status === "done" || t.status === "failed" || t.status === "blocked" || t.status === "cancelled"),
+      )
+      prevStatusRef.current = new Map(list.map((t) => [t.id, t.status]))
       setTasks(list)
+      if (flipped) onChanged()
       // Cari full approval row (verifier finding) untuk yang blocked.
       const blocked = list.filter((t) => t.status === "blocked" && approvalOf(t))
       if (blocked.length > 0) {
@@ -75,15 +85,16 @@ export default function SpaceAgentPanel({
           })
           .catch(() => {})
       }
-      // Auto-run: hanya task todo yang lahir setelah load pertama.
-      const fresh = list.filter((t) => t.status === "todo" && !seenRef.current.has(t.id))
-      if (firstLoadRef.current) {
-        firstLoadRef.current = false
-        for (const t of list) seenRef.current.add(t.id)
-      } else if (canWrite) {
-        for (const t of fresh) {
-          seenRef.current.add(t.id)
-          void runTask(t.id, null)
+      // Auto-run backup: semua todo jalan (server primer fire-and-forget;
+      // di sini idempoten — 409 bila sudah diambil). Guard in-flight lokal.
+      if (canWrite) {
+        for (const t of list) {
+          if (t.status === "todo" && !runningRef.current.has(t.id)) {
+            runningRef.current.add(t.id)
+            void runTask(t.id, null).finally(() => {
+              runningRef.current.delete(t.id)
+            })
+          }
         }
       }
     } catch {
