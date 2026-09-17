@@ -8,7 +8,6 @@ import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
 import { sendAgentMessage, type ConsolePendingApproval } from '@/lib/agentChat'
 import { agentNameOf, buildRoomPayload, candidateOf, type RoomHistoryEntry } from '@/lib/agentMentions'
-import { resolveApproval } from '@/lib/agentApprovals'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
 import { useMode } from '@/contexts/ModeContext'
 import { useSession } from './useSession'
@@ -465,55 +464,13 @@ export function useChat({
     }
   }, [currentSessionId, agentTarget, handleSend, addToast, clearAttachments])
 
-  // Resolves a pending F-1 approval surfaced inline in the console, reusing
-  // the same /api/v1/agent-approvals endpoint the dashboard Approvals page
-  // calls. On success, Cerveau's durable-resume continuation (if any) is
-  // appended as a new assistant message — same as approving from the
-  // dashboard resumes the original conversation there.
-  const resolveConsoleApproval = useCallback(async (messageId: string, decision: 'approve' | 'deny') => {
-    const target = messagesRef.current.find(m => m.id === messageId)
-    const approval = target?.pendingApproval
-    if (!approval) return
-
-    setMessages(p => p.map(m => m.id === messageId ? { ...m, approvalBusy: true } : m))
-    try {
-      const result = await resolveApproval(
-        // Room threads park approvals under the answering agent, not the
-        // global column selection — resolve against the message's own agent.
-        { id: approval.id, _agent_type: target.agentType ?? agentTarget ?? undefined },
-        decision,
-      )
-      const outcome: 'approved' | 'denied' = decision === 'approve' ? 'approved' : 'denied'
-      setMessages(prev => {
-        let updated = prev.map(m =>
-          m.id === messageId
-            ? { ...m, approvalBusy: false, approvalOutcome: outcome }
-            : m
-        )
-        if (result.reply) {
-          // Room threads: the continuation belongs to whichever agent parked
-          // the approval (e.g. Teo's delegate pull), so it keeps that
-          // bubble's attribution instead of falling back to the global target.
-          updated = [
-            ...updated,
-            {
-              id: (Date.now() + 2).toString(),
-              role: 'assistant' as const,
-              content: result.reply,
-              agentType: target.agentType,
-              agentName: target.agentName,
-            },
-          ]
-        }
-        saveSessionMessages(currentSessionId, updated, agentTarget)
-        setSessions(listSessions())
-        return updated
-      })
-    } catch (error) {
-      setMessages(p => p.map(m => m.id === messageId ? { ...m, approvalBusy: false } : m))
-      addToast("error", error instanceof Error ? error.message : "Failed to resolve approval.")
-    }
-  }, [agentTarget, currentSessionId, addToast])
+  // NOTE (conversational approval protocol): approvals used to be resolved
+  // from inline Approve/Deny buttons via resolveConsoleApproval here. Those
+  // buttons are gone — the agent asks in plain language and the user's next
+  // short reply ("Ya"/"Batal", multilingual) IS the decision, resolved
+  // server-side by avry-backend before any LLM roundtrip. This hook keeps
+  // carrying pendingApproval on messages only so the rail notification feed
+  // can hide approvals already visible in the open thread.
 
   const handleNewChat = useCallback(() => {
     if (messages.length > 0) {
@@ -591,7 +548,6 @@ export function useChat({
     handleSend,
     handleSendRoom,
     stopStreaming,
-    resolveConsoleApproval,
     handleNewChat,
     switchSession,
     deleteThread,

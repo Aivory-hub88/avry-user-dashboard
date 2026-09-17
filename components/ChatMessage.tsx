@@ -11,8 +11,6 @@ import { AttachmentCard } from '@/components/AttachmentCard'
 import type { Attachment } from '@/components/UploadMenu'
 import type { ClassifiedIntent } from '@/lib/intentClassifier'
 import { ThinkingDots } from '@/components/ui/ThinkingDots'
-import { describeTool } from '@/lib/agentApprovals'
-import type { ConsolePendingApproval } from '@/lib/agentChat'
 import { AgentAvatar } from '@/components/office/AgentAvatar'
 
 const WorkflowContainer = dynamic(() => import('@/components/console/WorkflowContainer'), { ssr: false })
@@ -28,11 +26,11 @@ interface ChatMessageProps {
   onAcceptRoute?: () => void
   onDismissRoute?: () => void
   attachments?: Attachment[]
-  pendingApproval?: ConsolePendingApproval | null
-  approvalOutcome?: 'approved' | 'denied' | null
-  approvalBusy?: boolean
-  onApproveAction?: () => void
-  onDenyAction?: () => void
+  /* Approval renders nothing here. It is a conversational protocol, not a
+   * button gate: the agent asks in plain language (server appends a
+   * "Balas Ya / Reply Yes..." hint) and the user's next short reply IS the
+   * decision. pendingApproval stays on the useChat message (for the rail
+   * feed's duplicate-hiding) but is intentionally not a ChatMessage prop. */
   /** Display name of whichever agent is answering — shown in the thinking
    *  indicator so a room with several agents says who's actually busy. */
   agentName?: string
@@ -41,55 +39,10 @@ interface ChatMessageProps {
   agentType?: string | null
 }
 
-/** Inline F-1 approval card — the console's own Approve/Deny, resolving
- *  through the same endpoint the dashboard's Approvals page uses. */
-function ApprovalCard({
-  approval,
-  outcome,
-  busy,
-  onApprove,
-  onDeny,
-}: {
-  approval: ConsolePendingApproval
-  outcome?: 'approved' | 'denied' | null
-  busy?: boolean
-  onApprove: () => void
-  onDeny: () => void
-}) {
-  if (outcome) {
-    return (
-      <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm">
-        <span className={outcome === 'approved' ? 'text-accent' : 'text-white/50'}>
-          {outcome === 'approved' ? '✓ Approved' : '✕ Denied'}
-        </span>
-        <span className="text-white/40">— {describeTool(approval.tool_name)}</span>
-      </div>
-    )
-  }
-  return (
-    <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3.5">
-      <div className="text-sm text-white/85">
-        <span className="text-amber-300/90">Needs your approval</span> — {describeTool(approval.tool_name)}
-      </div>
-      <div className="mt-3 flex gap-2">
-        <button
-          onClick={onApprove}
-          disabled={busy}
-          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-on-accent transition hover:opacity-90 disabled:opacity-50"
-        >
-          Approve
-        </button>
-        <button
-          onClick={onDeny}
-          disabled={busy}
-          className="rounded-lg border border-white/15 px-3.5 py-1.5 text-sm font-medium text-white/70 transition hover:bg-white/5 disabled:opacity-50"
-        >
-          Deny
-        </button>
-      </div>
-    </div>
-  )
-}
+/* Approval needs no card here. Approval is a conversational protocol, not a
+ * button gate: the agent asks in plain language (server appends a
+ * "Balas Ya / Reply Yes..." hint) and the user's next short reply IS the
+ * decision, resolved server-side. Nothing to render. */
 
 /**
  * Normalizes plain-text LLM output so ReactMarkdown renders proper paragraphs.
@@ -344,7 +297,7 @@ const markdownComponents = {
 
 /* ── Main component ────────────────────────────────────────────────────────── */
 
-export default memo(function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, pendingApproval, approvalOutcome, approvalBusy, onApproveAction, onDenyAction, agentName = 'Aivory', agentType = null }: ChatMessageProps) {
+export default memo(function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null }: ChatMessageProps) {
   const noop = useCallback(() => {}, [])
   const hasAgenticPhases = !!(agenticState && agenticState.phases.length > 0)
   const hasTextContent = !!content
@@ -421,15 +374,10 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, a
                 </div>
               )}
 
-              {pendingApproval && (
-                <ApprovalCard
-                  approval={pendingApproval}
-                  outcome={approvalOutcome}
-                  busy={approvalBusy}
-                  onApprove={() => onApproveAction?.()}
-                  onDeny={() => onDenyAction?.()}
-                />
-              )}
+              {/* No approval card: the reply text already carries the
+                  conversational protocol hint ("Balas Ya / Reply Yes...").
+                  pendingApproval stays on the message only so the rail
+                  notification feed can hide this same approval there. */}
             </div>
           </div>
           <MessageActions role="ai" content={content} onRegenerate={onRegenerate} />

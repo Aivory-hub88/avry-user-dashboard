@@ -210,7 +210,6 @@ export default function ConsolePage() {
     handleSend,
     handleSendRoom,
     stopStreaming,
-    resolveConsoleApproval,
     handleNewChat,
     switchSession,
     deleteThread,
@@ -820,11 +819,6 @@ export default function ConsolePage() {
                         agenticState={m.role === 'assistant' && m.id === messages[messages.length - 1]?.id ? agenticState : undefined}
                         onAcceptRoute={acceptRoute}
                         onDismissRoute={dismissRoute}
-                        pendingApproval={m.pendingApproval}
-                        approvalOutcome={m.approvalOutcome}
-                        approvalBusy={m.approvalBusy}
-                        onApproveAction={() => resolveConsoleApproval(m.id, 'approve')}
-                        onDenyAction={() => resolveConsoleApproval(m.id, 'deny')}
                         agentName={m.agentName ?? activeAgentName}
                         agentType={m.agentType ?? agentTarget}
                       />
