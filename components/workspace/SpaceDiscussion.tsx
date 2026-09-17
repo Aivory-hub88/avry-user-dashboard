@@ -18,6 +18,7 @@ import { useAgentMention } from "@/hooks/useAgentMention"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { candidateOf, type MentionCandidate } from "@/lib/agentMentions"
 import { AGENT_ROSTER } from "@/lib/agentRoster"
+import { timeAgo, MENU_POPOVER_CLASS, COMPOSER_STICKY_CLASS, PRESENCE_RING_CLASS, placeMenu } from "@/lib/spaceUi"
 import SpaceAgentPanel from "@/components/workspace/SpaceAgentPanel"
 import SpaceActivityPanel from "@/components/workspace/SpaceActivityPanel"
 import type { SpaceMessage, SpaceTopic } from "@/lib/spaceProtocol"
@@ -40,18 +41,6 @@ interface DocOption {
 
 const TOKEN_RE =
   /\[(@[^\[\]\\]+|#[^\[\]\\]+)\]\(#(member:([^\)\s]+)|agent:([^\)\s]+)|here|doc:([^\)\s]+))\)/g
-
-function timeAgo(iso: string): string {
-  const t = new Date(iso).getTime()
-  if (!Number.isFinite(t)) return ""
-  const s = Math.max(0, Math.floor((Date.now() - t) / 1000))
-  if (s < 60) return `${s}s`
-  const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h`
-  return `${Math.floor(h / 24)}d`
-}
 
 function initials(name: string): string {
   const clean = name.trim()
@@ -234,36 +223,33 @@ function Composer({
   const menuVisible = !disabled && (mention.menuOpen || hashNeedle !== null)
 
   // Fixed + flip: anchor textarea, buka ke atas bila ruang cukup.
+  // Scroll/resize = REPOSISI, bukan tutup (menutup saat scroll membuat menu
+  // mati seketika di browser: focus scroll-into-view, layout shift dari poll,
+  // sticky re-stick — bug 2026-09-17).
   useEffect(() => {
     if (!menuVisible) {
       setPickPos(null)
       return
     }
+    let raf = 0
     const place = () => {
-      const el = boxRef.current
-      if (!el) {
-        setPickPos(null)
-        return
-      }
-      const r = el.getBoundingClientRect()
-      const above = r.top >= 280
-      setPickPos({
-        left: Math.max(8, Math.min(r.left, window.innerWidth - 316)),
-        width: Math.min(300, window.innerWidth - 16),
-        ...(above
-          ? { bottom: Math.max(8, window.innerHeight - r.top + 4) }
-          : { top: Math.min(r.bottom + 4, window.innerHeight - 120) }),
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        const el = boxRef.current
+        if (!el) {
+          setPickPos(null)
+          return
+        }
+        const r = el.getBoundingClientRect()
+        setPickPos(placeMenu(r, window.innerWidth, window.innerHeight))
       })
     }
-    const close = () => {
-      mention.closeMenu()
-      setHashNeedle(null)
-    }
     place()
-    window.addEventListener("scroll", close, true)
+    window.addEventListener("scroll", place, true)
     window.addEventListener("resize", place)
     return () => {
-      window.removeEventListener("scroll", close, true)
+      cancelAnimationFrame(raf)
+      window.removeEventListener("scroll", place, true)
       window.removeEventListener("resize", place)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -421,7 +407,7 @@ function Composer({
         <div
           role="listbox"
           aria-label="Mention"
-          className="fixed z-50 max-h-[280px] overflow-y-auto rounded-2xl border border-white/10 bg-[#1e1e1c] p-1.5 shadow-2xl"
+          className={MENU_POPOVER_CLASS}
           style={{
             left: pickPos.left,
             width: pickPos.width,
@@ -721,7 +707,7 @@ export default function SpaceDiscussion({
                 <span
                   key={`${p.name}-${i}`}
                   title={p.name}
-                  className="flex h-[26px] w-[26px] items-center justify-center rounded-full border-2 border-[#18181b] text-[11px] font-bold text-white/70"
+                  className={`flex h-[26px] w-[26px] items-center justify-center rounded-full border-2 ${PRESENCE_RING_CLASS} text-[11px] font-bold text-white/70`}
                   style={{ backgroundColor: p.color || "rgba(255,255,255,.08)", marginLeft: i === 0 ? 0 : -7 }}
                 >
                   {initials(p.name)}
@@ -755,27 +741,45 @@ export default function SpaceDiscussion({
                   {r.replyCount > 0 ? `${r.replyCount} ${r.replyCount === 1 ? "reply" : "replies"} →` : "Open thread →"}
                 </button>
                 {canWrite && (
-                  <button
-                    onClick={() => {
-                      if (confirmDeleteRoot === r.id) void deleteRoot(r.id)
-                      else setConfirmDeleteRoot(r.id)
-                    }}
-                    disabled={deletingRoot === r.id}
-                    title={confirmDeleteRoot === r.id ? "Click again to confirm" : "Delete this thread and its replies"}
-                    className={`rounded p-1 disabled:opacity-40 ${
-                      confirmDeleteRoot === r.id
-                        ? "text-red-300"
-                        : "text-white/25 hover:text-red-300"
-                    }`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  confirmDeleteRoot === r.id ? (
+                    <span className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => void deleteRoot(r.id)}
+                        disabled={deletingRoot === r.id}
+                        title="Delete this thread and its replies"
+                        className="rounded bg-red-500/15 p-1 text-red-300 disabled:opacity-40"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => void deleteRoot(r.id)}
+                        disabled={deletingRoot === r.id}
+                        className="text-[11px] font-medium text-red-300 hover:text-red-200 disabled:opacity-40"
+                      >
+                        {deletingRoot === r.id ? "…" : "Sure?"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteRoot(null)}
+                        className="text-[11px] text-white/40 hover:text-white/70"
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDeleteRoot(r.id)}
+                      title="Delete this thread and its replies"
+                      className="rounded p-1 text-white/25 hover:text-red-300"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )
                 )}
               </div>
             </div>
           ))}
         </div>
-        <div className="sticky bottom-0 mt-5 bg-[#18181b]/95 pb-2 pt-3 backdrop-blur">
+        <div className={COMPOSER_STICKY_CLASS}>
           <Composer
             spaceId={spaceId}
             placeholder="Write an update… @ for agents, # for docs"
@@ -815,21 +819,33 @@ export default function SpaceDiscussion({
             </span>
             <span className="flex items-center gap-3">
               {canWrite && openRoot && (
-                <button
-                  onClick={() => {
-                    if (confirmDeleteRoot === openRoot) void deleteRoot(openRoot)
-                    else setConfirmDeleteRoot(openRoot)
-                  }}
-                  disabled={deletingRoot === openRoot}
-                  title={confirmDeleteRoot === openRoot ? "Click again to confirm" : "Delete this thread and its replies"}
-                  className={`rounded p-1 disabled:opacity-40 ${
-                    confirmDeleteRoot === openRoot
-                      ? "text-red-300"
-                      : "text-white/25 hover:text-red-300"
-                  }`}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                confirmDeleteRoot === openRoot ? (
+                  <span className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => void deleteRoot(openRoot)}
+                      disabled={deletingRoot === openRoot}
+                      title="Delete this thread and its replies"
+                      className="rounded bg-red-500/15 p-1 text-red-300 disabled:opacity-40"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => void deleteRoot(openRoot)}
+                      disabled={deletingRoot === openRoot}
+                      className="text-[11px] font-medium text-red-300 hover:text-red-200 disabled:opacity-40"
+                    >
+                      {deletingRoot === openRoot ? "…" : "Sure?"}
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDeleteRoot(openRoot)}
+                    title="Delete this thread and its replies"
+                    className="rounded p-1 text-white/25 hover:text-red-300"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )
               )}
               <button onClick={closeThread} className="text-[12px] text-white/40 hover:text-white/75">
                 Close

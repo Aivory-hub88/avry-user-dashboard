@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { NotificationCard } from "@/components/office/NotificationCard"
+import { timeAgo, KIND_META, POLL_MS, type ActivityKind } from "@/lib/spaceUi"
 
 export interface SpaceActivityItem {
   kind: "mention" | "here" | "reply"
@@ -21,22 +22,6 @@ export interface SpaceActivityItem {
   createdAt: string
   unread: boolean
 }
-
-function timeAgo(iso: string): string {
-  const t = new Date(iso).getTime()
-  if (!Number.isFinite(t)) return ""
-  const s = Math.max(0, Math.floor((Date.now() - t) / 1000))
-  if (s < 60) return `${s}s`
-  const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h`
-  return `${Math.floor(h / 24)}d`
-}
-
-const KIND_BADGE = { mention: "Mention", here: "Here", reply: "Reply" } as const
-
-const KIND_TONE = { mention: "info", here: "info", reply: "info" } as const
 
 export default function SpaceActivityPanel({
   onOpenThread,
@@ -66,7 +51,7 @@ export default function SpaceActivityPanel({
 
   useEffect(() => {
     void load()
-    const timer = setInterval(() => void load(), 30000)
+    const timer = setInterval(() => void load(), POLL_MS.activityPanel)
     return () => clearInterval(timer)
   }, [load])
 
@@ -112,11 +97,13 @@ export default function SpaceActivityPanel({
       {!loading && items.length === 0 && (
         <span className="text-[12px] text-white/35">You&apos;re all caught up.</span>
       )}
-      {items.map((s) => (
-        <NotificationCard
-          key={s.messageId}
-          tone={KIND_TONE[s.kind]}
-          badge={KIND_BADGE[s.kind]}
+      {items.map((s) => {
+        const meta = KIND_META[s.kind as ActivityKind]
+        return (
+          <NotificationCard
+            key={s.messageId}
+            tone={meta.tone}
+            badge={meta.badge}
           icon={<span className="text-[14px] leading-none">@</span>}
           title={
             <span className="text-[13.5px] font-semibold text-white">
@@ -135,7 +122,8 @@ export default function SpaceActivityPanel({
           meta={timeAgo(s.createdAt)}
           onClick={() => onOpenThread(s.threadRoot)}
         />
-      ))}
+        )
+      })}
     </div>
   )
 }
