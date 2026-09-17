@@ -161,7 +161,41 @@ function Composer({
   const [text, setText] = useState("")
   const [sending, setSending] = useState(false)
   const [pick, setPick] = useState<{ kind: "at" | "hash"; needle: string } | null>(null)
+  const [pickPos, setPickPos] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null)
   const boxRef = useRef<HTMLTextAreaElement>(null)
+
+  // Dropdown picker pakai position:fixed + flip atas/bawah — absolute di dalam
+  // container overflow-y-auto kepotong scrollport (bug 2026-09-17).
+  useEffect(() => {
+    if (!pick) {
+      setPickPos(null)
+      return
+    }
+    const place = () => {
+      const el = boxRef.current
+      if (!el) {
+        setPickPos(null)
+        return
+      }
+      const r = el.getBoundingClientRect()
+      const above = r.top >= 240
+      setPickPos({
+        left: Math.max(8, Math.min(r.left, window.innerWidth - 296)),
+        width: Math.min(280, window.innerWidth - 16),
+        ...(above
+          ? { bottom: Math.max(8, window.innerHeight - r.top + 4) }
+          : { top: Math.min(r.bottom + 4, window.innerHeight - 120) }),
+      })
+    }
+    const close = () => setPick(null)
+    place()
+    window.addEventListener("scroll", close, true)
+    window.addEventListener("resize", place)
+    return () => {
+      window.removeEventListener("scroll", close, true)
+      window.removeEventListener("resize", place)
+    }
+  }, [pick])
 
   const updatePick = useCallback((value: string, cursor: number) => {
     const before = value.slice(0, cursor)
@@ -248,9 +282,16 @@ function Composer({
   const options = pick?.kind === "at" ? atOptions : hashOptions
 
   return (
-    <div className="relative">
-      {pick && options.length > 0 && !disabled && (
-        <div className="absolute bottom-full left-0 z-10 mb-1 max-h-[220px] w-[280px] overflow-y-auto rounded-xl border border-line bg-[#1e1e1c] p-1.5 shadow-2xl">
+    <div>
+      {pick && pickPos && options.length > 0 && !disabled && (
+        <div
+          className="fixed z-50 max-h-[220px] overflow-y-auto rounded-xl border border-line bg-[#1e1e1c] p-1.5 shadow-2xl"
+          style={{
+            left: pickPos.left,
+            width: pickPos.width,
+            ...(pickPos.bottom !== undefined ? { bottom: pickPos.bottom } : { top: pickPos.top }),
+          }}
+        >
           {options.map((o) => (
             <button
               key={o.token}
