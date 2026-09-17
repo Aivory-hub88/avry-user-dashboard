@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     }
     params.push(rawLimit)
     const r = await query(
-      `SELECT id, workspace_id, owner, title, mode, favorite, deleted_at, updated_at, octet_length(yjs_update) as bytes
+      `SELECT id, workspace_id, owner, title, mode, favorite, deleted_at, updated_at, props, octet_length(yjs_update) as bytes
        FROM dashboard.workspace_docs
        WHERE deleted_at IS ${showTrash ? 'NOT NULL' : 'NULL'} ${cursorSql}
        ORDER BY updated_at DESC, id DESC LIMIT $${params.length}`,
@@ -67,6 +67,7 @@ export async function GET(req: NextRequest) {
       // skip the room-keyed dupe if bare also exists? keep both but dedupe by bare
       const role = roles.get(bare) ?? null
       if (role) {
+        const props = (row.props ?? {}) as Record<string, unknown>
         visible.push({
           id: bare,
           roomKey: row.id,
@@ -75,6 +76,7 @@ export async function GET(req: NextRequest) {
           title: row.title ?? bare,
           mode: 'page',
           favorite: row.favorite === true,
+          isProject: props.isProject === true,
           deleted_at: row.deleted_at ?? null,
           updated_at: row.updated_at,
           bytes: Number(row.bytes ?? 0),

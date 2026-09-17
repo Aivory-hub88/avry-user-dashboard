@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { FileText, Plus, Search, Trash2 } from "lucide-react"
 import { collabAuthHeaders } from "@/lib/collabClient"
+import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
+import { AGENT_ROSTER } from "@/lib/agentRoster"
 
 type DocItem = {
   id: string
   title: string
   updated_at: string | null
   myRole: string
+  isProject?: boolean
 }
 
 type TopicItem = {
@@ -18,10 +21,51 @@ type TopicItem = {
   title: string
 }
 
-export default function WorkspaceNavigator({ currentId, spaceId }: { currentId: string; spaceId?: string | null }) {
+type MemberUser = {
+  id: string
+  email: string | null
+  name: string | null
+  role: string
+}
+
+type MemberAgent = {
+  type: string
+  role: string
+}
+
+function memberLabel(u: MemberUser): string {
+  return u.name || u.email || u.id
+}
+
+function agentLabel(type: string): string {
+  return AGENT_ROSTER.find((a) => a.type === type)?.name ?? type
+}
+
+const ROLE_PILL: Record<string, string> = {
+  owner: "bg-emerald-500/15 text-emerald-300",
+  editor: "bg-sky-500/15 text-sky-300",
+  viewer: "bg-white/[0.07] text-white/45",
+  agent: "border border-violet-500/30 bg-violet-500/20 text-violet-200",
+}
+
+export default function WorkspaceNavigator({
+  currentId,
+  spaceId,
+  workspaceId,
+  spaceFiles,
+}: {
+  currentId: string
+  spaceId?: string | null
+  workspaceId?: string | null
+  spaceFiles?: string[]
+}) {
   const router = useRouter()
+  const peers = useWorkspaceAwareness(spaceId ? (workspaceId ?? null) : null)
   const [docs, setDocs] = useState<DocItem[]>([])
   const [topics, setTopics] = useState<TopicItem[]>([])
+  const [owner, setOwner] = useState<MemberUser | null>(null)
+  const [memberUsers, setMemberUsers] = useState<MemberUser[]>([])
+  const [memberAgents, setMemberAgents] = useState<MemberAgent[]>([])
   const [query, setQuery] = useState("")
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -41,7 +85,7 @@ export default function WorkspaceNavigator({ currentId, spaceId }: { currentId: 
     }
   }, [currentId])
 
-  // Team Space (Phase 1): Discussions rail — topic rows dari stream Space ini.
+  // Team Space: Discussions rail — topic rows dari stream Space ini.
   useEffect(() => {
     if (!spaceId) return
     let alive = true
@@ -54,6 +98,24 @@ export default function WorkspaceNavigator({ currentId, spaceId }: { currentId: 
             .filter((r: { topic?: { archived?: boolean } | null }) => r.topic && !r.topic.archived)
             .map((r: { id: string; topic: { title: string } }) => ({ root: r.id, title: r.topic.title })),
         )
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [spaceId])
+
+  // Team Space: rail MEMBERS — owner + grants + agent grants Space ini.
+  useEffect(() => {
+    if (!spaceId) return
+    let alive = true
+    fetch(`/api/workspace/${spaceId}/members`, { headers: collabAuthHeaders() })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!alive || !payload) return
+        setOwner(payload.owner ?? null)
+        setMemberUsers(Array.isArray(payload.users) ? payload.users : [])
+        setMemberAgents(Array.isArray(payload.agents) ? payload.agents : [])
       })
       .catch(() => {})
     return () => {
@@ -104,11 +166,43 @@ export default function WorkspaceNavigator({ currentId, spaceId }: { currentId: 
     return !needle || doc.title.toLowerCase().includes(needle) || doc.id.toLowerCase().includes(needle)
   })
 
+  const titleOf = (id: string): string => docs.find((d) => d.id === id)?.title || id
+  const spaces = docs.filter((d) => d.isProject)
+  const files = (spaceFiles ?? []).map((id) => ({ id, title: titleOf(id) }))
+  const peerNames = new Set(peers.map((p) => p.name.toLowerCase()))
+
   return (
     <aside className="flex w-full shrink-0 flex-col border-b border-line bg-black/10 lg:min-h-0 lg:w-[232px] lg:overflow-hidden lg:border-b-0 lg:border-r">
       {spaceId && (
-        <div className="border-b border-line px-4 pb-3 pt-4">
-          <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">Discussions</div>
+        <>
+          <div className="border-b border-line px-4 pb-3 pt-4">
+            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">Space</div>
+            <div className="mt-2 flex flex-col gap-0.5">
+              {spaces.map((s) => (
+                <Link
+                  key={s.id}
+                  href={`/workspace/${s.id}?view=discussion`}
+                  className={`truncate rounded-lg px-2.5 py-1.5 text-left text-[12px] ${
+                    s.id === spaceId
+                      ? "bg-white/[0.08] font-medium text-white/90"
+                      : "text-white/45 hover:bg-white/[0.04] hover:text-white/75"
+                  }`}
+                >
+                  {s.title || s.id}
+                  {s.id === spaceId && files.length > 0 && (
+                    <span className="ml-1.5 text-[11px] font-normal text-white/35">
+                      {files.length} files
+                    </span>
+                  )}
+                </Link>
+              ))}
+              {spaces.length === 0 && (
+                <span className="px-2.5 py-1 text-[11px] text-white/25">No spaces yet</span>
+              )}
+            </div>
+          </div>
+          <div className="border-b border-line px-4 pb-3 pt-4">
+            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">Discussions</div>
           <div className="mt-2 flex flex-col gap-0.5">
             {topics.map((t) => (
               <Link
@@ -127,8 +221,72 @@ export default function WorkspaceNavigator({ currentId, spaceId }: { currentId: 
                 Open discussion →
               </Link>
             )}
+            </div>
           </div>
-        </div>
+          <div className="border-b border-line px-4 pb-3 pt-4">
+            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">Files</div>
+            <div className="mt-2 flex flex-col gap-0.5">
+              {files.map((f) => (
+                <Link
+                  key={f.id}
+                  href={`/workspace/${f.id}`}
+                  className="truncate rounded-lg px-2.5 py-1.5 text-left text-[12px] text-white/45 hover:bg-white/[0.04] hover:text-white/75"
+                >
+                  {f.title}
+                </Link>
+              ))}
+              {files.length === 0 && (
+                <span className="px-2.5 py-1 text-[11px] text-white/25">No files yet</span>
+              )}
+            </div>
+          </div>
+          <div className="border-b border-line px-4 pb-3 pt-4">
+            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">Members</div>
+            <div className="mt-2 flex flex-col gap-1">
+              {owner && (
+                <div className="flex items-center gap-2 px-2.5 py-1">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-white/75">
+                    {memberLabel(owner)}
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${ROLE_PILL.owner}`}>
+                    Owner
+                  </span>
+                </div>
+              )}
+              {memberUsers.map((u) => {
+                const online = peerNames.has(memberLabel(u).toLowerCase())
+                return (
+                  <div key={u.id} className="flex items-center gap-2 px-2.5 py-1">
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${online ? "bg-emerald-400" : "bg-white/20"}`}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-[12px] text-white/60">
+                      {memberLabel(u)}
+                    </span>
+                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${ROLE_PILL[u.role] ?? ROLE_PILL.viewer}`}>
+                      {u.role}
+                    </span>
+                  </div>
+                )
+              })}
+              {memberAgents.map((a) => (
+                <div key={a.type} className="flex items-center gap-2 px-2.5 py-1">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-white/60">
+                    {agentLabel(a.type)}
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${ROLE_PILL.agent}`}>
+                    Agent
+                  </span>
+                </div>
+              ))}
+              {!owner && memberUsers.length === 0 && memberAgents.length === 0 && (
+                <span className="px-2.5 py-1 text-[11px] text-white/25">Just you</span>
+              )}
+            </div>
+          </div>
+        </>
       )}
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
         <div>
