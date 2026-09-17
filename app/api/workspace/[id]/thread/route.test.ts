@@ -141,6 +141,11 @@ describe("DELETE /api/workspace/[id]/thread", () => {
   it("deletes own thread + cascades (service author)", async () => {
     const res = await DELETE(del("m1"), params)
     expect(res.status).toBe(200)
+    const msgCall = queryMock.mock.calls.find((c) =>
+      String(c[0]).includes("DELETE FROM dashboard.workspace_messages"),
+    )
+    expect(msgCall).toBeDefined()
+    expect(msgCall![1]).toEqual(["m1", "space-1"])
     const delCall = queryMock.mock.calls.find((c) =>
       String(c[0]).includes("DELETE FROM dashboard.workspace_threads"),
     )

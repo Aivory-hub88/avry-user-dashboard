@@ -26,7 +26,7 @@ export interface SpaceActivityItem {
 export default function SpaceActivityPanel({
   onOpenThread,
 }: {
-  onOpenThread: (threadRoot: string) => void
+  onOpenThread: (threadRoot: string, spaceId?: string) => void
 }) {
   const [items, setItems] = useState<SpaceActivityItem[]>([])
   const [unread, setUnread] = useState(0)
@@ -60,17 +60,21 @@ export default function SpaceActivityPanel({
     setMarking(true)
     try {
       const spaces = [...new Set(items.map((i) => i.spaceId))]
-      await Promise.all(
+      const results = await Promise.all(
         spaces.map((spaceId) =>
-          fetch("/api/workspace/activity/read-all", {
+          fetch("/api/workspace/activity", {
             method: "POST",
             headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
             body: JSON.stringify({ spaceId }),
-          }).catch(() => null),
+          })
+            .then((r) => r.ok)
+            .catch(() => false),
         ),
       )
-      setItems([])
-      setUnread(0)
+      if (results.length === 0 || results.every(Boolean)) {
+        setItems([])
+        setUnread(0)
+      }
     } catch {
       // diam
     }
@@ -120,7 +124,7 @@ export default function SpaceActivityPanel({
           }
           subtitle={s.excerpt ? <span>{s.excerpt}</span> : undefined}
           meta={timeAgo(s.createdAt)}
-          onClick={() => onOpenThread(s.threadRoot)}
+          onClick={() => onOpenThread(s.threadRoot, s.spaceId)}
         />
         )
       })}

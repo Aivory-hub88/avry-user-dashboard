@@ -84,27 +84,30 @@ export default function WorkspaceBell() {
 
   const markRead = async () => {
     try {
-      const r = await fetch("/api/workspace/notifications", {
+      const n = await fetch("/api/workspace/notifications", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
         body: JSON.stringify({ markRead: true }),
-      })
-      if (r.ok) {
-        setItems([])
-      }
+      }).catch(() => null)
+      const notifOk = !!n?.ok
       // Space watermarks per Space (monotone, eksplisit per scope).
       const spaces = [...new Set(spaceItems.map((s) => s.spaceId))]
-      await Promise.all(
+      const results = await Promise.all(
         spaces.map((spaceId) =>
-          fetch("/api/workspace/activity/read-all", {
+          fetch("/api/workspace/activity", {
             method: "POST",
             headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
             body: JSON.stringify({ spaceId }),
-          }).catch(() => null),
+          })
+            .then((r) => r.ok)
+            .catch(() => false),
         ),
       )
-      setSpaceItems([])
-      setUnread(0)
+      const spaceOk = results.length === 0 || results.every(Boolean)
+      if (notifOk) setItems([])
+      if (spaceOk) setSpaceItems([])
+      if (notifOk && spaceOk) setUnread(0)
+      else void refresh(true)
     } catch {}
   }
 

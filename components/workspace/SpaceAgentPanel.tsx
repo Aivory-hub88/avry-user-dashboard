@@ -54,15 +54,43 @@ export default function SpaceAgentPanel({
   const [findings, setFindings] = useState<Record<string, PendingApproval>>({})
   const runningRef = useRef<Set<string>>(new Set())
   const prevStatusRef = useRef<Map<string, string>>(new Map())
+  const requestRef = useRef(0)
+  const loadRef = useRef<() => Promise<void>>(async () => {})
+
+  const runTask = useCallback(
+    async (taskId: string, after: { id: string; decision: "approve" | "deny" } | null) => {
+      if (!canWrite) return
+      setBusy(taskId)
+      try {
+        const r = await fetch(`/api/workspace/${spaceId}/agent-tasks/${taskId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+          body: JSON.stringify(
+            after ? { afterApprovalId: after.id, decision: after.decision } : {},
+          ),
+        })
+        if (r.ok || r.status === 502) {
+          onChanged()
+          await loadRef.current()
+        }
+      } catch {
+        // diam
+      }
+      setBusy(null)
+    },
+    [spaceId, canWrite, onChanged],
+  )
 
   const load = useCallback(async () => {
+    const my = ++requestRef.current
     try {
       const r = await fetch(
         `/api/workspace/${spaceId}/agent-tasks?thread=${encodeURIComponent(threadRoot)}`,
-        { headers: collabAuthHeaders() },
+        { headers: collabAuthHeaders(), cache: "no-store" },
       )
-      if (!r.ok) return
+      if (!r.ok || my !== requestRef.current) return
       const j = await r.json()
+      if (my !== requestRef.current) return
       const list: SpaceAgentTask[] = Array.isArray(j.tasks) ? j.tasks : []
       // Thread refresh saat status flip (balasan agent server-triggered).
       const prev = prevStatusRef.current
@@ -73,6 +101,7 @@ export default function SpaceAgentPanel({
           (t.status === "done" || t.status === "failed" || t.status === "blocked" || t.status === "cancelled"),
       )
       prevStatusRef.current = new Map(list.map((t) => [t.id, t.status]))
+      if (my !== requestRef.current) return
       setTasks(list)
       if (flipped) onChanged()
       // Cari full approval row (verifier finding) untuk yang blocked.
@@ -80,6 +109,7 @@ export default function SpaceAgentPanel({
       if (blocked.length > 0) {
         listPendingApprovals()
           .then((all) => {
+            if (my !== requestRef.current) return
             const map: Record<string, PendingApproval> = {}
             for (const a of all) map[a.id] = a
             setFindings((prev) => ({ ...map, ...prev }))
@@ -101,35 +131,16 @@ export default function SpaceAgentPanel({
     } catch {
       // diam — poll berikutnya mencoba lagi
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spaceId, threadRoot, canWrite])
-
-  const runTask = useCallback(
-    async (taskId: string, after: { id: string; decision: "approve" | "deny" } | null) => {
-      if (!canWrite) return
-      setBusy(taskId)
-      try {
-        const r = await fetch(`/api/workspace/${spaceId}/agent-tasks/${taskId}/run`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
-          body: JSON.stringify(
-            after ? { afterApprovalId: after.id, decision: after.decision } : {},
-          ),
-        })
-        if (r.ok || r.status === 502) onChanged()
-      } catch {
-        // diam
-      }
-      setBusy(null)
-      void load()
-    },
-    [spaceId, canWrite, onChanged, load],
-  )
+  }, [spaceId, threadRoot, canWrite, onChanged, runTask])
 
   useEffect(() => {
+    loadRef.current = load
     void load()
     const timer = setInterval(() => void load(), POLL_MS.agentPanel)
-    return () => clearInterval(timer)
+    return () => {
+      requestRef.current += 1
+      clearInterval(timer)
+    }
   }, [load])
 
   const decide = useCallback(
