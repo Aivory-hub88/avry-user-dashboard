@@ -7,7 +7,8 @@ const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }))
 
 vi.mock("@/lib/db", () => ({ query: queryMock }))
 
-import { stripInstruction, enqueueAgentTasks, spaceAgentTaskFromRow } from "@/lib/spaceAgent"
+import { stripInstruction, spaceAgentTaskFromRow } from "@/lib/spaceAgent"
+import { enqueueAgentTasks } from "@/lib/spaceAgentStore"
 
 beforeEach(() => {
   queryMock.mockReset()

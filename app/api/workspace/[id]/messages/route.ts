@@ -14,7 +14,7 @@ import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { parseSpaceMentions } from "@/lib/spaceProtocol"
 import { spaceMessageFromRow } from "@/lib/spaceThreads"
 import { requesterFrom, newId, cleanBody } from "@/lib/spaceWrite"
-import { enqueueAgentTasks } from "@/lib/spaceAgent"
+import { enqueueAgentTasks } from "@/lib/spaceAgentStore"
 
 export const runtime = "nodejs"
 
