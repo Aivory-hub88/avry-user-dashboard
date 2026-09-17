@@ -176,14 +176,18 @@ function pushUnique(arr: string[], v: string): void {
 /**
  * Parse + stamp mention dari body composer (pure, server-side).
  *
- * Aturan (TRD §5):
- * 1. Hanya token link yang di-stamp. Bare `@word` / email = prose, NOL stamp.
- * 2. Di dalam code region (fenced/inline) = kutipan, NOL stamp.
- * 3. Label TIDAK PERNAH di-parse: `[@Finn](#agent:autonomous)` men-stamp
- *    `autonomous` (Geno), bukan Finn.
- * 4. Id divalidasi: agent harus ∈ roster; member/doc divalidasi bila
+ * Aturan (TRD §5, selaras Room 2026-09-17):
+ * 1. Token link selalu di-stamp (`[@Geno](#agent:autonomous)`).
+ * 2. Nama polos juga di-stamp (`@Geno` diketik manual — pola Room
+ *    `parseAgentMentions`: first name / type id, case-insensitive;
+ *    `@here/@all/@everyone/@team` = broadcast). Email tak pernah kena.
+ * 3. Di dalam code region (fenced/inline) = kutipan, NOL stamp.
+ * 4. Label token TIDAK PERNAH di-parse: span token di-blank dulu sebelum
+ *    pindai nama polos, jadi `[@Finn](#agent:autonomous)` hanya men-stamp
+ *    `autonomous`, bukan `finn`.
+ * 5. Id divalidasi: agent harus ∈ roster; member/doc divalidasi bila
  *    allowlist diberikan. Unknown id = tampil apa adanya, stamp NOL.
- * 5. `#doc` = referensi (buka doc), notify NOL — masuk docRefs saja.
+ * 6. `#doc` = referensi (buka doc), notify NOL — masuk docRefs saja.
  */
 export function parseSpaceMentions(
   body: unknown,
@@ -242,6 +246,47 @@ export function parseSpaceMentions(
       pushUnique(out.docRefs, docId);
       out.tokens.push({ kind: "doc", id: docId, label });
       continue;
+    }
+  }
+
+  out.hasAgent = out.agentTypes.length > 0;
+
+  // 6. Fallback nama polos (pola Room): @Geno tanpa picker tetap menyapa.
+  //    Token-link spans di-blank dulu → label tidak pernah di-parse.
+  const withoutTokens = masked.replace(TOKEN_RE, (m) => " ".repeat(m.length));
+  const PLAIN_RE = /@([A-Za-z][A-Za-z0-9_-]*)/g;
+  const agentOfName = (tok: string): string | null => {
+    const t = tok.toLowerCase();
+    for (const a of AGENT_ROSTER) {
+      if (!(validAgents as readonly string[]).includes(a.type)) continue;
+      if (
+        a.name.toLowerCase() === t ||
+        a.type.toLowerCase() === t ||
+        a.type.toLowerCase().replace(/_/g, "") === t
+      ) {
+        return a.type;
+      }
+    }
+    return null;
+  };
+  PLAIN_RE.lastIndex = 0;
+  let pm: RegExpExecArray | null;
+  while ((pm = PLAIN_RE.exec(withoutTokens)) !== null) {
+    const tok = pm[1];
+    const low = tok.toLowerCase();
+    if (low === "here" || low === "all" || low === "everyone" || low === "team") {
+      if (!out.here) {
+        out.here = true;
+        out.tokens.push({ kind: "here", id: "here", label: `@${tok}` });
+      }
+      continue;
+    }
+    const agentType = agentOfName(tok);
+    if (agentType) {
+      pushUnique(out.agentTypes, agentType);
+      if (!out.tokens.some((t) => t.kind === "agent" && t.id === agentType)) {
+        out.tokens.push({ kind: "agent", id: agentType, label: `@${tok}` });
+      }
     }
   }
 
