@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
 import SpaceAgentPanel from "@/components/workspace/SpaceAgentPanel"
+import SpaceActivityPanel from "@/components/workspace/SpaceActivityPanel"
 import { AGENT_ROSTER } from "@/lib/agentRoster"
 import type { SpaceMessage, SpaceTopic } from "@/lib/spaceProtocol"
 
@@ -316,6 +317,7 @@ export default function SpaceDiscussion({
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [openRoot, setOpenRoot] = useState<string | null>(initialThread)
+  const [panelTab, setPanelTab] = useState<"thread" | "activity">("thread")
   const [thread, setThread] = useState<ThreadPayload | null>(null)
   const [threadLoading, setThreadLoading] = useState(false)
   const [docs, setDocs] = useState<DocOption[]>([])
@@ -382,6 +384,7 @@ export default function SpaceDiscussion({
   const openThread = useCallback(
     (rootId: string) => {
       setOpenRoot(rootId)
+      setPanelTab("thread")
       setThread(null)
       router.replace(`/workspace/${spaceId}?view=discussion&thread=${rootId}`, { scroll: false })
       void loadThread(rootId)
@@ -504,9 +507,30 @@ export default function SpaceDiscussion({
           ))}
         </div>
       </div>
-      {openRoot && (
-        <div className="flex w-full shrink-0 flex-col overflow-y-auto rounded-2xl border border-line bg-white/[0.02] p-4 lg:w-[380px] lg:max-w-[380px]">
-          <div className="mb-3 flex items-center justify-between">
+      <div
+        className={`${openRoot || panelTab === "activity" ? "flex" : "hidden"} w-full shrink-0 flex-col overflow-y-auto rounded-2xl border border-line bg-white/[0.02] p-4 lg:flex lg:w-[380px] lg:max-w-[380px]`}
+      >
+        <div className="mb-3 flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
+          <button
+            onClick={() => setPanelTab("thread")}
+            className={`flex-1 rounded-full px-3 py-1 text-[12px] ${panelTab === "thread" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
+          >
+            Thread
+          </button>
+          <button
+            onClick={() => setPanelTab("activity")}
+            className={`flex-1 rounded-full px-3 py-1 text-[12px] ${panelTab === "activity" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
+          >
+            Activity
+          </button>
+        </div>
+        {panelTab === "activity" ? (
+          <SpaceActivityPanel onOpenThread={openThread} />
+        ) : !openRoot ? (
+          <span className="text-[12px] text-white/35">Pilih thread dari stream untuk dibuka di sini.</span>
+        ) : (
+          <>
+            <div className="mb-3 flex items-center justify-between">
             <span className="text-[13px] font-medium text-white/75">
               {thread?.topic && !thread.topic.archived ? thread.topic.title : "Thread"}
             </span>
@@ -582,9 +606,10 @@ export default function SpaceDiscussion({
               threadRoot={openRoot}
               onSent={refreshAll}
             />
-          </div>
-        </div>
-      )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
