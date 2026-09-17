@@ -3,7 +3,13 @@
  *
  * Persists chat messages per session to localStorage so they survive
  * page refreshes and session switches.
+ *
+ * Threads are namespaced per user id (see lib/userScopedStorage) — logout
+ * no longer wipes anyone's history, and a different login on a shared
+ * device gets its own empty store instead of the previous account's
+ * threads. Pre-namespace threads are claimed once, on first access.
  */
+import { claimLegacyKey } from './userScopedStorage'
 
 // Local Message type to avoid circular imports with console page
 export interface Message {
@@ -34,7 +40,7 @@ export class ChatStorageError extends Error {
   }
 }
 
-const SESSIONS_KEY = "aivory_chat_sessions"
+const SESSIONS_KEY_BASE = "aivory_chat_sessions"
 
 /**
  * Load all persisted sessions from localStorage.
@@ -42,7 +48,7 @@ const SESSIONS_KEY = "aivory_chat_sessions"
  */
 function loadAllSessions(): PersistedSession[] {
   try {
-    const raw = localStorage.getItem(SESSIONS_KEY)
+    const raw = localStorage.getItem(claimLegacyKey(SESSIONS_KEY_BASE))
     if (!raw) return []
     const parsed = JSON.parse(raw)
     // Migration: sessions persisted before agentType existed get null,
@@ -63,7 +69,7 @@ function loadAllSessions(): PersistedSession[] {
  */
 function persistSessions(sessions: PersistedSession[]): boolean {
   try {
-    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions))
+    localStorage.setItem(claimLegacyKey(SESSIONS_KEY_BASE), JSON.stringify(sessions))
     return true
   } catch (err: unknown) {
     if (err instanceof DOMException && err.name === "QuotaExceededError") {

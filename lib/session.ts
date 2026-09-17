@@ -1,13 +1,19 @@
 /**
  * Session Management Utilities
- * 
+ *
  * Provides functions for managing console session IDs in localStorage.
  * Sessions persist across page refreshes and are only cleared on explicit "New chat" action.
- * 
+ *
+ * The thread pointer is namespaced per user id like chat history itself
+ * (see lib/userScopedStorage): one account's open thread never leaks into
+ * another login on a shared device, and logout no longer needs to delete
+ * anything here.
+ *
  * Requirements: 8.1, 8.4
  */
+import { claimLegacyKey } from './userScopedStorage'
 
-const SESSION_STORAGE_KEY = 'console_session_id';
+const SESSION_STORAGE_KEY_BASE = 'console_session_id';
 
 /**
  * Generates a unique session ID using crypto.randomUUID() with fallback to UUID v4
@@ -44,7 +50,7 @@ export function getSessionId(): string {
   }
 
   try {
-    const existingSessionId = localStorage.getItem(SESSION_STORAGE_KEY);
+    const existingSessionId = localStorage.getItem(claimLegacyKey(SESSION_STORAGE_KEY_BASE));
     
     if (existingSessionId) {
       return existingSessionId;
@@ -72,7 +78,7 @@ export function saveSession(sessionId: string): void {
   }
 
   try {
-    localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+    localStorage.setItem(claimLegacyKey(SESSION_STORAGE_KEY_BASE), sessionId);
   } catch (error) {
     console.warn('Failed to save session to localStorage:', error);
   }
@@ -88,7 +94,7 @@ export function clearSession(): void {
   }
 
   try {
-    localStorage.removeItem(SESSION_STORAGE_KEY);
+    localStorage.removeItem(claimLegacyKey(SESSION_STORAGE_KEY_BASE));
   } catch (error) {
     console.warn('Failed to clear session from localStorage:', error);
   }

@@ -7,8 +7,8 @@ import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
 import { sendAgentMessage, type ConsolePendingApproval } from '@/lib/agentChat'
+import { notifyApprovalsChanged } from '@/lib/agentApprovals'
 import { agentNameOf, buildRoomPayload, candidateOf, type RoomHistoryEntry } from '@/lib/agentMentions'
-import { resolveApproval } from '@/lib/agentApprovals'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
 import { useMode } from '@/contexts/ModeContext'
 import { useSession } from './useSession'
@@ -30,8 +30,42 @@ interface Message {
    *  Carried per message so one thread can hold several agents' replies. */
   agentType?: string | null
   agentName?: string
+  /** WhatsApp-style quote: set when this message was sent as a reply to an
+   *  earlier bubble. Display-only — the actual quoted context is folded into
+   *  the text sent to the agent at send time, not reconstructed from this. */
+  replyPreview?: ReplyTarget
 }
 export interface ChatSession { id: string; title: string; messages: Message[]; createdAt: number; updatedAt: number; pinned?: boolean; agentType: string | null }
+
+/** What the user picked "Reply" on. `id` lets the composer highlight/clear
+ *  against the right bubble; everything else is just quoted into the next
+ *  outgoing message so the agent knows which earlier turn this refers to. */
+export interface ReplyTarget {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  agentName?: string
+}
+
+const REPLY_QUOTE_MAX_CHARS = 280
+
+function truncateForQuote(text: string): string {
+  const clean = text.trim().replace(/\s+/g, ' ')
+  return clean.length > REPLY_QUOTE_MAX_CHARS
+    ? `${clean.slice(0, REPLY_QUOTE_MAX_CHARS)}…`
+    : clean
+}
+
+/** Folds a reply target into the text actually sent to the agent, so it
+ *  knows which earlier message this turn refers to even though the bubble
+ *  itself only shows the new text (the quote renders separately via
+ *  replyPreview). Conversation history already contains the original
+ *  message — this line just disambiguates "which one" for the current turn. */
+function withReplyContext(text: string, target: ReplyTarget | null): string {
+  if (!target) return text
+  const who = target.role === "user" ? "User" : (target.agentName ?? "Agent")
+  return `[Replying to earlier message from ${who}: "${truncateForQuote(target.content)}"]\n\n${text}`
+}
 
 const DEFAULT_SUGGESTIONS = [
   "Can you elaborate on that?",
@@ -69,6 +103,9 @@ export function useChat({
   const [streamingAgentType, setStreamingAgentType] = useState<string | null | undefined>(undefined)
   const [followUpSuggestions, setFollowUpSuggestions] = useState<string[]>([])
   const [isClarification, setIsClarification] = useState(false)
+  // WhatsApp-style "reply to this bubble" — set by clicking Reply on a
+  // message, consumed (and cleared) by the next handleSend/handleSendRoom.
+  const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null)
   const messagesRef = useRef<Message[]>([])
   const currentSessionIdRef = useRef<string>("")
   const streamingSessionRef = useRef<string>("")
@@ -126,6 +163,11 @@ export function useChat({
     setFollowUpSuggestions([])
     setIsClarification(false)
 
+    // Captured and cleared immediately — a reply target belongs to this one
+    // outgoing turn, not to whatever the user types next.
+    const activeReplyTo = replyTo
+    setReplyTo(null)
+
     const imageAtts = atts.filter(a => a.content?.startsWith('data:image/'))
     const textAtts = atts.filter(a => a.content && !a.content.startsWith('data:image/'))
     const attachmentText = [
@@ -133,14 +175,19 @@ export function useChat({
       ...imageAtts.map(a => `[Attached image: ${a.filename} — image preview shown above]`),
     ].join('\n\n')
     const userContent = attachmentText ? `${text}\n\n${attachmentText}` : text
+    // What the agent actually receives for this turn — the bubble itself
+    // stays clean (userContent), the quote renders separately via
+    // replyPreview, but the model gets an explicit pointer to which earlier
+    // message this is about.
+    const agentInputText = withReplyContext(userContent, activeReplyTo)
 
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: userContent, attachments: atts.length > 0 ? atts : undefined }
+    const userMsg: Message = { id: Date.now().toString(), role: "user", content: userContent, attachments: atts.length > 0 ? atts : undefined, replyPreview: activeReplyTo ?? undefined }
     const assistantId = (Date.now() + 1).toString()
     const placeholderMsg: Message = { id: assistantId, role: "assistant", content: "", isStreaming: true }
 
     const allMessages = [...messagesRef.current, userMsg].map(m => ({
       role: m.role,
-      content: m.content,
+      content: m.id === userMsg.id ? agentInputText : m.content,
     }))
 
     // This request belongs to whichever thread/agent is active right now —
@@ -175,7 +222,7 @@ export function useChat({
       try {
         const result = await sendAgentMessage(
           sentAgentTarget as TelegramAgentType,
-          userContent,
+          agentInputText,
           sentSessionId,
           signal
         )
@@ -238,6 +285,9 @@ export function useChat({
               addToast("error", "Chat history storage is full. Messages may not be saved.")
             }
           }
+          // The turn may have parked an approval — wake the rail now instead
+          // of letting it sit stale until its 60s poll.
+          notifyApprovalsChanged()
         }
       }
       return
@@ -326,7 +376,7 @@ export function useChat({
         }
       }
     }
-  }, [currentSessionId, agentTarget, addToast, processEvent, triggerClassification, clearAttachments])
+  }, [currentSessionId, agentTarget, addToast, processEvent, triggerClassification, clearAttachments, replyTo])
 
   // Room mode (Mission Control chat room): LobeHub-style group orchestration
   // in "sequential" mode. Mentioned agents answer one after another in
@@ -343,13 +393,19 @@ export function useChat({
     }
     if (!displayText.trim() && atts.length === 0) return
 
+    const activeReplyTo = replyTo
+    setReplyTo(null)
+
     const imageAtts = atts.filter(a => a.content?.startsWith('data:image/'))
     const textAtts = atts.filter(a => a.content && !a.content.startsWith('data:image/'))
     const attachmentText = [
       ...textAtts.map(a => `[Attached file: ${a.filename}]\n${a.content}`),
       ...imageAtts.map(a => `[Attached image: ${a.filename} — image preview shown above]`),
     ].join('\n\n')
-    const userText = attachmentText ? `${displayText}\n\n${attachmentText}` : displayText
+    const displayContent = attachmentText ? `${displayText}\n\n${attachmentText}` : displayText
+    // Same split as handleSend: peer agents get the explicit quote pointer,
+    // the bubble and shared transcript stay on the clean display text.
+    const userText = withReplyContext(displayContent, activeReplyTo)
 
     // Shared transcript, oldest-first — author-tagged like LobeHub's
     // <author_name> history markers. Placeholders carry no content yet.
@@ -362,7 +418,7 @@ export function useChat({
       }))
 
     const ts = Date.now()
-    const userMsg: Message = { id: `${ts}-room-user`, role: "user", content: displayText, attachments: atts.length > 0 ? atts : undefined }
+    const userMsg: Message = { id: `${ts}-room-user`, role: "user", content: displayText, attachments: atts.length > 0 ? atts : undefined, replyPreview: activeReplyTo ?? undefined }
     const placeholders: Message[] = targets.map((t, i) => ({
       id: `${ts}-room-${t}-${i}`,
       role: "assistant",
@@ -462,58 +518,18 @@ export function useChat({
         setIsStreaming(false)
         setStreamingAgentType(undefined)
       }
+      // Room turns can park approvals too — same rail wake-up as direct turns.
+      notifyApprovalsChanged()
     }
-  }, [currentSessionId, agentTarget, handleSend, addToast, clearAttachments])
+  }, [currentSessionId, agentTarget, handleSend, addToast, clearAttachments, replyTo])
 
-  // Resolves a pending F-1 approval surfaced inline in the console, reusing
-  // the same /api/v1/agent-approvals endpoint the dashboard Approvals page
-  // calls. On success, Cerveau's durable-resume continuation (if any) is
-  // appended as a new assistant message — same as approving from the
-  // dashboard resumes the original conversation there.
-  const resolveConsoleApproval = useCallback(async (messageId: string, decision: 'approve' | 'deny') => {
-    const target = messagesRef.current.find(m => m.id === messageId)
-    const approval = target?.pendingApproval
-    if (!approval) return
-
-    setMessages(p => p.map(m => m.id === messageId ? { ...m, approvalBusy: true } : m))
-    try {
-      const result = await resolveApproval(
-        // Room threads park approvals under the answering agent, not the
-        // global column selection — resolve against the message's own agent.
-        { id: approval.id, _agent_type: target.agentType ?? agentTarget ?? undefined },
-        decision,
-      )
-      const outcome: 'approved' | 'denied' = decision === 'approve' ? 'approved' : 'denied'
-      setMessages(prev => {
-        let updated = prev.map(m =>
-          m.id === messageId
-            ? { ...m, approvalBusy: false, approvalOutcome: outcome }
-            : m
-        )
-        if (result.reply) {
-          // Room threads: the continuation belongs to whichever agent parked
-          // the approval (e.g. Teo's delegate pull), so it keeps that
-          // bubble's attribution instead of falling back to the global target.
-          updated = [
-            ...updated,
-            {
-              id: (Date.now() + 2).toString(),
-              role: 'assistant' as const,
-              content: result.reply,
-              agentType: target.agentType,
-              agentName: target.agentName,
-            },
-          ]
-        }
-        saveSessionMessages(currentSessionId, updated, agentTarget)
-        setSessions(listSessions())
-        return updated
-      })
-    } catch (error) {
-      setMessages(p => p.map(m => m.id === messageId ? { ...m, approvalBusy: false } : m))
-      addToast("error", error instanceof Error ? error.message : "Failed to resolve approval.")
-    }
-  }, [agentTarget, currentSessionId, addToast])
+  // NOTE (conversational approval protocol): approvals used to be resolved
+  // from inline Approve/Deny buttons via resolveConsoleApproval here. Those
+  // buttons are gone — the agent asks in plain language and the user's next
+  // short reply ("Ya"/"Batal", multilingual) IS the decision, resolved
+  // server-side by avry-backend before any LLM roundtrip. This hook keeps
+  // carrying pendingApproval on messages only so the rail notification feed
+  // can hide approvals already visible in the open thread.
 
   const handleNewChat = useCallback(() => {
     if (messages.length > 0) {
@@ -591,9 +607,10 @@ export function useChat({
     handleSend,
     handleSendRoom,
     stopStreaming,
-    resolveConsoleApproval,
     handleNewChat,
     switchSession,
     deleteThread,
+    replyTo,
+    setReplyTo,
   }
 }

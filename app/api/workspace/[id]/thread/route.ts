@@ -4,7 +4,8 @@
  *
  * Root + replies oldest-first (cap 200) + topic row.
  * 400 bila ?root= hilang, 404 bila root tidak ada di Space ini.
- * DELETE: hapus fisik + cascade (replies, topic, agent tasks).
+ * DELETE: hapus fisik + cascade (replies, topic, agent tasks) + root message
+ * (root ber-thread_root NULL sehingga tidak ikut cascade — dihapus eksplisit).
  * Boleh: penulis root atau owner doc. Butuh gate tulis.
  */
 import { NextRequest, NextResponse } from "next/server"
@@ -96,6 +97,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const isAuthor = authorKeyOf(found.rows[0] as Record<string, unknown>) === requesterKey(me)
     if (!isAuthor && role !== "owner") return forbidden()
 
+    await query(
+      `DELETE FROM dashboard.workspace_messages WHERE space_id = $2 AND (id = $1 OR thread_root = $1)`,
+      [root, id],
+    )
     await query(`DELETE FROM dashboard.workspace_threads WHERE id = $1`, [root])
     await recordWorkspaceActivity({
       docId: id,

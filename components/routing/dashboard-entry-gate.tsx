@@ -4,14 +4,15 @@
  * DashboardEntryGate — operational-dashboard access gate (nextjs-console)
  *
  * Wraps the dashboard route group and renders its children only once the
- * {@link useDashboardAccess} state machine resolves to `allowed`. The hook owns
- * the access decision and ALREADY issues the (single) redirect on denial, so the
- * gate is purely a presentational guard around the resolved status:
+ * {@link useDashboardAccess} state machine resolves to `allowed`. The hook
+ * owns the access decision; the gate owns the single navigation on denial
+ * (hook runs with `navigate: false`):
  *
  *   - `loading` → full-screen loading state while access resolves after
  *      hydration (Req 3.6 monotonic transition; design `resolveDashboardAccess`).
- *   - `denied`  → render `null`. The hook has already started the redirect, so we
- *      expose NO dashboard content or user data to a user being routed away
+ *   - `denied` + sign-in → session-expired notice (explains + counts down,
+ *      then navigates once). Any other denial → render `null`, exposing NO
+ *      dashboard content or user data to a user being routed away
  *      (Req 13.4, 13.5, 13.6).
  *   - `allowed` → render the protected `children`.
  *
@@ -24,6 +25,7 @@
 
 import type { ReactNode } from 'react'
 import LoadingState from '@/components/dashboard/LoadingState'
+import SessionExpiredNotice from '@/components/SessionExpiredNotice'
 import { useDashboardAccess } from '@/hooks/useDashboardAccess'
 
 export interface DashboardEntryGateProps {
@@ -33,21 +35,28 @@ export interface DashboardEntryGateProps {
 
 /**
  * Client gate for the dashboard route group. Shows a loading state until access
- * resolves, renders `null` on denial (the hook has issued the redirect), and
- * renders `children` only when access is `allowed`.
+ * resolves, renders `children` only when access is `allowed`.
+ *
+ * On denial the gate owns the single navigation (the hook runs with
+ * `navigate: false`): a sign-in denial renders the session-expired notice —
+ * which explains WHY ("sesi telah berakhir", 8s countdown) instead of
+ * redirecting in silence — while any other denial renders `null` exactly as
+ * before, so no dashboard content or user data is exposed while navigating
+ * away (Req 13.4, 13.5, 13.6).
  */
 export function DashboardEntryGate({ children }: DashboardEntryGateProps) {
-  const { status } = useDashboardAccess()
+  const { status, redirect } = useDashboardAccess({ navigate: false })
 
   // Access granted — reveal the protected dashboard content.
   if (status === 'allowed') {
     return <>{children}</>
   }
 
-  // Denied — the hook has already started the single redirect. Render nothing so
-  // no dashboard content or user data is exposed while we navigate away
-  // (Req 13.4, 13.5, 13.6).
+  // Denied.
   if (status === 'denied') {
+    if (redirect === 'sign-in') {
+      return <SessionExpiredNotice autoNavigate />
+    }
     return null
   }
 

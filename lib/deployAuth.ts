@@ -1,10 +1,11 @@
 /**
  * Authenticated fetch for the deployable-agent APIs.
  *
- * Backend access tokens expire after 15 minutes and the dashboard has no
- * global auto-refresh, so any deploy click >15min after login used to fail
- * with "Invalid or expired token". This wrapper retries once after
- * exchanging the stored refresh_token via /api/v1/auth/refresh.
+ * Backend access tokens expire after 60 minutes and the dashboard has no
+ * global auto-refresh, so any deploy click >60min after the last refresh
+ * used to fail with "Invalid or expired token". This wrapper retries once
+ * after exchanging the stored refresh_token via /api/v1/auth/refresh
+ * (30-day sliding server-side session — active users stay logged in).
  *
  * This is the one choke point every authenticated data module in the
  * dashboard goes through (agent approvals, deployments, memory, profiles,
@@ -54,7 +55,7 @@ function handleDeadSession() {
   // Dynamic import avoids a module cycle risk (lib/auth.ts is imported all
   // over the app; this file should stay a leaf) and keeps this cold path
   // out of every authedFetch call's synchronous work.
-  import('./auth').then(({ logout }) => logout()).catch(() => {
+  import('./auth').then(({ logout }) => logout('expired')).catch(() => {
     // logout() itself only touches localStorage + does a location redirect,
     // so this catch is just defence against the dynamic import failing to
     // resolve at all (e.g. mid-navigation teardown) — nothing to recover.

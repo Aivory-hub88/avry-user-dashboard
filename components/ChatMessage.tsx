@@ -11,8 +11,6 @@ import { AttachmentCard } from '@/components/AttachmentCard'
 import type { Attachment } from '@/components/UploadMenu'
 import type { ClassifiedIntent } from '@/lib/intentClassifier'
 import { ThinkingDots } from '@/components/ui/ThinkingDots'
-import { describeTool } from '@/lib/agentApprovals'
-import type { ConsolePendingApproval } from '@/lib/agentChat'
 import { AgentAvatar } from '@/components/office/AgentAvatar'
 
 const WorkflowContainer = dynamic(() => import('@/components/console/WorkflowContainer'), { ssr: false })
@@ -28,68 +26,28 @@ interface ChatMessageProps {
   onAcceptRoute?: () => void
   onDismissRoute?: () => void
   attachments?: Attachment[]
-  pendingApproval?: ConsolePendingApproval | null
-  approvalOutcome?: 'approved' | 'denied' | null
-  approvalBusy?: boolean
-  onApproveAction?: () => void
-  onDenyAction?: () => void
+  /* Approval renders nothing here. It is a conversational protocol, not a
+   * button gate: the agent asks in plain language (server appends a
+   * "Balas Ya / Reply Yes..." hint) and the user's next short reply IS the
+   * decision. pendingApproval stays on the useChat message (for the rail
+   * feed's duplicate-hiding) but is intentionally not a ChatMessage prop. */
   /** Display name of whichever agent is answering — shown in the thinking
    *  indicator so a room with several agents says who's actually busy. */
   agentName?: string
   /** Which agent's avatar to show — same visual identity as the agent
    *  column and rail, so the chat header isn't the odd one out. */
   agentType?: string | null
+  /** WhatsApp-style reply: quotes an earlier bubble at the top of this one. */
+  replyPreview?: { role: 'user' | 'assistant'; content: string; agentName?: string }
+  /** "Reply" action on this bubble — hands its own role/content up so the
+   *  composer can quote it into the next outgoing message. */
+  onReply?: () => void
 }
 
-/** Inline F-1 approval card — the console's own Approve/Deny, resolving
- *  through the same endpoint the dashboard's Approvals page uses. */
-function ApprovalCard({
-  approval,
-  outcome,
-  busy,
-  onApprove,
-  onDeny,
-}: {
-  approval: ConsolePendingApproval
-  outcome?: 'approved' | 'denied' | null
-  busy?: boolean
-  onApprove: () => void
-  onDeny: () => void
-}) {
-  if (outcome) {
-    return (
-      <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm">
-        <span className={outcome === 'approved' ? 'text-accent' : 'text-white/50'}>
-          {outcome === 'approved' ? '✓ Approved' : '✕ Denied'}
-        </span>
-        <span className="text-white/40">— {describeTool(approval.tool_name)}</span>
-      </div>
-    )
-  }
-  return (
-    <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3.5">
-      <div className="text-sm text-white/85">
-        <span className="text-amber-300/90">Needs your approval</span> — {describeTool(approval.tool_name)}
-      </div>
-      <div className="mt-3 flex gap-2">
-        <button
-          onClick={onApprove}
-          disabled={busy}
-          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-on-accent transition hover:opacity-90 disabled:opacity-50"
-        >
-          Approve
-        </button>
-        <button
-          onClick={onDeny}
-          disabled={busy}
-          className="rounded-lg border border-white/15 px-3.5 py-1.5 text-sm font-medium text-white/70 transition hover:bg-white/5 disabled:opacity-50"
-        >
-          Deny
-        </button>
-      </div>
-    </div>
-  )
-}
+/* Approval needs no card here. Approval is a conversational protocol, not a
+ * button gate: the agent asks in plain language (server appends a
+ * "Balas Ya / Reply Yes..." hint) and the user's next short reply IS the
+ * decision, resolved server-side. Nothing to render. */
 
 /**
  * Normalizes plain-text LLM output so ReactMarkdown renders proper paragraphs.
@@ -344,11 +302,20 @@ const markdownComponents = {
 
 /* ── Main component ────────────────────────────────────────────────────────── */
 
-export default memo(function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, pendingApproval, approvalOutcome, approvalBusy, onApproveAction, onDenyAction, agentName = 'Aivory', agentType = null }: ChatMessageProps) {
+export default memo(function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null, replyPreview, onReply }: ChatMessageProps) {
   const noop = useCallback(() => {}, [])
   const hasAgenticPhases = !!(agenticState && agenticState.phases.length > 0)
   const hasTextContent = !!content
   const normalizedContent = useMemo(() => normalizeMarkdown(content), [content])
+  const quotedWho = replyPreview ? (replyPreview.role === 'user' ? 'You' : (replyPreview.agentName ?? agentName)) : null
+  const quotedSnippet = replyPreview ? (replyPreview.content.length > 160 ? `${replyPreview.content.slice(0, 160)}…` : replyPreview.content) : null
+
+  const ReplyQuote = replyPreview ? (
+    <div className="mb-2 pl-2.5 border-l-2 border-accent/50 text-[13px] leading-snug">
+      <div className="text-accent/80 font-medium">{quotedWho}</div>
+      <div className="text-[#a1a1aa] line-clamp-2">{quotedSnippet}</div>
+    </div>
+  ) : null
 
   return (
     <div className="mb-8">
@@ -356,6 +323,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, a
         /* USER BUBBLE — right-aligned, subtle container */
         <div className="flex justify-end group relative">
           <div className="max-w-[80%] bg-[#282825] rounded-[20px] px-5 py-3.5 text-base text-white leading-[1.6] border border-line text-left">
+            {ReplyQuote}
             {attachments && attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
                 {attachments.map((att, i) => (
@@ -370,7 +338,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, a
             )}
             {content}
           </div>
-          <MessageActions role="user" content={content} onEdit={onEdit} />
+          <MessageActions role="user" content={content} onEdit={onEdit} onReply={onReply} />
         </div>
       ) : (
         /* AI MESSAGE — avatar + clean Manus typography */
@@ -383,6 +351,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, a
               lighter surface, max-w-[720px] for readability */}
           <div className="flex-1 min-w-0 max-w-[720px] text-left">
             <div className="rounded-2xl border border-line bg-white/[0.035] px-5 py-3.5 text-base text-[#f7f7f7] leading-[1.6]">
+              {ReplyQuote}
               {/* Thinking indicator */}
               {isStreaming && !content && !hasAgenticPhases && (
                 <div className="flex items-center gap-2.5">
@@ -421,18 +390,13 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, a
                 </div>
               )}
 
-              {pendingApproval && (
-                <ApprovalCard
-                  approval={pendingApproval}
-                  outcome={approvalOutcome}
-                  busy={approvalBusy}
-                  onApprove={() => onApproveAction?.()}
-                  onDeny={() => onDenyAction?.()}
-                />
-              )}
+              {/* No approval card: the reply text already carries the
+                  conversational protocol hint ("Balas Ya / Reply Yes...").
+                  pendingApproval stays on the message only so the rail
+                  notification feed can hide this same approval there. */}
             </div>
           </div>
-          <MessageActions role="ai" content={content} onRegenerate={onRegenerate} />
+          <MessageActions role="ai" content={content} onRegenerate={onRegenerate} onReply={onReply} />
         </div>
         {/* Intent routing banner - sits below the message full-width */}
         {pendingRoute && (

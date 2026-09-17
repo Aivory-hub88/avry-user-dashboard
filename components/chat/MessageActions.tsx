@@ -1,19 +1,23 @@
 "use client"
 
 import { useState } from "react"
-import { Copy, RefreshCw, ThumbsUp, ThumbsDown, Pencil } from "lucide-react"
+import { Copy, RefreshCw, ThumbsUp, ThumbsDown, Pencil, Reply } from "lucide-react"
 
 interface MessageActionsProps {
   role: "ai" | "user"
   content: string
   onRegenerate?: () => void
   onEdit?: () => void
+  /** WhatsApp-style "reply to this bubble" — quotes this message into the
+   *  composer so the next turn (and the agent) knows which one it's about. */
+  onReply?: () => void
 }
 
-export default function MessageActions({ role, content, onRegenerate, onEdit }: MessageActionsProps) {
+export default function MessageActions({ role, content, onRegenerate, onEdit, onReply }: MessageActionsProps) {
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null)
 
   const aiActions = [
+    { id: "reply", icon: Reply, label: "Reply", action: onReply },
     { id: "copy", icon: Copy, label: "Copy", action: () => navigator.clipboard.writeText(content) },
     { id: "regenerate", icon: RefreshCw, label: "Regenerate", action: onRegenerate },
     { id: "thumbsup", icon: ThumbsUp, label: "Good response", action: () => setFeedback(feedback === "up" ? null : "up") },
@@ -21,6 +25,7 @@ export default function MessageActions({ role, content, onRegenerate, onEdit }: 
   ]
 
   const userActions = [
+    { id: "reply", icon: Reply, label: "Reply", action: onReply },
     { id: "edit", icon: Pencil, label: "Edit", action: onEdit },
     { id: "copy", icon: Copy, label: "Copy", action: () => navigator.clipboard.writeText(content) },
   ]

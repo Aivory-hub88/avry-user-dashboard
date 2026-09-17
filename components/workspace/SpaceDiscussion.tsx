@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation"
 import { Trash2 } from "lucide-react"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
+import { useDiscussionResource } from "@/hooks/useDiscussionResource"
 import { useAgentMention } from "@/hooks/useAgentMention"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { candidateOf, type MentionCandidate } from "@/lib/agentMentions"
@@ -174,6 +175,15 @@ function MessageRow({ m, topic }: { m: SpaceMessage; topic?: SpaceTopic | null }
 }
 
 type DocPick = { label: string; token: string }
+type Draft = { text: string; sending: boolean; error: string | null }
+type Drafts = Record<string, Draft>
+const EMPTY_DRAFT: Draft = { text: "", sending: false, error: null }
+type DiscussionProps = {
+  spaceId: string
+  workspaceId: string | null
+  initialThread: string | null
+  canWrite: boolean
+}
 
 /**
  * Composer ala Room (Mission Control): ketik @ → menu avatar + keyboard
@@ -187,7 +197,11 @@ function Composer({
   docs,
   onSent,
   threadRoot,
+  draft,
+  updateDraft,
 }: {
+  draft: Draft
+  updateDraft: (update: Partial<Draft>) => void
   spaceId: string
   placeholder: string
   disabled: boolean
@@ -195,8 +209,8 @@ function Composer({
   onSent: () => void
   threadRoot: string | null
 }) {
-  const [text, setText] = useState("")
-  const [sending, setSending] = useState(false)
+  const { text, sending, error: sendError } = draft
+  const setText = useCallback((text: string) => updateDraft({ text }), [updateDraft])
   const [hashNeedle, setHashNeedle] = useState<string | null>(null)
   const [hashIndex, setHashIndex] = useState(0)
   const [pickPos, setPickPos] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null)
@@ -280,7 +294,7 @@ function Composer({
         }
       })
     },
-    [text, mention],
+    [text, mention, setText],
   )
 
   const selectMention = useCallback(
@@ -297,7 +311,7 @@ function Composer({
       setHashNeedle(null)
       mention.focusAndRestore(applied.caret)
     },
-    [text, mention],
+    [text, mention, setText],
   )
 
   const selectHere = useCallback(() => {
@@ -323,24 +337,24 @@ function Composer({
   const send = useCallback(async () => {
     const body = text.trim()
     if (!body || sending || disabled) return
-    setSending(true)
+    updateDraft({ sending: true, error: null })
     try {
       const r = await fetch(`/api/workspace/${spaceId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
         body: JSON.stringify({ threadRoot, body }),
       })
-      if (r.ok) {
-        setText("")
-        mention.closeMenu()
-        setHashNeedle(null)
-        onSent()
-      }
+      if (!r.ok) throw new Error("Could not send message")
+      updateDraft({ text: "", error: null })
+      mention.closeMenu()
+      setHashNeedle(null)
+      onSent()
     } catch {
-      // diam — user bisa coba lagi, draf tidak hilang
+      updateDraft({ error: "Could not send message. Try again." })
+    } finally {
+      updateDraft({ sending: false })
     }
-    setSending(false)
-  }, [text, sending, disabled, threadRoot, onSent, spaceId, mention])
+  }, [text, sending, disabled, threadRoot, onSent, spaceId, mention, updateDraft])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Prioritas 1: menu @ ala Room.
@@ -516,6 +530,7 @@ function Composer({
           {sending ? "…" : "Send"}
         </button>
       </div>
+      {sendError && <div role="alert" className="mt-1 text-[12px] text-red-300">{sendError}</div>}
       <div className="mt-1 px-1 text-[11px] text-white/25">
         <span>@ pick an agent · # pick a doc · Enter to send, Shift+Enter for new line</span>
       </div>
@@ -523,52 +538,51 @@ function Composer({
   )
 }
 
-export default function SpaceDiscussion({
-  spaceId,
-  workspaceId,
-  initialThread,
-  canWrite,
-}: {
-  spaceId: string
-  workspaceId: string | null
-  initialThread: string | null
-  canWrite: boolean
-}) {
+export default function SpaceDiscussion(props: DiscussionProps) {
+  return <DiscussionSpace key={props.spaceId} {...props} />
+}
+
+function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: DiscussionProps) {
   const router = useRouter()
   const peers = useWorkspaceAwareness(workspaceId)
-  const [roots, setRoots] = useState<RootItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
   const [openRoot, setOpenRoot] = useState<string | null>(initialThread)
+  const [lastInitialThread, setLastInitialThread] = useState(initialThread)
   const [panelTab, setPanelTab] = useState<"thread" | "activity">("thread")
-  const [thread, setThread] = useState<ThreadPayload | null>(null)
-  const [threadLoading, setThreadLoading] = useState(false)
+  if (lastInitialThread !== initialThread) {
+    setLastInitialThread(initialThread)
+    setOpenRoot(initialThread)
+    setPanelTab("thread")
+  }
+  const stream = useDiscussionResource<{ roots: RootItem[] }>(`/api/workspace/${spaceId}/stream?limit=50`)
+  const threadResource = useDiscussionResource<ThreadPayload>(openRoot
+    ? `/api/workspace/${spaceId}/thread?root=${encodeURIComponent(openRoot)}` : null)
+  const roots = Array.isArray(stream.data?.roots) ? stream.data.roots : []
+  const loading = stream.loading
+  const loadError = stream.error ? "Could not load discussion." : null
+  const thread = threadResource.data?.root.id === openRoot ? threadResource.data : null
+  const threadLoading = threadResource.loading
+  const loadStream = stream.refresh
+  const loadThread = threadResource.refresh
   const [docs, setDocs] = useState<DocOption[]>([])
-  const [topicDraft, setTopicDraft] = useState("")
-  const [topicBusy, setTopicBusy] = useState(false)
-
-  const loadStream = useCallback(async () => {
-    try {
-      const r = await fetch(`/api/workspace/${spaceId}/stream?limit=50`, {
-        headers: collabAuthHeaders(),
-      })
-      if (r.ok) {
-        const j = await r.json()
-        setRoots(Array.isArray(j.roots) ? j.roots : [])
-        setLoadError(null)
-      } else {
-        setLoadError("Could not load discussion.")
-      }
-    } catch {
-      setLoadError("Could not load discussion.")
-    }
-    setLoading(false)
-  }, [spaceId])
-
+  const [drafts, setDrafts] = useState<Drafts>({})
+  const [topicDrafts, setTopicDrafts] = useState<Drafts>({})
+  const draftKey = JSON.stringify(openRoot)
+  const topicDraft = topicDrafts[draftKey]?.text ?? ""
+  const topicBusy = topicDrafts[draftKey]?.sending ?? false
+  const updateReply = useCallback((update: Partial<Draft>) => {
+    setDrafts((prev) => ({ ...prev, [draftKey]: { ...(prev[draftKey] ?? EMPTY_DRAFT), ...update } }))
+  }, [draftKey])
+  const updateRoot = useCallback((update: Partial<Draft>) => {
+    setDrafts((prev) => ({ ...prev, null: { ...(prev.null ?? EMPTY_DRAFT), ...update } }))
+  }, [])
+  const updateTopic = useCallback((update: Partial<Draft>) => {
+    setTopicDrafts((prev) => ({ ...prev, [draftKey]: { ...(prev[draftKey] ?? EMPTY_DRAFT), ...update } }))
+  }, [draftKey])
+  const visibleRoot = useRef<string | null>(openRoot)
   useEffect(() => {
-    setLoading(true)
-    void loadStream()
-  }, [loadStream])
+    visibleRoot.current = openRoot
+    return () => { visibleRoot.current = null }
+  }, [openRoot])
 
   useEffect(() => {
     fetch("/api/workspace", { headers: collabAuthHeaders() })
@@ -588,45 +602,21 @@ export default function SpaceDiscussion({
       .catch(() => {})
   }, [])
 
-  const loadThread = useCallback(
-    async (rootId: string) => {
-      setThreadLoading(true)
-      try {
-        const r = await fetch(`/api/workspace/${spaceId}/thread?root=${encodeURIComponent(rootId)}`, {
-          headers: collabAuthHeaders(),
-        })
-        setThread(r.ok ? ((await r.json()) as ThreadPayload) : null)
-      } catch {
-        setThread(null)
-      }
-      setThreadLoading(false)
-    },
-    [spaceId],
-  )
-
   const openThread = useCallback(
-    (rootId: string) => {
+    (rootId: string, targetSpace = spaceId) => {
+      if (targetSpace !== spaceId) {
+        router.push(`/workspace/${encodeURIComponent(targetSpace)}?view=discussion&thread=${encodeURIComponent(rootId)}`)
+        return
+      }
       setOpenRoot(rootId)
       setPanelTab("thread")
-      setThread(null)
-      router.replace(`/workspace/${spaceId}?view=discussion&thread=${rootId}`, { scroll: false })
-      void loadThread(rootId)
+      router.replace(`/workspace/${spaceId}?view=discussion&thread=${encodeURIComponent(rootId)}`, { scroll: false })
     },
-    [router, spaceId, loadThread],
+    [router, spaceId],
   )
-
-  useEffect(() => {
-    if (initialThread) {
-      setOpenRoot(initialThread)
-      void loadThread(initialThread)
-    }
-    // Hanya deep-link awal — pilihan berikutnya lewat klik.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const closeThread = useCallback(() => {
     setOpenRoot(null)
-    setThread(null)
     router.replace(`/workspace/${spaceId}?view=discussion`, { scroll: false })
   }, [router, spaceId])
 
@@ -635,8 +625,8 @@ export default function SpaceDiscussion({
 
   const refreshAll = useCallback(() => {
     void loadStream()
-    if (openRoot) void loadThread(openRoot)
-  }, [loadStream, loadThread, openRoot])
+    void loadThread()
+  }, [loadStream, loadThread])
 
   const deleteRoot = useCallback(
     async (rootId: string) => {
@@ -648,7 +638,7 @@ export default function SpaceDiscussion({
           { method: "DELETE", headers: collabAuthHeaders() },
         )
         if (r.ok) {
-          if (openRoot === rootId) closeThread()
+          if (visibleRoot.current === rootId) closeThread()
           setConfirmDeleteRoot(null)
           refreshAll()
         }
@@ -657,13 +647,13 @@ export default function SpaceDiscussion({
       }
       setDeletingRoot(null)
     },
-    [spaceId, openRoot, closeThread, refreshAll, deletingRoot],
+    [spaceId, closeThread, refreshAll, deletingRoot],
   )
 
   const saveTopic = useCallback(async () => {
     const title = topicDraft.trim()
     if (!title || !openRoot || topicBusy) return
-    setTopicBusy(true)
+    updateTopic({ sending: true, error: null })
     try {
       const r = await fetch(`/api/workspace/${spaceId}/topics`, {
         method: "POST",
@@ -671,18 +661,18 @@ export default function SpaceDiscussion({
         body: JSON.stringify({ rootMessageId: openRoot, title }),
       })
       if (r.ok) {
-        setTopicDraft("")
+        updateTopic({ text: "" })
         refreshAll()
       }
     } catch {
       // diam
     }
-    setTopicBusy(false)
-  }, [topicDraft, openRoot, topicBusy, spaceId, refreshAll])
+    updateTopic({ sending: false })
+  }, [topicDraft, openRoot, topicBusy, spaceId, refreshAll, updateTopic])
 
   const toggleArchive = useCallback(async () => {
     if (!thread?.topic || topicBusy) return
-    setTopicBusy(true)
+    updateTopic({ sending: true, error: null })
     try {
       const r = await fetch(`/api/workspace/${spaceId}/topics/${thread.topic.id}`, {
         method: "PATCH",
@@ -693,8 +683,8 @@ export default function SpaceDiscussion({
     } catch {
       // diam
     }
-    setTopicBusy(false)
-  }, [thread, topicBusy, spaceId, refreshAll])
+    updateTopic({ sending: false })
+  }, [thread, topicBusy, spaceId, refreshAll, updateTopic])
 
   return (
     <div className="mx-auto flex w-full max-w-[1200px] gap-4">
@@ -781,6 +771,8 @@ export default function SpaceDiscussion({
         </div>
         <div className={COMPOSER_STICKY_CLASS}>
           <Composer
+            draft={drafts.null ?? EMPTY_DRAFT}
+            updateDraft={updateRoot}
             spaceId={spaceId}
             placeholder="Write an update… @ for agents, # for docs"
             disabled={!canWrite}
@@ -858,6 +850,7 @@ export default function SpaceDiscussion({
             </div>
           )}
           <SpaceAgentPanel
+            key={`${spaceId}:${openRoot}`}
             spaceId={spaceId}
             threadRoot={openRoot}
             canWrite={canWrite}
@@ -884,7 +877,7 @@ export default function SpaceDiscussion({
               <div className="mb-3 flex items-center gap-2">
                 <input
                   value={topicDraft}
-                  onChange={(e) => setTopicDraft(e.target.value)}
+                  onChange={(e) => updateTopic({ text: e.target.value })}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void saveTopic()
                   }}
@@ -913,9 +906,12 @@ export default function SpaceDiscussion({
               </div>
             )}
             <Composer
+              key={openRoot}
+              draft={drafts[draftKey] ?? EMPTY_DRAFT}
+              updateDraft={updateReply}
               spaceId={spaceId}
               placeholder="Reply… @ for agents"
-              disabled={!canWrite}
+              disabled={!canWrite || !thread || threadResource.error}
               docs={docs}
               threadRoot={openRoot}
               onSent={refreshAll}

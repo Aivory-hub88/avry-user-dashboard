@@ -78,27 +78,79 @@ export function isAdmin(): boolean {
 /**
  * Every other module in this app treats localStorage as a write-through
  * cache keyed globally (not per-account) — deep diagnostic/blueprint/roadmap
- * results, console session id, chat sessions, conversation history, workflow
- * drafts. Logout used to remove only STORAGE_KEY, so on a shared device
- * (demo accounts handed between prospects, most of all) the next login saw
- * the previous account's cached content. Sweeping every "aivory_"-prefixed
- * key catches current and future caches without hand-listing each one;
- * console_session_id is the one exception without that prefix.
+ * results, workflow drafts. Logout sweeps every "aivory_"-prefixed key to
+ * catch current and future caches without hand-listing each one.
+ *
+ * Chat threads (`aivory_chat_sessions*`) and the console thread pointer
+ * (`console_session_id*`) are EXCLUDED from the sweep: both are namespaced
+ * per user id (see lib/userScopedStorage), so a different login on a shared
+ * device already gets its own empty store instead of the previous account's
+ * threads. Deleting them here is what used to wipe every conversation on
+ * logout ("chat tidak terekam") — and, worse, it also cleared the inline
+ * pendingApproval state that hides approvals from the rail, which is why
+ * the rail only showed pending rows after a relogin.
  */
 function clearLocalCaches() {
   const keysToRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith("aivory_")) keysToRemove.push(key);
+    if (!key || !key.startsWith("aivory_")) continue;
+    if (key === "aivory_chat_sessions" || key.startsWith("aivory_chat_sessions__u_")) continue;
+    keysToRemove.push(key);
   }
   keysToRemove.forEach((key) => localStorage.removeItem(key));
-  localStorage.removeItem("console_session_id");
 }
 
-export function logout() {
+/** Window event fired when the backend declares the session dead mid-use
+ *  (refresh explicitly rejected). `SessionExpiredNotice` shows the
+ *  "sesi telah berakhir" modal on it — previously the user was redirected
+ *  away in silence and met a login screen with zero context. */
+export const SESSION_EXPIRED_EVENT = 'aivory:session-expired'
+
+/** sessionStorage reason left for the sign-in notice: 'expired' vs a plain
+ *  signed-out visit. sessionStorage (not localStorage) so the reason never
+ *  leaks into another tab or survives longer than this navigation. */
+const SESSION_END_REASON_KEY = 'aivory_session_ended'
+
+export function readSessionEndReason(): 'expired' | null {
+  if (typeof window === 'undefined' || typeof sessionStorage === 'undefined') return null
+  try {
+    return sessionStorage.getItem(SESSION_END_REASON_KEY) === 'expired' ? 'expired' : null
+  } catch {
+    return null
+  }
+}
+
+export function clearSessionEndReason(): void {
+  if (typeof window === 'undefined' || typeof sessionStorage === 'undefined') return
+  try {
+    sessionStorage.removeItem(SESSION_END_REASON_KEY)
+  } catch {
+    // Non-fatal: worst case the notice shows "expired" copy once more.
+  }
+}
+
+export function logout(reason: 'manual' | 'expired' = 'manual') {
   if (typeof window !== "undefined") {
     clearLocalCaches();
     window.dispatchEvent(new Event("authManager:logout"));
+    if (reason === 'expired') {
+      // Do NOT navigate away: the user may have unsent input worth copying,
+      // and a silent redirect is exactly the missing-notification bug.
+      // The modal (SessionExpiredNotice) takes over from here.
+      try {
+        sessionStorage.setItem(SESSION_END_REASON_KEY, 'expired')
+      } catch {
+        // Modal still appears via the event below, just with generic copy.
+      }
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+      return;
+    }
+    try {
+      sessionStorage.removeItem(SESSION_END_REASON_KEY)
+    } catch {
+      // Ignore: a stale reason only affects notice copy, nothing structural.
+    }
     window.location.href = "/";
   }
 }

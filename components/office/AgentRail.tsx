@@ -41,12 +41,12 @@ import { ChevronLeft, ChevronRight, Brain } from "lucide-react"
 // and licensed only for software running on Apple platforms, so they
 // aren't an option to embed in this web dashboard — Ionicons is the
 // legitimately-licensed way to get that same visual language.
-import { IoWarning, IoCheckmarkCircle, IoCheckmark, IoChatbubbleEllipses, IoAt } from "react-icons/io5"
+import { IoWarning, IoCheckmarkCircle, IoChatbubbleEllipses, IoAt } from "react-icons/io5"
 import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
 import type { MentionCandidate } from "@/lib/agentMentions"
 import type { ActiveAgentRun } from "@/lib/agentRuns"
-import { describeTool, toolkitIconPath, readVerifierFinding, type PendingApproval } from "@/lib/agentApprovals"
+import { describeTool, toolkitIconPath, readVerifierFinding } from "@/lib/agentApprovals"
 import type { Notification } from "@/types/notifications"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { NotificationCard } from "@/components/office/NotificationCard"
@@ -118,7 +118,6 @@ interface AgentRailProps {
   /** Already sliced to this agent's own items — see useNotificationFeed. */
   notifications: Notification[]
   approvalsError: boolean
-  onResolveApproval: (approval: PendingApproval, decision: "approve" | "deny") => Promise<void>
   onRetryApprovals: () => void
   onOpenThread: (sessionId: string) => void
   deployments: AgentDeployment[]
@@ -142,7 +141,6 @@ export default function AgentRail({
   agentTarget,
   notifications,
   approvalsError,
-  onResolveApproval,
   onRetryApprovals,
   onOpenThread,
   deployments,
@@ -152,8 +150,6 @@ export default function AgentRail({
   collapsed = false,
   onToggleCollapse,
 }: AgentRailProps) {
-  const [busyId, setBusyId] = useState<string | null>(null)
-  const [resolveError, setResolveError] = useState<string | null>(null)
   const [memoryOpen, setMemoryOpen] = useState(false)
   const awarenessPeers = useWorkspaceAwareness(workspaceId)
   const [, forceNow] = useState(0)
@@ -173,17 +169,11 @@ export default function AgentRail({
   const notDeployed = agentTarget !== null && channels.length === 0
   const visibleAwarenessPeers = workspaceId ? awarenessPeers : []
 
-  const decide = async (approval: PendingApproval, decision: "approve" | "deny") => {
-    setBusyId(approval.id)
-    setResolveError(null)
-    try {
-      await onResolveApproval(approval, decision)
-    } catch {
-      setResolveError(`Could not ${decision} — try again.`)
-    } finally {
-      setBusyId(null)
-    }
-  }
+  // NOTE (conversational approval protocol): the rail used to resolve
+  // approvals from inline Approve/Deny buttons here. Those are gone — the
+  // agent asks in plain language and the user's next short reply ("Ya" /
+  // "Batal", multilingual) IS the decision, resolved server-side. The rail
+  // only informs; it never decides.
 
   if (collapsed) {
     return (
@@ -279,9 +269,6 @@ export default function AgentRail({
                   onClick={onRetryApprovals}
                 />
               )}
-              {resolveError && (
-                <NotificationCard tone="error" icon={<IoWarning className="h-[15px] w-[15px]" />} title={resolveError} />
-              )}
               {notDeployed && (
                 <NotificationCard
                   tone="warn"
@@ -303,7 +290,6 @@ export default function AgentRail({
               )}
 
               {approvalItems.map(({ approval: a }) => {
-                const busy = busyId === a.id
                 // A real approval is always about a specific tool/service —
                 // Gmail, Slack, whatever's being called. Show that service's
                 // own brand icon (the same /integrations/*.svg set the rest
@@ -347,8 +333,7 @@ export default function AgentRail({
                     tone="warn"
                     // The badge carries the most informative thing available,
                     // in that order: a flag beats where it came from, which
-                    // beats "Needs approval" — a label the Approve/Deny pair
-                    // directly below already implies.
+                    // beats "Needs approval".
                     badge={
                       finding?.verdict === "flag"
                         ? "Flagged"
@@ -366,25 +351,11 @@ export default function AgentRail({
                     title={describeTool(a.tool_name)}
                     subtitle={subtitle}
                     actions={
-                      <>
-                        <button
-                          onClick={() => decide(a, "approve")}
-                          disabled={busy}
-                          aria-busy={busy}
-                          className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-[12.5px] font-semibold text-on-accent transition-[opacity,transform] duration-150 ease-out hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.97] disabled:opacity-50"
-                        >
-                          <IoCheckmark className="h-[13px] w-[13px]" />
-                          {busy ? "Approving…" : "Approve"}
-                        </button>
-                        <button
-                          onClick={() => decide(a, "deny")}
-                          disabled={busy}
-                          aria-busy={busy}
-                          className="text-[12.5px] font-medium text-white/45 underline underline-offset-2 transition-colors hover:text-white/75 active:scale-[0.97] disabled:opacity-50"
-                        >
-                          Deny
-                        </button>
-                      </>
+                      <span className="text-[12.5px] font-light text-white/55">
+                        Balas <span className="font-medium text-white/85">Ya</span> di chat untuk
+                        menyetujui, <span className="font-medium text-white/85">Batal</span> untuk
+                        membatalkan.
+                      </span>
                     }
                   />
                 )

@@ -59,6 +59,10 @@ export interface DashboardAccess {
   tier: string
   /** True when access was granted via the super-admin bypass (URL code or account). */
   isSuperAdmin: boolean
+  /** Where a denial should send the user (`null` when allowed). Exposed so
+   *  the gate can explain the denial (session-expired notice) before
+   *  performing the single navigation itself when `navigate: false`. */
+  redirect: RedirectTarget
 }
 
 /* -------------------------------------------------------------------------- */
@@ -206,14 +210,21 @@ const LOADING_STATE: DashboardAccess = {
   status: 'loading',
   tier: 'free',
   isSuperAdmin: false,
+  redirect: null,
 }
 
 /**
  * Resolves dashboard access for the current visitor. Returns `loading` during
  * SSR and the initial client render, then resolves to a single terminal status
- * after hydration, redirecting away on denial.
+ * after hydration.
+ *
+ * Navigation on denial: by default the hook performs the single redirect
+ * itself (`navigate: true`, historical behavior). Pass `navigate: false` and
+ * the caller owns the one navigation — DashboardEntryGate does this so the
+ * session-expired notice can explain the denial before moving. Either way at
+ * most one redirect fires (Req 3.5, 3.6).
  */
-export function useDashboardAccess(): DashboardAccess {
+export function useDashboardAccess({ navigate = true }: { navigate?: boolean } = {}): DashboardAccess {
   // SSR-safe initial value: always `loading` before hydration (Req 10.1).
   const [access, setAccess] = useState<DashboardAccess>(LOADING_STATE)
 
@@ -241,8 +252,8 @@ export function useDashboardAccess(): DashboardAccess {
       // Monotonic: only the first resolution sticks; redirect fires at most once.
       if (cancelled || resolvedRef.current) return
       resolvedRef.current = true
-      if (target) redirect(target)
-      setAccess(next)
+      if (target && navigate) redirect(target)
+      setAccess({ ...next, redirect: target })
     }
 
     const run = async () => {
@@ -260,7 +271,7 @@ export function useDashboardAccess(): DashboardAccess {
         tier: null, // Tier not needed for decision anymore
       })
       finalize(
-        { status: decision.status, tier: decision.tier, isSuperAdmin: decision.isSuperAdmin },
+        { status: decision.status, tier: decision.tier, isSuperAdmin: decision.isSuperAdmin, redirect: decision.redirect },
         decision.redirect,
       )
     }
@@ -272,7 +283,7 @@ export function useDashboardAccess(): DashboardAccess {
       cancelled = true
       abortController.abort()
     }
-  }, [])
+  }, [navigate])
 
   return access
 }

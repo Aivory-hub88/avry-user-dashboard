@@ -16,7 +16,7 @@
  * the full, undeduped count — matching what the nav badge always showed.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { listPendingApprovalsByAgent, resolveApproval, type PendingApproval } from '@/lib/agentApprovals'
+import { APPROVALS_CHANGED_EVENT, listPendingApprovalsByAgent, resolveApproval, type PendingApproval } from '@/lib/agentApprovals'
 
 const POLL_MS = 60_000
 
@@ -68,7 +68,20 @@ export function useAgentApprovals(excludeIds?: Iterable<string>) {
   useEffect(() => {
     refetch()
     const interval = setInterval(refetch, POLL_MS)
-    return () => clearInterval(interval)
+    // A chat turn may have parked (or the user may just have resolved) a
+    // decision seconds ago — waiting for the next 60s tick to show it is
+    // what made the rail look dead until a relogin remounted everything.
+    const onChanged = () => refetch()
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refetch()
+    }
+    window.addEventListener(APPROVALS_CHANGED_EVENT, onChanged)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener(APPROVALS_CHANGED_EVENT, onChanged)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [refetch])
 
   const resolve = useCallback(async (approval: PendingApproval, decision: 'approve' | 'deny') => {

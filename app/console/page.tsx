@@ -210,10 +210,11 @@ export default function ConsolePage() {
     handleSend,
     handleSendRoom,
     stopStreaming,
-    resolveConsoleApproval,
     handleNewChat,
     switchSession,
     deleteThread,
+    replyTo,
+    setReplyTo,
   } = useChat({
     attachments,
     clearAttachments: () => setAttachments([]),
@@ -232,7 +233,6 @@ export default function ConsolePage() {
     byAgent: notificationsByAgent,
     approvalsLoaded,
     approvalsError,
-    resolveApproval: resolveRailApproval,
     retryApprovals: refetchApprovals,
   } = useNotificationFeed({ sessionsByAgent, currentSessionId, excludeApprovalIds: inlineApprovalIds })
   const { deployments } = useAgentDeployments()
@@ -540,7 +540,6 @@ export default function ConsolePage() {
           agentTarget={agentTarget}
           notifications={notificationsByAgent[agentTarget ?? "null"] ?? []}
           approvalsError={approvalsError}
-          onResolveApproval={resolveRailApproval}
           onRetryApprovals={refetchApprovals}
           onOpenThread={(sessionId) => {
             setShowMissionControl(false)
@@ -818,6 +817,7 @@ export default function ConsolePage() {
             <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-8 py-8 pb-44">
               <div className="max-w-[800px] mx-auto gap-0 flex flex-col">
                 {messages.map(m => {
+                  const displayAgentName = m.agentName ?? activeAgentName
                   return (
                     <div key={m.id}>
                       <ChatMessage
@@ -828,13 +828,10 @@ export default function ConsolePage() {
                         agenticState={m.role === 'assistant' && m.id === messages[messages.length - 1]?.id ? agenticState : undefined}
                         onAcceptRoute={acceptRoute}
                         onDismissRoute={dismissRoute}
-                        pendingApproval={m.pendingApproval}
-                        approvalOutcome={m.approvalOutcome}
-                        approvalBusy={m.approvalBusy}
-                        onApproveAction={() => resolveConsoleApproval(m.id, 'approve')}
-                        onDenyAction={() => resolveConsoleApproval(m.id, 'deny')}
-                        agentName={m.agentName ?? activeAgentName}
+                        agentName={displayAgentName}
                         agentType={m.agentType ?? agentTarget}
+                        replyPreview={m.replyPreview}
+                        onReply={() => setReplyTo({ id: m.id, role: m.role, content: m.content, agentName: displayAgentName })}
                       />
                     </div>
                   )
@@ -888,6 +885,8 @@ export default function ConsolePage() {
                   placeholder={inRoom ? t('sendPlaceholderRoom') : undefined}
                   isStreaming={isStreaming}
                   onStop={stopStreaming}
+                  replyTo={replyTo}
+                  onCancelReply={() => setReplyTo(null)}
                 />
               </div>
             </div>
