@@ -13,9 +13,15 @@ type DocItem = {
   myRole: string
 }
 
-export default function WorkspaceNavigator({ currentId }: { currentId: string }) {
+type TopicItem = {
+  root: string
+  title: string
+}
+
+export default function WorkspaceNavigator({ currentId, spaceId }: { currentId: string; spaceId?: string | null }) {
   const router = useRouter()
   const [docs, setDocs] = useState<DocItem[]>([])
+  const [topics, setTopics] = useState<TopicItem[]>([])
   const [query, setQuery] = useState("")
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -34,6 +40,26 @@ export default function WorkspaceNavigator({ currentId }: { currentId: string })
       alive = false
     }
   }, [currentId])
+
+  // Team Space (Phase 1): Discussions rail — topic rows dari stream Space ini.
+  useEffect(() => {
+    if (!spaceId) return
+    let alive = true
+    fetch(`/api/workspace/${spaceId}/stream?limit=50`, { headers: collabAuthHeaders() })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!alive || !Array.isArray(payload?.roots)) return
+        setTopics(
+          payload.roots
+            .filter((r: { topic?: { archived?: boolean } | null }) => r.topic && !r.topic.archived)
+            .map((r: { id: string; topic: { title: string } }) => ({ root: r.id, title: r.topic.title })),
+        )
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [spaceId])
 
   const createDocument = async () => {
     if (creating) return
@@ -80,6 +106,30 @@ export default function WorkspaceNavigator({ currentId }: { currentId: string })
 
   return (
     <aside className="flex w-full shrink-0 flex-col border-b border-line bg-black/10 lg:min-h-0 lg:w-[232px] lg:overflow-hidden lg:border-b-0 lg:border-r">
+      {spaceId && (
+        <div className="border-b border-line px-4 pb-3 pt-4">
+          <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">Discussions</div>
+          <div className="mt-2 flex flex-col gap-0.5">
+            {topics.map((t) => (
+              <Link
+                key={t.root}
+                href={`/workspace/${spaceId}?view=discussion&thread=${t.root}`}
+                className="truncate rounded-lg px-2.5 py-1.5 text-left text-[12px] text-white/45 hover:bg-white/[0.04] hover:text-white/75"
+              >
+                {t.title}
+              </Link>
+            ))}
+            {topics.length === 0 && (
+              <Link
+                href={`/workspace/${spaceId}?view=discussion`}
+                className="rounded-lg px-2.5 py-1.5 text-left text-[12px] text-white/25 hover:bg-white/[0.04] hover:text-white/60"
+              >
+                Open discussion →
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
         <div>
           <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">My pages</div>

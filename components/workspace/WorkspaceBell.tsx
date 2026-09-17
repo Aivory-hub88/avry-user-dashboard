@@ -4,6 +4,18 @@ import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Bell } from "lucide-react"
 import { collabAuthHeaders } from "@/lib/collabClient"
+import { NotificationCard } from "@/components/office/NotificationCard"
+
+type SpaceItem = {
+  kind: "mention" | "here" | "reply"
+  spaceId: string
+  threadRoot: string
+  messageId: string
+  authorName: string
+  excerpt: string
+  createdAt: string
+  unread: boolean
+}
 
 type Mention = {
   id: number
@@ -19,21 +31,34 @@ type Mention = {
   created_at: string
 }
 
-/** Notification bell: unread @mentions of the current user, with mark-read. */
+/** Notification bell: unread @mentions + Team Space activity ("What's new for me"). */
 export default function WorkspaceBell() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [unread, setUnread] = useState(0)
   const [items, setItems] = useState<Mention[]>([])
+  const [spaceItems, setSpaceItems] = useState<SpaceItem[]>([])
   const [loading, setLoading] = useState(false)
 
   const refresh = useCallback(async (withItems: boolean) => {
     try {
-      const r = await fetch("/api/workspace/notifications", { headers: collabAuthHeaders() })
-      if (!r.ok) return
-      const j = await r.json()
-      setUnread(j.unread ?? 0)
-      if (withItems) setItems(j.mentions ?? [])
+      const [n, a] = await Promise.all([
+        fetch("/api/workspace/notifications", { headers: collabAuthHeaders() }),
+        fetch("/api/workspace/activity?limit=30", { headers: collabAuthHeaders() }),
+      ])
+      let mentionCount = 0
+      if (n.ok) {
+        const j = await n.json()
+        mentionCount = j.unread ?? 0
+        if (withItems) setItems(j.mentions ?? [])
+      }
+      let spaceUnread = 0
+      if (a.ok) {
+        const j = await a.json()
+        spaceUnread = j.unread ?? 0
+        if (withItems) setSpaceItems(Array.isArray(j.items) ? j.items : [])
+      }
+      setUnread(mentionCount + spaceUnread)
     } catch {}
   }, [])
 
@@ -64,9 +89,21 @@ export default function WorkspaceBell() {
         body: JSON.stringify({ markRead: true }),
       })
       if (r.ok) {
-        setUnread(0)
         setItems([])
       }
+      // Space watermarks per Space (monotone, eksplisit per scope).
+      const spaces = [...new Set(spaceItems.map((s) => s.spaceId))]
+      await Promise.all(
+        spaces.map((spaceId) =>
+          fetch("/api/workspace/activity/read-all", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+            body: JSON.stringify({ spaceId }),
+          }).catch(() => null),
+        ),
+      )
+      setSpaceItems([])
+      setUnread(0)
     } catch {}
   }
 
@@ -74,6 +111,19 @@ export default function WorkspaceBell() {
     setOpen(false)
     router.push(`/workspace/${m.doc_id}`)
   }
+
+  const openSpaceItem = (s: SpaceItem) => {
+    setOpen(false)
+    router.push(`/workspace/${s.spaceId}?view=discussion&thread=${s.threadRoot}`)
+  }
+
+  const KIND_BADGE: Record<SpaceItem["kind"], string> = {
+    mention: "Mention",
+    here: "Here",
+    reply: "Reply",
+  }
+
+  const hasContent = items.length > 0 || spaceItems.length > 0
 
   return (
     <div className="relative shrink-0">
@@ -93,7 +143,7 @@ export default function WorkspaceBell() {
       {open && (
         <div className="absolute right-0 top-full z-30 mt-2 w-[340px] rounded-2xl border border-line bg-[#1e1e1c] p-3 shadow-2xl">
           <div className="mb-2 flex items-center justify-between px-1">
-            <span className="text-[12px] font-medium text-white/70">Mentions · {unread} unread</span>
+            <span className="text-[12px] font-medium text-white/70">What&apos;s new for me · {unread} unread</span>
             {unread > 0 && (
               <button onClick={markRead} className="text-[11px] text-white/40 underline-offset-4 hover:text-white/70 hover:underline">
                 Mark all read
@@ -102,10 +152,30 @@ export default function WorkspaceBell() {
           </div>
           {loading ? (
             <div className="py-6 text-center text-[12px] text-white/30">Loading…</div>
-          ) : items.length === 0 ? (
-            <div className="py-6 text-center text-[12px] text-white/30">No unread mentions.</div>
+          ) : !hasContent ? (
+            <div className="py-6 text-center text-[12px] text-white/30">You&apos;re all caught up.</div>
           ) : (
             <div className="flex max-h-[320px] flex-col gap-1.5 overflow-y-auto">
+              {spaceItems.map((s) => (
+                <NotificationCard
+                  key={`space-${s.messageId}`}
+                  tone="info"
+                  badge={KIND_BADGE[s.kind]}
+                  icon={<span className="text-[14px] leading-none">@</span>}
+                  title={
+                    <span className="text-[13.5px] font-semibold text-white">
+                      {s.authorName}
+                      <span className="font-normal text-white/50">
+                        {" "}
+                        {s.kind === "mention" ? "mentioned you" : s.kind === "here" ? "notified everyone" : "replied"}
+                      </span>
+                    </span>
+                  }
+                  subtitle={s.excerpt ? <span>{s.excerpt}</span> : undefined}
+                  meta={s.createdAt}
+                  onClick={() => openSpaceItem(s)}
+                />
+              ))}
               {items.map((m) => (
                 <button
                   key={m.id}

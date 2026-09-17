@@ -8,7 +8,22 @@ import * as Y from 'yjs'
 
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }))
 
-vi.mock('@/lib/db', () => ({ query: queryMock }))
+vi.mock('@/lib/db', () => ({
+  query: queryMock,
+  // recordWorkspaceEvent's audit-log writes (dual-written alongside
+  // recordWorkspaceActivity / recordCommentMentions) run through
+  // withTransaction. This gives it a minimal, self-contained tx so route
+  // tests don't need to model the event log's own queries in their
+  // `queryMock` branching — without it, withTransaction is undefined and
+  // recordWorkspaceEvent's own try/catch silently swallows the failure,
+  // which is harmless but prints noise on every write-path test.
+  withTransaction: async (fn: (tx: (sql: string) => Promise<{ rows: unknown[] }>) => Promise<unknown>) =>
+    fn(async (sql: string) =>
+      sql.includes('INSERT INTO dashboard.workspace_events')
+        ? { rows: [{ id: 1, created_at: '2026-01-01 00:00:00+00', payload: '{}' }] }
+        : { rows: [] },
+    ),
+}))
 
 vi.mock('@/lib/serverAuth', () => ({ getAuthUserWithToken: () => null }))
 
@@ -55,9 +70,12 @@ beforeEach(() => {
       return Promise.resolve({ rows: [{ props: {} }] })
     }
     // Agent granted on doc-launch only — doc-private must be filtered out.
+    // Batched: params[0] is the full candidate id array (doc_id = ANY($1)).
     if (sql.includes('FROM dashboard.workspace_agent_acl')) {
-      const granted = (params[0] as string) === 'doc-launch'
-      return Promise.resolve(granted ? { rows: [{ role: 'editor' }] } : { rows: [] })
+      const ids = params[0] as string[]
+      return Promise.resolve({
+        rows: ids.filter((id) => id === 'doc-launch').map((id) => ({ doc_id: id, role: 'editor' })),
+      })
     }
     if (sql.includes('FROM dashboard.workspace_docs')) {
       return Promise.resolve({ rows: [{ id: 'workspace:doc-launch', owner: 'owner-1', workspace_id: 'default' }] })
