@@ -14,6 +14,7 @@ import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { parseSpaceMentions } from "@/lib/spaceProtocol"
 import { spaceMessageFromRow } from "@/lib/spaceThreads"
 import { requesterFrom, newId, cleanBody } from "@/lib/spaceWrite"
+import { enqueueAgentTasks } from "@/lib/spaceAgent"
 
 export const runtime = "nodejs"
 
@@ -93,7 +94,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     )
     const message = spaceMessageFromRow(inserted.rows[0] as Record<string, unknown>, id)
     if (!message) return NextResponse.json({ error: "db" }, { status: 500 })
-    return NextResponse.json({ message, threadRoot: rootId, unarchived }, { status: 201 })
+
+    // Phase 3: stamp agent → enqueue task per agent (dipakai UI sebagai receipt 👀).
+    let tasks: unknown[] = []
+    if (stamps.hasAgent) {
+      try {
+        tasks = await enqueueAgentTasks({
+          spaceId: id,
+          threadRoot: rootId,
+          triggerMsg: msgId,
+          stamps,
+          body,
+          createdBy: `${me.kind}:${me.id}`,
+        })
+        await recordWorkspaceActivity({
+          docId: id,
+          credential,
+          agentType: me.agentType ?? "user",
+          action: "agent.mentioned",
+          summary: `${me.name} mentioned ${(tasks as { agentType: string }[]).map((t) => t.agentType).join(", ")}`,
+        }).catch(() => {})
+      } catch (error) {
+        console.error("[workspace/messages enqueue]", error)
+      }
+    }
+    return NextResponse.json({ message, threadRoot: rootId, unarchived, tasks }, { status: 201 })
   } catch (error) {
     console.error("[workspace/messages POST]", error)
     return NextResponse.json({ error: "db" }, { status: 500 })

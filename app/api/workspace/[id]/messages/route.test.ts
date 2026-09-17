@@ -99,6 +99,47 @@ describe("POST /api/workspace/[id]/messages", () => {
     expect(params[11]).toBe(true) // has_agent
   })
 
+  it("enqueues one agent task per stamped agent (dispatcher)", async () => {
+    queryMock.mockImplementation((sql: string, params?: unknown[]) => {
+      if (sql.includes("FROM dashboard.workspace_agent_tasks"))
+        return Promise.resolve({ rows: [] })
+      if (sql.includes("INSERT INTO dashboard.workspace_agent_tasks"))
+        return Promise.resolve({
+          rows: [
+            {
+              id: "task-1",
+              space_id: "space-1",
+              thread_root: "m1",
+              trigger_msg: "m-new",
+              agent_type: params?.[4],
+              instruction: "Tolong @Geno cek",
+              status: "todo",
+              reason: "mention",
+              result_msg: null,
+              approval_ref: {},
+              created_by: "system:service",
+              created_at: "2026-09-17T10:00:00.000Z",
+              updated_at: "2026-09-17T10:00:00.000Z",
+            },
+          ],
+          rowCount: 1,
+        })
+      if (sql.includes("INSERT INTO dashboard.workspace_messages"))
+        return Promise.resolve({
+          rows: [msgRow({ id: params?.[0] as string, mentions: ["autonomous"], has_agent: true })],
+          rowCount: 1,
+        })
+      return Promise.resolve({ rows: [], rowCount: 0 })
+    })
+    const res = await POST(post({ body: "Tolong [@Geno](#agent:autonomous) cek" }), {
+      params: Promise.resolve({ id: "space-1" }),
+    })
+    expect(res.status).toBe(201)
+    const j = await res.json()
+    expect(j.tasks).toHaveLength(1)
+    expect(j.tasks[0]).toMatchObject({ agentType: "autonomous", status: "todo" })
+  })
+
   it("reply un-archives the topic", async () => {
     queryMock.mockImplementation((sql: string) => {
       if (sql.includes("FROM dashboard.workspace_messages"))

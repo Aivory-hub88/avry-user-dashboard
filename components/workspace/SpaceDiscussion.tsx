@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
+import SpaceAgentPanel from "@/components/workspace/SpaceAgentPanel"
 import { AGENT_ROSTER } from "@/lib/agentRoster"
 import type { SpaceMessage, SpaceTopic } from "@/lib/spaceProtocol"
 
@@ -518,6 +519,12 @@ export default function SpaceDiscussion({
               <span>Diarsipkan — reply baru akan membuka lagi.</span>
             </div>
           )}
+          <SpaceAgentPanel
+            spaceId={spaceId}
+            threadRoot={openRoot}
+            canWrite={canWrite}
+            onChanged={refreshAll}
+          />
           {threadLoading && <span className="text-[12px] text-white/40">Loading thread…</span>}
           {!threadLoading && !thread && (
             <span className="text-[12px] text-white/40">Thread tidak ditemukan.</span>
