@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import { Trash2 } from "lucide-react"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
 import { useAgentMention } from "@/hooks/useAgentMention"
@@ -44,12 +45,12 @@ function timeAgo(iso: string): string {
   const t = new Date(iso).getTime()
   if (!Number.isFinite(t)) return ""
   const s = Math.max(0, Math.floor((Date.now() - t) / 1000))
-  if (s < 60) return `${s} dtk`
+  if (s < 60) return `${s}s`
   const m = Math.floor(s / 60)
-  if (m < 60) return `${m} mnt`
+  if (m < 60) return `${m}m`
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h} jam`
-  return `${Math.floor(h / 24)} hari`
+  if (h < 24) return `${h}h`
+  return `${Math.floor(h / 24)}d`
 }
 
 function initials(name: string): string {
@@ -176,7 +177,7 @@ function MessageRow({ m, topic }: { m: SpaceMessage; topic?: SpaceTopic | null }
           </div>
         )}
         <div className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-[1.6] text-white/75">
-          {m.body ? <RichBody body={m.body} /> : <span className="italic text-white/30">(dihapus)</span>}
+          {m.body ? <RichBody body={m.body} /> : <span className="italic text-white/30">(deleted)</span>}
         </div>
       </div>
     </div>
@@ -467,13 +468,13 @@ function Composer({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-medium text-white/85">@here</span>
-                    <span className="block truncate text-[11px] text-white/40">semua member</span>
+                    <span className="block truncate text-[11px] text-white/40">all members</span>
                   </span>
                 </button>
               )}
               {mention.mentionList.length === 0 && !showHereRow && (
                 <div className="px-2.5 py-2 text-[12px] text-white/40">
-                  <span>Tidak ada agent cocok — ketik nama lain atau @here.</span>
+                  <span>No matching agent — try another name or @here.</span>
                 </div>
               )}
             </>
@@ -497,7 +498,7 @@ function Composer({
               ))}
               {hashOptions.length === 0 && (
                 <div className="px-2.5 py-2 text-[12px] text-white/40">
-                  <span>Tidak ada doc cocok.</span>
+                  <span>No matching docs.</span>
                 </div>
               )}
             </>
@@ -517,7 +518,7 @@ function Composer({
             updateHash(next, caret)
           }}
           onKeyDown={onKeyDown}
-          placeholder={disabled ? "Viewer tidak bisa menulis" : placeholder}
+          placeholder={disabled ? "Viewers can't write" : placeholder}
           rows={2}
           className="max-h-[160px] min-h-[40px] flex-1 resize-y bg-transparent text-[13px] leading-[1.6] text-white/85 outline-none placeholder:text-white/25 disabled:opacity-50"
         />
@@ -526,11 +527,11 @@ function Composer({
           disabled={disabled || sending || !text.trim()}
           className="shrink-0 rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40"
         >
-          {sending ? "…" : "Kirim"}
+          {sending ? "…" : "Send"}
         </button>
       </div>
       <div className="mt-1 px-1 text-[11px] text-white/25">
-        <span>@ pilih agent · # pilih doc · Enter kirim, Shift+Enter baris baru</span>
+        <span>@ pick an agent · # pick a doc · Enter to send, Shift+Enter for new line</span>
       </div>
     </div>
   )
@@ -733,8 +734,8 @@ export default function SpaceDiscussion({
         {loadError && <span className="text-[13px] text-white/40">{loadError}</span>}
         {!loading && !loadError && roots.length === 0 && (
           <div className="rounded-2xl border border-line bg-white/[0.03] p-8 text-center">
-            <div className="text-[14px] font-medium text-white/70">Belum ada diskusi</div>
-            <div className="mt-1 text-[12px] text-white/35">Tulis root message pertama di bawah.</div>
+            <div className="text-[14px] font-medium text-white/70">No discussion yet</div>
+            <div className="mt-1 text-[12px] text-white/35">Write the first root message below.</div>
           </div>
         )}
         <div className="flex flex-col gap-5">
@@ -751,7 +752,7 @@ export default function SpaceDiscussion({
                   onClick={() => openThread(r.id)}
                   className="text-[12px] text-white/40 hover:text-white/75"
                 >
-                  {r.replyCount > 0 ? `${r.replyCount} ${r.replyCount === 1 ? "reply" : "replies"} →` : "Buka thread →"}
+                  {r.replyCount > 0 ? `${r.replyCount} ${r.replyCount === 1 ? "reply" : "replies"} →` : "Open thread →"}
                 </button>
                 {canWrite && (
                   <button
@@ -760,10 +761,14 @@ export default function SpaceDiscussion({
                       else setConfirmDeleteRoot(r.id)
                     }}
                     disabled={deletingRoot === r.id}
-                    title="Hapus thread ini beserta replies-nya"
-                    className="text-[12px] text-white/25 hover:text-red-300 disabled:opacity-40"
+                    title={confirmDeleteRoot === r.id ? "Click again to confirm" : "Delete this thread and its replies"}
+                    className={`rounded p-1 disabled:opacity-40 ${
+                      confirmDeleteRoot === r.id
+                        ? "text-red-300"
+                        : "text-white/25 hover:text-red-300"
+                    }`}
                   >
-                    {deletingRoot === r.id ? "…" : confirmDeleteRoot === r.id ? "Yakin? klik lagi" : "Hapus"}
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
@@ -773,7 +778,7 @@ export default function SpaceDiscussion({
         <div className="sticky bottom-0 mt-5 bg-[#18181b]/95 pb-2 pt-3 backdrop-blur">
           <Composer
             spaceId={spaceId}
-            placeholder="Tulis update… @ untuk agent, # untuk doc"
+            placeholder="Write an update… @ for agents, # for docs"
             disabled={!canWrite}
             docs={docs}
             threadRoot={null}
@@ -801,7 +806,7 @@ export default function SpaceDiscussion({
         {panelTab === "activity" ? (
           <SpaceActivityPanel onOpenThread={openThread} />
         ) : !openRoot ? (
-          <span className="text-[12px] text-white/35">Pilih thread dari stream untuk dibuka di sini.</span>
+          <span className="text-[12px] text-white/35">Select a thread from the stream to open it here.</span>
         ) : (
           <>
             <div className="mb-3 flex items-center justify-between">
@@ -816,20 +821,24 @@ export default function SpaceDiscussion({
                     else setConfirmDeleteRoot(openRoot)
                   }}
                   disabled={deletingRoot === openRoot}
-                  title="Hapus thread ini beserta replies-nya"
-                  className="text-[12px] text-white/25 hover:text-red-300 disabled:opacity-40"
+                  title={confirmDeleteRoot === openRoot ? "Click again to confirm" : "Delete this thread and its replies"}
+                  className={`rounded p-1 disabled:opacity-40 ${
+                    confirmDeleteRoot === openRoot
+                      ? "text-red-300"
+                      : "text-white/25 hover:text-red-300"
+                  }`}
                 >
-                  {deletingRoot === openRoot ? "…" : confirmDeleteRoot === openRoot ? "Yakin? klik lagi" : "Hapus"}
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}
               <button onClick={closeThread} className="text-[12px] text-white/40 hover:text-white/75">
-                Tutup
+                Close
               </button>
             </span>
           </div>
           {thread?.topic?.archived && (
             <div className="mb-3 rounded-xl border border-line bg-white/[0.03] px-3 py-2 text-[12px] text-white/45">
-              <span>Diarsipkan — reply baru akan membuka lagi.</span>
+              <span>Archived — a new reply will reopen it.</span>
             </div>
           )}
           <SpaceAgentPanel
@@ -840,7 +849,7 @@ export default function SpaceDiscussion({
           />
           {threadLoading && <span className="text-[12px] text-white/40">Loading thread…</span>}
           {!threadLoading && !thread && (
-            <span className="text-[12px] text-white/40">Thread tidak ditemukan.</span>
+            <span className="text-[12px] text-white/40">Thread not found.</span>
           )}
           {thread && (
             <div className="flex flex-col gap-5">
@@ -850,7 +859,7 @@ export default function SpaceDiscussion({
                 <MessageRow key={m.id} m={m} />
               ))}
               {thread.replies.length === 0 && (
-                <span className="text-[12px] text-white/35">Belum ada reply.</span>
+                <span className="text-[12px] text-white/35">No replies yet.</span>
               )}
             </div>
           )}
@@ -863,7 +872,7 @@ export default function SpaceDiscussion({
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void saveTopic()
                   }}
-                  placeholder="Judul goal thread ini…"
+                  placeholder="Thread goal title…"
                   disabled={topicBusy}
                   className="min-w-0 flex-1 rounded-xl border border-line bg-white/[0.03] px-3 py-1.5 text-[12px] text-white/85 outline-none placeholder:text-white/25"
                 />
@@ -883,13 +892,13 @@ export default function SpaceDiscussion({
                   disabled={topicBusy}
                   className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] text-white/55 hover:bg-white/[0.1] hover:text-white/80 disabled:opacity-40"
                 >
-                  {thread.topic.archived ? "Buka arsip" : "Arsipkan"}
+                  {thread.topic.archived ? "Unarchive" : "Archive"}
                 </button>
               </div>
             )}
             <Composer
               spaceId={spaceId}
-              placeholder="Reply… @ untuk agent"
+              placeholder="Reply… @ for agents"
               disabled={!canWrite}
               docs={docs}
               threadRoot={openRoot}

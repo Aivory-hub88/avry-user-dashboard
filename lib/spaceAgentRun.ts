@@ -153,13 +153,13 @@ export async function runAgentTask(opts: {
       credential,
       agentType: task.agentType,
       action: "agent.failed",
-      summary: `${agentDisplayName(task.agentType)} gagal: ${reason}`,
+      summary: `${agentDisplayName(task.agentType)} failed: ${reason}`,
     }).catch(() => {});
     return { task: await loadAgentTask(id, taskId), error: "agent unreachable", status: 502 };
   }
 
   if (pendingApproval) {
-    await setAgentTask(taskId, "blocked", `menunggu approval: ${pendingApproval.tool_name}`, {
+    await setAgentTask(taskId, "blocked", `waiting for approval: ${pendingApproval.tool_name}`, {
       approvalRef: pendingApproval,
     });
     return { task: await loadAgentTask(id, taskId), pendingApproval, status: 200 };
@@ -192,7 +192,7 @@ export async function runAgentTask(opts: {
     credential,
     agentType: task.agentType,
     action: "agent.replied",
-    summary: `${name} membalas di thread`,
+      summary: `${name} replied in the thread`,
   }).catch(() => {});
   return { task: await loadAgentTask(id, taskId), message, status: 200 };
 }

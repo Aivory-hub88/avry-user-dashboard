@@ -102,7 +102,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       credential,
       agentType: me.agentType ?? "user",
       action: "thread.deleted",
-      summary: `${me.name} menghapus thread`,
+      summary: `${me.name} deleted a thread`,
     }).catch(() => {})
     return NextResponse.json({ ok: true })
   } catch (error) {

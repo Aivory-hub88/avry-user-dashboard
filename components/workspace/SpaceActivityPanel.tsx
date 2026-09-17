@@ -26,12 +26,12 @@ function timeAgo(iso: string): string {
   const t = new Date(iso).getTime()
   if (!Number.isFinite(t)) return ""
   const s = Math.max(0, Math.floor((Date.now() - t) / 1000))
-  if (s < 60) return `${s} dtk`
+  if (s < 60) return `${s}s`
   const m = Math.floor(s / 60)
-  if (m < 60) return `${m} mnt`
+  if (m < 60) return `${m}m`
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h} jam`
-  return `${Math.floor(h / 24)} hari`
+  if (h < 24) return `${h}h`
+  return `${Math.floor(h / 24)}d`
 }
 
 const KIND_BADGE = { mention: "Mention", here: "Here", reply: "Reply" } as const

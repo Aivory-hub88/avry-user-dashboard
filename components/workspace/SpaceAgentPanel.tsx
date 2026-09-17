@@ -169,7 +169,7 @@ export default function SpaceAgentPanel({
         <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/35">Agent</span>
         {openCount > 0 && (
           <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200">
-            {openCount} berjalan
+            {openCount} running
           </span>
         )}
       </div>
@@ -177,17 +177,17 @@ export default function SpaceAgentPanel({
         {openCount > 0 ? (
           <span>
             <span className="mr-1">👀</span>
-            {names.join(", ")} mengerjakan…
+            {names.join(", ")} working…
           </span>
         ) : allDone ? (
           <span>
             <span className="mr-1">✅</span>
-            {names.join(", ")} selesai
+            {names.join(", ")} done
           </span>
         ) : failed ? (
           <span>
             <span className="mr-1">❗</span>
-            Ada yang gagal — coba Jalankan ulang
+            Something failed — retry
           </span>
         ) : null}
       </div>
@@ -203,7 +203,7 @@ export default function SpaceAgentPanel({
                 {agentDisplayName(t.agentType)}
               </span>
               <span className="text-[11px] text-white/30">
-                {t.status === "in_progress" ? "Running…" : t.status === "todo" ? "Antre…" : t.status === "blocked" ? "Menunggu approval" : t.status === "done" ? "Idle" : t.status}
+                {t.status === "in_progress" ? "Running…" : t.status === "todo" ? "Queued…" : t.status === "blocked" ? "Waiting for approval" : t.status === "done" ? "Idle" : t.status}
               </span>
               {t.reason && t.status !== "done" && (
                 <span className="truncate text-[11px] text-white/25">{t.reason}</span>
@@ -214,7 +214,7 @@ export default function SpaceAgentPanel({
                   disabled={busy === t.id}
                   className="ml-auto shrink-0 rounded-full bg-white/[0.08] px-3 py-1 text-[11px] text-white/75 hover:bg-white/[0.12] disabled:opacity-40"
                 >
-                  {busy === t.id ? "…" : t.status === "failed" ? "Ulangi" : "Jalankan"}
+                  {busy === t.id ? "…" : t.status === "failed" ? "Retry" : "Run"}
                 </button>
               )}
             </div>
@@ -226,13 +226,13 @@ export default function SpaceAgentPanel({
                   icon={<span className="text-[16px] leading-none">⚠</span>}
                   title={
                     <span className="text-[13.5px] font-semibold text-white/90">
-                      {agentDisplayName(t.agentType)} perlu persetujuan
+                      {agentDisplayName(t.agentType)} needs approval
                     </span>
                   }
                   subtitle={
                     <span className="text-[12.5px] text-white/55">
                       {ap.tool}
-                      {ap.risk ? ` · risiko ${ap.risk}` : ""}
+                      {ap.risk ? ` · risk ${ap.risk}` : ""}
                       {finding ? ` — Automated check: ${finding.reasoning}` : ""}
                     </span>
                   }
