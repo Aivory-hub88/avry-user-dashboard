@@ -1005,6 +1005,7 @@ export default function RoadmapPage() {
   const [kpiActuals, setKpiActuals] = useState<Record<string, string>>({});
   // Phase complete state
   const [phaseCompletes, setPhaseCompletes] = useState<Record<string, boolean>>({});
+  const [importing, setImporting] = useState(false);
 
   const { pendingContext, clearPendingContext } = useRouterContext()
   const [routingNotice, setRoutingNotice] = useState<string | null>(null)
@@ -1125,6 +1126,26 @@ export default function RoadmapPage() {
     } finally { setGenerating(false); }
   };
 
+  // Phase 4 killer flow: roadmap ini → project (wave docs + tasks + board penuh).
+  const handleMakeProject = async () => {
+    if (!roadmap || importing) return;
+    setImporting(true); setError(null);
+    try {
+      const { collabAuthHeaders } = await import('@/lib/collabClient');
+      const r = await fetch('/api/workspace/roadmap-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...collabAuthHeaders() },
+        body: JSON.stringify({ roadmap }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.boardUrl) router.push(j.boardUrl);
+      else setError('Import gagal — coba lagi.');
+    } catch {
+      setError('Import gagal — coba lagi.');
+    }
+    setImporting(false);
+  };
+
   const handleNodeClick = useCallback((idx: number) => {
     setActiveIdx(idx);
     if (!roadmap) return;
@@ -1242,6 +1263,9 @@ export default function RoadmapPage() {
               <BtnGhost onClick={handleGenerate} disabled={generating}>
                 {generating ? t("regenerating") : t("regenerateRoadmap")}
               </BtnGhost>
+              <BtnPrimary onClick={handleMakeProject} disabled={importing} loading={importing}>
+                {importing ? "Membuat project…" : "Jadikan Project →"}
+              </BtnPrimary>
             </div>
           )}
         </header>

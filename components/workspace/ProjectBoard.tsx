@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Calendar, Plus, User, X } from "lucide-react"
 import { collabAuthHeaders } from "@/lib/collabClient"
 
@@ -52,6 +53,8 @@ export default function ProjectBoard({
   const [error, setError] = useState<string | null>(null)
   const [movingId, setMovingId] = useState<string | null>(null)
   const [addDoc, setAddDoc] = useState("")
+  const [importing, setImporting] = useState(false)
+  const router = useRouter()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -109,6 +112,42 @@ export default function ProjectBoard({
     await onMembersChange(members.filter((m) => m !== docId))
   }
 
+  // Phase 4 killer flow: roadmap (localStorage aivory_roadmap) → project ini.
+  const importRoadmap = async () => {
+    if (importing) return
+    setImporting(true)
+    setError(null)
+    try {
+      const raw = localStorage.getItem("aivory_roadmap")
+      if (!raw) {
+        setError("Tidak ada roadmap tersimpan — buat dulu di halaman Roadmap.")
+        setImporting(false)
+        return
+      }
+      const roadmap = JSON.parse(raw) as { phases?: unknown[] }
+      if (!roadmap || !Array.isArray(roadmap.phases)) {
+        setError("Roadmap tersimpan rusak — generate ulang di halaman Roadmap.")
+        setImporting(false)
+        return
+      }
+      const r = await fetch("/api/workspace/roadmap-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+        body: JSON.stringify({ roadmap, projectId }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        setError("Import gagal — coba lagi.")
+      } else if (j.boardUrl) {
+        router.push(j.boardUrl as string)
+        await load()
+      }
+    } catch {
+      setError("Could not connect to your workspace. Please try again.")
+    }
+    setImporting(false)
+  }
+
   const allRows = (data?.docs ?? []).flatMap((d) => d.rows)
 
   return (
@@ -132,7 +171,7 @@ export default function ProjectBoard({
           ))}
         </div>
         {canWrite && (
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <input
               value={addDoc}
               onChange={(e) => setAddDoc(e.target.value)}
@@ -142,6 +181,14 @@ export default function ProjectBoard({
             />
             <button onClick={addMember} className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-[12px] font-medium text-black hover:bg-white/90">
               <Plus className="h-3.5 w-3.5" /> Add doc
+            </button>
+            <button
+              onClick={importRoadmap}
+              disabled={importing}
+              title="Import roadmap tersimpan jadi wave docs + tasks"
+              className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/20 px-3 py-1.5 text-[12px] font-medium text-violet-200 hover:bg-violet-500/30 disabled:opacity-50"
+            >
+              {importing ? "Importing…" : "Import dari Roadmap →"}
             </button>
           </div>
         )}
