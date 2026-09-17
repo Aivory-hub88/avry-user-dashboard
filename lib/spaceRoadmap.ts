@@ -25,7 +25,7 @@ export const RoadmapPhaseSchema = z.object({
   name: z.string().min(1),
   timeframe: z.string().optional().default(""),
   description: z.string().optional().default(""),
-  milestones: z.array(RoadmapMilestoneSchema).default([]),
+  milestones: z.array(RoadmapMilestoneSchema).max(200).default([]),
 });
 
 export const RoadmapImportSchema = z.object({

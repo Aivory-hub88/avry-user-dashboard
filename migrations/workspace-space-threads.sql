@@ -76,11 +76,13 @@ CREATE INDEX IF NOT EXISTS idx_workspace_messages_mentions
   ON dashboard.workspace_messages USING GIN (mentions);
 
 -- Read marks: watermark monotone per (space, member, thread?).
--- Broadcast ephemeral ke device lain; naik saja, tidak pernah turun.
+-- thread_root = '' berarti level-Space (kolom NOT NULL agar PK valid —
+-- Postgres tidak mengizinkan NULL di PRIMARY KEY). Broadcast ephemeral ke
+-- device lain; naik saja (updated_at = now()), tidak pernah turun.
 CREATE TABLE IF NOT EXISTS dashboard.workspace_read_marks (
   space_id TEXT NOT NULL,
   member TEXT NOT NULL,
-  thread_root TEXT,
+  thread_root TEXT NOT NULL DEFAULT '',
   offset_msg TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (space_id, member, thread_root)
