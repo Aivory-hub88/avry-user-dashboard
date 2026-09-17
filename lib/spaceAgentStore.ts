@@ -58,7 +58,7 @@ export async function enqueueAgentTasks(input: EnqueueInput): Promise<SpaceAgent
         triggerMsg,
         agentType,
         instruction,
-        `mention di thread oleh ${createdBy}`,
+        `mentioned in thread by ${createdBy}`,
         createdBy,
       ],
     );

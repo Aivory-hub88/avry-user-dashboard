@@ -319,7 +319,7 @@ export async function POST(req: NextRequest) {
       credential,
       agentType: "system",
       action: "roadmap.imported",
-      summary: `Roadmap "${roadmap.title}" → ${docs.filter((d) => d.status === "created").length} docs baru, ${rowsAdded} tasks`,
+      summary: `Roadmap "${roadmap.title}" → ${docs.filter((d) => d.status === "created").length} new docs, ${rowsAdded} tasks`,
       metadata: { roadmap_id: roadmap.id, rowsAdded, rowsUpdated, conflicts: conflicts.length },
     }).catch(() => {})
 

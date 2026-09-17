@@ -75,14 +75,14 @@ export async function PATCH(
     if (!task) return NextResponse.json({ error: "not found" }, { status: 404 })
     if (task.status === "done" || task.status === "cancelled")
       return NextResponse.json({ error: `task ${task.status}` }, { status: 409 })
-    await setAgentTask(taskId, "cancelled", "dibatalkan manusia")
+    await setAgentTask(taskId, "cancelled", "cancelled by human")
     const who = credential.kind === "user" ? (credential.user.email ?? credential.user.user_id) : "service"
     await recordWorkspaceActivity({
       docId: id,
       credential,
       agentType: task.agentType,
       action: "agent.cancelled",
-      summary: `${who} membatalkan tugas ${agentDisplayName(task.agentType)}`,
+      summary: `${who} cancelled ${agentDisplayName(task.agentType)}'s task`,
     }).catch(() => {})
     return NextResponse.json({ task: await loadAgentTask(id, taskId) })
   } catch (error) {
