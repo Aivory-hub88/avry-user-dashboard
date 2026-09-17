@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Bell } from "lucide-react"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { NotificationCard } from "@/components/office/NotificationCard"
+import { KIND_META, POLL_MS, type ActivityKind } from "@/lib/spaceUi"
 
 type SpaceItem = {
   kind: "mention" | "here" | "reply"
@@ -66,7 +67,7 @@ export default function WorkspaceBell() {
     void refresh(false)
     const t = setInterval(() => {
       if (!document.hidden) void refresh(open)
-    }, 60000)
+    }, POLL_MS.bell)
     return () => clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh])
@@ -117,12 +118,6 @@ export default function WorkspaceBell() {
     router.push(`/workspace/${s.spaceId}?view=discussion&thread=${s.threadRoot}`)
   }
 
-  const KIND_BADGE: Record<SpaceItem["kind"], string> = {
-    mention: "Mention",
-    here: "Here",
-    reply: "Reply",
-  }
-
   const hasContent = items.length > 0 || spaceItems.length > 0
 
   return (
@@ -156,11 +151,13 @@ export default function WorkspaceBell() {
             <div className="py-6 text-center text-[12px] text-white/30">You&apos;re all caught up.</div>
           ) : (
             <div className="flex max-h-[320px] flex-col gap-1.5 overflow-y-auto">
-              {spaceItems.map((s) => (
-                <NotificationCard
-                  key={`space-${s.messageId}`}
-                  tone="info"
-                  badge={KIND_BADGE[s.kind]}
+              {spaceItems.map((s) => {
+                const meta = KIND_META[s.kind as ActivityKind]
+                return (
+                  <NotificationCard
+                    key={`space-${s.messageId}`}
+                    tone={meta.tone}
+                    badge={meta.badge}
                   icon={<span className="text-[14px] leading-none">@</span>}
                   title={
                     <span className="text-[13.5px] font-semibold text-white">
@@ -175,7 +172,8 @@ export default function WorkspaceBell() {
                   meta={s.createdAt}
                   onClick={() => openSpaceItem(s)}
                 />
-              ))}
+                )
+              })}
               {items.map((m) => (
                 <button
                   key={m.id}

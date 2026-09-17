@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { agentDisplayName, type SpaceAgentTask } from "@/lib/spaceAgent"
+import { POLL_MS, APPROVE_CLASS } from "@/lib/spaceUi"
 import { NotificationCard } from "@/components/office/NotificationCard"
 import {
   listPendingApprovals,
@@ -127,7 +128,7 @@ export default function SpaceAgentPanel({
 
   useEffect(() => {
     void load()
-    const timer = setInterval(() => void load(), 5000)
+    const timer = setInterval(() => void load(), POLL_MS.agentPanel)
     return () => clearInterval(timer)
   }, [load])
 
@@ -243,7 +244,7 @@ export default function SpaceAgentPanel({
                         <button
                           onClick={() => void decide(t, ap.id, "approve")}
                           disabled={busy === t.id}
-                          className="rounded-full bg-[#b7cba6] px-4 py-1.5 text-[12px] font-semibold text-[#1a1a18] hover:brightness-105 disabled:opacity-50"
+                          className={APPROVE_CLASS}
                         >
                           Approve
                         </button>
