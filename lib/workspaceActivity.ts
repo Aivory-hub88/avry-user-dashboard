@@ -1,4 +1,5 @@
 import { query } from "@/lib/db"
+import { recordWorkspaceEvent } from "@/lib/workspaceEvents"
 import type { WorkspaceCredential } from "@/lib/workspaceAuth"
 
 type ActivityInput = {
@@ -41,6 +42,23 @@ export async function recordWorkspaceActivity({
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)`,
       [workspaceId, docId, actorType, actorId, actorName, action, targetType ?? null, targetId ?? null, summary, status, JSON.stringify(metadata)],
     )
+    // Dual-write to the Buzz-style kind log (kind = action verbatim so no
+    // mapping can drift). Fire-and-forget like the activity insert above.
+    await recordWorkspaceEvent({
+      kind: action,
+      workspaceId,
+      docId,
+      actorType: actorType as "user" | "agent" | "system",
+      actorId,
+      actorName,
+      payload: {
+        summary,
+        status,
+        target_type: targetType ?? null,
+        target_id: targetId ?? null,
+        metadata,
+      },
+    })
   } catch (error) {
     console.error("[workspace activity]", error)
   }

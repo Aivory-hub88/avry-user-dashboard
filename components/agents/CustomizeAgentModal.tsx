@@ -115,9 +115,27 @@ const TOOLKIT_LABELS: Record<string, string> = {
   asana: 'Asana',
   erpnext: 'ERPNext',
   gmail: 'Gmail',
+  outlook: 'Outlook',
   googlecalendar: 'Google Calendar',
   trello: 'Trello',
   linear: 'Linear',
+  smartlead: 'Smartlead',
+  prospeo: 'Prospeo',
+  millionverifier: 'MillionVerifier',
+  emaillistverify: 'EmailListVerify',
+};
+
+const TOOLKIT_ICONS: Record<string, string> = {
+  zendesk: '/integrations/zendesk.svg',
+  hubspot: '/integrations/hubspot.svg',
+  slack: '/integrations/slack.svg',
+  asana: '/integrations/asana.svg',
+  erpnext: '/integrations/erpnext.svg',
+  gmail: '/integrations/gmail.svg',
+  outlook: '/integrations/outlook.svg',
+  googlecalendar: '/integrations/icons/google-calendar.svg',
+  trello: '/integrations/trello.svg',
+  linear: '/integrations/linear.svg',
 };
 
 const CONNECTION_STATUS_STYLES: Record<ConnectedApp['status'], { label: string; className: string }> = {
@@ -340,11 +358,15 @@ export default function CustomizeAgentModal({
   // scheme, so the Connections tab renders an inline credential form and
   // submits it to /api/integrations/apikey/connect instead.
   const [apiKeyFormOpen, setApiKeyFormOpen] = useState(false);
+  const [apiKeyFormSlug, setApiKeyFormSlug] = useState<string | null>(null);
   const [apiKeyBusy, setApiKeyBusy] = useState(false);
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
   const [erpnextBaseUrl, setErpNextBaseUrl] = useState('');
   const [erpnextApiKey, setErpNextApiKey] = useState('');
   const [erpnextApiSecret, setErpNextApiSecret] = useState('');
+  // Tier-2 Lex outbound (docs/CERVEAU-TIER2-BYO-PLAN.md): single API key
+  // per provider, same Composio custom-auth shape as ERPNext.
+  const [tier2ApiKey, setTier2ApiKey] = useState('');
 
   const handleErpNextConnect = async () => {
     if (apiKeyBusy) return;
@@ -364,6 +386,29 @@ export default function CustomizeAgentModal({
       setErpNextApiKey('');
       setErpNextApiSecret('');
       setApiKeyFormOpen(false);
+      setApiKeyFormSlug(null);
+      setConnectFeedback({ type: 'success', message: t('erpnextConnected') });
+      refetchConnections();
+    } catch (e: unknown) {
+      setApiKeyError(e instanceof Error ? e.message : t('erpnextConnectFailed'));
+    } finally {
+      setApiKeyBusy(false);
+    }
+  };
+
+  const handleTier2Connect = async (slug: string) => {
+    if (apiKeyBusy) return;
+    setApiKeyError(null);
+    if (!tier2ApiKey.trim()) {
+      setApiKeyError(t('erpnextRequired'));
+      return;
+    }
+    setApiKeyBusy(true);
+    try {
+      await startApiKeyConnect(slug, { generic_api_key: tier2ApiKey.trim() });
+      setTier2ApiKey('');
+      setApiKeyFormOpen(false);
+      setApiKeyFormSlug(null);
       setConnectFeedback({ type: 'success', message: t('erpnextConnected') });
       refetchConnections();
     } catch (e: unknown) {
@@ -1127,18 +1172,30 @@ export default function CustomizeAgentModal({
                   </div>
                 )}
                 {Object.entries(toolScope?.tools ?? {}).map(([slug, enabled]) => {
-                  const conn = (connections || []).find((c) => c.appId === slug && c.status === 'connected');
-                  const style = CONNECTION_STATUS_STYLES[conn ? 'connected' : 'revoked'];
+                  const conn = (connections || []).find((c) => c.appId === slug);
+                  const connected = conn?.status === 'connected';
+                  const style = CONNECTION_STATUS_STYLES[conn?.status ?? 'revoked'];
                   const busy = connectBusyId === slug || savingToolkit === slug;
-                  const isApiKey = slug === 'erpnext';
+                  const isApiKey = slug === 'erpnext' || slug === 'smartlead' || slug === 'prospeo' || slug === 'millionverifier' || slug === 'emaillistverify';
+                  const isTier2 = slug === 'smartlead' || slug === 'prospeo' || slug === 'millionverifier' || slug === 'emaillistverify';
+                  const formOpenForRow = isApiKey && apiKeyFormOpen && apiKeyFormSlug === slug;
                   const app = connectableApps.find((a) => a.id === slug);
+                  const iconPath = app?.iconPath || TOOLKIT_ICONS[slug];
+                  const label = TOOLKIT_LABELS[slug] || slug;
                   return (
                     <div key={slug} className="px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                       <div className="flex items-center justify-between gap-3">
                         <span className="flex items-center gap-2.5 text-white/80 text-[13px]">
-                          {TOOLKIT_LABELS[slug] || slug}
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06]">
+                            {iconPath ? (
+                              <Image src={asset(iconPath)} alt="" width={18} height={18} className="object-contain" />
+                            ) : (
+                              <span className="text-[11px] font-semibold text-white/60">{label.slice(0, 1)}</span>
+                            )}
+                          </span>
+                          <span>{label}</span>
                           <span className={`px-2 py-[2px] rounded-full border text-[10.5px] font-medium ${style.className}`}>
-                            {conn ? t('connected') : t('notConnected')}
+                            {connected ? t('connected') : t('notConnected')}
                           </span>
                         </span>
                         <span className="flex items-center gap-2 shrink-0">
@@ -1147,24 +1204,30 @@ export default function CustomizeAgentModal({
                               type="button"
                               disabled={busy}
                               onClick={() => {
-                                if (app) handleConnect(app);
+                                if (conn?.status === 'needs_reauth') handleReconnect(conn);
+                                else if (app) handleConnect(app);
                                 else setConnectFeedback({ type: 'error', message: t('connectStartError', { toolkit: TOOLKIT_LABELS[slug] || slug }) });
                               }}
                               className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/25 text-[var(--color-accent-text)] hover:bg-accent/25 text-[11px] font-medium disabled:opacity-40 transition-colors"
                             >
-                              {busy ? '…' : t('connect')}
+                              {busy ? '…' : conn?.status === 'needs_reauth' ? t('reconnect') : t('connect')}
                             </button>
                           )}
                           {isApiKey && (
                             <button
                               type="button"
-                              onClick={() => { setApiKeyFormOpen((v) => !v); setApiKeyError(null); }}
+                              onClick={() => {
+                                const next = !(apiKeyFormOpen && apiKeyFormSlug === slug);
+                                setApiKeyFormOpen(next);
+                                setApiKeyFormSlug(next ? slug : null);
+                                setApiKeyError(null);
+                              }}
                               className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/25 text-[var(--color-accent-text)] hover:bg-accent/25 text-[11px] font-medium transition-colors"
                             >
-                              {apiKeyFormOpen ? t('close') : t('connect')}
+                              {formOpenForRow ? t('close') : t('connect')}
                             </button>
                           )}
-                          {conn && (
+                          {connected && conn && (
                             <button
                               type="button"
                               disabled={connectBusyId === slug}
@@ -1178,8 +1241,8 @@ export default function CustomizeAgentModal({
                             type="button"
                             role="switch"
                             aria-checked={enabled}
-                            disabled={!conn || savingToolkit === slug}
-                            title={conn ? undefined : t('connectFirst')}
+                            disabled={!connected || savingToolkit === slug}
+                            title={connected ? undefined : t('connectFirst')}
                             onClick={() => toggleToolkit(slug, !enabled)}
                             className={`relative w-10 h-[22px] rounded-full transition-colors disabled:opacity-30 ${
                               enabled ? 'bg-accent/70' : 'bg-white/10'
@@ -1193,7 +1256,7 @@ export default function CustomizeAgentModal({
                           </button>
                         </span>
                       </div>
-                      {isApiKey && apiKeyFormOpen && (
+                      {isApiKey && formOpenForRow && !isTier2 && (
                         <div className="mt-3 space-y-2">
                           <p className="text-white/40 text-[11.5px] leading-relaxed">
                             {t('erpnextInstructions')}
@@ -1226,6 +1289,31 @@ export default function CustomizeAgentModal({
                             type="button"
                             disabled={apiKeyBusy}
                             onClick={handleErpNextConnect}
+                            className="w-full px-3 py-2 rounded-lg bg-accent/15 border border-accent/25 text-[var(--color-accent-text)] hover:bg-accent/25 text-[12px] font-medium disabled:opacity-40 transition-colors"
+                          >
+                            {apiKeyBusy ? t('connecting') : t('saveAndConnect')}
+                          </button>
+                        </div>
+                      )}
+                      {isApiKey && formOpenForRow && isTier2 && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-white/40 text-[11.5px] leading-relaxed">
+                            {t('erpnextInstructions')}
+                          </p>
+                          <input
+                            type="password"
+                            value={tier2ApiKey}
+                            onChange={(e) => setTier2ApiKey(e.target.value)}
+                            placeholder={t('apiKeyPlaceholder')}
+                            className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 text-white text-[12.5px] placeholder:text-white/25 focus:outline-none focus:border-accent/50"
+                          />
+                          {apiKeyError && (
+                            <p className="text-red-300/80 text-[11.5px]">{apiKeyError}</p>
+                          )}
+                          <button
+                            type="button"
+                            disabled={apiKeyBusy}
+                            onClick={() => handleTier2Connect(slug)}
                             className="w-full px-3 py-2 rounded-lg bg-accent/15 border border-accent/25 text-[var(--color-accent-text)] hover:bg-accent/25 text-[12px] font-medium disabled:opacity-40 transition-colors"
                           >
                             {apiKeyBusy ? t('connecting') : t('saveAndConnect')}

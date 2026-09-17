@@ -120,7 +120,8 @@ function isLocalHost(host: string | null | undefined): boolean {
  * Precedence:
  *   1. Trimmed `NEXT_PUBLIC_DASHBOARD_URL` when non-empty after trimming.
  *   2. `http://localhost:3000` when the host is `localhost` / `127.0.0.1`.
- *   3. `https://dashboard.aivory.id` otherwise.
+ *   3. `https://aivory.id/dashboard` otherwise (canonical live serves
+ *      `https://aivory.uk/dashboard`; the legacy `.id` 308s there path-preserving).
  *
  * The result is byte-for-byte identical for identical inputs (Req 4.4).
  */

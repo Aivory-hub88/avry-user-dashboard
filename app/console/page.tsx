@@ -22,7 +22,7 @@ import { useNotificationFeed } from "@/hooks/useNotificationFeed"
 import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { useActiveRuns } from "@/hooks/useActiveRuns"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
-import { getMentionCandidates, parseAgentMentions, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
+import { getMentionCandidates, parseAgentMentions, resolveNamedAgents, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import type { Attachment } from "@/components/UploadMenu"
@@ -123,7 +123,7 @@ function RoomMembers({ candidates }: { candidates: MentionCandidate[] }) {
         ))}
       </span>
       <span>
-        Room · {candidates.map((c) => c.name).join(", ")} · type @ to mention
+        Room · {candidates.map((c) => c.name).join(", ")} · type @ or a name to mention
       </span>
     </div>
   )
@@ -360,6 +360,14 @@ export default function ConsolePage() {
         if (mentioned.length > 0) {
           saveRoomSticky(mentioned)
           await handleSendRoom(text, atts, mentioned)
+        } else if (resolveNamedAgents(text, mentionCandidates).length > 0) {
+          // Name-called ("panggilkan Lex", "tanya Teo"): same mention
+          // semantics as @ — the named agent answers in its own bubble via
+          // handleSendRoom, instead of the fallback agent delegating behind
+          // the scenes and narrating the result.
+          const named = resolveNamedAgents(text, mentionCandidates)
+          saveRoomSticky(named)
+          await handleSendRoom(text, atts, named)
         } else {
           // No @mention: continue with whoever holds the floor in this
           // thread (e.g. answering Lex's questions goes back to Lex), else

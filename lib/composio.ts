@@ -71,7 +71,7 @@ export function isComposioConfigError(err: unknown): boolean {
 export function getComposioRedirectUrl(): string {
   return (
     process.env.COMPOSIO_REDIRECT_URL ||
-    `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/integrations/callback`
+    `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/integrations/callback`
   )
 }
 

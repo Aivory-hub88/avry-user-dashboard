@@ -14,6 +14,10 @@ type SearchHit = { kind: "doc" | "row"; doc_id: string; doc_title: string; row_i
 export default function WorkspacePage() {
   const [docs, setDocs] = useState<DocItem[]>([])
   const [trashDocs, setTrashDocs] = useState<DocItem[]>([])
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [trashNextCursor, setTrashNextCursor] = useState<string | null>(null)
+  const [trashLoadingMore, setTrashLoadingMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [title, setTitle] = useState('')
@@ -68,6 +72,7 @@ export default function WorkspacePage() {
       if (r.ok) {
         const j = await r.json()
         setDocs(j.docs ?? [])
+        setNextCursor(j.nextCursor ?? null)
         setAuthRequired(false)
       } else if (r.status === 401) {
         clearClientAuthSession()
@@ -78,6 +83,23 @@ export default function WorkspacePage() {
     setLoading(false)
   }
 
+  // Pages beyond the first page's worth (default 100) used to just vanish
+  // with no signal anything was truncated — this keeps fetching in explicit,
+  // user-driven pages instead of silently hiding older docs.
+  const loadMore = async () => {
+    if (!nextCursor || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const r = await fetch(`/api/workspace?cursor=${encodeURIComponent(nextCursor)}`, { headers: collabAuthHeaders() })
+      if (r.ok) {
+        const j = await r.json()
+        setDocs((prev) => [...prev, ...(j.docs ?? [])])
+        setNextCursor(j.nextCursor ?? null)
+      }
+    } catch {}
+    setLoadingMore(false)
+  }
+
   const loadTrash = async () => {
     setTrashLoading(true)
     try {
@@ -85,9 +107,24 @@ export default function WorkspacePage() {
       if (r.ok) {
         const j = await r.json()
         setTrashDocs(j.docs ?? [])
+        setTrashNextCursor(j.nextCursor ?? null)
       }
     } catch {}
     setTrashLoading(false)
+  }
+
+  const loadMoreTrash = async () => {
+    if (!trashNextCursor || trashLoadingMore) return
+    setTrashLoadingMore(true)
+    try {
+      const r = await fetch(`/api/workspace?trash=1&cursor=${encodeURIComponent(trashNextCursor)}`, { headers: collabAuthHeaders() })
+      if (r.ok) {
+        const j = await r.json()
+        setTrashDocs((prev) => [...prev, ...(j.docs ?? [])])
+        setTrashNextCursor(j.nextCursor ?? null)
+      }
+    } catch {}
+    setTrashLoadingMore(false)
   }
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load() }, [])
@@ -323,6 +360,17 @@ export default function WorkspacePage() {
               ))}
             </div>
           )}
+          {!loading && !q.trim() && nextCursor && (
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="rounded-full border border-line bg-white/[0.04] px-4 py-1.5 text-[12px] font-medium text-white/70 hover:bg-white/[0.08] hover:text-white disabled:opacity-50"
+              >
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </button>
+            </div>
+          )}
         </div>
         ) : (
         <div className="rounded-[16px] border border-line bg-white/[0.03] p-6">
@@ -346,6 +394,17 @@ export default function WorkspacePage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          {!trashLoading && trashNextCursor && (
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={loadMoreTrash}
+                disabled={trashLoadingMore}
+                className="rounded-full border border-line bg-white/[0.04] px-4 py-1.5 text-[12px] font-medium text-white/70 hover:bg-white/[0.08] hover:text-white disabled:opacity-50"
+              >
+                {trashLoadingMore ? 'Loading…' : 'Load more'}
+              </button>
             </div>
           )}
         </div>

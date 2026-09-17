@@ -180,13 +180,34 @@ export async function loadDbDoc(
  * must NOT leak into pg), then pg upsert of the merged state.
  */
 export async function saveDbDoc(id: string, doc: Y.Doc, cred: WorkspaceCredential, agentType = "user"): Promise<void> {
-  const upd = Buffer.from(Y.encodeStateAsUpdate(doc))
   const res = await collabFetch(id, cred, agentType, {
     method: "PUT",
     headers: { "Content-Type": "application/octet-stream" },
-    body: upd as unknown as BodyInit,
+    body: Buffer.from(Y.encodeStateAsUpdate(doc)) as unknown as BodyInit,
   })
   if (res && (res.status === 401 || res.status === 403)) throw new WorkspaceDenied(res.status)
+
+  // Merge whatever is currently in pg into `doc` before overwriting it.
+  // collab's PUT above is the authoritative write when it succeeds, but this
+  // upsert also runs unconditionally when collab is unreachable or its PUT
+  // failed for a non-auth reason (network error, timeout, 5xx) — in that
+  // window this is a plain pg write with no CRDT authority behind it, and a
+  // blind overwrite lets two concurrent writers stomp each other (last one
+  // wins) instead of converging like Yjs is supposed to guarantee. Applying
+  // the current pg state first makes the write a merge, same as loadDbDoc.
+  const canonical = canonicalRoomId(id)
+  const legacy = legacyDocId(id)
+  const existing = await query("SELECT id, yjs_update FROM dashboard.workspace_docs WHERE id = $1 OR id = $2", [
+    canonical,
+    legacy,
+  ])
+  if (existing.rows.length > 0) {
+    const byId = new Map<string, Buffer>(existing.rows.map((row) => [row.id as string, row.yjs_update as Buffer]))
+    const merged = mergeYjsUpdates([byId.get(canonical) ?? null, byId.get(legacy) ?? null])
+    if (merged) Y.applyUpdate(doc, new Uint8Array(merged))
+  }
+  const upd = Buffer.from(Y.encodeStateAsUpdate(doc))
+
   await query(
     `INSERT INTO dashboard.workspace_docs (id, yjs_update, updated_at)
      VALUES ($1, $2, now())
@@ -247,19 +268,21 @@ export async function withResolvedRollups(
     if (rel?.targetDocId) needTargets.add(rel.targetDocId)
   }
   if (needTargets.size === 0 || rows.length === 0) return rows
-  const cache = new Map<string, DbRow[] | null>()
-  for (const t of needTargets) {
-    if (!(await canReadDocId(cred, t, agentType))) {
-      cache.set(t, null)
-      continue
-    }
-    try {
-      const doc = await loadDbDoc(t, cred, agentType, allowPgFallback)
-      cache.set(t, rowsFromDbDoc(doc))
-    } catch {
-      cache.set(t, null)
-    }
-  }
+  // Fan out target-doc loads concurrently instead of one at a time — each
+  // loadDbDoc can itself take up to 2s on a collab timeout, so N rollup
+  // targets used to multiply straight into this request's latency.
+  const entries = await Promise.all(
+    Array.from(needTargets).map(async (t): Promise<[string, DbRow[] | null]> => {
+      if (!(await canReadDocId(cred, t, agentType))) return [t, null]
+      try {
+        const doc = await loadDbDoc(t, cred, agentType, allowPgFallback)
+        return [t, rowsFromDbDoc(doc)]
+      } catch {
+        return [t, null]
+      }
+    }),
+  )
+  const cache = new Map<string, DbRow[] | null>(entries)
   const computed = computeRollups(rows, defs, (docId) => cache.get(docId) ?? null)
   if (Object.keys(computed).length === 0) return rows
   // Nulls (unreadable links) are omitted from cells — renderers show empty.
