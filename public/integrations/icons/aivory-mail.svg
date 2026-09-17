@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 512 512">
+  <!-- Generator: Adobe Illustrator 30.6.0, SVG Export Plug-In . SVG Version: 2.1.4 Build 109)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: none;
+      }
+
+      .st1 {
+        fill: #ff6d00;
+      }
+
+      .st2 {
+        fill: #d80000;
+      }
+
+      .st3 {
+        clip-path: url(#clippath-1);
+      }
+
+      .st4 {
+        clip-path: url(#clippath-2);
+      }
+
+      .st5 {
+        fill: #fff;
+      }
+
+      .st6 {
+        fill: #f7c34d;
+      }
+
+      .st7 {
+        fill: #d3d3d3;
+      }
+
+      .st8 {
+        clip-path: url(#clippath);
+      }
+
+      .st9 {
+        fill: #665e5b;
+      }
+    </style>
+    <clipPath id="clippath">
+      <path class="st0" d="M11.3,180.7l245,149.4,245-149.4s3.3-49.1-43.2-51.1H53.8s-43.8,0-43.2,51.1h.7Z"/>
+    </clipPath>
+    <clipPath id="clippath-1">
+      <path class="st0" d="M272.2,8c-11.3-7.3-25.9-7.3-37.9,0L33.8,130.2c-29.9,17.9-19.3,64.4,15.9,67.1,35.2,2.7,0,0,1.3,0h404.4s24.6,0,36.5-21.9c12-21.9,2-31.9-12-40.5L271.6,8h.7Z"/>
+    </clipPath>
+    <clipPath id="clippath-2">
+      <path class="st0" d="M392.4,325.4c-43.8,0-55.1,6.6-72.4,35.2l-51.1,84.3c-2,3.3-4,6.6-6,10h28.6c19.3-17.3,27.2-23.9,47.1-34.5l78.4-43.8v79h25.9v-130.2s-50.5,0-50.5,0ZM344,397.2c-8,2-15.3,4.6-22.6,7.3l14.6-24.6c23.2-37.9,32.5-31.9,81-31.9v28.6l-73,21.3v-.7Z"/>
+    </clipPath>
+  </defs>
+  <g class="st8">
+    <g>
+      <rect class="st6" x="11.3" y="67.1" width="164" height="342.7"/>
+      <rect class="st1" x="175.3" y="67.1" width="164" height="342.7"/>
+      <rect class="st2" x="340" y="67.1" width="164" height="342.7"/>
+    </g>
+  </g>
+  <g class="st3">
+    <g>
+      <polygon class="st6" points="175.3 262.4 8.6 262.4 8.6 -86.3 175.3 -86.3 175.3 146.1 175.3 262.4"/>
+      <rect class="st1" x="176" y="-86.3" width="166.7" height="348.6"/>
+      <rect class="st2" x="339.3" y="-86.3" width="174" height="348.6"/>
+    </g>
+  </g>
+  <path class="st9" d="M257,329.4l243.7,146.8s-12,33.2-47.1,33.2H60.4s-45.8,4-49.8-43.2V180l246.4,150.1h0v-.7Z"/>
+  <path d="M254.3,329.4L10.6,476.2s12,33.2,47.1,33.2h393.1s45.8,4,49.8-43.2V180l-246.4,150.1h0v-.7Z"/>
+  <g>
+    <path class="st5" d="M392.4,325.4c-43.8,0-55.1,6.6-72.4,35.2l-51.1,84.3c-2,3.3-4,6.6-6,10h28.6c19.3-17.3,27.2-23.9,47.1-34.5l78.4-43.8v79h25.9v-130.2s-50.5,0-50.5,0ZM344,397.2c-8,2-15.3,4.6-22.6,7.3l14.6-24.6c23.2-37.9,32.5-31.9,81-31.9v28.6l-73,21.3h0v-.7Z"/>
+    <g class="st4">
+      <polygon class="st7" points="448.2 620.3 247 620.3 249.7 424.4 450.2 365.3 448.2 620.3"/>
+    </g>
+  </g>
+</svg>
