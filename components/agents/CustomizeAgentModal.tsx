@@ -1485,7 +1485,7 @@ export default function CustomizeAgentModal({
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-left transition-colors"
                     >
-                      <Image src={asset('/Aivory_icon_2026.svg')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
+                      <Image src={asset('/integrations/icons/aivory-mail.svg')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
                       <div className="min-w-0">
                         <div className="text-white/85 text-[13px] font-medium">{t('mcpTemplateMailName')}</div>
                         <div className="text-white/40 text-[11.5px] truncate">{t('mcpTemplateMailDesc')}</div>
@@ -1569,7 +1569,7 @@ export default function CustomizeAgentModal({
                       <>
                         {mcpTemplate === 'aivory-mail' && (
                           <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                            <Image src={asset('/Aivory_icon_2026.svg')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
+                            <Image src={asset('/integrations/icons/aivory-mail.svg')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
                             <div className="min-w-0">
                               <div className="text-white/85 text-[13px] font-medium">{t('mcpTemplateMailName')}</div>
                               <div className="text-white/40 text-[11.5px] leading-relaxed">{t('mcpMailSetupNote')}</div>
