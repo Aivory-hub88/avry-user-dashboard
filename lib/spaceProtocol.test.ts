@@ -92,16 +92,34 @@ describe("spaceProtocol code-block = kutipan", () => {
   });
 });
 
-describe("spaceProtocol bare-word = prose", () => {
-  it("@Geno tanpa link mencapai NOL orang", () => {
-    expect(parseSpaceMentions("@Geno cek queue").agentTypes).toEqual([]);
+describe("spaceProtocol plain names (Room-aligned)", () => {
+  it("@Geno diketik manual ikut men-stamp (case-insensitive)", () => {
+    expect(parseSpaceMentions("@Geno cek queue").agentTypes).toEqual(["autonomous"]);
+    expect(parseSpaceMentions("Hey @TEO!").agentTypes).toEqual(["customer_service"]);
+    expect(parseSpaceMentions("@customer_service hi").agentTypes).toEqual(["customer_service"]);
+  });
+
+  it("@here/@all/@everyone/@team = broadcast", () => {
+    expect(parseSpaceMentions("@here semua").here).toBe(true);
+    expect(parseSpaceMentions("@all status?").here).toBe(true);
+  });
+
+  it("kata biasa + email tetap prose", () => {
+    expect(parseSpaceMentions("@someone hi").agentTypes).toEqual([]);
     expect(parseSpaceMentions("email a@b.com halo").tokens).toEqual([]);
     expect(parseSpaceMentions("").agentTypes).toEqual([]);
     expect(parseSpaceMentions(undefined).here).toBe(false);
   });
 
-  it("@here tanpa link bukan broadcast", () => {
-    expect(parseSpaceMentions("@here semua").here).toBe(false);
+  it("label token tidak bocor ke pindai polos", () => {
+    // Label @Finn + id autonomous → hanya autonomous (bukan finn).
+    const p = parseSpaceMentions("[@Finn](#agent:autonomous) cek");
+    expect(p.agentTypes).toEqual(["autonomous"]);
+  });
+
+  it("token + nama polos agent sama ter-dedupe", () => {
+    const p = parseSpaceMentions("[@Geno](#agent:autonomous) dan @Geno lagi");
+    expect(p.agentTypes).toEqual(["autonomous"]);
   });
 });
 

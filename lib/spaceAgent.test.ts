@@ -7,7 +7,7 @@ const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }))
 
 vi.mock("@/lib/db", () => ({ query: queryMock }))
 
-import { stripInstruction, spaceAgentTaskFromRow } from "@/lib/spaceAgent"
+import { stripInstruction, spaceAgentTaskFromRow, buildSpacePayload } from "@/lib/spaceAgent"
 import { enqueueAgentTasks } from "@/lib/spaceAgentStore"
 
 beforeEach(() => {
@@ -98,5 +98,29 @@ describe("enqueueAgentTasks", () => {
 
   it("drops corrupt rows instead of throwing", () => {
     expect(spaceAgentTaskFromRow({ id: 1 } as unknown as Record<string, unknown>)).toBeNull()
+  })
+})
+
+describe("buildSpacePayload", () => {
+  it("carries who, transcript, and instruction", () => {
+    const p = buildSpacePayload({
+      me: "Geno",
+      peers: ["Teo"],
+      instruction: "Tolong @Geno cek",
+      history: [
+        { author: "Sarah", text: "launch cut Jumat?" },
+        { author: "Geno", text: "Siap" },
+      ],
+    })
+    expect(p).toContain("You are Geno")
+    expect(p).toContain("Teo")
+    expect(p).toContain("<thread_history>\nSarah: launch cut Jumat?")
+    expect(p).toContain("<instruction>\nTolong @Geno cek\n</instruction>")
+  })
+
+  it("omits empty history and handles solo runs", () => {
+    const p = buildSpacePayload({ me: "Finn", peers: [], instruction: "cek", history: [] })
+    expect(p).toContain("only agent mentioned")
+    expect(p).not.toContain("<thread_history>")
   })
 })

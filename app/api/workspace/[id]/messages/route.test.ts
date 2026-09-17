@@ -86,16 +86,16 @@ describe("POST /api/workspace/[id]/messages", () => {
     expect(insertCall).toBeDefined()
   })
 
-  it("stamps token links but ignores code blocks + bare words", async () => {
+  it("stamps tokens + plain names, ignores code blocks", async () => {
     const body =
-      "Tolong [@Geno](#agent:autonomous) cek, `@Aira` kutipan, dan @Finn prose\n```\n[@Teo](#agent:customer_service)\n```"
+      "Tolong [@Geno](#agent:autonomous) cek, `@Aira` kutipan, dan @Finn bantu\n```\n[@Teo](#agent:customer_service)\n```"
     const res = await POST(post({ body }), { params: Promise.resolve({ id: "space-1" }) })
     expect(res.status).toBe(201)
     const insertCall = queryMock.mock.calls.find((c) =>
       String(c[0]).includes("INSERT INTO dashboard.workspace_messages"),
     )
     const params = insertCall![1] as unknown[]
-    expect(params[8]).toEqual(["autonomous"]) // mentions
+    expect(params[8]).toEqual(["autonomous", "finance_invoice_ops"]) // token + nama polos
     expect(params[11]).toBe(true) // has_agent
   })
 

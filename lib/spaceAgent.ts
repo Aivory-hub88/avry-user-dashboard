@@ -44,6 +44,63 @@ export function agentDisplayName(agentType: string): string {
   return AGENT_ROSTER.find((a) => a.type === agentType)?.name ?? agentType;
 }
 
+// ── Run payload (gaya Room group-chat context, LobeHub RFC-130) ────────────
+// Tiap agent menerima 3 hal yang sama: siapa di thread + transkrip bersama
+// ber-tag author + instruksi. Tanpa ini "@Geno bantu @Teo" dijawab seperti
+// 1:1 baru: tak terlihat itu pesan grup, siapa lagi disapa, apa kata lain.
+
+export interface SpacePayloadEntry {
+  author: string;
+  text: string;
+}
+
+export interface SpacePayloadParams {
+  /** Agent yang payload ini dibuat untuknya. */
+  me: string;
+  /** Nama agent lain yang disebut di instruksi/pesan pemicu. */
+  peers: string[];
+  /** Instruksi polos (token sudah jadi label). */
+  instruction: string;
+  /** Transkrip thread sebelum giliran ini, tertua-dulu. */
+  history: SpacePayloadEntry[];
+}
+
+const MAX_HISTORY_ENTRIES = 8;
+const MAX_HISTORY_CHARS = 500;
+
+function clip(text: string, max: number): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  return t.length > max ? `${t.slice(0, max)}…` : t;
+}
+
+export function buildSpacePayload({ me, peers, instruction, history }: SpacePayloadParams): string {
+  const lines: string[] = [];
+  lines.push("<space_context>");
+  lines.push(`You are in a Team Space thread on the Aivory dashboard. You are ${me}.`);
+  if (peers.length > 0) {
+    lines.push(
+      `Also mentioned in this thread: ${peers.join(", ")}. ` +
+        "Read the whole instruction and work out what is asked of YOU specifically. " +
+        "Reply as yourself in the user's language. Do not impersonate other members.",
+    );
+  } else {
+    lines.push("You are the only agent mentioned in this thread.");
+  }
+  lines.push("</space_context>");
+
+  const recent = history.filter((h) => h.text.trim()).slice(-MAX_HISTORY_ENTRIES);
+  if (recent.length > 0) {
+    lines.push("<thread_history>");
+    for (const h of recent) lines.push(`${h.author}: ${clip(h.text, MAX_HISTORY_CHARS)}`);
+    lines.push("</thread_history>");
+  }
+
+  lines.push("<instruction>");
+  lines.push(instruction.trim());
+  lines.push("</instruction>");
+  return lines.join("\n");
+}
+
 function iso(v: unknown): string {
   if (v instanceof Date) return v.toISOString();
   return typeof v === "string" ? v : "";

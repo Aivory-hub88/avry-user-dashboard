@@ -9,13 +9,16 @@
  */
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
+import { useAgentMention } from "@/hooks/useAgentMention"
+import { AgentAvatar } from "@/components/office/AgentAvatar"
+import { candidateOf, type MentionCandidate } from "@/lib/agentMentions"
+import { AGENT_ROSTER } from "@/lib/agentRoster"
 import SpaceAgentPanel from "@/components/workspace/SpaceAgentPanel"
 import SpaceActivityPanel from "@/components/workspace/SpaceActivityPanel"
-import { AGENT_ROSTER } from "@/lib/agentRoster"
 import type { SpaceMessage, SpaceTopic } from "@/lib/spaceProtocol"
 
 type RootItem = SpaceMessage & {
@@ -59,7 +62,41 @@ function displayName(m: SpaceMessage): string {
   return m.author.agentName || m.author.memberId
 }
 
-/** Render body: token link → chip, sisanya teks biasa. */
+/** Render body: token link → chip; nama polos (@Geno/@here) → chip juga. */
+const AGENT_NAMES_PATTERN = AGENT_ROSTER.map((a) =>
+  a.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+).join("|")
+const PLAIN_CHIP_RE = new RegExp(`@(${AGENT_NAMES_PATTERN}|here|all|everyone|team)\\b`, "gi")
+const AGENT_NAME_SET = new Set(AGENT_ROSTER.map((a) => a.name.toLowerCase()))
+
+function chipPlain(text: string, keyBase: number): React.ReactNode[] {
+  const out: React.ReactNode[] = []
+  let last = 0
+  let k = 0
+  PLAIN_CHIP_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = PLAIN_CHIP_RE.exec(text)) !== null) {
+    if (m.index > last) out.push(<span key={`${keyBase}-${k++}`}>{text.slice(last, m.index)}</span>)
+    const isAgent = AGENT_NAME_SET.has(m[1].toLowerCase())
+    out.push(
+      <span
+        key={`${keyBase}-${k++}`}
+        className={`inline-block rounded-full border px-2 py-px text-[12px] ${
+          isAgent
+            ? "border-violet-500/30 bg-violet-500/20 text-violet-200"
+            : "border-white/10 bg-white/[0.08] text-white/75"
+        }`}
+      >
+        @{m[1]}
+      </span>,
+    )
+    last = m.index + m[0].length
+  }
+  if (last < text.length) out.push(<span key={`${keyBase}-${k++}`}>{text.slice(last)}</span>)
+  if (out.length === 0) out.push(<span key={`${keyBase}-0`}>{text}</span>)
+  return out
+}
+
 function RichBody({ body }: { body: string }) {
   const parts: { key: number; node: React.ReactNode }[] = []
   let last = 0
@@ -67,7 +104,11 @@ function RichBody({ body }: { body: string }) {
   TOKEN_RE.lastIndex = 0
   let m: RegExpExecArray | null
   while ((m = TOKEN_RE.exec(body)) !== null) {
-    if (m.index > last) parts.push({ key: k++, node: body.slice(last, m.index) })
+    if (m.index > last) {
+      for (const n of chipPlain(body.slice(last, m.index), k)) {
+        parts.push({ key: k++, node: n })
+      }
+    }
     const label = m[1]
     const target = m[2]
     const tone = target.startsWith("agent:")
@@ -83,7 +124,11 @@ function RichBody({ body }: { body: string }) {
     })
     last = m.index + m[0].length
   }
-  if (last < body.length) parts.push({ key: k++, node: body.slice(last) })
+  if (last < body.length) {
+    for (const n of chipPlain(body.slice(last), k)) {
+      parts.push({ key: k++, node: n })
+    }
+  }
   if (parts.length === 0) return <span>{body}</span>
   return (
     <span>
@@ -138,11 +183,13 @@ function MessageRow({ m, topic }: { m: SpaceMessage; topic?: SpaceTopic | null }
   )
 }
 
-type AtPick =
-  | { kind: "agent"; label: string; token: string }
-  | { kind: "here"; label: string; token: string }
-  | { kind: "doc"; label: string; token: string }
+type DocPick = { label: string; token: string }
 
+/**
+ * Composer ala Room (Mission Control): ketik @ → menu avatar + keyboard
+ * (↑/↓/Enter/Tab/Esc, pola ChatInput), sisipkan `@Nama ` polos — readable,
+ * server men-stamp by name. Dropdown fixed + flip (anti-kepotong scroll).
+ */
 function Composer({
   placeholder,
   disabled,
@@ -160,14 +207,34 @@ function Composer({
 }) {
   const [text, setText] = useState("")
   const [sending, setSending] = useState(false)
-  const [pick, setPick] = useState<{ kind: "at" | "hash"; needle: string } | null>(null)
+  const [hashNeedle, setHashNeedle] = useState<string | null>(null)
+  const [hashIndex, setHashIndex] = useState(0)
   const [pickPos, setPickPos] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null)
   const boxRef = useRef<HTMLTextAreaElement>(null)
 
-  // Dropdown picker pakai position:fixed + flip atas/bawah — absolute di dalam
-  // container overflow-y-auto kepotong scrollport (bug 2026-09-17).
+  const candidates = useMemo<MentionCandidate[]>(
+    () =>
+      AGENT_ROSTER.map((a) => candidateOf(a.type)).filter(
+        (c): c is MentionCandidate => c !== null,
+      ),
+    [],
+  )
+  const mention = useAgentMention({ textareaRef: boxRef, candidates, enabled: !disabled })
+
+  const hashOptions: DocPick[] =
+    hashNeedle === null
+      ? []
+      : docs
+          .filter((d) => d.title.toLowerCase().includes(hashNeedle) || d.id.includes(hashNeedle))
+          .slice(0, 8)
+          .map((d) => ({ label: d.title, token: `[#${d.title}](#doc:${d.id})` }))
+
+  const hereRow = mention.menuOpen && mention.mentionList.length === 0 && "here".includes(mention.mentionQuery)
+  const menuVisible = !disabled && (mention.menuOpen || hashNeedle !== null)
+
+  // Fixed + flip: anchor textarea, buka ke atas bila ruang cukup.
   useEffect(() => {
-    if (!pick) {
+    if (!menuVisible) {
       setPickPos(null)
       return
     }
@@ -178,16 +245,19 @@ function Composer({
         return
       }
       const r = el.getBoundingClientRect()
-      const above = r.top >= 240
+      const above = r.top >= 280
       setPickPos({
-        left: Math.max(8, Math.min(r.left, window.innerWidth - 296)),
-        width: Math.min(280, window.innerWidth - 16),
+        left: Math.max(8, Math.min(r.left, window.innerWidth - 316)),
+        width: Math.min(300, window.innerWidth - 16),
         ...(above
           ? { bottom: Math.max(8, window.innerHeight - r.top + 4) }
           : { top: Math.min(r.bottom + 4, window.innerHeight - 120) }),
       })
     }
-    const close = () => setPick(null)
+    const close = () => {
+      mention.closeMenu()
+      setHashNeedle(null)
+    }
     place()
     window.addEventListener("scroll", close, true)
     window.addEventListener("resize", place)
@@ -195,67 +265,72 @@ function Composer({
       window.removeEventListener("scroll", close, true)
       window.removeEventListener("resize", place)
     }
-  }, [pick])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuVisible])
 
-  const updatePick = useCallback((value: string, cursor: number) => {
-    const before = value.slice(0, cursor)
-    const at = before.match(/@([\w-]*)$/)
-    if (at) {
-      setPick({ kind: "at", needle: at[1].toLowerCase() })
-      return
-    }
-    const hash = before.match(/#([\w-]*)$/)
-    if (hash) {
-      setPick({ kind: "hash", needle: hash[1].toLowerCase() })
-      return
-    }
-    setPick(null)
+  const updateHash = useCallback((value: string, cursor: number) => {
+    const m = /#([\w-]*)$/.exec(value.slice(0, cursor))
+    // # hanya bila @ tidak aktif (hook @ yang menang bila keduanya cocok).
+    setHashNeedle(m ? m[1].toLowerCase() : null)
+    setHashIndex(0)
   }, [])
 
-  const agentOptions: AtPick[] =
-    pick?.kind === "at"
-      ? AGENT_ROSTER.filter(
-          (a) => a.name.toLowerCase().includes(pick.needle) || a.type.includes(pick.needle),
-        ).map((a) => ({
-          kind: "agent" as const,
-          label: `${a.name} — ${a.title}`,
-          token: `[@${a.name}](#agent:${a.type})`,
-        }))
-      : []
-  const hereOption: AtPick[] =
-    pick?.kind === "at" && "here".includes(pick.needle)
-      ? [{ kind: "here" as const, label: "@here — semua member", token: "[@here](#here)" }]
-      : []
-  const atOptions: AtPick[] = [...agentOptions, ...hereOption]
-  const hashOptions: AtPick[] =
-    pick?.kind === "hash"
-      ? docs
-          .filter((d) => d.title.toLowerCase().includes(pick.needle) || d.id.includes(pick.needle))
-          .slice(0, 8)
-          .map((d) => ({ kind: "doc" as const, label: d.title, token: `[#${d.title}](#doc:${d.id})` }))
-      : []
-
-  const insertToken = useCallback(
-    (token: string) => {
+  const insertAtCursor = useCallback(
+    (insert: string, tokenLen: number) => {
       const el = boxRef.current
-      if (!el) {
-        setText((t) => `${t}${token} `)
-        setPick(null)
-        return
-      }
-      const cursor = el.selectionStart ?? text.length
-      const before = text.slice(0, cursor).replace(/[@#][\w-]*$/, "")
-      const after = text.slice(cursor)
-      const next = `${before}${token} ${after}`
+      const cursor = el?.selectionStart ?? text.length
+      const before = text.slice(0, cursor).slice(0, cursor - tokenLen)
+      const next = `${before}${insert}${text.slice(cursor)}`
       setText(next)
-      setPick(null)
+      mention.closeMenu()
+      setHashNeedle(null)
       requestAnimationFrame(() => {
-        el.focus()
-        const pos = before.length + token.length + 1
-        el.setSelectionRange(pos, pos)
+        el?.focus()
+        try {
+          el?.setSelectionRange(before.length + insert.length, before.length + insert.length)
+        } catch {
+          // abaikan
+        }
       })
     },
-    [text],
+    [text, mention],
+  )
+
+  const selectMention = useCallback(
+    (c: MentionCandidate) => {
+      const el = boxRef.current
+      const caret = el?.selectionStart ?? text.length
+      const applied = mention.applyMention(c, text, caret)
+      if (!applied) {
+        mention.closeMenu()
+        return
+      }
+      setText(applied.text)
+      mention.closeMenu()
+      setHashNeedle(null)
+      mention.focusAndRestore(applied.caret)
+    },
+    [text, mention],
+  )
+
+  const selectHere = useCallback(() => {
+    const el = boxRef.current
+    const caret = el?.selectionStart ?? text.length
+    const m = /(^|\s)@([A-Za-z0-9_]*)$/.exec(text.slice(0, caret))
+    if (!m) return
+    const tokenStart = caret - m[2].length - 1
+    insertAtCursor("@here ", caret - tokenStart)
+  }, [text, insertAtCursor])
+
+  const selectDoc = useCallback(
+    (d: DocPick) => {
+      const el = boxRef.current
+      const caret = el?.selectionStart ?? text.length
+      const m = /#([\w-]*)$/.exec(text.slice(0, caret))
+      if (!m) return
+      insertAtCursor(`${d.token} `, m[1].length + 1)
+    },
+    [text, insertAtCursor],
   )
 
   const send = useCallback(async () => {
@@ -270,40 +345,163 @@ function Composer({
       })
       if (r.ok) {
         setText("")
-        setPick(null)
+        mention.closeMenu()
+        setHashNeedle(null)
         onSent()
       }
     } catch {
       // diam — user bisa coba lagi, draf tidak hilang
     }
     setSending(false)
-  }, [text, sending, disabled, threadRoot, onSent, spaceId])
+  }, [text, sending, disabled, threadRoot, onSent, spaceId, mention])
 
-  const options = pick?.kind === "at" ? atOptions : hashOptions
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Prioritas 1: menu @ ala Room.
+    if (mention.menuOpen) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault()
+        const n = mention.mentionList.length + (hereRow ? 1 : 0)
+        if (n > 0) {
+          mention.setMentionIndex(
+            (mention.mentionIndex + (e.key === "ArrowDown" ? 1 : -1) + n) % n,
+          )
+        }
+        return
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        const pickAgent = mention.mentionList[mention.mentionIndex]
+        if (pickAgent) {
+          e.preventDefault()
+          selectMention(pickAgent)
+          return
+        }
+        if (hereRow) {
+          e.preventDefault()
+          selectHere()
+          return
+        }
+      }
+      if (e.key === "Escape") {
+        e.preventDefault()
+        mention.closeMenu()
+        return
+      }
+    }
+    // Prioritas 2: menu # doc.
+    if (hashNeedle !== null && hashOptions.length > 0 && !mention.menuOpen) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault()
+        const n = hashOptions.length
+        setHashIndex((i) => (i + (e.key === "ArrowDown" ? 1 : -1) + n) % n)
+        return
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault()
+        selectDoc(hashOptions[hashIndex] ?? hashOptions[0])
+        return
+      }
+      if (e.key === "Escape") {
+        e.preventDefault()
+        setHashNeedle(null)
+        return
+      }
+    }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      void send()
+    }
+  }
+
+  const showHereRow = hereRow && !disabled
 
   return (
     <div>
-      {pick && pickPos && options.length > 0 && !disabled && (
+      {menuVisible && pickPos && !disabled && (
         <div
-          className="fixed z-50 max-h-[220px] overflow-y-auto rounded-xl border border-line bg-[#1e1e1c] p-1.5 shadow-2xl"
+          role="listbox"
+          aria-label="Mention"
+          className="fixed z-50 max-h-[280px] overflow-y-auto rounded-2xl border border-white/10 bg-[#1e1e1c] p-1.5 shadow-2xl"
           style={{
             left: pickPos.left,
             width: pickPos.width,
             ...(pickPos.bottom !== undefined ? { bottom: pickPos.bottom } : { top: pickPos.top }),
           }}
         >
-          {options.map((o) => (
-            <button
-              key={o.token}
-              onMouseDown={(e) => {
-                e.preventDefault()
-                insertToken(o.token)
-              }}
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] text-white/70 hover:bg-white/[0.06] hover:text-white"
-            >
-              <span className="truncate">{o.label}</span>
-            </button>
-          ))}
+          {mention.menuOpen && (
+            <>
+              {mention.mentionList.map((c, i) => (
+                <button
+                  key={c.type}
+                  role="option"
+                  aria-selected={i === mention.mentionIndex}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    selectMention(c)
+                  }}
+                  onMouseEnter={() => mention.setMentionIndex(i)}
+                  className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left ${
+                    i === mention.mentionIndex ? "bg-white/[0.08]" : ""
+                  }`}
+                >
+                  <AgentAvatar type={c.type} size={28} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-medium text-white/85">
+                      {c.name}
+                    </span>
+                    <span className="block truncate text-[11px] text-white/40">{c.title}</span>
+                  </span>
+                </button>
+              ))}
+              {showHereRow && (
+                <button
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    selectHere()
+                  }}
+                  className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left ${
+                    mention.mentionIndex === mention.mentionList.length ? "bg-white/[0.08]" : ""
+                  }`}
+                >
+                  <span className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[13px] font-bold text-white/70">
+                    @
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-medium text-white/85">@here</span>
+                    <span className="block truncate text-[11px] text-white/40">semua member</span>
+                  </span>
+                </button>
+              )}
+              {mention.mentionList.length === 0 && !showHereRow && (
+                <div className="px-2.5 py-2 text-[12px] text-white/40">
+                  <span>Tidak ada agent cocok — ketik nama lain atau @here.</span>
+                </div>
+              )}
+            </>
+          )}
+          {hashNeedle !== null && !mention.menuOpen && (
+            <>
+              {hashOptions.map((d, i) => (
+                <button
+                  key={d.token}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    selectDoc(d)
+                  }}
+                  onMouseEnter={() => setHashIndex(i)}
+                  className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] text-white/70 hover:bg-white/[0.06] hover:text-white ${
+                    i === hashIndex ? "bg-white/[0.08]" : ""
+                  }`}
+                >
+                  <span className="truncate">{d.label}</span>
+                </button>
+              ))}
+              {hashOptions.length === 0 && (
+                <div className="px-2.5 py-2 text-[12px] text-white/40">
+                  <span>Tidak ada doc cocok.</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
       <div className="flex items-end gap-2 rounded-2xl border border-line bg-white/[0.03] p-2 pl-3">
@@ -312,16 +510,13 @@ function Composer({
           value={text}
           disabled={disabled || sending}
           onChange={(e) => {
-            setText(e.target.value)
-            updatePick(e.target.value, e.target.selectionStart ?? e.target.value.length)
+            const next = e.target.value
+            const caret = e.target.selectionStart ?? next.length
+            setText(next)
+            mention.checkForMention(next, caret)
+            updateHash(next, caret)
           }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault()
-              void send()
-            }
-            if (e.key === "Escape") setPick(null)
-          }}
+          onKeyDown={onKeyDown}
           placeholder={disabled ? "Viewer tidak bisa menulis" : placeholder}
           rows={2}
           className="max-h-[160px] min-h-[40px] flex-1 resize-y bg-transparent text-[13px] leading-[1.6] text-white/85 outline-none placeholder:text-white/25 disabled:opacity-50"
@@ -335,7 +530,7 @@ function Composer({
         </button>
       </div>
       <div className="mt-1 px-1 text-[11px] text-white/25">
-        <span>@ untuk agent/member · # untuk doc · Enter kirim, Shift+Enter baris baru</span>
+        <span>@ pilih agent · # pilih doc · Enter kirim, Shift+Enter baris baru</span>
       </div>
     </div>
   )
