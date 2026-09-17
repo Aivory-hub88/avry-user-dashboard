@@ -112,6 +112,16 @@ describe("GET /api/workspace/activity", () => {
     const res = await GET(new NextRequest("http://localhost/api/workspace/activity"))
     expect(res.status).toBe(401)
   })
+
+  it("400s unknown service agents", async () => {
+    authMock.mockReturnValue(null)
+    const res = await GET(
+      new NextRequest("http://localhost/api/workspace/activity", {
+        headers: { "x-service-token": "test-service-token", "x-agent-type": "ghost" },
+      }),
+    )
+    expect(res.status).toBe(400)
+  })
 })
 
 describe("POST /api/workspace/activity/read-all", () => {
