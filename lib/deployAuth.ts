@@ -1,10 +1,11 @@
 /**
  * Authenticated fetch for the deployable-agent APIs.
  *
- * Backend access tokens expire after 15 minutes and the dashboard has no
- * global auto-refresh, so any deploy click >15min after login used to fail
- * with "Invalid or expired token". This wrapper retries once after
- * exchanging the stored refresh_token via /api/v1/auth/refresh.
+ * Backend access tokens expire after 60 minutes and the dashboard has no
+ * global auto-refresh, so any deploy click >60min after the last refresh
+ * used to fail with "Invalid or expired token". This wrapper retries once
+ * after exchanging the stored refresh_token via /api/v1/auth/refresh
+ * (30-day sliding server-side session — active users stay logged in).
  *
  * This is the one choke point every authenticated data module in the
  * dashboard goes through (agent approvals, deployments, memory, profiles,
