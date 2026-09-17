@@ -5,12 +5,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest } from "next/server"
 
-const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }))
+const { queryMock, authMock } = vi.hoisted(() => ({
+  queryMock: vi.fn(),
+  authMock: vi.fn<(...args: unknown[]) => unknown>(() => null),
+}))
 
-vi.mock("@/lib/db", () => ({ query: queryMock }))
-vi.mock("@/lib/serverAuth", () => ({ getAuthUserWithToken: () => null }))
+vi.mock("@/lib/db", () => ({
+  query: queryMock,
+  withTransaction: async (fn: (tx: (sql: string) => Promise<{ rows: unknown[] }>) => Promise<unknown>) =>
+    fn(async () => ({ rows: [] })),
+}))
+vi.mock("@/lib/serverAuth", () => ({ getAuthUserWithToken: () => authMock() }))
 
-import { GET } from "./route"
+import { GET, DELETE } from "./route"
 
 process.env.COLLAB_SERVICE_TOKEN = "test-service-token"
 
@@ -104,6 +111,69 @@ describe("GET /api/workspace/[id]/thread", () => {
   it("rejects unauthenticated callers", async () => {
     const req = new NextRequest("http://localhost/api/workspace/space-1/thread?root=m1")
     const res = await GET(req, { params: Promise.resolve({ id: "space-1" }) })
+    expect(res.status).toBe(401)
+  })
+})
+
+describe("DELETE /api/workspace/[id]/thread", () => {
+  const del = (root: string | null, headers: Record<string, string> = svc) =>
+    new NextRequest(
+      root === null
+        ? "http://localhost/api/workspace/space-1/thread"
+        : `http://localhost/api/workspace/space-1/thread?root=${root}`,
+      { method: "DELETE", headers },
+    )
+  const params = { params: Promise.resolve({ id: "space-1" }) }
+
+  beforeEach(() => {
+    queryMock.mockReset()
+    authMock.mockReset()
+    authMock.mockReturnValue(null)
+    queryMock.mockImplementation((sql: string) => {
+      if (sql.includes("FROM dashboard.workspace_messages"))
+        return Promise.resolve({
+          rows: [{ author_kind: "system", author_id: "service" }],
+        })
+      return Promise.resolve({ rows: [], rowCount: 0 })
+    })
+  })
+
+  it("deletes own thread + cascades (service author)", async () => {
+    const res = await DELETE(del("m1"), params)
+    expect(res.status).toBe(200)
+    const delCall = queryMock.mock.calls.find((c) =>
+      String(c[0]).includes("DELETE FROM dashboard.workspace_threads"),
+    )
+    expect(delCall).toBeDefined()
+    expect(delCall![1]).toEqual(["m1"])
+  })
+
+  it("400s without ?root=, 404s unknown thread", async () => {
+    expect((await DELETE(del(null), params)).status).toBe(400)
+    queryMock.mockImplementation(() => Promise.resolve({ rows: [], rowCount: 0 }))
+    expect((await DELETE(del("nope"), params)).status).toBe(404)
+  })
+
+  it("403s editor deleting other author's thread (bukan penulis/owner)", async () => {
+    authMock.mockReturnValue({
+      user: { user_id: "viewer-1", email: "v@x.id", account_type: "member" },
+      token: "t",
+    })
+    queryMock.mockImplementation((sql: string) => {
+      if (sql.includes("FROM dashboard.workspace_docs"))
+        return Promise.resolve({ rows: [{ id: "space-1", owner: "owner-1", workspace_id: "ws-1" }] })
+      if (sql.includes("FROM dashboard.workspace_doc_acl"))
+        return Promise.resolve({ rows: [{ doc_id: "space-1", role: "editor" }] })
+      if (sql.includes("FROM dashboard.workspace_messages"))
+        return Promise.resolve({ rows: [{ author_kind: "user", author_id: "other-1" }] })
+      return Promise.resolve({ rows: [], rowCount: 0 })
+    })
+    const res = await DELETE(del("m1", {}), params)
+    expect(res.status).toBe(403)
+  })
+
+  it("rejects unauthenticated callers", async () => {
+    const res = await DELETE(del("m1", {}), params)
     expect(res.status).toBe(401)
   })
 })

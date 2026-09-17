@@ -643,10 +643,35 @@ export default function SpaceDiscussion({
     router.replace(`/workspace/${spaceId}?view=discussion`, { scroll: false })
   }, [router, spaceId])
 
+  const [confirmDeleteRoot, setConfirmDeleteRoot] = useState<string | null>(null)
+  const [deletingRoot, setDeletingRoot] = useState<string | null>(null)
+
   const refreshAll = useCallback(() => {
     void loadStream()
     if (openRoot) void loadThread(openRoot)
   }, [loadStream, loadThread, openRoot])
+
+  const deleteRoot = useCallback(
+    async (rootId: string) => {
+      if (deletingRoot) return
+      setDeletingRoot(rootId)
+      try {
+        const r = await fetch(
+          `/api/workspace/${spaceId}/thread?root=${encodeURIComponent(rootId)}`,
+          { method: "DELETE", headers: collabAuthHeaders() },
+        )
+        if (r.ok) {
+          if (openRoot === rootId) closeThread()
+          setConfirmDeleteRoot(null)
+          refreshAll()
+        }
+      } catch {
+        // diam
+      }
+      setDeletingRoot(null)
+    },
+    [spaceId, openRoot, closeThread, refreshAll, deletingRoot],
+  )
 
   const saveTopic = useCallback(async () => {
     const title = topicDraft.trim()
@@ -704,22 +729,12 @@ export default function SpaceDiscussion({
             </span>
           )}
         </div>
-        <div className="mb-5">
-          <Composer
-            spaceId={spaceId}
-            placeholder="Mulai diskusi… @Geno untuk agent, # untuk doc"
-            disabled={!canWrite}
-            docs={docs}
-            threadRoot={null}
-            onSent={refreshAll}
-          />
-        </div>
         {loading && <span className="text-[13px] text-white/40">Loading discussion…</span>}
         {loadError && <span className="text-[13px] text-white/40">{loadError}</span>}
         {!loading && !loadError && roots.length === 0 && (
           <div className="rounded-2xl border border-line bg-white/[0.03] p-8 text-center">
             <div className="text-[14px] font-medium text-white/70">Belum ada diskusi</div>
-            <div className="mt-1 text-[12px] text-white/35">Tulis root message pertama di atas.</div>
+            <div className="mt-1 text-[12px] text-white/35">Tulis root message pertama di bawah.</div>
           </div>
         )}
         <div className="flex flex-col gap-5">
@@ -731,16 +746,39 @@ export default function SpaceDiscussion({
               }`}
             >
               <MessageRow m={r} topic={r.topic} />
-              <div className="mt-2 pl-[44px]">
+              <div className="mt-2 flex items-center gap-3 pl-[44px]">
                 <button
                   onClick={() => openThread(r.id)}
                   className="text-[12px] text-white/40 hover:text-white/75"
                 >
                   {r.replyCount > 0 ? `${r.replyCount} ${r.replyCount === 1 ? "reply" : "replies"} →` : "Buka thread →"}
                 </button>
+                {canWrite && (
+                  <button
+                    onClick={() => {
+                      if (confirmDeleteRoot === r.id) void deleteRoot(r.id)
+                      else setConfirmDeleteRoot(r.id)
+                    }}
+                    disabled={deletingRoot === r.id}
+                    title="Hapus thread ini beserta replies-nya"
+                    className="text-[12px] text-white/25 hover:text-red-300 disabled:opacity-40"
+                  >
+                    {deletingRoot === r.id ? "…" : confirmDeleteRoot === r.id ? "Yakin? klik lagi" : "Hapus"}
+                  </button>
+                )}
               </div>
             </div>
           ))}
+        </div>
+        <div className="sticky bottom-0 mt-5 bg-[#18181b]/95 pb-2 pt-3 backdrop-blur">
+          <Composer
+            spaceId={spaceId}
+            placeholder="Tulis update… @ untuk agent, # untuk doc"
+            disabled={!canWrite}
+            docs={docs}
+            threadRoot={null}
+            onSent={refreshAll}
+          />
         </div>
       </div>
       <div
@@ -770,9 +808,24 @@ export default function SpaceDiscussion({
             <span className="text-[13px] font-medium text-white/75">
               {thread?.topic && !thread.topic.archived ? thread.topic.title : "Thread"}
             </span>
-            <button onClick={closeThread} className="text-[12px] text-white/40 hover:text-white/75">
-              Tutup
-            </button>
+            <span className="flex items-center gap-3">
+              {canWrite && openRoot && (
+                <button
+                  onClick={() => {
+                    if (confirmDeleteRoot === openRoot) void deleteRoot(openRoot)
+                    else setConfirmDeleteRoot(openRoot)
+                  }}
+                  disabled={deletingRoot === openRoot}
+                  title="Hapus thread ini beserta replies-nya"
+                  className="text-[12px] text-white/25 hover:text-red-300 disabled:opacity-40"
+                >
+                  {deletingRoot === openRoot ? "…" : confirmDeleteRoot === openRoot ? "Yakin? klik lagi" : "Hapus"}
+                </button>
+              )}
+              <button onClick={closeThread} className="text-[12px] text-white/40 hover:text-white/75">
+                Tutup
+              </button>
+            </span>
           </div>
           {thread?.topic?.archived && (
             <div className="mb-3 rounded-xl border border-line bg-white/[0.03] px-3 py-2 text-[12px] text-white/45">
