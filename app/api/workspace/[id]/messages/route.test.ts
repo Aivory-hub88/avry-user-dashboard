@@ -140,6 +140,68 @@ describe("POST /api/workspace/[id]/messages", () => {
     expect(j.tasks[0]).toMatchObject({ agentType: "autonomous", status: "todo" })
   })
 
+  it("auto-runs enqueued tasks fire-and-forget for user senders", async () => {
+    authMock.mockReturnValue({
+      user: { user_id: "u1", email: "s@x.id", account_type: "member" },
+      token: "jwt-1",
+    })
+    const taskRow = {
+      id: "task-auto",
+      space_id: "space-1",
+      thread_root: "m-root",
+      trigger_msg: "m-new",
+      agent_type: "autonomous",
+      instruction: "Halo @Geno",
+      status: "todo",
+      reason: "mention",
+      result_msg: null,
+      approval_ref: {},
+      created_by: "user:u1",
+      created_at: "2026-09-17T10:00:00.000Z",
+      updated_at: "2026-09-17T10:00:00.000Z",
+    }
+    const agentMsgRow = {
+      ...msgRow({ id: "m-agent" }),
+      author_kind: "agent",
+      author_id: "autonomous",
+      author_name: "Geno",
+      agent_type: "autonomous",
+      body: "Siap.",
+    }
+    queryMock.mockImplementation((sql: string, params?: unknown[]) => {
+      if (sql.includes("FROM dashboard.workspace_agent_tasks") && sql.includes("WHERE id ="))
+        return Promise.resolve({ rows: [{ ...taskRow, status: "todo" }] })
+      if (sql.includes("FROM dashboard.workspace_agent_tasks"))
+        return Promise.resolve({ rows: [] })
+      if (sql.includes("INSERT INTO dashboard.workspace_agent_tasks"))
+        return Promise.resolve({ rows: [taskRow], rowCount: 1 })
+      if (sql.includes("INSERT INTO dashboard.workspace_messages")) {
+        const authorKind = (params?.[3] as string) ?? ""
+        return Promise.resolve({
+          rows: [authorKind === "agent" ? agentMsgRow : msgRow({ id: params?.[0] as string })],
+          rowCount: 1,
+        })
+      }
+      return Promise.resolve({ rows: [], rowCount: 0 })
+    })
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => ({ reply: "Siap.", pending_approval: null }) })),
+    )
+    const res = await POST(post({ body: "Halo @Geno" }, {}), {
+      params: Promise.resolve({ id: "space-1" }),
+    })
+    expect(res.status).toBe(201)
+    for (let i = 0; i < 30; i++) await new Promise((r) => setImmediate(r))
+    const agentWrite = queryMock.mock.calls.find(
+      (c) =>
+        String(c[0]).includes("INSERT INTO dashboard.workspace_messages") &&
+        (c[1] as unknown[])[4] === "Geno",
+    )
+    expect(agentWrite).toBeDefined()
+    vi.unstubAllGlobals()
+  })
+
   it("reply un-archives the topic", async () => {
     queryMock.mockImplementation((sql: string) => {
       if (sql.includes("FROM dashboard.workspace_messages"))

@@ -15,6 +15,7 @@ import { parseSpaceMentions } from "@/lib/spaceProtocol"
 import { spaceMessageFromRow } from "@/lib/spaceThreads"
 import { requesterFrom, newId, cleanBody } from "@/lib/spaceWrite"
 import { enqueueAgentTasks } from "@/lib/spaceAgentStore"
+import { runAgentTask } from "@/lib/spaceAgentRun"
 
 export const runtime = "nodejs"
 
@@ -95,25 +96,35 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const message = spaceMessageFromRow(inserted.rows[0] as Record<string, unknown>, id)
     if (!message) return NextResponse.json({ error: "db" }, { status: 500 })
 
-    // Phase 3: stamp agent → enqueue task per agent (dipakai UI sebagai receipt 👀).
-    let tasks: unknown[] = []
+    // Stamp agent → enqueue task per agent (dipakai UI sebagai receipt 👀),
+    // lalu auto-run fire-and-forget bila pengirim user (chat-room: mention
+    // langsung dijawab tanpa klik). Task 409 (sudah diambil) = aman.
+    let tasks: { id: string; agentType: string }[] = []
     if (stamps.hasAgent) {
       try {
-        tasks = await enqueueAgentTasks({
+        tasks = (await enqueueAgentTasks({
           spaceId: id,
           threadRoot: rootId,
           triggerMsg: msgId,
           stamps,
           body,
           createdBy: `${me.kind}:${me.id}`,
-        })
+        })) as { id: string; agentType: string }[]
         await recordWorkspaceActivity({
           docId: id,
           credential,
           agentType: me.agentType ?? "user",
           action: "agent.mentioned",
-          summary: `${me.name} mentioned ${(tasks as { agentType: string }[]).map((t) => t.agentType).join(", ")}`,
+          summary: `${me.name} mentioned ${tasks.map((t) => t.agentType).join(", ")}`,
         }).catch(() => {})
+        if (credential.kind === "user") {
+          const userCred = credential
+          for (const t of tasks) {
+            runAgentTask({ spaceId: id, taskId: t.id, credential: userCred }).catch((error) =>
+              console.error("[workspace/messages auto-run]", t.id, error),
+            )
+          }
+        }
       } catch (error) {
         console.error("[workspace/messages enqueue]", error)
       }
