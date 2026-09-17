@@ -541,7 +541,12 @@ export default function WorkspaceDocPage() {
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <WorkspaceNavigator currentId={id} spaceId={isProject ? id : null} />
+        <WorkspaceNavigator
+          currentId={id}
+          spaceId={isProject ? id : null}
+          workspaceId={meta?.workspace_id ?? null}
+          spaceFiles={isProject ? projectMembers : []}
+        />
         <div className="min-w-0 flex-1 overflow-y-auto bg-black/10 px-8 py-8 lg:px-10 xl:px-12">
           {view === "page" && (
             <>
