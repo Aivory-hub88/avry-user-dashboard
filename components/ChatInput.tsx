@@ -23,6 +23,9 @@ interface ChatInputProps {
   /** When a turn is in flight, the send button morphs into stop. */
   isStreaming?: boolean
   onStop?: () => void
+  /** WhatsApp-style "replying to" bar — set via a bubble's Reply action. */
+  replyTo?: { role: 'user' | 'assistant'; content: string; agentName?: string } | null
+  onCancelReply?: () => void
 }
 
 /** Shared send-button glyph: an enter/return arrow (corner-up-left). One
@@ -46,6 +49,8 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
   placeholder,
   isStreaming = false,
   onStop,
+  replyTo,
+  onCancelReply,
 }: ChatInputProps) {
   const [message, setMessage] = useState(prefill ?? "")
   const [activeTool, setActiveTool] = useState<string | null>(null)
@@ -247,6 +252,27 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
         />
       )}
       <div className="bg-[#1f1f22] border border-line rounded-[20px] overflow-hidden">
+        {/* Replying-to bar — WhatsApp-style quote above the composer */}
+        {replyTo && (
+          <div className="flex items-start gap-2 px-4 pt-3 pb-2 border-b border-line/60">
+            <div className="flex-1 min-w-0 pl-2.5 border-l-2 border-accent/50">
+              <div className="text-[12px] font-medium text-accent/80">
+                Replying to {replyTo.role === 'user' ? 'yourself' : (replyTo.agentName ?? 'Agent')}
+              </div>
+              <div className="text-[13px] text-[#a1a1aa] truncate">{replyTo.content}</div>
+            </div>
+            <button
+              type="button"
+              onClick={onCancelReply}
+              className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-white/40 hover:text-white/80 hover:bg-white/[0.08] transition-colors"
+              aria-label="Cancel reply"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        )}
         {/* Textarea area */}
         <textarea
           ref={textareaRef}

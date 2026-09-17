@@ -37,6 +37,11 @@ interface ChatMessageProps {
   /** Which agent's avatar to show — same visual identity as the agent
    *  column and rail, so the chat header isn't the odd one out. */
   agentType?: string | null
+  /** WhatsApp-style reply: quotes an earlier bubble at the top of this one. */
+  replyPreview?: { role: 'user' | 'assistant'; content: string; agentName?: string }
+  /** "Reply" action on this bubble — hands its own role/content up so the
+   *  composer can quote it into the next outgoing message. */
+  onReply?: () => void
 }
 
 /* Approval needs no card here. Approval is a conversational protocol, not a
@@ -297,11 +302,20 @@ const markdownComponents = {
 
 /* ── Main component ────────────────────────────────────────────────────────── */
 
-export default memo(function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null }: ChatMessageProps) {
+export default memo(function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null, replyPreview, onReply }: ChatMessageProps) {
   const noop = useCallback(() => {}, [])
   const hasAgenticPhases = !!(agenticState && agenticState.phases.length > 0)
   const hasTextContent = !!content
   const normalizedContent = useMemo(() => normalizeMarkdown(content), [content])
+  const quotedWho = replyPreview ? (replyPreview.role === 'user' ? 'You' : (replyPreview.agentName ?? agentName)) : null
+  const quotedSnippet = replyPreview ? (replyPreview.content.length > 160 ? `${replyPreview.content.slice(0, 160)}…` : replyPreview.content) : null
+
+  const ReplyQuote = replyPreview ? (
+    <div className="mb-2 pl-2.5 border-l-2 border-accent/50 text-[13px] leading-snug">
+      <div className="text-accent/80 font-medium">{quotedWho}</div>
+      <div className="text-[#a1a1aa] line-clamp-2">{quotedSnippet}</div>
+    </div>
+  ) : null
 
   return (
     <div className="mb-8">
@@ -309,6 +323,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, a
         /* USER BUBBLE — right-aligned, subtle container */
         <div className="flex justify-end group relative">
           <div className="max-w-[80%] bg-[#282825] rounded-[20px] px-5 py-3.5 text-base text-white leading-[1.6] border border-line text-left">
+            {ReplyQuote}
             {attachments && attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
                 {attachments.map((att, i) => (
@@ -323,7 +338,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, a
             )}
             {content}
           </div>
-          <MessageActions role="user" content={content} onEdit={onEdit} />
+          <MessageActions role="user" content={content} onEdit={onEdit} onReply={onReply} />
         </div>
       ) : (
         /* AI MESSAGE — avatar + clean Manus typography */
@@ -336,6 +351,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, a
               lighter surface, max-w-[720px] for readability */}
           <div className="flex-1 min-w-0 max-w-[720px] text-left">
             <div className="rounded-2xl border border-line bg-white/[0.035] px-5 py-3.5 text-base text-[#f7f7f7] leading-[1.6]">
+              {ReplyQuote}
               {/* Thinking indicator */}
               {isStreaming && !content && !hasAgenticPhases && (
                 <div className="flex items-center gap-2.5">
@@ -380,7 +396,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, a
                   notification feed can hide this same approval there. */}
             </div>
           </div>
-          <MessageActions role="ai" content={content} onRegenerate={onRegenerate} />
+          <MessageActions role="ai" content={content} onRegenerate={onRegenerate} onReply={onReply} />
         </div>
         {/* Intent routing banner - sits below the message full-width */}
         {pendingRoute && (
