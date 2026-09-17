@@ -646,7 +646,7 @@ export default function WorkspaceDocPage() {
           )}
           {view === "discussion" ? (
             isProject ? (
-              <SpaceDiscussion spaceId={id} workspaceId={meta?.workspace_id ?? null} initialThread={threadParam} />
+              <SpaceDiscussion spaceId={id} workspaceId={meta?.workspace_id ?? null} initialThread={threadParam} canWrite={canWrite} />
             ) : (
               <div className="mx-auto w-full max-w-[960px] rounded-2xl border border-line bg-white/[0.03] p-8 text-center">
                 <div className="text-[15px] font-medium text-white/80">Not a project yet</div>
