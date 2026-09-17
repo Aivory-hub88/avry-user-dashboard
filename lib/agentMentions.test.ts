@@ -108,7 +108,7 @@ describe("buildRoomPayload", () => {
   it("names the recipient, peers, and keeps the raw message", () => {
     const p = buildRoomPayload(base)
     expect(p).toContain("You are Teo (Ticket Ops Agent)")
-    expect(p).toContain("Lex (Leads Qualifier Agent)")
+    expect(p).toContain("Lex (Sales and Lead Agent)")
     expect(p).toContain("<user_message>\nHi @Teo, can you help @Lex?\n</user_message>")
   })
 
