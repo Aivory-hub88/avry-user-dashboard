@@ -10,6 +10,20 @@
 import { authedFetch } from './deployAuth'
 import { APP_CATALOG } from './integrations/store'
 
+/**
+ * Fired (window CustomEvent) whenever a chat turn may have changed the
+ * pending-approval set — `useAgentApprovals` refetches on it instead of
+ * waiting for its 60s poll, so the rail reflects a newly parked decision
+ * within a beat, not a minute. Dispatched from `useChat` after agent turns.
+ */
+export const APPROVALS_CHANGED_EVENT = 'aivory:approvals-changed'
+
+export function notifyApprovalsChanged(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(APPROVALS_CHANGED_EVENT))
+  }
+}
+
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'
 

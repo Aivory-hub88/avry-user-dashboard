@@ -7,6 +7,7 @@ import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
 import { sendAgentMessage, type ConsolePendingApproval } from '@/lib/agentChat'
+import { notifyApprovalsChanged } from '@/lib/agentApprovals'
 import { agentNameOf, buildRoomPayload, candidateOf, type RoomHistoryEntry } from '@/lib/agentMentions'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
 import { useMode } from '@/contexts/ModeContext'
@@ -237,6 +238,9 @@ export function useChat({
               addToast("error", "Chat history storage is full. Messages may not be saved.")
             }
           }
+          // The turn may have parked an approval — wake the rail now instead
+          // of letting it sit stale until its 60s poll.
+          notifyApprovalsChanged()
         }
       }
       return
@@ -461,6 +465,8 @@ export function useChat({
         setIsStreaming(false)
         setStreamingAgentType(undefined)
       }
+      // Room turns can park approvals too — same rail wake-up as direct turns.
+      notifyApprovalsChanged()
     }
   }, [currentSessionId, agentTarget, handleSend, addToast, clearAttachments])
 

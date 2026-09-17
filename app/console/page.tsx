@@ -231,7 +231,6 @@ export default function ConsolePage() {
     byAgent: notificationsByAgent,
     approvalsLoaded,
     approvalsError,
-    resolveApproval: resolveRailApproval,
     retryApprovals: refetchApprovals,
   } = useNotificationFeed({ sessionsByAgent, currentSessionId, excludeApprovalIds: inlineApprovalIds })
   const { deployments } = useAgentDeployments()
@@ -531,7 +530,6 @@ export default function ConsolePage() {
           agentTarget={agentTarget}
           notifications={notificationsByAgent[agentTarget ?? "null"] ?? []}
           approvalsError={approvalsError}
-          onResolveApproval={resolveRailApproval}
           onRetryApprovals={refetchApprovals}
           onOpenThread={(sessionId) => {
             setShowMissionControl(false)
