@@ -55,7 +55,7 @@ function handleDeadSession() {
   // Dynamic import avoids a module cycle risk (lib/auth.ts is imported all
   // over the app; this file should stay a leaf) and keeps this cold path
   // out of every authedFetch call's synchronous work.
-  import('./auth').then(({ logout }) => logout()).catch(() => {
+  import('./auth').then(({ logout }) => logout('expired')).catch(() => {
     // logout() itself only touches localStorage + does a location redirect,
     // so this catch is just defence against the dynamic import failing to
     // resolve at all (e.g. mid-navigation teardown) — nothing to recover.

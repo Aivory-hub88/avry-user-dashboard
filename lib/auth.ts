@@ -101,10 +101,56 @@ function clearLocalCaches() {
   keysToRemove.forEach((key) => localStorage.removeItem(key));
 }
 
-export function logout() {
+/** Window event fired when the backend declares the session dead mid-use
+ *  (refresh explicitly rejected). `SessionExpiredNotice` shows the
+ *  "sesi telah berakhir" modal on it — previously the user was redirected
+ *  away in silence and met a login screen with zero context. */
+export const SESSION_EXPIRED_EVENT = 'aivory:session-expired'
+
+/** sessionStorage reason left for the sign-in notice: 'expired' vs a plain
+ *  signed-out visit. sessionStorage (not localStorage) so the reason never
+ *  leaks into another tab or survives longer than this navigation. */
+const SESSION_END_REASON_KEY = 'aivory_session_ended'
+
+export function readSessionEndReason(): 'expired' | null {
+  if (typeof window === 'undefined' || typeof sessionStorage === 'undefined') return null
+  try {
+    return sessionStorage.getItem(SESSION_END_REASON_KEY) === 'expired' ? 'expired' : null
+  } catch {
+    return null
+  }
+}
+
+export function clearSessionEndReason(): void {
+  if (typeof window === 'undefined' || typeof sessionStorage === 'undefined') return
+  try {
+    sessionStorage.removeItem(SESSION_END_REASON_KEY)
+  } catch {
+    // Non-fatal: worst case the notice shows "expired" copy once more.
+  }
+}
+
+export function logout(reason: 'manual' | 'expired' = 'manual') {
   if (typeof window !== "undefined") {
     clearLocalCaches();
     window.dispatchEvent(new Event("authManager:logout"));
+    if (reason === 'expired') {
+      // Do NOT navigate away: the user may have unsent input worth copying,
+      // and a silent redirect is exactly the missing-notification bug.
+      // The modal (SessionExpiredNotice) takes over from here.
+      try {
+        sessionStorage.setItem(SESSION_END_REASON_KEY, 'expired')
+      } catch {
+        // Modal still appears via the event below, just with generic copy.
+      }
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+      return;
+    }
+    try {
+      sessionStorage.removeItem(SESSION_END_REASON_KEY)
+    } catch {
+      // Ignore: a stale reason only affects notice copy, nothing structural.
+    }
     window.location.href = "/";
   }
 }

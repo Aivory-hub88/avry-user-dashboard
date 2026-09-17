@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { Inter_Tight, Nunito, Manrope } from "next/font/google"
 import Sidebar from "@/components/shared/Sidebar"
 import ClientShell from "@/components/ClientShell"
+import SessionExpiredNotice from "@/components/SessionExpiredNotice"
 import LocaleWrapper from "@/components/LocaleWrapper"
 import DashboardEntryGate from "@/components/routing/dashboard-entry-gate"
 import DemoRouteGuard from "@/components/routing/demo-route-guard"
@@ -53,6 +54,7 @@ export default function RootLayout({
                       {children}
                     </main>
                     <ClientShell />
+                    <SessionExpiredNotice />
                   </DashboardEntryGate>
                 </WorkspaceProvider>
               </SettingsModalProvider>
