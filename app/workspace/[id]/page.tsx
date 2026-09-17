@@ -13,6 +13,7 @@ import WorkspacePageComments from "@/components/workspace/WorkspacePageComments"
 import WorkspaceHistory from "@/components/workspace/WorkspaceHistory"
 import SharingPanel from "@/components/workspace/SharingPanel"
 import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
+import SpaceDiscussion from "@/components/workspace/SpaceDiscussion"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 import { parseMarkdown, type ImportedBlock } from "@/lib/markdownImport"
@@ -44,7 +45,8 @@ export default function WorkspaceDocPage() {
   const search = useSearchParams()
   const router = useRouter()
   const id = (params?.id as string) ?? "demo"
-  const view = search.get("view") === "database" ? "database" : search.get("view") === "board" ? "board" : "page"
+  const view = search.get("view") === "database" ? "database" : search.get("view") === "board" ? "board" : search.get("view") === "discussion" ? "discussion" : "page"
+  const threadParam = search.get("thread")
 
   const [meta, setMeta] = useState<Meta | null>(null)
   const [status, setStatus] = useState<'loading' | 'ok' | 'locked' | 'unauth'>('loading')
@@ -371,6 +373,14 @@ export default function WorkspaceDocPage() {
           <span className="ml-1 shrink-0 rounded-full bg-white/[0.06] px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-white/40">{meta?.myRole}</span>
            {!canWrite && <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-amber-300">view only</span>}
            <div className="ml-3 flex shrink-0 items-center gap-1 rounded-full bg-white/[0.04] p-1">
+            {isProject && (
+              <Link
+                href={`/workspace/${id}?view=discussion`}
+                className={`rounded-full px-3 py-1 text-[12px] ${view === "discussion" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
+              >
+                Discussion
+              </Link>
+            )}
             <Link
               href={`/workspace/${id}`}
               className={`rounded-full px-3 py-1 text-[12px] ${view === "page" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
@@ -531,7 +541,7 @@ export default function WorkspaceDocPage() {
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <WorkspaceNavigator currentId={id} />
+        <WorkspaceNavigator currentId={id} spaceId={isProject ? id : null} />
         <div className="min-w-0 flex-1 overflow-y-auto bg-black/10 px-8 py-8 lg:px-10 xl:px-12">
           {view === "page" && (
             <>
@@ -634,7 +644,18 @@ export default function WorkspaceDocPage() {
               />
             </div>
           )}
-          {view === "board" ? (
+          {view === "discussion" ? (
+            isProject ? (
+              <SpaceDiscussion spaceId={id} workspaceId={meta?.workspace_id ?? null} initialThread={threadParam} />
+            ) : (
+              <div className="mx-auto w-full max-w-[960px] rounded-2xl border border-line bg-white/[0.03] p-8 text-center">
+                <div className="text-[15px] font-medium text-white/80">Not a project yet</div>
+                <div className="mt-2 text-[13px] leading-relaxed text-white/40">
+                  Flag this doc as a project to open its team discussion.
+                </div>
+              </div>
+            )
+          ) : view === "board" ? (
             isProject ? (
               <ProjectBoard
                 projectId={id}
