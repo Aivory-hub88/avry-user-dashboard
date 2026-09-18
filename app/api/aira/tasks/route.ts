@@ -111,9 +111,12 @@ export async function GET(req: NextRequest) {
     )
     const tasks = r.rows as LedgerTask[]
     const now = Date.now()
+    // Cancelled rows (stopped by the operator) stay in the DB as the audit
+    // trail but leave the active board: no column, no count, no SLA flag.
+    const live = tasks.filter((t) => t.status !== 'cancelled')
     // Enrichment needs parent context (SLA differs), so group first, then
     // flatten back into the legacy column shape — same objects, no copies.
-    const orchestrations = groupIntoOrchestrations(tasks, now)
+    const orchestrations = groupIntoOrchestrations(live, now)
     const enriched: EnrichedTask[] = orchestrations.flatMap((o) => [
       ...(o.parent ? [o.parent] : []),
       ...o.children,

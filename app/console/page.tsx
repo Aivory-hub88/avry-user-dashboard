@@ -21,6 +21,7 @@ import { useChat } from "@/hooks/useChat"
 import { useNotificationFeed } from "@/hooks/useNotificationFeed"
 import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { useActiveRuns } from "@/hooks/useActiveRuns"
+import { useStuckTasks } from "@/hooks/useStuckTasks"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
 import { getMentionCandidates, parseAgentMentions, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
 import { fetchLedgerHint } from "@/lib/roomLedger"
@@ -238,6 +239,12 @@ export default function ConsolePage() {
   } = useNotificationFeed({ sessionsByAgent, currentSessionId, excludeApprovalIds: inlineApprovalIds })
   const { deployments } = useAgentDeployments()
   const { byAgentType: activeRunsByAgentType } = useActiveRuns()
+  const {
+    stuck: stuckTasks,
+    stoppingId: stoppingTaskId,
+    stopError: stopTaskError,
+    stopTask,
+  } = useStuckTasks(agentTarget)
 
   // Room mode (Mission Control chat room): only deployed agents are
   // mentionable — @ expands to this list, sends fan out in parallel.
@@ -550,6 +557,10 @@ export default function ConsolePage() {
           }}
           deployments={deployments}
           activeRun={agentTarget ? activeRunsByAgentType[agentTarget] : undefined}
+          stuckTasks={stuckTasks}
+          onStopTask={stopTask}
+          stoppingTaskId={stoppingTaskId}
+          stopTaskError={stopTaskError}
           inRoom={inRoom}
           roomMembers={mentionCandidates}
         />

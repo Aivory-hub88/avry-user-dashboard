@@ -125,6 +125,16 @@ interface AgentRailProps {
    *  Telegram, or Slack) — see hooks/useActiveRuns.ts. `undefined` means
    *  not running, not "unknown". */
   activeRun?: ActiveAgentRun
+  /** Ledger rows stuck past SLA with no live turn behind them — see
+   *  hooks/useStuckTasks.ts. Rendered with a Stop action under Running now.
+   *  Empty/absent = nothing stuck, section hidden. */
+  stuckTasks?: import("@/lib/airaTasks").EnrichedTask[]
+  /** Stop-button handler from useStuckTasks.stopTask (parent-owned). */
+  onStopTask?: (taskId: string) => void
+  /** Task currently being stopped (disables its button). */
+  stoppingTaskId?: string | null
+  /** Last stop failure, shown once under the section. */
+  stopTaskError?: string | null
   /** Room mode (Mission Control chat): the rail gains a Room card atop the
    *  Notifications section listing who @ can reach — deployed agents only.
    *  This replaces the old top-toast, which overlapped the header. */
@@ -145,6 +155,10 @@ export default function AgentRail({
   onOpenThread,
   deployments,
   activeRun,
+  stuckTasks = [],
+  onStopTask,
+  stoppingTaskId = null,
+  stopTaskError = null,
   inRoom = false,
   roomMembers = [],
   collapsed = false,
@@ -444,6 +458,43 @@ export default function AgentRail({
                 <Bar tone="idle">Not running anything right now.</Bar>
               )}
             </section>
+
+            {stuckTasks.length > 0 && (
+              <section className="mt-[20px] flex flex-col gap-[8px]">
+                <span className="px-0.5 text-[12px] font-semibold leading-none text-white">
+                  Stuck tasks
+                  <span className="ml-1.5 rounded-full bg-amber/15 px-2 py-0.5 text-[11px] font-semibold text-amber">
+                    {stuckTasks.length}
+                  </span>
+                </span>
+                <span className="px-0.5 text-[11px] font-light text-white/35">
+                  Past SLA with no live turn — stop them here, they won&apos;t finish on their own.
+                </span>
+                {stuckTasks.map((t) => (
+                  <Bar key={t.task_id} tone="warn">
+                    <span className="block truncate text-white/85" title={t.title}>
+                      {t.title || "Untitled task"}
+                    </span>
+                    <span className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-white/45">
+                      <span className="tabular-nums">
+                        {t.status === "blocked" ? "Waiting" : "Running"}
+                        {t.blocked_reason ? ` · ${t.blocked_reason.slice(0, 60)}` : ""}
+                      </span>
+                      <button
+                        onClick={() => onStopTask?.(t.task_id)}
+                        disabled={stoppingTaskId === t.task_id || !onStopTask}
+                        className="shrink-0 rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-0.5 font-medium text-white/70 hover:bg-white/[0.12] disabled:opacity-40"
+                      >
+                        {stoppingTaskId === t.task_id ? "Stopping…" : "Stop"}
+                      </button>
+                    </span>
+                  </Bar>
+                ))}
+                {stopTaskError && (
+                  <span className="px-0.5 text-[11px] font-light text-amber/90">{stopTaskError}</span>
+                )}
+              </section>
+            )}
 
             {channels.length > 0 && (
               <section className="mt-[20px] flex flex-col gap-[8px]">

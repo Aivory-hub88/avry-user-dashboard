@@ -30,6 +30,18 @@ describe('isTaskOverdue', () => {
     expect(isTaskOverdue(old, true)).toBe(false)
   })
 
+  it('cancelled tasks are never overdue and never open', () => {
+    const old = task({ status: 'cancelled', created_at: new Date(Date.now() - 10 * 3_600_000).toISOString() })
+    expect(isTaskOverdue(old, false)).toBe(false)
+    expect(isTaskOverdue(old, true)).toBe(false)
+    const [g] = groupIntoOrchestrations([
+      task({ task_id: 'p', agent_type: 'chief_of_staff', status: 'in_progress', created_at: old.created_at }),
+      task({ task_id: 'c', agent_type: 'autonomous', status: 'cancelled', created_at: old.created_at }),
+    ])
+    expect(g.open_count).toBe(1)
+    expect(g.overdue_count).toBe(1)
+  })
+
   it('children breach at 15 min, parents at 60', () => {
     const twentyMinAgo = new Date(Date.now() - 20 * 60_000).toISOString()
     const t = task({ status: 'in_progress', created_at: twentyMinAgo })

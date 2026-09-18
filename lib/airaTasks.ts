@@ -59,7 +59,8 @@ export function isTaskOverdue(
   isParent: boolean,
   now = Date.now(),
 ): boolean {
-  if (t.status === 'done') return false
+  // Terminal states never flag: done delivered, cancelled stopped by operator.
+  if (t.status === 'done' || t.status === 'cancelled') return false
   const slaMs = (isParent ? PARENT_SLA_MINUTES : CHILD_SLA_MINUTES) * 60_000
   return taskAgeMs(t, now) > slaMs
 }
@@ -102,22 +103,24 @@ export function groupIntoOrchestrations(tasks: LedgerTask[], now = Date.now()): 
       .filter((r) => r !== parentRow)
       .map((r) => enrichTask(r, false, now))
     const all = [...(parent ? [parent] : []), ...children]
+    const isOpen = (t: EnrichedTask) => t.status !== 'done' && t.status !== 'cancelled'
     out.push({
       session_id: sessionId,
       parent,
       children,
       overdue_count: all.filter((t) => t.overdue).length,
-      open_count: all.filter((t) => t.status !== 'done').length,
+      open_count: all.filter(isOpen).length,
     })
   }
   for (const t of unscoped) {
     const enriched = enrichTask(t, t.agent_type === 'chief_of_staff', now)
+    const isOpen = enriched.status !== 'done' && enriched.status !== 'cancelled'
     out.push({
       session_id: '',
       parent: enriched.is_parent ? enriched : null,
       children: enriched.is_parent ? [] : [enriched],
       overdue_count: enriched.overdue ? 1 : 0,
-      open_count: enriched.status !== 'done' ? 1 : 0,
+      open_count: isOpen ? 1 : 0,
     })
   }
   return out
