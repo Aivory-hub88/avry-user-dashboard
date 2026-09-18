@@ -386,7 +386,7 @@ export function useChat({
   // where Geno has already spoken, not as a fresh 1:1 greeting. Pure
   // parallel fan-out could not do this: no agent ever saw the others.
   // Empty target list falls back to the direct console path.
-  const handleSendRoom = useCallback(async (displayText: string, atts: Attachment[], agentTypes: string[]) => {
+  const handleSendRoom = useCallback(async (displayText: string, atts: Attachment[], agentTypes: string[], ledgerHint: string | null = null) => {
     const targets = [...new Set(agentTypes)]
     if (targets.length === 0) {
       return handleSend(displayText, atts)
@@ -449,7 +449,7 @@ export function useChat({
       if (signal.aborted) break
       const me = candidateOf(t) ?? { type: t, name: agentNameOf(t), title: t, channels: [] as string[] }
       const peers = targets.filter(x => x !== t).map(x => candidateOf(x) ?? { type: x, name: agentNameOf(x), title: x, channels: [] as string[] })
-      const payload = buildRoomPayload({ me, peers, userText, history, roundReplies })
+      const payload = buildRoomPayload({ me, peers, userText, history, roundReplies, ledgerHint })
       try {
         const result = await sendAgentMessage(t as TelegramAgentType, payload, sentSessionId, signal)
         // Backend reply is unvalidated (Cerveau may return null/a non-string

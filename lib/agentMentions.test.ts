@@ -22,7 +22,17 @@ const candidates = getMentionCandidates(deployments)
 
 describe("getMentionCandidates", () => {
   it("returns deployed agents only, first-seen order", () => {
-    expect(candidates.map((c) => c.type)).toEqual(["customer_service", "leads_qualifier"])
+    expect(candidates.map((c) => c.type)).toEqual([
+      "customer_service",
+      "leads_qualifier",
+      "chief_of_staff",
+    ])
+  })
+
+  it("always appends console-native Aira", () => {
+    const aira = candidates.find((c) => c.type === "chief_of_staff")
+    expect(aira?.name).toBe("Aira")
+    expect(aira?.channels).toEqual(["console"])
   })
 
   it("merges channel kinds per agent", () => {
@@ -36,7 +46,8 @@ describe("getMentionCandidates", () => {
 
   it("drops roster-less types", () => {
     const ds: AgentDeployment[] = [{ kind: "api", id: "k", agentType: "ghost", label: "x" }]
-    expect(getMentionCandidates(ds)).toEqual([])
+    // Ghost dropped, but console-native Aira is still appended.
+    expect(getMentionCandidates(ds).map((c) => c.type)).toEqual(["chief_of_staff"])
   })
 })
 
@@ -65,6 +76,7 @@ describe("parseAgentMentions", () => {
     expect(parseAgentMentions("@all status?", candidates)).toEqual([
       "customer_service",
       "leads_qualifier",
+      "chief_of_staff",
     ])
   })
 

@@ -18,7 +18,7 @@ export interface MentionCandidate {
   type: string
   name: string
   title: string
-  /** Channel kinds this agent is deployed to (telegram/slack/api). */
+  /** Channel kinds this agent is deployed to (telegram/slack/api), or console for Aira. */
   channels: string[]
 }
 
@@ -26,6 +26,12 @@ export interface MentionCandidate {
  * Unique deployed agent types, first-seen order, joined with the roster for
  * display names. Roster-less types (stale bindings) are dropped — there is
  * no name/avatar to render for them.
+ *
+ * Plus Aira (chief_of_staff), always: she is console-native (no deployment
+ * needed — the backend routes chief_of_staff like any agent type) and the
+ * task contract expects one parent row per room round, which only she
+ * writes. Without her in the candidate set, @all rounds never produce a
+ * parent and the Mission Timeline cannot group the round.
  */
 export function getMentionCandidates(deployments: AgentDeployment[]): MentionCandidate[] {
   const seen = new Map<string, string[]>()
@@ -43,6 +49,17 @@ export function getMentionCandidates(deployments: AgentDeployment[]): MentionCan
       title: roster.title,
       channels: [...new Set(kinds)],
     })
+  }
+  if (!out.some((c) => c.type === "chief_of_staff")) {
+    const aira = PREBUILT_AGENTS.find((a) => a.type === "chief_of_staff")
+    if (aira) {
+      out.push({
+        type: aira.type,
+        name: aira.name,
+        title: aira.title,
+        channels: ["console"],
+      })
+    }
   }
   return out
 }
@@ -216,6 +233,14 @@ export interface RoomPayloadParams {
   history: RoomHistoryEntry[]
   /** Replies already given this round, in speaking order. */
   roundReplies: RoomHistoryEntry[]
+  /**
+   * Pre-fetched mission-ledger state for this session (see lib/roomLedger).
+   * Lets the agent see its own child-task status without spending a
+   * task_list round-trip — and, combined with the done-is-terminal rule in
+   * the agent IDENTITY, stops re-execution of finished work. Null = unknown
+   * (fetch failed); the agent falls back to task_list as before.
+   */
+  ledgerHint?: string | null
 }
 
 const MAX_HISTORY_ENTRIES = 6
@@ -227,7 +252,7 @@ function clip(text: string, max: number): string {
   return t.length > max ? `${t.slice(0, max)}…` : t
 }
 
-export function buildRoomPayload({ me, peers, userText, history, roundReplies }: RoomPayloadParams): string {
+export function buildRoomPayload({ me, peers, userText, history, roundReplies, ledgerHint }: RoomPayloadParams): string {
   const lines: string[] = []
   lines.push("<room_context>")
   lines.push(`You are in the "Mission Control Room" group chat on the Aivory dashboard. You are ${me.name} (${me.title}).`)
@@ -258,6 +283,12 @@ export function buildRoomPayload({ me, peers, userText, history, roundReplies }:
     lines.push("These members already replied in this round — build on them, don't repeat them:")
     for (const r of roundReplies) lines.push(`${r.author}: ${clip(r.text, MAX_REPLY_CHARS)}`)
     lines.push("</round_replies>")
+  }
+
+  if (ledgerHint && ledgerHint.trim()) {
+    lines.push("<ledger>")
+    lines.push(ledgerHint.trim())
+    lines.push("</ledger>")
   }
 
   lines.push("<user_message>")

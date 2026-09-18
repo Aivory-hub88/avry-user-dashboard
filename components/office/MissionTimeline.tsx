@@ -13,7 +13,7 @@
  */
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
-import { collabAuthHeaders } from "@/lib/collabClient"
+import { authedFetch } from "@/lib/deployAuth"
 import { relativeTime } from "@/lib/officeRows"
 import type { EnrichedTask, Orchestration } from "@/lib/airaTasks"
 
@@ -98,8 +98,17 @@ function TaskCard({ task, orch }: { task: EnrichedTask; orch: Orchestration | un
 }
 
 async function fetchTaskLedger(): Promise<TasksResponse> {
-  const r = await fetch("/api/aira/tasks?limit=100", { headers: collabAuthHeaders() })
-  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  // Refresh-aware: backend access tokens expire after 60 minutes.
+  // A plain fetch with a stale Bearer would 401 here with no recovery
+  // (the "Mission ledger unavailable (HTTP 401)" wall). authedFetch retries
+  // once after exchanging the stored refresh_token, and fires the
+  // session-expired modal when the refresh itself is dead — same choke point
+  // every other authenticated dashboard module goes through.
+  const r = await authedFetch("/api/aira/tasks?limit=100")
+  if (!r.ok) {
+    if (r.status === 401) throw new Error("HTTP 401 — session expired, please sign in again")
+    throw new Error(`HTTP ${r.status}`)
+  }
   return (await r.json()) as TasksResponse
 }
 
