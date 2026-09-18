@@ -63,10 +63,13 @@ export default function AgentMentionMenu({
   }
 
   return (
+    // NOTE: fadeUp, NOT dropIn — dropIn ends with translateX(-50%) for
+    // centered dropdowns and would shift this left-0 menu half its width
+    // off-screen (clipped text like "nd Lead Agent").
     <div
       role="listbox"
       aria-label="Mention an agent"
-      className="absolute bottom-full left-0 z-30 mb-2 max-h-[280px] w-[300px] overflow-y-auto rounded-2xl border border-white/10 bg-surface-2 p-1.5 shadow-2xl [animation:dropIn_0.18s_cubic-bezier(0.22,1,0.36,1)_both]"
+      className="absolute bottom-full left-0 z-30 mb-2 max-h-[280px] w-[300px] overflow-y-auto rounded-2xl border border-white/10 bg-surface-2 p-1.5 shadow-2xl [animation:fadeUp_0.18s_cubic-bezier(0.22,1,0.36,1)_both]"
     >
       {candidates.map((c, i) => (
         <button

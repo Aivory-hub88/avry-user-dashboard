@@ -23,6 +23,7 @@ import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { useActiveRuns } from "@/hooks/useActiveRuns"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
 import { getMentionCandidates, parseAgentMentions, resolveNamedAgents, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
+import { fetchLedgerHint } from "@/lib/roomLedger"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import type { Attachment } from "@/components/UploadMenu"
@@ -359,7 +360,12 @@ export default function ConsolePage() {
         const mentioned = parseAgentMentions(text, mentionCandidates)
         if (mentioned.length > 0) {
           saveRoomSticky(mentioned)
-          await handleSendRoom(text, atts, mentioned)
+          await handleSendRoom(
+            text,
+            atts,
+            mentioned,
+            await fetchLedgerHint(currentSessionId, mentioned),
+          )
         } else if (resolveNamedAgents(text, mentionCandidates).length > 0) {
           // Name-called ("panggilkan Lex", "tanya Teo"): same mention
           // semantics as @ — the named agent answers in its own bubble via
@@ -367,7 +373,12 @@ export default function ConsolePage() {
           // the scenes and narrating the result.
           const named = resolveNamedAgents(text, mentionCandidates)
           saveRoomSticky(named)
-          await handleSendRoom(text, atts, named)
+          await handleSendRoom(
+            text,
+            atts,
+            named,
+            await fetchLedgerHint(currentSessionId, named),
+          )
         } else {
           // No @mention: continue with whoever holds the floor in this
           // thread (e.g. answering Lex's questions goes back to Lex), else
@@ -392,7 +403,12 @@ export default function ConsolePage() {
           }
           if (targets.length > 0) {
             saveRoomSticky(targets)
-            await handleSendRoom(text, atts, targets)
+            await handleSendRoom(
+              text,
+              atts,
+              targets,
+              await fetchLedgerHint(currentSessionId, targets),
+            )
           } else {
             handleSend(text, atts)
           }
