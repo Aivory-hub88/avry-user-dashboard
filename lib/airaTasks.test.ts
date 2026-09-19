@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  enrichTask,
   groupIntoOrchestrations,
   isTaskOverdue,
   CHILD_SLA_MINUTES,
@@ -90,5 +91,31 @@ describe('groupIntoOrchestrations', () => {
     const [g] = groupIntoOrchestrations(rows)
     expect(g.session_id).toBe('')
     expect(g.children).toHaveLength(1)
+  })
+})
+
+describe('enrichTask elapsed', () => {
+  it('open work counts time since it started', () => {
+    const now = Date.now()
+    const t = task({ status: 'in_progress', created_at: new Date(now - 5 * 60_000).toISOString() })
+    expect(enrichTask(t, false, now).elapsed_ms).toBe(5 * 60_000)
+  })
+
+  it('finished work reports how long it took, not how long ago it started', () => {
+    const now = Date.now()
+    const created = new Date(now - 3 * 24 * 3_600_000)
+    const t = task({
+      status: 'done',
+      created_at: created.toISOString(),
+      updated_at: new Date(created.getTime() + 4 * 60_000).toISOString(),
+    })
+    const e = enrichTask(t, false, now)
+    expect(e.elapsed_ms).toBe(4 * 60_000)
+    expect(e.overdue).toBe(false)
+  })
+
+  it('never reports a negative duration for a skewed clock', () => {
+    const t = task({ status: 'done', created_at: '2026-09-19T10:00:05Z', updated_at: '2026-09-19T10:00:00Z' })
+    expect(enrichTask(t, false).elapsed_ms).toBe(0)
   })
 })

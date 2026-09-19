@@ -8,6 +8,11 @@ import {
   type LedgerTask,
   type EnrichedTask,
 } from '@/lib/airaTasks'
+import {
+  ARCHIVE_ROW_CAP,
+  clampDoneDays,
+  decodeArchivedTasks,
+} from '@/lib/airaArchive'
 
 /**
  * GET /api/aira/tasks — Aira task ledger for kanban render.
@@ -25,11 +30,18 @@ import {
  *   from created_at against CHILD_SLA_MINUTES (15) / PARENT_SLA_MINUTES (60)
  *   — surfacing for human-driven enforcement, no background canceller.
  *
+ * Finished work: Cerveau moves a task out of agent_tasks the moment it is
+ * marked done and keeps it, gzip-compressed, in agent_tasks_archive for 40
+ * days. This route reads both, so the Done column and the room ledger hint
+ * see finished tasks again (lib/airaArchive.ts). The archive read is
+ * best-effort: if it fails the live board is still served.
+ *
  * Query params:
  *   agent_type  filter to one agent (default: all — Aira + specialists)
  *   session_id  filter to one room/console session
  *   status      filter to one column (todo | in_progress | blocked | done)
  *   limit       max rows, default 100, capped at 500
+ *   done_days   how far back finished tasks are shown, default 14, max 40
  *
  * Auth: user JWT is tenant-isolated to their own user_id; service token
  * may pass an explicit tenant_id (Cerveau → dashboard server-side calls).
@@ -47,6 +59,50 @@ const DEFAULT_LIMIT = 100
 
 function emptyColumns(): Record<Status, EnrichedTask[]> {
   return { todo: [], in_progress: [], blocked: [], done: [] }
+}
+
+/**
+ * Finished tasks from Cerveau's archive, newest first. Best-effort by design:
+ * a missing table (a dev database, or an older Cerveau) or a decode problem
+ * must not take the whole board down, so failures are logged and yield [].
+ */
+async function fetchFinishedTasks(opts: {
+  wanted: boolean
+  tenantId: string
+  agentType: string | null
+  sessionId: string | null
+  limit: number
+  days: number
+}): Promise<LedgerTask[]> {
+  if (!opts.wanted) return []
+  const values: unknown[] = [opts.tenantId]
+  let agentClause = ''
+  if (opts.agentType) {
+    values.push(opts.agentType)
+    agentClause = `AND agent_type = $${values.length}`
+  }
+  values.push(opts.days)
+  const daysIdx = values.length
+  values.push(Math.min(opts.limit, ARCHIVE_ROW_CAP))
+  const limitIdx = values.length
+  try {
+    const r = await query(
+      `SELECT payload
+       FROM cerveau.agent_tasks_archive
+       WHERE tenant_id = $1 ${agentClause}
+         AND archived_at > NOW() - make_interval(days => $${daysIdx}::int)
+       ORDER BY archived_at DESC
+       LIMIT $${limitIdx}`,
+      values,
+    )
+    return decodeArchivedTasks(
+      r.rows.map((row: { payload: unknown }) => row.payload),
+      { tenantId: opts.tenantId, sessionId: opts.sessionId },
+    )
+  } catch (err) {
+    console.error('[api/aira/tasks] archive read failed (serving live rows only):', err)
+    return []
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -109,7 +165,19 @@ export async function GET(req: NextRequest) {
        LIMIT $${values.length}`,
       values,
     )
-    const tasks = r.rows as LedgerTask[]
+    const liveRows = r.rows as LedgerTask[]
+    const finished = await fetchFinishedTasks({
+      wanted: !statusParam || statusParam === 'done',
+      tenantId,
+      agentType,
+      sessionId,
+      limit,
+      days: clampDoneDays(params.get('done_days')),
+    })
+    // A task is in exactly one table, but be safe against a row caught
+    // mid-move: the live copy wins.
+    const seen = new Set(liveRows.map((t) => t.task_id))
+    const tasks = [...liveRows, ...finished.filter((t) => !seen.has(t.task_id))]
     const now = Date.now()
     // Cancelled rows (stopped by the operator) stay in the DB as the audit
     // trail but leave the active board: no column, no count, no SLA flag.

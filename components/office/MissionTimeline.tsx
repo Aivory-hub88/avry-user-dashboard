@@ -76,12 +76,21 @@ function TaskCard({ task, orch }: { task: EnrichedTask; orch: Orchestration | un
             Orchestration
           </span>
         )}
-        <span className="tabular-nums">{formatElapsed(task.elapsed_ms)} elapsed</span>
+        <span className="tabular-nums">
+          {task.status === "done"
+            ? `took ${formatElapsed(task.elapsed_ms)}`
+            : `${formatElapsed(task.elapsed_ms)} elapsed`}
+        </span>
       </div>
       {task.is_parent && orch && (
         <div className="mt-1.5 text-[11px] font-light text-white/45">
           {orch.children.length} step{orch.children.length === 1 ? "" : "s"} · {orch.open_count} open
           {orch.overdue_count > 0 ? ` · ${orch.overdue_count} overdue` : ""}
+        </div>
+      )}
+      {task.status === "done" && task.result_summary && (
+        <div className="mt-1.5 truncate text-[11.5px] font-light text-white/50" title={task.result_summary}>
+          Result: {task.result_summary}
         </div>
       )}
       {task.status === "blocked" && task.blocked_reason && (

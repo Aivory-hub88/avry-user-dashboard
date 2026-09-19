@@ -27,6 +27,12 @@ export interface LedgerTask {
   blocked_reason: string | null
   created_at: string
   updated_at: string
+  /** Delegation link — only on tasks Cerveau created for a delegation and only
+   *  when read back from the archive (see lib/airaArchive.ts). */
+  delegated_by?: string
+  delegation_id?: string
+  /** Bounded summary of what a finished delegation produced. */
+  result_summary?: string
 }
 
 export interface EnrichedTask extends LedgerTask {
@@ -65,12 +71,22 @@ export function isTaskOverdue(
   return taskAgeMs(t, now) > slaMs
 }
 
+/** How long a finished task took: created → marked done. */
+export function taskDurationMs(t: Pick<LedgerTask, 'created_at' | 'updated_at'>): number {
+  const created = new Date(t.created_at).getTime()
+  const done = new Date(t.updated_at).getTime()
+  if (Number.isNaN(created) || Number.isNaN(done)) return 0
+  return Math.max(0, done - created)
+}
+
 export function enrichTask(t: LedgerTask, isParent: boolean, now = Date.now()): EnrichedTask {
   return {
     ...t,
     is_parent: isParent,
     overdue: isTaskOverdue(t, isParent, now),
-    elapsed_ms: taskAgeMs(t, now),
+    // Open work: time since it started. Finished work: how long it took —
+    // "elapsed since creation" would keep growing on a card that is done.
+    elapsed_ms: t.status === 'done' ? taskDurationMs(t) : taskAgeMs(t, now),
   }
 }
 
