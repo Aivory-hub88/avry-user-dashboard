@@ -18,6 +18,10 @@ import type { AgentType } from "@/lib/agentRoster"
 
 const CONSOLE_ICON_SRC = "/Aivory_Avatar.svg"
 
+// Portrait filenames stay the same across art refreshes, so browsers (and the
+// CDN) keep serving the old SVG. Bump this whenever public/agents/* changes.
+const PORTRAIT_VERSION = "20260919b"
+
 export interface AgentVisual {
   /** A full-bleed circular portrait (own background baked in) — rendered
    *  with object-fit: cover, no tinted backdrop needed. Absent for Aivory
@@ -62,7 +66,7 @@ export function AgentAvatar({ type, size = 32, className = "" }: AgentAvatarProp
         style={{ width: size, height: size }}
       >
         <Image
-          src={asset(v.portraitSrc)}
+          src={`${asset(v.portraitSrc)}?v=${PORTRAIT_VERSION}`}
           alt=""
           fill
           sizes={`${size}px`}
