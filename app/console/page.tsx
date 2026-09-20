@@ -601,10 +601,10 @@ export default function ConsolePage() {
               <div
                 className="mb-8 flex items-center justify-center gap-3 [animation:fadeUp_0.55s_0s_cubic-bezier(0.22,1,0.36,1)_both]"
               >
-                {/* The brand mark's artwork sits high in its viewBox, so it
-                    renders above the text's optical center — nudge it down
-                    to sit on the same line. */}
-                <span className="inline-flex translate-y-[3px]">
+                {/* The new brand mark artwork is vertically centered in its
+                    viewBox, so plain flex centering aligns it with the text —
+                    no manual nudge (the old mark sat high and needed one). */}
+                <span className="inline-flex">
                    <AgentAvatar type={agentTarget} size={48} />
                 </span>
                 <h1
