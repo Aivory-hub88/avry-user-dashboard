@@ -255,9 +255,9 @@ export default function Sidebar() {
             <Image
               src={asset("/Aivory_logo_2026.svg?v=20260920")}
               alt="Aivory"
-              width={152}
-              height={22}
-              className="h-[22px] w-auto object-contain"
+              width={91}
+              height={13}
+              className="h-[13px] w-auto object-contain"
             />
           </div>
         ) : (
