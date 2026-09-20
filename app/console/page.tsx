@@ -605,7 +605,7 @@ export default function ConsolePage() {
                     renders above the text's optical center — nudge it down
                     to sit on the same line. */}
                 <span className="inline-flex translate-y-[3px]">
-                  <AgentAvatar type={agentTarget} size={40} />
+                   <AgentAvatar type={agentTarget} size={48} />
                 </span>
                 <h1
                   className="font-light"
