@@ -147,7 +147,7 @@ export const AddWithCopilotPanel: React.FC<AddWithCopilotPanelProps> = ({
       {/* ── Header ── */}
       <div className={styles.header}>
         <div className={styles.headerLeft}>
-          <Image src={asset('/Aivory_Avatar.svg')} alt="" width={22} height={22} className={styles.headerAvatar} />
+          <Image src={asset('/Aivory_Avatar.svg?v=20260920')} alt="" width={22} height={22} className={styles.headerAvatar} />
           <div className={styles.headerText}>
             <span className={styles.headerTitle}>{nodeTitle}</span>
             <span className={styles.headerSub}>{typeLabel} · Aivory copilot</span>

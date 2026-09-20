@@ -16,7 +16,7 @@ import Image from "next/image"
 import { asset } from "@/lib/asset"
 import type { AgentType } from "@/lib/agentRoster"
 
-const CONSOLE_ICON_SRC = "/Aivory_Avatar.svg"
+const CONSOLE_ICON_SRC = "/Aivory_Avatar.svg?v=20260920"
 
 // Portrait filenames stay the same across art refreshes, so browsers (and the
 // CDN) keep serving the old SVG. Bump this whenever public/agents/* changes.

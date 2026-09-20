@@ -478,7 +478,7 @@ export default function AivoryAssistant() {
         aria-haspopup="dialog"
       >
         <Image
-          src={asset("/Aivory_Avatar.svg")}
+          src={asset("/Aivory_Avatar.svg?v=20260920")}
           alt=""
           width={20}
           height={20}

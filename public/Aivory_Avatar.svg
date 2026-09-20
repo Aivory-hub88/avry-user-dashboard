@@ -1,19 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="275" height="218" viewBox="0 0 275 218">
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 512 512">
+  <!-- Generator: Adobe Illustrator 30.6.0, SVG Export Plug-In . SVG Version: 2.1.4 Build 109)  -->
   <defs>
-    <clipPath id="clip-path">
-      <rect id="Rectangle_1" data-name="Rectangle 1" width="205.193" height="148.293" fill="none"/>
-    </clipPath>
-    <clipPath id="clip-Artboard_1">
-      <rect width="275" height="218"/>
+    <style>
+      .st0 {
+        fill: none;
+      }
+
+      .st1 {
+        fill: #fff;
+      }
+
+      .st2 {
+        fill: #d3d3d3;
+      }
+
+      .st3 {
+        clip-path: url(#clippath);
+      }
+    </style>
+    <clipPath id="clippath">
+      <path class="st0" d="M347.7,92.2c-110.6,0-139.1,16.8-182.6,88.9L36.6,394.3c-5.3,7.9-10.4,16.4-15.3,25.5h0s0,0,0,0h0s71.2,0,71.2,0h.5l.5-.9c48.1-42,68-59.5,118.1-86.5l197.3-111.1v198.5h65.8V92.2h-126.9ZM225.5,274c-19.7,5.5-38.7,11.1-57,18l36.4-61.7c58.4-94.8,82.1-81,203.9-81v71.8l-183.4,52.9Z"/>
     </clipPath>
   </defs>
-  <g id="Artboard_1" data-name="Artboard 1" clip-path="url(#clip-Artboard_1)">
-    <rect width="275" height="218" fill="rgba(255,255,255,0)"/>
-    <g id="Group_2" data-name="Group 2" transform="translate(35 35)">
-      <g id="Group_1" data-name="Group 1" clip-path="url(#clip-path)">
-        <path id="Path_1" data-name="Path 1" d="M0,148.291,65.122,40.25C84.781,7.626,97.681,0,147.752,0h57.441V148.291H175.418V25.827c-44.217,0-61.018-3.08-88,36.669l-50.684,85.8Z" fill="#fff"/>
-        <path id="Path_2" data-name="Path 2" d="M138.762,117.6s-23.31-2.345-35.83,4.485c-5.618,3.065-8.857,9.438-12.723,16.172l-5.166,10.037h53.719Z" fill="#fff"/>
-      </g>
-    </g>
+  <path class="st1" d="M347.7,92.2c-110.6,0-139.1,16.8-182.6,88.9L36.6,394.3c-5.3,7.9-10.4,16.4-15.3,25.5h0s0,0,0,0h0s71.2,0,71.2,0h.5l.5-.9c48.1-42,68-59.5,118.1-86.5l197.3-111.1v198.5h65.8V92.2h-126.9ZM225.5,274c-19.7,5.5-38.7,11.1-57,18l36.4-61.7c58.4-94.8,82.1-81,203.9-81v71.8l-183.4,52.9Z"/>
+  <g class="st3">
+    <polygon class="st2" points="488.2 835.4 -18.7 835.4 -12.5 341.9 493.9 193.2 488.2 835.4"/>
   </g>
 </svg>

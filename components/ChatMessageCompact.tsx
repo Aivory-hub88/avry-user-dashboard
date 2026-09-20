@@ -112,7 +112,7 @@ export default function ChatMessageCompact({
       ) : (
         <div className="flex items-start gap-2.5">
           <div className="w-6 h-6 rounded-full flex-shrink-0 mt-0.5 flex items-center justify-center bg-accent/15 border border-accent/20">
-            <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={13} height={13} />
+            <Image src={asset("/Aivory_Avatar.svg?v=20260920")} alt="Aivory" width={13} height={13} />
           </div>
           <div className="flex-1 min-w-0 pt-0.5">
             {isStreaming && !content && (

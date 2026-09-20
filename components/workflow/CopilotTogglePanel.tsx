@@ -329,7 +329,7 @@ function CopilotPanelExpanded({
           {loading && (
             <div className="flex items-start gap-2">
               <div className="shrink-0 mt-0.5">
-                <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={16} height={16} className="w-4 h-4" />
+                <Image src={asset("/Aivory_Avatar.svg?v=20260920")} alt="Aivory" width={16} height={16} className="w-4 h-4" />
               </div>
               <div className="flex flex-col gap-1.5 px-3 py-2 bg-white/[0.04] border border-white/5 rounded-[10px] rounded-bl-[2px]">
                 <ThinkingDots size={15} dotSize={2} />
@@ -596,7 +596,7 @@ function MessageRow({
     return (
       <div className="group flex items-start gap-2.5">
         <div className="shrink-0 mt-1">
-          <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={18} height={18} className="w-[18px] h-[18px]" />
+          <Image src={asset("/Aivory_Avatar.svg?v=20260920")} alt="Aivory" width={18} height={18} className="w-[18px] h-[18px]" />
         </div>
         <div className="flex-1 min-w-0">
           <div className={`${MD_CLASSES} text-[#ecebe7]`}>

@@ -148,7 +148,7 @@ const Icons = {
     </svg>
   ),
   aivoryAvatar: (
-    <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={18} height={18} />
+    <Image src={asset("/Aivory_Avatar.svg?v=20260920")} alt="Aivory" width={18} height={18} />
   ),
   robot: (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -1594,7 +1594,7 @@ function WorkflowsPageInner() {
       <div className={styles.onboardingOverlay}>
         <div className={styles.onboardingContent}>
           <div className={styles.onboardingAvatarWrap}>
-            <Image src={asset("/Aivory_Avatar.svg")} alt="Aivory" width={28} height={28} />
+            <Image src={asset("/Aivory_Avatar.svg?v=20260920")} alt="Aivory" width={28} height={28} />
           </div>
           <h2 className={styles.onboardingTitle}>{t('onboardingTitle')}</h2>
           <p className={styles.onboardingSubtitle}>
@@ -1604,7 +1604,7 @@ function WorkflowsPageInner() {
             className={styles.onboardingCTA}
             onClick={() => {}}
           >
-            <Image src={asset("/Aivory_Avatar.svg")} alt="" width={16} height={16} aria-hidden="true" />
+            <Image src={asset("/Aivory_Avatar.svg?v=20260920")} alt="" width={16} height={16} aria-hidden="true" />
             {t('askAivoryCopilot')}
           </button>
           <p className={styles.onboardingHotkey}>
