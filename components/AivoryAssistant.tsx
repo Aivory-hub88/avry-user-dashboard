@@ -363,7 +363,7 @@ export default function AivoryAssistant() {
           aria-label="Aivory assistant"
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08] shrink-0">
-            <Image src={asset("/Aivory_logo_2026.svg")} alt="Aivory" width={64} height={16} className="h-4 object-contain" />
+            <Image src={asset("/Aivory_logo_2026.svg?v=20260920")} alt="Aivory" width={64} height={16} className="h-4 object-contain" />
             <div className="flex items-center gap-2.5">
               {(activeSourceTab || pageContext) && (
                 <span className="text-white/40 text-xs font-light tracking-wide lowercase">

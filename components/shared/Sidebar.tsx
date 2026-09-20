@@ -253,7 +253,7 @@ export default function Sidebar() {
         {!collapsed ? (
           <div className="flex items-center">
             <Image
-              src={asset("/Aivory_logo_2026.svg")}
+              src={asset("/Aivory_logo_2026.svg?v=20260920")}
               alt="Aivory"
               width={152}
               height={22}
@@ -263,7 +263,7 @@ export default function Sidebar() {
         ) : (
           <div className="flex items-center justify-center w-full py-1">
             <Image
-              src={asset("/Aivory_icon_2026.svg")}
+              src={asset("/Aivory_icon_2026.svg?v=20260920")}
               alt="Aivory"
               width={32}
               height={32}

@@ -40,7 +40,7 @@ function getFileIcon(name: string) {
 function AivoryLogo() {
   return (
     <Image
-      src={asset("/Aivory_logo_2026.svg")}
+      src={asset("/Aivory_logo_2026.svg?v=20260920")}
       alt="Aivory"
       width={96}
       height={24}
@@ -121,7 +121,7 @@ function CopilotBarCollapsed({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       aria-label="Open Aivory Copilot"
     >
-      <Image src={asset("/Aivory_logo_2026.svg")} alt="" width={64} height={16} className="h-4 object-contain" aria-hidden="true" />
+      <Image src={asset("/Aivory_logo_2026.svg?v=20260920")} alt="" width={64} height={16} className="h-4 object-contain" aria-hidden="true" />
       <span>Aivory Copilot</span>
       <span className="text-[11px] text-[#a1a1aa] ml-1">/ or &#8984;K</span>
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#a1a1aa] ml-0.5">
