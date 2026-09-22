@@ -45,7 +45,14 @@ export default function WorkspaceDocPage() {
   const search = useSearchParams()
   const router = useRouter()
   const id = (params?.id as string) ?? "demo"
-  const view = search.get("view") === "database" ? "database" : search.get("view") === "board" ? "board" : search.get("view") === "discussion" ? "discussion" : "page"
+  // Discussion = tampilan awal project: tanpa ?view eksplisit, project
+  // (isProject) langsung mendarat di ruang diskusi; Write/Data/Board
+  // eksplisit tetap menang. Non-project tetap Write (tanpa discussion).
+  const viewParam = search.get("view")
+  const explicitView =
+    viewParam === "database" || viewParam === "board" || viewParam === "discussion" || viewParam === "page"
+      ? viewParam
+      : null
   const threadParam = search.get("thread")
 
   const [meta, setMeta] = useState<Meta | null>(null)
@@ -201,6 +208,7 @@ export default function WorkspaceDocPage() {
   const canWrite = meta?.myRole === 'owner' || meta?.myRole === 'editor'
   const isTrashed = !!meta?.deleted_at
   const isProject = meta?.props?.isProject === true
+  const view = explicitView ?? (isProject ? "discussion" : "page")
   const projectMembers = Array.isArray(meta?.props?.projectDocs)
     ? (meta?.props?.projectDocs as string[]).filter((m) => typeof m === "string")
     : []
@@ -382,7 +390,7 @@ export default function WorkspaceDocPage() {
               </Link>
             )}
             <Link
-              href={`/workspace/${id}`}
+              href={`/workspace/${id}?view=page`}
               className={`rounded-full px-3 py-1 text-[12px] ${view === "page" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
             >
                Write

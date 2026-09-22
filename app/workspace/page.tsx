@@ -150,7 +150,7 @@ export default function WorkspacePage() {
               body: JSON.stringify({ props: { isProject: true, projectDocs: [] } }),
             })
           } catch {}
-          router.push(`/workspace/${j.id}?view=board`)
+          router.push(`/workspace/${j.id}?view=discussion`)
         } else {
           router.push(`/workspace/${j.id}`)
         }
