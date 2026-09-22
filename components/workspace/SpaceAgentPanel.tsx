@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { agentDisplayName, type SpaceAgentTask } from "@/lib/spaceAgent"
 import { POLL_MS, APPROVE_CLASS } from "@/lib/spaceUi"
+import { ThinkingDots } from "@/components/ui/ThinkingDots"
 import { NotificationCard } from "@/components/office/NotificationCard"
 import {
   listPendingApprovals,
@@ -187,9 +188,11 @@ export default function SpaceAgentPanel({
       </div>
       <div className="text-[12px] text-white/45">
         {openCount > 0 ? (
-          <span>
-            <span className="mr-1">👀</span>
-            {names.join(", ")} working…
+          <span className="flex items-center gap-2.5">
+            <ThinkingDots size={16} dotSize={2.5} />
+            <span className="text-[13px] text-[#a1a1aa]">
+              {names.join(", ")} is thinking…
+            </span>
           </span>
         ) : allDone ? (
           <span>

@@ -50,6 +50,8 @@ import { useAgentMention } from "@/hooks/useAgentMention"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { candidateOf, type MentionCandidate } from "@/lib/agentMentions"
 import { AGENT_ROSTER } from "@/lib/agentRoster"
+import { agentDisplayName, type SpaceAgentTask } from "@/lib/spaceAgent"
+import { ThinkingDots } from "@/components/ui/ThinkingDots"
 import { timeAgo, MENU_POPOVER_CLASS, PRESENCE_RING_CLASS, placeMenu } from "@/lib/spaceUi"
 import SpaceAgentPanel from "@/components/workspace/SpaceAgentPanel"
 import SpaceActivityPanel from "@/components/workspace/SpaceActivityPanel"
@@ -1014,6 +1016,34 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
   const stream = useDiscussionResource<{ roots: RootItem[] }>(`/api/workspace/${spaceId}/stream?limit=50`)
   const threadResource = useDiscussionResource<ThreadPayload>(openRoot
     ? `/api/workspace/${spaceId}/thread?root=${encodeURIComponent(openRoot)}` : null)
+  // Satu poll untuk seluruh Space: status task terbuka per thread, bahan
+  // gelembung thinking di tengah (pola console, bukan di panel saja).
+  const spaceTasks = useDiscussionResource<{ tasks: SpaceAgentTask[] }>(
+    `/api/workspace/${spaceId}/agent-tasks`,
+  )
+  const thinkingByRoot = useMemo(() => {
+    const map = new Map<string, string[]>()
+    const list = Array.isArray(spaceTasks.data?.tasks) ? spaceTasks.data.tasks : []
+    for (const t of list) {
+      if (t.status !== "todo" && t.status !== "in_progress" && t.status !== "blocked") continue
+      if (!t.threadRoot) continue
+      const names = map.get(t.threadRoot) ?? []
+      const label = agentDisplayName(t.agentType)
+      if (!names.includes(label)) names.push(label)
+      map.set(t.threadRoot, names)
+    }
+    return map
+  }, [spaceTasks.data])
+  const firstThinkingType = useMemo(() => {
+    const map = new Map<string, string>()
+    const list = Array.isArray(spaceTasks.data?.tasks) ? spaceTasks.data.tasks : []
+    for (const t of list) {
+      if (t.status !== "todo" && t.status !== "in_progress" && t.status !== "blocked") continue
+      if (!t.threadRoot || map.has(t.threadRoot)) continue
+      map.set(t.threadRoot, t.agentType)
+    }
+    return map
+  }, [spaceTasks.data])
   const roots = useMemo(
     () => (Array.isArray(stream.data?.roots) ? stream.data.roots : []),
     [stream.data],
@@ -1024,6 +1054,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
   const threadLoading = threadResource.loading
   const loadStream = stream.refresh
   const loadThread = threadResource.refresh
+  const loadSpaceTasks = spaceTasks.refresh
   const [docs, setDocs] = useState<DocOption[]>([])
   const [drafts, setDrafts] = useState<Drafts>({})
   const [topicDrafts, setTopicDrafts] = useState<Drafts>({})
@@ -1099,7 +1130,8 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
   const refreshAll = useCallback(() => {
     void loadStream()
     void loadThread()
-  }, [loadStream, loadThread])
+    void loadSpaceTasks()
+  }, [loadStream, loadThread, loadSpaceTasks])
 
   const focusRootComposer = useCallback(() => {
     requestAnimationFrame(() => {
@@ -1508,6 +1540,25 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                           </div>
                         )
                       })}
+                      {/* Agent sedang kerja di thread ini — gelembung thinking
+                          console di tengah flow (bukan cuma di panel). */}
+                      {thinkingByRoot.get(r.id) && (
+                        <div className="mt-5">
+                          <div className="flex items-start gap-4">
+                            <AgentAvatar
+                              type={firstThinkingType.get(r.id) ?? null}
+                              size={36}
+                              className="mt-0.5"
+                            />
+                            <div className="flex items-center gap-2.5 rounded-2xl border border-line bg-white/[0.035] px-5 py-3.5">
+                              <ThinkingDots size={16} dotSize={2.5} />
+                              <span className="text-sm text-[#a1a1aa]">
+                                {(thinkingByRoot.get(r.id) ?? []).join(", ")} is thinking…
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       {hiddenCount > 0 ? (
                         <div className={ownRoot ? "mt-2 text-right" : "ml-[52px] mt-2"}>
                           <button
