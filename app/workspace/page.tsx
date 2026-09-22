@@ -2,13 +2,13 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Trash2 } from "lucide-react"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 import WorkspaceBell from "@/components/workspace/WorkspaceBell"
 
-type DocItem = { id: string; title: string; workspace_id: string; owner: string | null; updated_at: string | null; myRole: string }
+type DocItem = { id: string; title: string; workspace_id: string; owner: string | null; updated_at: string | null; myRole: string; isProject?: boolean }
 type SearchHit = { kind: "doc" | "row"; doc_id: string; doc_title: string; row_id?: string; title: string; snippet: string }
 
 export default function WorkspacePage() {
@@ -31,6 +31,9 @@ export default function WorkspacePage() {
   const [hits, setHits] = useState<SearchHit[] | null>(null)
   const [searching, setSearching] = useState(false)
   const router = useRouter()
+  const search = useSearchParams()
+  // Sub-page dokumen: ?view=pages mematikan smart landing (tetap tampil list).
+  const wantPages = search.get("view") === "pages"
   const loginUrl = `${getMarketingUrl()}/login`
 
   // Unified search (docs + task rows, server-ranked) — debounced.
@@ -130,6 +133,16 @@ export default function WorkspacePage() {
   useEffect(() => { load() }, [])
   useEffect(() => { if (showTrash) void loadTrash() }, [showTrash])
 
+  // Smart landing: klik Workspace langsung masuk ruang discussion project
+  // terbaru (list API sudah urut updated_at DESC). replace (bukan push)
+  // supaya tombol back tidak memantul. Tanpa project / ?view=pages / error
+  // → tetap tampil list dokumen sebagai sub-page.
+  const topProject = docs.find((d) => d.isProject) ?? null
+  useEffect(() => {
+    if (wantPages || loading || error) return
+    if (topProject) router.replace(`/workspace/${topProject.id}?view=discussion`)
+  }, [wantPages, loading, error, topProject, router])
+
   const create = async (asProject = false) => {
     if (creating) return
     setCreating(true)
@@ -219,6 +232,17 @@ export default function WorkspacePage() {
         ? 'bg-sky-500/15 text-sky-300'
         : 'bg-amber-500/15 text-amber-300'
 
+  if (!wantPages && !error && (loading || topProject)) {
+    return (
+      <div className="flex h-full w-full flex-col bg-surface-1">
+        <div className="flex h-12 shrink-0 items-center border-b border-line bg-black/10 px-6 text-[13px] font-medium leading-none text-white/80">My workspace</div>
+        <div className="flex flex-1 items-center justify-center text-[13px] text-white/30">
+          {loading ? "Loading…" : "Opening discussion…"}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full w-full flex-col bg-surface-1">
       <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-black/10 px-6">
@@ -280,6 +304,11 @@ export default function WorkspacePage() {
         <div className="mb-4 flex items-center gap-2">
           <button onClick={() => setShowTrash(false)} className={`rounded-full px-3 py-1.5 text-[12px] ${!showTrash ? "bg-white text-black" : "bg-white/[0.06] text-white/50"}`}>Pages</button>
           <button onClick={() => setShowTrash(true)} className={`rounded-full px-3 py-1.5 text-[12px] ${showTrash ? "bg-white text-black" : "bg-white/[0.06] text-white/50"}`}>Trash {trashDocs.length ? `· ${trashDocs.length}` : ""}</button>
+          {wantPages && topProject && (
+            <Link href={`/workspace/${topProject.id}?view=discussion`} className="ml-auto rounded-full bg-white/[0.06] px-3 py-1.5 text-[12px] text-white/60 hover:bg-white/[0.1] hover:text-white/85">
+              → Back to discussion
+            </Link>
+          )}
         </div>
         {!showTrash ? (
         <div className="rounded-[16px] border border-line bg-white/[0.03] p-6">

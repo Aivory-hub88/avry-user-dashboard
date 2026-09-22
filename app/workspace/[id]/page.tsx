@@ -196,7 +196,7 @@ export default function WorkspaceDocPage() {
             )}
             {reqMsg && <div className="mt-3 text-[11px] text-white/50">{reqMsg}</div>}
             <div className="mt-6">
-              <Link href="/workspace" className="text-[12px] text-white/30 underline-offset-4 hover:underline">← Back to workspace</Link>
+              <Link href="/workspace?view=pages" className="text-[12px] text-white/30 underline-offset-4 hover:underline">← Back to workspace</Link>
             </div>
           </div>
         </div>
@@ -342,9 +342,9 @@ export default function WorkspaceDocPage() {
     <div className="flex h-full w-full flex-col bg-surface-1">
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-black/10 px-6">
         <div className="flex min-w-0 items-center gap-2">
-          <Link href="/workspace" className="shrink-0 text-[13px] text-white/40 hover:text-white/70">
-            Workspace
-          </Link>
+            <Link href="/workspace?view=pages" className="shrink-0 text-[13px] text-white/40 hover:text-white/70">
+              Workspace
+            </Link>
           <span className="shrink-0 text-white/20">/</span>
           {view === "page" ? (
             // Write view: the Big Title above the editor is the rename surface
@@ -544,7 +544,7 @@ export default function WorkspaceDocPage() {
           <span>This page is in trash — it’s hidden from the list until restored.</span>
           <span className="flex items-center gap-2">
             <button onClick={restoreDoc} disabled={busy} className="rounded-full bg-white px-3 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-50">Restore</button>
-            <Link href="/workspace" className="text-[11px] text-amber-200/70 underline">Back to workspace</Link>
+            <Link href="/workspace?view=pages" className="text-[11px] text-amber-200/70 underline">Back to workspace</Link>
           </span>
         </div>
       )}

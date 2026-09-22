@@ -149,8 +149,8 @@ export default function WorkspaceNavigator({
       const response = await fetch(`/api/workspace/${docId}`, { method: "DELETE", headers: collabAuthHeaders() })
       if (response.ok) {
         setDocs((prev) => prev.filter((doc) => doc.id !== docId))
-        // The active page is gone — back to the list, never a dead doc.
-        if (docId === currentId) router.push("/workspace")
+        // The active page is gone — back to the pages list, never a dead doc.
+        if (docId === currentId) router.push("/workspace?view=pages")
       } else {
         setCreateError(response.status === 401 ? "Sign in required" : "Could not delete page")
       }
