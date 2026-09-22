@@ -1,9 +1,24 @@
 /**
- * SpaceDiscussion — mode Discussion di Space view (Phase 2: baca + tulis).
+ * SpaceDiscussion — mode Discussion di Space view (redesain UI/UX total).
  *
- * Stream root + panel thread + composer (root & reply) + picker @/# +
- * chip render + topic actions (title/archive). Stream kiri tidak reset
- * saat thread dibuka; di-refresh background setelah tulis berhasil.
+ * API 100% tetap (stream / thread / messages / topics / agent-tasks / activity).
+ * Yang berubah hanya presentasi + UX, ala Slack/Linear:
+ *
+ * - Stream header: judul + count, presence stack, filter search, refresh,
+ *   tombol "New thread" (fokus ke composer).
+ * - Root cards: aksen violet saat thread aktif, hover actions (reply, copy
+ *   link, delete), topic pill klik-able, reply summary, group per hari.
+ * - Composer elevated: toolbar @/#, focus ring, tombol Send ikon.
+ * - Thread panel: header (judul topic + count + close), blok topic, timeline
+ *   root → replies, reply composer sticky di bawah.
+ * - States rapi: skeleton loading, error + Retry, empty state dengan CTA.
+ *
+ * Kontrak yang dijaga (jangan diubah tanpa update test):
+ * - placeholder root "Write an update…", reply "Reply… @ for agents",
+ *   topic "Thread goal title…"; menu mention role="listbox"; delete flow
+ *   title="Delete this thread and its replies" + "Sure?"; string
+ *   "Loading thread…"; panel scroll pakai class overflow-y-auto; search
+ *   pakai type="search" (bukan textbox) supaya indeks textbox di test stabil.
  *
  * Aturan gaya (SCOPE §5.3–5.4): token existing saja, teks hanya span/div.
  */
@@ -11,7 +26,20 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Trash2 } from "lucide-react"
+import {
+  AtSign,
+  Check,
+  ChevronLeft,
+  Hash,
+  Link2,
+  MessageSquarePlus,
+  RefreshCw,
+  Reply,
+  Search,
+  SendHorizontal,
+  Trash2,
+  X,
+} from "lucide-react"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
 import { useDiscussionResource } from "@/hooks/useDiscussionResource"
@@ -51,6 +79,18 @@ function initials(name: string): string {
 function displayName(m: SpaceMessage): string {
   if (m.author.actingMode === "agent") return m.author.agentName || m.author.agentType || "Agent"
   return m.author.agentName || m.author.memberId
+}
+
+/** Label hari untuk group stream: Today / Yesterday / tanggal. */
+function dayLabel(iso: string): string {
+  const t = new Date(iso)
+  if (!Number.isFinite(t.getTime())) return ""
+  const now = new Date()
+  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const diffDays = Math.round((startOf(now) - startOf(t)) / 86400000)
+  if (diffDays <= 0) return "Today"
+  if (diffDays === 1) return "Yesterday"
+  return t.toLocaleDateString(undefined, { day: "numeric", month: "short", year: t.getFullYear() === now.getFullYear() ? undefined : "numeric" })
 }
 
 /** Render body: token link → chip; nama polos (@Geno/@here) → chip juga. */
@@ -130,10 +170,14 @@ function RichBody({ body }: { body: string }) {
   )
 }
 
-function Avatar({ name, size = 32 }: { name: string; size?: number }) {
+function Avatar({ name, size = 32, agent = false }: { name: string; size?: number; agent?: boolean }) {
   return (
     <span
-      className="flex shrink-0 items-center justify-center rounded-full bg-white/[0.08] font-semibold text-white/70"
+      className={`flex shrink-0 items-center justify-center rounded-full font-semibold ${
+        agent
+          ? "bg-violet-500/20 text-violet-200 ring-1 ring-violet-500/40"
+          : "bg-white/[0.08] text-white/70"
+      }`}
       style={{ width: size, height: size, fontSize: size * 0.38 }}
     >
       {initials(name)}
@@ -141,35 +185,44 @@ function Avatar({ name, size = 32 }: { name: string; size?: number }) {
   )
 }
 
-function MessageRow({ m, topic }: { m: SpaceMessage; topic?: SpaceTopic | null }) {
+function AgentPill() {
+  return (
+    <span className="rounded-full border border-violet-500/30 bg-violet-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-violet-200">
+      agent
+    </span>
+  )
+}
+
+function MessageHead({ m, topicTitle }: { m: SpaceMessage; topicTitle?: string | null }) {
   const name = displayName(m)
   const isAgent = m.author.actingMode === "agent"
   return (
-    <div className="flex gap-3">
-      <Avatar name={name} />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[13px] font-medium text-white/85">{name}</span>
-          {isAgent && (
-            <span className="rounded-full border border-violet-500/30 bg-violet-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-violet-200">
-              agent
-            </span>
-          )}
-          <span className="text-[11px] tabular-nums text-white/35" title={m.createdAt}>
-            {timeAgo(m.createdAt)}
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        <span className="truncate text-[13px] font-medium text-white/85">{name}</span>
+        {isAgent && <AgentPill />}
+        <span className="shrink-0 text-[11px] tabular-nums text-white/35" title={m.createdAt}>
+          {timeAgo(m.createdAt)}
+        </span>
+        {m.editedAt && (
+          <span className="shrink-0 text-[11px] text-white/25">(edited)</span>
+        )}
+      </div>
+      {topicTitle && (
+        <div className="mt-1">
+          <span className="inline-block max-w-full truncate rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] text-white/60">
+            {topicTitle}
           </span>
         </div>
-        {topic && !topic.archived && (
-          <div className="mt-1">
-            <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] text-white/60">
-              {topic.title}
-            </span>
-          </div>
-        )}
-        <div className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-[1.6] text-white/75">
-          {m.body ? <RichBody body={m.body} /> : <span className="italic text-white/30">(deleted)</span>}
-        </div>
-      </div>
+      )}
+    </div>
+  )
+}
+
+function MessageBody({ m }: { m: SpaceMessage }) {
+  return (
+    <div className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-[1.6] text-white/75">
+      {m.body ? <RichBody body={m.body} /> : <span className="italic text-white/30">(deleted)</span>}
     </div>
   )
 }
@@ -199,6 +252,8 @@ function Composer({
   threadRoot,
   draft,
   updateDraft,
+  textareaId,
+  autofocusKey,
 }: {
   draft: Draft
   updateDraft: (update: Partial<Draft>) => void
@@ -208,11 +263,14 @@ function Composer({
   docs: DocOption[]
   onSent: () => void
   threadRoot: string | null
+  textareaId?: string
+  autofocusKey?: string
 }) {
   const { text, sending, error: sendError } = draft
   const setText = useCallback((text: string) => updateDraft({ text }), [updateDraft])
   const [hashNeedle, setHashNeedle] = useState<string | null>(null)
   const [hashIndex, setHashIndex] = useState(0)
+  const [focused, setFocused] = useState(false)
   const [pickPos, setPickPos] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null)
   const boxRef = useRef<HTMLTextAreaElement>(null)
 
@@ -295,6 +353,31 @@ function Composer({
       })
     },
     [text, mention, setText],
+  )
+
+  /** Toolbar @/#: sisipkan trigger di cursor lalu buka menu-nya. */
+  const insertTrigger = useCallback(
+    (ch: "@" | "#") => {
+      if (disabled || sending) return
+      const el = boxRef.current
+      const cursor = el?.selectionStart ?? text.length
+      const atLineStart = cursor === 0 || text[cursor - 1] === "\n" || text[cursor - 1] === " "
+      const insert = atLineStart ? ch : ` ${ch}`
+      const next = `${text.slice(0, cursor)}${insert}${text.slice(cursor)}`
+      const caret = cursor + insert.length
+      setText(next)
+      mention.checkForMention(next, caret)
+      updateHash(next, caret)
+      requestAnimationFrame(() => {
+        el?.focus()
+        try {
+          el?.setSelectionRange(caret, caret)
+        } catch {
+          // abaikan
+        }
+      })
+    },
+    [disabled, sending, text, setText, mention, updateHash],
   )
 
   const selectMention = useCallback(
@@ -505,36 +588,142 @@ function Composer({
           )}
         </div>
       )}
-      <div className="flex items-end gap-2 rounded-2xl border border-line bg-white/[0.03] p-2 pl-3">
-        <textarea
-          ref={boxRef}
-          value={text}
-          disabled={disabled || sending}
-          onChange={(e) => {
-            const next = e.target.value
-            const caret = e.target.selectionStart ?? next.length
-            setText(next)
-            mention.checkForMention(next, caret)
-            updateHash(next, caret)
-          }}
-          onKeyDown={onKeyDown}
-          placeholder={disabled ? "Viewers can't write" : placeholder}
-          rows={2}
-          className="max-h-[160px] min-h-[40px] flex-1 resize-y bg-transparent text-[13px] leading-[1.6] text-white/85 outline-none placeholder:text-white/25 disabled:opacity-50"
-        />
-        <button
-          onClick={() => void send()}
-          disabled={disabled || sending || !text.trim()}
-          className="shrink-0 rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40"
-        >
-          {sending ? "…" : "Send"}
-        </button>
+      <div
+        className={`rounded-2xl border bg-white/[0.03] transition-colors ${
+          focused && !disabled ? "border-white/20 bg-white/[0.045]" : "border-line"
+        }`}
+      >
+        <div className="flex items-center gap-1 px-2.5 pt-2">
+          <button
+            type="button"
+            title="Mention an agent or @here"
+            disabled={disabled || sending}
+            onClick={() => insertTrigger("@")}
+            className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-white/40 hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-40"
+          >
+            <AtSign className="h-3.5 w-3.5" />
+            <span>Mention</span>
+          </button>
+          <button
+            type="button"
+            title="Reference a doc"
+            disabled={disabled || sending}
+            onClick={() => insertTrigger("#")}
+            className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-white/40 hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-40"
+          >
+            <Hash className="h-3.5 w-3.5" />
+            <span>Doc</span>
+          </button>
+          {autofocusKey === "root" && (
+            <span className="ml-auto hidden px-2 text-[11px] text-white/25 sm:block">
+              <span>Enter to send · Shift+Enter new line</span>
+            </span>
+          )}
+        </div>
+        <div className="flex items-end gap-2 p-2 pl-3">
+          <textarea
+            id={textareaId}
+            ref={boxRef}
+            value={text}
+            disabled={disabled || sending}
+            onChange={(e) => {
+              const next = e.target.value
+              const caret = e.target.selectionStart ?? next.length
+              setText(next)
+              mention.checkForMention(next, caret)
+              updateHash(next, caret)
+            }}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onKeyDown={onKeyDown}
+            placeholder={disabled ? "Viewers can't write" : placeholder}
+            rows={2}
+            className="max-h-[160px] min-h-[40px] flex-1 resize-y bg-transparent text-[13px] leading-[1.6] text-white/85 outline-none placeholder:text-white/25 disabled:opacity-50"
+          />
+          <button
+            onClick={() => void send()}
+            disabled={disabled || sending || !text.trim()}
+            title="Send message"
+            aria-label="Send message"
+            className="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40"
+          >
+            {sending ? <span>…</span> : (
+              <>
+                <SendHorizontal className="h-3.5 w-3.5" />
+                <span>Send</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
       {sendError && <div role="alert" className="mt-1 text-[12px] text-red-300">{sendError}</div>}
-      <div className="mt-1 px-1 text-[11px] text-white/25">
-        <span>@ pick an agent · # pick a doc · Enter to send, Shift+Enter for new line</span>
-      </div>
+      {autofocusKey !== "root" && (
+        <div className="mt-1 px-1 text-[11px] text-white/25">
+          <span>@ pick an agent · # pick a doc · Enter to send, Shift+Enter for new line</span>
+        </div>
+      )}
     </div>
+  )
+}
+
+/** Skeleton loading untuk stream — 3 kartu berdenyut. */
+function StreamSkeleton() {
+  return (
+    <div className="flex flex-col gap-3" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="animate-pulse rounded-2xl border border-line bg-white/[0.02] p-4">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-full bg-white/[0.07]" />
+            <div className="flex-1">
+              <div className="h-3 w-1/3 rounded-full bg-white/[0.07]" />
+              <div className="mt-2 h-3 w-5/6 rounded-full bg-white/[0.05]" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Tombol hapus thread dengan konfirmasi inline (Sure? → hapus). */
+function DeleteThreadButton({
+  active,
+  deleting,
+  onAsk,
+  onCancel,
+  onConfirm,
+}: {
+  active: boolean
+  deleting: boolean
+  onAsk: () => void
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  if (!active) {
+    return (
+      <button
+        onClick={onAsk}
+        title="Delete this thread and its replies"
+        className="rounded-lg p-1.5 text-white/25 opacity-0 hover:bg-red-500/10 hover:text-red-300 focus:opacity-100 group-hover:opacity-100"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    )
+  }
+  return (
+    <span className="flex items-center gap-1.5 rounded-full bg-red-500/10 px-2 py-1">
+      <button
+        onClick={onConfirm}
+        disabled={deleting}
+        title="Delete this thread and its replies"
+        className="text-[11px] font-medium text-red-300 hover:text-red-200 disabled:opacity-40"
+      >
+        {deleting ? "…" : "Sure?"}
+      </button>
+      <button onClick={onCancel} aria-label="Cancel delete" className="rounded-full p-0.5 text-white/40 hover:text-white/70">
+        <X className="h-3 w-3" />
+      </button>
+    </span>
   )
 }
 
@@ -548,6 +737,12 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
   const [openRoot, setOpenRoot] = useState<string | null>(initialThread)
   const [lastInitialThread, setLastInitialThread] = useState(initialThread)
   const [panelTab, setPanelTab] = useState<"thread" | "activity">("thread")
+  const [query, setQuery] = useState("")
+  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (copyTimer.current) clearTimeout(copyTimer.current)
+  }, [])
   if (lastInitialThread !== initialThread) {
     setLastInitialThread(initialThread)
     setOpenRoot(initialThread)
@@ -556,7 +751,10 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
   const stream = useDiscussionResource<{ roots: RootItem[] }>(`/api/workspace/${spaceId}/stream?limit=50`)
   const threadResource = useDiscussionResource<ThreadPayload>(openRoot
     ? `/api/workspace/${spaceId}/thread?root=${encodeURIComponent(openRoot)}` : null)
-  const roots = Array.isArray(stream.data?.roots) ? stream.data.roots : []
+  const roots = useMemo(
+    () => (Array.isArray(stream.data?.roots) ? stream.data.roots : []),
+    [stream.data],
+  )
   const loading = stream.loading
   const loadError = stream.error ? "Could not load discussion." : null
   const thread = threadResource.data?.root.id === openRoot ? threadResource.data : null
@@ -628,6 +826,27 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
     void loadThread()
   }, [loadStream, loadThread])
 
+  const focusRootComposer = useCallback(() => {
+    requestAnimationFrame(() => {
+      document.getElementById("discussion-root-composer")?.focus()
+    })
+  }, [])
+
+  const copyThreadLink = useCallback(
+    (rootId: string) => {
+      try {
+        const url = `${window.location.origin}/workspace/${spaceId}?view=discussion&thread=${encodeURIComponent(rootId)}`
+        void navigator.clipboard?.writeText(url)
+      } catch {
+        // abaikan — clipboard tidak tersedia
+      }
+      setCopiedId(rootId)
+      if (copyTimer.current) clearTimeout(copyTimer.current)
+      copyTimer.current = setTimeout(() => setCopiedId(null), 1600)
+    },
+    [spaceId],
+  )
+
   const deleteRoot = useCallback(
     async (rootId: string) => {
       if (deletingRoot) return
@@ -686,89 +905,247 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
     updateTopic({ sending: false })
   }, [thread, topicBusy, spaceId, refreshAll, updateTopic])
 
+  const needle = query.trim().toLowerCase()
+  const filtered = useMemo(() => {
+    if (!needle) return roots
+    return roots.filter((r) => {
+      const name = displayName(r).toLowerCase()
+      const topic = r.topic?.title.toLowerCase() ?? ""
+      return r.body.toLowerCase().includes(needle) || name.includes(needle) || topic.includes(needle)
+    })
+  }, [roots, needle])
+
+  const groups = useMemo(() => {
+    const out: { label: string; items: RootItem[] }[] = []
+    for (const r of filtered) {
+      const label = dayLabel(r.createdAt)
+      const last = out[out.length - 1]
+      if (last && last.label === label) last.items.push(r)
+      else out.push({ label, items: [r] })
+    }
+    return out
+  }, [filtered])
+
+  const threadTitle = thread?.topic && !thread.topic.archived ? thread.topic.title : "Thread"
+  const threadReplyCount = thread ? thread.replies.length : 0
+
   return (
-    <div className="mx-auto flex w-full max-w-[1200px] gap-4">
+    <div className="mx-auto flex w-full max-w-[1240px] items-start gap-4">
+      {/* ── STREAM ─────────────────────────────────────────── */}
       <div className="min-w-0 flex-1">
-        <div className="mb-4 flex items-center gap-3">
-          <span className="text-[15px] font-medium text-white/85">Discussion</span>
-          {peers.length > 0 && (
-            <span className="flex items-center">
-              {peers.slice(0, 5).map((p, i) => (
-                <span
-                  key={`${p.name}-${i}`}
-                  title={p.name}
-                  className={`flex h-[26px] w-[26px] items-center justify-center rounded-full border-2 ${PRESENCE_RING_CLASS} text-[11px] font-bold text-white/70`}
-                  style={{ backgroundColor: p.color || "rgba(255,255,255,.08)", marginLeft: i === 0 ? 0 : -7 }}
-                >
-                  {initials(p.name)}
+        {/* Header */}
+        <div className="mb-4 rounded-2xl border border-line bg-white/[0.02] p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[15px] font-medium text-white/85">Discussion</span>
+                {!loading && (
+                  <span className="rounded-full bg-white/[0.07] px-2 py-0.5 text-[11px] tabular-nums text-white/55">
+                    {roots.length}
+                  </span>
+                )}
+              </div>
+              <div className="mt-0.5 text-[12px] text-white/35">
+                <span>
+                  {needle
+                    ? `${filtered.length} of ${roots.length} shown`
+                    : "Team stream — pick a thread to dive in"}
                 </span>
-              ))}
-            </span>
-          )}
+              </div>
+            </div>
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              {peers.length > 0 && (
+                <span className="flex items-center" title={`${peers.length} online`}>
+                  {peers.slice(0, 5).map((p, i) => (
+                    <span
+                      key={`${p.name}-${i}`}
+                      title={p.name}
+                      className={`flex h-[26px] w-[26px] items-center justify-center rounded-full border-2 ${PRESENCE_RING_CLASS} text-[11px] font-bold text-white/70`}
+                      style={{ backgroundColor: p.color || "rgba(255,255,255,.08)", marginLeft: i === 0 ? 0 : -7 }}
+                    >
+                      {initials(p.name)}
+                    </span>
+                  ))}
+                </span>
+              )}
+              <button
+                onClick={refreshAll}
+                title="Refresh discussion"
+                className="rounded-full p-2 text-white/40 hover:bg-white/[0.06] hover:text-white/80"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
+              {canWrite && (
+                <button
+                  onClick={focusRootComposer}
+                  className="flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-[12px] font-medium text-black hover:bg-white/90"
+                >
+                  <MessageSquarePlus className="h-3.5 w-3.5" />
+                  <span>New thread</span>
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="mt-3">
+            <label className="flex items-center gap-2 rounded-xl border border-line bg-white/[0.03] px-3 py-1.5 focus-within:border-white/20">
+              <Search className="h-3.5 w-3.5 shrink-0 text-white/25" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Filter discussion…"
+                aria-label="Filter discussion"
+                className="min-w-0 flex-1 bg-transparent text-[12px] text-white/75 outline-none placeholder:text-white/25"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  aria-label="Clear filter"
+                  className="rounded-full p-0.5 text-white/40 hover:text-white/75"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </label>
+          </div>
         </div>
-        {loading && <span className="text-[13px] text-white/40">Loading discussion…</span>}
-        {loadError && <span className="text-[13px] text-white/40">{loadError}</span>}
-        {!loading && !loadError && roots.length === 0 && (
+
+        {/* Body */}
+        {loading && <StreamSkeleton />}
+        {loadError && (
           <div className="rounded-2xl border border-line bg-white/[0.03] p-8 text-center">
-            <div className="text-[14px] font-medium text-white/70">No discussion yet</div>
-            <div className="mt-1 text-[12px] text-white/35">Write the first root message below.</div>
+            <div className="text-[14px] font-medium text-white/70">{loadError}</div>
+            <div className="mt-1 text-[12px] text-white/35">Check your connection and try again.</div>
+            <button
+              onClick={refreshAll}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span>Retry</span>
+            </button>
           </div>
         )}
-        <div className="flex flex-col gap-5">
-          {roots.map((r) => (
-            <div
-              key={r.id}
-              className={`rounded-2xl border p-4 ${
-                openRoot === r.id ? "border-white/15 bg-white/[0.05]" : "border-line bg-white/[0.03]"
-              }`}
+        {!loading && !loadError && roots.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-10 text-center">
+            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.05] text-white/50">
+              <MessageSquarePlus className="h-5 w-5" />
+            </div>
+            <div className="mt-3 text-[14px] font-medium text-white/70">Start the discussion</div>
+            <div className="mx-auto mt-1 max-w-[380px] text-[12px] leading-relaxed text-white/35">
+              <span>Post the first update below. Mention an agent with @ to put them to work, or link a doc with #.</span>
+            </div>
+            {canWrite && (
+              <button
+                onClick={focusRootComposer}
+                className="mt-4 rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90"
+              >
+                Write the first message
+              </button>
+            )}
+          </div>
+        )}
+        {!loading && !loadError && roots.length > 0 && filtered.length === 0 && (
+          <div className="rounded-2xl border border-line bg-white/[0.03] p-8 text-center">
+            <div className="text-[14px] font-medium text-white/70">No matches</div>
+            <div className="mt-1 text-[12px] text-white/35">Nothing matches “{query.trim()}”.</div>
+            <button
+              onClick={() => setQuery("")}
+              className="mt-4 rounded-full bg-white/[0.08] px-4 py-1.5 text-[12px] text-white/75 hover:bg-white/[0.12]"
             >
-              <MessageRow m={r} topic={r.topic} />
-              <div className="mt-2 flex items-center gap-3 pl-[44px]">
-                <button
-                  onClick={() => openThread(r.id)}
-                  className="text-[12px] text-white/40 hover:text-white/75"
-                >
-                  {r.replyCount > 0 ? `${r.replyCount} ${r.replyCount === 1 ? "reply" : "replies"} →` : "Open thread →"}
-                </button>
-                {canWrite && (
-                  confirmDeleteRoot === r.id ? (
-                    <span className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => void deleteRoot(r.id)}
-                        disabled={deletingRoot === r.id}
-                        title="Delete this thread and its replies"
-                        className="rounded bg-red-500/15 p-1 text-red-300 disabled:opacity-40"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => void deleteRoot(r.id)}
-                        disabled={deletingRoot === r.id}
-                        className="text-[11px] font-medium text-red-300 hover:text-red-200 disabled:opacity-40"
-                      >
-                        {deletingRoot === r.id ? "…" : "Sure?"}
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteRoot(null)}
-                        className="text-[11px] text-white/40 hover:text-white/70"
-                      >
-                        Cancel
-                      </button>
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmDeleteRoot(r.id)}
-                      title="Delete this thread and its replies"
-                      className="rounded p-1 text-white/25 hover:text-red-300"
+              Clear filter
+            </button>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-4">
+          {groups.map((g) => (
+            <div key={g.label}>
+              <div className="mb-2 flex items-center gap-3 px-1">
+                <span className="shrink-0 text-[11px] font-medium uppercase tracking-[0.12em] text-white/30">
+                  {g.label}
+                </span>
+                <span className="h-px flex-1 bg-white/[0.06]" />
+              </div>
+              <div className="flex flex-col gap-2.5">
+                {g.items.map((r) => {
+                  const selected = openRoot === r.id
+                  const name = displayName(r)
+                  const isAgent = r.author.actingMode === "agent"
+                  return (
+                    <div
+                      key={r.id}
+                      className={`group relative overflow-hidden rounded-2xl border p-4 transition-colors ${
+                        selected
+                          ? "border-violet-400/40 bg-white/[0.05]"
+                          : "border-line bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.04]"
+                      }`}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                      {selected && (
+                        <span className="absolute inset-y-0 left-0 w-[3px] bg-violet-400/70" />
+                      )}
+                      <div className="flex gap-3">
+                        <Avatar name={name} agent={isAgent} />
+                        <div className="min-w-0 flex-1">
+                          <MessageHead
+                            m={r}
+                            topicTitle={r.topic && !r.topic.archived ? r.topic.title : null}
+                          />
+                          <MessageBody m={r} />
+                          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                            <button
+                              onClick={() => openThread(r.id)}
+                              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] transition-colors ${
+                                selected
+                                  ? "bg-violet-500/20 text-violet-200 hover:bg-violet-500/30"
+                                  : "bg-white/[0.06] text-white/60 hover:bg-white/[0.1] hover:text-white/85"
+                              }`}
+                            >
+                              <Reply className="h-3 w-3" />
+                              <span>
+                                {r.replyCount > 0
+                                  ? `${r.replyCount} ${r.replyCount === 1 ? "reply" : "replies"} →`
+                                  : "Open thread →"}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => copyThreadLink(r.id)}
+                              title="Copy thread link"
+                              className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-white/30 opacity-0 hover:bg-white/[0.06] hover:text-white/70 focus:opacity-100 group-hover:opacity-100"
+                            >
+                              {copiedId === r.id ? (
+                                <span className="flex items-center gap-1 text-emerald-300">
+                                  <Check className="h-3 w-3" />
+                                  <span>Copied</span>
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1">
+                                  <Link2 className="h-3 w-3" />
+                                  <span>Copy link</span>
+                                </span>
+                              )}
+                            </button>
+                            <span className="ml-auto">
+                              {canWrite && (
+                                <DeleteThreadButton
+                                  active={confirmDeleteRoot === r.id}
+                                  deleting={deletingRoot === r.id}
+                                  onAsk={() => setConfirmDeleteRoot(r.id)}
+                                  onCancel={() => setConfirmDeleteRoot(null)}
+                                  onConfirm={() => void deleteRoot(r.id)}
+                                />
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   )
-                )}
+                })}
               </div>
             </div>
           ))}
         </div>
+
         <div className={COMPOSER_STICKY_CLASS}>
           <Composer
             draft={drafts.null ?? EMPTY_DRAFT}
@@ -779,22 +1156,26 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
             docs={docs}
             threadRoot={null}
             onSent={refreshAll}
+            textareaId="discussion-root-composer"
+            autofocusKey="root"
           />
         </div>
       </div>
+
+      {/* ── SIDE PANEL ─────────────────────────────────────── */}
       <div
-        className={`${openRoot || panelTab === "activity" ? "flex" : "hidden"} w-full shrink-0 flex-col overflow-y-auto rounded-2xl border border-line bg-white/[0.02] p-4 lg:flex lg:w-[380px] lg:max-w-[380px]`}
+        className={`${openRoot || panelTab === "activity" ? "flex" : "hidden"} max-h-[calc(100vh-140px)] w-full shrink-0 flex-col overflow-y-auto rounded-2xl border border-line bg-white/[0.02] p-4 lg:sticky lg:top-4 lg:flex lg:w-[400px] lg:max-w-[400px]`}
       >
         <div className="mb-3 flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
           <button
             onClick={() => setPanelTab("thread")}
-            className={`flex-1 rounded-full px-3 py-1 text-[12px] ${panelTab === "thread" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
+            className={`flex-1 rounded-full px-3 py-1 text-[12px] ${panelTab === "thread" ? "bg-white font-medium text-black" : "text-white/40 hover:text-white/70"}`}
           >
             Thread
           </button>
           <button
             onClick={() => setPanelTab("activity")}
-            className={`flex-1 rounded-full px-3 py-1 text-[12px] ${panelTab === "activity" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
+            className={`flex-1 rounded-full px-3 py-1 text-[12px] ${panelTab === "activity" ? "bg-white font-medium text-black" : "text-white/40 hover:text-white/70"}`}
           >
             Activity
           </button>
@@ -802,120 +1183,198 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
         {panelTab === "activity" ? (
           <SpaceActivityPanel onOpenThread={openThread} />
         ) : !openRoot ? (
-          <span className="text-[12px] text-white/35">Select a thread from the stream to open it here.</span>
+          <div className="rounded-xl border border-dashed border-white/10 p-6 text-center">
+            <div className="text-[13px] font-medium text-white/60">No thread selected</div>
+            <div className="mt-1 text-[12px] text-white/35">
+              <span>Select a thread from the stream to read replies, run agents, and manage its goal here.</span>
+            </div>
+          </div>
         ) : (
           <>
-            <div className="mb-3 flex items-center justify-between">
-            <span className="text-[13px] font-medium text-white/75">
-              {thread?.topic && !thread.topic.archived ? thread.topic.title : "Thread"}
-            </span>
-            <span className="flex items-center gap-3">
-              {canWrite && openRoot && (
-                confirmDeleteRoot === openRoot ? (
-                  <span className="flex items-center gap-1.5">
+            {/* Thread header */}
+            <div className="mb-3 flex items-start gap-2">
+              <button
+                onClick={closeThread}
+                title="Back to stream"
+                aria-label="Back to stream"
+                className="rounded-full p-1.5 text-white/40 hover:bg-white/[0.06] hover:text-white/80 lg:hidden"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-medium text-white/80">{threadTitle}</div>
+                <div className="mt-0.5 text-[11px] tabular-nums text-white/35">
+                  <span>
+                    {threadReplyCount} {threadReplyCount === 1 ? "reply" : "replies"}
+                    {thread?.topic?.archived ? " · archived" : ""}
+                  </span>
+                </div>
+              </div>
+              <span className="flex shrink-0 items-center gap-1">
+                {canWrite && openRoot && (
+                  confirmDeleteRoot === openRoot ? (
+                    <span className="flex items-center gap-1.5 rounded-full bg-red-500/10 px-2 py-1">
+                      <button
+                        onClick={() => void deleteRoot(openRoot)}
+                        disabled={deletingRoot === openRoot}
+                        title="Delete this thread and its replies"
+                        className="text-[11px] font-medium text-red-300 hover:text-red-200 disabled:opacity-40"
+                      >
+                        {deletingRoot === openRoot ? "…" : "Sure?"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteRoot(null)}
+                        aria-label="Cancel delete"
+                        className="rounded-full p-0.5 text-white/40 hover:text-white/70"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ) : (
                     <button
-                      onClick={() => void deleteRoot(openRoot)}
-                      disabled={deletingRoot === openRoot}
+                      onClick={() => setConfirmDeleteRoot(openRoot)}
                       title="Delete this thread and its replies"
-                      className="rounded bg-red-500/15 p-1 text-red-300 disabled:opacity-40"
+                      className="rounded-lg p-1.5 text-white/25 hover:bg-red-500/10 hover:text-red-300"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
-                    <button
-                      onClick={() => void deleteRoot(openRoot)}
-                      disabled={deletingRoot === openRoot}
-                      className="text-[11px] font-medium text-red-300 hover:text-red-200 disabled:opacity-40"
-                    >
-                      {deletingRoot === openRoot ? "…" : "Sure?"}
-                    </button>
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => setConfirmDeleteRoot(openRoot)}
-                    title="Delete this thread and its replies"
-                    className="rounded p-1 text-white/25 hover:text-red-300"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )
-              )}
-              <button onClick={closeThread} className="text-[12px] text-white/40 hover:text-white/75">
-                Close
-              </button>
-            </span>
-          </div>
-          {thread?.topic?.archived && (
-            <div className="mb-3 rounded-xl border border-line bg-white/[0.03] px-3 py-2 text-[12px] text-white/45">
-              <span>Archived — a new reply will reopen it.</span>
-            </div>
-          )}
-          <SpaceAgentPanel
-            key={`${spaceId}:${openRoot}`}
-            spaceId={spaceId}
-            threadRoot={openRoot}
-            canWrite={canWrite}
-            onChanged={refreshAll}
-          />
-          {threadLoading && <span className="text-[12px] text-white/40">Loading thread…</span>}
-          {!threadLoading && !thread && (
-            <span className="text-[12px] text-white/40">Thread not found.</span>
-          )}
-          {thread && (
-            <div className="flex flex-col gap-5">
-              <MessageRow m={thread.root} />
-              <div className="border-t border-line" />
-              {thread.replies.map((m) => (
-                <MessageRow key={m.id} m={m} />
-              ))}
-              {thread.replies.length === 0 && (
-                <span className="text-[12px] text-white/35">No replies yet.</span>
-              )}
-            </div>
-          )}
-          <div className="mt-4 border-t border-line pt-3">
-            {canWrite && thread && !thread.topic && (
-              <div className="mb-3 flex items-center gap-2">
-                <input
-                  value={topicDraft}
-                  onChange={(e) => updateTopic({ text: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void saveTopic()
-                  }}
-                  placeholder="Thread goal title…"
-                  disabled={topicBusy}
-                  className="min-w-0 flex-1 rounded-xl border border-line bg-white/[0.03] px-3 py-1.5 text-[12px] text-white/85 outline-none placeholder:text-white/25"
-                />
+                  )
+                )}
                 <button
-                  onClick={() => void saveTopic()}
-                  disabled={topicBusy || !topicDraft.trim()}
-                  className="shrink-0 rounded-full bg-white/[0.08] px-3 py-1.5 text-[12px] text-white/75 hover:bg-white/[0.12] disabled:opacity-40"
+                  onClick={closeThread}
+                  className="hidden rounded-full px-2.5 py-1 text-[12px] text-white/40 hover:bg-white/[0.06] hover:text-white/75 lg:block"
                 >
-                  Title
+                  Close
                 </button>
+              </span>
+            </div>
+
+            {thread?.topic?.archived && (
+              <div className="mb-3 rounded-xl border border-line bg-white/[0.03] px-3 py-2 text-[12px] text-white/45">
+                <span>Archived — a new reply will reopen it.</span>
               </div>
             )}
-            {canWrite && thread?.topic && (
-              <div className="mb-3">
-                <button
-                  onClick={() => void toggleArchive()}
-                  disabled={topicBusy}
-                  className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] text-white/55 hover:bg-white/[0.1] hover:text-white/80 disabled:opacity-40"
-                >
-                  {thread.topic.archived ? "Unarchive" : "Archive"}
-                </button>
-              </div>
-            )}
-            <Composer
-              key={openRoot}
-              draft={drafts[draftKey] ?? EMPTY_DRAFT}
-              updateDraft={updateReply}
+
+            <SpaceAgentPanel
+              key={`${spaceId}:${openRoot}`}
               spaceId={spaceId}
-              placeholder="Reply… @ for agents"
-              disabled={!canWrite || !thread || threadResource.error}
-              docs={docs}
               threadRoot={openRoot}
-              onSent={refreshAll}
+              canWrite={canWrite}
+              onChanged={refreshAll}
             />
+
+            {threadLoading && (
+              <div className="flex flex-col gap-3" aria-hidden>
+                <span className="text-[12px] text-white/40">Loading thread…</span>
+                <div className="animate-pulse rounded-xl border border-line bg-white/[0.02] p-4">
+                  <div className="h-3 w-2/3 rounded-full bg-white/[0.07]" />
+                  <div className="mt-2 h-3 w-full rounded-full bg-white/[0.05]" />
+                </div>
+              </div>
+            )}
+            {!threadLoading && !thread && (
+              <div className="rounded-xl border border-line bg-white/[0.03] p-4 text-center">
+                <span className="text-[12px] text-white/40">Thread not found.</span>
+              </div>
+            )}
+            {thread && (
+              <div className="flex flex-col">
+                {/* Root */}
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3.5">
+                  <div className="flex gap-2.5">
+                    <Avatar
+                      name={displayName(thread.root)}
+                      size={30}
+                      agent={thread.root.author.actingMode === "agent"}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <MessageHead m={thread.root} />
+                      <MessageBody m={thread.root} />
+                    </div>
+                  </div>
+                </div>
+                {/* Replies */}
+                {thread.replies.length > 0 && (
+                  <div className="mt-3 flex flex-col gap-4">
+                    {thread.replies.map((m) => {
+                      const nm = displayName(m)
+                      const ag = m.author.actingMode === "agent"
+                      return (
+                        <div key={m.id} className="flex gap-2.5 px-1">
+                          <div className="flex flex-col items-center">
+                            <Avatar name={nm} size={28} agent={ag} />
+                            <span className="mt-1 w-px flex-1 bg-white/[0.07]" />
+                          </div>
+                          <div className="min-w-0 flex-1 pb-1">
+                            <MessageHead m={m} />
+                            <MessageBody m={m} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {thread.replies.length === 0 && (
+                  <div className="mt-3 rounded-xl border border-dashed border-white/10 px-3 py-4 text-center">
+                    <span className="text-[12px] text-white/35">No replies yet — start below.</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mt-4 border-t border-line pt-3">
+              {canWrite && thread && !thread.topic && (
+                <div className="mb-3 rounded-xl border border-line bg-white/[0.02] p-2.5">
+                  <div className="px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-white/30">
+                    <span>Thread goal</span>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <input
+                      value={topicDraft}
+                      onChange={(e) => updateTopic({ text: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void saveTopic()
+                      }}
+                      placeholder="Thread goal title…"
+                      disabled={topicBusy}
+                      aria-label="Thread goal title"
+                      className="min-w-0 flex-1 rounded-xl border border-line bg-white/[0.03] px-3 py-1.5 text-[12px] text-white/85 outline-none placeholder:text-white/25 focus:border-white/20"
+                    />
+                    <button
+                      onClick={() => void saveTopic()}
+                      disabled={topicBusy || !topicDraft.trim()}
+                      className="shrink-0 rounded-full bg-white/[0.08] px-3 py-1.5 text-[12px] text-white/75 hover:bg-white/[0.12] disabled:opacity-40"
+                    >
+                      Title
+                    </button>
+                  </div>
+                </div>
+              )}
+              {canWrite && thread?.topic && (
+                <div className="mb-3 flex items-center gap-2">
+                  <button
+                    onClick={() => void toggleArchive()}
+                    disabled={topicBusy}
+                    className="rounded-full bg-white/[0.06] px-3 py-1 text-[11px] text-white/55 hover:bg-white/[0.1] hover:text-white/80 disabled:opacity-40"
+                  >
+                    {thread.topic.archived ? "Unarchive" : "Archive"}
+                  </button>
+                  {thread.topic.archived && (
+                    <span className="text-[11px] text-white/30">Hidden from Discussions rail</span>
+                  )}
+                </div>
+              )}
+              <Composer
+                key={openRoot}
+                draft={drafts[draftKey] ?? EMPTY_DRAFT}
+                updateDraft={updateReply}
+                spaceId={spaceId}
+                placeholder="Reply… @ for agents"
+                disabled={!canWrite || !thread || threadResource.error}
+                docs={docs}
+                threadRoot={openRoot}
+                onSent={refreshAll}
+              />
             </div>
           </>
         )}
