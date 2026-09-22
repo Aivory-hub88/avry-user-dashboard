@@ -26,6 +26,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import { createPortal } from "react-dom"
 import {
   AtSign,
   Check,
@@ -500,7 +501,10 @@ function Composer({
 
   return (
     <div>
-      {menuVisible && pickPos && !disabled && (
+      {/* Portal ke body: position:fixed menu harus relatif ke viewport.
+          Di dalam wrapper sticky + backdrop-blur, fixed malah relatif ke
+          wrapper itu (containing block) — menu melayang lepas (bug 2026-09-22). */}
+      {menuVisible && pickPos && !disabled && typeof document !== "undefined" && createPortal(
         <div
           role="listbox"
           aria-label="Mention"
@@ -586,7 +590,8 @@ function Composer({
               )}
             </>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
       <div
         className={`rounded-2xl border bg-white/[0.03] transition-colors ${
