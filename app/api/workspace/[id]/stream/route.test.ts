@@ -73,6 +73,47 @@ describe("GET /api/workspace/[id]/stream", () => {
     })
   })
 
+  it("attaches up to 2 recent replies per root, oldest-first", async () => {
+    const reply = (rid: string, created: string, body = rid) => ({
+      id: rid,
+      space_id: "space-1",
+      thread_root: "m1",
+      author_kind: "user",
+      author_id: "user-john",
+      author_name: "John",
+      agent_type: null,
+      body,
+      mentions: [],
+      member_ids: [],
+      here: false,
+      has_agent: false,
+      doc_refs: [],
+      created_at: created,
+      edited_at: null,
+      deleted_at: null,
+    })
+    queryMock
+      .mockResolvedValueOnce({ rows: [ROOT_ROW], rowCount: 1 })
+      .mockResolvedValueOnce({
+        rows: [
+          reply("r1", "2026-09-17T10:02:00.000Z"),
+          reply("r2", "2026-09-17T10:03:00.000Z"),
+        ],
+        rowCount: 2,
+      })
+    const req = new NextRequest("http://localhost/api/workspace/space-1/stream", {
+      headers: svc,
+    })
+    const res = await GET(req, { params: Promise.resolve({ id: "space-1" }) })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.roots).toHaveLength(1)
+    expect(body.roots[0].recentReplies.map((m: { id: string }) => m.id)).toEqual(["r1", "r2"])
+    const sql = String(queryMock.mock.calls[1][0])
+    expect(sql).toContain("ROW_NUMBER() OVER (PARTITION BY m.thread_root")
+    expect(sql).toContain("s.rn <= 2")
+  })
+
   it("passes before/after windows to SQL", async () => {
     const req = new NextRequest(
       "http://localhost/api/workspace/space-1/stream?before=2026-09-17T11:00:00.000Z&after=2026-09-17T09:00:00.000Z",

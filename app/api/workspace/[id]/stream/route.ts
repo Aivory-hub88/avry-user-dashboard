@@ -3,7 +3,8 @@
  *
  * Query: ?limit= (default 50, cap 200) ?before= (ISO, halaman lebih lama)
  * ?after= (ISO, pesan lebih baru). Roots newest-first + replyCount +
- * topic row + truncated. Write/Data/Board tidak tersentuh.
+ * topic row + recentReplies (2 balasan terakhir per thread, ascending —
+ * bahan chat inline) + truncated. Write/Data/Board tidak tersentuh.
  */
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
@@ -15,6 +16,7 @@ import {
   spaceTopicFromRow,
   replyCountOf,
 } from "@/lib/spaceThreads"
+import type { SpaceMessage } from "@/lib/spaceProtocol"
 
 export const runtime = "nodejs"
 
@@ -56,6 +58,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       values,
     )
     const roots = []
+    const rootIds: string[] = []
     for (const row of result.rows as Record<string, unknown>[]) {
       const msg = spaceMessageFromRow(row, id)
       if (!msg) continue
@@ -71,9 +74,35 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
               created_at: row.topic_at,
             })
           : null
+      rootIds.push(msg.id)
       roots.push({ ...msg, replyCount: replyCountOf(row), topic })
     }
-    return NextResponse.json({ roots, truncated: result.rows.length === limit })
+    // Chat inline: 2 balasan terakhir per thread (ascending). Satu query
+    // windowed — tanpa N+1, tanpa migrasi; field aditif (klien lama abaikan).
+    const repliesByRoot = new Map<string, SpaceMessage[]>()
+    if (rootIds.length > 0) {
+      const placeholders = rootIds.map((_, i) => `$${i + 2}`).join(", ")
+      const rep = await query(
+        `SELECT * FROM (
+           SELECT m.*, ROW_NUMBER() OVER (PARTITION BY m.thread_root ORDER BY m.created_at DESC) AS rn
+           FROM dashboard.workspace_messages m
+           WHERE m.space_id = $1 AND m.thread_root IN (${placeholders})
+         ) s WHERE s.rn <= 2 ORDER BY s.thread_root, s.created_at ASC`,
+        [id, ...rootIds],
+      )
+      for (const row of rep.rows as Record<string, unknown>[]) {
+        const m = spaceMessageFromRow(row, id)
+        if (!m || !m.threadRoot) continue
+        const list = repliesByRoot.get(m.threadRoot) ?? []
+        list.push(m)
+        repliesByRoot.set(m.threadRoot, list)
+      }
+    }
+    const withReplies = roots.map((r: { id: string }) => ({
+      ...r,
+      recentReplies: repliesByRoot.get(r.id) ?? [],
+    }))
+    return NextResponse.json({ roots: withReplies, truncated: result.rows.length === limit })
   } catch (error) {
     console.error("[workspace/stream GET]", error)
     return NextResponse.json({ error: "db" }, { status: 500 })

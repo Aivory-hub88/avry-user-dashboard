@@ -52,7 +52,7 @@ import { useAgentMention } from "@/hooks/useAgentMention"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { candidateOf, type MentionCandidate } from "@/lib/agentMentions"
 import { AGENT_ROSTER } from "@/lib/agentRoster"
-import { timeAgo, MENU_POPOVER_CLASS, COMPOSER_STICKY_CLASS, PRESENCE_RING_CLASS, placeMenu } from "@/lib/spaceUi"
+import { timeAgo, MENU_POPOVER_CLASS, PRESENCE_RING_CLASS, placeMenu } from "@/lib/spaceUi"
 import SpaceAgentPanel from "@/components/workspace/SpaceAgentPanel"
 import SpaceActivityPanel from "@/components/workspace/SpaceActivityPanel"
 import type { SpaceMessage, SpaceTopic } from "@/lib/spaceProtocol"
@@ -60,6 +60,8 @@ import type { SpaceMessage, SpaceTopic } from "@/lib/spaceProtocol"
 type RootItem = SpaceMessage & {
   replyCount: number
   topic: SpaceTopic | null
+  /** 2 balasan terakhir (ascending) — bahan chat inline. Absen di mock lama. */
+  recentReplies: SpaceMessage[]
 }
 
 interface ThreadPayload {
@@ -1077,16 +1079,40 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
     })
   }, [roots, needle])
 
+  // Chat ala AI console: kronologis menanjak (terlama di atas, terbaru di
+  // bawah), stream punya scroll sendiri + nempel ke bawah selama user tidak
+  // sedang membaca riwayat atas.
+  const ascRoots = useMemo(() => [...filtered].reverse(), [filtered])
+
+  const listRef = useRef<HTMLDivElement>(null)
+  const stickRef = useRef(true)
+  const onListScroll = useCallback(() => {
+    const el = listRef.current
+    if (!el) return
+    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 140
+  }, [])
+  const scrollKey = useMemo(() => {
+    const ids = roots.map((r) => `${r.id}:${r.replyCount}`).join(",")
+    const reps = roots
+      .map((r) => (r.recentReplies ?? []).map((m) => m.id).join("+"))
+      .join(",")
+    return `${ids}|${reps}|${pending.length}`
+  }, [roots, pending.length])
+  useEffect(() => {
+    const el = listRef.current
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight
+  }, [scrollKey])
+
   const groups = useMemo(() => {
     const out: { label: string; items: RootItem[] }[] = []
-    for (const r of filtered) {
+    for (const r of ascRoots) {
       const label = dayLabel(r.createdAt)
       const last = out[out.length - 1]
       if (last && last.label === label) last.items.push(r)
       else out.push({ label, items: [r] })
     }
     return out
-  }, [filtered])
+  }, [ascRoots])
 
   const pendingRoots = useMemo(() => pending.filter((p) => p.threadRoot === null), [pending])
   const pendingReplies = useMemo(
@@ -1098,11 +1124,11 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
   const threadReplyCount = thread ? thread.replies.length : 0
 
   return (
-    <div className="mx-auto flex w-full max-w-[1240px] items-start gap-4">
-      {/* ── STREAM ─────────────────────────────────────────── */}
-      <div className="min-w-0 flex-1">
+    <div className="mx-auto flex h-full w-full max-w-[1240px] items-stretch gap-4">
+      {/* ── STREAM = chat room ─────────────────────────────────── */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Header — flat ala console, tanpa kartu. */}
-        <div className="mb-3 px-1 py-2">
+        <div className="shrink-0 px-1 py-2">
           <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -1117,7 +1143,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                 <span>
                   {needle
                     ? `${filtered.length} of ${roots.length} shown`
-                    : "Team stream — pick a thread to dive in"}
+                    : "Team chat — humans & agents in one flow"}
                 </span>
               </div>
             </div>
@@ -1187,8 +1213,10 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
           </div>
         </div>
 
-        {/* Body */}
-        {loading && <StreamSkeleton />}
+        {/* Chat flow: scroll sendiri, nempel ke bawah selama user di dasar. */}
+        <div ref={listRef} onScroll={onListScroll} className="min-h-0 flex-1 overflow-y-auto px-1">
+          {/* Body */}
+          {loading && <StreamSkeleton />}
         {loadError && (
           <div className="rounded-2xl bg-white/[0.03] p-8 text-center">
             <div className="text-[14px] font-medium text-white/70">{loadError}</div>
@@ -1268,6 +1296,24 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                             topicTitle={r.topic && !r.topic.archived ? r.topic.title : null}
                           />
                           <MessageBody m={r} />
+                          {/* Balasan inline — chat mengalir, tanpa wajib buka thread. */}
+                          {(r.recentReplies ?? []).length > 0 && (
+                            <div className="mt-2.5 flex flex-col gap-2.5 border-l-2 border-white/10 pl-3">
+                              {(r.recentReplies ?? []).map((rep) => {
+                                const nm = displayName(rep)
+                                const ag = rep.author.actingMode === "agent"
+                                return (
+                                  <div key={rep.id} className="flex gap-2.5">
+                                    <Avatar name={nm} size={24} agent={ag} />
+                                    <div className="min-w-0 flex-1">
+                                      <MessageHead m={rep} />
+                                      <MessageBody m={rep} />
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
                           <div className="mt-2.5 flex flex-wrap items-center gap-2">
                             <button
                               onClick={() => openThread(r.id)}
@@ -1279,9 +1325,11 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                             >
                               <Reply className="h-3 w-3" />
                               <span>
-                                {r.replyCount > 0
-                                  ? `${r.replyCount} ${r.replyCount === 1 ? "reply" : "replies"} →`
-                                  : "Open thread →"}
+                                {r.replyCount > (r.recentReplies ?? []).length
+                                  ? `View all ${r.replyCount} ${r.replyCount === 1 ? "reply" : "replies"} →`
+                                  : r.replyCount > 0
+                                    ? "Open thread →"
+                                    : "Reply"}
                               </span>
                             </button>
                             <button
@@ -1325,7 +1373,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
 
         {/* Provisional roots (optimistic) — selalu di bawah, milik sendiri. */}
         {pendingRoots.length > 0 && (
-          <div className="mt-2.5 flex flex-col gap-2.5">
+          <div className="mt-2.5 flex flex-col gap-2.5 pb-2">
             {pendingRoots.map((p) => (
               <div
                 key={p.tempId}
@@ -1336,8 +1384,9 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
             ))}
           </div>
         )}
+        </div>
 
-        <div className={COMPOSER_STICKY_CLASS}>
+        <div className="mt-2 shrink-0 px-1 pb-1">
           <Composer
             draft={drafts.null ?? EMPTY_DRAFT}
             updateDraft={updateRoot}
@@ -1351,9 +1400,9 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
         </div>
       </div>
 
-      {/* ── SIDE PANEL (hideable) ──────────────────────────────── */}
+      {/* ── SIDE PANEL = thread detail (hideable) ──────────────── */}
       <div
-        className={`${panelVisible ? "flex" : "hidden"} max-h-[calc(100vh-140px)] w-full shrink-0 flex-col overflow-y-auto py-1 pl-1 pr-2 lg:sticky lg:top-4 lg:w-[400px] lg:max-w-[400px]`}
+        className={`${panelVisible ? "flex" : "hidden"} max-h-[calc(100dvh-180px)] min-h-0 w-full shrink-0 flex-col overflow-y-auto py-1 pl-1 pr-2 lg:h-full lg:max-h-full lg:w-[400px] lg:max-w-[400px]`}
       >
         <div className="mb-3 flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
           <button
