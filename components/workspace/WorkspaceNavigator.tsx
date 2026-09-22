@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import { FileText, Plus, Search, Trash2 } from "lucide-react"
+import { useCallback, useEffect, useState, type ReactNode } from "react"
+import { ChevronDown, ChevronRight, FileText, Plus, Search, Trash2, X } from "lucide-react"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
 import { AGENT_ROSTER } from "@/lib/agentRoster"
@@ -46,6 +46,61 @@ const ROLE_PILL: Record<string, string> = {
   editor: "bg-sky-500/15 text-sky-300",
   viewer: "bg-white/[0.07] text-white/45",
   agent: "border border-violet-500/30 bg-violet-500/20 text-violet-200",
+}
+
+/**
+ * RailSection — grup rail kiri yang collapsible ala AI console (chevron +
+ * ingat status buka/tutup per grup di localStorage).
+ */
+function RailSection({
+  storageKey,
+  title,
+  action,
+  defaultCollapsed = false,
+  children,
+}: {
+  storageKey: string
+  title: string
+  action?: ReactNode
+  defaultCollapsed?: boolean
+  children: ReactNode
+}) {
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      if (typeof window === "undefined") return defaultCollapsed
+      return window.localStorage.getItem(`aivory_rail_${storageKey}`) === "1"
+    } catch {
+      return defaultCollapsed
+    }
+  })
+  const toggle = () => {
+    setCollapsed((v) => {
+      const next = !v
+      try {
+        window.localStorage.setItem(`aivory_rail_${storageKey}`, next ? "1" : "0")
+      } catch {
+        // abaikan — tetap jalan tanpa persist
+      }
+      return next
+    })
+  }
+  return (
+    <div className="border-b border-line px-4 pb-3 pt-4">
+      <div className="flex items-center gap-1">
+        <button
+          onClick={toggle}
+          aria-expanded={!collapsed}
+          title={collapsed ? `Expand ${title}` : `Collapse ${title}`}
+          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md py-0.5 text-left text-[11px] font-medium uppercase tracking-[0.16em] text-white/35 hover:text-white/60"
+        >
+          {collapsed ? <ChevronRight className="h-3 w-3 shrink-0" /> : <ChevronDown className="h-3 w-3 shrink-0" />}
+          <span className="truncate">{title}</span>
+        </button>
+        {action}
+      </div>
+      {!collapsed && <div className="mt-2">{children}</div>}
+    </div>
+  )
 }
 
 export default function WorkspaceNavigator({
@@ -106,22 +161,53 @@ export default function WorkspaceNavigator({
   }, [spaceId])
 
   // Team Space: rail MEMBERS — owner + grants + agent grants Space ini.
-  useEffect(() => {
+  const loadMembers = useCallback(async () => {
     if (!spaceId) return
-    let alive = true
-    fetch(`/api/workspace/${spaceId}/members`, { headers: collabAuthHeaders() })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload) => {
-        if (!alive || !payload) return
-        setOwner(payload.owner ?? null)
-        setMemberUsers(Array.isArray(payload.users) ? payload.users : [])
-        setMemberAgents(Array.isArray(payload.agents) ? payload.agents : [])
-      })
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
+    try {
+      const response = await fetch(`/api/workspace/${spaceId}/members`, { headers: collabAuthHeaders() })
+      const payload = response.ok ? await response.json().catch(() => null) : null
+      if (!payload) return
+      setOwner(payload.owner ?? null)
+      setMemberUsers(Array.isArray(payload.users) ? payload.users : [])
+      setMemberAgents(Array.isArray(payload.agents) ? payload.agents : [])
+    } catch {}
   }, [spaceId])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadMembers()
+  }, [loadMembers])
+
+  // Invite team member langsung dari rail (epic: + di header MEMBERS).
+  const [showInvite, setShowInvite] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRole, setInviteRole] = useState<"viewer" | "editor">("editor")
+  const [inviteMsg, setInviteMsg] = useState<string | null>(null)
+  const [inviting, setInviting] = useState(false)
+
+  const inviteMember = useCallback(async () => {
+    const email = inviteEmail.trim()
+    if (!spaceId || !email || inviting) return
+    setInviting(true)
+    setInviteMsg(null)
+    try {
+      const r = await fetch(`/api/workspace/${spaceId}/acl`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+        body: JSON.stringify({ email, role: inviteRole }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (r.ok) {
+        setInviteMsg(`Invited ${email} as ${inviteRole}`)
+        setInviteEmail("")
+        void loadMembers()
+      } else {
+        setInviteMsg(typeof j?.error === "string" ? j.error : "Could not invite (owner only?)")
+      }
+    } catch {
+      setInviteMsg("Could not invite. Try again.")
+    }
+    setInviting(false)
+  }, [spaceId, inviteEmail, inviteRole, inviting, loadMembers])
 
   const createDocument = async () => {
     if (creating) return
@@ -175,9 +261,8 @@ export default function WorkspaceNavigator({
     <aside className="flex w-full shrink-0 flex-col border-b border-line bg-black/10 lg:min-h-0 lg:w-[232px] lg:overflow-hidden lg:border-b-0 lg:border-r">
       {spaceId && (
         <>
-          <div className="border-b border-line px-4 pb-3 pt-4">
-            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">Space</div>
-            <div className="mt-2 flex flex-col gap-0.5">
+          <RailSection storageKey="space" title="Space">
+            <div className="flex flex-col gap-0.5">
               {spaces.map((s) => (
                 <Link
                   key={s.id}
@@ -200,10 +285,9 @@ export default function WorkspaceNavigator({
                 <span className="px-2.5 py-1 text-[11px] text-white/25">No spaces yet</span>
               )}
             </div>
-          </div>
-          <div className="border-b border-line px-4 pb-3 pt-4">
-            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">Discussions</div>
-          <div className="mt-2 flex flex-col gap-0.5">
+          </RailSection>
+          <RailSection storageKey="discussions" title="Discussions">
+            <div className="flex flex-col gap-0.5">
             {topics.map((t) => (
               <Link
                 key={t.root}
@@ -222,10 +306,9 @@ export default function WorkspaceNavigator({
               </Link>
             )}
             </div>
-          </div>
-          <div className="border-b border-line px-4 pb-3 pt-4">
-            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">Files</div>
-            <div className="mt-2 flex flex-col gap-0.5">
+          </RailSection>
+          <RailSection storageKey="files" title="Files">
+            <div className="flex flex-col gap-0.5">
               {files.map((f) => (
                 <Link
                   key={f.id}
@@ -239,10 +322,56 @@ export default function WorkspaceNavigator({
                 <span className="px-2.5 py-1 text-[11px] text-white/25">No files yet</span>
               )}
             </div>
-          </div>
-          <div className="border-b border-line px-4 pb-3 pt-4">
-            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">Members</div>
-            <div className="mt-2 flex flex-col gap-1">
+          </RailSection>
+          <RailSection
+            storageKey="members"
+            title="Members"
+            action={
+              <button
+                onClick={() => setShowInvite((v) => !v)}
+                title={showInvite ? "Close invite" : "Invite team member"}
+                aria-label={showInvite ? "Close invite" : "Invite team member"}
+                className="rounded-md p-1 text-white/35 hover:bg-white/[0.06] hover:text-white/80"
+              >
+                {showInvite ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+              </button>
+            }
+          >
+            {showInvite && (
+              <div className="mb-2 rounded-xl border border-line bg-white/[0.03] p-2.5">
+                <input
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void inviteMember()
+                    if (e.key === "Escape") setShowInvite(false)
+                  }}
+                  placeholder="teammate@aivory.id"
+                  aria-label="Teammate email"
+                  className="w-full rounded-lg border border-line bg-white/[0.04] px-2.5 py-1.5 text-[12px] text-white/80 outline-none placeholder:text-white/25 focus:border-white/20"
+                />
+                <div className="mt-1.5 flex gap-1.5">
+                  <select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value as "viewer" | "editor")}
+                    aria-label="Invite role"
+                    className="min-w-0 flex-1 rounded-lg border border-line bg-white/[0.04] px-2 py-1.5 text-[12px] text-white/70"
+                  >
+                    <option value="editor">editor</option>
+                    <option value="viewer">viewer</option>
+                  </select>
+                  <button
+                    onClick={() => void inviteMember()}
+                    disabled={inviting || !inviteEmail.trim()}
+                    className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40"
+                  >
+                    {inviting ? "…" : "Invite"}
+                  </button>
+                </div>
+                {inviteMsg && <div className="mt-1.5 text-[11px] text-white/50">{inviteMsg}</div>}
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
               {owner && (
                 <div className="flex items-center gap-2 px-2.5 py-1">
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
@@ -285,34 +414,35 @@ export default function WorkspaceNavigator({
                 <span className="px-2.5 py-1 text-[11px] text-white/25">Just you</span>
               )}
             </div>
-          </div>
+          </RailSection>
         </>
       )}
-      <div className="flex items-center justify-between px-4 pb-2 pt-4">
-        <div>
-          <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/35">My pages</div>
-          <div className="mt-1 text-[12px] text-white/55">Notes, tasks, and ideas</div>
-        </div>
-        <button
-          onClick={createDocument}
-          disabled={creating}
-          title="Create a new page"
-          className="rounded-lg p-1.5 text-white/35 hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-40"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-      </div>
-      <label className="mx-3 mb-2 flex items-center gap-2 rounded-lg border border-line bg-white/[0.03] px-2.5 py-1.5">
-        <Search className="h-3.5 w-3.5 shrink-0 text-white/25" />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Find a page"
-          className="min-w-0 flex-1 bg-transparent text-[12px] text-white/75 outline-none placeholder:text-white/25"
-        />
-      </label>
-      {createError && <div className="mx-3 mb-2 rounded-lg bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-200">{createError}</div>}
-      <nav className="flex max-h-[180px] flex-row gap-1 overflow-x-auto px-3 pb-3 lg:min-h-0 lg:max-h-none lg:flex-col lg:overflow-y-auto lg:pb-4">
+      <RailSection
+        storageKey="mypages"
+        title="My pages"
+        action={
+          <button
+            onClick={createDocument}
+            disabled={creating}
+            title="Create a new page"
+            className="rounded-md p-1 text-white/35 hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-40"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        }
+      >
+        <div className="mb-2 px-2.5 text-[12px] text-white/55">Notes, tasks, and ideas</div>
+        <label className="mb-2 flex items-center gap-2 rounded-lg border border-line bg-white/[0.03] px-2.5 py-1.5">
+          <Search className="h-3.5 w-3.5 shrink-0 text-white/25" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Find a page"
+            className="min-w-0 flex-1 bg-transparent text-[12px] text-white/75 outline-none placeholder:text-white/25"
+          />
+        </label>
+        {createError && <div className="mb-2 rounded-lg bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-200">{createError}</div>}
+        <nav className="flex max-h-[180px] flex-row gap-1 overflow-x-auto pb-1 lg:min-h-0 lg:max-h-none lg:flex-col lg:overflow-y-auto lg:pb-2">
         {filtered.map((doc) => (
           <div
             key={doc.id}
@@ -368,7 +498,8 @@ export default function WorkspaceNavigator({
           </div>
         ))}
         {filtered.length === 0 && <div className="px-2.5 py-3 text-[11px] text-white/25">No pages found</div>}
-      </nav>
+        </nav>
+      </RailSection>
     </aside>
   )
 }

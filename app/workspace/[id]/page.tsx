@@ -13,6 +13,7 @@ import WorkspacePageComments from "@/components/workspace/WorkspacePageComments"
 import WorkspaceHistory from "@/components/workspace/WorkspaceHistory"
 import SharingPanel from "@/components/workspace/SharingPanel"
 import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
+import WorkspacePagesList from "@/components/workspace/WorkspacePagesList"
 import SpaceDiscussion from "@/components/workspace/SpaceDiscussion"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
@@ -50,7 +51,7 @@ export default function WorkspaceDocPage() {
   // eksplisit tetap menang. Non-project tetap Write (tanpa discussion).
   const viewParam = search.get("view")
   const explicitView =
-    viewParam === "database" || viewParam === "board" || viewParam === "discussion" || viewParam === "page"
+    viewParam === "database" || viewParam === "board" || viewParam === "discussion" || viewParam === "page" || viewParam === "pages"
       ? viewParam
       : null
   const threadParam = search.get("thread")
@@ -406,9 +407,15 @@ export default function WorkspaceDocPage() {
                 href={`/workspace/${id}?view=board`}
                 className={`rounded-full px-3 py-1 text-[12px] ${view === "board" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
               >
-                 Board
+                  Board
               </Link>
             )}
+            <Link
+              href={`/workspace/${id}?view=pages`}
+              className={`rounded-full px-3 py-1 text-[12px] ${view === "pages" ? "bg-white text-black" : "text-white/40 hover:text-white/70"}`}
+            >
+               Pages
+            </Link>
           </div>
          </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -691,6 +698,10 @@ export default function WorkspaceDocPage() {
                 )}
               </div>
             )
+          ) : view === "pages" ? (
+            <div className="mx-auto w-full max-w-[960px]">
+              <WorkspacePagesList query="" />
+            </div>
           ) : view === "database" ? (
             <WorkspaceDatabase docId={id} readOnly={!canWrite} />
           ) : (
