@@ -9,6 +9,9 @@
  * - Root cards: aksen violet saat thread aktif, hover actions (reply, copy
  *   link, delete), topic pill klik-able, reply summary, group per hari.
  * - Composer elevated: toolbar @/#, focus ring, tombol Send ikon.
+ * - Optimistic send ala Nakama-ack: pesan langsung tampil sebagai "You"
+ *   (Sending… → Sent ✓ → hilang saat refresh memuat aslinya); gagal →
+ *   Retry inline. Box tidak menunggu round-trip.
  * - Thread panel: header (judul topic + count + close), blok topic, timeline
  *   root → replies, reply composer sticky di bawah.
  * - States rapi: skeleton loading, error + Retry, empty state dengan CTA.
@@ -67,6 +70,30 @@ interface ThreadPayload {
 interface DocOption {
   id: string
   title: string
+}
+
+/**
+ * Pesan optimistic (provisional) ala Nakama-ack: langsung tampil sebagai
+ * "You" selagi POST berjalan; status sending → sent (ack id diterima) →
+ * hilang begitu refresh memuat pesan aslinya; failed → Retry inline.
+ */
+type PendingStatus = "sending" | "sent" | "failed"
+interface PendingMsg {
+  tempId: string
+  threadRoot: string | null
+  body: string
+  status: PendingStatus
+  /** Id server dari ack 201 — untuk drop saat refresh sudah memuatnya. */
+  realId: string | null
+  at: number
+}
+
+function newTempId(): string {
+  try {
+    return `pending-${crypto.randomUUID()}`
+  } catch {
+    return `pending-${Date.now()}-${Math.floor(Math.random() * 1e9)}`
+  }
 }
 
 const TOKEN_RE =
@@ -228,6 +255,38 @@ function MessageBody({ m }: { m: SpaceMessage }) {
   )
 }
 
+/** Baris pesan optimistic: identitas "You" (tanpa tebak JWT), status kirim. */
+function PendingRow({ p, onRetry }: { p: PendingMsg; onRetry: (tempId: string) => void }) {
+  return (
+    <div className={p.status === "failed" ? "" : "opacity-70"}>
+      <div className="flex gap-3">
+        <Avatar name="You" size={p.threadRoot ? 28 : 32} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="truncate text-[13px] font-medium text-white/85">You</span>
+            <span className="shrink-0 text-[11px] tabular-nums text-white/35">
+              {p.status === "sending" ? "Sending…" : p.status === "sent" ? "Sent ✓" : "Couldn't send"}
+            </span>
+          </div>
+          <div className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-[1.6] text-white/75">
+            <RichBody body={p.body} />
+          </div>
+          {p.status === "failed" && (
+            <div className="mt-1.5">
+              <button
+                onClick={() => onRetry(p.tempId)}
+                className="rounded-full bg-white/[0.08] px-3 py-1 text-[11px] text-white/75 hover:bg-white/[0.12]"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 type DocPick = { label: string; token: string }
 type Draft = { text: string; sending: boolean; error: string | null }
 type Drafts = Record<string, Draft>
@@ -247,10 +306,8 @@ type DiscussionProps = {
 function Composer({
   placeholder,
   disabled,
-  spaceId,
   docs,
-  onSent,
-  threadRoot,
+  onDispatch,
   draft,
   updateDraft,
   textareaId,
@@ -258,16 +315,15 @@ function Composer({
 }: {
   draft: Draft
   updateDraft: (update: Partial<Draft>) => void
-  spaceId: string
   placeholder: string
   disabled: boolean
   docs: DocOption[]
-  onSent: () => void
-  threadRoot: string | null
+  /** Optimistic dispatch: parent menampilkan provisional + POST + ack. */
+  onDispatch: (body: string) => void
   textareaId?: string
   autofocusKey?: string
 }) {
-  const { text, sending, error: sendError } = draft
+  const { text, error: sendError } = draft
   const setText = useCallback((text: string) => updateDraft({ text }), [updateDraft])
   const [hashNeedle, setHashNeedle] = useState<string | null>(null)
   const [hashIndex, setHashIndex] = useState(0)
@@ -359,7 +415,7 @@ function Composer({
   /** Toolbar @/#: sisipkan trigger di cursor lalu buka menu-nya. */
   const insertTrigger = useCallback(
     (ch: "@" | "#") => {
-      if (disabled || sending) return
+      if (disabled) return
       const el = boxRef.current
       const cursor = el?.selectionStart ?? text.length
       const atLineStart = cursor === 0 || text[cursor - 1] === "\n" || text[cursor - 1] === " "
@@ -378,7 +434,7 @@ function Composer({
         }
       })
     },
-    [disabled, sending, text, setText, mention, updateHash],
+    [disabled, text, setText, mention, updateHash],
   )
 
   const selectMention = useCallback(
@@ -418,27 +474,23 @@ function Composer({
     [text, insertAtCursor],
   )
 
-  const send = useCallback(async () => {
+  /**
+   * Optimistic send ala Nakama-ack: pesan langsung dibersihkan dari box dan
+   * diteruskan ke parent (provisional "You" + POST + ack + refresh). Tidak
+   * menunggu round-trip — box langsung siap untuk pesan berikutnya.
+   */
+  const send = useCallback(() => {
     const body = text.trim()
-    if (!body || sending || disabled) return
-    updateDraft({ sending: true, error: null })
+    if (!body || disabled) return
+    updateDraft({ text: "", error: null })
+    mention.closeMenu()
+    setHashNeedle(null)
     try {
-      const r = await fetch(`/api/workspace/${spaceId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
-        body: JSON.stringify({ threadRoot, body }),
-      })
-      if (!r.ok) throw new Error("Could not send message")
-      updateDraft({ text: "", error: null })
-      mention.closeMenu()
-      setHashNeedle(null)
-      onSent()
+      onDispatch(body)
     } catch {
-      updateDraft({ error: "Could not send message. Try again." })
-    } finally {
-      updateDraft({ sending: false })
+      updateDraft({ text: body, error: "Could not send message. Try again." })
     }
-  }, [text, sending, disabled, threadRoot, onSent, spaceId, mention, updateDraft])
+  }, [text, disabled, mention, updateDraft, onDispatch])
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Prioritas 1: menu @ ala Room.
@@ -493,7 +545,7 @@ function Composer({
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      void send()
+      send()
     }
   }
 
@@ -602,7 +654,7 @@ function Composer({
           <button
             type="button"
             title="Mention an agent or @here"
-            disabled={disabled || sending}
+            disabled={disabled}
             onClick={() => insertTrigger("@")}
             className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-white/40 hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-40"
           >
@@ -612,7 +664,7 @@ function Composer({
           <button
             type="button"
             title="Reference a doc"
-            disabled={disabled || sending}
+            disabled={disabled}
             onClick={() => insertTrigger("#")}
             className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-white/40 hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-40"
           >
@@ -630,7 +682,7 @@ function Composer({
             id={textareaId}
             ref={boxRef}
             value={text}
-            disabled={disabled || sending}
+            disabled={disabled}
             onChange={(e) => {
               const next = e.target.value
               const caret = e.target.selectionStart ?? next.length
@@ -646,18 +698,14 @@ function Composer({
             className="max-h-[160px] min-h-[40px] flex-1 resize-y bg-transparent text-[13px] leading-[1.6] text-white/85 outline-none placeholder:text-white/25 disabled:opacity-50"
           />
           <button
-            onClick={() => void send()}
-            disabled={disabled || sending || !text.trim()}
+            onClick={() => send()}
+            disabled={disabled || !text.trim()}
             title="Send message"
             aria-label="Send message"
             className="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40"
           >
-            {sending ? <span>…</span> : (
-              <>
-                <SendHorizontal className="h-3.5 w-3.5" />
-                <span>Send</span>
-              </>
-            )}
+            <SendHorizontal className="h-3.5 w-3.5" />
+            <span>Send</span>
           </button>
         </div>
       </div>
@@ -910,6 +958,90 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
     updateTopic({ sending: false })
   }, [thread, topicBusy, spaceId, refreshAll, updateTopic])
 
+  // ── Optimistic send (ack ala Nakama) ─────────────────────────────
+  const [pending, setPending] = useState<PendingMsg[]>([])
+
+  const postMessage = useCallback(
+    async (threadRoot: string | null, body: string) => {
+      const r = await fetch(`/api/workspace/${spaceId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+        body: JSON.stringify({ threadRoot, body }),
+      })
+      const j = await r.json().catch(() => null)
+      if (!r.ok || typeof j?.message?.id !== "string") throw new Error("send failed")
+      return j.message as SpaceMessage
+    },
+    [spaceId],
+  )
+
+  const dispatchSend = useCallback(
+    (threadRoot: string | null, body: string) => {
+      const clean = body.trim()
+      if (!clean || !canWrite) return
+      const tempId = newTempId()
+      setPending((prev) => [...prev, { tempId, threadRoot, body: clean, status: "sending", realId: null, at: Date.now() }])
+      void postMessage(threadRoot, clean)
+        .then((message) => {
+          setPending((prev) =>
+            prev.map((p) => (p.tempId === tempId ? { ...p, status: "sent", realId: message.id } : p)),
+          )
+          refreshAll()
+        })
+        .catch(() => {
+          setPending((prev) =>
+            prev.map((p) => (p.tempId === tempId ? { ...p, status: "failed" } : p)),
+          )
+        })
+    },
+    [canWrite, postMessage, refreshAll],
+  )
+
+  const retrySend = useCallback(
+    (tempId: string) => {
+      const target = pending.find((p) => p.tempId === tempId)
+      if (!target || target.status !== "failed" || !canWrite) return
+      setPending((prev) =>
+        prev.map((p) => (p.tempId === tempId ? { ...p, status: "sending", at: Date.now() } : p)),
+      )
+      void postMessage(target.threadRoot, target.body)
+        .then((message) => {
+          setPending((prev) =>
+            prev.map((p) => (p.tempId === tempId ? { ...p, status: "sent", realId: message.id } : p)),
+          )
+          refreshAll()
+        })
+        .catch(() => {
+          setPending((prev) =>
+            prev.map((p) => (p.tempId === tempId ? { ...p, status: "failed" } : p)),
+          )
+        })
+    },
+    [pending, canWrite, postMessage, refreshAll],
+  )
+
+  // Drop provisional begitu pesan aslinya sudah dimuat refresh (cocok via
+  // ack realId) + pengaman umur. Bail-out bila tak ada perubahan (anti-loop).
+  useEffect(() => {
+    const serverIds = new Set<string>()
+    for (const r of roots) serverIds.add(r.id)
+    if (thread) {
+      serverIds.add(thread.root.id)
+      for (const m of thread.replies) serverIds.add(m.id)
+    }
+    const now = Date.now()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPending((prev) => {
+      const next = prev.filter((p) => {
+        if (p.status === "sent" && p.realId && serverIds.has(p.realId)) return false
+        if (p.status === "sent" && now - p.at > 30000) return false
+        if (p.status !== "failed" && now - p.at > 120000) return false
+        return true
+      })
+      return next.length === prev.length ? prev : next
+    })
+  }, [roots, thread])
+
   const needle = query.trim().toLowerCase()
   const filtered = useMemo(() => {
     if (!needle) return roots
@@ -930,6 +1062,12 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
     }
     return out
   }, [filtered])
+
+  const pendingRoots = useMemo(() => pending.filter((p) => p.threadRoot === null), [pending])
+  const pendingReplies = useMemo(
+    () => (openRoot ? pending.filter((p) => p.threadRoot === openRoot) : []),
+    [pending, openRoot],
+  )
 
   const threadTitle = thread?.topic && !thread.topic.archived ? thread.topic.title : "Thread"
   const threadReplyCount = thread ? thread.replies.length : 0
@@ -1151,16 +1289,28 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
           ))}
         </div>
 
+        {/* Provisional roots (optimistic) — selalu di bawah, milik sendiri. */}
+        {pendingRoots.length > 0 && (
+          <div className="mt-2.5 flex flex-col gap-2.5">
+            {pendingRoots.map((p) => (
+              <div
+                key={p.tempId}
+                className="rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-4"
+              >
+                <PendingRow p={p} onRetry={retrySend} />
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className={COMPOSER_STICKY_CLASS}>
           <Composer
             draft={drafts.null ?? EMPTY_DRAFT}
             updateDraft={updateRoot}
-            spaceId={spaceId}
             placeholder="Write an update… @ for agents, # for docs"
             disabled={!canWrite}
             docs={docs}
-            threadRoot={null}
-            onSent={refreshAll}
+            onDispatch={(body) => dispatchSend(null, body)}
             textareaId="discussion-root-composer"
             autofocusKey="root"
           />
@@ -1319,11 +1469,19 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                     })}
                   </div>
                 )}
-                {thread.replies.length === 0 && (
+                {thread.replies.length === 0 && pendingReplies.length === 0 && (
                   <div className="mt-3 rounded-xl border border-dashed border-white/10 px-3 py-4 text-center">
                     <span className="text-[12px] text-white/35">No replies yet — start below.</span>
                   </div>
                 )}
+              </div>
+            )}
+            {/* Provisional replies (optimistic) — di bawah replies server. */}
+            {pendingReplies.length > 0 && (
+              <div className={thread ? "mt-3 flex flex-col gap-4 px-1" : "flex flex-col gap-4 px-1"}>
+                {pendingReplies.map((p) => (
+                  <PendingRow key={p.tempId} p={p} onRetry={retrySend} />
+                ))}
               </div>
             )}
 
@@ -1373,12 +1531,10 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                 key={openRoot}
                 draft={drafts[draftKey] ?? EMPTY_DRAFT}
                 updateDraft={updateReply}
-                spaceId={spaceId}
                 placeholder="Reply… @ for agents"
                 disabled={!canWrite || !thread || threadResource.error}
                 docs={docs}
-                threadRoot={openRoot}
-                onSent={refreshAll}
+                onDispatch={(body) => dispatchSend(openRoot, body)}
               />
             </div>
           </>
