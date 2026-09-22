@@ -82,7 +82,9 @@ export async function runAgentTask(opts: {
     ? `${task.instruction}\n\n[Approval ${afterApprovalId} diputuskan ${decision} oleh manusia — lanjutkan turn yang diparkir.]`
     : task.instruction;
 
-  // Konteks thread ala Room: transkrip ber-tag author + peer agents.
+  // Transkrip thread (data mentah). Identitas + konteks channel milik
+  // deployment channel backend (binding discussion_* + room session) —
+  // tanpa coaching prompt yang memanjangkan pesan.
   let prompt = instruction;
   try {
     const hist = await query(
@@ -104,20 +106,7 @@ export async function runAgentTask(opts: {
         return { author: name, text: typeof r.body === "string" ? r.body : "" };
       })
       .filter((h) => h.text.trim());
-    const peers = await query(
-      `SELECT DISTINCT agent_type FROM dashboard.workspace_agent_tasks
-       WHERE space_id = $1 AND thread_root = $2 AND agent_type <> $3
-         AND status IN ('todo', 'in_progress', 'blocked')`,
-      [id, task.threadRoot, task.agentType],
-    );
-    prompt = buildSpacePayload({
-      me: agentDisplayName(task.agentType),
-      peers: (peers.rows as Record<string, unknown>[]).map((r) =>
-        agentDisplayName(String(r.agent_type)),
-      ),
-      instruction,
-      history,
-    });
+    prompt = buildSpacePayload({ instruction, history });
   } catch {
     // Konteks best-effort — instruksi polos tetap jalan.
   }
@@ -125,7 +114,7 @@ export async function runAgentTask(opts: {
   let reply = "";
   let pendingApproval: { id: string; tool_name: string; risk_tier: string } | null = null;
   try {
-    const upstream = await fetch(`${BACKEND_URL}/api/v1/telegram/agent-chat`, {
+    const upstream = await fetch(`${BACKEND_URL}/api/v1/telegram/discussion-turn`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -133,8 +122,9 @@ export async function runAgentTask(opts: {
       },
       body: JSON.stringify({
         agent_type: task.agentType,
+        space_id: id,
+        thread_root: task.threadRoot,
         text: prompt,
-        conversation_id: `space:${id}:${task.threadRoot}:${task.agentType}`,
       }),
       signal: AbortSignal.timeout(120_000),
     });

@@ -55,10 +55,6 @@ export interface SpacePayloadEntry {
 }
 
 export interface SpacePayloadParams {
-  /** Agent yang payload ini dibuat untuknya. */
-  me: string;
-  /** Nama agent lain yang disebut di instruksi/pesan pemicu. */
-  peers: string[];
   /** Instruksi polos (token sudah jadi label). */
   instruction: string;
   /** Transkrip thread sebelum giliran ini, tertua-dulu. */
@@ -73,21 +69,17 @@ function clip(text: string, max: number): string {
   return t.length > max ? `${t.slice(0, max)}…` : t;
 }
 
-export function buildSpacePayload({ me, peers, instruction, history }: SpacePayloadParams): string {
+/**
+ * Payload turn discussion: transkrip + instruksi polos (DATA).
+ *
+ * Identitas channel ("kamu di thread Team Space X sebagai Y") TIDAK
+ * disuntik di sini — itu tugas deployment channel backend
+ * (binding discussion_* + room session), sama seperti console/telegram.
+ * Men-coaching ulang per-pesan hanya memanjangkan prompt tanpa menambah
+ * informasi yang belum dimiliki session.
+ */
+export function buildSpacePayload({ instruction, history }: SpacePayloadParams): string {
   const lines: string[] = [];
-  lines.push("<space_context>");
-  lines.push(`You are in a Team Space thread on the Aivory dashboard. You are ${me}.`);
-  if (peers.length > 0) {
-    lines.push(
-      `Also mentioned in this thread: ${peers.join(", ")}. ` +
-        "Read the whole instruction and work out what is asked of YOU specifically. " +
-        "Reply as yourself in the user's language. Do not impersonate other members.",
-    );
-  } else {
-    lines.push("You are the only agent mentioned in this thread.");
-  }
-  lines.push("</space_context>");
-
   const recent = history.filter((h) => h.text.trim()).slice(-MAX_HISTORY_ENTRIES);
   if (recent.length > 0) {
     lines.push("<thread_history>");

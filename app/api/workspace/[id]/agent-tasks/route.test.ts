@@ -166,12 +166,14 @@ describe("POST /api/workspace/[id]/agent-tasks/[task]/run", () => {
     expect(failed).toBeDefined()
   })
 
-  it("sends thread transcript + peers to the agent", async () => {
-    let sentText = ""
+  it("sends transcript via the discussion channel (no prompt coaching)", async () => {
+    let sentUrl = ""
+    let sentBody: Record<string, unknown> = {}
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (_url: unknown, init: { body?: unknown } | undefined) => {
-        sentText = String((JSON.parse(String(init?.body)) as { text?: unknown }).text ?? "")
+      vi.fn(async (url: unknown, init: { body?: unknown } | undefined) => {
+        sentUrl = String(url)
+        sentBody = JSON.parse(String(init?.body)) as Record<string, unknown>
         return { ok: true, json: async () => ({ reply: "ok", pending_approval: null }) }
       }),
     )
@@ -183,17 +185,22 @@ describe("POST /api/workspace/[id]/agent-tasks/[task]/run", () => {
             { author_kind: "user", author_id: "u1", author_name: "Sarah", agent_type: null, body: "launch cut?" },
           ],
         })
-      if (sql.includes("FROM dashboard.workspace_agent_tasks") && sql.includes("DISTINCT"))
-        return Promise.resolve({ rows: [{ agent_type: "customer_service" }] })
       if (sql.includes("INSERT INTO dashboard.workspace_messages"))
         return Promise.resolve({ rows: [MSG_ROW], rowCount: 1 })
       return Promise.resolve({ rows: [], rowCount: 0 })
     })
     const res = await POST(req("POST", "http://localhost/x", {}), params)
     expect(res.status).toBe(200)
+    // Deployment channel: structured ids, channel introduces identity.
+    expect(sentUrl).toContain("/api/v1/telegram/discussion-turn")
+    expect(sentBody).toMatchObject({ agent_type: "autonomous" })
+    expect(typeof sentBody.space_id).toBe("string")
+    expect(typeof sentBody.thread_root).toBe("string")
+    expect(sentBody).not.toHaveProperty("conversation_id")
+    const sentText = String(sentBody.text ?? "")
     expect(sentText).toContain("<thread_history>")
     expect(sentText).toContain("Sarah: launch cut?")
-    expect(sentText).toContain("Teo")
+    expect(sentText).not.toContain("<space_context>")
   })
 
   it("forbids service credentials (agents don't trigger agents)", async () => {

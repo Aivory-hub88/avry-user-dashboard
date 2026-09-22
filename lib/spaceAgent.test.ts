@@ -102,25 +102,23 @@ describe("enqueueAgentTasks", () => {
 })
 
 describe("buildSpacePayload", () => {
-  it("carries who, transcript, and instruction", () => {
+  it("carries transcript and instruction without channel coaching", () => {
     const p = buildSpacePayload({
-      me: "Geno",
-      peers: ["Teo"],
       instruction: "Tolong @Geno cek",
       history: [
         { author: "Sarah", text: "launch cut Jumat?" },
         { author: "Geno", text: "Siap" },
       ],
     })
-    expect(p).toContain("You are Geno")
-    expect(p).toContain("Teo")
+    expect(p).not.toContain("<space_context>")
+    expect(p).not.toContain("You are Geno")
     expect(p).toContain("<thread_history>\nSarah: launch cut Jumat?")
     expect(p).toContain("<instruction>\nTolong @Geno cek\n</instruction>")
   })
 
-  it("omits empty history and handles solo runs", () => {
-    const p = buildSpacePayload({ me: "Finn", peers: [], instruction: "cek", history: [] })
-    expect(p).toContain("only agent mentioned")
+  it("omits empty history", () => {
+    const p = buildSpacePayload({ instruction: "cek", history: [] })
     expect(p).not.toContain("<thread_history>")
+    expect(p).toContain("<instruction>\ncek\n</instruction>")
   })
 })
