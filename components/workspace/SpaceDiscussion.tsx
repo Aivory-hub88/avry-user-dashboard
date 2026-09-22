@@ -37,6 +37,7 @@ import {
   Hash,
   Link2,
   MessageSquarePlus,
+  PanelRight,
   RefreshCw,
   Reply,
   Search,
@@ -646,8 +647,8 @@ function Composer({
         document.body,
       )}
       <div
-        className={`rounded-2xl border bg-white/[0.03] transition-colors ${
-          focused && !disabled ? "border-white/20 bg-white/[0.045]" : "border-line"
+        className={`rounded-2xl bg-white/[0.03] transition-colors ${
+          focused && !disabled ? "bg-white/[0.05]" : ""
         }`}
       >
         <div className="flex items-center gap-1 px-2.5 pt-2">
@@ -724,7 +725,7 @@ function StreamSkeleton() {
   return (
     <div className="flex flex-col gap-3" aria-hidden>
       {[0, 1, 2].map((i) => (
-        <div key={i} className="animate-pulse rounded-2xl border border-line bg-white/[0.02] p-4">
+        <div key={i} className="animate-pulse rounded-2xl bg-white/[0.02] p-4">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-full bg-white/[0.07]" />
             <div className="flex-1">
@@ -790,6 +791,27 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
   const [openRoot, setOpenRoot] = useState<string | null>(initialThread)
   const [lastInitialThread, setLastInitialThread] = useState(initialThread)
   const [panelTab, setPanelTab] = useState<"thread" | "activity">("thread")
+  // Panel kanan hideable ala AI console (persist). Default: sembunyi bila
+  // tidak ada thread yang diminta — stream yang jadi bintang utama.
+  const [panelHidden, setPanelHidden] = useState<boolean>(() => {
+    try {
+      if (typeof window === "undefined") return !initialThread
+      const stored = window.localStorage.getItem("aivory_discussion_panel")
+      if (stored !== null) return stored === "1"
+    } catch {
+      // abaikan — pakai default
+    }
+    return !initialThread
+  })
+  const setPanelHiddenPersist = useCallback((hidden: boolean) => {
+    setPanelHidden(hidden)
+    try {
+      window.localStorage.setItem("aivory_discussion_panel", hidden ? "1" : "0")
+    } catch {
+      // abaikan — tetap jalan tanpa persist
+    }
+  }, [])
+  const panelVisible = !panelHidden && (openRoot !== null || panelTab === "activity")
   const [query, setQuery] = useState("")
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -800,6 +822,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
     setLastInitialThread(initialThread)
     setOpenRoot(initialThread)
     setPanelTab("thread")
+    if (initialThread) setPanelHidden(false)
   }
   const stream = useDiscussionResource<{ roots: RootItem[] }>(`/api/workspace/${spaceId}/stream?limit=50`)
   const threadResource = useDiscussionResource<ThreadPayload>(openRoot
@@ -861,15 +884,17 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
       }
       setOpenRoot(rootId)
       setPanelTab("thread")
+      setPanelHiddenPersist(false)
       router.replace(`/workspace/${spaceId}?view=discussion&thread=${encodeURIComponent(rootId)}`, { scroll: false })
     },
-    [router, spaceId],
+    [router, spaceId, setPanelHiddenPersist],
   )
 
   const closeThread = useCallback(() => {
     setOpenRoot(null)
+    setPanelHiddenPersist(true)
     router.replace(`/workspace/${spaceId}?view=discussion`, { scroll: false })
-  }, [router, spaceId])
+  }, [router, spaceId, setPanelHiddenPersist])
 
   const [confirmDeleteRoot, setConfirmDeleteRoot] = useState<string | null>(null)
   const [deletingRoot, setDeletingRoot] = useState<string | null>(null)
@@ -1076,8 +1101,8 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
     <div className="mx-auto flex w-full max-w-[1240px] items-start gap-4">
       {/* ── STREAM ─────────────────────────────────────────── */}
       <div className="min-w-0 flex-1">
-        {/* Header */}
-        <div className="mb-4 rounded-2xl border border-line bg-white/[0.02] p-4">
+        {/* Header — flat ala console, tanpa kartu. */}
+        <div className="mb-3 px-1 py-2">
           <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -1118,6 +1143,15 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
               >
                 <RefreshCw className="h-3.5 w-3.5" />
               </button>
+              <button
+                onClick={() => setPanelHiddenPersist(!panelHidden)}
+                title={panelVisible ? "Hide thread panel" : "Show thread panel"}
+                aria-label={panelVisible ? "Hide thread panel" : "Show thread panel"}
+                aria-expanded={panelVisible}
+                className={`rounded-full p-2 hover:bg-white/[0.06] hover:text-white/80 ${panelVisible ? "text-white/80" : "text-white/40"}`}
+              >
+                <PanelRight className="h-3.5 w-3.5" />
+              </button>
               {canWrite && (
                 <button
                   onClick={focusRootComposer}
@@ -1130,7 +1164,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
             </div>
           </div>
           <div className="mt-3">
-            <label className="flex items-center gap-2 rounded-xl border border-line bg-white/[0.03] px-3 py-1.5 focus-within:border-white/20">
+            <label className="flex items-center gap-2 rounded-xl bg-white/[0.04] px-3 py-1.5 focus-within:bg-white/[0.06]">
               <Search className="h-3.5 w-3.5 shrink-0 text-white/25" />
               <input
                 type="search"
@@ -1156,7 +1190,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
         {/* Body */}
         {loading && <StreamSkeleton />}
         {loadError && (
-          <div className="rounded-2xl border border-line bg-white/[0.03] p-8 text-center">
+          <div className="rounded-2xl bg-white/[0.03] p-8 text-center">
             <div className="text-[14px] font-medium text-white/70">{loadError}</div>
             <div className="mt-1 text-[12px] text-white/35">Check your connection and try again.</div>
             <button
@@ -1169,7 +1203,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
           </div>
         )}
         {!loading && !loadError && roots.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-10 text-center">
+          <div className="rounded-2xl bg-white/[0.02] p-10 text-center">
             <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.05] text-white/50">
               <MessageSquarePlus className="h-5 w-5" />
             </div>
@@ -1188,7 +1222,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
           </div>
         )}
         {!loading && !loadError && roots.length > 0 && filtered.length === 0 && (
-          <div className="rounded-2xl border border-line bg-white/[0.03] p-8 text-center">
+          <div className="rounded-2xl bg-white/[0.03] p-8 text-center">
             <div className="text-[14px] font-medium text-white/70">No matches</div>
             <div className="mt-1 text-[12px] text-white/35">Nothing matches “{query.trim()}”.</div>
             <button
@@ -1217,10 +1251,10 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                   return (
                     <div
                       key={r.id}
-                      className={`group relative overflow-hidden rounded-2xl border p-4 transition-colors ${
+                      className={`group relative overflow-hidden rounded-2xl p-4 transition-colors ${
                         selected
-                          ? "border-violet-400/40 bg-white/[0.05]"
-                          : "border-line bg-white/[0.03] hover:border-white/15 hover:bg-white/[0.04]"
+                          ? "bg-white/[0.05]"
+                          : "hover:bg-white/[0.04]"
                       }`}
                     >
                       {selected && (
@@ -1295,7 +1329,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
             {pendingRoots.map((p) => (
               <div
                 key={p.tempId}
-                className="rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-4"
+                className="rounded-2xl bg-white/[0.02] p-4"
               >
                 <PendingRow p={p} onRetry={retrySend} />
               </div>
@@ -1317,9 +1351,9 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
         </div>
       </div>
 
-      {/* ── SIDE PANEL ─────────────────────────────────────── */}
+      {/* ── SIDE PANEL (hideable) ──────────────────────────────── */}
       <div
-        className={`${openRoot || panelTab === "activity" ? "flex" : "hidden"} max-h-[calc(100vh-140px)] w-full shrink-0 flex-col overflow-y-auto rounded-2xl border border-line bg-white/[0.02] p-4 lg:sticky lg:top-4 lg:flex lg:w-[400px] lg:max-w-[400px]`}
+        className={`${panelVisible ? "flex" : "hidden"} max-h-[calc(100vh-140px)] w-full shrink-0 flex-col overflow-y-auto py-1 pl-1 pr-2 lg:sticky lg:top-4 lg:w-[400px] lg:max-w-[400px]`}
       >
         <div className="mb-3 flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
           <button
@@ -1338,7 +1372,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
         {panelTab === "activity" ? (
           <SpaceActivityPanel onOpenThread={openThread} />
         ) : !openRoot ? (
-          <div className="rounded-xl border border-dashed border-white/10 p-6 text-center">
+          <div className="rounded-xl bg-white/[0.02] p-6 text-center">
             <div className="text-[13px] font-medium text-white/60">No thread selected</div>
             <div className="mt-1 text-[12px] text-white/35">
               <span>Select a thread from the stream to read replies, run agents, and manage its goal here.</span>
@@ -1405,7 +1439,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
             </div>
 
             {thread?.topic?.archived && (
-              <div className="mb-3 rounded-xl border border-line bg-white/[0.03] px-3 py-2 text-[12px] text-white/45">
+              <div className="mb-3 rounded-xl bg-white/[0.03] px-3 py-2 text-[12px] text-white/45">
                 <span>Archived — a new reply will reopen it.</span>
               </div>
             )}
@@ -1421,21 +1455,21 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
             {threadLoading && (
               <div className="flex flex-col gap-3" aria-hidden>
                 <span className="text-[12px] text-white/40">Loading thread…</span>
-                <div className="animate-pulse rounded-xl border border-line bg-white/[0.02] p-4">
+                <div className="animate-pulse rounded-xl bg-white/[0.02] p-4">
                   <div className="h-3 w-2/3 rounded-full bg-white/[0.07]" />
                   <div className="mt-2 h-3 w-full rounded-full bg-white/[0.05]" />
                 </div>
               </div>
             )}
             {!threadLoading && !thread && (
-              <div className="rounded-xl border border-line bg-white/[0.03] p-4 text-center">
+              <div className="rounded-xl bg-white/[0.03] p-4 text-center">
                 <span className="text-[12px] text-white/40">Thread not found.</span>
               </div>
             )}
             {thread && (
               <div className="flex flex-col">
                 {/* Root */}
-                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3.5">
+                <div className="rounded-xl bg-white/[0.04] p-3.5">
                   <div className="flex gap-2.5">
                     <Avatar
                       name={displayName(thread.root)}
@@ -1470,7 +1504,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                   </div>
                 )}
                 {thread.replies.length === 0 && pendingReplies.length === 0 && (
-                  <div className="mt-3 rounded-xl border border-dashed border-white/10 px-3 py-4 text-center">
+                  <div className="mt-3 rounded-xl bg-white/[0.02] px-3 py-4 text-center">
                     <span className="text-[12px] text-white/35">No replies yet — start below.</span>
                   </div>
                 )}
@@ -1485,9 +1519,9 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
               </div>
             )}
 
-            <div className="mt-4 border-t border-line pt-3">
+            <div className="mt-4 border-t border-white/[0.07] pt-3">
               {canWrite && thread && !thread.topic && (
-                <div className="mb-3 rounded-xl border border-line bg-white/[0.02] p-2.5">
+                <div className="mb-3 rounded-xl bg-white/[0.03] p-2.5">
                   <div className="px-1 text-[11px] font-medium uppercase tracking-[0.12em] text-white/30">
                     <span>Thread goal</span>
                   </div>
@@ -1501,7 +1535,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                       placeholder="Thread goal title…"
                       disabled={topicBusy}
                       aria-label="Thread goal title"
-                      className="min-w-0 flex-1 rounded-xl border border-line bg-white/[0.03] px-3 py-1.5 text-[12px] text-white/85 outline-none placeholder:text-white/25 focus:border-white/20"
+                      className="min-w-0 flex-1 rounded-xl bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/85 outline-none placeholder:text-white/25 focus:bg-white/[0.06]"
                     />
                     <button
                       onClick={() => void saveTopic()}

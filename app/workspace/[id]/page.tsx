@@ -19,7 +19,7 @@ import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 import { parseMarkdown, type ImportedBlock } from "@/lib/markdownImport"
 import { useWorkspaceContext } from "@/contexts/WorkspaceContext"
-import { Share2, Star, Trash2, Sparkles, Download, FileDown, Presentation, Upload } from "lucide-react"
+import { Share2, Star, Trash2, Sparkles, Download, FileDown, Presentation, Upload, PanelLeft } from "lucide-react"
 
 type Meta = {
   id: string
@@ -70,6 +70,26 @@ export default function WorkspaceDocPage() {
   const [aiDocText, setAiDocText] = useState("")
   const [showExport, setShowExport] = useState(false)
   const [present, setPresent] = useState(false)
+  // Rail kiri hideable ala AI console (persist).
+  const [railHidden, setRailHidden] = useState<boolean>(() => {
+    try {
+      if (typeof window === "undefined") return false
+      return window.localStorage.getItem("aivory_doc_rail") === "1"
+    } catch {
+      return false
+    }
+  })
+  const toggleRail = () => {
+    setRailHidden((v) => {
+      const next = !v
+      try {
+        window.localStorage.setItem("aivory_doc_rail", next ? "1" : "0")
+      } catch {
+        // abaikan — tetap jalan tanpa persist
+      }
+      return next
+    })
+  }
   // Markdown import plumbing: the editor registers its importer once live.
   const importFnRef = useRef<((blocks: ImportedBlock[]) => number) | null>(null)
   const importFileRef = useRef<HTMLInputElement | null>(null)
@@ -343,9 +363,18 @@ export default function WorkspaceDocPage() {
     <div className="flex h-full w-full flex-col bg-surface-1">
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-line bg-black/10 px-6">
         <div className="flex min-w-0 items-center gap-2">
-            <Link href="/workspace?view=pages" className="shrink-0 text-[13px] text-white/40 hover:text-white/70">
-              Workspace
-            </Link>
+          <button
+            onClick={toggleRail}
+            title={railHidden ? "Show sidebar" : "Hide sidebar"}
+            aria-label={railHidden ? "Show sidebar" : "Hide sidebar"}
+            aria-expanded={!railHidden}
+            className={`shrink-0 rounded-full p-1.5 hover:bg-white/[0.06] hover:text-white/80 ${railHidden ? "text-white/40" : "text-white/60"}`}
+          >
+            <PanelLeft className="h-3.5 w-3.5" />
+          </button>
+          <Link href="/workspace?view=pages" className="shrink-0 text-[13px] text-white/40 hover:text-white/70">
+            Workspace
+          </Link>
           <span className="shrink-0 text-white/20">/</span>
           {view === "page" ? (
             // Write view: the Big Title above the editor is the rename surface
@@ -556,12 +585,14 @@ export default function WorkspaceDocPage() {
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <WorkspaceNavigator
-          currentId={id}
-          spaceId={isProject ? id : null}
-          workspaceId={meta?.workspace_id ?? null}
-          spaceFiles={isProject ? projectMembers : []}
-        />
+        {!railHidden && (
+          <WorkspaceNavigator
+            currentId={id}
+            spaceId={isProject ? id : null}
+            workspaceId={meta?.workspace_id ?? null}
+            spaceFiles={isProject ? projectMembers : []}
+          />
+        )}
         <div className="min-w-0 flex-1 overflow-y-auto bg-black/10 px-8 py-8 lg:px-10 xl:px-12">
           {view === "page" && (
             <>
