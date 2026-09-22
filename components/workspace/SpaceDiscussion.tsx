@@ -31,13 +31,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createPortal } from "react-dom"
 import {
-  Check,
   ChevronLeft,
-  Link2,
+  Copy,
   MessageSquarePlus,
   PanelRight,
   Plus,
-  CornerDownLeft,
   RefreshCw,
   Reply,
   Search,
@@ -45,6 +43,7 @@ import {
   X,
 } from "lucide-react"
 import { collabAuthHeaders } from "@/lib/collabClient"
+import { AuthManager } from "@/lib/authManager"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
 import { useDiscussionResource } from "@/hooks/useDiscussionResource"
 import { useAgentMention } from "@/hooks/useAgentMention"
@@ -111,6 +110,39 @@ function displayName(m: SpaceMessage): string {
   return m.author.agentName || m.author.memberId
 }
 
+/** user_id sendiri (untuk bubble kanan ala console). Null bila tak dikenal. */
+function useSelfId(): string | null {
+  const [selfId] = useState<string | null>(() => {
+    try {
+      if (typeof window === "undefined") return null
+      return AuthManager.getUser()?.user_id ?? null
+    } catch {
+      return null
+    }
+  })
+  return selfId
+}
+
+function isOwnMessage(m: SpaceMessage, selfId: string | null): boolean {
+  return selfId !== null && m.author.actingMode === "user" && m.author.memberId === selfId
+}
+
+function excerptOf(body: string, max = 140): string {
+  const t = body.trim().replace(/\s+/g, " ")
+  return t.length > max ? `${t.slice(0, max)}…` : t
+}
+
+/** Panah kirim console (disalin dari ChatInput.SendArrowIcon supaya tidak
+ *  menarik dependensi berat UploadMenu/ContextToolbar ke chunk discussion). */
+function SendArrowIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="9 14 4 9 9 4" />
+      <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+    </svg>
+  )
+}
+
 /** Label hari untuk group stream: Today / Yesterday / tanggal. */
 function dayLabel(iso: string): string {
   const t = new Date(iso)
@@ -142,11 +174,11 @@ function chipPlain(text: string, keyBase: number): React.ReactNode[] {
     out.push(
       <span
         key={`${keyBase}-${k++}`}
-        className={`inline-block rounded-full border px-2 py-px text-[12px] ${
+        className={
           isAgent
-            ? "border-violet-500/30 bg-violet-500/20 text-violet-200"
-            : "border-white/10 bg-white/[0.08] text-white/75"
-        }`}
+            ? "font-medium text-accent"
+            : "inline-block rounded-full border border-white/10 bg-white/[0.08] px-2 py-px text-[12px] text-white/75"
+        }
       >
         @{m[1]}
       </span>,
@@ -172,13 +204,13 @@ function RichBody({ body }: { body: string }) {
     }
     const label = m[1]
     const target = m[2]
-    const tone = target.startsWith("agent:")
-      ? "border-violet-500/30 bg-violet-500/20 text-violet-200"
-      : "border-white/10 bg-white/[0.08] text-white/75"
+    const isAgentToken = target.startsWith("agent:")
     parts.push({
       key: k++,
-      node: (
-        <span className={`inline-block rounded-full border px-2 py-px text-[12px] ${tone}`}>
+      node: isAgentToken ? (
+        <span className="font-medium text-accent">{label}</span>
+      ) : (
+        <span className="inline-block rounded-full border border-white/10 bg-white/[0.08] px-2 py-px text-[12px] text-white/75">
           {label}
         </span>
       ),
@@ -200,14 +232,15 @@ function RichBody({ body }: { body: string }) {
   )
 }
 
-function Avatar({ name, size = 32, agent = false }: { name: string; size?: number; agent?: boolean }) {
+/**
+ * Avatar chat — meniru AI console persis:
+ * - agent → portrait AgentAvatar (ilustrasi per tipe, tanpa huruf/ring ungu)
+ * - manusia → lingkaran netral inisial (tanpa aksen warna)
+ */
+function LetterAvatar({ name, size = 32 }: { name: string; size?: number }) {
   return (
     <span
-      className={`flex shrink-0 items-center justify-center rounded-full font-semibold ${
-        agent
-          ? "bg-violet-500/20 text-violet-200 ring-1 ring-violet-500/40"
-          : "bg-white/[0.08] text-white/70"
-      }`}
+      className="flex shrink-0 items-center justify-center rounded-full bg-white/[0.08] font-semibold text-white/70"
       style={{ width: size, height: size, fontSize: size * 0.38 }}
     >
       {initials(name)}
@@ -215,9 +248,16 @@ function Avatar({ name, size = 32, agent = false }: { name: string; size?: numbe
   )
 }
 
+function ChatAvatar({ m, size = 32 }: { m: SpaceMessage; size?: number }) {
+  if (m.author.actingMode === "agent") {
+    return <AgentAvatar type={m.author.agentType ?? null} size={size} />
+  }
+  return <LetterAvatar name={displayName(m)} size={size} />
+}
+
 function AgentPill() {
   return (
-    <span className="rounded-full border border-violet-500/30 bg-violet-500/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-violet-200">
+    <span className="rounded-full border border-white/15 bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/50">
       agent
     </span>
   )
@@ -257,32 +297,157 @@ function MessageBody({ m }: { m: SpaceMessage }) {
   )
 }
 
-/** Baris pesan optimistic: identitas "You" (tanpa tebak JWT), status kirim. */
-function PendingRow({ p, onRetry }: { p: PendingMsg; onRetry: (tempId: string) => void }) {
+/** Aksi hover ala MessageActions console: ikon w-7 rounded-md. */
+function RowActions({
+  onReply,
+  onCopy,
+  deleteNode,
+}: {
+  onReply?: () => void
+  onCopy?: () => void
+  deleteNode?: React.ReactNode
+}) {
+  const btn =
+    "w-7 h-7 flex items-center justify-center rounded-md text-white/40 hover:text-white/80 hover:bg-white/[0.08] transition-colors duration-150"
   return (
-    <div className={p.status === "failed" ? "" : "opacity-70"}>
-      <div className="flex gap-3">
-        <Avatar name="You" size={p.threadRoot ? 28 : 32} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span className="truncate text-[13px] font-medium text-white/85">You</span>
-            <span className="shrink-0 text-[11px] tabular-nums text-white/35">
-              {p.status === "sending" ? "Sending…" : p.status === "sent" ? "Sent ✓" : "Couldn't send"}
-            </span>
+    <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100">
+      {onReply && (
+        <button onClick={onReply} title="Reply" aria-label="Reply" className={btn}>
+          <Reply className="w-3.5 h-3.5" />
+        </button>
+      )}
+      {onCopy && (
+        <button onClick={onCopy} title="Copy" aria-label="Copy" className={btn}>
+          <Copy className="w-3.5 h-3.5" />
+        </button>
+      )}
+      {deleteNode}
+    </div>
+  )
+}
+
+/**
+ * Baris chat — meniru ChatMessage console persis:
+ * - milik sendiri → bubble kanan bg #282825, tanpa avatar/nama
+ * - agent → portrait AgentAvatar 36 + bubble bg-white/[0.035], tanpa nama/pill
+ * - member lain → avatar huruf netral + nama + bubble yang sama
+ * Tanpa aksen ungu di mana pun.
+ */
+function ChatRow({
+  m,
+  own,
+  topicTitle,
+  highlighted,
+  onReply,
+  deleteNode,
+  extraBelow,
+}: {
+  m: SpaceMessage
+  own: boolean
+  topicTitle?: string | null
+  highlighted?: boolean
+  onReply?: () => void
+  deleteNode?: React.ReactNode
+  extraBelow?: React.ReactNode
+}) {
+  const isAgent = m.author.actingMode === "agent"
+  const body = m.body ? (
+    <RichBody body={m.body} />
+  ) : (
+    <span className="italic text-white/30">(deleted)</span>
+  )
+  const copy = () => {
+    try {
+      void navigator.clipboard?.writeText(m.body)
+    } catch {
+      // abaikan
+    }
+  }
+  if (own) {
+    return (
+      <div className={`group relative rounded-xl ${highlighted ? "bg-white/[0.02]" : ""}`}>
+        {topicTitle && (
+          <div className="mb-1 text-right text-[11px] text-white/35">{topicTitle}</div>
+        )}
+        <div className="flex justify-end">
+          <div
+            className="max-w-[80%] bg-[#282825] rounded-[20px] px-5 py-3.5 text-base text-white leading-[1.6] border border-line text-left"
+            title={m.createdAt}
+          >
+            {body}
           </div>
-          <div className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-[1.6] text-white/75">
-            <RichBody body={p.body} />
-          </div>
-          {p.status === "failed" && (
-            <div className="mt-1.5">
-              <button
-                onClick={() => onRetry(p.tempId)}
-                className="rounded-full bg-white/[0.08] px-3 py-1 text-[11px] text-white/75 hover:bg-white/[0.12]"
-              >
-                Retry
-              </button>
+        </div>
+        <div className="mt-1 flex justify-end">
+          <RowActions onReply={onReply} onCopy={copy} deleteNode={deleteNode} />
+        </div>
+        {extraBelow}
+      </div>
+    )
+  }
+  return (
+    <div className={`group relative rounded-xl ${highlighted ? "bg-white/[0.02]" : ""}`}>
+      <div className="flex items-start gap-4">
+        {isAgent ? (
+          <AgentAvatar type={m.author.agentType ?? null} size={36} className="mt-0.5" />
+        ) : (
+          <span className="mt-0.5 flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[13px] font-semibold text-white/70">
+            {initials(displayName(m))}
+          </span>
+        )}
+        <div className="flex-1 min-w-0 max-w-[720px] text-left">
+          {topicTitle && <div className="mb-1 text-[11px] text-white/35">{topicTitle}</div>}
+          {!isAgent && (
+            <div className="mb-1 flex flex-wrap items-baseline gap-x-2">
+              <span className="truncate text-[13px] font-medium text-white/85">
+                {displayName(m)}
+              </span>
+              <span className="shrink-0 text-[11px] tabular-nums text-white/25" title={m.createdAt}>
+                {timeAgo(m.createdAt)}
+              </span>
             </div>
           )}
+          <div
+            className="rounded-2xl border border-line bg-white/[0.035] px-5 py-3.5 text-base text-[#f7f7f7] leading-[1.6]"
+            title={isAgent ? m.createdAt : undefined}
+          >
+            {body}
+          </div>
+          <div className="mt-1">
+            <RowActions onReply={onReply} onCopy={copy} deleteNode={deleteNode} />
+          </div>
+        </div>
+      </div>
+      {extraBelow}
+    </div>
+  )
+}
+
+/** Provisional optimistic: bubble kanan milik sendiri + status kirim. */
+function PendingRow({ p, onRetry }: { p: PendingMsg; onRetry: (tempId: string) => void }) {
+  return (
+    <div className="group relative">
+      <div className="flex justify-end">
+        <div className="max-w-[80%]">
+          <div className="bg-[#282825] rounded-[20px] px-5 py-3.5 text-base text-white leading-[1.6] border border-line text-left opacity-70">
+            <RichBody body={p.body} />
+          </div>
+          <div className="mt-1 text-right text-[11px] text-white/30">
+            {p.status === "failed" ? (
+              <span className="inline-flex items-center gap-2">
+                <span>Couldn&apos;t send</span>
+                <button
+                  onClick={() => onRetry(p.tempId)}
+                  className="rounded-full bg-white/[0.08] px-3 py-1 text-white/75 hover:bg-white/[0.12]"
+                >
+                  Retry
+                </button>
+              </span>
+            ) : p.status === "sent" ? (
+              <span>Sent ✓</span>
+            ) : (
+              <span>Sending…</span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -314,6 +479,8 @@ function Composer({
   updateDraft,
   textareaId,
   autofocus,
+  replyQuote,
+  onCancelReply,
 }: {
   draft: Draft
   updateDraft: (update: Partial<Draft>) => void
@@ -324,12 +491,14 @@ function Composer({
   onDispatch: (body: string) => void
   textareaId?: string
   autofocus?: boolean
+  /** Quote WhatsApp-style di atas composer (reply inline, pola ChatInput). */
+  replyQuote?: { name: string; excerpt: string } | null
+  onCancelReply?: () => void
 }) {
   const { text, error: sendError } = draft
   const setText = useCallback((text: string) => updateDraft({ text }), [updateDraft])
   const [hashNeedle, setHashNeedle] = useState<string | null>(null)
   const [hashIndex, setHashIndex] = useState(0)
-  const [focused, setFocused] = useState(false)
   const [pickPos, setPickPos] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null)
   const boxRef = useRef<HTMLTextAreaElement>(null)
 
@@ -647,13 +816,27 @@ function Composer({
         </div>,
         document.body,
       )}
-      {/* Composer ala AI console: box besar, tombol + bulat kiri bawah,
-          tombol panah bulat kanan bawah. Tanpa toolbar — @/# via ketikan. */}
-      <div
-        className={`rounded-[20px] bg-white/[0.04] p-3 transition-colors ${
-          focused && !disabled ? "bg-white/[0.055]" : ""
-        }`}
-      >
+      {/* Composer = kartu console persis: bg #1f1f22, radius 20,
+          textarea console-textarea, tombol console-icon-btn/send-btn. */}
+      <div className="bg-[#1f1f22] border border-line rounded-[20px] overflow-hidden">
+        {replyQuote && (
+          <div className="flex items-start gap-2 px-4 pt-3 pb-2 border-b border-line/60">
+            <div className="flex-1 min-w-0 pl-2.5 border-l-2 border-accent/50">
+              <div className="text-[12px] font-medium text-accent/80">
+                Replying to {replyQuote.name}
+              </div>
+              <div className="text-[13px] text-[#a1a1aa] truncate">{replyQuote.excerpt}</div>
+            </div>
+            <button
+              type="button"
+              onClick={onCancelReply}
+              aria-label="Cancel reply"
+              className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-white/40 hover:text-white/80 hover:bg-white/[0.08] transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
         <textarea
           id={textareaId}
           ref={boxRef}
@@ -666,34 +849,33 @@ function Composer({
             mention.checkForMention(next, caret)
             updateHash(next, caret)
           }}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           onKeyDown={onKeyDown}
           placeholder={disabled ? "Viewers can't write" : placeholder}
-          rows={3}
+          rows={2}
           autoFocus={autofocus}
-          className="max-h-[220px] min-h-[88px] w-full resize-y bg-transparent text-[13.5px] leading-[1.6] text-white/85 outline-none placeholder:text-white/25 disabled:opacity-50"
+          className="console-textarea w-full px-5 pt-[14px] pb-1 text-[15px]"
         />
-        <div className="mt-1 flex items-center gap-2">
-          <button
-            type="button"
-            title="Mention someone or an agent (@)"
-            aria-label="Mention someone or an agent"
-            disabled={disabled}
-            onClick={() => insertTrigger("@")}
-            className="rounded-full border border-white/10 p-2 text-white/50 hover:bg-white/[0.06] hover:text-white/85 disabled:opacity-40"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-          <span className="flex-1" />
+        <div className="flex items-center justify-between px-4 pt-1 pb-3">
+          <div className="flex items-center gap-[6px]">
+            <button
+              type="button"
+              title="Mention someone or an agent (@)"
+              aria-label="Mention someone or an agent"
+              disabled={disabled}
+              onClick={() => insertTrigger("@")}
+              className="console-icon-btn"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
           <button
             onClick={() => send()}
             disabled={disabled || !text.trim()}
             title="Send message (Enter)"
             aria-label="Send message"
-            className="rounded-full border border-white/10 p-2.5 text-white/70 hover:bg-white hover:text-black disabled:opacity-40"
+            className="console-send-btn"
           >
-            <CornerDownLeft className="h-4 w-4" />
+            <SendArrowIcon size={16} />
           </button>
         </div>
       </div>
@@ -740,9 +922,10 @@ function DeleteThreadButton({
       <button
         onClick={onAsk}
         title="Delete this thread and its replies"
-        className="rounded-lg p-1.5 text-white/25 opacity-0 hover:bg-red-500/10 hover:text-red-300 focus:opacity-100 group-hover:opacity-100"
+        aria-label="Delete this thread and its replies"
+        className="w-7 h-7 flex items-center justify-center rounded-md text-white/40 hover:text-red-300 hover:bg-white/[0.08] transition-colors duration-150 opacity-0 focus:opacity-100 group-hover:opacity-100"
       >
-        <Trash2 className="h-3.5 w-3.5" />
+        <Trash2 className="w-3.5 h-3.5" />
       </button>
     )
   }
@@ -795,11 +978,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
   }, [])
   const panelVisible = !panelHidden && (openRoot !== null || panelTab === "activity")
   const [query, setQuery] = useState("")
-  const [copiedId, setCopiedId] = useState<string | null>(null)
-  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => () => {
-    if (copyTimer.current) clearTimeout(copyTimer.current)
-  }, [])
+  const selfId = useSelfId()
   if (lastInitialThread !== initialThread) {
     setLastInitialThread(initialThread)
     setOpenRoot(initialThread)
@@ -831,9 +1010,9 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
   const updateRoot = useCallback((update: Partial<Draft>) => {
     setDrafts((prev) => ({ ...prev, null: { ...(prev.null ?? EMPTY_DRAFT), ...update } }))
   }, [])
-  // Reply inline di tengah (ala AI console): draft per-thread terpisah dari
-  // composer panel, terisolasi per root id.
-  const [replyTo, setReplyTo] = useState<string | null>(null)
+  // Reply inline di tengah (ala AI console): quote WhatsApp-style masuk ke
+  // composer; draft terisolasi per thread.
+  const [replyTo, setReplyTo] = useState<{ rootId: string; name: string; excerpt: string } | null>(null)
   const updateInlineDraft = useCallback(
     (rootId: string) => (update: Partial<Draft>) => {
       const key = `inline:${rootId}`
@@ -901,21 +1080,6 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
       document.getElementById("discussion-root-composer")?.focus()
     })
   }, [])
-
-  const copyThreadLink = useCallback(
-    (rootId: string) => {
-      try {
-        const url = `${window.location.origin}/workspace/${spaceId}?view=discussion&thread=${encodeURIComponent(rootId)}`
-        void navigator.clipboard?.writeText(url)
-      } catch {
-        // abaikan — clipboard tidak tersedia
-      }
-      setCopiedId(rootId)
-      if (copyTimer.current) clearTimeout(copyTimer.current)
-      copyTimer.current = setTimeout(() => setCopiedId(null), 1600)
-    },
-    [spaceId],
-  )
 
   const deleteRoot = useCallback(
     async (rootId: string) => {
@@ -1263,127 +1427,98 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
               </div>
               <div className="flex flex-col">
                 {g.items.map((r) => {
-                  const selected = openRoot === r.id
-                  const name = displayName(r)
-                  const isAgent = r.author.actingMode === "agent"
+                  const ownRoot = isOwnMessage(r, selfId)
                   const shown = r.recentReplies ?? []
                   const inlineKey = `inline:${r.id}`
+                  const topic = r.topic && !r.topic.archived ? r.topic.title : null
+                  const hiddenCount = r.replyCount - shown.length
                   return (
-                    <div
-                      key={r.id}
-                      className={`group rounded-xl px-2 py-2.5 ${
-                        selected ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"
-                      }`}
-                    >
-                      <div className="flex gap-3">
-                        <Avatar name={name} agent={isAgent} />
-                        <div className="min-w-0 flex-1">
-                          <MessageHead
-                            m={r}
-                            topicTitle={r.topic && !r.topic.archived ? r.topic.title : null}
-                          />
-                          <MessageBody m={r} />
-                          {/* Balasan mengalir di tengah — seperti chat room. */}
-                          {shown.length > 0 && (
-                            <div className="mt-2 flex flex-col gap-2">
-                              {shown.map((rep) => {
-                                const nm = displayName(rep)
-                                const ag = rep.author.actingMode === "agent"
-                                return (
-                                  <div key={rep.id} className="flex gap-2.5">
-                                    <Avatar name={nm} size={24} agent={ag} />
-                                    <div className="min-w-0 flex-1">
-                                      <MessageHead m={rep} />
-                                      <MessageBody m={rep} />
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )}
-                          <div className="mt-1 flex flex-wrap items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-                            <button
-                              onClick={() => setReplyTo(replyTo === r.id ? null : r.id)}
-                              title="Reply in the middle"
-                              className={`flex items-center gap-1 rounded-full px-2 py-1 text-[11px] hover:bg-white/[0.06] ${
-                                replyTo === r.id ? "text-white/85" : "text-white/40 hover:text-white/75"
-                              }`}
-                            >
-                              <Reply className="h-3 w-3" />
-                              <span>Reply</span>
-                            </button>
-                            {r.replyCount > shown.length ? (
-                              <button
-                                onClick={() => openThread(r.id)}
-                                className="rounded-full px-2 py-1 text-[11px] text-white/40 hover:bg-white/[0.06] hover:text-white/75"
-                              >
-                                <span>
-                                  View all {r.replyCount} {r.replyCount === 1 ? "reply" : "replies"} →
-                                </span>
-                              </button>
-                            ) : (
-                              r.replyCount > 0 && (
-                                <button
-                                  onClick={() => openThread(r.id)}
-                                  className="rounded-full px-2 py-1 text-[11px] text-white/30 hover:bg-white/[0.06] hover:text-white/70"
-                                >
-                                  <span>Open thread →</span>
-                                </button>
-                              )
-                            )}
-                            <button
-                              onClick={() => copyThreadLink(r.id)}
-                              title="Copy thread link"
-                              aria-label="Copy thread link"
-                              className="rounded-full p-1.5 text-white/30 hover:bg-white/[0.06] hover:text-white/70"
-                            >
-                              {copiedId === r.id ? (
-                                <Check className="h-3 w-3 text-emerald-300" />
-                              ) : (
-                                <Link2 className="h-3 w-3" />
-                              )}
-                            </button>
-                            <span className="ml-auto">
-                              {canWrite && (
-                                <DeleteThreadButton
-                                  active={confirmDeleteRoot === r.id}
-                                  deleting={deletingRoot === r.id}
-                                  onAsk={() => setConfirmDeleteRoot(r.id)}
-                                  onCancel={() => setConfirmDeleteRoot(null)}
-                                  onConfirm={() => void deleteRoot(r.id)}
-                                />
-                              )}
-                            </span>
+                    <div key={r.id} className="mb-7 last:mb-2">
+                      <ChatRow
+                        m={r}
+                        own={ownRoot}
+                        topicTitle={topic}
+                        highlighted={openRoot === r.id}
+                        onReply={
+                          canWrite
+                            ? () =>
+                                setReplyTo({
+                                  rootId: r.id,
+                                  name: ownRoot ? "yourself" : displayName(r),
+                                  excerpt: excerptOf(r.body),
+                                })
+                            : undefined
+                        }
+                        deleteNode={
+                          canWrite ? (
+                            <DeleteThreadButton
+                              active={confirmDeleteRoot === r.id}
+                              deleting={deletingRoot === r.id}
+                              onAsk={() => setConfirmDeleteRoot(r.id)}
+                              onCancel={() => setConfirmDeleteRoot(null)}
+                              onConfirm={() => void deleteRoot(r.id)}
+                            />
+                          ) : undefined
+                        }
+                      />
+                      {shown.map((rep) => {
+                        const ownRep = isOwnMessage(rep, selfId)
+                        return (
+                          <div key={rep.id} className="mt-5">
+                            <ChatRow
+                              m={rep}
+                              own={ownRep}
+                              onReply={
+                                canWrite
+                                  ? () =>
+                                      setReplyTo({
+                                        rootId: r.id,
+                                        name: ownRep ? "yourself" : displayName(rep),
+                                        excerpt: excerptOf(rep.body),
+                                      })
+                                  : undefined
+                              }
+                            />
                           </div>
-                          {/* Reply inline di tengah — tanpa wajib buka panel. */}
-                          {replyTo === r.id && (
-                            <div className="mt-2">
-                              <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] text-white/40">
-                                <Reply className="h-3 w-3" />
-                                <span className="min-w-0 flex-1 truncate">
-                                  Replying to {name}
-                                </span>
-                                <button
-                                  onClick={() => setReplyTo(null)}
-                                  aria-label="Cancel reply"
-                                  className="rounded-full p-0.5 text-white/40 hover:text-white/75"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </div>
-                              <Composer
-                                draft={drafts[inlineKey] ?? EMPTY_DRAFT}
-                                updateDraft={updateInlineDraft(r.id)}
-                                placeholder="Reply to thread…"
-                                disabled={!canWrite}
-                                docs={docs}
-                                onDispatch={(body) => dispatchSend(r.id, body)}
-                                autofocus
-                              />
-                            </div>
-                          )}
+                        )
+                      })}
+                      {hiddenCount > 0 ? (
+                        <div className={ownRoot ? "mt-2 text-right" : "ml-[52px] mt-2"}>
+                          <button
+                            onClick={() => openThread(r.id)}
+                            className="text-[12px] text-accent/80 hover:text-accent"
+                          >
+                            View all {r.replyCount} {r.replyCount === 1 ? "reply" : "replies"} →
+                          </button>
                         </div>
-                      </div>
+                      ) : (
+                        (r.replyCount > 0 || topic) && (
+                          <div className={ownRoot ? "mt-1 text-right" : "ml-[52px] mt-1"}>
+                            <button
+                              onClick={() => openThread(r.id)}
+                              className="text-[12px] text-white/30 hover:text-white/70"
+                            >
+                              Thread →
+                            </button>
+                          </div>
+                        )
+                      )}
+                      {/* Reply inline di tengah — quote masuk ke composer. */}
+                      {replyTo?.rootId === r.id && (
+                        <div className="mt-3">
+                          <Composer
+                            draft={drafts[inlineKey] ?? EMPTY_DRAFT}
+                            updateDraft={updateInlineDraft(r.id)}
+                            placeholder="Reply to thread…"
+                            disabled={!canWrite}
+                            docs={docs}
+                            onDispatch={(body) => dispatchSend(r.id, body)}
+                            autofocus
+                            replyQuote={{ name: replyTo.name, excerpt: replyTo.excerpt }}
+                            onCancelReply={() => setReplyTo(null)}
+                          />
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -1537,11 +1672,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                 {/* Root */}
                 <div className="rounded-xl bg-white/[0.04] p-3.5">
                   <div className="flex gap-2.5">
-                    <Avatar
-                      name={displayName(thread.root)}
-                      size={30}
-                      agent={thread.root.author.actingMode === "agent"}
-                    />
+                    <ChatAvatar m={thread.root} size={30} />
                     <div className="min-w-0 flex-1">
                       <MessageHead m={thread.root} />
                       <MessageBody m={thread.root} />
@@ -1552,12 +1683,10 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                 {thread.replies.length > 0 && (
                   <div className="mt-3 flex flex-col gap-4">
                     {thread.replies.map((m) => {
-                      const nm = displayName(m)
-                      const ag = m.author.actingMode === "agent"
                       return (
                         <div key={m.id} className="flex gap-2.5 px-1">
                           <div className="flex flex-col items-center">
-                            <Avatar name={nm} size={28} agent={ag} />
+                            <ChatAvatar m={m} size={28} />
                             <span className="mt-1 w-px flex-1 bg-white/[0.07]" />
                           </div>
                           <div className="min-w-0 flex-1 pb-1">
