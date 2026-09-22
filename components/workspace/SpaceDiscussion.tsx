@@ -31,17 +31,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createPortal } from "react-dom"
 import {
-  AtSign,
   Check,
   ChevronLeft,
-  Hash,
   Link2,
   MessageSquarePlus,
   PanelRight,
+  Plus,
+  CornerDownLeft,
   RefreshCw,
   Reply,
   Search,
-  SendHorizontal,
   Trash2,
   X,
 } from "lucide-react"
@@ -314,7 +313,7 @@ function Composer({
   draft,
   updateDraft,
   textareaId,
-  autofocusKey,
+  autofocus,
 }: {
   draft: Draft
   updateDraft: (update: Partial<Draft>) => void
@@ -324,7 +323,7 @@ function Composer({
   /** Optimistic dispatch: parent menampilkan provisional + POST + ack. */
   onDispatch: (body: string) => void
   textareaId?: string
-  autofocusKey?: string
+  autofocus?: boolean
 }) {
   const { text, error: sendError } = draft
   const setText = useCallback((text: string) => updateDraft({ text }), [updateDraft])
@@ -648,76 +647,57 @@ function Composer({
         </div>,
         document.body,
       )}
+      {/* Composer ala AI console: box besar, tombol + bulat kiri bawah,
+          tombol panah bulat kanan bawah. Tanpa toolbar — @/# via ketikan. */}
       <div
-        className={`rounded-2xl bg-white/[0.03] transition-colors ${
-          focused && !disabled ? "bg-white/[0.05]" : ""
+        className={`rounded-[20px] bg-white/[0.04] p-3 transition-colors ${
+          focused && !disabled ? "bg-white/[0.055]" : ""
         }`}
       >
-        <div className="flex items-center gap-1 px-2.5 pt-2">
+        <textarea
+          id={textareaId}
+          ref={boxRef}
+          value={text}
+          disabled={disabled}
+          onChange={(e) => {
+            const next = e.target.value
+            const caret = e.target.selectionStart ?? next.length
+            setText(next)
+            mention.checkForMention(next, caret)
+            updateHash(next, caret)
+          }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onKeyDown={onKeyDown}
+          placeholder={disabled ? "Viewers can't write" : placeholder}
+          rows={3}
+          autoFocus={autofocus}
+          className="max-h-[220px] min-h-[88px] w-full resize-y bg-transparent text-[13.5px] leading-[1.6] text-white/85 outline-none placeholder:text-white/25 disabled:opacity-50"
+        />
+        <div className="mt-1 flex items-center gap-2">
           <button
             type="button"
-            title="Mention an agent or @here"
+            title="Mention someone or an agent (@)"
+            aria-label="Mention someone or an agent"
             disabled={disabled}
             onClick={() => insertTrigger("@")}
-            className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-white/40 hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-40"
+            className="rounded-full border border-white/10 p-2 text-white/50 hover:bg-white/[0.06] hover:text-white/85 disabled:opacity-40"
           >
-            <AtSign className="h-3.5 w-3.5" />
-            <span>Mention</span>
+            <Plus className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            title="Reference a doc"
-            disabled={disabled}
-            onClick={() => insertTrigger("#")}
-            className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-white/40 hover:bg-white/[0.06] hover:text-white/80 disabled:opacity-40"
-          >
-            <Hash className="h-3.5 w-3.5" />
-            <span>Doc</span>
-          </button>
-          {autofocusKey === "root" && (
-            <span className="ml-auto hidden px-2 text-[11px] text-white/25 sm:block">
-              <span>Enter to send · Shift+Enter new line</span>
-            </span>
-          )}
-        </div>
-        <div className="flex items-end gap-2 p-2 pl-3">
-          <textarea
-            id={textareaId}
-            ref={boxRef}
-            value={text}
-            disabled={disabled}
-            onChange={(e) => {
-              const next = e.target.value
-              const caret = e.target.selectionStart ?? next.length
-              setText(next)
-              mention.checkForMention(next, caret)
-              updateHash(next, caret)
-            }}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            onKeyDown={onKeyDown}
-            placeholder={disabled ? "Viewers can't write" : placeholder}
-            rows={2}
-            className="max-h-[160px] min-h-[40px] flex-1 resize-y bg-transparent text-[13px] leading-[1.6] text-white/85 outline-none placeholder:text-white/25 disabled:opacity-50"
-          />
+          <span className="flex-1" />
           <button
             onClick={() => send()}
             disabled={disabled || !text.trim()}
-            title="Send message"
+            title="Send message (Enter)"
             aria-label="Send message"
-            className="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40"
+            className="rounded-full border border-white/10 p-2.5 text-white/70 hover:bg-white hover:text-black disabled:opacity-40"
           >
-            <SendHorizontal className="h-3.5 w-3.5" />
-            <span>Send</span>
+            <CornerDownLeft className="h-4 w-4" />
           </button>
         </div>
       </div>
-      {sendError && <div role="alert" className="mt-1 text-[12px] text-red-300">{sendError}</div>}
-      {autofocusKey !== "root" && (
-        <div className="mt-1 px-1 text-[11px] text-white/25">
-          <span>@ pick an agent · # pick a doc · Enter to send, Shift+Enter for new line</span>
-        </div>
-      )}
+      {sendError && <div role="alert" className="mt-1 px-1 text-[12px] text-red-300">{sendError}</div>}
     </div>
   )
 }
@@ -851,6 +831,16 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
   const updateRoot = useCallback((update: Partial<Draft>) => {
     setDrafts((prev) => ({ ...prev, null: { ...(prev.null ?? EMPTY_DRAFT), ...update } }))
   }, [])
+  // Reply inline di tengah (ala AI console): draft per-thread terpisah dari
+  // composer panel, terisolasi per root id.
+  const [replyTo, setReplyTo] = useState<string | null>(null)
+  const updateInlineDraft = useCallback(
+    (rootId: string) => (update: Partial<Draft>) => {
+      const key = `inline:${rootId}`
+      setDrafts((prev) => ({ ...prev, [key]: { ...(prev[key] ?? EMPTY_DRAFT), ...update } }))
+    },
+    [],
+  )
   const updateTopic = useCallback((update: Partial<Draft>) => {
     setTopicDrafts((prev) => ({ ...prev, [draftKey]: { ...(prev[draftKey] ?? EMPTY_DRAFT), ...update } }))
   }, [draftKey])
@@ -1184,7 +1174,7 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                   className="flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-[12px] font-medium text-black hover:bg-white/90"
                 >
                   <MessageSquarePlus className="h-3.5 w-3.5" />
-                  <span>New thread</span>
+                  <span>New message</span>
                 </button>
               )}
             </div>
@@ -1271,23 +1261,20 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                 </span>
                 <span className="h-px flex-1 bg-white/[0.06]" />
               </div>
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col">
                 {g.items.map((r) => {
                   const selected = openRoot === r.id
                   const name = displayName(r)
                   const isAgent = r.author.actingMode === "agent"
+                  const shown = r.recentReplies ?? []
+                  const inlineKey = `inline:${r.id}`
                   return (
                     <div
                       key={r.id}
-                      className={`group relative overflow-hidden rounded-2xl p-4 transition-colors ${
-                        selected
-                          ? "bg-white/[0.05]"
-                          : "hover:bg-white/[0.04]"
+                      className={`group rounded-xl px-2 py-2.5 ${
+                        selected ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"
                       }`}
                     >
-                      {selected && (
-                        <span className="absolute inset-y-0 left-0 w-[3px] bg-violet-400/70" />
-                      )}
                       <div className="flex gap-3">
                         <Avatar name={name} agent={isAgent} />
                         <div className="min-w-0 flex-1">
@@ -1296,10 +1283,10 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                             topicTitle={r.topic && !r.topic.archived ? r.topic.title : null}
                           />
                           <MessageBody m={r} />
-                          {/* Balasan inline — chat mengalir, tanpa wajib buka thread. */}
-                          {(r.recentReplies ?? []).length > 0 && (
-                            <div className="mt-2.5 flex flex-col gap-2.5 border-l-2 border-white/10 pl-3">
-                              {(r.recentReplies ?? []).map((rep) => {
+                          {/* Balasan mengalir di tengah — seperti chat room. */}
+                          {shown.length > 0 && (
+                            <div className="mt-2 flex flex-col gap-2">
+                              {shown.map((rep) => {
                                 const nm = displayName(rep)
                                 const ag = rep.author.actingMode === "agent"
                                 return (
@@ -1314,39 +1301,46 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                               })}
                             </div>
                           )}
-                          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                          <div className="mt-1 flex flex-wrap items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
                             <button
-                              onClick={() => openThread(r.id)}
-                              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] transition-colors ${
-                                selected
-                                  ? "bg-violet-500/20 text-violet-200 hover:bg-violet-500/30"
-                                  : "bg-white/[0.06] text-white/60 hover:bg-white/[0.1] hover:text-white/85"
+                              onClick={() => setReplyTo(replyTo === r.id ? null : r.id)}
+                              title="Reply in the middle"
+                              className={`flex items-center gap-1 rounded-full px-2 py-1 text-[11px] hover:bg-white/[0.06] ${
+                                replyTo === r.id ? "text-white/85" : "text-white/40 hover:text-white/75"
                               }`}
                             >
                               <Reply className="h-3 w-3" />
-                              <span>
-                                {r.replyCount > (r.recentReplies ?? []).length
-                                  ? `View all ${r.replyCount} ${r.replyCount === 1 ? "reply" : "replies"} →`
-                                  : r.replyCount > 0
-                                    ? "Open thread →"
-                                    : "Reply"}
-                              </span>
+                              <span>Reply</span>
                             </button>
+                            {r.replyCount > shown.length ? (
+                              <button
+                                onClick={() => openThread(r.id)}
+                                className="rounded-full px-2 py-1 text-[11px] text-white/40 hover:bg-white/[0.06] hover:text-white/75"
+                              >
+                                <span>
+                                  View all {r.replyCount} {r.replyCount === 1 ? "reply" : "replies"} →
+                                </span>
+                              </button>
+                            ) : (
+                              r.replyCount > 0 && (
+                                <button
+                                  onClick={() => openThread(r.id)}
+                                  className="rounded-full px-2 py-1 text-[11px] text-white/30 hover:bg-white/[0.06] hover:text-white/70"
+                                >
+                                  <span>Open thread →</span>
+                                </button>
+                              )
+                            )}
                             <button
                               onClick={() => copyThreadLink(r.id)}
                               title="Copy thread link"
-                              className="flex items-center gap-1 rounded-full px-2 py-1 text-[11px] text-white/30 opacity-0 hover:bg-white/[0.06] hover:text-white/70 focus:opacity-100 group-hover:opacity-100"
+                              aria-label="Copy thread link"
+                              className="rounded-full p-1.5 text-white/30 hover:bg-white/[0.06] hover:text-white/70"
                             >
                               {copiedId === r.id ? (
-                                <span className="flex items-center gap-1 text-emerald-300">
-                                  <Check className="h-3 w-3" />
-                                  <span>Copied</span>
-                                </span>
+                                <Check className="h-3 w-3 text-emerald-300" />
                               ) : (
-                                <span className="flex items-center gap-1">
-                                  <Link2 className="h-3 w-3" />
-                                  <span>Copy link</span>
-                                </span>
+                                <Link2 className="h-3 w-3" />
                               )}
                             </button>
                             <span className="ml-auto">
@@ -1361,6 +1355,33 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
                               )}
                             </span>
                           </div>
+                          {/* Reply inline di tengah — tanpa wajib buka panel. */}
+                          {replyTo === r.id && (
+                            <div className="mt-2">
+                              <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] text-white/40">
+                                <Reply className="h-3 w-3" />
+                                <span className="min-w-0 flex-1 truncate">
+                                  Replying to {name}
+                                </span>
+                                <button
+                                  onClick={() => setReplyTo(null)}
+                                  aria-label="Cancel reply"
+                                  className="rounded-full p-0.5 text-white/40 hover:text-white/75"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                              <Composer
+                                draft={drafts[inlineKey] ?? EMPTY_DRAFT}
+                                updateDraft={updateInlineDraft(r.id)}
+                                placeholder="Reply to thread…"
+                                disabled={!canWrite}
+                                docs={docs}
+                                onDispatch={(body) => dispatchSend(r.id, body)}
+                                autofocus
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1373,12 +1394,9 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
 
         {/* Provisional roots (optimistic) — selalu di bawah, milik sendiri. */}
         {pendingRoots.length > 0 && (
-          <div className="mt-2.5 flex flex-col gap-2.5 pb-2">
+          <div className="flex flex-col pb-2">
             {pendingRoots.map((p) => (
-              <div
-                key={p.tempId}
-                className="rounded-2xl bg-white/[0.02] p-4"
-              >
+              <div key={p.tempId} className="rounded-xl px-2 py-2.5">
                 <PendingRow p={p} onRetry={retrySend} />
               </div>
             ))}
@@ -1395,7 +1413,6 @@ function DiscussionSpace({ spaceId, workspaceId, initialThread, canWrite }: Disc
             docs={docs}
             onDispatch={(body) => dispatchSend(null, body)}
             textareaId="discussion-root-composer"
-            autofocusKey="root"
           />
         </div>
       </div>
