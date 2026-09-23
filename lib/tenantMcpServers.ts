@@ -108,6 +108,9 @@ export interface ConnectOdooInput {
   odoo_url: string
   odoo_db: string
   api_key: string
+  /** Login email owning the API key — optional for CRUD, required for
+   *  odoo_generate_report on Odoo 19+ (/report/pdf is auth='user'). */
+  odoo_username?: string
 }
 
 /**

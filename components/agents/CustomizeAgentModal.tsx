@@ -435,7 +435,7 @@ export default function CustomizeAgentModal({
   // the tenant already has (their Odoo URL, database, and an API key).
   // Goes through connectOdoo(), not registerTenantMcpServer() -- see
   // POST /api/v1/tenant-mcp-servers/odoo/connect.
-  const [odooForm, setOdooForm] = useState({ url: '', db: '', apiKey: '' });
+  const [odooForm, setOdooForm] = useState({ url: '', db: '', apiKey: '', username: '' });
   const [mcpRegistering, setMcpRegistering] = useState(false);
   const [mcpFormError, setMcpFormError] = useState<string | null>(null);
   // The registration form is hidden once a server exists (the list takes
@@ -519,7 +519,7 @@ export default function CustomizeAgentModal({
     setMcpFetched(false);
     setMcpListError(null);
     setMcpForm({ name: '', url: '', transport: 'streamable-http', authHeaderName: '', authHeaderValue: '' });
-    setOdooForm({ url: '', db: '', apiKey: '' });
+    setOdooForm({ url: '', db: '', apiKey: '', username: '' });
     setMcpFormError(null);
     setMcpFormOpen(false);
     setMcpAdvancedOpen(false);
@@ -816,6 +816,7 @@ export default function CustomizeAgentModal({
     const url = odooForm.url.trim();
     const db = odooForm.db.trim();
     const apiKey = odooForm.apiKey.trim();
+    const username = odooForm.username.trim();
     if (!url || !db || !apiKey) {
       setMcpFormError(t('mcpOdooFieldsRequired'));
       return;
@@ -823,15 +824,21 @@ export default function CustomizeAgentModal({
     setMcpRegistering(true);
     setMcpFormError(null);
     try {
-      const result = await connectOdoo({ agent_type: agentType, odoo_url: url, odoo_db: db, api_key: apiKey });
+      const result = await connectOdoo({
+        agent_type: agentType,
+        odoo_url: url,
+        odoo_db: db,
+        api_key: apiKey,
+        ...(username ? { odoo_username: username } : {}),
+      });
       setMcpServers((prev) => [result, ...prev]);
-      setOdooForm({ url: '', db: '', apiKey: '' });
+      setOdooForm({ url: '', db: '', apiKey: '', username: '' });
       setMcpFormOpen(false);
       setMcpTemplate(null);
     } catch (e) {
       if (e instanceof TenantMcpServerError && e.server) {
         setMcpServers((prev) => [e.server as TenantMcpServer, ...prev]);
-        setOdooForm({ url: '', db: '', apiKey: '' });
+        setOdooForm({ url: '', db: '', apiKey: '', username: '' });
         setMcpTemplate(null);
         setMcpFormError(t('mcpSavedButFailed', { message: e.message }));
       } else {
@@ -1509,7 +1516,7 @@ export default function CustomizeAgentModal({
                   <>
                     <button
                       type="button"
-                      onClick={() => { setMcpFormError(null); setMcpAdvancedOpen(false); setMcpTemplate(null); setMcpForm({ name: '', url: '', transport: 'streamable-http', authHeaderName: '', authHeaderValue: '' }); setOdooForm({ url: '', db: '', apiKey: '' }); }}
+                      onClick={() => { setMcpFormError(null); setMcpAdvancedOpen(false); setMcpTemplate(null); setMcpForm({ name: '', url: '', transport: 'streamable-http', authHeaderName: '', authHeaderValue: '' }); setOdooForm({ url: '', db: '', apiKey: '', username: '' }); }}
                       className="flex items-center gap-1 text-white/45 hover:text-white/70 text-[12px] font-medium transition-colors"
                     >
                       <ChevronRight className="h-3.5 w-3.5 rotate-180" />
@@ -1554,6 +1561,14 @@ export default function CustomizeAgentModal({
                           onChange={(v) => setOdooForm((f) => ({ ...f, apiKey: v }))}
                           placeholder={t('odooApiKeyPlaceholder')}
                         />
+                        <Field
+                          label={t('odooUsernameLabel')}
+                          value={odooForm.username}
+                          limit={320}
+                          onChange={(v) => setOdooForm((f) => ({ ...f, username: v }))}
+                          placeholder={t('odooUsernamePlaceholder')}
+                        />
+                        <div className="text-white/35 text-[11px] leading-relaxed -mt-2 px-0.5">{t('odooUsernameHelp')}</div>
                         <button
                           type="button"
                           onClick={handleConnectOdoo}
