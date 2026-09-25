@@ -714,7 +714,9 @@
     "skillOriginOpenSkills": "Open Skills",
     "skillOriginPlugin": "Plugin",
     "skillOriginBundle": "Bundle",
-    "skillOriginOther": "Lainnya"
+    "skillOriginOther": "Lainnya",
+    "mcpKeyExpiresSoon": "API key Odoo akan kedaluwarsa dalam {days} hari. Buat key baru di Odoo (Preferences › Account Security) dengan durasi lebih panjang, lalu hubungkan ulang Odoo di sini.",
+    "mcpKeyExpiresToday": "API key Odoo kedaluwarsa hari ini. Buat key baru di Odoo (Preferences › Account Security) dengan durasi lebih panjang, lalu hubungkan ulang Odoo di sini."
   },
   "agents": {
     "breadcrumb": "Agen",

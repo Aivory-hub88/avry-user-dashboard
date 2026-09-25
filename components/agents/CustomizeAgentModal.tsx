@@ -30,8 +30,7 @@ import {
   listTenantMcpServers,
   registerTenantMcpServer,
   reverifyTenantMcpServer,
-  updateDisabledTools,
-} from '@/lib/tenantMcpServers';
+  updateDisabledTools, credentialDaysLeft } from '@/lib/tenantMcpServers';
 import {
   createDeployLink,
   getLinkStatus,
@@ -1385,6 +1384,13 @@ export default function CustomizeAgentModal({
                               {style.label}
                             </span>
                           </button>
+                          {s.status === 'verified' && credentialDaysLeft(s) !== null && (
+                            <div className="mx-4 mb-3 rounded-lg bg-amber/10 px-3 py-2 text-[11.5px] text-amber">
+                              {(credentialDaysLeft(s) ?? 0) <= 0
+                                ? t('mcpKeyExpiresToday')
+                                : t('mcpKeyExpiresSoon', { days: credentialDaysLeft(s) ?? 0 })}
+                            </div>
+                          )}
                           {expanded && (
                             <div className="px-4 pb-3.5">
                               <div className="text-white/35 text-[11px] truncate mb-2.5">{s.url}</div>

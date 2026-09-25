@@ -714,7 +714,9 @@
     "skillOriginOpenSkills": "Open Skills",
     "skillOriginPlugin": "Plugin",
     "skillOriginBundle": "Bundle",
-    "skillOriginOther": "Other"
+    "skillOriginOther": "Other",
+    "mcpKeyExpiresSoon": "The Odoo API key expires in {days, plural, one {# day} other {# days}}. Create a new key in Odoo (Preferences › Account Security) with a longer duration, then reconnect Odoo here.",
+    "mcpKeyExpiresToday": "The Odoo API key expires today. Create a new key in Odoo (Preferences › Account Security) with a longer duration, then reconnect Odoo here."
   },
   "agents": {
     "breadcrumb": "Agent",

@@ -38,6 +38,23 @@ export interface TenantMcpServer {
   tools: VerifiedTool[]
   /** Tool names (from `tools`) the tenant has turned off via `updateDisabledTools`. */
   disabled_tools: string[]
+  /** Shared Odoo connector only: when the tenant's Odoo API key expires, as
+   *  last checked by the backend (every 6 h). Null = unknown or never. */
+  credential_expires_at?: string | null
+}
+
+/** Days until the connection's credential expires, when it does within
+ *  `withinDays` (0 or less = already past). Null when unknown or far off. */
+export function credentialDaysLeft(
+  server: Pick<TenantMcpServer, 'credential_expires_at'>,
+  withinDays = 7,
+  now = Date.now(),
+): number | null {
+  if (!server.credential_expires_at) return null
+  const at = Date.parse(server.credential_expires_at)
+  if (Number.isNaN(at)) return null
+  const days = (at - now) / 86_400_000
+  return days <= withinDays ? Math.floor(days) : null
 }
 
 export type RegisterResult = TenantMcpServer
@@ -74,6 +91,14 @@ export async function listTenantMcpServers(agentType: string): Promise<TenantMcp
   const res = await authedFetch(
     `${BACKEND_URL}/api/v1/tenant-mcp-servers?agent_type=${encodeURIComponent(agentType)}`
   )
+  if (!res.ok) await parseErrorAndThrow(res)
+  const data = await res.json()
+  return data.servers ?? []
+}
+
+/** Every agent's custom MCP servers in one call (no agent_type filter). */
+export async function listAllTenantMcpServers(): Promise<TenantMcpServer[]> {
+  const res = await authedFetch(`${BACKEND_URL}/api/v1/tenant-mcp-servers`)
   if (!res.ok) await parseErrorAndThrow(res)
   const data = await res.json()
   return data.servers ?? []

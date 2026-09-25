@@ -229,6 +229,7 @@ export default function AgentRail({
   const approvalItems = notifications.filter((n): n is Extract<Notification, { kind: "approval" }> => n.kind === "approval")
   const activityItems = notifications.filter((n): n is Extract<Notification, { kind: "activity" }> => n.kind === "activity")
   const statusItems = notifications.filter((n): n is Extract<Notification, { kind: "status" }> => n.kind === "status")
+  const connectionItems = notifications.filter((n): n is Extract<Notification, { kind: "connection" }> => n.kind === "connection")
   const channels = agentTarget ? deployments.filter((d) => d.agentType === agentTarget) : []
   const notDeployed = agentTarget !== null && channels.length === 0
   const visibleAwarenessPeers = workspaceId ? awarenessPeers : []
@@ -433,6 +434,25 @@ export default function AgentRail({
                   button: fixing it means editing the schedule, which lives
                   in Customise Agent, and a button that only opens another
                   screen is worse than the sentence that says where to go. */}
+              {connectionItems.map((item) => (
+                <NotificationCard
+                  key={item.id}
+                  tone={item.state === "failed" ? "error" : "warn"}
+                  badge={item.state === "failed" ? "Reconnect" : item.daysLeft !== null && item.daysLeft <= 0 ? "Today" : `${item.daysLeft}d left`}
+                  icon={<IoWarning className="h-[16px] w-[16px]" />}
+                  title={
+                    item.state === "failed"
+                      ? `${item.serverName} connection stopped working`
+                      : `${item.serverName} API key expires ${item.daysLeft !== null && item.daysLeft <= 0 ? "today" : `in ${item.daysLeft} day${item.daysLeft === 1 ? "" : "s"}`}`
+                  }
+                  subtitle={
+                    item.state === "failed"
+                      ? `${item.detail ?? "Its credentials were rejected."} Fix it under Customise agent → MCP.`
+                      : "Create a longer-lived key in Odoo, then reconnect it under Customise agent → MCP."
+                  }
+                />
+              ))}
+
               {statusItems.map((item) => (
                 <NotificationCard
                   key={item.id}

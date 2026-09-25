@@ -22,3 +22,6 @@ export type Notification =
    *  this does not clear by being read; it clears when the underlying
    *  condition does, which is why it carries no timestamp. */
   | { id: string; kind: 'status'; agentType: string; title: string; detail: string | null }
+  /** A connected tool that needs the user: credential rejected, or an Odoo
+   *  API key about to expire (see hooks/useConnectionAlerts.ts). */
+  | { id: string; kind: 'connection'; agentType: string; serverName: string; state: 'failed' | 'expiring'; daysLeft: number | null; detail: string | null }
