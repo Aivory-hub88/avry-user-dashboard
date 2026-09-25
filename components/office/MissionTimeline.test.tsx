@@ -24,7 +24,7 @@ vi.mock("@/hooks/useAgentApprovals", () => ({
   }),
 }))
 
-import MissionTimeline from "./MissionTimeline"
+import MissionTimeline, { approvalHeading, humanAsk } from "./MissionTimeline"
 
 const NOW = Date.now()
 const iso = (msAgo: number) => new Date(NOW - msAgo).toISOString()
@@ -198,5 +198,26 @@ describe("MissionTimeline — approvals and stuck tasks", () => {
       expect(patch).toBeTruthy()
       expect(JSON.parse(patch![1].body)).toEqual({ action: "stop" })
     })
+  })
+})
+
+describe("approval card text", () => {
+  it("leads with the action, not a truncated toolkit name", () => {
+    expect(approvalHeading("aivory-native-leads-qualifier__update_lead_stage")).toEqual({
+      action: "Update lead stage",
+      source: "Aivory Native",
+    })
+    expect(approvalHeading("tenant_odoo__odoo_create")).toEqual({ action: "Odoo create", source: "Odoo" })
+    expect(approvalHeading("shell")).toEqual({ action: "Shell", source: null })
+  })
+
+  it("shows what the person asked, never the room's machine context", () => {
+    const room =
+      "<room_context>members: Lex, Aira</room_context>\n<room_history>earlier turns</room_history>\n" +
+      "<user_message>Move Alvin to the qualified stage</user_message>"
+    expect(humanAsk(room)).toBe("Move Alvin to the qualified stage")
+    expect(humanAsk("<room_context>x</room_context> plain ask")).toBe("plain ask")
+    expect(humanAsk("<room_context>only context</room_context>")).toBeNull()
+    expect(humanAsk(null)).toBeNull()
   })
 })

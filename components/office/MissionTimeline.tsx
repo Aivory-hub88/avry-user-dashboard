@@ -127,6 +127,48 @@ function StopControl({ taskId, onStopped }: { taskId: string; onStopped: () => v
   )
 }
 
+/**
+ * "Update lead stage" + "Aivory Native" from
+ * `aivory-native-leads-qualifier__update_lead_stage`. The action leads: in a
+ * narrow card `describeTool`'s "Toolkit — action" truncated to "Aivor…".
+ */
+export function approvalHeading(toolName: string): { action: string; source: string | null } {
+  const [server, action] = toolName.includes("__") ? toolName.split("__", 2) : [null, toolName]
+  const words = action
+    .replace(/^[A-Z]+_/, "")
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .toLowerCase()
+  const actionLabel = words ? words[0].toUpperCase() + words.slice(1) : toolName
+  if (!server) return { action: actionLabel, source: null }
+  const source = server
+    .replace(/^tenant_/, "")
+    .replace(/^composio-/, "")
+    .split("-")
+    .slice(0, 2)
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ")
+  return { action: actionLabel, source: source || null }
+}
+
+/**
+ * What the person actually asked: the `<user_message>` of a Room turn, or
+ * the text with machine context blocks (`<room_context>`, `<room_history>`,
+ * `<round_replies>`, …) removed.
+ * Returns null when nothing human is left.
+ */
+export function humanAsk(origin: string | null | undefined): string | null {
+  if (!origin) return null
+  // A Room turn wraps the person's words in <user_message>; prefer them.
+  const own = /<user_message(?:\s[^>]*)?>([\s\S]*?)<\/user_message>/i.exec(origin)
+  const text = (own ? own[1] : origin)
+    .replace(/<([a-z_]+)(?:\s[^>]*)?>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<\/?[a-z_]+(?:\s[^>]*)?>/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+  return text || null
+}
+
 function agentLabel(agentType: string | undefined): string {
   if (!agentType) return "Agent"
   return isAgentType(agentType) ? AGENT_NAMES[agentType] : agentType
@@ -143,6 +185,8 @@ function ApprovalCard({
   const [error, setError] = useState<string | null>(null)
   const finding = readVerifierFinding(approval)
   const flagged = finding?.verdict === "flag"
+  const heading = approvalHeading(approval.tool_name)
+  const asked = humanAsk(approval.origin_message)
   const decide = async (d: "approve" | "deny") => {
     setBusy(d)
     setError(null)
@@ -157,8 +201,8 @@ function ApprovalCard({
   return (
     <div className="rounded-xl border border-amber/25 bg-amber/[0.05] p-3.5 text-left">
       <div className="flex items-start justify-between gap-2">
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-white/85" title={approval.tool_name}>
-          {describeTool(approval.tool_name)}
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-white/85" title={describeTool(approval.tool_name)}>
+          {heading.action}
         </span>
         <span
           className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
@@ -173,11 +217,16 @@ function ApprovalCard({
         <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 font-medium text-white/60">
           {agentLabel(approval._agent_type)}
         </span>
+        {heading.source && (
+          <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-white/50">
+            {heading.source}
+          </span>
+        )}
         <span className="tabular-nums">{relativeTime(new Date(approval.requested_at).getTime())}</span>
       </div>
-      {approval.origin_message && (
-        <div className="mt-1.5 truncate text-[11.5px] font-light text-white/50" title={approval.origin_message}>
-          Asked: {approval.origin_message}
+      {asked && (
+        <div className="mt-1.5 truncate text-[11.5px] font-light text-white/50" title={asked}>
+          Asked: {asked}
         </div>
       )}
       <div className="mt-2.5 flex items-center gap-1.5">

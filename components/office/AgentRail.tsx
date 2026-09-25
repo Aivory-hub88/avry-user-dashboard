@@ -112,6 +112,50 @@ function RoomCard({ members }: { members: MentionCandidate[] }) {
   )
 }
 
+/** Another agent's pending approvals, summarised for this rail. */
+export interface ElsewhereWaiting {
+  agentType: string
+  name: string
+  count: number
+  flagged: boolean
+}
+
+/**
+ * Approvals parked by agents other than the one this rail is showing.
+ * Without it, a Room turn could park two of Lex's CRM writes while the rail
+ * (on Aira) said "Notifications 0": the only signal was a small badge on a
+ * card the user might not be looking at. Informs and navigates only; the
+ * decision still happens with that agent (see the protocol note below).
+ */
+function ElsewhereSection({
+  items,
+  onOpenAgent,
+}: {
+  items: ElsewhereWaiting[]
+  onOpenAgent?: (agentType: string) => void
+}) {
+  if (items.length === 0) return null
+  return (
+    <section className="mb-[14px] flex flex-col gap-[8px]">
+      <div className="flex items-baseline gap-[7px] px-0.5">
+        <span className="text-[12px] font-semibold leading-none text-white/65">Waiting on you elsewhere</span>
+        <span className="text-[11px] text-amber">{items.reduce((n, i) => n + i.count, 0)}</span>
+      </div>
+      {items.map((i) => (
+        <NotificationCard
+          key={i.agentType}
+          tone={i.flagged ? "error" : "warn"}
+          icon={<AgentAvatar type={i.agentType} size={20} />}
+          title={`${i.name} needs your approval`}
+          subtitle={`${i.count} ${i.count === 1 ? "action is" : "actions are"} waiting${i.flagged ? ", one flagged for a closer look" : ""}. Open ${i.name} to review.`}
+          badge={formatBadgeCount(i.count)}
+          onClick={onOpenAgent ? () => onOpenAgent(i.agentType) : undefined}
+        />
+      ))}
+    </section>
+  )
+}
+
 interface AgentRailProps {
   workspaceId: string | null
   agentTarget: string | null
@@ -144,6 +188,10 @@ interface AgentRailProps {
    *  component just renders itself accordingly. */
   collapsed?: boolean
   onToggleCollapse?: () => void
+  /** Other agents' pending approvals (never this rail's own agent). */
+  elsewhere?: ElsewhereWaiting[]
+  /** Switches the Console to that agent's most recent thread. */
+  onOpenAgent?: (agentType: string) => void
 }
 
 export default function AgentRail({
@@ -163,6 +211,8 @@ export default function AgentRail({
   roomMembers = [],
   collapsed = false,
   onToggleCollapse,
+  elsewhere = [],
+  onOpenAgent,
 }: AgentRailProps) {
   const [memoryOpen, setMemoryOpen] = useState(false)
   const awarenessPeers = useWorkspaceAwareness(workspaceId)
@@ -242,6 +292,7 @@ export default function AgentRail({
       <MemoryModal agentType={agentTarget} agentTitle={title} open={memoryOpen} onClose={() => setMemoryOpen(false)} />
 
       <div className="flex-1 overflow-y-auto px-[14px] py-[14px]">
+        <ElsewhereSection items={elsewhere} onOpenAgent={onOpenAgent} />
         {/* Console itself isn't approval-gated, but an approval whose
             `_agent_type` is missing (an older Cerveau) is grouped under this
             same `null` key rather than a made-up bucket no row reads — see

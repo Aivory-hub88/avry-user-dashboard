@@ -23,6 +23,7 @@ import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { useActiveRuns } from "@/hooks/useActiveRuns"
 import { useStuckTasks } from "@/hooks/useStuckTasks"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
+import { readVerifierFinding } from "@/lib/agentApprovals"
 import { getMentionCandidates, parseAgentMentions, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
 import { fetchLedgerHint } from "@/lib/roomLedger"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
@@ -34,7 +35,7 @@ import { useSettingsModal } from "@/contexts/SettingsModalContext"
 import { useMode } from "@/contexts/ModeContext"
 import OfficeShell from "@/components/office/OfficeShell"
 import AgentColumn from "@/components/office/AgentColumn"
-import AgentRail from "@/components/office/AgentRail"
+import AgentRail, { type ElsewhereWaiting } from "@/components/office/AgentRail"
 import AgentDeployNotice from "@/components/office/AgentDeployNotice"
 import MissionControl from "@/components/office/MissionControl"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
@@ -511,6 +512,24 @@ export default function ConsolePage() {
   // threaded through as a shared prop, same independence the column/rail
   // already keep from each other (see AgentRail's own copy of channel
   // filtering, for instance).
+  // Pending approvals of every agent other than the one open in the rail,
+  // so a Room turn that parks (say) Lex's CRM write is visible while the
+  // rail is on Aira. Same merged feed as the badges, approvals only.
+  const elsewhereWaiting: ElsewhereWaiting[] = Object.entries(notificationsByAgent)
+    .filter(([key]) => key !== (agentTarget ?? "null") && key !== "null")
+    .map(([key, items]) => {
+      const approvals = items.filter((n) => n.kind === "approval")
+      return {
+        agentType: key,
+        name: PREBUILT_AGENTS.find((a) => a.type === key)?.name ?? key,
+        count: approvals.length,
+        flagged: approvals.some(
+          (n) => n.kind === "approval" && readVerifierFinding(n.approval)?.verdict === "flag",
+        ),
+      }
+    })
+    .filter((w) => w.count > 0)
+
   const openAgentFromMissionControl = (type: string | null) => {
     setShowMissionControl(false)
     const key = type ?? "null"
@@ -563,6 +582,8 @@ export default function ConsolePage() {
           stopTaskError={stopTaskError}
           inRoom={inRoom}
           roomMembers={mentionCandidates}
+          elsewhere={elsewhereWaiting}
+          onOpenAgent={openAgentFromMissionControl}
         />
       }
     >
