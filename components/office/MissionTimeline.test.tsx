@@ -5,8 +5,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, within, cleanup } from "@testing-library/react"
 
-const { authedFetchMock } = vi.hoisted(() => ({ authedFetchMock: vi.fn() }))
+const { authedFetchMock, approvalsState } = vi.hoisted(() => ({
+  authedFetchMock: vi.fn(),
+  approvalsState: {
+    byAgent: {} as Record<string, unknown[]>,
+    resolve: vi.fn(async () => {}),
+  },
+}))
 vi.mock("@/lib/deployAuth", () => ({ authedFetch: authedFetchMock }))
+vi.mock("@/hooks/useAgentApprovals", () => ({
+  useAgentApprovals: () => ({
+    byAgent: approvalsState.byAgent,
+    total: Object.values(approvalsState.byAgent).flat().length,
+    error: false,
+    loaded: true,
+    refetch: () => {},
+    resolve: approvalsState.resolve,
+  }),
+}))
 
 import MissionTimeline from "./MissionTimeline"
 
@@ -81,7 +97,11 @@ function column(title: string): HTMLElement {
   return header!.closest("div.rounded-2xl") as HTMLElement
 }
 
-beforeEach(() => authedFetchMock.mockReset())
+beforeEach(() => {
+  authedFetchMock.mockReset()
+  approvalsState.byAgent = {}
+  approvalsState.resolve.mockClear()
+})
 afterEach(cleanup)
 
 describe("MissionTimeline — Done column", () => {
@@ -122,5 +142,61 @@ describe("MissionTimeline — Done column", () => {
     respondWith([])
     render(<MissionTimeline variant="full" />)
     await waitFor(() => expect(screen.getByText(/No missions yet/)).toBeTruthy())
+  })
+})
+
+const APPROVAL = {
+  id: "pa_1",
+  principal: "u1",
+  tool_name: "aivory-native-leads-qualifier__create_lead",
+  arguments: {},
+  risk_tier: "irreversible",
+  requested_at: iso(3_600_000),
+  status: "pending",
+  resolved_at: null,
+  resolved_by: null,
+  origin_message: "add Ethan as a lead",
+  _agent_type: "leads_qualifier",
+}
+
+describe("MissionTimeline — approvals and stuck tasks", () => {
+  it("lists pending approvals under Waiting, even with no ledger rows", async () => {
+    approvalsState.byAgent = { leads_qualifier: [APPROVAL] }
+    respondWith([])
+    render(<MissionTimeline variant="full" />)
+    await waitFor(() => expect(screen.getByText("Asked: add Ethan as a lead")).toBeTruthy())
+    const waiting = within(column("Waiting"))
+    expect(waiting.getByText("Needs approval")).toBeTruthy()
+    expect(waiting.getByText("Lex")).toBeTruthy()
+    expect(screen.queryByText(/No missions yet/)).toBeNull()
+    expect(screen.getByText("1 approval")).toBeTruthy()
+  })
+
+  it("approve resolves through the shared approvals hook", async () => {
+    approvalsState.byAgent = { leads_qualifier: [APPROVAL] }
+    respondWith([])
+    render(<MissionTimeline variant="full" />)
+    await waitFor(() => expect(screen.getByText("Approve")).toBeTruthy())
+    screen.getByText("Approve").click()
+    await waitFor(() => expect(approvalsState.resolve).toHaveBeenCalledWith(APPROVAL, "approve"))
+  })
+
+  it("an open task can be stopped after a confirm step; done tasks cannot", async () => {
+    respondWith([RUNNING, DONE_PLAIN])
+    render(<MissionTimeline variant="full" />)
+    await waitFor(() => expect(screen.getByText("Reconcile invoices")).toBeTruthy())
+    expect(within(column("Done")).queryByText("Stop task")).toBeNull()
+
+    within(column("Running")).getByText("Stop task").click()
+    const confirm = await within(column("Running")).findByText("Confirm stop")
+    const stopCallsBefore = authedFetchMock.mock.calls.length
+    confirm.click()
+    await waitFor(() => {
+      const patch = authedFetchMock.mock.calls
+        .slice(stopCallsBefore)
+        .find(([url, init]) => String(url) === "/api/aira/tasks/r" && init?.method === "PATCH")
+      expect(patch).toBeTruthy()
+      expect(JSON.parse(patch![1].body)).toEqual({ action: "stop" })
+    })
   })
 })

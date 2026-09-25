@@ -27,7 +27,7 @@ export default function ConsoleMissionsPage() {
           Mission Timeline
         </div>
         <div className="mb-8 text-[13px] font-light text-white/40">
-          Every Aira orchestration and its specialist steps — read-only, status moves via approvals in Console.
+          Every Aira orchestration, its specialist steps, and anything waiting on your approval.
         </div>
         <MissionTimeline variant="full" />
       </div>
