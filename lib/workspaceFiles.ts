@@ -72,11 +72,21 @@ export function safeObjectName(name: string, mime: string): string {
 /** Key segments are validated ids, so a crafted doc id can't escape its prefix. */
 const SEGMENT_RE = /^[A-Za-z0-9_:-]{1,128}$/
 
-export function objectKey(p: { workspaceId: string; roomId: string; fileId: string; name: string; mime: string }): string {
-  for (const seg of [p.workspaceId, p.roomId, p.fileId]) {
+export type FileOwnerKind = "room" | "request"
+
+/** Keys never move: a request's files keep their request/ key after approval. */
+export function objectKey(p: {
+  workspaceId: string
+  kind?: FileOwnerKind
+  ownerId: string
+  fileId: string
+  name: string
+  mime: string
+}): string {
+  for (const seg of [p.workspaceId, p.ownerId, p.fileId]) {
     if (!SEGMENT_RE.test(seg)) throw new Error("invalid key segment")
   }
-  return `ws/${p.workspaceId}/room/${p.roomId}/${p.fileId}/${safeObjectName(p.name, p.mime)}`
+  return `ws/${p.workspaceId}/${p.kind ?? "room"}/${p.ownerId}/${p.fileId}/${safeObjectName(p.name, p.mime)}`
 }
 
 /** RFC 6266 attachment header: ASCII fallback + UTF-8 filename*. */

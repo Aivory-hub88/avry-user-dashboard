@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { LEGACY_WORKSPACE } from "@/lib/teams"
 
 export const runtime = "nodejs"
 
@@ -56,6 +57,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const userId = cred.kind === "service" ? undefined : cred.user.user_id
   const accountType = cred.kind === "service" ? "superadmin" : cred.user.account_type
   if (!(await isManager(id, accountType, userId))) return forbidden()
+  // Membership of the legacy shared workspace = editor on every user's pages.
+  if (id === LEGACY_WORKSPACE)
+    return NextResponse.json({ error: "the shared default workspace doesn't take members" }, { status: 400 })
 
   let body: { email?: string; role?: string; userId?: string }
   try {

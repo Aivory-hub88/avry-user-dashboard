@@ -49,13 +49,15 @@ describe("safeObjectName", () => {
 
 describe("objectKey", () => {
   it("builds a tenant-scoped key", () => {
-    expect(objectKey({ workspaceId: "default", roomId: "room-1", fileId: "f1", name: "a b.pdf", mime: "application/pdf" }))
+    expect(objectKey({ workspaceId: "default", ownerId: "room-1", fileId: "f1", name: "a b.pdf", mime: "application/pdf" }))
       .toBe("ws/default/room/room-1/f1/a-b.pdf")
+    expect(objectKey({ workspaceId: "t1", kind: "request", ownerId: "r1", fileId: "f1", name: "a.pdf", mime: "application/pdf" }))
+      .toBe("ws/t1/request/r1/f1/a.pdf")
   })
 
   it("refuses segments that could escape the prefix", () => {
-    expect(() => objectKey({ workspaceId: "default", roomId: "../x", fileId: "f1", name: "a", mime: "text/plain" })).toThrow()
-    expect(() => objectKey({ workspaceId: "a/b", roomId: "r", fileId: "f1", name: "a", mime: "text/plain" })).toThrow()
+    expect(() => objectKey({ workspaceId: "default", ownerId: "../x", fileId: "f1", name: "a", mime: "text/plain" })).toThrow()
+    expect(() => objectKey({ workspaceId: "a/b", ownerId: "r", fileId: "f1", name: "a", mime: "text/plain" })).toThrow()
   })
 })
 
