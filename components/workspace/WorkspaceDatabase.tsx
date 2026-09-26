@@ -268,11 +268,18 @@ type HistoryItem = {
   created_at: string
 }
 
+/** Comment ids are time-based; kept outside the component so render stays pure. */
+function newCommentId(): string {
+  return `c-${Date.now().toString(36)}`
+}
+
 /** Per-row history from the workspace activity log (created/moved/commented…). */
 function RowHistory({ docId, rowId }: { docId: string; rowId: string }) {
   const [items, setItems] = useState<HistoryItem[] | null>(null)
   useEffect(() => {
     let alive = true
+    // Reset to the loading state when switching rows; the fetch below fills it.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setItems(null)
     fetch(`/api/workspace/${docId}/activity?targetType=database-row&targetId=${encodeURIComponent(rowId)}`, {
       headers: collabAuthHeaders(),
@@ -689,7 +696,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     } catch {}
   }
 
-  const useTemplate = (tpl: DbTemplate) => {
+  const applyTemplate = (tpl: DbTemplate) => {
     if (readOnlyRef.current) return
     const yRows = yRowsRef.current
     const doc = docRef.current
@@ -1049,7 +1056,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   const addComment = () => {
     if (!selectedRow || !commentDraft.trim() || readOnlyRef.current) return
     const author = (typeof window !== "undefined" ? localStorage.getItem("aivory:userId") || localStorage.getItem("aivory:agentType") || "You" : "You") as string
-    const next = [...selectedRow.comments, { id: `c-${Date.now().toString(36)}`, text: commentDraft.trim().slice(0, 500), author, at: new Date().toISOString() }]
+    const next = [...selectedRow.comments, { id: newCommentId(), text: commentDraft.trim().slice(0, 500), author, at: new Date().toISOString() }]
     updateRow(selectedRow.id, { comments: next } as unknown as Partial<Row>)
     setCommentDraft("")
   }
@@ -1337,7 +1344,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
               <select
                 onChange={(e) => {
                   const tpl = templates.find((t) => t.id === e.target.value)
-                  if (tpl) useTemplate(tpl)
+                  if (tpl) applyTemplate(tpl)
                   e.target.selectedIndex = 0
                 }}
                 defaultValue=""
@@ -2189,7 +2196,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                         <div key={t.id} className="flex items-center justify-between rounded-xl border border-line bg-white/[0.03] px-3 py-2">
                           <span className="truncate text-[12px] text-white/70">{t.name}</span>
                           <span className="flex items-center gap-1">
-                            <button onClick={() => useTemplate(t)} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-black hover:bg-white/90">Use</button>
+                            <button onClick={() => applyTemplate(t)} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-black hover:bg-white/90">Use</button>
                             <button
                               onClick={async () => {
                                 const next = templates.filter((x) => x.id !== t.id)
@@ -2230,7 +2237,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                   <div className="text-[13px] font-medium text-white/80">{t.name}</div>
                   <div className="mt-0.5 text-[11px] text-white/30">{t.priority} priority · {t.status}</div>
                   <button
-                    onClick={() => { useTemplate(t); setShowGallery(false) }}
+                    onClick={() => { applyTemplate(t); setShowGallery(false) }}
                     className="mt-2.5 w-full rounded-full bg-white px-3 py-1.5 text-[12px] font-medium text-black hover:bg-white/90"
                   >
                     Use template
@@ -2250,7 +2257,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                     <span className="min-w-0 flex-1 truncate text-[12px] text-white/70">{t.name}</span>
                     <span className="flex shrink-0 items-center gap-1">
                       <button
-                        onClick={() => { useTemplate(t); setShowGallery(false) }}
+                        onClick={() => { applyTemplate(t); setShowGallery(false) }}
                         className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-black hover:bg-white/90"
                       >
                         Use

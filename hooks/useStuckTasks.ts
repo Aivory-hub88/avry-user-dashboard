@@ -67,6 +67,8 @@ export function useStuckTasks(agentType: string | null) {
   }, [agentType])
 
   useEffect(() => {
+    // Poll from mount; refetch only sets state after its await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refetch()
     const t = setInterval(refetch, POLL_MS)
     return () => clearInterval(t)
