@@ -74,3 +74,24 @@ describe("loadRoomContext", () => {
     expect(await loadRoomContext("nope", "x")).toBeNull()
   })
 })
+
+describe("room notes in agent context (P6)", () => {
+  it("puts notes for this agent first and labels date and addressee", async () => {
+    const base = queryMock.getMockImplementation()!
+    queryMock.mockImplementation((sql: string, params: unknown[]) => {
+      if (sql.includes("FROM dashboard.room_notes")) {
+        expect(params[1]).toBe("sales_agent")
+        return Promise.resolve({
+          rows: [
+            { title: "Chase invoice", body: "Ask Acme", on_date: "2026-10-02", for_kind: "agent", for_id: "sales_agent", for_name: "Sales" },
+            { title: "Kickoff", body: "Agenda", on_date: null, for_kind: "member", for_id: "u2", for_name: "Rina" },
+          ],
+        })
+      }
+      return base(sql, params)
+    })
+    const c = await loadRoomContext("room-1", "anything", "sales_agent")
+    expect(c!.notes).toContain("## Chase invoice (for you, 2 Oct 2026)")
+    expect(c!.notes).toContain("## Kickoff (for Rina)")
+  })
+})

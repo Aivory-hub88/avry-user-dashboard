@@ -19,6 +19,20 @@ export type TeamRole = "owner" | "editor" | "viewer"
 export const LEGACY_WORKSPACE = "default"
 export const MAX_OWNED_TEAMS = 10
 
+/**
+ * WHERE fragment: rooms user $1 reaches (owns, granted, or via their team).
+ * Expects `dashboard.workspace_docs d` LEFT JOINed to `dashboard.workspaces w`
+ * on d.workspace_id. Shared by the Workspace home and the timeline.
+ */
+export const ROOMS_VISIBLE_TO_USER = `d.id NOT LIKE 'workspace:%' AND d.props->>'isRoom' = 'true' AND d.deleted_at IS NULL
+         AND (
+           d.owner = $1
+           OR EXISTS (SELECT 1 FROM dashboard.workspace_doc_acl x WHERE x.doc_id = d.id AND x.user_id = $1)
+           OR (d.workspace_id <> 'default' AND (
+                w.owner = $1
+                OR EXISTS (SELECT 1 FROM dashboard.workspace_members m WHERE m.workspace_id = d.workspace_id AND m.user_id = $1)))
+         )`
+
 export interface Team {
   id: string
   name: string
