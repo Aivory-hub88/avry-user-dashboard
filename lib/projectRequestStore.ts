@@ -18,6 +18,7 @@ import { newId } from "@/lib/spaceWrite"
 import { dbRowToYMap, newDbRowId, saveDbDoc, type DbRow } from "@/lib/workspaceDb"
 import type { FieldDef } from "@/lib/workspaceDbModel"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
+import { ingestRoomFiles } from "@/lib/roomContext"
 
 export interface RequestAccess {
   isRequester: boolean
@@ -169,6 +170,9 @@ export async function approveRequest(
     summary: `Project request “${r.title}” approved`,
     metadata: { requestId: r.id, seededRows },
   }).catch(() => {})
+
+  // The request's files now belong to the room: read them for its agents.
+  void ingestRoomFiles(roomId)
 
   return { roomId, notFound: done.notFound, seededRows, seedError }
 }

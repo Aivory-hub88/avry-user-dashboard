@@ -14,6 +14,7 @@ import { requesterFrom, requesterKey, newId } from "@/lib/spaceWrite"
 import { validateUploadIntent, objectKey, fileFromRow, type FileOwnerKind } from "@/lib/workspaceFiles"
 import { presignPut, presignGet, headObject, deleteObject, r2Configured, R2_TTL } from "@/lib/r2"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
+import { ingestRoomFiles, dropFileChunks } from "@/lib/roomContext"
 
 export interface FileScope {
   kind: FileOwnerKind
@@ -164,6 +165,8 @@ export async function completeUpload(req: NextRequest, ownerId: string, fileId: 
     )
     const file = fileFromRow((updated.rows[0] ?? { ...row, status: "ready" }) as Record<string, unknown>)
     await logActivity(scope, cred, me.agentType, "file.uploaded", fileId, `${me.name} uploaded ${file.name}`)
+    // Read it for the room's agents now, so the next turn doesn't wait (ADR-019 P3).
+    if (scope.kind === "room") void ingestRoomFiles(ownerId)
     return NextResponse.json({ file })
   } catch (e) {
     console.error("[workspace/files complete]", e)
@@ -201,6 +204,7 @@ export async function removeFile(req: NextRequest, ownerId: string, fileId: stri
     const me = requesterFrom(req, cred)
     if (!scope.canManage && row.uploaded_by !== requesterKey(me)) return forbidden()
     await query(`UPDATE dashboard.workspace_files SET deleted_at = now(), updated_at = now() WHERE id = $1`, [fileId])
+    if (scope.kind === "room") await dropFileChunks(ownerId, fileId)
     await logActivity(scope, cred, me.agentType, "file.deleted", fileId, `${me.name} removed ${String(row.name)}`)
     return NextResponse.json({ ok: true })
   } catch (e) {

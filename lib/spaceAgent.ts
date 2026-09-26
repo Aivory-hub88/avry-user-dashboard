@@ -59,6 +59,28 @@ export interface SpacePayloadParams {
   instruction: string;
   /** Transkrip room sebelum giliran ini, tertua-dulu. */
   history: SpacePayloadEntry[];
+  /** Room the turn happens in (ADR-019 P3): brief, task board, files, excerpts. */
+  room?: SpaceRoomContext | null;
+}
+
+/** Same shape as lib/roomContext's RoomContext, declared here so this module stays client-safe. */
+export interface SpaceRoomContext {
+  brief: string;
+  tasks: string;
+  files: string;
+  excerpts: { file: string; text: string }[];
+}
+
+// Room context caps (chars): brief + tasks + 5 excerpts ≈ 2.5k tokens at most.
+const MAX_BRIEF_CHARS = 1500;
+const MAX_TASKS_CHARS = 2500;
+const MAX_FILES_CHARS = 800;
+const MAX_EXCERPT_CHARS = 900;
+
+function block(tag: string, body: string, max: number): string[] {
+  const t = body.trim();
+  if (!t) return [];
+  return [`<${tag}>`, t.length > max ? `${t.slice(0, max)}…` : t, `</${tag}>`];
 }
 
 // 12 × 500 chars ≈ 1.5k tokens: enough room-wide context without bloating each turn.
@@ -79,8 +101,18 @@ function clip(text: string, max: number): string {
  * Men-coaching ulang per-pesan hanya memanjangkan prompt tanpa menambah
  * informasi yang belum dimiliki session.
  */
-export function buildSpacePayload({ instruction, history }: SpacePayloadParams): string {
+export function buildSpacePayload({ instruction, history, room }: SpacePayloadParams): string {
   const lines: string[] = [];
+  if (room) {
+    lines.push(...block("room_brief", room.brief, MAX_BRIEF_CHARS));
+    lines.push(...block("room_tasks", room.tasks, MAX_TASKS_CHARS));
+    lines.push(...block("room_files", room.files, MAX_FILES_CHARS));
+    if (room.excerpts.length > 0) {
+      lines.push("<file_excerpts>");
+      for (const e of room.excerpts) lines.push(`[${e.file}]`, clip(e.text, MAX_EXCERPT_CHARS));
+      lines.push("</file_excerpts>");
+    }
+  }
   const recent = history.filter((h) => h.text.trim()).slice(-MAX_HISTORY_ENTRIES);
   if (recent.length > 0) {
     lines.push("<thread_history>");

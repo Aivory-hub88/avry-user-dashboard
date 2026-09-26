@@ -75,6 +75,14 @@ export async function headObject(key: string): Promise<{ size: number; mime: str
   }
 }
 
+/** Object bytes for server-side processing (text extraction), capped at `maxBytes`. */
+export async function getObjectBytes(key: string, maxBytes: number): Promise<Uint8Array | null> {
+  const { client, bucket } = r2()
+  const r = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
+  if (Number(r.ContentLength ?? 0) > maxBytes || !r.Body) return null
+  return r.Body.transformToByteArray()
+}
+
 export async function deleteObject(key: string): Promise<void> {
   const { client, bucket } = r2()
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))

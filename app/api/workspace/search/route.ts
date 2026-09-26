@@ -151,6 +151,7 @@ export async function GET(req: NextRequest) {
             `SELECT c.doc_id, c.row_id, c.text, 1 - (c.embedding <=> $1::vector) AS sim
              FROM dashboard.workspace_chunks c
              WHERE c.doc_id = ANY($2::text[]) AND c.embedding IS NOT NULL
+               AND c.row_id NOT LIKE 'file:%' -- room file chunks (ADR-019 P3) aren't tasks
              ORDER BY c.embedding <=> $1::vector
              LIMIT 20`,
             [`[${qvec.join(",")}]`, readableIds],

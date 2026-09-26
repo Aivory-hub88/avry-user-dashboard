@@ -18,12 +18,16 @@ import {
   type SpaceAgentTask,
 } from "@/lib/spaceAgent";
 import { newId } from "@/lib/spaceWrite";
+import { ingestRoomFiles, loadRoomContext } from "@/lib/roomContext";
 import type { WorkspaceCredential } from "@/lib/workspaceAuth";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://backend.aivory.id";
 
 // Room-wide transcript size for each agent turn (buildSpacePayload also caps entries).
 const ROOM_HISTORY_MESSAGES = 20;
+// A turn waits at most this long for new room files to be read before it
+// goes ahead with whatever is already indexed (ingest keeps going after).
+const INGEST_WAIT_MS = 10_000;
 
 export async function loadAgentTask(spaceId: string, taskId: string): Promise<SpaceAgentTask | null> {
   const found = await query(
@@ -113,7 +117,9 @@ export async function runAgentTask(opts: {
         return { author: name, text: typeof r.body === "string" ? r.body : "" };
       })
       .filter((h) => h.text.trim());
-    prompt = buildSpacePayload({ instruction, history });
+    await Promise.race([ingestRoomFiles(id), new Promise((r) => setTimeout(r, INGEST_WAIT_MS))]);
+    const room = await loadRoomContext(id, instruction);
+    prompt = buildSpacePayload({ instruction, history, room });
   } catch {
     // Konteks best-effort — instruksi polos tetap jalan.
   }
