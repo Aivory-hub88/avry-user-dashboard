@@ -448,6 +448,9 @@ export default function WorkspaceDocPage() {
           </div>
          </div>
           <div className="flex shrink-0 items-center gap-2">
+            <Link href="/workspace/requests" className="shrink-0 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
+              Requests
+            </Link>
             <button
               onClick={() => setShowAI((v) => !v)}
               title="Cerveau AI"

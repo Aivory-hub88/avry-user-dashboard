@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import WorkspaceBell from "@/components/workspace/WorkspaceBell"
 import WorkspacePagesList from "@/components/workspace/WorkspacePagesList"
@@ -131,6 +132,9 @@ export default function WorkspacePage() {
       <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-black/10 px-6">
         <span className="shrink-0 text-[13px] font-medium leading-none text-white/80">My workspace</span>
         <div className="relative flex min-w-0 flex-1 items-center justify-end gap-2">
+          <Link href="/workspace/requests" className="shrink-0 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
+            Requests
+          </Link>
           <WorkspaceBell />
           <input
             value={q}

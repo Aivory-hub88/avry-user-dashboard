@@ -184,7 +184,7 @@ describe("review", () => {
     request = baseRequest({
       status: "submitted",
       members: [{ email: "dewi@x.id", role: "viewer" }, { email: "ghost@x.id", role: "editor" }],
-      agents: ["generalist"],
+      agents: ["autonomous"],
       data_table: { columns: ["Customer", "City"], rows: [["Acme", "Jakarta"], ["Beta", "Bali"]] },
     })
   })
