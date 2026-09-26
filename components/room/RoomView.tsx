@@ -18,11 +18,14 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { PanelRight } from "lucide-react"
 import ChatMessage from "@/components/ChatMessage"
 import ChatInput from "@/components/ChatInput"
 import { NotificationCard } from "@/components/office/NotificationCard"
 import RoomPanel, { type Autonomy, type RoomBrief, type RoomPerson } from "@/components/room/RoomPanel"
+import RoomNotes from "@/components/room/RoomNotes"
+import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
 import { useDiscussionResource } from "@/hooks/useDiscussionResource"
 import { useSelfId } from "@/hooks/useSelfId"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
@@ -55,6 +58,13 @@ type ReplyTarget = { message: TimelineMessage; name: string; isAgent: boolean }
 
 const ROLE_LABEL: Record<string, string> = { owner: "Admin", editor: "Member", viewer: "Viewer" }
 
+type RoomTab = "chat" | "tasks" | "notes"
+const TABS: { value: RoomTab; label: string }[] = [
+  { value: "chat", label: "Chat" },
+  { value: "tasks", label: "Tasks" },
+  { value: "notes", label: "Notes" },
+]
+
 export default function RoomView({
   roomId,
   title,
@@ -75,6 +85,12 @@ export default function RoomView({
   isOwner?: boolean
   autonomy?: Autonomy
 }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const search = useSearchParams()
+  const tabParam = search.get("tab")
+  const tab: RoomTab = tabParam === "tasks" || tabParam === "notes" ? tabParam : "chat"
+  const setTab = (t: RoomTab) => router.replace(t === "chat" ? pathname : `${pathname}?tab=${t}`, { scroll: false })
   const selfId = useSelfId()
   const peers = useWorkspaceAwareness(workspaceId)
   const timeline = useDiscussionResource<{ messages: TimelineMessage[]; tasks: SpaceAgentTask[] }>(`/api/workspace/${roomId}/timeline`)
@@ -310,11 +326,25 @@ export default function RoomView({
     <div className="flex h-full w-full flex-col bg-surface-1">
       <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-black/10 px-6">
         <div className="flex min-w-0 items-center gap-2 text-[13px]">
-          <Link href="/workspace?view=pages" className="shrink-0 text-white/40 hover:text-white/70">
+          <Link href="/workspace" className="shrink-0 text-white/40 hover:text-white/70">
             Workspace
           </Link>
           <span className="shrink-0 text-white/20">/</span>
           <span className="truncate font-medium text-white/85">{title}</span>
+          <div className="ml-3 flex shrink-0 items-center gap-0.5 rounded-full bg-white/[0.04] p-0.5" role="tablist" aria-label="Room views">
+            {TABS.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.value}
+                onClick={() => setTab(t.value)}
+                className={`rounded-full px-3 py-1 text-[12px] transition-colors duration-150 ${tab === t.value ? "bg-white text-black" : "text-white/45 hover:text-white/75"}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {peers.length > 0 && (
@@ -347,6 +377,13 @@ export default function RoomView({
       </div>
 
       <div className="flex min-h-0 flex-1">
+        {tab === "tasks" ? (
+          <div className="min-w-0 flex-1 overflow-y-auto px-6 py-6">
+            <WorkspaceDatabase docId={roomId} readOnly={!canWrite} />
+          </div>
+        ) : tab === "notes" ? (
+          <RoomNotes roomId={roomId} canWrite={canWrite} />
+        ) : (
         <div className="flex min-w-0 flex-1 flex-col">
           <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-8 py-8">
             <div className="mx-auto flex max-w-[800px] flex-col">
@@ -500,6 +537,7 @@ export default function RoomView({
             </div>
           </div>
         </div>
+        )}
 
         {panelOpen && (
           <RoomPanel

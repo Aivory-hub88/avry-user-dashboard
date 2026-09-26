@@ -8,7 +8,6 @@
  */
 import Link from "next/link"
 import { useState } from "react"
-import { ChevronRight } from "lucide-react"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import FileAttachments from "@/components/requests/FileAttachments"
 import { formatDate } from "@/components/requests/requestUi"
@@ -195,15 +194,6 @@ export default function RoomPanel({
         <FileAttachments base={`/api/workspace/${roomId}/files`} canWrite={canWrite} reloadKey={filesReloadKey} />
       </Block>
 
-      <Block title="Tasks">
-        <Link
-          href={`/workspace/${roomId}?view=database`}
-          className="group flex items-center justify-between rounded-xl border border-line px-3 py-2.5 text-[12px] text-white/65 transition-colors duration-150 hover:bg-white/[0.04] hover:text-white/85"
-        >
-          <span>Open the task board</span>
-          <ChevronRight className="h-3.5 w-3.5 text-white/25 group-hover:text-white/55" />
-        </Link>
-      </Block>
     </aside>
   )
 }

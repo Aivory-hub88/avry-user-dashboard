@@ -26,6 +26,7 @@ const MAX_TASK_ROWS = 30
 export interface RoomContext {
   brief: string
   tasks: string
+  notes: string
   files: string
   excerpts: { file: string; text: string }[]
 }
@@ -119,6 +120,23 @@ async function taskText(roomId: string, props: Record<string, unknown>): Promise
   return lines.join("\n")
 }
 
+const MAX_NOTES = 10
+const MAX_NOTE_CHARS = 400
+
+/** The room's newest notes as "## title" + a clipped body. */
+async function notesText(roomId: string): Promise<string> {
+  const r = await query(
+    `SELECT title, body FROM dashboard.room_notes WHERE room_id = $1 AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT ${MAX_NOTES}`,
+    [roomId],
+  )
+  return (r.rows as { title: string; body: string }[])
+    .map((n) => {
+      const body = n.body.replace(/\s+/g, " ").trim()
+      return `## ${n.title.trim() || "Untitled note"}\n${body.length > MAX_NOTE_CHARS ? `${body.slice(0, MAX_NOTE_CHARS)}…` : body}`
+    })
+    .join("\n\n")
+}
+
 /** Everything a turn should know about its room. Parts that fail load as empty. */
 export async function loadRoomContext(roomId: string, instruction: string): Promise<RoomContext | null> {
   try {
@@ -129,8 +147,9 @@ export async function loadRoomContext(roomId: string, instruction: string): Prom
     const props = row.props ?? {}
     const title = row.title ?? "Untitled"
 
-    const [tasks, fileRows, chunkRows] = await Promise.all([
+    const [tasks, notes, fileRows, chunkRows] = await Promise.all([
       taskText(roomId, props).catch(() => ""),
+      notesText(roomId).catch(() => ""),
       query(
         `SELECT id, name, status FROM dashboard.workspace_files WHERE room_id = $1 AND deleted_at IS NULL AND status IN ('ready', 'ingested') ORDER BY created_at ASC LIMIT 50`,
         [roomId],
@@ -158,6 +177,7 @@ export async function loadRoomContext(roomId: string, instruction: string): Prom
     return {
       brief: briefText(props, title),
       tasks,
+      notes,
       files: fileRows.map((f) => `- ${f.name}`).join("\n"),
       excerpts,
     }

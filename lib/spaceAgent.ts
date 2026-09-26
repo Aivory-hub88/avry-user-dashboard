@@ -67,6 +67,8 @@ export interface SpacePayloadParams {
 export interface SpaceRoomContext {
   brief: string;
   tasks: string;
+  /** Shared notes, newest first (ADR-019 P5). Absent on older callers. */
+  notes?: string;
   files: string;
   excerpts: { file: string; text: string }[];
 }
@@ -75,6 +77,7 @@ export interface SpaceRoomContext {
 const MAX_BRIEF_CHARS = 1500;
 const MAX_TASKS_CHARS = 2500;
 const MAX_FILES_CHARS = 800;
+const MAX_NOTES_CHARS = 2000;
 const MAX_EXCERPT_CHARS = 900;
 
 function block(tag: string, body: string, max: number): string[] {
@@ -106,6 +109,7 @@ export function buildSpacePayload({ instruction, history, room }: SpacePayloadPa
   if (room) {
     lines.push(...block("room_brief", room.brief, MAX_BRIEF_CHARS));
     lines.push(...block("room_tasks", room.tasks, MAX_TASKS_CHARS));
+    lines.push(...block("room_notes", room.notes ?? "", MAX_NOTES_CHARS));
     lines.push(...block("room_files", room.files, MAX_FILES_CHARS));
     if (room.excerpts.length > 0) {
       lines.push("<file_excerpts>");

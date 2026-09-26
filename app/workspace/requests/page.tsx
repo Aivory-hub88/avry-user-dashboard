@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronRight, Plus, Users } from "lucide-react"
 import { requestsApi, teamsApi, type RequestWithTeam, type TeamSummary } from "@/lib/requestsClient"
 import { Button, StatusPill, formatDate, inputClass } from "@/components/requests/requestUi"
+import { ROADMAP_DRAFT_KEY, type RequestDraft } from "@/lib/roadmapRequest"
 
 type Tab = "mine" | "inbox"
 
@@ -21,9 +22,20 @@ export default function RequestsPage() {
   const [tab, setTab] = useState<Tab>(search.get("tab") === "inbox" ? "inbox" : "mine")
   const [lists, setLists] = useState<Record<Tab, RequestWithTeam[] | null>>({ mine: null, inbox: null })
   const [error, setError] = useState<string | null>(null)
-  const [composing, setComposing] = useState(false)
+  const fromRoadmap = search.get("from") === "roadmap"
+  const [composing, setComposing] = useState(search.get("new") === "1" || fromRoadmap)
+  // A roadmap handed over by the Roadmap page ("Request as a project").
+  const [draft] = useState<RequestDraft | null>(() => {
+    if (!fromRoadmap || typeof window === "undefined") return null
+    try {
+      const raw = sessionStorage.getItem(ROADMAP_DRAFT_KEY)
+      return raw ? (JSON.parse(raw) as RequestDraft) : null
+    } catch {
+      return null
+    }
+  })
   const [pickedTeam, setTeamId] = useState("")
-  const [title, setTitle] = useState("")
+  const [title, setTitle] = useState(draft?.title ?? "")
   const [teamName, setTeamName] = useState("")
   const [busy, setBusy] = useState(false)
 
@@ -55,6 +67,14 @@ export default function RequestsPage() {
     setBusy(true)
     try {
       const r = await requestsApi.create(teamId, title.trim() || "Untitled request")
+      if (draft) {
+        await requestsApi.patch(r.id, { goal: draft.goal, fields: draft.fields, dataTable: draft.dataTable })
+        try {
+          sessionStorage.removeItem(ROADMAP_DRAFT_KEY)
+        } catch {
+          // a leftover draft only prefills the next roadmap request
+        }
+      }
       router.push(`/workspace/requests/${r.id}`)
     } catch (e) {
       setError((e as Error).message)
@@ -84,7 +104,7 @@ export default function RequestsPage() {
     <div className="flex h-full w-full flex-col bg-surface-1">
       <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-black/10 px-6">
         <div className="flex items-center gap-2 text-[13px]">
-          <Link href="/workspace?view=pages" className="text-white/40 hover:text-white/70">
+          <Link href="/workspace" className="text-white/40 hover:text-white/70">
             Workspace
           </Link>
           <span className="text-white/20">/</span>
@@ -160,7 +180,11 @@ export default function RequestsPage() {
                   {busy ? "Creating…" : "Continue"}
                 </Button>
               </div>
-              <div className="mt-2 text-[11px] text-white/30">You&apos;ll add the goal, data, files, people and agents next. Nothing is sent until you submit.</div>
+              <div className="mt-2 text-[11px] text-white/30">
+                {draft
+                  ? `Prefilled from your roadmap: the goal and ${draft.dataTable.rows.length} milestones. Pick the team, then review and submit.`
+                  : "You'll add the goal, data, files, people and agents next. Nothing is sent until you submit."}
+              </div>
             </div>
           )}
 
