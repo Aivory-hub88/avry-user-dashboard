@@ -1,9 +1,9 @@
 /**
  * Plain text out of a room file — SERVER-ONLY (ADR-019 P3).
  *
- * PDF via pdfjs-dist's legacy build (runs in Node with its fake worker;
- * the worker module is imported explicitly so the standalone build traces
- * it), DOCX via mammoth, XLSX by reading the sheet XML out of the zip
+ * PDF via unpdf (a serverless pdfjs build: no worker, no native canvas —
+ * plain pdfjs-dist needs @napi-rs/canvas for DOMMatrix and failed to load
+ * on the Node 20 Alpine image), DOCX via mammoth, XLSX by reading the sheet XML out of the zip
  * (jszip), CSV/TXT/MD as UTF-8. Images carry no text here. Output is capped
  * so one huge file can't dominate the index.
  */
@@ -17,27 +17,14 @@ const MAX_SHEET_ROWS = 2000
 const decode = (b: Uint8Array) => new TextDecoder("utf-8", { fatal: false }).decode(b).replace(/^﻿/, "")
 
 async function pdfText(bytes: Uint8Array): Promise<string> {
-  const g = globalThis as unknown as { pdfjsWorker?: unknown }
-  if (!g.pdfjsWorker) g.pdfjsWorker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs")
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
-  const doc = await pdfjs.getDocument({ data: bytes, useSystemFonts: true }).promise
-  const pages: string[] = []
-  let total = 0
-  for (let i = 1; i <= Math.min(doc.numPages, MAX_PDF_PAGES) && total < MAX_TEXT_CHARS; i++) {
-    const page = await doc.getPage(i)
-    const tc = await page.getTextContent()
-    const text = tc.items
-      .map((it) => ("str" in it ? `${it.str}${it.hasEOL ? "\n" : " "}` : ""))
-      .join("")
-      .replace(/[ \t]+/g, " ")
-      .trim()
-    if (text) {
-      pages.push(text)
-      total += text.length
-    }
-  }
-  await doc.destroy()
-  return pages.join("\n\n")
+  const { getDocumentProxy, extractText: pdfPages } = await import("unpdf")
+  const pdf = await getDocumentProxy(bytes)
+  const { text } = await pdfPages(pdf, { mergePages: false })
+  return (text as string[])
+    .slice(0, MAX_PDF_PAGES)
+    .map((t) => t.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n\n")
 }
 
 async function docxText(bytes: Uint8Array): Promise<string> {

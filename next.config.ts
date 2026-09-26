@@ -6,9 +6,6 @@ const nextConfig: NextConfig = {
   assetPrefix: "/dashboard",
   reactStrictMode: false,
   images: { unoptimized: true },
-  // Room file text extraction (ADR-019 P3) runs pdfjs on the server; keep it
-  // a real node_modules package so its legacy build + worker load as-is.
-  serverExternalPackages: ["pdfjs-dist"],
   typescript: { ignoreBuildErrors: false },
   // Dedup yjs — MissionControl + AgentRail both import * as Y from "yjs" + y-websocket bundles its own copy.
   // Duplicate copies break Yjs constructor checks ("Yjs was already imported").
