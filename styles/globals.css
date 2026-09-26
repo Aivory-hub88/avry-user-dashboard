@@ -1255,3 +1255,16 @@ body {
 .notification-card-in {
   animation: notificationCardIn 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
+
+/* Timeline item popover (ADR-019 P6): scales in from where it was opened,
+   interruptible transition rather than a keyframe. */
+.timeline-pop {
+  transform-origin: var(--pop-origin, top left);
+  transition: opacity 150ms cubic-bezier(0.23, 1, 0.32, 1), transform 150ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@starting-style {
+  .timeline-pop {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}

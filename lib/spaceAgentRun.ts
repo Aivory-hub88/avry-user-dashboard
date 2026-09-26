@@ -118,7 +118,7 @@ export async function runAgentTask(opts: {
       })
       .filter((h) => h.text.trim());
     await Promise.race([ingestRoomFiles(id), new Promise((r) => setTimeout(r, INGEST_WAIT_MS))]);
-    const room = await loadRoomContext(id, instruction);
+    const room = await loadRoomContext(id, instruction, task.agentType);
     prompt = buildSpacePayload({ instruction, history, room });
   } catch {
     // Konteks best-effort — instruksi polos tetap jalan.

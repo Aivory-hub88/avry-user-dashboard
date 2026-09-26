@@ -123,22 +123,40 @@ async function taskText(roomId: string, props: Record<string, unknown>): Promise
 const MAX_NOTES = 10
 const MAX_NOTE_CHARS = 400
 
-/** The room's newest notes as "## title" + a clipped body. */
-async function notesText(roomId: string): Promise<string> {
+/** "2026-10-02" (or a pg DATE) → "2 Oct 2026". */
+function noteDay(v: unknown): string {
+  const d = v instanceof Date ? v : typeof v === "string" ? new Date(`${v.slice(0, 10)}T00:00:00`) : null
+  return d && Number.isFinite(d.getTime()) ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : ""
+}
+
+/**
+ * The room's newest notes as "## title" + a clipped body. Notes meant for
+ * the agent running this turn come first; dated or addressed notes say so
+ * in the heading ("for you", "for Rina", "2 Oct 2026").
+ */
+async function notesText(roomId: string, agentType?: string): Promise<string> {
   const r = await query(
-    `SELECT title, body FROM dashboard.room_notes WHERE room_id = $1 AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT ${MAX_NOTES}`,
-    [roomId],
+    `SELECT title, body, on_date, for_kind, for_id, for_name FROM dashboard.room_notes
+     WHERE room_id = $1 AND deleted_at IS NULL
+     ORDER BY (for_kind = 'agent' AND for_id = $2) IS TRUE DESC, updated_at DESC LIMIT ${MAX_NOTES}`,
+    [roomId, agentType ?? ""],
   )
-  return (r.rows as { title: string; body: string }[])
+  return (r.rows as { title: string; body: string; on_date?: unknown; for_kind?: string | null; for_id?: string | null; for_name?: string | null }[])
     .map((n) => {
       const body = n.body.replace(/\s+/g, " ").trim()
-      return `## ${n.title.trim() || "Untitled note"}\n${body.length > MAX_NOTE_CHARS ? `${body.slice(0, MAX_NOTE_CHARS)}…` : body}`
+      const forYou = n.for_kind === "agent" && agentType && n.for_id === agentType
+      const tags = [
+        forYou ? "for you" : n.for_kind && n.for_name ? `for ${n.for_name}` : "",
+        n.on_date ? noteDay(n.on_date) : "",
+      ].filter(Boolean)
+      const heading = `${n.title.trim() || "Untitled note"}${tags.length ? ` (${tags.join(", ")})` : ""}`
+      return `## ${heading}\n${body.length > MAX_NOTE_CHARS ? `${body.slice(0, MAX_NOTE_CHARS)}…` : body}`
     })
     .join("\n\n")
 }
 
 /** Everything a turn should know about its room. Parts that fail load as empty. */
-export async function loadRoomContext(roomId: string, instruction: string): Promise<RoomContext | null> {
+export async function loadRoomContext(roomId: string, instruction: string, agentType?: string): Promise<RoomContext | null> {
   try {
     const d = await query(`SELECT id, title, props FROM dashboard.workspace_docs WHERE id = $1 OR id = $2`, [`workspace:${roomId}`, roomId])
     const rows = d.rows as { id: string; title: string | null; props: Record<string, unknown> | null }[]
@@ -149,7 +167,7 @@ export async function loadRoomContext(roomId: string, instruction: string): Prom
 
     const [tasks, notes, fileRows, chunkRows] = await Promise.all([
       taskText(roomId, props).catch(() => ""),
-      notesText(roomId).catch(() => ""),
+      notesText(roomId, agentType).catch(() => ""),
       query(
         `SELECT id, name, status FROM dashboard.workspace_files WHERE room_id = $1 AND deleted_at IS NULL AND status IN ('ready', 'ingested') ORDER BY created_at ASC LIMIT 50`,
         [roomId],

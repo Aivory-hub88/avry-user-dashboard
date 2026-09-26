@@ -1,10 +1,10 @@
 /**
  * /api/workspace/[id]/notes/[noteId] (ADR-019 P5).
- * PATCH { title?, body? } (write role). DELETE → soft delete (write role).
+ * PATCH { title?, body?, onDate?, for? } (write role). for = { kind, id } | null. DELETE → soft delete (write role).
  */
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { cleanNoteInput, noteFromRow, noteGate } from "@/lib/roomNotes"
+import { addresseeName, cleanNoteInput, noteFromRow, noteGate } from "@/lib/roomNotes"
 
 export const runtime = "nodejs"
 
@@ -24,6 +24,16 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (v.body !== undefined) {
     values.push(v.body)
     sets.push(`body = $${values.length}`)
+  }
+  if (v.onDate !== undefined) {
+    values.push(v.onDate)
+    sets.push(`on_date = $${values.length}`)
+  }
+  if (v.for !== undefined) {
+    const name = v.for ? await addresseeName(id, v.for.kind, v.for.id) : ""
+    if (name === null) return NextResponse.json({ error: "that person or agent isn't in this room" }, { status: 400 })
+    values.push(v.for?.kind ?? null, v.for?.id ?? null, name)
+    sets.push(`for_kind = $${values.length - 2}`, `for_id = $${values.length - 1}`, `for_name = $${values.length}`)
   }
   if (sets.length === 0) return NextResponse.json({ error: "nothing to change" }, { status: 400 })
   try {
