@@ -50,6 +50,12 @@ export function getAuthUserWithToken(
       const payload = jwt.verify(token, secret, { algorithms: ['HS256'] })
       if (typeof payload !== 'object' || payload === null) continue
       const p = payload as Record<string, unknown>
+      // Refresh tokens share the secret but are not bearer credentials: they
+      // live 30 days and survive logout (the backend only revokes the session
+      // row its /refresh endpoint checks). Legacy refresh tokens have no
+      // "type" but always carry session_id; access tokens never do.
+      if (p.type === 'refresh' || (p.type === undefined && 'session_id' in p)) continue
+      if (p.type !== undefined && p.type !== 'access') continue
       const userId = typeof p.user_id === 'string' && p.user_id
         ? p.user_id
         : typeof p.sub === 'string' && p.sub ? p.sub : null

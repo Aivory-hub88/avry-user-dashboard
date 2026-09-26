@@ -4,7 +4,6 @@
  */
 
 import { cookies } from 'next/headers'
-import { JWT_SECRET } from '@/lib/jwt'
 
 export interface User {
   user_id: string
