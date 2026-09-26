@@ -28,6 +28,10 @@ function r2(): { client: S3Client; bucket: string } {
       client: new S3Client({
         region: "auto",
         endpoint,
+        // Path-style keeps every presigned URL on the one account host, so the
+        // CSP connect-src can name that host instead of *.r2.cloudflarestorage.com
+        // (a wildcard would also allow uploads to anyone else's bucket).
+        forcePathStyle: true,
         credentials: { accessKeyId: env("R2_ACCESS_KEY_ID"), secretAccessKey: env("R2_SECRET_ACCESS_KEY") },
       }),
       bucket: env("R2_BUCKET"),
