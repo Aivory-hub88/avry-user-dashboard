@@ -1609,7 +1609,10 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-line bg-white/[0.02]">
-                  <th className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Title</th>
+                  {/* Title keeps a readable width; narrow containers (a room with its
+                      side panel open) scroll the table sideways instead of
+                      squeezing titles down to one letter. */}
+                  <th className="min-w-[240px] px-4 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Title</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Status</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Priority</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Assignee</th>
@@ -1624,7 +1627,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
               <tbody className="divide-y divide-line">
                 {filtered.map((r) => (
                   <tr key={r.id} className="group hover:bg-white/[0.03]">
-                    <td className="px-4 py-3">
+                    <td className="min-w-[240px] px-4 py-3">
                       <div className="flex items-center gap-2">
                         <GripVertical className="h-3.5 w-3.5 shrink-0 text-white/15 opacity-0 group-hover:opacity-100" />
                         <input
