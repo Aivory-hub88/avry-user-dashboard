@@ -22,7 +22,7 @@ import { PanelRight } from "lucide-react"
 import ChatMessage from "@/components/ChatMessage"
 import ChatInput from "@/components/ChatInput"
 import { NotificationCard } from "@/components/office/NotificationCard"
-import RoomPanel, { type RoomBrief, type RoomPerson } from "@/components/room/RoomPanel"
+import RoomPanel, { type Autonomy, type RoomBrief, type RoomPerson } from "@/components/room/RoomPanel"
 import { useDiscussionResource } from "@/hooks/useDiscussionResource"
 import { useSelfId } from "@/hooks/useSelfId"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
@@ -62,6 +62,8 @@ export default function RoomView({
   brief,
   requestId,
   canWrite,
+  isOwner = false,
+  autonomy: initialAutonomy = "suggest",
 }: {
   roomId: string
   title: string
@@ -69,6 +71,9 @@ export default function RoomView({
   brief: RoomBrief | null
   requestId: string | null
   canWrite: boolean
+  /** Only the owner may change how freely agents act on their own. */
+  isOwner?: boolean
+  autonomy?: Autonomy
 }) {
   const selfId = useSelfId()
   const peers = useWorkspaceAwareness(workspaceId)
@@ -80,6 +85,23 @@ export default function RoomView({
   const [notice, setNotice] = useState<string | null>(null)
   const [filesReloadKey, setFilesReloadKey] = useState(0)
   const [panelOpen, setPanelOpen] = useState(true)
+  const [autonomy, setAutonomy] = useState<Autonomy>(initialAutonomy)
+
+  const changeAutonomy = async (next: Autonomy) => {
+    const prev = autonomy
+    setAutonomy(next)
+    try {
+      const r = await fetch(`/api/workspace/${roomId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+        body: JSON.stringify({ props: { autonomy: next } }),
+      })
+      if (!r.ok) throw new Error(String(r.status))
+    } catch {
+      setAutonomy(prev)
+      setNotice("That setting couldn't be saved. Try again.")
+    }
+  }
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const endRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -261,10 +283,11 @@ export default function RoomView({
       }
       setNotice(`Uploading ${f.name}…`)
       try {
-        const file = await uploadFile(`/api/workspace/${roomId}/files`, f)
+        await uploadFile(`/api/workspace/${roomId}/files`, f)
         setFilesReloadKey((k) => k + 1)
         setNotice(null)
-        send(`Shared a file: ${file.name}`)
+        // The server posts "<you> added <file>" to the room (and the lead agent may summarise it).
+        void timeline.refresh()
       } catch (e) {
         setNotice((e as Error).message)
       }
@@ -276,7 +299,7 @@ export default function RoomView({
       ? {
           role: (r.kind === "agent" ? "assistant" : "user") as "user" | "assistant",
           content: quoteText(r.body),
-          name: r.kind === "agent" ? agentDisplayName(r.agentType ?? "") : r.authorId === selfId ? "You" : personName(r.name, r.authorId ? nameById.get(r.authorId) : null),
+          name: r.kind === "agent" ? agentDisplayName(r.agentType ?? "") : r.kind === "system" ? "Aivory" : r.authorId === selfId ? "You" : personName(r.name, r.authorId ? nameById.get(r.authorId) : null),
         }
       : undefined
 
@@ -350,6 +373,12 @@ export default function RoomView({
 
               {messages.map((m) => {
                 if (m.deletedAt) return null
+                if (m.author.actingMode === "system")
+                  return (
+                    <div key={m.id} className="mb-8 flex justify-center">
+                      <span className="rounded-full bg-white/[0.04] px-3 py-1 text-[12px] text-white/45">{displayBody(m.body)}</span>
+                    </div>
+                  )
                 const isAgent = m.author.actingMode === "agent"
                 const name = whoIs(m)
                 return (
@@ -482,6 +511,8 @@ export default function RoomView({
             tasks={tasks}
             canWrite={canWrite}
             filesReloadKey={filesReloadKey}
+            autonomy={autonomy}
+            onAutonomyChange={isOwner ? changeAutonomy : undefined}
           />
         )}
       </div>

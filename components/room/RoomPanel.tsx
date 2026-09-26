@@ -22,6 +22,14 @@ export interface RoomBrief {
   fields?: { label: string; value: string }[]
 }
 
+export type Autonomy = "observe" | "suggest" | "act"
+
+const AUTONOMY: { value: Autonomy; label: string; hint: string }[] = [
+  { value: "observe", label: "Only when asked", hint: "Agents answer when someone mentions them." },
+  { value: "suggest", label: "Suggest", hint: "Agents also post a kickoff and file summaries on their own, and propose changes instead of making them." },
+  { value: "act", label: "Act", hint: "Agents may also use their tools unprompted. Risky actions still wait for your approval." },
+]
+
 export interface RoomPerson {
   id: string
   name: string
@@ -58,6 +66,8 @@ export default function RoomPanel({
   tasks,
   canWrite,
   filesReloadKey,
+  autonomy = "suggest",
+  onAutonomyChange,
 }: {
   roomId: string
   brief: RoomBrief | null
@@ -67,6 +77,9 @@ export default function RoomPanel({
   tasks: SpaceAgentTask[]
   canWrite: boolean
   filesReloadKey: number
+  autonomy?: Autonomy
+  /** Present for the room owner only; others see the setting read-only. */
+  onAutonomyChange?: (next: Autonomy) => void
 }) {
   const [goalOpen, setGoalOpen] = useState(false)
   const goal = brief?.goal?.trim() ?? ""
@@ -138,6 +151,30 @@ export default function RoomPanel({
             <div className="pt-1 text-[11px] text-white/30">Mention an agent with @ to give it work.</div>
           </div>
         )}
+        <div className="mt-4">
+          <div className="mb-1.5 text-[11px] text-white/35">Working on their own</div>
+          {onAutonomyChange ? (
+            <div className="flex items-center gap-0.5 rounded-full bg-white/[0.04] p-0.5" role="radiogroup" aria-label="How freely agents act on their own">
+              {AUTONOMY.map((a) => (
+                <button
+                  key={a.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={autonomy === a.value}
+                  onClick={() => autonomy !== a.value && onAutonomyChange(a.value)}
+                  className={`flex-1 rounded-full px-2 py-1 text-[11px] transition-colors duration-150 ${
+                    autonomy === a.value ? "bg-white text-black" : "text-white/45 hover:text-white/75"
+                  }`}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-[12px] text-white/65">{AUTONOMY.find((a) => a.value === autonomy)?.label}</div>
+          )}
+          <div className="mt-1.5 text-[11px] leading-relaxed text-white/30">{AUTONOMY.find((a) => a.value === autonomy)?.hint}</div>
+        </div>
       </Block>
 
       <Block title="People">

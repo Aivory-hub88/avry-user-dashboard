@@ -19,6 +19,7 @@ import { dbRowToYMap, newDbRowId, saveDbDoc, type DbRow } from "@/lib/workspaceD
 import type { FieldDef } from "@/lib/workspaceDbModel"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { ingestRoomFiles } from "@/lib/roomContext"
+import { onRoomOpened } from "@/lib/roomProactive"
 
 export interface RequestAccess {
   isRequester: boolean
@@ -171,8 +172,12 @@ export async function approveRequest(
     metadata: { requestId: r.id, seededRows },
   }).catch(() => {})
 
-  // The request's files now belong to the room: read them for its agents.
-  void ingestRoomFiles(roomId)
+  // The request's files now belong to the room: read them, then let the
+  // lead agent post a kickoff that can already use them (ADR-019 P4).
+  void (async () => {
+    await ingestRoomFiles(roomId)
+    await onRoomOpened(roomId)
+  })().catch((e) => console.error("[project-requests approve kickoff]", r.id, e))
 
   return { roomId, notFound: done.notFound, seededRows, seedError }
 }

@@ -74,6 +74,12 @@ export async function ingestRoomFiles(roomId: string): Promise<number> {
   return done
 }
 
+/** Whether a file produced any indexed text (images and empty files don't). */
+export async function fileHasText(roomId: string, fileId: string): Promise<boolean> {
+  const r = await query(`SELECT 1 FROM dashboard.workspace_chunks WHERE doc_id = $1 AND row_id LIKE $2 LIMIT 1`, [roomId, `file:${fileId}:%`])
+  return (r.rowCount ?? r.rows.length) > 0
+}
+
 /** Remove a file's chunks (soft-deleted files stop informing agents). */
 export async function dropFileChunks(roomId: string, fileId: string): Promise<void> {
   await query(`DELETE FROM dashboard.workspace_chunks WHERE doc_id = $1 AND row_id LIKE $2`, [roomId, `file:${fileId}:%`]).catch(() => {})

@@ -245,6 +245,8 @@ export default function WorkspaceDocPage() {
         brief={meta?.props?.brief && typeof meta.props.brief === "object" ? (meta.props.brief as RoomBrief) : null}
         requestId={typeof meta?.props?.requestId === "string" ? meta.props.requestId : null}
         canWrite={canWrite}
+        isOwner={isOwner}
+        autonomy={meta?.props?.autonomy === "observe" || meta?.props?.autonomy === "act" ? meta.props.autonomy : "suggest"}
       />
     )
   }

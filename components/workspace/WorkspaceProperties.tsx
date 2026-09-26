@@ -14,6 +14,8 @@ export type DocProps = {
   isRoom?: boolean
   requestId?: string
   brief?: { goal?: string; deadline?: string | null; priority?: string; fields?: { label: string; value: string }[] }
+  /** How freely the room's agents act unprompted (ADR-019 P4). */
+  autonomy?: "observe" | "suggest" | "act"
 }
 
 const TAG_COLORS: Record<string, string> = {

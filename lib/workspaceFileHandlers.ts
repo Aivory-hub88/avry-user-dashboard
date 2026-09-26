@@ -14,7 +14,8 @@ import { requesterFrom, requesterKey, newId } from "@/lib/spaceWrite"
 import { validateUploadIntent, objectKey, fileFromRow, type FileOwnerKind } from "@/lib/workspaceFiles"
 import { presignPut, presignGet, headObject, deleteObject, r2Configured, R2_TTL } from "@/lib/r2"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
-import { ingestRoomFiles, dropFileChunks } from "@/lib/roomContext"
+import { ingestRoomFiles, dropFileChunks, fileHasText } from "@/lib/roomContext"
+import { onFileAdded, postSystemNote } from "@/lib/roomProactive"
 
 export interface FileScope {
   kind: FileOwnerKind
@@ -165,8 +166,16 @@ export async function completeUpload(req: NextRequest, ownerId: string, fileId: 
     )
     const file = fileFromRow((updated.rows[0] ?? { ...row, status: "ready" }) as Record<string, unknown>)
     await logActivity(scope, cred, me.agentType, "file.uploaded", fileId, `${me.name} uploaded ${file.name}`)
-    // Read it for the room's agents now, so the next turn doesn't wait (ADR-019 P3).
-    if (scope.kind === "room") void ingestRoomFiles(ownerId)
+    // Read it for the room's agents now (P3), then tell the room: a note
+    // always, plus a summary by the lead agent when the file had text (P4).
+    if (scope.kind === "room") {
+      const who = me.kind === "user" ? me.name.split("@")[0] : me.name
+      void (async () => {
+        await ingestRoomFiles(ownerId)
+        if (await fileHasText(ownerId, fileId)) await onFileAdded(ownerId, file.name, who)
+        else await postSystemNote(ownerId, `${who} added ${file.name}.`)
+      })().catch((e) => console.error("[workspace/files announce]", fileId, e))
+    }
     return NextResponse.json({ file })
   } catch (e) {
     console.error("[workspace/files complete]", e)
