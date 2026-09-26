@@ -24,8 +24,13 @@ interface ChatInputProps {
   isStreaming?: boolean
   onStop?: () => void
   /** WhatsApp-style "replying to" bar — set via a bubble's Reply action. */
-  replyTo?: { role: 'user' | 'assistant'; content: string; agentName?: string } | null
+  replyTo?: { role: 'user' | 'assistant'; content: string; agentName?: string; name?: string } | null
   onCancelReply?: () => void
+  /** Replace the built-in upload menu (e.g. a shared room uploads to its
+   *  own file store). When set, the + button calls this instead. */
+  onAttachClick?: () => void
+  /** Console tool/mode strip above the composer; off in shared rooms. */
+  showContextToolbar?: boolean
 }
 
 /** Shared send-button glyph: an enter/return arrow (corner-up-left). One
@@ -51,6 +56,8 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
   onStop,
   replyTo,
   onCancelReply,
+  onAttachClick,
+  showContextToolbar = true,
 }: ChatInputProps) {
   const [message, setMessage] = useState(prefill ?? "")
   const [activeTool, setActiveTool] = useState<string | null>(null)
@@ -198,7 +205,7 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
   return (
     <div className="relative">
       {/* Context Toolbar */}
-      <ContextToolbar onToolSelect={handleToolSelect} />
+      {showContextToolbar && <ContextToolbar onToolSelect={handleToolSelect} />}
 
       {/* Pending attachments from drag & drop */}
       {pendingAttachments.length > 0 && (
@@ -257,7 +264,7 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
           <div className="flex items-start gap-2 px-4 pt-3 pb-2 border-b border-line/60">
             <div className="flex-1 min-w-0 pl-2.5 border-l-2 border-accent/50">
               <div className="text-[12px] font-medium text-accent/80">
-                Replying to {replyTo.role === 'user' ? 'yourself' : (replyTo.agentName ?? 'Agent')}
+                Replying to {replyTo.name ?? (replyTo.role === 'user' ? 'yourself' : (replyTo.agentName ?? 'Agent'))}
               </div>
               <div className="text-[13px] text-[#a1a1aa] truncate">{replyTo.content}</div>
             </div>
@@ -291,7 +298,7 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
             {/* Attach / upload button — + icon */}
             <button
               className="console-icon-btn"
-              onClick={() => setUploadMenuOpen(o => !o)}
+              onClick={() => (onAttachClick ? onAttachClick() : setUploadMenuOpen(o => !o))}
               aria-label="Upload file"
               type="button"
             >

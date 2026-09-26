@@ -28,7 +28,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!canWrite(await getDocRole(credential, id))) return forbidden()
 
   const payload = (await req.json().catch(() => ({}))) as Record<string, unknown>
-  const threadRoot = typeof payload.threadRoot === "string" ? payload.threadRoot.slice(0, 128) : null
+  let threadRoot = typeof payload.threadRoot === "string" ? payload.threadRoot.slice(0, 128) : null
+  const replyTarget = typeof payload.replyTo === "string" ? payload.replyTo.slice(0, 128) : null
   const body = cleanBody(payload.body)
   if (!body) return NextResponse.json({ error: "body required (1..8000 chars)" }, { status: 400 })
 
@@ -37,6 +38,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const msgId = newId()
 
   try {
+    // replyTo (rooms, ADR-019 P2): answer any message, root or reply. The
+    // thread stays flat — we join the target's root — and reply_to keeps
+    // the exact message so the room can quote it.
+    let replyToId: string | null = null
+    if (replyTarget) {
+      const target = await query(
+        `SELECT id, thread_root FROM dashboard.workspace_messages WHERE id = $1 AND space_id = $2`,
+        [replyTarget, id],
+      )
+      const t = target.rows[0] as { id: string; thread_root: string | null } | undefined
+      if (!t) return NextResponse.json({ error: "message not found" }, { status: 404 })
+      replyToId = t.id
+      threadRoot = t.thread_root ?? t.id
+    }
     let rootId = msgId
     let unarchived = false
     if (threadRoot) {
@@ -74,8 +89,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const inserted = await query(
       `INSERT INTO dashboard.workspace_messages
          (id, space_id, thread_root, author_kind, author_id, author_name, agent_type,
-          body, mentions, member_ids, here, has_agent, doc_refs)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          body, mentions, member_ids, here, has_agent, doc_refs, reply_to)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         msgId,
@@ -91,6 +106,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         stamps.here,
         stamps.hasAgent,
         stamps.docRefs,
+        replyToId,
       ],
     )
     const message = spaceMessageFromRow(inserted.rows[0] as Record<string, unknown>, id)

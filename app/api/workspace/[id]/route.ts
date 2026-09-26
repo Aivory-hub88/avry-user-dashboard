@@ -84,6 +84,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (src.pageWidth === "full" || src.pageWidth === "standard") propsPatch.pageWidth = src.pageWidth
     // Project docs (Fase 2): flags a doc as a project + its member doc ids.
     if (typeof src.isProject === "boolean") propsPatch.isProject = src.isProject
+    // Room autonomy (ADR-019 P4): how freely the room's agents act unprompted.
+    // Owner-only — it decides whether agents spend tokens on their own.
+    if (src.autonomy !== undefined) {
+      if (src.autonomy !== "observe" && src.autonomy !== "suggest" && src.autonomy !== "act")
+        return NextResponse.json({ error: "props.autonomy must be observe, suggest or act" }, { status: 400 })
+      if (role !== "owner") return forbidden()
+      propsPatch.autonomy = src.autonomy
+    }
     if (Array.isArray(src.projectDocs)) {
       const cleanedDocs: string[] = []
       const seen = new Set<string>()

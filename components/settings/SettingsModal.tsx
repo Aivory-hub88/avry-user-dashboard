@@ -103,6 +103,8 @@ export function SettingsModal({ user }: SettingsModalProps) {
   }
 
   useEffect(() => {
+    // Fetch when the tab opens; loadImageTokens only sets state after its await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (activeTab === 'downloads') loadImageTokens()
   }, [activeTab, loadImageTokens])
 

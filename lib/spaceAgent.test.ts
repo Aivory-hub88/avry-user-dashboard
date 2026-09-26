@@ -116,6 +116,34 @@ describe("buildSpacePayload", () => {
     expect(p).toContain("<instruction>\nTolong @Geno cek\n</instruction>")
   })
 
+  it("puts the room's brief, tasks, files and excerpts before the transcript (ADR-019 P3)", () => {
+    const p = buildSpacePayload({
+      instruction: "what is this project about?",
+      history: [{ author: "Rina", text: "hi" }],
+      room: {
+        brief: "Project: Odoo rollout\nGoal: Move CRM to Odoo",
+        tasks: "- Acme (Todo, City: Jakarta)",
+        files: "- SOP.pdf",
+        excerpts: [{ file: "SOP.pdf", text: "Import customers   before quotes." }],
+      },
+    })
+    expect(p.indexOf("<room_brief>")).toBeLessThan(p.indexOf("<thread_history>"))
+    expect(p).toContain("<room_brief>\nProject: Odoo rollout\nGoal: Move CRM to Odoo\n</room_brief>")
+    expect(p).toContain("<room_tasks>\n- Acme (Todo, City: Jakarta)\n</room_tasks>")
+    expect(p).toContain("<file_excerpts>\n[SOP.pdf]\nImport customers before quotes.\n</file_excerpts>")
+  })
+
+  it("skips empty room parts and caps long ones", () => {
+    const p = buildSpacePayload({
+      instruction: "x",
+      history: [],
+      room: { brief: "b".repeat(5000), tasks: "", files: "", excerpts: [] },
+    })
+    expect(p).not.toContain("<room_tasks>")
+    expect(p).not.toContain("<file_excerpts>")
+    expect(p.match(/<room_brief>\n(b+)…/)?.[1].length).toBe(1500)
+  })
+
   it("omits empty history", () => {
     const p = buildSpacePayload({ instruction: "cek", history: [] })
     expect(p).not.toContain("<thread_history>")

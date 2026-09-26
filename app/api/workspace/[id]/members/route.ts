@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     const doc = await query(
-      `SELECT d.owner, u.email AS owner_email, u.full_name AS owner_name
+      `SELECT d.owner, d.workspace_id, u.email AS owner_email, u.full_name AS owner_name
        FROM dashboard.workspace_docs d
        LEFT JOIN identity.users u ON u.id = d.owner
        WHERE d.id = $1 LIMIT 1`,
@@ -36,6 +36,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
        WHERE a.doc_id = $1 ORDER BY a.created_at`,
       [id],
     )
+    // Team rooms (ADR-019): the team's members reach the room through
+    // workspace membership, so list them too. The shared 'default'
+    // workspace has no members by design.
+    const workspaceId = typeof docRow.workspace_id === "string" ? docRow.workspace_id : "default"
+    const team =
+      workspaceId === "default"
+        ? { rows: [] }
+        : await query(
+            `SELECT m.user_id, m.role, u.email, u.full_name
+             FROM dashboard.workspace_members m
+             LEFT JOIN identity.users u ON u.id = m.user_id
+             WHERE m.workspace_id = $1 ORDER BY m.created_at`,
+            [workspaceId],
+          )
     const agents = await query(
       `SELECT agent_type, role FROM dashboard.workspace_agent_acl
        WHERE doc_id = $1 ORDER BY agent_type`,
@@ -54,6 +68,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         email: typeof g.email === "string" ? g.email : null,
         name: typeof g.full_name === "string" ? g.full_name : null,
         role: String(g.role),
+      })),
+      team: (team.rows as Record<string, unknown>[]).map((m) => ({
+        id: String(m.user_id),
+        email: typeof m.email === "string" ? m.email : null,
+        name: typeof m.full_name === "string" ? m.full_name : null,
+        role: String(m.role),
       })),
       agents: (agents.rows as Record<string, unknown>[]).map((a) => ({
         type: String(a.agent_type),

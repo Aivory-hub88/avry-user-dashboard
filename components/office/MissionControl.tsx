@@ -338,7 +338,7 @@ export default function MissionControl({
               ))}
             </div>
             <div className="mt-2 text-[11px] text-white/25">
-               <Link href={workspaceId ? `/workspace/${workspaceId}?view=database` : "/workspace"} className="underline decoration-white/20 underline-offset-2 hover:text-white/50">
+               <Link href={workspaceId ? `/workspace/${workspaceId}?tab=tasks` : "/workspace"} className="underline decoration-white/20 underline-offset-2 hover:text-white/50">
                  Open Data
               </Link>
             </div>

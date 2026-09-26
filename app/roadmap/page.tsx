@@ -1126,24 +1126,19 @@ export default function RoadmapPage() {
     } finally { setGenerating(false); }
   };
 
-  // Phase 4 killer flow: roadmap ini → project (wave docs + tasks + board penuh).
+  // Roadmap → project request draft (ADR-019 P5): the roadmap prefills a
+  // request (goal + milestone table); the requests page picks the team.
   const handleMakeProject = async () => {
     if (!roadmap || importing) return;
     setImporting(true); setError(null);
     try {
-      const { collabAuthHeaders } = await import('@/lib/collabClient');
-      const r = await fetch('/api/workspace/roadmap-import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...collabAuthHeaders() },
-        body: JSON.stringify({ roadmap }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (r.ok && j.boardUrl) router.push(j.boardUrl);
-      else setError('Import gagal — coba lagi.');
+      const { roadmapToRequest, ROADMAP_DRAFT_KEY } = await import('@/lib/roadmapRequest');
+      sessionStorage.setItem(ROADMAP_DRAFT_KEY, JSON.stringify(roadmapToRequest(roadmap)));
+      router.push('/workspace/requests?new=1&from=roadmap');
     } catch {
-      setError('Import gagal — coba lagi.');
+      setError("The request couldn't be prepared. Try again.");
+      setImporting(false);
     }
-    setImporting(false);
   };
 
   const handleNodeClick = useCallback((idx: number) => {
@@ -1264,7 +1259,7 @@ export default function RoadmapPage() {
                 {generating ? t("regenerating") : t("regenerateRoadmap")}
               </BtnGhost>
               <BtnPrimary onClick={handleMakeProject} disabled={importing} loading={importing}>
-                {importing ? "Membuat project…" : "Jadikan Project →"}
+                {importing ? "Opening request…" : "Request as a project →"}
               </BtnPrimary>
             </div>
           )}

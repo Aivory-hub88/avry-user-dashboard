@@ -38,10 +38,17 @@ interface ChatMessageProps {
    *  column and rail, so the chat header isn't the odd one out. */
   agentType?: string | null
   /** WhatsApp-style reply: quotes an earlier bubble at the top of this one. */
-  replyPreview?: { role: 'user' | 'assistant'; content: string; agentName?: string }
+  replyPreview?: { role: 'user' | 'assistant'; content: string; agentName?: string; name?: string }
   /** "Reply" action on this bubble — hands its own role/content up so the
    *  composer can quote it into the next outgoing message. */
   onReply?: () => void
+  /** Shared rooms (Workspace): who wrote a human message. `self` keeps the
+   *  Console's right-hand bubble; anyone else renders on the left with their
+   *  initial and name. Absent (Console) = unchanged single-user layout. */
+  author?: { name: string; self: boolean }
+  /** Shared rooms: label agent bubbles with the agent's name, since several
+   *  agents and people speak in one feed. */
+  showAgentName?: boolean
 }
 
 /* Approval needs no card here. Approval is a conversational protocol, not a
@@ -302,12 +309,12 @@ const markdownComponents = {
 
 /* ── Main component ────────────────────────────────────────────────────────── */
 
-export default memo(function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null, replyPreview, onReply }: ChatMessageProps) {
+export default memo(function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null, replyPreview, onReply, author, showAgentName = false }: ChatMessageProps) {
   const noop = useCallback(() => {}, [])
   const hasAgenticPhases = !!(agenticState && agenticState.phases.length > 0)
   const hasTextContent = !!content
   const normalizedContent = useMemo(() => normalizeMarkdown(content), [content])
-  const quotedWho = replyPreview ? (replyPreview.role === 'user' ? 'You' : (replyPreview.agentName ?? agentName)) : null
+  const quotedWho = replyPreview ? (replyPreview.name ?? (replyPreview.role === 'user' ? 'You' : (replyPreview.agentName ?? agentName))) : null
   const quotedSnippet = replyPreview ? (replyPreview.content.length > 160 ? `${replyPreview.content.slice(0, 160)}…` : replyPreview.content) : null
 
   const ReplyQuote = replyPreview ? (
@@ -319,7 +326,25 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, a
 
   return (
     <div className="mb-8">
-      {role === 'user' ? (
+      {role === 'user' && author && !author.self ? (
+        /* OTHER PERSON (shared room) — left-aligned, their initial + name */
+        <div className="flex items-start gap-4 group relative">
+          <div
+            aria-hidden="true"
+            className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[14px] font-medium text-white/70"
+          >
+            {author.name.trim().slice(0, 1).toUpperCase() || '?'}
+          </div>
+          <div className="min-w-0 max-w-[80%] text-left">
+            <div className="mb-1 text-[12px] text-[#a1a1aa]">{author.name}</div>
+            <div className="bg-[#282825] rounded-[20px] px-5 py-3.5 text-base text-white leading-[1.6] border border-line whitespace-pre-wrap break-words">
+              {ReplyQuote}
+              {content}
+            </div>
+          </div>
+          <MessageActions role="user" content={content} onReply={onReply} />
+        </div>
+      ) : role === 'user' ? (
         /* USER BUBBLE — right-aligned, subtle container */
         <div className="flex justify-end group relative">
           <div className="max-w-[80%] bg-[#282825] rounded-[20px] px-5 py-3.5 text-base text-white leading-[1.6] border border-line text-left">
@@ -350,6 +375,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, a
           {/* Message bubble — mirrors the user bubble's shape language on a
               lighter surface, max-w-[720px] for readability */}
           <div className="flex-1 min-w-0 max-w-[720px] text-left">
+            {showAgentName && <div className="mb-1 text-[12px] text-[#a1a1aa]">{agentName}</div>}
             <div className="rounded-2xl border border-line bg-white/[0.035] px-5 py-3.5 text-base text-[#f7f7f7] leading-[1.6]">
               {ReplyQuote}
               {/* Thinking indicator */}
