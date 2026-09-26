@@ -42,8 +42,8 @@ import {
   Trash2,
   X,
 } from "lucide-react"
-import { collabAuthHeaders, collabToken } from "@/lib/collabClient"
-import { AuthManager } from "@/lib/authManager"
+import { collabAuthHeaders } from "@/lib/collabClient"
+import { useSelfId } from "@/hooks/useSelfId"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
 import { useDiscussionResource } from "@/hooks/useDiscussionResource"
 import { useAgentMention } from "@/hooks/useAgentMention"
@@ -110,45 +110,6 @@ function initials(name: string): string {
 function displayName(m: SpaceMessage): string {
   if (m.author.actingMode === "agent") return m.author.agentName || m.author.agentType || "Agent"
   return m.author.agentName || m.author.memberId
-}
-
-/** user_id sendiri (untuk bubble kanan ala console). Null bila tak dikenal. */
-function claimSelfId(obj: unknown): string | null {
-  if (!obj || typeof obj !== "object") return null
-  const o = obj as Record<string, unknown>
-  for (const k of ["user_id", "sub", "id"]) {
-    if (typeof o[k] === "string" && o[k]) return o[k] as string
-  }
-  return null
-}
-
-function useSelfId(): string | null {
-  const [selfId] = useState<string | null>(() => {
-    try {
-      if (typeof window === "undefined") return null
-      const direct = AuthManager.getUserId?.()
-      if (typeof direct === "string" && direct) return direct
-      const u = AuthManager.getUser?.() as { user_id?: unknown; email?: unknown } | null
-      if (u && typeof u.user_id === "string" && u.user_id) return u.user_id
-      // Fallback: intip klaim JWT (tanpa verifikasi — hanya untuk tampilan).
-      const token = collabToken()
-      if (token) {
-        const part = token.split(".")[1]
-        if (part) {
-          const b64 = part.replace(/-/g, "+").replace(/_/g, "/")
-          const bin = atob(b64)
-          const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
-          const id = claimSelfId(JSON.parse(new TextDecoder().decode(bytes)))
-          if (id) return id
-        }
-      }
-      if (u && typeof u.email === "string" && u.email) return u.email
-    } catch {
-      // abaikan — pesan tampil sebagai kiri
-    }
-    return null
-  })
-  return selfId
 }
 
 function isOwnMessage(m: SpaceMessage, selfId: string | null): boolean {

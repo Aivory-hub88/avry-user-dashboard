@@ -4,7 +4,17 @@ import { useState, useEffect } from "react"
 import { Tag, X, Plus, Calendar, User, Clock, FileText, Eye, LayoutTemplate, ChevronDown, ChevronUp, Minimize2 } from "lucide-react"
 
 export type DocTag = { id: string; label: string; color: string }
-export type DocProps = { isJournal?: boolean; isTemplate?: boolean; pageWidth?: "standard" | "full"; isProject?: boolean; projectDocs?: string[] }
+export type DocProps = {
+  isJournal?: boolean
+  isTemplate?: boolean
+  pageWidth?: "standard" | "full"
+  isProject?: boolean
+  projectDocs?: string[]
+  /** Set on rooms opened from an approved project request (ADR-019). */
+  isRoom?: boolean
+  requestId?: string
+  brief?: { goal?: string; deadline?: string | null; priority?: string; fields?: { label: string; value: string }[] }
+}
 
 const TAG_COLORS: Record<string, string> = {
   gray: "bg-white/10 text-white/60 border-white/15",

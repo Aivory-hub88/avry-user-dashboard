@@ -22,6 +22,9 @@ import type { WorkspaceCredential } from "@/lib/workspaceAuth";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://backend.aivory.id";
 
+// Room-wide transcript size for each agent turn (buildSpacePayload also caps entries).
+const ROOM_HISTORY_MESSAGES = 20;
+
 export async function loadAgentTask(spaceId: string, taskId: string): Promise<SpaceAgentTask | null> {
   const found = await query(
     `SELECT * FROM dashboard.workspace_agent_tasks WHERE id = $1 AND space_id = $2`,
@@ -82,17 +85,21 @@ export async function runAgentTask(opts: {
     ? `${task.instruction}\n\n[Approval ${afterApprovalId} diputuskan ${decision} oleh manusia — lanjutkan turn yang diparkir.]`
     : task.instruction;
 
-  // Transkrip thread (data mentah). Identitas + konteks channel milik
-  // deployment channel backend (binding discussion_* + room session) —
-  // tanpa coaching prompt yang memanjangkan pesan.
+  // Transkrip room (data mentah): 20 pesan terakhir di seluruh Space, bukan
+  // hanya thread pemicu — room ala Console adalah satu percakapan linear,
+  // jadi agent harus melihat apa yang baru dibahas di luar thread-nya
+  // (ADR-019 P2). Identitas + konteks channel milik deployment channel
+  // backend (binding discussion_* + room session) — tanpa coaching prompt.
   let prompt = instruction;
   try {
     const hist = await query(
-      `SELECT author_kind, author_id, author_name, agent_type, body
-       FROM dashboard.workspace_messages
-       WHERE space_id = $1 AND (id = $2 OR thread_root = $2)
-       ORDER BY created_at ASC LIMIT 10`,
-      [id, task.threadRoot],
+      `SELECT * FROM (
+         SELECT author_kind, author_id, author_name, agent_type, body, created_at
+         FROM dashboard.workspace_messages
+         WHERE space_id = $1 AND deleted_at IS NULL
+         ORDER BY created_at DESC LIMIT ${ROOM_HISTORY_MESSAGES}
+       ) h ORDER BY created_at ASC`,
+      [id],
     );
     const history = (hist.rows as Record<string, unknown>[])
       .map((r) => {
@@ -167,12 +174,14 @@ export async function runAgentTask(opts: {
   const inserted = await query(
     `INSERT INTO dashboard.workspace_messages
        (id, space_id, thread_root, author_kind, author_id, author_name, agent_type,
-        body, mentions, member_ids, here, has_agent, doc_refs)
-     VALUES ($1, $2, $3, 'agent', $4, $5, $4, $6, $7, $8, $9, $10, $11)
+        body, mentions, member_ids, here, has_agent, doc_refs, reply_to)
+     VALUES ($1, $2, $3, 'agent', $4, $5, $4, $6, $7, $8, $9, $10, $11, $12)
      RETURNING *`,
     [
       msgId, id, task.threadRoot, task.agentType, name, reply,
       stamps.agentTypes, stamps.memberIds, stamps.here, stamps.hasAgent, stamps.docRefs,
+      // The room quotes the message that asked (ADR-019 P2).
+      task.triggerMsg,
     ],
   );
   const message = spaceMessageFromRow(inserted.rows[0] as Record<string, unknown>, id);

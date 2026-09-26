@@ -13,7 +13,16 @@ import { formatBytes } from "@/components/requests/requestUi"
 
 type Pending = { key: string; name: string; progress: number; error: string | null }
 
-export default function FileAttachments({ base, canWrite }: { base: FileBase; canWrite: boolean }) {
+export default function FileAttachments({
+  base,
+  canWrite,
+  reloadKey = 0,
+}: {
+  base: FileBase
+  canWrite: boolean
+  /** Bump to re-read the list after an upload made elsewhere (e.g. the room composer). */
+  reloadKey?: number
+}) {
   const [files, setFiles] = useState<WorkspaceFile[] | null>(null)
   const [pending, setPending] = useState<Pending[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -27,7 +36,9 @@ export default function FileAttachments({ base, canWrite }: { base: FileBase; ca
     } catch (e) {
       setLoadError((e as Error).message)
     }
-  }, [base])
+    // reloadKey is a deliberate re-fetch trigger, not read inside.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base, reloadKey])
 
   useEffect(() => {
     // Fetch on mount; load() only sets state after its await.

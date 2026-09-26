@@ -15,6 +15,8 @@ import SharingPanel from "@/components/workspace/SharingPanel"
 import WorkspaceNavigator from "@/components/workspace/WorkspaceNavigator"
 import WorkspacePagesList from "@/components/workspace/WorkspacePagesList"
 import SpaceDiscussion from "@/components/workspace/SpaceDiscussion"
+import RoomView from "@/components/room/RoomView"
+import type { RoomBrief } from "@/components/room/RoomPanel"
 import { clearClientAuthSession, collabAuthHeaders } from "@/lib/collabClient"
 import { getMarketingUrl } from "@/lib/config"
 import { parseMarkdown, type ImportedBlock } from "@/lib/markdownImport"
@@ -230,6 +232,22 @@ export default function WorkspaceDocPage() {
   const isTrashed = !!meta?.deleted_at
   const isProject = meta?.props?.isProject === true
   const view = explicitView ?? (isProject ? "discussion" : "page")
+  // Rooms (approved project requests, ADR-019) open as a Console-style
+  // conversation. The task board seeded from the request stays reachable
+  // as ?view=database (the room panel links to it).
+  const isRoom = meta?.props?.isRoom === true
+  if (isRoom && view !== "database" && view !== "board") {
+    return (
+      <RoomView
+        roomId={id}
+        title={meta?.title ?? "Room"}
+        workspaceId={meta?.workspace_id ?? null}
+        brief={meta?.props?.brief && typeof meta.props.brief === "object" ? (meta.props.brief as RoomBrief) : null}
+        requestId={typeof meta?.props?.requestId === "string" ? meta.props.requestId : null}
+        canWrite={canWrite}
+      />
+    )
+  }
   const projectMembers = Array.isArray(meta?.props?.projectDocs)
     ? (meta?.props?.projectDocs as string[]).filter((m) => typeof m === "string")
     : []
@@ -448,9 +466,6 @@ export default function WorkspaceDocPage() {
           </div>
          </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Link href="/workspace/requests" className="shrink-0 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
-              Requests
-            </Link>
             <button
               onClick={() => setShowAI((v) => !v)}
               title="Cerveau AI"

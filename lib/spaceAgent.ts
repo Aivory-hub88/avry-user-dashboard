@@ -57,11 +57,12 @@ export interface SpacePayloadEntry {
 export interface SpacePayloadParams {
   /** Instruksi polos (token sudah jadi label). */
   instruction: string;
-  /** Transkrip thread sebelum giliran ini, tertua-dulu. */
+  /** Transkrip room sebelum giliran ini, tertua-dulu. */
   history: SpacePayloadEntry[];
 }
 
-const MAX_HISTORY_ENTRIES = 8;
+// 12 × 500 chars ≈ 1.5k tokens: enough room-wide context without bloating each turn.
+const MAX_HISTORY_ENTRIES = 12;
 const MAX_HISTORY_CHARS = 500;
 
 function clip(text: string, max: number): string {
