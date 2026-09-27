@@ -25,6 +25,7 @@ import ChatInput from "@/components/ChatInput"
 import { NotificationCard } from "@/components/office/NotificationCard"
 import RoomPanel, { type Autonomy, type RoomBrief, type RoomPerson } from "@/components/room/RoomPanel"
 import RoomNotes from "@/components/room/RoomNotes"
+import ProjectTimeline from "@/components/timeline/ProjectTimeline"
 import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
 import { useDiscussionResource } from "@/hooks/useDiscussionResource"
 import { useSelfId } from "@/hooks/useSelfId"
@@ -58,10 +59,11 @@ type ReplyTarget = { message: TimelineMessage; name: string; isAgent: boolean }
 
 const ROLE_LABEL: Record<string, string> = { owner: "Admin", editor: "Member", viewer: "Viewer" }
 
-type RoomTab = "chat" | "tasks" | "notes"
+type RoomTab = "chat" | "tasks" | "timeline" | "notes"
 const TABS: { value: RoomTab; label: string }[] = [
   { value: "chat", label: "Chat" },
   { value: "tasks", label: "Tasks" },
+  { value: "timeline", label: "Timeline" },
   { value: "notes", label: "Notes" },
 ]
 
@@ -89,7 +91,7 @@ export default function RoomView({
   const pathname = usePathname()
   const search = useSearchParams()
   const tabParam = search.get("tab")
-  const tab: RoomTab = tabParam === "tasks" || tabParam === "notes" ? tabParam : "chat"
+  const tab: RoomTab = tabParam === "tasks" || tabParam === "timeline" || tabParam === "notes" ? tabParam : "chat"
   const setTab = (t: RoomTab) => router.replace(t === "chat" ? pathname : `${pathname}?tab=${t}`, { scroll: false })
   const selfId = useSelfId()
   const peers = useWorkspaceAwareness(workspaceId)
@@ -381,8 +383,10 @@ export default function RoomView({
           <div className="min-w-0 flex-1 overflow-y-auto px-6 py-6">
             <WorkspaceDatabase docId={roomId} readOnly={!canWrite} />
           </div>
+        ) : tab === "timeline" ? (
+          <ProjectTimeline roomId={roomId} />
         ) : tab === "notes" ? (
-          <RoomNotes roomId={roomId} canWrite={canWrite} />
+          <RoomNotes roomId={roomId} canWrite={canWrite} initialNoteId={search.get("note")} />
         ) : (
         <div className="flex min-w-0 flex-1 flex-col">
           <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-8 py-8">

@@ -10,7 +10,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ChevronRight, Plus, Users } from "lucide-react"
+import { CalendarRange, ChevronRight, Plus, Users } from "lucide-react"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { agentDisplayName } from "@/lib/spaceAgent"
@@ -87,6 +87,10 @@ export default function WorkspaceHome() {
       <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-black/10 px-6">
         <span className="text-[13px] font-medium text-white/85">Workspace</span>
         <div className="flex items-center gap-1">
+          <Link href="/workspace/timeline" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
+            <CalendarRange className="h-3.5 w-3.5" />
+            <span>Timeline</span>
+          </Link>
           <Link href="/workspace/teams" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
             <Users className="h-3.5 w-3.5" />
             <span>Teams</span>

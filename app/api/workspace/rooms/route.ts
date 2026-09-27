@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { workspaceCredential, unauthorized } from "@/lib/workspaceAuth"
+import { ROOMS_VISIBLE_TO_USER } from "@/lib/teams"
 
 export const runtime = "nodejs"
 
@@ -30,14 +31,7 @@ export async function GET(req: NextRequest) {
          SELECT created_at, body, author_kind, author_name FROM dashboard.workspace_messages m
          WHERE m.space_id = d.id AND m.deleted_at IS NULL ORDER BY m.created_at DESC LIMIT 1
        ) lm ON true
-       WHERE d.id NOT LIKE 'workspace:%' AND d.props->>'isRoom' = 'true' AND d.deleted_at IS NULL
-         AND (
-           d.owner = $1
-           OR EXISTS (SELECT 1 FROM dashboard.workspace_doc_acl x WHERE x.doc_id = d.id AND x.user_id = $1)
-           OR (d.workspace_id <> 'default' AND (
-                w.owner = $1
-                OR EXISTS (SELECT 1 FROM dashboard.workspace_members m WHERE m.workspace_id = d.workspace_id AND m.user_id = $1)))
-         )
+       WHERE ${ROOMS_VISIBLE_TO_USER}
        ORDER BY GREATEST(d.updated_at, COALESCE(lm.created_at, d.updated_at)) DESC
        LIMIT 100`,
       [userId],
