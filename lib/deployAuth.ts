@@ -24,6 +24,7 @@
  */
 
 import { AuthManager } from './authManager'
+import { syncAccessTokenCookies } from './accessCookies'
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'
@@ -96,6 +97,9 @@ async function tryRefresh(): Promise<string | null> {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session))
   // keep the cross-port fallback token in sync too
   localStorage.setItem('auth_token', tokens.access_token)
+  // ...and the landing's cookies, which server routes read and
+  // AuthManager.getAccessToken() prefers over localStorage.
+  syncAccessTokenCookies(tokens.access_token)
   return tokens.access_token
 }
 
