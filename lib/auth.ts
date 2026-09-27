@@ -2,6 +2,8 @@
  * Auth helper — reads from 'aivory_auth' localStorage key
  * (shared session set by the homepage login modal)
  */
+import { clearAuthCookies } from "./accessCookies";
+
 const STORAGE_KEY = "aivory_auth";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_URL || '';
 
@@ -130,9 +132,39 @@ export function clearSessionEndReason(): void {
   }
 }
 
+/** Fire-and-forget: ask the backend to delete this session so the refresh
+ *  token stops working server-side too (the landing's logout already does).
+ *  `keepalive` lets the request finish even though logout navigates away
+ *  right after; a failure only means the session ages out on its own. */
+function revokeServerSession() {
+  try {
+    const refreshToken = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}")?.refresh_token;
+    if (!refreshToken || typeof fetch !== "function") return;
+    fetch(`${API_BASE_URL}/api/v1/auth/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    // Unreadable session blob: nothing to revoke.
+  }
+}
+
+/** Legacy cross-port copies of the token that don't carry the "aivory_"
+ *  prefix clearLocalCaches sweeps. */
+const LEGACY_AUTH_KEYS = ["auth_token", "user_data", "user_id"];
+
 export function logout(reason: 'manual' | 'expired' = 'manual') {
   if (typeof window !== "undefined") {
+    // An expired session is already dead server-side; revoking it again
+    // would only add a failing request.
+    if (reason === 'manual') revokeServerSession();
     clearLocalCaches();
+    LEGACY_AUTH_KEYS.forEach((key) => localStorage.removeItem(key));
+    // Server routes read the token from these cookies; leaving them meant
+    // the dashboard still accepted it after sign-out until it expired.
+    clearAuthCookies();
     window.dispatchEvent(new Event("authManager:logout"));
     if (reason === 'expired') {
       // Do NOT navigate away: the user may have unsent input worth copying,
