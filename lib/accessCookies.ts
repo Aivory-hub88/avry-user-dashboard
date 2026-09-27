@@ -16,13 +16,16 @@
  * cookie token and refreshing again on every call.
  *
  * Only a session that already has these cookies is updated. A session that
- * never had them (dashboard-only login) is left as it was, because this
- * app's logout does not clear cookies, and a cookie created here would
- * outlive that logout.
+ * never had them (dashboard-only login) is left as it was: there is nothing
+ * to keep current.
+ *
+ * `clearAuthCookies` is the other half: logout removes them, so server
+ * routes stop accepting the token the moment the user signs out.
  */
 
 export const ACCESS_COOKIE = 'aivory_access_token'
 export const SESSION_COOKIE = 'aivory_session_token'
+export const USER_COOKIE = 'aivory_user'
 
 // Same attributes as the landing's setAuthCookies, so this overwrites that
 // cookie instead of adding a second one with a different scope.
@@ -41,4 +44,19 @@ export function syncAccessTokenCookies(accessToken: string): void {
   if (!hasCookie(current, ACCESS_COOKIE) && !hasCookie(current, SESSION_COOKIE)) return
   document.cookie = `${ACCESS_COOKIE}=${accessToken}; ${COOKIE_ATTRS}`
   document.cookie = `${SESSION_COOKIE}=${encodeURIComponent(JSON.stringify(accessToken))}; ${COOKIE_ATTRS}`
+}
+
+// Host-only is what the landing writes today; the domain-wide variants are
+// what older landing builds wrote (.aivory.id) and what the site's current
+// domain would carry (.aivory.uk). Expiring all three leaves no copy behind.
+const CLEAR_SCOPES = ['', '; domain=.aivory.id', '; domain=.aivory.uk']
+
+/** Expire every auth cookie the landing may have set, in every scope it used. */
+export function clearAuthCookies(): void {
+  if (typeof document === 'undefined') return
+  for (const name of [ACCESS_COOKIE, SESSION_COOKIE, USER_COOKIE]) {
+    for (const scope of CLEAR_SCOPES) {
+      document.cookie = `${name}=; path=/${scope}; max-age=0; SameSite=Lax`
+    }
+  }
 }

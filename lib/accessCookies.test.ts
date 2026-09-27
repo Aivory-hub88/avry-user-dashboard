@@ -129,3 +129,76 @@ describe("refresh in authedFetch keeps the cookie current", () => {
     expect(getAuthUser(req(jar.get(ACCESS_COOKIE)!))?.user_id).toBe("u1")
   })
 })
+
+describe("logout clears what server routes read", () => {
+  function stubWindow() {
+    const events: string[] = []
+    ;(globalThis as any).window = {
+      location: { href: "" },
+      dispatchEvent: (e: Event) => void events.push(e.type),
+    }
+    ;(globalThis as any).sessionStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+    return events
+  }
+
+  function lsWithKeys(initial: Record<string, string>) {
+    const ls = stubLocalStorage(initial)
+    ;(globalThis as any).localStorage.key = (i: number) => [...ls.keys()][i] ?? null
+    Object.defineProperty((globalThis as any).localStorage, "length", { get: () => ls.size })
+    return ls
+  }
+
+  afterEach(() => {
+    delete (globalThis as any).sessionStorage
+  })
+
+  it("clearAuthCookies expires every auth cookie in every scope", async () => {
+    const { jar, writes } = stubCookieJar({ [ACCESS_COOKIE]: "t", [SESSION_COOKIE]: "%22t%22", aivory_user: "u", other: "keep" })
+    const { clearAuthCookies } = await import("@/lib/accessCookies")
+    clearAuthCookies()
+    expect([...jar.keys()]).toEqual(["other"])
+    for (const scope of ["", "domain=.aivory.id", "domain=.aivory.uk"]) {
+      expect(writes.some((w) => w.startsWith(`${ACCESS_COOKIE}=;`) && w.includes(scope) && w.includes("max-age=0"))).toBe(true)
+    }
+  })
+
+  it("manual logout revokes the server session and removes cookies and legacy tokens", async () => {
+    stubWindow()
+    const { jar } = stubCookieJar({ [ACCESS_COOKIE]: "t", [SESSION_COOKIE]: "%22t%22" })
+    const ls = lsWithKeys({
+      aivory_auth: JSON.stringify({ access_token: "t", refresh_token: "r1" }),
+      auth_token: "t",
+      user_id: "u1",
+    })
+    const fetchMock = vi.fn(async () => new Response("{}"))
+    vi.stubGlobal("fetch", fetchMock)
+
+    const { logout } = await import("@/lib/auth")
+    logout()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toMatch(/\/api\/v1\/auth\/logout$/)
+    expect(JSON.parse(init.body as string)).toEqual({ refresh_token: "r1" })
+    expect(init.keepalive).toBe(true)
+    expect(jar.has(ACCESS_COOKIE)).toBe(false)
+    expect(jar.has(SESSION_COOKIE)).toBe(false)
+    expect(ls.has("aivory_auth")).toBe(false)
+    expect(ls.has("auth_token")).toBe(false)
+    expect(ls.has("user_id")).toBe(false)
+  })
+
+  it("expired logout clears cookies but doesn't call the backend", async () => {
+    stubWindow()
+    const { jar } = stubCookieJar({ [ACCESS_COOKIE]: "t" })
+    lsWithKeys({ aivory_auth: JSON.stringify({ refresh_token: "r1" }) })
+    const fetchMock = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
+
+    const { logout } = await import("@/lib/auth")
+    logout("expired")
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(jar.has(ACCESS_COOKIE)).toBe(false)
+  })
+})
