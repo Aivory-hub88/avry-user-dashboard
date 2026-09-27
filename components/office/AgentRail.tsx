@@ -112,44 +112,51 @@ function RoomCard({ members }: { members: MentionCandidate[] }) {
   )
 }
 
-/** Another agent's pending approvals, summarised for this rail. */
-export interface ElsewhereWaiting {
-  agentType: string
-  name: string
-  count: number
-  flagged: boolean
-}
+import type { ElsewhereWaiting } from "@/lib/elsewhereNotifications"
+export type { ElsewhereWaiting }
 
 /**
- * Approvals parked by agents other than the one this rail is showing.
- * Without it, a Room turn could park two of Lex's CRM writes while the rail
- * (on Aira) said "Notifications 0": the only signal was a small badge on a
- * card the user might not be looking at. Informs and navigates only; the
+ * Everything other agents have for you, one card per agent (see
+ * lib/elsewhereNotifications). Without it, a Room turn could park two of
+ * Lex's CRM writes while the rail (on Aira) said "Notifications 0", and a
+ * new reply or an expiring Odoo key on Lex showed a badge on the avatar
+ * with nothing here saying what it was. Informs and navigates only; the
  * decision still happens with that agent (see the protocol note below).
  */
 function ElsewhereSection({
   items,
   onOpenAgent,
+  onOpenThread,
 }: {
   items: ElsewhereWaiting[]
   onOpenAgent?: (agentType: string) => void
+  onOpenThread: (sessionId: string) => void
 }) {
   if (items.length === 0) return null
+  const urgent = items.some((i) => i.tone !== "info")
   return (
     <section className="mb-[14px] flex flex-col gap-[8px]">
       <div className="flex items-baseline gap-[7px] px-0.5">
         <span className="text-[12px] font-semibold leading-none text-white/65">Waiting on you elsewhere</span>
-        <span className="text-[11px] text-amber">{items.reduce((n, i) => n + i.count, 0)}</span>
+        <span className={`text-[11px] ${urgent ? "text-amber" : "text-white/50"}`}>
+          {items.reduce((n, i) => n + i.count, 0)}
+        </span>
       </div>
       {items.map((i) => (
         <NotificationCard
           key={i.agentType}
-          tone={i.flagged ? "error" : "warn"}
+          tone={i.tone}
           icon={<AgentAvatar type={i.agentType} size={20} />}
-          title={`${i.name} needs your approval`}
-          subtitle={`${i.count} ${i.count === 1 ? "action is" : "actions are"} waiting${i.flagged ? ", one flagged for a closer look" : ""}. Open ${i.name} to review.`}
+          title={i.title}
+          subtitle={i.subtitle}
           badge={formatBadgeCount(i.count)}
-          onClick={onOpenAgent ? () => onOpenAgent(i.agentType) : undefined}
+          onClick={
+            i.sessionId
+              ? () => onOpenThread(i.sessionId!)
+              : onOpenAgent
+                ? () => onOpenAgent(i.agentType)
+                : undefined
+          }
         />
       ))}
     </section>
@@ -188,7 +195,7 @@ interface AgentRailProps {
    *  component just renders itself accordingly. */
   collapsed?: boolean
   onToggleCollapse?: () => void
-  /** Other agents' pending approvals (never this rail's own agent). */
+  /** What other agents have for you (never this rail's own agent). */
   elsewhere?: ElsewhereWaiting[]
   /** Switches the Console to that agent's most recent thread. */
   onOpenAgent?: (agentType: string) => void
@@ -293,7 +300,7 @@ export default function AgentRail({
       <MemoryModal agentType={agentTarget} agentTitle={title} open={memoryOpen} onClose={() => setMemoryOpen(false)} />
 
       <div className="flex-1 overflow-y-auto px-[14px] py-[14px]">
-        <ElsewhereSection items={elsewhere} onOpenAgent={onOpenAgent} />
+        <ElsewhereSection items={elsewhere} onOpenAgent={onOpenAgent} onOpenThread={onOpenThread} />
         {/* Console itself isn't approval-gated, but an approval whose
             `_agent_type` is missing (an older Cerveau) is grouped under this
             same `null` key rather than a made-up bucket no row reads — see
