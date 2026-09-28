@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plug } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -136,6 +136,19 @@ const TOOLKIT_ICONS: Record<string, string> = {
   trello: '/integrations/trello.svg',
   linear: '/integrations/linear.svg',
 };
+
+// Registered MCP rows get the same logo as the picker tile they were added
+// from; the server record has no template field, so match on host/name.
+function mcpServerIcon(s: { name: string; url: string }): string | null {
+  let host = '';
+  try { host = new URL(s.url).hostname.toLowerCase(); } catch { /* bad url */ }
+  const name = s.name.toLowerCase();
+  if (host === 'mail.aivory.uk' || name.includes('aivory-mail') || name.includes('aivory mail')) {
+    return '/integrations/icons/aivory-mail.svg';
+  }
+  if (host.includes('odoo') || name.includes('odoo')) return '/integrations/odoo.svg';
+  return null;
+}
 
 const CONNECTION_STATUS_STYLES: Record<ConnectedApp['status'], { label: string; className: string }> = {
   connected: { label: 'Connected', className: 'bg-accent/15 border-accent/25 text-[var(--color-accent-text)]' },
@@ -1375,6 +1388,16 @@ export default function CustomizeAgentModal({
                               ) : (
                                 <ChevronRight className="h-3.5 w-3.5 text-white/30 shrink-0" />
                               )}
+                              {(() => {
+                                const icon = mcpServerIcon(s);
+                                return icon ? (
+                                  <Image src={asset(icon)} alt="" width={28} height={28} className="shrink-0 rounded-md" />
+                                ) : (
+                                  <div className="w-7 h-7 shrink-0 rounded-md bg-white/[0.06] flex items-center justify-center">
+                                    <Plug className="h-3.5 w-3.5 text-white/40" />
+                                  </div>
+                                );
+                              })()}
                               <div className="min-w-0">
                                 <div className="text-white/80 text-[13px] font-medium truncate">{s.name}</div>
                                 {!expanded && <div className="text-white/35 text-[11px] truncate">{s.url}</div>}
