@@ -37,6 +37,19 @@ export type Deal = Owned & {
   custom_fields: Record<string, unknown>
 }
 
+export type Grant = {
+  id: string
+  label: string
+  agent: string
+  scopes: string[]
+  created_at: string
+  expires_at: string
+  last_used_at: string | null
+  revoked_at: string | null
+}
+/** `token` is returned exactly once, on creation. */
+export type CreatedGrant = Grant & { token: string }
+
 export class CrmError extends Error {
   constructor(public status: number, message: string) {
     super(message)
@@ -91,5 +104,11 @@ export const crmApi = {
       api<Deal>("deals", { method: "POST", json: clean(b) }),
     setStage: (id: string, stage: DealStage) => api<Deal>(`deals/${id}/stage`, { method: "PATCH", json: { stage } }),
     remove: (id: string) => api(`deals/${id}`, { method: "DELETE" }),
+  },
+  grants: {
+    list: () => api<Grant[]>("grants"),
+    create: (b: { label?: string; scopes?: string[]; expires_in_days?: number }) =>
+      api<CreatedGrant>("grants", { method: "POST", json: b }),
+    revoke: (id: string) => api(`grants/${id}`, { method: "DELETE" }),
   },
 }

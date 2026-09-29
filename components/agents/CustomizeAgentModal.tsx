@@ -146,6 +146,9 @@ function mcpServerIcon(s: { name: string; url: string }): string | null {
   if (host === 'mail.aivory.uk' || name.includes('aivory-mail') || name.includes('aivory mail')) {
     return '/integrations/icons/aivory-mail.svg';
   }
+  if (name.includes('aivory-crm') || name.includes('aivory crm') || s.url.includes('/crm/mcp')) {
+    return '/integrations/icons/aivory-crm.svg';
+  }
   if (host.includes('odoo') || name.includes('odoo')) return '/integrations/odoo.svg';
   return null;
 }
@@ -474,7 +477,7 @@ export default function CustomizeAgentModal({
   // (https://mail.aivory.uk/mcp) for every tenant -- safe, because the
   // pasted capability token (not the URL) scopes which mailbox the agent
   // may read/draft/send in.
-  const [mcpTemplate, setMcpTemplate] = useState<'odoo' | 'aivory-mail' | 'custom' | null>(null);
+  const [mcpTemplate, setMcpTemplate] = useState<'odoo' | 'aivory-mail' | 'aivory-crm' | 'custom' | null>(null);
 
   // Deploy tab — was a separate modal (app/agents/page.tsx's DeployModal),
   // merged in so identity/connections/tools/MCP are configured before a
@@ -1529,6 +1532,27 @@ export default function CustomizeAgentModal({
                     </button>
                     <button
                       type="button"
+                      onClick={() => {
+                        setMcpFormError(null);
+                        setMcpForm((f) => ({
+                          ...f,
+                          name: 'aivory-crm',
+                          transport: 'streamable-http',
+                          url: 'https://api.aivory.id/crm/mcp',
+                          authHeaderName: 'Authorization',
+                        }));
+                        setMcpTemplate('aivory-crm');
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-left transition-colors"
+                    >
+                      <Image src={asset('/integrations/icons/aivory-crm.svg')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
+                      <div className="min-w-0">
+                        <div className="text-white/85 text-[13px] font-medium">{t('mcpTemplateCrmName')}</div>
+                        <div className="text-white/40 text-[11.5px] truncate">{t('mcpTemplateCrmDesc')}</div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => { setMcpFormError(null); setMcpTemplate('custom'); }}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-left transition-colors"
                     >
@@ -1617,6 +1641,16 @@ export default function CustomizeAgentModal({
                             <div className="min-w-0">
                               <div className="text-white/85 text-[13px] font-medium">{t('mcpTemplateMailName')}</div>
                               <div className="text-white/40 text-[11.5px] leading-relaxed">{t('mcpMailSetupNote')}</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {mcpTemplate === 'aivory-crm' && (
+                          <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                            <Image src={asset('/integrations/icons/aivory-crm.svg')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
+                            <div className="min-w-0">
+                              <div className="text-white/85 text-[13px] font-medium">{t('mcpTemplateCrmName')}</div>
+                              <div className="text-white/40 text-[11.5px] leading-relaxed">{t('mcpCrmSetupNote')}</div>
                             </div>
                           </div>
                         )}

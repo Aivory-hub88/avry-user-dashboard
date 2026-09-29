@@ -33,6 +33,12 @@ describe("isAllowedCrmPath", () => {
     expect(isAllowedCrmPath(["contacts", ID, "stage"], "PATCH")).toBe(false)
     expect(isAllowedCrmPath(["activities", ID], "PATCH")).toBe(false)
     expect(isAllowedCrmPath(["companies"], "DELETE")).toBe(false)
+    expect(isAllowedCrmPath(["grants"], "GET")).toBe(true)
+    expect(isAllowedCrmPath(["grants"], "POST")).toBe(true)
+    expect(isAllowedCrmPath(["grants", ID], "DELETE")).toBe(true)
+    expect(isAllowedCrmPath(["grants", ID], "GET")).toBe(false)
+    expect(isAllowedCrmPath(["grants", ID], "PATCH")).toBe(false)
+    expect(isAllowedCrmPath(["mcp"], "POST")).toBe(false)
   })
 })
 
