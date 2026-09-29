@@ -3,6 +3,7 @@
 /** Browser helpers for the CRM. Everything goes through /api/crm (see the proxy route). */
 import { BASE_PATH } from "@/lib/asset"
 import { collabAuthHeaders } from "@/lib/collabClient"
+import type { ActivityKind, SubjectType } from "@/lib/crmActivity"
 
 export const DEAL_STAGES = ["lead", "qualified", "proposal", "won", "lost"] as const
 export type DealStage = (typeof DEAL_STAGES)[number]
@@ -35,6 +36,17 @@ export type Deal = Owned & {
   contact_ids: string[]
   expected_close_date: string | null
   custom_fields: Record<string, unknown>
+}
+
+export type Activity = Owned & {
+  id: string
+  kind: ActivityKind
+  subject_type: SubjectType
+  subject_id: string
+  body: string | null
+  occurred_at: string
+  due_at: string | null
+  created_at: string
 }
 
 export type Grant = {
@@ -104,6 +116,19 @@ export const crmApi = {
       api<Deal>("deals", { method: "POST", json: clean(b) }),
     setStage: (id: string, stage: DealStage) => api<Deal>(`deals/${id}/stage`, { method: "PATCH", json: { stage } }),
     remove: (id: string) => api(`deals/${id}`, { method: "DELETE" }),
+  },
+  activities: {
+    list: (q: { subject_type?: SubjectType; subject_id?: string; has_due?: boolean } = {}) => {
+      const p = new URLSearchParams()
+      if (q.subject_type) p.set("subject_type", q.subject_type)
+      if (q.subject_id) p.set("subject_id", q.subject_id)
+      if (q.has_due !== undefined) p.set("has_due", String(q.has_due))
+      const qs = p.toString()
+      return api<Activity[]>(qs ? `activities?${qs}` : "activities")
+    },
+    create: (b: { kind: ActivityKind; subject_type: SubjectType; subject_id: string; body?: string; due_at?: string | null }) =>
+      api<Activity>("activities", { method: "POST", json: clean(b) }),
+    remove: (id: string) => api(`activities/${id}`, { method: "DELETE" }),
   },
   grants: {
     list: () => api<Grant[]>("grants"),
