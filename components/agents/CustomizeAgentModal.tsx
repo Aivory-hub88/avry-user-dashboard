@@ -147,7 +147,7 @@ function mcpServerIcon(s: { name: string; url: string }): string | null {
     return '/integrations/icons/aivory-mail.svg';
   }
   if (name.includes('aivory-crm') || name.includes('aivory crm') || s.url.includes('/crm/mcp')) {
-    return '/integrations/icons/aivory-crm.svg?v=20260929';
+    return '/integrations/icons/aivory-crm.svg?v=20260929b';
   }
   if (host.includes('odoo') || name.includes('odoo')) return '/integrations/odoo.svg';
   return null;
@@ -1545,7 +1545,7 @@ export default function CustomizeAgentModal({
                       }}
                       className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-left transition-colors"
                     >
-                      <Image src={asset('/integrations/icons/aivory-crm.svg?v=20260929')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
+                      <Image src={asset('/integrations/icons/aivory-crm.svg?v=20260929b')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
                       <div className="min-w-0">
                         <div className="text-white/85 text-[13px] font-medium">{t('mcpTemplateCrmName')}</div>
                         <div className="text-white/40 text-[11.5px] truncate">{t('mcpTemplateCrmDesc')}</div>
@@ -1647,7 +1647,7 @@ export default function CustomizeAgentModal({
 
                         {mcpTemplate === 'aivory-crm' && (
                           <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-                            <Image src={asset('/integrations/icons/aivory-crm.svg?v=20260929')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
+                            <Image src={asset('/integrations/icons/aivory-crm.svg?v=20260929b')} alt="" width={28} height={28} className="shrink-0 rounded-md" />
                             <div className="min-w-0">
                               <div className="text-white/85 text-[13px] font-medium">{t('mcpTemplateCrmName')}</div>
                               <div className="text-white/40 text-[11.5px] leading-relaxed">{t('mcpCrmSetupNote')}</div>
