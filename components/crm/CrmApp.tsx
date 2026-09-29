@@ -8,9 +8,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Trash2 } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
+import AgentAccess from "@/components/crm/AgentAccess"
 import { crmApi, DEAL_STAGES, type Company, type Contact, type Deal, type DealStage } from "@/lib/crmClient"
 
-type Tab = "deals" | "companies" | "contacts"
+type Tab = "deals" | "companies" | "contacts" | "agents"
 
 const STAGE_LABEL: Record<DealStage, string> = {
   lead: "Lead",
@@ -81,6 +82,7 @@ export default function CrmApp() {
     { key: "deals", label: "Deals", count: deals?.length },
     { key: "companies", label: "Companies", count: companies?.length },
     { key: "contacts", label: "Contacts", count: contacts?.length },
+    { key: "agents", label: "Agent access", count: undefined },
   ]
 
   return (
@@ -102,19 +104,23 @@ export default function CrmApp() {
             </button>
           ))}
         </div>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search"
-          aria-label="Search"
-          className={`ml-auto w-[220px] ${fieldClass}`}
-        />
+        {tab !== "agents" && (
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search"
+            aria-label="Search"
+            className={`ml-auto w-[220px] ${fieldClass}`}
+          />
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         {error && <div className="mb-4 rounded-xl bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>}
 
-        {deals === null || companies === null || contacts === null ? (
+        {tab === "agents" ? (
+          <AgentAccess onError={setError} />
+        ) : deals === null || companies === null || contacts === null ? (
           !error && <div className="h-40 animate-pulse rounded-2xl bg-white/[0.03]" />
         ) : tab === "deals" ? (
           <DealsTab
@@ -210,7 +216,7 @@ function DealsTab({
         </select>
       </AddRow>
 
-      <div className="grid gap-3 md:grid-cols-5">
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
         {DEAL_STAGES.map((stage) => {
           const col = deals.filter((d) => d.stage === stage)
           const total = col.reduce((n, d) => n + (d.value ?? 0), 0)
