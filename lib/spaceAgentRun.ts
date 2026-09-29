@@ -15,6 +15,8 @@ import {
   spaceAgentTaskFromRow,
   agentDisplayName,
   buildSpacePayload,
+  pickSpaceLeader,
+  actingAsFor,
   type SpaceAgentTask,
 } from "@/lib/spaceAgent";
 import { newId } from "@/lib/spaceWrite";
@@ -28,6 +30,16 @@ const ROOM_HISTORY_MESSAGES = 20;
 // A turn waits at most this long for new room files to be read before it
 // goes ahead with whatever is already indexed (ingest keeps going after).
 const INGEST_WAIT_MS = 10_000;
+
+/** Owner (leader) of a Space, or null when unknown/ownerless. */
+async function loadSpaceLeader(spaceId: string): Promise<string | null> {
+  const bare = spaceId.replace(/^workspace:/, "").replace(/^db:/, "");
+  const found = await query(
+    `SELECT id, owner FROM dashboard.workspace_docs WHERE id = ANY($1)`,
+    [[bare, `workspace:${bare}`]],
+  );
+  return pickSpaceLeader(found.rows as { id: unknown; owner: unknown }[], spaceId);
+}
 
 export async function loadAgentTask(spaceId: string, taskId: string): Promise<SpaceAgentTask | null> {
   const found = await query(
@@ -127,6 +139,9 @@ export async function runAgentTask(opts: {
   let reply = "";
   let pendingApproval: { id: string; tool_name: string; risk_tier: string } | null = null;
   try {
+    // Agents here are the leader's: run the turn in the leader's tenant, billed
+    // to them, with this member as requester (backend re-verifies both).
+    const actingAs = actingAsFor(await loadSpaceLeader(id), credential.user.user_id);
     const upstream = await fetch(`${BACKEND_URL}/api/v1/telegram/discussion-turn`, {
       method: "POST",
       headers: {
@@ -138,6 +153,7 @@ export async function runAgentTask(opts: {
         space_id: id,
         thread_root: task.threadRoot,
         text: prompt,
+        ...(actingAs ? { acting_as: actingAs } : {}),
       }),
       signal: AbortSignal.timeout(120_000),
     });
