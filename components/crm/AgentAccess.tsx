@@ -6,9 +6,9 @@
  */
 import { useCallback, useEffect, useState } from "react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
+import ConnectLex from "@/components/crm/ConnectLex"
 import { crmApi, type CreatedGrant, type Grant } from "@/lib/crmClient"
-
-const MCP_URL = "https://api.aivory.id/crm/mcp"
+import { CRM_MCP_URL } from "@/lib/crmConnect"
 
 function status(g: Grant): { label: string; tone: string } {
   if (g.revoked_at) return { label: "Revoked", tone: "text-white/30" }
@@ -85,8 +85,17 @@ export default function AgentAccess({ onError }: { onError: (m: string | null) =
       <div>
         <div className="text-[13px] font-medium text-white/80">Let an agent use your CRM</div>
         <div className="mt-1 text-[12px] leading-relaxed text-white/40">
-          Give Lex a token so it can look up, create and update companies, contacts and deals, and log follow-ups. Records it
-          creates are marked as created by the agent. An agent can never delete anything. Revoke a token any time.
+          Records an agent creates are marked as created by the agent. An agent can never delete anything, and you can revoke its
+          access any time.
+        </div>
+      </div>
+
+      <ConnectLex grants={grants} onGrantsChanged={() => void load()} />
+
+      <div>
+        <div className="text-[13px] font-medium text-white/80">Set it up manually</div>
+        <div className="mt-1 text-[12px] leading-relaxed text-white/40">
+          Prefer to do it yourself, or want a read-only token? Generate one and add it under Customise agent, MCP.
         </div>
       </div>
 
@@ -120,8 +129,8 @@ export default function AgentAccess({ onError }: { onError: (m: string | null) =
               <li>Add MCP server and pick Aivory CRM.</li>
               <li>
                 Paste the token under Advanced settings as the auth value. The server URL is{" "}
-                <button onClick={() => copy("url", MCP_URL)} className="text-white/75 underline decoration-white/20 underline-offset-2 hover:text-white">
-                  {copied === "url" ? "copied" : MCP_URL}
+                <button onClick={() => copy("url", CRM_MCP_URL)} className="text-white/75 underline decoration-white/20 underline-offset-2 hover:text-white">
+                  {copied === "url" ? "copied" : CRM_MCP_URL}
                 </button>
                 .
               </li>
