@@ -46,6 +46,7 @@ export type Activity = Owned & {
   body: string | null
   occurred_at: string
   due_at: string | null
+  completed_at: string | null
   created_at: string
 }
 
@@ -118,16 +119,18 @@ export const crmApi = {
     remove: (id: string) => api(`deals/${id}`, { method: "DELETE" }),
   },
   activities: {
-    list: (q: { subject_type?: SubjectType; subject_id?: string; has_due?: boolean } = {}) => {
+    list: (q: { subject_type?: SubjectType; subject_id?: string; has_due?: boolean; completed?: boolean } = {}) => {
       const p = new URLSearchParams()
       if (q.subject_type) p.set("subject_type", q.subject_type)
       if (q.subject_id) p.set("subject_id", q.subject_id)
       if (q.has_due !== undefined) p.set("has_due", String(q.has_due))
+      if (q.completed !== undefined) p.set("completed", String(q.completed))
       const qs = p.toString()
       return api<Activity[]>(qs ? `activities?${qs}` : "activities")
     },
     create: (b: { kind: ActivityKind; subject_type: SubjectType; subject_id: string; body?: string; due_at?: string | null }) =>
       api<Activity>("activities", { method: "POST", json: clean(b) }),
+    complete: (id: string, completed = true) => api<Activity>(`activities/${id}`, { method: "PATCH", json: { completed } }),
     remove: (id: string) => api(`activities/${id}`, { method: "DELETE" }),
   },
   grants: {

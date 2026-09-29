@@ -37,7 +37,20 @@ export function dueState(due: string | null, now: Date = new Date()): DueState {
   return sameLocalDay(d, now) ? "today" : "upcoming"
 }
 
-export const DUE_TONE: Record<Exclude<DueState, "none">, string> = {
+export type ActivityState = "done" | DueState
+
+/** A completed activity is "done" whatever its due date says. */
+export function activityState(a: { due_at: string | null; completed_at: string | null }, now: Date = new Date()): ActivityState {
+  return a.completed_at ? "done" : dueState(a.due_at, now)
+}
+
+/** Follow-ups (anything with a due date) and tasks can be ticked off; plain notes cannot. */
+export function isCompletable(a: { due_at: string | null; kind: ActivityKind }): boolean {
+  return a.due_at !== null || a.kind === "task"
+}
+
+export const DUE_TONE: Record<Exclude<ActivityState, "none">, string> = {
+  done: "bg-emerald-500/15 text-emerald-300",
   overdue: "bg-red-500/10 text-red-300",
   today: "bg-amber-500/15 text-amber-300",
   upcoming: "bg-sky-500/15 text-sky-300",

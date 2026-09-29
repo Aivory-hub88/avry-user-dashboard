@@ -12,7 +12,8 @@ export function isAllowedCrmPath(segments: string[], method: string): boolean {
   if (!UUID.test(id)) return false
   if (segments.length === 2) {
     if (root === "grants") return method === "DELETE"
-    return method === "GET" || method === "DELETE" || (method === "PATCH" && root !== "activities")
+    // Activities are append-only except for PATCH, which only toggles completion.
+    return method === "GET" || method === "DELETE" || method === "PATCH"
   }
   return segments.length === 3 && root === "deals" && sub === "stage" && method === "PATCH"
 }

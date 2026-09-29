@@ -31,7 +31,7 @@ describe("isAllowedCrmPath", () => {
     expect(isAllowedCrmPath(["companies", "..", "x"], "GET")).toBe(false)
     expect(isAllowedCrmPath(["companies", "not-a-uuid"], "GET")).toBe(false)
     expect(isAllowedCrmPath(["contacts", ID, "stage"], "PATCH")).toBe(false)
-    expect(isAllowedCrmPath(["activities", ID], "PATCH")).toBe(false)
+    expect(isAllowedCrmPath(["activities", ID], "PATCH")).toBe(true)
     expect(isAllowedCrmPath(["companies"], "DELETE")).toBe(false)
     expect(isAllowedCrmPath(["grants"], "GET")).toBe(true)
     expect(isAllowedCrmPath(["grants"], "POST")).toBe(true)

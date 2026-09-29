@@ -24,12 +24,19 @@ export default function ActivityFeed({
 }) {
   const [recent, setRecent] = useState<Activity[] | null>(null)
   const [followUps, setFollowUps] = useState<Activity[] | null>(null)
+  const [completed, setCompleted] = useState<Activity[]>([])
+  const [showCompleted, setShowCompleted] = useState(false)
 
   const load = useCallback(async () => {
     try {
-      const [r, f] = await Promise.all([crmApi.activities.list(), crmApi.activities.list({ has_due: true })])
+      const [r, open, done] = await Promise.all([
+        crmApi.activities.list(),
+        crmApi.activities.list({ has_due: true, completed: false }),
+        crmApi.activities.list({ has_due: true, completed: true }),
+      ])
       setRecent(r)
-      setFollowUps(f)
+      setFollowUps(open)
+      setCompleted(done)
     } catch (e) {
       onError((e as Error).message)
     }
@@ -46,12 +53,24 @@ export default function ActivityFeed({
   const visible = (rows: Activity[]) => (needle ? rows.filter((a) => (a.body ?? "").toLowerCase().includes(needle) || nameOf(a).toLowerCase().includes(needle)) : rows)
   const upcoming = useMemo(() => sortFollowUps(visible(followUps ?? [])), [followUps, needle, names]) // eslint-disable-line react-hooks/exhaustive-deps
   const latest = visible(recent ?? []).slice(0, RECENT_SHOWN)
+  const doneRows = visible(completed).sort((a, b) => new Date(b.completed_at ?? 0).getTime() - new Date(a.completed_at ?? 0).getTime())
+
+  const toggleDone = async (a: Activity) => {
+    onError(null)
+    try {
+      await crmApi.activities.complete(a.id, !a.completed_at)
+      await load()
+    } catch (e) {
+      onError((e as Error).message)
+    }
+  }
 
   const row = (a: Activity) => (
     <ActivityItem
       key={a.id}
       a={a}
       subjectName={nameOf(a)}
+      onToggleDone={() => toggleDone(a)}
       onOpenSubject={() => {
         const name = names.get(`${a.subject_type}:${a.subject_id}`)
         if (name) onOpen({ type: a.subject_type as SubjectType, id: a.subject_id, name })
@@ -73,6 +92,16 @@ export default function ActivityFeed({
           </div>
         ) : (
           <ul className="divide-y divide-line rounded-2xl border border-line">{upcoming.map(row)}</ul>
+        )}
+        {completed.length > 0 && (
+          <div className="mt-3">
+            <button onClick={() => setShowCompleted((v) => !v)} aria-expanded={showCompleted} className="text-[12px] text-white/45 hover:text-white/75">
+              {showCompleted ? "Hide" : "Show"} completed ({completed.length})
+            </button>
+            {showCompleted && (
+              <ul className="mt-2 divide-y divide-line rounded-2xl border border-line">{doneRows.map(row)}</ul>
+            )}
+          </div>
         )}
       </section>
 
