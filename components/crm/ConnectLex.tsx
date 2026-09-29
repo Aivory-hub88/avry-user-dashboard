@@ -80,7 +80,7 @@ export default function ConnectLex({ grants, onGrantsChanged }: { grants: Grant[
   return (
     <div className="rounded-2xl border border-line p-5">
       <div className="flex items-start gap-3">
-        <Image src={asset("/integrations/icons/aivory-crm.svg")} alt="" width={28} height={28} className="mt-0.5 shrink-0 rounded-md" />
+        <Image src={asset("/integrations/icons/aivory-crm.svg?v=20260929")} alt="" width={28} height={28} className="mt-0.5 shrink-0 rounded-md" />
         <div className="min-w-0 flex-1">
           <div className="text-[13px] font-medium text-white/85">
             Connect Lex
