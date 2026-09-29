@@ -1,9 +1,63 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Aivory CRM">
-  <rect width="512" height="512" rx="96" fill="#1c1f1a"/>
-  <g fill="none" stroke="#b7cba6" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="200" cy="190" r="56"/>
-    <path d="M96 392c0-62 46-104 104-104s104 42 104 104"/>
-    <circle cx="352" cy="214" r="40"/>
-    <path d="M336 300c66-8 96 28 96 78"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 512 512">
+  <!-- Generator: Adobe Illustrator 30.6.0, SVG Export Plug-In . SVG Version: 2.1.4 Build 109)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: none;
+      }
+
+      .st1 {
+        fill: #d60200;
+      }
+
+      .st2 {
+        clip-path: url(#clippath-1);
+      }
+
+      .st3 {
+        fill: #fff;
+      }
+
+      .st4 {
+        fill: #ff9713;
+      }
+
+      .st5 {
+        fill: #fd6d02;
+      }
+
+      .st6 {
+        fill: #081628;
+      }
+
+      .st7 {
+        fill: #d1d1d1;
+      }
+
+      .st8 {
+        clip-path: url(#clippath);
+      }
+    </style>
+    <clipPath id="clippath">
+      <ellipse class="st0" cx="343.7" cy="262.1" rx="163.3" ry="160.9"/>
+    </clipPath>
+    <clipPath id="clippath-1">
+      <path class="st0" d="M323,122.7c-88,0-110.7,13.3-145.4,70.7l-102.7,169.4c-4,6.6-8,13.3-12.1,20.1h57.5c38.8-34.8,54.6-48,94.6-69.3l157.5-88v158.7h52V122.7h-101.5ZM225.8,266.9c-16.1,4-30.7,9.2-45.4,14.7l29.3-49.4c46.6-76.1,65.3-64.1,162.7-64.1v57.5l-135.7,38.2-10.9,3.2h0Z"/>
+    </clipPath>
+  </defs>
+  <circle class="st6" cx="166" cy="262.1" r="160.9"/>
+  <g class="st8">
+    <g>
+      <polygon class="st4" points="530.8 318.9 530.8 431.5 84.7 431.5 84.7 318.9 382 318.9 530.8 318.9"/>
+      <rect class="st5" x="251.4" y="39.1" width="112.6" height="446" transform="translate(45.6 569.9) rotate(-90)"/>
+      <rect class="st1" x="248.9" y="-73.6" width="117.5" height="446" transform="translate(158.3 457.1) rotate(-90)"/>
+    </g>
+  </g>
+  <g>
+    <path class="st3" d="M323,122.7c-88,0-110.7,13.3-145.4,70.7l-102.7,169.4c-4,6.6-8,13.3-12.1,20.1h57.5c38.8-34.8,54.6-48,94.6-69.3l157.5-88v158.7h52V122.7h-101.5ZM225.8,266.9c-16.1,4-30.7,9.2-45.4,14.7l29.3-49.4c46.6-76.1,65.3-64.1,162.7-64.1v57.5l-146.7,42.8h0v-1.4h0Z"/>
+    <g class="st2">
+      <polygon class="st7" points="435.1 715.1 30.9 715.1 36.3 321.6 439.1 202.8 435.1 715.1"/>
+    </g>
   </g>
 </svg>
