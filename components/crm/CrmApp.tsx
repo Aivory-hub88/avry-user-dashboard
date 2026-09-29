@@ -9,9 +9,12 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Trash2 } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import AgentAccess from "@/components/crm/AgentAccess"
+import ActivityFeed from "@/components/crm/ActivityFeed"
+import ActivityPanel, { type Subject } from "@/components/crm/ActivityPanel"
+import { agentLabel } from "@/lib/crmActivity"
 import { crmApi, DEAL_STAGES, type Company, type Contact, type Deal, type DealStage } from "@/lib/crmClient"
 
-type Tab = "deals" | "companies" | "contacts" | "agents"
+type Tab = "deals" | "companies" | "contacts" | "activity" | "agents"
 
 const STAGE_LABEL: Record<DealStage, string> = {
   lead: "Lead",
@@ -30,7 +33,7 @@ const STAGE_DOT: Record<DealStage, string> = {
 }
 
 function ownerLabel(o: { owner_agent: string | null }): string | null {
-  return o.owner_agent ? `${o.owner_agent} (agent)` : null
+  return o.owner_agent ? agentLabel(o.owner_agent) : null
 }
 
 function money(v: number | null, currency: string | null): string {
@@ -45,6 +48,8 @@ export default function CrmApp() {
   const [deals, setDeals] = useState<Deal[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [q, setQ] = useState("")
+  const [panel, setPanel] = useState<Subject | null>(null)
+  const [feedVersion, setFeedVersion] = useState(0)
 
   const load = useCallback(async () => {
     try {
@@ -65,6 +70,13 @@ export default function CrmApp() {
   }, [load])
 
   const companyName = useMemo(() => new Map((companies ?? []).map((c) => [c.id, c.name])), [companies])
+  const names = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const c of companies ?? []) m.set(`company:${c.id}`, c.name)
+    for (const c of contacts ?? []) m.set(`contact:${c.id}`, c.name)
+    for (const d of deals ?? []) m.set(`deal:${d.id}`, d.title)
+    return m
+  }, [companies, contacts, deals])
   const needle = q.trim().toLowerCase()
   const hit = (...parts: (string | null | undefined)[]) => !needle || parts.some((p) => p?.toLowerCase().includes(needle))
 
@@ -82,6 +94,7 @@ export default function CrmApp() {
     { key: "deals", label: "Deals", count: deals?.length },
     { key: "companies", label: "Companies", count: companies?.length },
     { key: "contacts", label: "Contacts", count: contacts?.length },
+    { key: "activity", label: "Activity", count: undefined },
     { key: "agents", label: "Agent access", count: undefined },
   ]
 
@@ -120,6 +133,12 @@ export default function CrmApp() {
 
         {tab === "agents" ? (
           <AgentAccess onError={setError} />
+        ) : tab === "activity" ? (
+          companies === null || contacts === null || deals === null ? (
+            !error && <div className="h-40 animate-pulse rounded-2xl bg-white/[0.03]" />
+          ) : (
+            <ActivityFeed names={names} query={q} version={feedVersion} onOpen={setPanel} onError={setError} />
+          )
         ) : deals === null || companies === null || contacts === null ? (
           !error && <div className="h-40 animate-pulse rounded-2xl bg-white/[0.03]" />
         ) : tab === "deals" ? (
@@ -130,12 +149,14 @@ export default function CrmApp() {
             onCreate={(b) => run(() => crmApi.deals.create(b))}
             onStage={(id, s) => run(() => crmApi.deals.setStage(id, s))}
             onRemove={(id) => run(() => crmApi.deals.remove(id))}
+            onOpen={(d) => setPanel({ type: "deal", id: d.id, name: d.title })}
           />
         ) : tab === "companies" ? (
           <CompaniesTab
             companies={companies.filter((c) => hit(c.name, c.domain, c.industry))}
             onCreate={(b) => run(() => crmApi.companies.create(b))}
             onRemove={(id) => run(() => crmApi.companies.remove(id))}
+            onOpen={(c) => setPanel({ type: "company", id: c.id, name: c.name })}
           />
         ) : (
           <ContactsTab
@@ -144,9 +165,11 @@ export default function CrmApp() {
             companyName={companyName}
             onCreate={(b) => run(() => crmApi.contacts.create(b))}
             onRemove={(id) => run(() => crmApi.contacts.remove(id))}
+            onOpen={(c) => setPanel({ type: "contact", id: c.id, name: c.name })}
           />
         )}
       </div>
+      {panel && <ActivityPanel subject={panel} onClose={() => setPanel(null)} onChanged={() => setFeedVersion((v) => v + 1)} />}
     </div>
   )
 }
@@ -179,6 +202,7 @@ function DealsTab({
   onCreate,
   onStage,
   onRemove,
+  onOpen,
 }: {
   deals: Deal[]
   companies: Company[]
@@ -186,6 +210,7 @@ function DealsTab({
   onCreate: (b: { title: string; value?: number; company_id?: string }) => void
   onStage: (id: string, s: DealStage) => void
   onRemove: (id: string) => void
+  onOpen: (r: Deal) => void
 }) {
   const [title, setTitle] = useState("")
   const [value, setValue] = useState("")
@@ -232,7 +257,7 @@ function DealsTab({
                 {col.map((d) => (
                   <div key={d.id} className="rounded-xl border border-line bg-white/[0.04] p-3">
                     <div className="flex items-start gap-2">
-                      <span className="min-w-0 flex-1 break-words text-[13px] text-white/85">{d.title}</span>
+                      <button onClick={() => onOpen(d)} className="min-w-0 flex-1 break-words text-left text-[13px] text-white/85 hover:underline hover:decoration-white/25 hover:underline-offset-2">{d.title}</button>
                       <button onClick={() => onRemove(d.id)} aria-label={`Delete ${d.title}`} className="text-white/25 hover:text-red-300">
                         <Trash2 size={13} />
                       </button>
@@ -268,10 +293,12 @@ function CompaniesTab({
   companies,
   onCreate,
   onRemove,
+  onOpen,
 }: {
   companies: Company[]
   onCreate: (b: { name: string; domain?: string; industry?: string }) => void
   onRemove: (id: string) => void
+  onOpen: (r: Company) => void
 }) {
   const [name, setName] = useState("")
   const [domain, setDomain] = useState("")
@@ -298,7 +325,7 @@ function CompaniesTab({
           {companies.map((c) => (
             <li key={c.id} className="flex items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] text-white/85">{c.name}</div>
+                <button onClick={() => onOpen(c)} className="block max-w-full truncate text-left text-[13px] text-white/85 hover:underline hover:decoration-white/25 hover:underline-offset-2">{c.name}</button>
                 <div className="truncate text-[11px] text-white/40">{[c.domain, c.industry, ownerLabel(c)].filter(Boolean).join(" · ")}</div>
               </div>
               <button onClick={() => onRemove(c.id)} aria-label={`Delete ${c.name}`} className="text-white/25 hover:text-red-300">
@@ -318,12 +345,14 @@ function ContactsTab({
   companyName,
   onCreate,
   onRemove,
+  onOpen,
 }: {
   contacts: Contact[]
   companies: Company[]
   companyName: Map<string, string>
   onCreate: (b: { name: string; email?: string; title?: string; company_id?: string }) => void
   onRemove: (id: string) => void
+  onOpen: (r: Contact) => void
 }) {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -360,7 +389,7 @@ function ContactsTab({
           {contacts.map((c) => (
             <li key={c.id} className="flex items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] text-white/85">{c.name}</div>
+                <button onClick={() => onOpen(c)} className="block max-w-full truncate text-left text-[13px] text-white/85 hover:underline hover:decoration-white/25 hover:underline-offset-2">{c.name}</button>
                 <div className="truncate text-[11px] text-white/40">
                   {[c.title, companyName.get(c.company_id ?? ""), c.email, ownerLabel(c)].filter(Boolean).join(" · ")}
                 </div>
