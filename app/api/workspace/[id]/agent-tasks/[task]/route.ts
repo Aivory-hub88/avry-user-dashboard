@@ -27,10 +27,14 @@ export async function POST(
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
   if (credential.kind !== "user") return forbidden()
-  if (!canWrite(await getDocRole(credential, id))) return forbidden()
+  const role = await getDocRole(credential, id)
+  if (!canWrite(role)) return forbidden()
 
   const payload = (await req.json().catch(() => ({}))) as Record<string, unknown>
   const afterApprovalId = typeof payload.afterApprovalId === "string" ? payload.afterApprovalId : null
+  // Approvals belong to the space leader (ADR-020): only the owner may resume a
+  // turn parked on one. Members can still run/retry ordinary tasks.
+  if (afterApprovalId && role !== "owner") return forbidden()
   const decision = payload.decision === "deny" ? "deny" : "approve"
 
   try {
@@ -65,7 +69,8 @@ export async function PATCH(
   const { id, task: taskId } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
-  if (!canWrite(await getDocRole(credential, id))) return forbidden()
+  const role = await getDocRole(credential, id)
+  if (!canWrite(role)) return forbidden()
 
   const payload = (await req.json().catch(() => ({}))) as Record<string, unknown>
   if (payload.op !== "cancel") return NextResponse.json({ error: "invalid op" }, { status: 400 })
@@ -73,6 +78,8 @@ export async function PATCH(
   try {
     const task = await loadAgentTask(id, taskId)
     if (!task) return NextResponse.json({ error: "not found" }, { status: 404 })
+    // Deny on a task parked for approval is the leader's decision (ADR-020).
+    if (task.status === "blocked" && role !== "owner") return forbidden()
     if (task.status === "done" || task.status === "cancelled")
       return NextResponse.json({ error: `task ${task.status}` }, { status: 409 })
     await setAgentTask(taskId, "cancelled", "cancelled by human")

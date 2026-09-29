@@ -464,9 +464,13 @@ export default function RoomView({
                         badge="Needs approval"
                         icon={<span aria-hidden="true">⚠</span>}
                         title={describeTool(tool)}
-                        subtitle={`${name} is waiting for your go-ahead before running this.`}
+                        subtitle={
+                          isOwner
+                            ? `${name} is waiting for your go-ahead before running this.`
+                            : `${name} is waiting for the space owner's go-ahead before running this.`
+                        }
                         actions={
-                          canWrite ? (
+                          canWrite && isOwner ? (
                             <div className="mt-2 flex gap-2">
                               <button
                                 type="button"
