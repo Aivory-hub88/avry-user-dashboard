@@ -21,6 +21,8 @@ import { useChat } from "@/hooks/useChat"
 import { useNotificationFeed } from "@/hooks/useNotificationFeed"
 import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { useActiveRuns } from "@/hooks/useActiveRuns"
+import { useRoomTeam } from "@/hooks/useRoomTeam"
+import { filterCandidatesByTeam } from "@/lib/agentTeams"
 import { useStuckTasks } from "@/hooks/useStuckTasks"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
 import { getMentionCandidates, parseAgentMentions, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
@@ -145,6 +147,8 @@ export default function ConsolePage() {
   // thing that overrides that guarantee.
   const [showMissionControl, setShowMissionControl] = useState(false)
   const [chatMode, setChatMode] = useState<ConsoleChatMode>("direct")
+  // Agent Team the Room is scoped to (ADR-020); none = all deployed agents.
+  const { teams: agentTeams, team: roomTeam, teamId: roomTeamId, setTeamId: setRoomTeamId } = useRoomTeam()
   const [toasts, setToasts] = useState<Toast[]>([])
   const [activeChip, setActiveChip] = useState<string | null>(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
@@ -225,6 +229,7 @@ export default function ConsolePage() {
     resetAgentic,
     triggerClassification,
     addToast,
+    teamId: roomTeamId,
   })
 
   // A decision already rendered inline in this open thread must not also
@@ -249,7 +254,10 @@ export default function ConsolePage() {
 
   // Room mode (Mission Control chat room): only deployed agents are
   // mentionable — @ expands to this list, sends fan out in parallel.
-  const mentionCandidates = useMemo(() => getMentionCandidates(deployments), [deployments])
+  const mentionCandidates = useMemo(
+    () => filterCandidatesByTeam(getMentionCandidates(deployments), roomTeam),
+    [deployments, roomTeam],
+  )
   const inRoom = chatMode === "room"
 
   const changeChatMode = useCallback((mode: ConsoleChatMode) => {
@@ -592,6 +600,9 @@ export default function ConsolePage() {
           chatMode={chatMode}
           onChatModeChange={changeChatMode}
           roomCount={mentionCandidates.length}
+          teams={agentTeams}
+          teamId={roomTeamId}
+          onTeamChange={setRoomTeamId}
         />
       )}
 

@@ -80,6 +80,8 @@ interface UseChatParams {
   resetAgentic: () => void
   triggerClassification: (userText: string, assistantText: string) => void
   addToast: (type: "error" | "success", msg: string) => void
+  /** Agent Team for Room turns (ADR-020); null/undefined = all deployed agents. */
+  teamId?: string | null
 }
 
 export function useChat({
@@ -89,6 +91,7 @@ export function useChat({
   resetAgentic,
   triggerClassification,
   addToast,
+  teamId,
 }: UseChatParams) {
   const [messages, setMessages] = useState<Message[]>([])
   const [sessions, setSessions] = useState<ChatSession[]>([])
@@ -107,6 +110,11 @@ export function useChat({
   // message, consumed (and cleared) by the next handleSend/handleSendRoom.
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null)
   const messagesRef = useRef<Message[]>([])
+  // Read at send time so the chain in handleSendRoom sees the live pick.
+  const teamIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    teamIdRef.current = teamId ?? null
+  }, [teamId])
   const currentSessionIdRef = useRef<string>("")
   const streamingSessionRef = useRef<string>("")
   // Abort handle for the in-flight turn (console SSE, single agent call, or
@@ -451,7 +459,7 @@ export function useChat({
       const peers = targets.filter(x => x !== t).map(x => candidateOf(x) ?? { type: x, name: agentNameOf(x), title: x, channels: [] as string[] })
       const payload = buildRoomPayload({ me, peers, userText, history, roundReplies, ledgerHint })
       try {
-        const result = await sendAgentMessage(t as TelegramAgentType, payload, sentSessionId, signal)
+        const result = await sendAgentMessage(t as TelegramAgentType, payload, sentSessionId, signal, teamIdRef.current)
         // Backend reply is unvalidated (Cerveau may return null/a non-string
         // on odd turns) — a non-string here used to flow into ChatMessage and
         // throw during render, killing the whole page. Treat it as a failed

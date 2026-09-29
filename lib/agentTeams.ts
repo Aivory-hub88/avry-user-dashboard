@@ -83,3 +83,17 @@ export function boundElsewhere(teams: AgentTeam[], exceptTeamId: string): Set<st
   }
   return out
 }
+
+/**
+ * Room mentions narrowed to a team: only its members are offered (and so only
+ * they can be addressed). No team, or a team that is not isolated, leaves the
+ * list untouched (all deployed agents).
+ */
+export function filterCandidatesByTeam<T extends { type: string }>(
+  candidates: T[],
+  team: Pick<AgentTeam, 'agent_types' | 'isolated'> | null | undefined,
+): T[] {
+  if (!team || !team.isolated) return candidates
+  const members = new Set(team.agent_types)
+  return candidates.filter((c) => members.has(c.type))
+}
