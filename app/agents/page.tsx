@@ -4,6 +4,7 @@ import { asset } from "@/lib/asset";
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
+import Link from 'next/link';
 import { TelegramAgentType } from '@/lib/telegramDeploy';
 import { AGENT_NAMES } from '@/lib/agentRoster';
 import { buildSlackOpenUrl } from '@/lib/slackDeploy';
@@ -665,7 +666,15 @@ export default function AgentsPage() {
           <div className="text-[13px] font-light text-[#a1a1aa] flex items-center gap-2">
             <span className="text-white">{t('breadcrumb')}</span>
           </div>
-          <CreditsPill />
+          <div className="flex items-center gap-3">
+            <Link
+              href="/agents/teams"
+              className="rounded-full border border-white/10 px-3 py-1 text-[12px] text-[#a1a1aa] transition-colors hover:bg-white/[0.06] hover:text-white"
+            >
+              Agent teams
+            </Link>
+            <CreditsPill />
+          </div>
         </div>
 
         {/* Hero Banner */}
