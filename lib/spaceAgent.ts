@@ -156,3 +156,26 @@ export function spaceAgentTaskFromRow(row: Record<string, unknown>): SpaceAgentT
   });
   return parsed.success ? parsed.data : null;
 }
+
+/**
+ * ADR-020 §1.1: agents in a Space belong to its leader (the space doc's
+ * owner), so a member's @mention runs in the LEADER's tenant and is billed to
+ * them. Pick the owner from the doc rows for a space (room-keyed
+ * `workspace:{id}` row wins over the bare row, same as getDocRole).
+ */
+export function pickSpaceLeader(
+  rows: { id: unknown; owner: unknown }[],
+  spaceId: string,
+): string | null {
+  const bare = spaceId.replace(/^workspace:/, "").replace(/^db:/, "");
+  const row =
+    rows.find((r) => String(r.id) === `workspace:${bare}`) ??
+    rows.find((r) => String(r.id) === bare) ??
+    null;
+  return typeof row?.owner === "string" && row.owner ? row.owner : null;
+}
+
+/** `acting_as` for the backend: only when someone other than the caller leads the Space. */
+export function actingAsFor(leader: string | null, callerUserId: string): string | undefined {
+  return leader && leader !== callerUserId ? leader : undefined;
+}

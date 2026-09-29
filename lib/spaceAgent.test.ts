@@ -150,3 +150,32 @@ describe("buildSpacePayload", () => {
     expect(p).toContain("<instruction>\ncek\n</instruction>")
   })
 })
+
+describe("space leader (ADR-020 acting_as)", () => {
+  it("prefers the room-keyed row's owner over the bare row", async () => {
+    const { pickSpaceLeader } = await import("./spaceAgent");
+    expect(
+      pickSpaceLeader(
+        [
+          { id: "s1", owner: "old" },
+          { id: "workspace:s1", owner: "leader" },
+        ],
+        "s1",
+      ),
+    ).toBe("leader");
+  });
+
+  it("returns null for missing or ownerless docs", async () => {
+    const { pickSpaceLeader } = await import("./spaceAgent");
+    expect(pickSpaceLeader([], "s1")).toBeNull();
+    expect(pickSpaceLeader([{ id: "s1", owner: null }], "s1")).toBeNull();
+    expect(pickSpaceLeader([{ id: "s1", owner: "" }], "s1")).toBeNull();
+  });
+
+  it("acts as the leader only when the caller is someone else", async () => {
+    const { actingAsFor } = await import("./spaceAgent");
+    expect(actingAsFor("leader", "member")).toBe("leader");
+    expect(actingAsFor("leader", "leader")).toBeUndefined();
+    expect(actingAsFor(null, "member")).toBeUndefined();
+  });
+});

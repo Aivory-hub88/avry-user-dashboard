@@ -231,3 +231,61 @@ describe("PATCH /api/workspace/[id]/agent-tasks/[task]", () => {
     expect(cancelled).toBeDefined()
   })
 })
+
+describe("approvals belong to the space leader (ADR-020)", () => {
+  const params = { params: Promise.resolve({ id: "space-1", task: "task-1" }) }
+  const BLOCKED = { ...TASK_ROW, status: "blocked", approval_ref: { id: "ap-1", tool_name: "db.transact" } }
+
+  // Owner of the doc is `ownerId`; USER (u1) is an editor unless ownerId === "u1".
+  function asRole(ownerId: string, row: Record<string, unknown> = BLOCKED) {
+    queryMock.mockImplementation((sql: string) => {
+      if (sql.includes("FROM dashboard.workspace_docs"))
+        return Promise.resolve({ rows: [{ id: "space-1", owner: ownerId, workspace_id: "default" }] })
+      if (sql.includes("FROM dashboard.workspace_doc_acl") || sql.includes("FROM dashboard.workspace_members"))
+        return Promise.resolve({ rows: [{ doc_id: "space-1", workspace_id: "default", role: "editor" }] })
+      if (sql.includes("FROM dashboard.workspace_agent_tasks")) return Promise.resolve({ rows: [row] })
+      if (sql.includes("INSERT INTO dashboard.workspace_messages"))
+        return Promise.resolve({ rows: [MSG_ROW], rowCount: 1 })
+      return Promise.resolve({ rows: [], rowCount: 0 })
+    })
+  }
+
+  it("403s a member resuming a turn parked on an approval", async () => {
+    asRole("leader-1")
+    const res = await POST(req("POST", "http://localhost/x", { afterApprovalId: "ap-1", decision: "approve" }), params)
+    expect(res.status).toBe(403)
+  })
+
+  it("lets the leader resume it", async () => {
+    asRole("u1")
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => ({ reply: "done", pending_approval: null }) })),
+    )
+    const res = await POST(req("POST", "http://localhost/x", { afterApprovalId: "ap-1", decision: "approve" }), params)
+    expect(res.status).toBe(200)
+  })
+
+  it("still lets a member run an ordinary task", async () => {
+    asRole("leader-1", TASK_ROW)
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => ({ reply: "ok", pending_approval: null }) })),
+    )
+    const res = await POST(req("POST", "http://localhost/x", {}), params)
+    expect(res.status).toBe(200)
+  })
+
+  it("403s a member denying (cancelling) a blocked task", async () => {
+    asRole("leader-1")
+    const res = await PATCH(req("PATCH", "http://localhost/x", { op: "cancel" }), params)
+    expect(res.status).toBe(403)
+  })
+
+  it("lets the leader deny it, and a member cancel a non-blocked task", async () => {
+    asRole("u1")
+    expect((await PATCH(req("PATCH", "http://localhost/x", { op: "cancel" }), params)).status).toBe(200)
+    asRole("leader-1", TASK_ROW)
+    expect((await PATCH(req("PATCH", "http://localhost/x", { op: "cancel" }), params)).status).toBe(200)
+  })
+})
