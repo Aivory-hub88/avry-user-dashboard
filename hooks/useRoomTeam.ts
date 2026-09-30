@@ -5,7 +5,13 @@
  * exists is ignored, so deleting a team can never leave the Room stuck on it.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { listAgentTeams, type AgentTeam } from '@/lib/agentTeams'
+import {
+  createAgentTeam,
+  deleteAgentTeam,
+  listAgentTeams,
+  updateAgentTeam,
+  type AgentTeam,
+} from '@/lib/agentTeams'
 
 const KEY = 'aivory.console.roomTeam'
 
@@ -50,5 +56,34 @@ export function useRoomTeam() {
     writeStored(id)
   }, [])
 
-  return { teams, team, teamId: team?.id ?? null, setTeamId }
+  /** Create a group from the Room and switch the Room to it. Throws the backend's message on failure. */
+  const createGroup = useCallback(
+    async (name: string, agentTypes: string[]) => {
+      const created = await createAgentTeam({ name, agent_types: agentTypes })
+      setTeams((cur) => [...cur, created])
+      setTeamId(created.id)
+      return created
+    },
+    [setTeamId],
+  )
+
+  const saveGroup = useCallback(async (id: string, name: string, agentTypes: string[]) => {
+    const saved = await updateAgentTeam(id, { name, agent_types: agentTypes })
+    setTeams((cur) => cur.map((t) => (t.id === id ? saved : t)))
+    return saved
+  }, [])
+
+  const removeGroup = useCallback(
+    async (id: string) => {
+      await deleteAgentTeam(id)
+      setTeams((cur) => cur.filter((t) => t.id !== id))
+      setPickedId((cur) => {
+        if (cur === id) writeStored(null)
+        return cur === id ? null : cur
+      })
+    },
+    [],
+  )
+
+  return { teams, team, teamId: team?.id ?? null, setTeamId, createGroup, saveGroup, removeGroup }
 }
