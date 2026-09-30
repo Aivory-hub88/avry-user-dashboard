@@ -57,6 +57,17 @@ export default function ActivityPanel({ subject, onClose, onChanged }: { subject
     setBusy(false)
   }
 
+  const toggleDone = async (a: Activity) => {
+    setError(null)
+    try {
+      await crmApi.activities.complete(a.id, !a.completed_at)
+      await load()
+      onChanged()
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
   const remove = async (id: string) => {
     setError(null)
     try {
@@ -132,7 +143,7 @@ export default function ActivityPanel({ subject, onClose, onChanged }: { subject
           ) : (
             <ul className="divide-y divide-line">
               {rows.map((a) => (
-                <ActivityItem key={a.id} a={a} onDelete={() => remove(a.id)} />
+                <ActivityItem key={a.id} a={a} onDelete={() => remove(a.id)} onToggleDone={() => toggleDone(a)} />
               ))}
             </ul>
           )}

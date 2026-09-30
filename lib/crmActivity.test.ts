@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { agentLabel, dueState, sortFollowUps, localInputToIso, formatWhen } from "./crmActivity"
+import { activityState, agentLabel, dueState, formatWhen, isCompletable, localInputToIso, sortFollowUps } from "./crmActivity"
 
 // Built from local components so the assertions hold in any timezone.
 const NOW = new Date(2026, 8, 29, 12, 0, 0)
@@ -60,5 +60,21 @@ describe("formatWhen", () => {
     expect(formatWhen(at(9, 3, 10, 30), NOW)).not.toMatch(/2026/)
     expect(formatWhen(new Date(2027, 0, 5, 9, 0).toISOString(), NOW)).toMatch(/2027/)
     expect(formatWhen("bad", NOW)).toBe("")
+  })
+})
+
+describe("activityState / isCompletable", () => {
+  it("a completed activity is done even when its due date passed", () => {
+    expect(activityState({ due_at: at(8, 20), completed_at: at(8, 21) }, NOW)).toBe("done")
+    expect(activityState({ due_at: at(8, 20), completed_at: null }, NOW)).toBe("overdue")
+    expect(activityState({ due_at: null, completed_at: null }, NOW)).toBe("none")
+    expect(activityState({ due_at: at(9, 5), completed_at: null }, NOW)).toBe("upcoming")
+  })
+
+  it("follow-ups and tasks can be ticked off, plain notes cannot", () => {
+    expect(isCompletable({ due_at: at(9, 5), kind: "call" })).toBe(true)
+    expect(isCompletable({ due_at: null, kind: "task" })).toBe(true)
+    expect(isCompletable({ due_at: null, kind: "note" })).toBe(false)
+    expect(isCompletable({ due_at: null, kind: "email" })).toBe(false)
   })
 })
