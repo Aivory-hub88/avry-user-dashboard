@@ -207,6 +207,22 @@ export const APP_CATALOG: AivoryApp[] = [
     fields: [],
   },
   {
+    // Composio toolkit slug (see the note on googledrive above). Agent access
+    // is wired in Cerveau (composio-googledocs-docs) and gated per agent type.
+    id: 'googledocs',
+    name: 'Google Docs',
+    description: 'Create and edit documents in Google Docs.',
+    icon: '',
+    iconPath: '/integrations/icons/google-docs.svg',
+    authType: 'oauth',
+    categories: ['Productivity'],
+    defaultAction: 'Create Document',
+    oauthProvider: 'google',
+    connectLabel: 'Sign in with Google',
+    oauthScopes: ['openid', 'email', 'https://www.googleapis.com/auth/documents'],
+    fields: [],
+  },
+  {
     id: 'googlecalendar',
     name: 'Google Calendar',
     description: 'Create and manage calendar events.',
