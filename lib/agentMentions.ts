@@ -160,6 +160,43 @@ export function expandToRoom(mentioned: string[], candidates: MentionCandidate[]
 }
 
 /**
+ * Yes/No to a parked approval is a whole-message protocol on the backend: it only
+ * recognises a SHORT message that is nothing but the answer. The Room wraps every
+ * turn in <room_context> etc., so a bare "Batal" reached the agent as a long
+ * message, was treated as chat, and the approval stayed pending.
+ *
+ * True when `agentType`'s latest bubble in this thread is still waiting on an
+ * approval the user has not acted on.
+ */
+export function agentAwaitingApproval(
+  messages: { role: string; agentType?: string | null; pendingApproval?: unknown; approvalOutcome?: string | null }[],
+  agentType: string,
+): boolean {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (m.role !== "assistant" || m.agentType !== agentType) continue
+    return !!m.pendingApproval && !m.approvalOutcome
+  }
+  return false
+}
+
+/** Same ceiling as the backend's parse_approval_text (24 chars after trimming). */
+export const APPROVAL_REPLY_MAX_CHARS = 24
+
+/**
+ * The text to send to `agentType` for a Room turn: the raw reply when it looks like
+ * an answer to that agent's pending approval, otherwise the full room payload.
+ */
+export function roomTurnText(opts: {
+  rawText: string
+  wrapped: string
+  awaitingApproval: boolean
+}): string {
+  const raw = opts.rawText.trim()
+  return opts.awaitingApproval && raw.length > 0 && raw.length <= APPROVAL_REPLY_MAX_CHARS ? raw : opts.wrapped
+}
+
+/**
  * Removes only the @tokens that resolved to a candidate (or @all), leaving
  * the rest of the text — including unknown @tokens — untouched.
  */
