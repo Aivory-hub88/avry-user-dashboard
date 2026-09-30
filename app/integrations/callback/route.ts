@@ -48,35 +48,42 @@ async function resolveCallbackOutcome(
 ): Promise<CallbackResult> {
   const classified = classifyCallbackParams(params)
 
-  const connectedAccountId = params.get('connectedAccountId')
+  // Composio v3 sends `connected_account_id`; `connectedAccountId` is the old spelling.
+  const connectedAccountId = params.get('connected_account_id') ?? params.get('connectedAccountId')
+  if (!isNonEmptyString(connectedAccountId)) return classified
 
-  // Only reconcile a param-based success that carries an account id to verify.
-  if (classified.status !== 'connected' || !isNonEmptyString(connectedAccountId)) {
-    return classified
-  }
+  // A provider error / denial stays exactly as classified. Without an app the
+  // param-based result is `not_active`, which we try to repair below by asking
+  // Composio which toolkit this account belongs to.
+  const appUnknown = classified.status === 'error' && classified.reason === 'not_active' && !classified.app
+  if (classified.status === 'error' && !appUnknown) return classified
 
   try {
     const composio = getComposioClient()
     // `@composio/core` v0.13 exposes connected accounts via
-    // `composio.connectedAccounts.get(id)` — the old `getEntity().getConnection()`
-    // shape no longer exists (it threw a TypeError on every call, silently
-    // disabling this reconciliation).
-    const account = await composio.connectedAccounts.get(connectedAccountId.trim())
-
-    const status = String(
-      (account as { status?: unknown } | null | undefined)?.status ?? ''
-    )
-      .trim()
-      .toUpperCase()
-
-    // Downgrade a non-ACTIVE account to a not_active error, preserving the app.
-    if (status !== 'ACTIVE') {
-      return { status: 'error', reason: 'not_active', app: classified.app }
+    // `composio.connectedAccounts.get(id)`.
+    // The account can still read INITIATED for a moment after the redirect, so
+    // give it a few short chances to turn ACTIVE before calling it a failure.
+    let status = ''
+    let slug = ''
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const account = (await composio.connectedAccounts.get(connectedAccountId.trim())) as
+        | { status?: unknown; toolkit?: { slug?: unknown } | null }
+        | null
+        | undefined
+      status = String(account?.status ?? '').trim().toUpperCase()
+      slug = String(account?.toolkit?.slug ?? '').trim().toLowerCase()
+      if (status === 'ACTIVE' || status === 'FAILED' || status === 'EXPIRED') break
+      await new Promise((resolve) => setTimeout(resolve, 800))
     }
 
-    return classified
+    const app = classified.status === 'connected' ? classified.app : slug || undefined
+    if (status !== 'ACTIVE') {
+      return app ? { status: 'error', reason: 'not_active', app } : { status: 'error', reason: 'not_active' }
+    }
+    return app ? { status: 'connected', app } : classified
   } catch {
-    // Best-effort: any reconciliation failure keeps the param-based result.
+    // Best-effort: any lookup failure keeps the param-based result.
     // The redirect must never crash (Requirement 5.5).
     return classified
   }

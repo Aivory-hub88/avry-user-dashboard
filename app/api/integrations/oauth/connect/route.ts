@@ -60,8 +60,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Composio retired initiate() for Composio-managed OAuth on 2026-07-03.
     const authConfigId = await getOrCreateAuthConfigId(composio, appId)
 
+    // Composio v3 appends only `status` and `connected_account_id` to the
+    // callback and keeps whatever is already on the URL, so carry the app with us.
+    const callbackUrl = new URL(redirectUrl)
+    callbackUrl.searchParams.set('appName', appId)
+
     const connectionRequest = await composio.connectedAccounts.link(userId, authConfigId, {
-      callbackUrl: redirectUrl,
+      callbackUrl: callbackUrl.toString(),
     })
 
     console.log('[integrations/oauth/connect] initiated', {
