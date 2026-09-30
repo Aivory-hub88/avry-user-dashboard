@@ -10,6 +10,7 @@ import {
   loadRoomSticky,
   saveRoomSticky,
   parseAgentMentions,
+  resolveNamedAgents,
   stripAgentMentions,
 } from "@/lib/agentMentions"
 import type { AgentDeployment } from "@/lib/agentChat"
@@ -50,6 +51,36 @@ describe("getMentionCandidates", () => {
     const ds: AgentDeployment[] = [{ kind: "api", id: "k", agentType: "ghost", label: "x" }]
     // Ghost dropped, but console-native Aira is still appended.
     expect(getMentionCandidates(ds).map((c) => c.type)).toEqual(["chief_of_staff"])
+  })
+})
+
+describe("resolveNamedAgents", () => {
+  it("resolves a bare first name, case-insensitive", () => {
+    expect(resolveNamedAgents("bisa tolong panggilkan Lex?", candidates)).toEqual([
+      "leads_qualifier",
+    ])
+    expect(resolveNamedAgents("tanya ke TEO soal tiket", candidates)).toEqual([
+      "customer_service",
+    ])
+  })
+  it("resolves agent type ids with and without underscores", () => {
+    expect(resolveNamedAgents("route this to customer_service", candidates)).toEqual([
+      "customer_service",
+    ])
+    expect(resolveNamedAgents("route this to leadsqualifier", candidates)).toEqual([
+      "leads_qualifier",
+    ])
+  })
+  it("keeps order of appearance and dedupes", () => {
+    expect(resolveNamedAgents("Lex dulu, lalu Teo, lalu Lex lagi", candidates)).toEqual([
+      "leads_qualifier",
+      "customer_service",
+    ])
+  })
+  it("ignores undeployed agents and substrings", () => {
+    expect(resolveNamedAgents("panggilkan Geno", candidates)).toEqual([])
+    expect(resolveNamedAgents("lexicon dan teori", candidates)).toEqual([])
+    expect(resolveNamedAgents("halo semuanya", candidates)).toEqual([])
   })
 })
 
