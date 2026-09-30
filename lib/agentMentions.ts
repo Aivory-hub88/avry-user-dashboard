@@ -102,6 +102,31 @@ export function parseAgentMentions(text: string, candidates: MentionCandidate[])
 }
 
 /**
+ * Whole-room intents: messages that ask EVERY member to answer for themselves.
+ * Addressing one agent ("@Aira absen satu-satu") must not leave the rest silent
+ * while that one agent answers, or invents, for them. Narrow on purpose: it needs
+ * the act (roll call / introductions) AND a whole-group marker, so "@Aira buat
+ * absensi karyawan" or "@Lex kenalan sama leadnya" do not fan out.
+ */
+export type RoundIntent = "rollcall"
+
+const ROLLCALL_ACT =
+  /\b(absen|roll[\s-]?call|kenalan|berkenalan|perkenalan|perkenalkan\s+diri|introduce\s+yourselves?|introductions?|say\s+hi|saling\s+(sapa|kenal)|get\s+to\s+know)\b/i
+const WHOLE_GROUP =
+  /\b(semua(nya)?(\s+agent)?|kalian|para\s+agent|tim\s+ini|satu[\s-]?(per[\s-]?)?satu|masing[\s-]?masing|everyone|everybody|all\s+of\s+you|yourselves|one\s+by\s+one|each\s+of\s+you|the\s+team|the\s+group)\b/i
+
+export function detectRoundIntent(text: string): RoundIntent | null {
+  return ROLLCALL_ACT.test(text) && WHOLE_GROUP.test(text) ? "rollcall" : null
+}
+
+/** Whole room answers: mentioned agents first (they were addressed), then the rest in room order. */
+export function expandToRoom(mentioned: string[], candidates: MentionCandidate[]): string[] {
+  const out = [...mentioned]
+  for (const c of candidates) if (!out.includes(c.type)) out.push(c.type)
+  return out
+}
+
+/**
  * Removes only the @tokens that resolved to a candidate (or @all), leaving
  * the rest of the text — including unknown @tokens — untouched.
  */
@@ -229,6 +254,8 @@ export interface RoomPayloadParams {
   peers: MentionCandidate[]
   /** Raw user message, @mentions intact (they signal who is asked what). */
   userText: string
+  /** Set when the user asked every member to answer for themselves (roll call / introductions). */
+  intent?: RoundIntent | null
   /**
    * Everyone in the room (the picked group or all deployed agents), whether or
    * not they answer this round. Without it an agent addressed alone is told it
@@ -258,7 +285,7 @@ function clip(text: string, max: number): string {
   return t.length > max ? `${t.slice(0, max)}…` : t
 }
 
-export function buildRoomPayload({ me, peers, members = [], userText, history, roundReplies, ledgerHint }: RoomPayloadParams): string {
+export function buildRoomPayload({ me, peers, members = [], intent = null, userText, history, roundReplies, ledgerHint }: RoomPayloadParams): string {
   const lines: string[] = []
   lines.push("<room_context>")
   lines.push(`You are in the "Mission Control Room" group chat on the Aivory dashboard. You are ${me.name} (${me.title}).`)
@@ -282,6 +309,13 @@ export function buildRoomPayload({ me, peers, members = [], userText, history, r
         .map((m) => `${m.name}, ${m.title} [id: ${m.type}]`)
         .join("; ")}. ` +
         "Use exactly these titles when describing them. To reach a member who is not answering this round, delegate to them by id.",
+    )
+  }
+  if (intent === "rollcall") {
+    lines.push(
+      "The user is doing a roll call / asking everyone in the room to say hello and introduce themselves, and every member is answering in turn. " +
+        "Answer for YOURSELF only, in one or two short sentences in your own voice: say hi and who you are. " +
+        "Do not answer for teammates, do not list who is present, do not delegate, and do not repeat an introduction a teammate already gave in this round.",
     )
   }
   if (members.length > 1) {
