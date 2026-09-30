@@ -145,6 +145,8 @@
     }
   },
   "console": {
+    "introChip": "Let them introduce themselves",
+    "introMessage": "Hi everyone! Let's get to know each other. Please introduce yourselves one by one, and say hi to each other.",
     "title": "Console",
     "newChat": "New Chat",
     "chatHistory": "Chat History",

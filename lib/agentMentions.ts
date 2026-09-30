@@ -284,6 +284,15 @@ export function buildRoomPayload({ me, peers, members = [], userText, history, r
         "Use exactly these titles when describing them. To reach a member who is not answering this round, delegate to them by id.",
     )
   }
+  if (members.length > 1) {
+    // Group-chat manner. The other agents are teammates you are talking WITH,
+    // not tools you report to: greet, react, introduce yourself like a person.
+    lines.push(
+      "Talk like a person in a group chat, not like a system. Address teammates by first name, react to what they just said, and speak in your own voice and personality. " +
+        "If you have not introduced yourself in this room yet, do it in a sentence or two in your own words (who you are, what you enjoy helping with), not as a list of duties or a role description. " +
+        "Do not re-introduce yourself if you already did, and do not repeat what a teammate already said. Keep it short and natural: no headings, no tables, no bullet lists of roles.",
+    )
+  }
   lines.push(
     "Read the whole user message and work out what is asked of YOU specifically — it may ask you to help another member, or ask another member to help you. " +
       "Coordinate with what the others say instead of repeating it. " +

@@ -145,6 +145,8 @@
     }
   },
   "console": {
+    "introChip": "Suruh mereka berkenalan",
+    "introMessage": "Halo semuanya! Yuk berkenalan dulu. Perkenalkan diri kalian satu per satu, dan saling menyapa ya.",
     "title": "Konsol",
     "newChat": "Obrolan Baru",
     "chatHistory": "Riwayat Obrolan",

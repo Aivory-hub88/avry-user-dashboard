@@ -157,6 +157,18 @@ describe("buildRoomPayload", () => {
     expect(p).toContain("other room members can still be asked")
   })
 
+  it("asks for a human group-chat manner (greet, introduce, no role lists) in a group", () => {
+    const geno = candidateOf("autonomous")!
+    const p = buildRoomPayload({ ...base, members: [geno, teo, lex] })
+    expect(p).toContain("Talk like a person in a group chat")
+    expect(p).toContain("introduced yourself")
+    expect(p).toContain("no tables")
+  })
+
+  it("does not ask for banter when alone in the room", () => {
+    expect(buildRoomPayload({ ...base, peers: [], members: [teo] })).not.toContain("Talk like a person")
+  })
+
   it("adds no member line when the roster is unknown", () => {
     expect(buildRoomPayload(base)).not.toContain("Room members")
   })
