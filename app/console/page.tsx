@@ -26,7 +26,7 @@ import { filterCandidatesByTeam } from "@/lib/agentTeams"
 import RoomGroupModal from "@/components/console/RoomGroupModal"
 import { useStuckTasks } from "@/hooks/useStuckTasks"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
-import { getMentionCandidates, parseAgentMentions, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
+import { getMentionCandidates, parseAgentMentions, detectRoundIntent, expandToRoom, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
 import { fetchLedgerHint } from "@/lib/roomLedger"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
 import { collabAuthHeaders } from "@/lib/collabClient"
@@ -389,7 +389,14 @@ export default function ConsolePage() {
           return
         }
         const mentioned = parseAgentMentions(text, mentionCandidates)
-        if (mentioned.length > 0) {
+        // "Absen satu-satu" / introductions: everyone answers for themselves, each in
+        // their own bubble, even if the user only @mentioned one agent.
+        const roundIntent = mentionCandidates.length > 1 ? detectRoundIntent(text) : null
+        if (roundIntent) {
+          const everyone = expandToRoom(mentioned, mentionCandidates)
+          saveRoomSticky(everyone)
+          await handleSendRoom(text, atts, everyone, await fetchLedgerHint(currentSessionId, everyone), roundIntent)
+        } else if (mentioned.length > 0) {
           saveRoomSticky(mentioned)
           await handleSendRoom(
             text,
@@ -696,7 +703,7 @@ export default function ConsolePage() {
                       onClick={() => {
                         const types = mentionCandidates.map((c) => c.type)
                         saveRoomSticky(types)
-                        void handleSendRoom(t('introMessage'), [], types, null)
+                        void handleSendRoom(t('introMessage'), [], types, null, 'rollcall')
                       }}
                       className="rounded-full border border-[#b7cba6]/40 bg-[#b7cba6]/10 px-3.5 py-1.5 text-[12px] font-medium text-[#b7cba6] transition-colors hover:bg-[#b7cba6]/20"
                     >

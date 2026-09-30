@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest"
 import {
   buildRoomPayload,
+  detectRoundIntent,
+  expandToRoom,
   candidateOf,
   getMentionCandidates,
   inferRoomFallback,
@@ -250,5 +252,60 @@ describe("room sticky", () => {
     // Node/vitest has no localStorage: helpers must no-op, never throw.
     expect(() => saveRoomSticky(["autonomous"])).not.toThrow()
     expect(loadRoomSticky()).toEqual([])
+  })
+})
+
+describe("detectRoundIntent (whole-room roll call)", () => {
+  it("catches the roll call that started this", () => {
+    expect(detectRoundIntent("@Aira Halo Aira, coba absen satu satu para agent di tim ini")).toBe("rollcall")
+  })
+
+  it.each([
+    "absen dulu semuanya",
+    "kalian semua kenalan dong",
+    "tolong berkenalan satu per satu",
+    "roll call everyone",
+    "introduce yourselves one by one",
+    "everybody say hi",
+    "@Geno absen kalian ya",
+    "saling menyapa dan kenalan semua ya",
+  ])("fans out: %s", (text) => {
+    expect(detectRoundIntent(text)).toBe("rollcall")
+  })
+
+  it.each([
+    "@Aira buat absensi karyawan untuk tim sales",
+    "@Lex kenalan sama lead baru ini",
+    "@Teo ringkas semua tiket hari ini",
+    "@Finn tolong cek semua invoice",
+    "kirim email ke semua pelanggan",
+    "introduce me to the client",
+    "@Geno say hi to the customer",
+    "hadir tidak di rapat besok?",
+  ])("does NOT fan out: %s", (text) => {
+    expect(detectRoundIntent(text)).toBeNull()
+  })
+})
+
+describe("expandToRoom", () => {
+  const cands = ["autonomous", "customer_service", "leads_qualifier"].map((t) => candidateOf(t)!)
+  it("puts the addressed agent first, then the rest in room order, once each", () => {
+    expect(expandToRoom(["leads_qualifier"], cands)).toEqual(["leads_qualifier", "autonomous", "customer_service"])
+    expect(expandToRoom([], cands)).toEqual(["autonomous", "customer_service", "leads_qualifier"])
+    expect(expandToRoom(["autonomous", "customer_service", "leads_qualifier"], cands)).toHaveLength(3)
+  })
+})
+
+describe("buildRoomPayload roll-call intent", () => {
+  const teo = candidateOf("customer_service")!
+  const lex = candidateOf("leads_qualifier")!
+  const base = { me: teo, peers: [lex], userText: "absen", history: [], roundReplies: [] }
+  it("tells each agent to answer only for itself and not delegate", () => {
+    const p = buildRoomPayload({ ...base, intent: "rollcall", members: [teo, lex] })
+    expect(p).toContain("Answer for YOURSELF only")
+    expect(p).toContain("do not delegate")
+  })
+  it("adds nothing without the intent", () => {
+    expect(buildRoomPayload({ ...base, members: [teo, lex] })).not.toContain("roll call")
   })
 })
