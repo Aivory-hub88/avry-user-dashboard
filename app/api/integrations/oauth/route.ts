@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getComposioClient } from '@/lib/composio'
 import { resolveIntegrationUser } from '@/lib/integration-auth'
+import { collapseAccounts } from '@/lib/integration-accounts'
 
 // Turns a failed resolveIntegrationUser() result into this route's own
 // error contract ({code, message}) — resolveUserId()'s unverified-header /
@@ -48,7 +49,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     // 2. Fetch connected accounts from Composio
     try {
       const composio    = getComposioClient()
-      const { items }   = await composio.connectedAccounts.list({ userIds: [userId] })
+      const { items: allItems } = await composio.connectedAccounts.list({ userIds: [userId] })
+      const items = collapseAccounts(allItems)
 
       const connectedApps = items.map((c) => {
         const composioStatus = String(c.status ?? '').toUpperCase()
@@ -117,7 +119,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     try {
       const composio  = getComposioClient()
-      const { items } = await composio.connectedAccounts.list({ userIds: [userId] })
+      const { items: allItems } = await composio.connectedAccounts.list({ userIds: [userId] })
+      const items = collapseAccounts(allItems)
 
       // Map Composio's connected-account objects → AivoryConnection shape.
       // Composio status values: ACTIVE | INITIATED | FAILED | EXPIRED | NEEDS_REAUTH
