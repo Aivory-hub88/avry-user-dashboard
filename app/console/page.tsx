@@ -214,6 +214,15 @@ export default function ConsolePage() {
 
   // Extracted hooks
   const { attachments, setAttachments, isDragging, handleFileSelect } = useFileUpload(addToast)
+  // Deployed agents and the Room's members (narrowed to the picked group). Defined
+  // before useChat: the room turn tells every agent who is in the room.
+  const { deployments } = useAgentDeployments()
+  const roomAgents = useMemo(() => getMentionCandidates(deployments), [deployments])
+  const mentionCandidates = useMemo(
+    () => filterCandidatesByTeam(roomAgents, roomTeam),
+    [roomAgents, roomTeam],
+  )
+
   const {
     messages,
     sessions,
@@ -240,6 +249,7 @@ export default function ConsolePage() {
     triggerClassification,
     addToast,
     teamId: roomTeamId,
+    roomMembers: mentionCandidates,
   })
 
   // A decision already rendered inline in this open thread must not also
@@ -253,7 +263,6 @@ export default function ConsolePage() {
     approvalsError,
     retryApprovals: refetchApprovals,
   } = useNotificationFeed({ sessionsByAgent, currentSessionId, excludeApprovalIds: inlineApprovalIds })
-  const { deployments } = useAgentDeployments()
   const { byAgentType: activeRunsByAgentType } = useActiveRuns()
   const {
     stuck: stuckTasks,
@@ -264,11 +273,6 @@ export default function ConsolePage() {
 
   // Room mode (Mission Control chat room): only deployed agents are
   // mentionable — @ expands to this list, sends fan out in parallel.
-  const roomAgents = useMemo(() => getMentionCandidates(deployments), [deployments])
-  const mentionCandidates = useMemo(
-    () => filterCandidatesByTeam(roomAgents, roomTeam),
-    [roomAgents, roomTeam],
-  )
   const inRoom = chatMode === "room"
 
   const changeChatMode = useCallback((mode: ConsoleChatMode) => {
@@ -683,6 +687,23 @@ export default function ConsolePage() {
 
               <div className="relative w-full [animation:fadeUp_0.55s_0.13s_cubic-bezier(0.22,1,0.36,1)_both]">
                 {inRoom && <RoomMembers candidates={mentionCandidates} />}
+                {inRoom && roomTeam && mentionCandidates.length > 1 && !isStreaming && (
+                  // A fresh group: one tap has the members say hi and introduce
+                  // themselves in their own words, each seeing the earlier ones.
+                  <div className="mb-2 flex w-full justify-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const types = mentionCandidates.map((c) => c.type)
+                        saveRoomSticky(types)
+                        void handleSendRoom(t('introMessage'), [], types, null)
+                      }}
+                      className="rounded-full border border-[#b7cba6]/40 bg-[#b7cba6]/10 px-3.5 py-1.5 text-[12px] font-medium text-[#b7cba6] transition-colors hover:bg-[#b7cba6]/20"
+                    >
+                      {t('introChip')}
+                    </button>
+                  </div>
+                )}
                 {emptyMention.menuOpen && (
                   <AgentMentionMenu
                     candidates={emptyMention.mentionList}

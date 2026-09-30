@@ -8,7 +8,7 @@ import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
 import { sendAgentMessage, type ConsolePendingApproval } from '@/lib/agentChat'
 import { notifyApprovalsChanged } from '@/lib/agentApprovals'
-import { agentNameOf, buildRoomPayload, candidateOf, type RoomHistoryEntry } from '@/lib/agentMentions'
+import { agentNameOf, buildRoomPayload, candidateOf, type MentionCandidate, type RoomHistoryEntry } from '@/lib/agentMentions'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
 import { useMode } from '@/contexts/ModeContext'
 import { useSession } from './useSession'
@@ -82,6 +82,9 @@ interface UseChatParams {
   addToast: (type: "error" | "success", msg: string) => void
   /** Agent Team for Room turns (ADR-020); null/undefined = all deployed agents. */
   teamId?: string | null
+  /** Everyone in the Room (the picked group, or all deployed agents). Told to each agent so
+   *  it knows the roster and roles even when it is the only one answering this round. */
+  roomMembers?: MentionCandidate[]
 }
 
 export function useChat({
@@ -92,6 +95,7 @@ export function useChat({
   triggerClassification,
   addToast,
   teamId,
+  roomMembers,
 }: UseChatParams) {
   const [messages, setMessages] = useState<Message[]>([])
   const [sessions, setSessions] = useState<ChatSession[]>([])
@@ -115,6 +119,10 @@ export function useChat({
   useEffect(() => {
     teamIdRef.current = teamId ?? null
   }, [teamId])
+  const roomMembersRef = useRef<MentionCandidate[]>([])
+  useEffect(() => {
+    roomMembersRef.current = roomMembers ?? []
+  }, [roomMembers])
   const currentSessionIdRef = useRef<string>("")
   const streamingSessionRef = useRef<string>("")
   // Abort handle for the in-flight turn (console SSE, single agent call, or
@@ -457,7 +465,7 @@ export function useChat({
       if (signal.aborted) break
       const me = candidateOf(t) ?? { type: t, name: agentNameOf(t), title: t, channels: [] as string[] }
       const peers = targets.filter(x => x !== t).map(x => candidateOf(x) ?? { type: x, name: agentNameOf(x), title: x, channels: [] as string[] })
-      const payload = buildRoomPayload({ me, peers, userText, history, roundReplies, ledgerHint })
+      const payload = buildRoomPayload({ me, peers, userText, history, roundReplies, ledgerHint, members: roomMembersRef.current })
       try {
         const result = await sendAgentMessage(t as TelegramAgentType, payload, sentSessionId, signal, teamIdRef.current)
         // Backend reply is unvalidated (Cerveau may return null/a non-string

@@ -145,6 +145,34 @@ describe("buildRoomPayload", () => {
     expect(p).toContain("only agent answering")
   })
 
+  it("lists the whole room with real titles, even when only one agent answers", () => {
+    const geno = candidateOf("autonomous")!
+    const p = buildRoomPayload({ ...base, me: teo, peers: [], members: [geno, teo, lex] })
+    // Roles come from the roster, not from ids: Teo is Ticket Ops, never "customer service".
+    expect(p).toContain("Teo, Ticket Ops Agent [id: customer_service]")
+    expect(p).toContain("Geno, Generalist Agent [id: autonomous]")
+    expect(p).toContain("Lex, Sales and Lead Agent [id: leads_qualifier]")
+    expect(p).toContain("delegate to them by id")
+    expect(p).toContain("only agent answering")
+    expect(p).toContain("other room members can still be asked")
+  })
+
+  it("asks for a human group-chat manner (greet, introduce, no role lists) in a group", () => {
+    const geno = candidateOf("autonomous")!
+    const p = buildRoomPayload({ ...base, members: [geno, teo, lex] })
+    expect(p).toContain("Talk like a person in a group chat")
+    expect(p).toContain("introduced yourself")
+    expect(p).toContain("no tables")
+  })
+
+  it("does not ask for banter when alone in the room", () => {
+    expect(buildRoomPayload({ ...base, peers: [], members: [teo] })).not.toContain("Talk like a person")
+  })
+
+  it("adds no member line when the roster is unknown", () => {
+    expect(buildRoomPayload(base)).not.toContain("Room members")
+  })
+
   it("clips long texts to bound tokens", () => {
     const p = buildRoomPayload({
       ...base,
