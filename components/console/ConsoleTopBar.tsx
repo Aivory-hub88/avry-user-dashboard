@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react"
 import { Bot, Terminal } from "lucide-react"
 import { useMode } from "@/contexts/ModeContext"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
@@ -23,8 +22,11 @@ interface ConsoleTopBarProps {
   onEditGroup?: () => void
 }
 
-/** Room group switcher: All agents / your groups / "New group". */
-function GroupMenu({
+/**
+ * Room groups, no dropdown: one button to create a group, and your existing
+ * groups as chips (click to use one, click again to go back to all agents).
+ */
+function GroupBar({
   teams,
   teamId,
   onTeamChange,
@@ -37,103 +39,47 @@ function GroupMenu({
   onNewGroup: () => void
   onEditGroup?: () => void
 }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const current = teams.find((t) => t.id === teamId) ?? null
-
-  useEffect(() => {
-    if (!open) return
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false)
-    }
-    document.addEventListener("mousedown", onDown)
-    document.addEventListener("keydown", onKey)
-    return () => {
-      document.removeEventListener("mousedown", onDown)
-      document.removeEventListener("keydown", onKey)
-    }
-  }, [open])
-
-  const item = "flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[12px] hover:bg-white/[0.06]"
-
   return (
-    <div ref={ref} className="relative ml-1 flex items-center gap-1">
+    <div className="ml-1 flex min-w-0 items-center gap-1.5">
       <button
         type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        title="Choose which agents this room uses"
-        className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-[3px] text-[11px] font-medium text-white/70 transition-colors hover:text-white/90"
+        onClick={onNewGroup}
+        className="shrink-0 rounded-full border border-[#b7cba6]/40 bg-[#b7cba6]/10 px-3 py-[3px] text-[11px] font-medium text-[#b7cba6] transition-colors hover:bg-[#b7cba6]/20"
       >
-        {current ? current.name : "All agents"} <span aria-hidden="true" className="text-white/35">▾</span>
+        + Create group of agents
       </button>
-      {current && onEditGroup && (
-        <button
-          type="button"
-          onClick={onEditGroup}
-          title="Group info"
-          aria-label="Group info"
-          className="rounded-full px-2 py-[3px] text-[11px] text-white/45 hover:bg-white/[0.06] hover:text-white/85"
-        >
-          Info
-        </button>
-      )}
-      {open && (
-        <div
-          role="menu"
-          className="absolute left-0 top-full z-30 mt-2 min-w-[220px] overflow-hidden rounded-xl border border-white/10 bg-[#161618] py-1 shadow-2xl"
-        >
-          <button
-            role="menuitemradio"
-            aria-checked={!current}
-            className={`${item} ${!current ? "text-white" : "text-white/70"}`}
-            onClick={() => {
-              onTeamChange(null)
-              setOpen(false)
-            }}
-          >
-            All agents {!current && <span aria-hidden="true">✓</span>}
-          </button>
-          {teams.map((t) => (
+      {teams.map((t) => {
+        const on = t.id === teamId
+        return (
+          <span key={t.id} className="flex shrink-0 items-center gap-0.5">
             <button
-              key={t.id}
-              role="menuitemradio"
-              aria-checked={t.id === teamId}
-              className={`${item} ${t.id === teamId ? "text-white" : "text-white/70"}`}
-              onClick={() => {
-                onTeamChange(t.id)
-                setOpen(false)
-              }}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onTeamChange(on ? null : t.id)}
+              title={on ? "Back to all agents" : `Use ${t.name} in this room`}
+              className={`rounded-full border px-3 py-[3px] text-[11px] font-medium transition-colors ${
+                on ? "border-white bg-white text-black" : "border-white/10 bg-white/[0.04] text-white/60 hover:text-white/90"
+              }`}
             >
-              <span className="truncate">{t.name}</span>
-              <span className="shrink-0 text-white/35">{t.agent_types.length} {t.id === teamId ? "✓" : ""}</span>
+              {t.name}
             </button>
-          ))}
-          <div className="my-1 border-t border-white/[0.06]" />
-          <button
-            role="menuitem"
-            className={`${item} text-[#b7cba6]`}
-            onClick={() => {
-              setOpen(false)
-              onNewGroup()
-            }}
-          >
-            + New group
-          </button>
-        </div>
-      )}
+            {on && onEditGroup && (
+              <button
+                type="button"
+                onClick={onEditGroup}
+                aria-label="Group info"
+                className="rounded-full px-2 py-[3px] text-[11px] text-white/45 hover:bg-white/[0.06] hover:text-white/85"
+              >
+                Info
+              </button>
+            )}
+          </span>
+        )
+      })}
     </div>
   )
 }
 
-// Switching agents happens in the left column now — this just confirms
-// who you're talking to, rather than duplicating that control here too.
-// The Direct/Room switch turns the same composer into a Mission Control
-// chat room: @mention deployed agents, every mention answers in parallel.
 export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, roomCount = 0, teams = [], teamId = null, onTeamChange, onNewGroup, onEditGroup }: ConsoleTopBarProps) {
   const { agentTarget } = useMode()
   const activeAgent = PREBUILT_AGENTS.find((a) => a.type === agentTarget)
@@ -174,7 +120,7 @@ export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, r
           </span>
         )}
         {inRoom && onTeamChange && onNewGroup && (
-          <GroupMenu teams={teams} teamId={teamId} onTeamChange={onTeamChange} onNewGroup={onNewGroup} onEditGroup={onEditGroup} />
+          <GroupBar teams={teams} teamId={teamId} onTeamChange={onTeamChange} onNewGroup={onNewGroup} onEditGroup={onEditGroup} />
         )}
       </div>
       <div className="flex items-center">
