@@ -23,6 +23,7 @@ import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { useActiveRuns } from "@/hooks/useActiveRuns"
 import { useRoomTeam } from "@/hooks/useRoomTeam"
 import { filterCandidatesByTeam } from "@/lib/agentTeams"
+import RoomGroupModal from "@/components/console/RoomGroupModal"
 import { useStuckTasks } from "@/hooks/useStuckTasks"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
 import { getMentionCandidates, parseAgentMentions, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
@@ -148,7 +149,16 @@ export default function ConsolePage() {
   const [showMissionControl, setShowMissionControl] = useState(false)
   const [chatMode, setChatMode] = useState<ConsoleChatMode>("direct")
   // Agent Team the Room is scoped to (ADR-020); none = all deployed agents.
-  const { teams: agentTeams, team: roomTeam, teamId: roomTeamId, setTeamId: setRoomTeamId } = useRoomTeam()
+  const {
+    teams: agentTeams,
+    team: roomTeam,
+    teamId: roomTeamId,
+    setTeamId: setRoomTeamId,
+    createGroup,
+    saveGroup,
+    removeGroup,
+  } = useRoomTeam()
+  const [groupModal, setGroupModal] = useState<"create" | "edit" | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [activeChip, setActiveChip] = useState<string | null>(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
@@ -254,9 +264,10 @@ export default function ConsolePage() {
 
   // Room mode (Mission Control chat room): only deployed agents are
   // mentionable — @ expands to this list, sends fan out in parallel.
+  const roomAgents = useMemo(() => getMentionCandidates(deployments), [deployments])
   const mentionCandidates = useMemo(
-    () => filterCandidatesByTeam(getMentionCandidates(deployments), roomTeam),
-    [deployments, roomTeam],
+    () => filterCandidatesByTeam(roomAgents, roomTeam),
+    [roomAgents, roomTeam],
   )
   const inRoom = chatMode === "room"
 
@@ -603,6 +614,8 @@ export default function ConsolePage() {
           teams={agentTeams}
           teamId={roomTeamId}
           onTeamChange={setRoomTeamId}
+          onNewGroup={() => setGroupModal("create")}
+          onEditGroup={() => setGroupModal("edit")}
         />
       )}
 
@@ -1031,6 +1044,17 @@ export default function ConsolePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {groupModal && (
+        <RoomGroupModal
+          candidates={roomAgents}
+          group={groupModal === "edit" ? roomTeam : null}
+          onClose={() => setGroupModal(null)}
+          onCreate={createGroup}
+          onSave={saveGroup}
+          onDelete={removeGroup}
+        />
       )}
     </div>
     </OfficeShell>
