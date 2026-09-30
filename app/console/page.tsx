@@ -214,6 +214,15 @@ export default function ConsolePage() {
 
   // Extracted hooks
   const { attachments, setAttachments, isDragging, handleFileSelect } = useFileUpload(addToast)
+  // Deployed agents and the Room's members (narrowed to the picked group). Defined
+  // before useChat: the room turn tells every agent who is in the room.
+  const { deployments } = useAgentDeployments()
+  const roomAgents = useMemo(() => getMentionCandidates(deployments), [deployments])
+  const mentionCandidates = useMemo(
+    () => filterCandidatesByTeam(roomAgents, roomTeam),
+    [roomAgents, roomTeam],
+  )
+
   const {
     messages,
     sessions,
@@ -240,6 +249,7 @@ export default function ConsolePage() {
     triggerClassification,
     addToast,
     teamId: roomTeamId,
+    roomMembers: mentionCandidates,
   })
 
   // A decision already rendered inline in this open thread must not also
@@ -253,7 +263,6 @@ export default function ConsolePage() {
     approvalsError,
     retryApprovals: refetchApprovals,
   } = useNotificationFeed({ sessionsByAgent, currentSessionId, excludeApprovalIds: inlineApprovalIds })
-  const { deployments } = useAgentDeployments()
   const { byAgentType: activeRunsByAgentType } = useActiveRuns()
   const {
     stuck: stuckTasks,
@@ -264,11 +273,6 @@ export default function ConsolePage() {
 
   // Room mode (Mission Control chat room): only deployed agents are
   // mentionable — @ expands to this list, sends fan out in parallel.
-  const roomAgents = useMemo(() => getMentionCandidates(deployments), [deployments])
-  const mentionCandidates = useMemo(
-    () => filterCandidatesByTeam(roomAgents, roomTeam),
-    [roomAgents, roomTeam],
-  )
   const inRoom = chatMode === "room"
 
   const changeChatMode = useCallback((mode: ConsoleChatMode) => {

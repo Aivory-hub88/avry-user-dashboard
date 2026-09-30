@@ -229,6 +229,12 @@ export interface RoomPayloadParams {
   peers: MentionCandidate[]
   /** Raw user message, @mentions intact (they signal who is asked what). */
   userText: string
+  /**
+   * Everyone in the room (the picked group or all deployed agents), whether or
+   * not they answer this round. Without it an agent addressed alone is told it
+   * is "the only agent" and guesses teammates' roles from their ids.
+   */
+  members?: MentionCandidate[]
   /** Room transcript before this turn, oldest-first. */
   history: RoomHistoryEntry[]
   /** Replies already given this round, in speaking order. */
@@ -252,7 +258,7 @@ function clip(text: string, max: number): string {
   return t.length > max ? `${t.slice(0, max)}…` : t
 }
 
-export function buildRoomPayload({ me, peers, userText, history, roundReplies, ledgerHint }: RoomPayloadParams): string {
+export function buildRoomPayload({ me, peers, members = [], userText, history, roundReplies, ledgerHint }: RoomPayloadParams): string {
   const lines: string[] = []
   lines.push("<room_context>")
   lines.push(`You are in the "Mission Control Room" group chat on the Aivory dashboard. You are ${me.name} (${me.title}).`)
@@ -262,7 +268,21 @@ export function buildRoomPayload({ me, peers, userText, history, roundReplies, l
         "Each of you replies separately and the user sees all replies side by side.",
     )
   } else {
-    lines.push("You are the only agent answering in this round.")
+    lines.push(
+      members.length > 1
+        ? "You are the only agent answering in this round. That does not make the room just you: the other room members can still be asked to do things."
+        : "You are the only agent answering in this round.",
+    )
+  }
+  if (members.length > 0) {
+    // Roles come from the roster, never from the ids: an id like customer_service
+    // is not a job title. The id is the alias to delegate to.
+    lines.push(
+      `Room members (the whole group, not only those answering now): ${members
+        .map((m) => `${m.name}, ${m.title} [id: ${m.type}]`)
+        .join("; ")}. ` +
+        "Use exactly these titles when describing them. To reach a member who is not answering this round, delegate to them by id.",
+    )
   }
   lines.push(
     "Read the whole user message and work out what is asked of YOU specifically — it may ask you to help another member, or ask another member to help you. " +
