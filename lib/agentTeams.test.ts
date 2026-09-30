@@ -73,3 +73,23 @@ describe('boundElsewhere', () => {
     expect(set.has('workspace:r1')).toBe(false)
   })
 })
+
+describe('filterCandidatesByTeam', async () => {
+  const { filterCandidatesByTeam } = await import('./agentTeams')
+  const all = [{ type: 'autonomous' }, { type: 'leads_qualifier' }, { type: 'customer_service' }]
+
+  it('offers only the isolated team members', () => {
+    const out = filterCandidatesByTeam(all, { isolated: true, agent_types: ['leads_qualifier', 'customer_service'] })
+    expect(out.map((c) => c.type)).toEqual(['leads_qualifier', 'customer_service'])
+  })
+
+  it('leaves everything alone with no team or a non-isolated one', () => {
+    expect(filterCandidatesByTeam(all, null)).toBe(all)
+    expect(filterCandidatesByTeam(all, undefined)).toBe(all)
+    expect(filterCandidatesByTeam(all, { isolated: false, agent_types: ['autonomous'] })).toBe(all)
+  })
+
+  it('can leave nothing if the team shares no deployed agent', () => {
+    expect(filterCandidatesByTeam(all, { isolated: true, agent_types: ['office_assistant'] })).toEqual([])
+  })
+})

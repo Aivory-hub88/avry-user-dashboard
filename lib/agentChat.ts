@@ -39,6 +39,8 @@ export async function sendAgentMessage(
   text: string,
   conversationId?: string,
   signal?: AbortSignal,
+  /** Agent Team this Room turn belongs to (ADR-020); omitted = all deployed agents. */
+  teamId?: string | null,
 ): Promise<AgentChatResult> {
   const init: RequestInit = {
     method: 'POST',
@@ -46,6 +48,7 @@ export async function sendAgentMessage(
       agent_type: agentType,
       text,
       conversation_id: conversationId,
+      ...(teamId ? { team_id: teamId } : {}),
     }),
   }
   // AbortSignal survives authedFetch's init spread (and its 401 retry),

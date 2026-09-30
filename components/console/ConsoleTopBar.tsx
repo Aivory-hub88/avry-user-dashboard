@@ -1,6 +1,7 @@
 import { Bot, Terminal } from "lucide-react"
 import { useMode } from "@/contexts/ModeContext"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
+import type { AgentTeam } from "@/lib/agentTeams"
 
 export type ConsoleChatMode = "direct" | "room"
 
@@ -11,13 +12,17 @@ interface ConsoleTopBarProps {
   onChatModeChange?: (mode: ConsoleChatMode) => void
   /** Deployed-agent count shown on the Room pill. */
   roomCount?: number
+  /** Agent Teams (ADR-020): scope the Room to one team's agents. Hidden with no teams. */
+  teams?: AgentTeam[]
+  teamId?: string | null
+  onTeamChange?: (id: string | null) => void
 }
 
 // Switching agents happens in the left column now — this just confirms
 // who you're talking to, rather than duplicating that control here too.
 // The Direct/Room switch turns the same composer into a Mission Control
 // chat room: @mention deployed agents, every mention answers in parallel.
-export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, roomCount = 0 }: ConsoleTopBarProps) {
+export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, roomCount = 0, teams = [], teamId = null, onTeamChange }: ConsoleTopBarProps) {
   const { agentTarget } = useMode()
   const activeAgent = PREBUILT_AGENTS.find((a) => a.type === agentTarget)
   const inRoom = chatMode === "room"
@@ -55,6 +60,22 @@ export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, r
               </button>
             ))}
           </span>
+        )}
+        {inRoom && onTeamChange && teams.length > 0 && (
+          <select
+            aria-label="Agent team for this room"
+            value={teamId ?? ""}
+            onChange={(e) => onTeamChange(e.target.value || null)}
+            title="Limit this room to one agent team"
+            className="ml-1 rounded-full border border-white/10 bg-white/[0.04] px-3 py-[3px] text-[11px] font-medium text-white/70 outline-none hover:text-white/90"
+          >
+            <option value="">All my agents</option>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
         )}
       </div>
       <div className="flex items-center">
