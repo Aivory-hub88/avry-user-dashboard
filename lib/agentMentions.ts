@@ -101,6 +101,39 @@ export function parseAgentMentions(text: string, candidates: MentionCandidate[])
   return out
 }
 
+function escapeMentionRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+/**
+ * Name-based addressing ("panggilkan Lex", "tanya ke Teo", "ask Finn") —
+ * mention semantics without the @ sign. Whole-word match (case-insensitive)
+ * on display name, agent type id, and the id without underscores, in order
+ * of first appearance, deduplicated. Only deployed candidates are ever
+ * passed in, so every hit is directly callable — same guarantee as @.
+ */
+export function resolveNamedAgents(text: string, candidates: MentionCandidate[]): string[] {
+  const hits: Array<{ type: string; index: number }> = []
+  for (const c of candidates) {
+    const aliases = [c.name, c.type, c.type.replace(/_/g, "")]
+    for (const a of aliases) {
+      if (!a) continue
+      const re = new RegExp(`(^|[^A-Za-z0-9_])${escapeMentionRegExp(a)}([^A-Za-z0-9_]|$)`, "i")
+      const m = re.exec(text)
+      if (m) {
+        hits.push({ type: c.type, index: m.index })
+        break
+      }
+    }
+  }
+  hits.sort((x, y) => x.index - y.index)
+  const out: string[] = []
+  for (const h of hits) {
+    if (!out.includes(h.type)) out.push(h.type)
+  }
+  return out
+}
+
 /**
  * Whole-room intents: messages that ask EVERY member to answer for themselves.
  * Addressing one agent ("@Aira absen satu-satu") must not leave the rest silent

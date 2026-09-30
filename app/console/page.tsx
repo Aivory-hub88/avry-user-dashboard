@@ -26,7 +26,7 @@ import { filterCandidatesByTeam } from "@/lib/agentTeams"
 import RoomGroupModal from "@/components/console/RoomGroupModal"
 import { useStuckTasks } from "@/hooks/useStuckTasks"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
-import { getMentionCandidates, parseAgentMentions, detectRoundIntent, expandToRoom, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
+import { getMentionCandidates, parseAgentMentions, resolveNamedAgents, detectRoundIntent, expandToRoom, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
 import { fetchLedgerHint } from "@/lib/roomLedger"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
 import { collabAuthHeaders } from "@/lib/collabClient"
@@ -129,7 +129,7 @@ function RoomMembers({ candidates }: { candidates: MentionCandidate[] }) {
         ))}
       </span>
       <span>
-        Room · {candidates.map((c) => c.name).join(", ")} · type @ to mention
+        Room · {candidates.map((c) => c.name).join(", ")} · type @ or a name to mention
       </span>
     </div>
   )
@@ -403,6 +403,19 @@ export default function ConsolePage() {
             atts,
             mentioned,
             await fetchLedgerHint(currentSessionId, mentioned),
+          )
+        } else if (resolveNamedAgents(text, mentionCandidates).length > 0) {
+          // Name-called ("panggilkan Lex", "tanya Teo"): same mention
+          // semantics as @ — the named agent answers in its own bubble via
+          // handleSendRoom, instead of the fallback agent delegating behind
+          // the scenes and narrating the result.
+          const named = resolveNamedAgents(text, mentionCandidates)
+          saveRoomSticky(named)
+          await handleSendRoom(
+            text,
+            atts,
+            named,
+            await fetchLedgerHint(currentSessionId, named),
           )
         } else {
           // No @mention: continue with whoever holds the floor in this
