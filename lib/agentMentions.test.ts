@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest"
 import {
   buildRoomPayload,
   detectRoundIntent,
+  agentAwaitingApproval,
+  roomTurnText,
   expandToRoom,
   candidateOf,
   getMentionCandidates,
@@ -338,5 +340,45 @@ describe("buildRoomPayload roll-call intent", () => {
   })
   it("adds nothing without the intent", () => {
     expect(buildRoomPayload({ ...base, members: [teo, lex] })).not.toContain("roll call")
+  })
+})
+
+describe("answering a pending approval inside the Room", () => {
+  const parked = { id: "pa_1", tool_name: "x", risk_tier: "irreversible" }
+  const msgs = (over: object = {}) => [
+    { role: "user", content: "hapus barisnya" },
+    { role: "assistant", agentType: "leads_qualifier", pendingApproval: parked, ...over },
+  ]
+
+  it("knows the agent is waiting when its latest bubble carries an unanswered approval", () => {
+    expect(agentAwaitingApproval(msgs(), "leads_qualifier")).toBe(true)
+  })
+
+  it("is not waiting once the user acted, for another agent, or with no approval", () => {
+    expect(agentAwaitingApproval(msgs({ approvalOutcome: "denied" }), "leads_qualifier")).toBe(false)
+    expect(agentAwaitingApproval(msgs(), "autonomous")).toBe(false)
+    expect(agentAwaitingApproval(msgs({ pendingApproval: null }), "leads_qualifier")).toBe(false)
+    expect(agentAwaitingApproval([], "leads_qualifier")).toBe(false)
+  })
+
+  it("looks only at that agent's LATEST bubble", () => {
+    const list = [
+      { role: "assistant", agentType: "leads_qualifier", pendingApproval: parked },
+      { role: "user", content: "x" },
+      { role: "assistant", agentType: "leads_qualifier", pendingApproval: null },
+    ]
+    expect(agentAwaitingApproval(list, "leads_qualifier")).toBe(false)
+  })
+
+  const wrapped = "<room_context>...</room_context><user_message>Batal</user_message>"
+  it("sends a short reply raw while an approval is pending", () => {
+    expect(roomTurnText({ rawText: "Batal", wrapped, awaitingApproval: true })).toBe("Batal")
+    expect(roomTurnText({ rawText: "  Ya  ", wrapped, awaitingApproval: true })).toBe("Ya")
+  })
+
+  it("keeps the full room payload otherwise", () => {
+    expect(roomTurnText({ rawText: "Batal", wrapped, awaitingApproval: false })).toBe(wrapped)
+    expect(roomTurnText({ rawText: "ya tolong ganti juga kolom C dan D besok pagi", wrapped, awaitingApproval: true })).toBe(wrapped)
+    expect(roomTurnText({ rawText: "   ", wrapped, awaitingApproval: true })).toBe(wrapped)
   })
 })

@@ -8,7 +8,7 @@ import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
 import { sendAgentMessage, type ConsolePendingApproval } from '@/lib/agentChat'
 import { notifyApprovalsChanged } from '@/lib/agentApprovals'
-import { agentNameOf, buildRoomPayload, candidateOf, type MentionCandidate, type RoomHistoryEntry, type RoundIntent } from '@/lib/agentMentions'
+import { agentAwaitingApproval, agentNameOf, buildRoomPayload, candidateOf, roomTurnText, type MentionCandidate, type RoomHistoryEntry, type RoundIntent } from '@/lib/agentMentions'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
 import { useMode } from '@/contexts/ModeContext'
 import { useSession } from './useSession'
@@ -465,7 +465,14 @@ export function useChat({
       if (signal.aborted) break
       const me = candidateOf(t) ?? { type: t, name: agentNameOf(t), title: t, channels: [] as string[] }
       const peers = targets.filter(x => x !== t).map(x => candidateOf(x) ?? { type: x, name: agentNameOf(x), title: x, channels: [] as string[] })
-      const payload = buildRoomPayload({ me, peers, userText, history, roundReplies, ledgerHint, members: roomMembersRef.current, intent })
+      const wrapped = buildRoomPayload({ me, peers, userText, history, roundReplies, ledgerHint, members: roomMembersRef.current, intent })
+      // A short "Ya"/"Batal" to an agent that is waiting on an approval must reach the
+      // backend as-is: wrapped in the room context it is no longer recognised as an answer.
+      const payload = roomTurnText({
+        rawText: displayText,
+        wrapped,
+        awaitingApproval: atts.length === 0 && agentAwaitingApproval(messagesRef.current, t),
+      })
       try {
         const result = await sendAgentMessage(t as TelegramAgentType, payload, sentSessionId, signal, teamIdRef.current)
         // Backend reply is unvalidated (Cerveau may return null/a non-string
