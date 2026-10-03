@@ -5,6 +5,7 @@
  * AgentSelector dropdown in ConsoleTopBar: one place to switch agents,
  * not two.
  */
+import { pickDirectThread } from "@/lib/agentThreads"
 import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import { ChevronRight, ChevronLeft, Lock, Plus, Trash2, LayoutGrid, Search } from "lucide-react"
@@ -136,8 +137,12 @@ export default function AgentColumn({
     }
     setExpanded(row.key)
     onExitMissionControl?.()
-    if (threads.length > 0) {
-      switchSession(threads[0].id)
+    const own = pickDirectThread(threads, row.type)
+    if (own) {
+      switchSession(own.id)
+      // switchSession no-ops when that thread is already open, and a shared
+      // thread would have restored its owner — pin the agent that was clicked.
+      setAgentTarget(row.type)
     } else {
       handleNewChat()
       setAgentTarget(row.type)
