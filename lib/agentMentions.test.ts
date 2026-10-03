@@ -382,3 +382,34 @@ describe("answering a pending approval inside the Room", () => {
     expect(roomTurnText({ rawText: "   ", wrapped, awaitingApproval: true })).toBe(wrapped)
   })
 })
+
+describe("handoff in the room payload", () => {
+  const teo = candidateOf("customer_service")!
+  const lex = candidateOf("leads_qualifier")!
+  const base = { me: teo, peers: [], userText: "cek tiket", history: [], roundReplies: [], members: [teo, lex] }
+
+  it("explains how to hand work over, and when not to", () => {
+    const p = buildRoomPayload(base)
+    expect(p).toContain("write @FirstName")
+    expect(p).toContain("Never @ someone just to greet or thank them")
+  })
+
+  it("gives the receiver the handoff and the last-hop rule", () => {
+    const first = buildRoomPayload({ ...base, handoff: { from: "Lex", text: "@Teo cek tiket 123", hop: 1 } })
+    expect(first).toContain('<handoff from="Lex" hop="1" max="2">')
+    expect(first).toContain("@Teo cek tiket 123")
+    expect(first).toContain("otherwise do not @ anyone")
+    const last = buildRoomPayload({ ...base, handoff: { from: "Lex", text: "x", hop: 2 } })
+    expect(last).toContain("This is the last hop: do not @mention anyone.")
+  })
+
+  it("forbids @ during a roll call and offers no handoff guidance there", () => {
+    const p = buildRoomPayload({ ...base, intent: "rollcall" })
+    expect(p).toContain("Do not @mention anyone in this reply.")
+    expect(p).not.toContain("write @FirstName")
+  })
+
+  it("adds nothing when alone in the room", () => {
+    expect(buildRoomPayload({ ...base, members: [teo] })).not.toContain("write @FirstName")
+  })
+})

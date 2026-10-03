@@ -14,6 +14,7 @@
 
 import { z } from "zod";
 import { AGENT_ROSTER } from "@/lib/agentRoster";
+import { HANDOFF_MAX_DEPTH } from "@/lib/agentHandoff";
 
 export const SpaceAgentTaskSchema = z.object({
   id: z.string().min(1),
@@ -29,6 +30,9 @@ export const SpaceAgentTaskSchema = z.object({
   createdBy: z.string().min(1),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
+  /** Handoff chain (ADR-020): the human message that started it, and hops after it. */
+  chainRoot: z.string().nullable().optional(),
+  chainDepth: z.number().int().optional(),
 });
 export type SpaceAgentTask = z.infer<typeof SpaceAgentTaskSchema>;
 
@@ -61,6 +65,10 @@ export interface SpacePayloadParams {
   history: SpacePayloadEntry[];
   /** Room the turn happens in (ADR-019 P3): brief, task board, files, excerpts. */
   room?: SpaceRoomContext | null;
+  /** Other agents in this space that can be handed work (display names). */
+  teammates?: string[];
+  /** Set when this turn is itself a handoff: hops after the human's message (1 = first). */
+  hop?: number;
 }
 
 /** Same shape as lib/roomContext's RoomContext, declared here so this module stays client-safe. */
@@ -90,6 +98,10 @@ function block(tag: string, body: string, max: number): string[] {
 const MAX_HISTORY_ENTRIES = 12;
 const MAX_HISTORY_CHARS = 500;
 
+function params_teammates(t: string[] | undefined): string[] {
+  return Array.isArray(t) ? t.filter(Boolean) : [];
+}
+
 function clip(text: string, max: number): string {
   const t = text.replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max)}…` : t;
@@ -104,7 +116,7 @@ function clip(text: string, max: number): string {
  * Men-coaching ulang per-pesan hanya memanjangkan prompt tanpa menambah
  * informasi yang belum dimiliki session.
  */
-export function buildSpacePayload({ instruction, history, room }: SpacePayloadParams): string {
+export function buildSpacePayload({ instruction, history, room, teammates, hop }: SpacePayloadParams): string {
   const lines: string[] = [];
   if (room) {
     lines.push(...block("room_brief", room.brief, MAX_BRIEF_CHARS));
@@ -124,6 +136,17 @@ export function buildSpacePayload({ instruction, history, room }: SpacePayloadPa
     lines.push("</thread_history>");
   }
 
+  if (params_teammates(teammates).length > 0) {
+    lines.push("<handoff_rules>");
+    lines.push(
+      `Teammates in this space: ${teammates!.join(", ")}. To hand work to one, write @Name followed by exactly what you need from them; they answer in their own message. ` +
+        "Only do this when you truly need their skills or tools. Never @ someone just to greet or thank them or to repeat what they said. " +
+        (hop !== undefined && hop >= HANDOFF_MAX_DEPTH
+          ? "This is the last hop: do not @mention anyone."
+          : hop ? "If you still need another teammate, @ them; otherwise do not @ anyone." : ""),
+    );
+    lines.push("</handoff_rules>");
+  }
   lines.push("<instruction>");
   lines.push(instruction.trim());
   lines.push("</instruction>");
@@ -153,6 +176,8 @@ export function spaceAgentTaskFromRow(row: Record<string, unknown>): SpaceAgentT
     createdBy: String(row.created_by ?? ""),
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
+    chainRoot: typeof row.chain_root === "string" && row.chain_root ? row.chain_root : null,
+    chainDepth: typeof row.chain_depth === "number" ? row.chain_depth : 0,
   });
   return parsed.success ? parsed.data : null;
 }
