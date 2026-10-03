@@ -8,6 +8,7 @@ import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
 import { sendAgentMessage, type ConsolePendingApproval } from '@/lib/agentChat'
 import { notifyApprovalsChanged } from '@/lib/agentApprovals'
+import { planHandoffs } from '@/lib/agentHandoff'
 import { agentAwaitingApproval, agentNameOf, buildRoomPayload, candidateOf, roomTurnText, type MentionCandidate, type RoomHistoryEntry, type RoundIntent } from '@/lib/agentMentions'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
 import { useMode } from '@/contexts/ModeContext'
@@ -435,18 +436,27 @@ export function useChat({
 
     const ts = Date.now()
     const userMsg: Message = { id: `${ts}-room-user`, role: "user", content: displayText, attachments: atts.length > 0 ? atts : undefined, replyPreview: activeReplyTo ?? undefined }
-    const placeholders: Message[] = targets.map((t, i) => ({
-      id: `${ts}-room-${t}-${i}`,
+    // One turn per bubble. The human's @mentions seed the queue (depth 0); a reply that
+    // @mentions a teammate appends a turn for them (ADR-020 handoff), so the teammate
+    // answers in its own bubble. Results are keyed by turn id, not agent type, because
+    // an agent can speak twice in one chain.
+    type RoomTurn = { id: string; agent: string; depth: number; handoff: { from: string; text: string; hop: number } | null }
+    const turns: RoomTurn[] = targets.map((t, i) => ({ id: `${ts}-room-${t}-${i}`, agent: t, depth: 0, handoff: null }))
+    const placeholderFor = (turn: RoomTurn): Message => ({
+      id: turn.id,
       role: "assistant",
       content: "",
       isStreaming: true,
-      agentType: t,
-      agentName: agentNameOf(t),
-    }))
+      agentType: turn.agent,
+      agentName: agentNameOf(turn.agent),
+    })
+    const placeholders: Message[] = turns.map(placeholderFor) // grows when a teammate is handed work
+    const baseMessages = [...messagesRef.current]
     const sentSessionId = currentSessionId
-    const sentMessagesSnapshot = [...messagesRef.current, userMsg, ...placeholders]
 
-    setMessages(p => [...p, userMsg, ...placeholders])
+    // Copy: `placeholders` grows later (handoffs) and a React updater may run after that.
+    const initialPlaceholders = [...placeholders]
+    setMessages(p => [...p, userMsg, ...initialPlaceholders])
     clearAttachments()
     streamingSessionRef.current = sentSessionId
     setIsStreaming(true)
@@ -461,17 +471,19 @@ export function useChat({
     // by the merge below, no error toast.
     const roundReplies: RoomHistoryEntry[] = []
     const outcomes = new Map<string, { reply: string; pendingApproval: ConsolePendingApproval | null }>()
-    for (const t of targets) {
+    for (let qi = 0; qi < turns.length; qi++) {
+      const turn = turns[qi]
+      const t = turn.agent
       if (signal.aborted) break
       const me = candidateOf(t) ?? { type: t, name: agentNameOf(t), title: t, channels: [] as string[] }
-      const peers = targets.filter(x => x !== t).map(x => candidateOf(x) ?? { type: x, name: agentNameOf(x), title: x, channels: [] as string[] })
-      const wrapped = buildRoomPayload({ me, peers, userText, history, roundReplies, ledgerHint, members: roomMembersRef.current, intent })
+      const peers = [...new Set(turns.map(x => x.agent))].filter(x => x !== t).map(x => candidateOf(x) ?? { type: x, name: agentNameOf(x), title: x, channels: [] as string[] })
+      const wrapped = buildRoomPayload({ me, peers, userText, history, roundReplies, ledgerHint, members: roomMembersRef.current, intent, handoff: turn.handoff })
       // A short "Ya"/"Batal" to an agent that is waiting on an approval must reach the
       // backend as-is: wrapped in the room context it is no longer recognised as an answer.
       const payload = roomTurnText({
         rawText: displayText,
         wrapped,
-        awaitingApproval: atts.length === 0 && agentAwaitingApproval(messagesRef.current, t),
+        awaitingApproval: !turn.handoff && atts.length === 0 && agentAwaitingApproval(messagesRef.current, t),
       })
       try {
         const result = await sendAgentMessage(t as TelegramAgentType, payload, sentSessionId, signal, teamIdRef.current)
@@ -482,7 +494,7 @@ export function useChat({
         if (typeof result.reply !== "string" || !result.reply.trim()) {
           throw new Error("empty reply")
         }
-        outcomes.set(t, { reply: result.reply, pendingApproval: result.pendingApproval ?? null })
+        outcomes.set(turn.id, { reply: result.reply, pendingApproval: result.pendingApproval ?? null })
         roundReplies.push({ author: me.name, text: result.reply })
         // Paint progressively — the room feels alive while later agents
         // are still thinking, instead of going quiet for the whole chain.
@@ -492,14 +504,37 @@ export function useChat({
         // crash). Never spread a Map for this.
         if (currentSessionIdRef.current === sentSessionId) {
           setMessages(p => p.map(m => {
-            const idx = placeholders.findIndex(ph => ph.id === m.id)
-            if (idx === -1 || targets[idx] !== t) return m
-            const o = outcomes.get(t)
-            if (!o) return m
-            return { ...m, content: o.reply, isStreaming: false, pendingApproval: o.pendingApproval }
+            if (m.id !== turn.id) return m
+            const o = outcomes.get(turn.id)
+            return o ? { ...m, content: o.reply, isStreaming: false, pendingApproval: o.pendingApproval } : m
           }))
         }
-        setStreamingAgentType(targets[targets.indexOf(t) + 1] ?? undefined)
+        // ADR-020: an @mention in this reply hands work to a teammate, who answers in
+        // their own bubble. A parked approval ends this branch; depth, total turns and
+        // turns per agent are capped (lib/agentHandoff).
+        if (!result.pendingApproval) {
+          const usedPerAgent: Record<string, number> = {}
+          for (const x of turns) usedPerAgent[x.agent] = (usedPerAgent[x.agent] ?? 0) + 1
+          const next = planHandoffs(result.reply, roomMembersRef.current, t, {
+            depth: turn.depth,
+            usedPerAgent,
+            usedTotal: turns.length,
+            queued: turns.slice(qi + 1).map(x => x.agent),
+          })
+          for (const agent of next) {
+            const handed: RoomTurn = {
+              id: `${ts}-room-${agent}-h${turns.length}`,
+              agent,
+              depth: turn.depth + 1,
+              handoff: { from: me.name, text: result.reply, hop: turn.depth + 1 },
+            }
+            turns.push(handed)
+            const ph = placeholderFor(handed)
+            placeholders.push(ph)
+            if (currentSessionIdRef.current === sentSessionId) setMessages(p => [...p, ph])
+          }
+        }
+        setStreamingAgentType(turns[qi + 1]?.agent ?? undefined)
       } catch {
         // Stopped turns break the chain quietly; failures toast per agent.
         if (signal.aborted) break
@@ -510,9 +545,8 @@ export function useChat({
     // Pure merge: successes fill their bubble, failures drop theirs.
     const applyRoomResults = (list: Message[]): Message[] =>
       list.flatMap(m => {
-        const idx = placeholders.findIndex(ph => ph.id === m.id)
-        if (idx === -1) return [m]
-        const o = outcomes.get(targets[idx])
+        if (!placeholders.some(ph => ph.id === m.id)) return [m]
+        const o = outcomes.get(m.id)
         if (o) return [{ ...m, content: o.reply, isStreaming: false, pendingApproval: o.pendingApproval }]
         return []
       })
@@ -526,7 +560,7 @@ export function useChat({
           return updated
         })
       } else {
-        const finalList = applyRoomResults(sentMessagesSnapshot)
+        const finalList = applyRoomResults([...baseMessages, userMsg, ...placeholders])
         saveSessionMessages(sentSessionId, finalList, agentTarget)
         setSessions(listSessions())
       }

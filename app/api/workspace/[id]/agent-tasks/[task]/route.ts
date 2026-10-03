@@ -3,7 +3,9 @@
  * (Tombol Jalankan / lanjutkan approval; auto-run primer kini fire-and-
  * forget dari POST messages.) Inti di `lib/spaceAgentRun.ts`.
  *
- * - Hanya kredensial user (agent tidak memicu agent — depth 1, ADR-008).
+ * - Hanya kredensial user: endpoint ini tidak bisa dipicu oleh agent. Handoff antar-agent
+ *   (ADR-020) berjalan DI DALAM runAgentTask dengan kredensial user yang sama dan dibatasi
+ *   kedalaman/jumlah giliran (lib/agentHandoff), bukan lewat kredensial layanan.
  * - Gate tulis: owner/editor.
  * - Reply → pesan agent + task done. pending_approval → task blocked +
  *   approval_ref, NOL tulis (guard irreversible: Deny = nol tulis).

@@ -13,6 +13,7 @@
  */
 
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
+import { HANDOFF_MAX_DEPTH } from "@/lib/agentHandoff"
 
 export interface MentionCandidate {
   type: string
@@ -326,6 +327,8 @@ export interface RoomPayloadParams {
   userText: string
   /** Set when the user asked every member to answer for themselves (roll call / introductions). */
   intent?: RoundIntent | null
+  /** Set when a teammate handed this turn over with an @mention (ADR-020). `hop` is 1 for the first handoff. */
+  handoff?: { from: string; text: string; hop: number } | null
   /**
    * Everyone in the room (the picked group or all deployed agents), whether or
    * not they answer this round. Without it an agent addressed alone is told it
@@ -355,7 +358,7 @@ function clip(text: string, max: number): string {
   return t.length > max ? `${t.slice(0, max)}…` : t
 }
 
-export function buildRoomPayload({ me, peers, members = [], intent = null, userText, history, roundReplies, ledgerHint }: RoomPayloadParams): string {
+export function buildRoomPayload({ me, peers, members = [], intent = null, handoff = null, userText, history, roundReplies, ledgerHint }: RoomPayloadParams): string {
   const lines: string[] = []
   lines.push("<room_context>")
   lines.push(`You are in the "Mission Control Room" group chat on the Aivory dashboard. You are ${me.name} (${me.title}).`)
@@ -387,6 +390,26 @@ export function buildRoomPayload({ me, peers, members = [], intent = null, userT
         "Answer for YOURSELF only, in one or two short sentences in your own voice: say hi and who you are. " +
         "Do not answer for teammates, do not list who is present, do not delegate, and do not repeat an introduction a teammate already gave in this round.",
     )
+  }
+  if (members.length > 1 && intent !== "rollcall") {
+    // Handing work over. A teammate you @ answers in their own message, so only do it
+    // when you really need them (every handoff is a paid turn, and chains are capped).
+    lines.push(
+      "To hand work to a teammate, write @FirstName followed by exactly what you need from them; they will answer in their own message. " +
+        "Do this only when you truly need their skills or tools. Never @ someone just to greet or thank them or to repeat what they already said, " +
+        "and do not @ the person who just handed this to you unless you need something new from them. When you only talk ABOUT someone, use their plain name without @.",
+    )
+  }
+  if (intent === "rollcall") {
+    lines.push("Do not @mention anyone in this reply.")
+  }
+  if (handoff) {
+    const last = handoff.hop >= HANDOFF_MAX_DEPTH
+    lines.push(
+      `${handoff.from} handed this over to you with an @mention. Answer what ${handoff.from} asked, directly, for the user. ` +
+        (last ? "This is the last hop: do not @mention anyone." : "If you still need another teammate, @ them; otherwise do not @ anyone."),
+    )
+    lines.push(`<handoff from="${handoff.from}" hop="${handoff.hop}" max="${HANDOFF_MAX_DEPTH}">`, handoff.text.trim().slice(0, 1500), "</handoff>")
   }
   if (members.length > 1) {
     // Group-chat manner. The other agents are teammates you are talking WITH,

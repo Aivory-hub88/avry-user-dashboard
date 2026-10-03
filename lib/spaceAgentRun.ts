@@ -17,10 +17,13 @@ import {
   buildSpacePayload,
   pickSpaceLeader,
   actingAsFor,
+  stripInstruction,
   type SpaceAgentTask,
 } from "@/lib/spaceAgent";
 import { newId } from "@/lib/spaceWrite";
 import { ingestRoomFiles, loadRoomContext } from "@/lib/roomContext";
+import { linkAgentMentions, planHandoffs } from "@/lib/agentHandoff";
+import { enqueueAgentTasks } from "@/lib/spaceAgentStore";
 import type { WorkspaceCredential } from "@/lib/workspaceAuth";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://backend.aivory.id";
@@ -39,6 +42,94 @@ async function loadSpaceLeader(spaceId: string): Promise<string | null> {
     [[bare, `workspace:${bare}`]],
   );
   return pickSpaceLeader(found.rows as { id: unknown; owner: unknown }[], spaceId);
+}
+
+/** Agents invited to this Space (the only ones that can be handed work). */
+async function loadSpaceAgents(spaceId: string): Promise<string[]> {
+  const bare = spaceId.replace(/^workspace:/, "").replace(/^db:/, "");
+  try {
+    const r = await query(`SELECT agent_type FROM dashboard.workspace_agent_acl WHERE doc_id = $1`, [bare]);
+    return (r.rows as Record<string, unknown>[]).map((x) => String(x.agent_type)).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * ADR-020: a reply that @mentions a teammate hands work over. Enqueues a task for them
+ * (created_by `agent:<type>`) in the same thread and runs it, so they answer in their own
+ * message. Bounded by depth / turns per chain / turns per agent (lib/agentHandoff). Runs
+ * under the SAME user credential as the chain's first turn, so tenant (acting-as-leader),
+ * credits and the approval gate behave exactly as for a human @mention. Best effort: a
+ * failure here (e.g. migrations/workspace-agent-handoff.sql not applied) never fails the
+ * reply that was already posted.
+ */
+async function spawnHandoffs(opts: {
+  spaceId: string;
+  task: SpaceAgentTask;
+  linkedReply: string;
+  msgId: string;
+  candidates: { type: string; name: string }[];
+  credential: Extract<WorkspaceCredential, { kind: "user" }>;
+}): Promise<void> {
+  const { spaceId, task, linkedReply, msgId, candidates, credential } = opts;
+  if (candidates.length < 2) return;
+  try {
+    const root = task.chainRoot ?? task.triggerMsg;
+    const depth = task.chainDepth ?? 0;
+    const used = await query(
+      `SELECT agent_type, count(*)::int AS n FROM dashboard.workspace_agent_tasks
+       WHERE space_id = $1 AND (chain_root = $2 OR (chain_root IS NULL AND trigger_msg = $2))
+       GROUP BY agent_type`,
+      [spaceId, root],
+    );
+    const usedPerAgent: Record<string, number> = {};
+    let usedTotal = 0;
+    for (const r of used.rows as Record<string, unknown>[]) {
+      usedPerAgent[String(r.agent_type)] = Number(r.n);
+      usedTotal += Number(r.n);
+    }
+    const open = await query(
+      `SELECT agent_type FROM dashboard.workspace_agent_tasks
+       WHERE space_id = $1 AND thread_root = $2 AND status IN ('todo', 'in_progress', 'blocked')`,
+      [spaceId, task.threadRoot],
+    );
+    const next = planHandoffs(linkedReply, candidates, task.agentType, {
+      depth,
+      usedPerAgent,
+      usedTotal,
+      queued: (open.rows as Record<string, unknown>[]).map((r) => String(r.agent_type)),
+    });
+    if (next.length === 0) return;
+
+    const stamps = parseSpaceMentions(linkedReply);
+    const fromName = agentDisplayName(task.agentType);
+    const created = await enqueueAgentTasks({
+      spaceId,
+      threadRoot: task.threadRoot,
+      triggerMsg: msgId,
+      stamps: { ...stamps, agentTypes: next, hasAgent: true },
+      body: linkedReply,
+      createdBy: `agent:${task.agentType}`,
+      chain: { root, depth: depth + 1 },
+      instruction: `Handoff dari ${fromName}: ${stripInstruction(linkedReply)}`,
+    });
+    if (created.length === 0) return;
+    await recordWorkspaceActivity({
+      docId: spaceId,
+      credential,
+      agentType: task.agentType,
+      action: "agent.handoff",
+      summary: `${fromName} handed work to ${created.map((t) => agentDisplayName(t.agentType)).join(", ")}`,
+    }).catch(() => {});
+    for (const t of created) {
+      runAgentTask({ spaceId, taskId: t.id, credential }).catch((error) =>
+        console.error("[workspace handoff auto-run]", t.id, error),
+      );
+    }
+  } catch (error) {
+    console.error("[workspace handoff]", error);
+  }
 }
 
 export async function loadAgentTask(spaceId: string, taskId: string): Promise<SpaceAgentTask | null> {
@@ -131,7 +222,15 @@ export async function runAgentTask(opts: {
       .filter((h) => h.text.trim());
     await Promise.race([ingestRoomFiles(id), new Promise((r) => setTimeout(r, INGEST_WAIT_MS))]);
     const room = await loadRoomContext(id, instruction, task.agentType);
-    prompt = buildSpacePayload({ instruction, history, room });
+    const spaceAgents = await loadSpaceAgents(id);
+    const teammates = spaceAgents.filter((a) => a !== task.agentType).map(agentDisplayName);
+    prompt = buildSpacePayload({
+      instruction,
+      history,
+      room,
+      teammates,
+      hop: (task.chainDepth ?? 0) > 0 ? task.chainDepth : undefined,
+    });
   } catch {
     // Konteks best-effort — instruksi polos tetap jalan.
   }
@@ -190,7 +289,12 @@ export async function runAgentTask(opts: {
   }
 
   // Tulis balik sebagai agent itu (message, bukan artifact) + reason terlihat.
-  const stamps = parseSpaceMentions(reply);
+  // Plain @Name from the agent becomes the space's link token, so the message shows a
+  // mention chip and carries the agent stamp (and can hand work over, ADR-020).
+  const spaceAgentsForReply = await loadSpaceAgents(id);
+  const candidates = spaceAgentsForReply.map((type) => ({ type, name: agentDisplayName(type) }));
+  const linkedReply = linkAgentMentions(reply, candidates);
+  const stamps = parseSpaceMentions(linkedReply);
   const msgId = newId();
   const name = agentDisplayName(task.agentType);
   const inserted = await query(
@@ -200,7 +304,7 @@ export async function runAgentTask(opts: {
      VALUES ($1, $2, $3, 'agent', $4, $5, $4, $6, $7, $8, $9, $10, $11, $12)
      RETURNING *`,
     [
-      msgId, id, task.threadRoot, task.agentType, name, reply,
+      msgId, id, task.threadRoot, task.agentType, name, linkedReply,
       stamps.agentTypes, stamps.memberIds, stamps.here, stamps.hasAgent, stamps.docRefs,
       // The room quotes the message that asked (ADR-019 P2).
       task.triggerMsg,
@@ -215,5 +319,6 @@ export async function runAgentTask(opts: {
     action: "agent.replied",
       summary: `${name} replied in the thread`,
   }).catch(() => {});
+  await spawnHandoffs({ spaceId: id, task, linkedReply, msgId, candidates, credential });
   return { task: await loadAgentTask(id, taskId), message, status: 200 };
 }
