@@ -64,9 +64,14 @@ describe("AgentRail approval card", () => {
     expect(await screen.findByText(/Couldn't send your decision/)).toBeTruthy()
   })
 
-  it("falls back to the chat hint when no handler is wired", () => {
+  it("keeps the chat way of deciding next to the buttons", () => {
+    renderRail(vi.fn(async () => {}))
+    expect(screen.getByText(/di chat untuk menyetujui/)).toBeTruthy()
+  })
+
+  it("shows only the chat hint when no handler is wired", () => {
     renderRail(undefined)
     expect(screen.queryByRole("button", { name: "Setujui" })).toBeNull()
-    expect(screen.getByText(/di chat untuk/)).toBeTruthy()
+    expect(screen.getByText(/di chat untuk menyetujui/)).toBeTruthy()
   })
 })

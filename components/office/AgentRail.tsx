@@ -199,9 +199,9 @@ interface AgentRailProps {
   elsewhere?: ElsewhereWaiting[]
   /** Switches the Console to that agent's most recent thread. */
   onOpenAgent?: (agentType: string) => void
-  /** Approve / deny a parked approval straight from its card. Typing "Ya" in
-   *  chat still works, but it only resolves when the reply reaches the same
-   *  agent that parked the call — the buttons always do. */
+  /** Approve / deny a parked approval straight from its card — a convenience
+   *  for when the conversation has moved on. Replying "Ya"/"Batal" in chat
+   *  keeps working and stays on the card as the other way to decide. */
   onResolveApproval?: (approval: PendingApproval, decision: "approve" | "deny") => Promise<void>
 }
 
@@ -260,11 +260,11 @@ export default function AgentRail({
   const notDeployed = agentTarget !== null && channels.length === 0
   const visibleAwarenessPeers = workspaceId ? awarenessPeers : []
 
-  // NOTE (conversational approval protocol): the agent also asks in plain
-  // language and a short "Ya" / "Batal" reply resolves it server-side. That
-  // path only works when the reply lands on the agent that parked the call, so
-  // each card carries real Approve / Deny buttons too — same endpoint, no
-  // dependence on where the user happens to be typing.
+  // NOTE (conversational approval protocol): the agent asks in plain language
+  // and a short "Ya" / "Batal" reply resolves it server-side — that stays the
+  // primary path. It only works while the reply lands on the agent that parked
+  // the call, so each card also carries Approve / Deny buttons for when the
+  // conversation has moved on — same endpoint, same outcome.
 
   if (collapsed) {
     return (
@@ -443,35 +443,36 @@ export default function AgentRail({
                     title={describeTool(a.tool_name)}
                     subtitle={subtitle}
                     actions={
-                      onResolveApproval ? (
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <button
-                            type="button"
-                            disabled={deciding !== null}
-                            onClick={() => decide(a, "approve")}
-                            className="rounded-full bg-white/90 px-3 py-1 text-[11.5px] font-semibold text-black hover:bg-white disabled:opacity-50"
-                          >
-                            {deciding?.id === a.id && deciding.decision === "approve" ? "Menyetujui…" : "Setujui"}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={deciding !== null}
-                            onClick={() => decide(a, "deny")}
-                            className="rounded-full border border-white/10 px-3 py-1 text-[11.5px] text-white/70 hover:bg-white/[0.06] hover:text-white/90 disabled:opacity-50"
-                          >
-                            {deciding?.id === a.id && deciding.decision === "deny" ? "Membatalkan…" : "Batal"}
-                          </button>
-                          {decideError?.id === a.id && (
-                            <span className="text-[11px] text-red-300/80">{decideError.message}</span>
-                          )}
-                        </div>
-                      ) : (
+                      <div className="flex flex-col gap-1.5">
+                        {onResolveApproval && (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <button
+                              type="button"
+                              disabled={deciding !== null}
+                              onClick={() => decide(a, "approve")}
+                              className="rounded-full bg-white/90 px-3 py-1 text-[11.5px] font-semibold text-black hover:bg-white disabled:opacity-50"
+                            >
+                              {deciding?.id === a.id && deciding.decision === "approve" ? "Menyetujui…" : "Setujui"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={deciding !== null}
+                              onClick={() => decide(a, "deny")}
+                              className="rounded-full border border-white/10 px-3 py-1 text-[11.5px] text-white/70 hover:bg-white/[0.06] hover:text-white/90 disabled:opacity-50"
+                            >
+                              {deciding?.id === a.id && deciding.decision === "deny" ? "Membatalkan…" : "Batal"}
+                            </button>
+                            {decideError?.id === a.id && (
+                              <span className="text-[11px] text-red-300/80">{decideError.message}</span>
+                            )}
+                          </div>
+                        )}
                         <span className="text-[12.5px] font-light text-white/55">
-                          Balas <span className="font-medium text-white/85">Ya</span> di chat untuk
-                          menyetujui, <span className="font-medium text-white/85">Batal</span> untuk
-                          membatalkan.
+                          {onResolveApproval ? "Atau balas" : "Balas"}{" "}
+                          <span className="font-medium text-white/85">Ya</span> di chat untuk menyetujui,{" "}
+                          <span className="font-medium text-white/85">Batal</span> untuk membatalkan.
                         </span>
-                      )
+                      </div>
                     }
                   />
                 )
