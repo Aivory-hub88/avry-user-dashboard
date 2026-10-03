@@ -262,6 +262,7 @@ export default function ConsolePage() {
     approvalsLoaded,
     approvalsError,
     retryApprovals: refetchApprovals,
+    resolveApproval,
   } = useNotificationFeed({ sessionsByAgent, currentSessionId, excludeApprovalIds: inlineApprovalIds })
   const { byAgentType: activeRunsByAgentType } = useActiveRuns()
   const {
@@ -609,6 +610,7 @@ export default function ConsolePage() {
             setShowMissionControl(false)
             switchSession(sessionId)
           }}
+          onResolveApproval={resolveApproval}
           deployments={deployments}
           activeRun={agentTarget ? activeRunsByAgentType[agentTarget] : undefined}
           stuckTasks={stuckTasks}

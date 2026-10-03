@@ -46,7 +46,7 @@ import { asset } from "@/lib/asset"
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
 import type { MentionCandidate } from "@/lib/agentMentions"
 import type { ActiveAgentRun } from "@/lib/agentRuns"
-import { describeTool, toolkitIconPath, readVerifierFinding } from "@/lib/agentApprovals"
+import { describeTool, toolkitIconPath, readVerifierFinding, type PendingApproval } from "@/lib/agentApprovals"
 import type { Notification } from "@/types/notifications"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { NotificationCard } from "@/components/office/NotificationCard"
@@ -199,6 +199,10 @@ interface AgentRailProps {
   elsewhere?: ElsewhereWaiting[]
   /** Switches the Console to that agent's most recent thread. */
   onOpenAgent?: (agentType: string) => void
+  /** Approve / deny a parked approval straight from its card — a convenience
+   *  for when the conversation has moved on. Replying "Ya"/"Batal" in chat
+   *  keeps working and stays on the card as the other way to decide. */
+  onResolveApproval?: (approval: PendingApproval, decision: "approve" | "deny") => Promise<void>
 }
 
 export default function AgentRail({
@@ -220,8 +224,23 @@ export default function AgentRail({
   onToggleCollapse,
   elsewhere = [],
   onOpenAgent,
+  onResolveApproval,
 }: AgentRailProps) {
   const [memoryOpen, setMemoryOpen] = useState(false)
+  const [deciding, setDeciding] = useState<{ id: string; decision: "approve" | "deny" } | null>(null)
+  const [decideError, setDecideError] = useState<{ id: string; message: string } | null>(null)
+  const decide = async (approval: PendingApproval, decision: "approve" | "deny") => {
+    if (!onResolveApproval || deciding) return
+    setDeciding({ id: approval.id, decision })
+    setDecideError(null)
+    try {
+      await onResolveApproval(approval, decision)
+    } catch {
+      setDecideError({ id: approval.id, message: "Couldn't send your decision — try again." })
+    } finally {
+      setDeciding(null)
+    }
+  }
   const awarenessPeers = useWorkspaceAwareness(workspaceId)
   const [, forceNow] = useState(0)
   useEffect(() => {
@@ -241,11 +260,11 @@ export default function AgentRail({
   const notDeployed = agentTarget !== null && channels.length === 0
   const visibleAwarenessPeers = workspaceId ? awarenessPeers : []
 
-  // NOTE (conversational approval protocol): the rail used to resolve
-  // approvals from inline Approve/Deny buttons here. Those are gone — the
-  // agent asks in plain language and the user's next short reply ("Ya" /
-  // "Batal", multilingual) IS the decision, resolved server-side. The rail
-  // only informs; it never decides.
+  // NOTE (conversational approval protocol): the agent asks in plain language
+  // and a short "Ya" / "Batal" reply resolves it server-side — that stays the
+  // primary path. It only works while the reply lands on the agent that parked
+  // the call, so each card also carries Approve / Deny buttons for when the
+  // conversation has moved on — same endpoint, same outcome.
 
   if (collapsed) {
     return (
@@ -424,11 +443,36 @@ export default function AgentRail({
                     title={describeTool(a.tool_name)}
                     subtitle={subtitle}
                     actions={
-                      <span className="text-[12.5px] font-light text-white/55">
-                        Balas <span className="font-medium text-white/85">Ya</span> di chat untuk
-                        menyetujui, <span className="font-medium text-white/85">Batal</span> untuk
-                        membatalkan.
-                      </span>
+                      <div className="flex flex-col gap-1.5">
+                        {onResolveApproval && (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <button
+                              type="button"
+                              disabled={deciding !== null}
+                              onClick={() => decide(a, "approve")}
+                              className="rounded-full bg-white/90 px-3 py-1 text-[11.5px] font-semibold text-black hover:bg-white disabled:opacity-50"
+                            >
+                              {deciding?.id === a.id && deciding.decision === "approve" ? "Menyetujui…" : "Setujui"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={deciding !== null}
+                              onClick={() => decide(a, "deny")}
+                              className="rounded-full border border-white/10 px-3 py-1 text-[11.5px] text-white/70 hover:bg-white/[0.06] hover:text-white/90 disabled:opacity-50"
+                            >
+                              {deciding?.id === a.id && deciding.decision === "deny" ? "Membatalkan…" : "Batal"}
+                            </button>
+                            {decideError?.id === a.id && (
+                              <span className="text-[11px] text-red-300/80">{decideError.message}</span>
+                            )}
+                          </div>
+                        )}
+                        <span className="text-[12.5px] font-light text-white/55">
+                          {onResolveApproval ? "Atau balas" : "Balas"}{" "}
+                          <span className="font-medium text-white/85">Ya</span> di chat untuk menyetujui,{" "}
+                          <span className="font-medium text-white/85">Batal</span> untuk membatalkan.
+                        </span>
+                      </div>
                     }
                   />
                 )
