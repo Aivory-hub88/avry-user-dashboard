@@ -394,6 +394,12 @@ describe("handoff in the room payload", () => {
     expect(p).toContain("Never @ someone just to greet or thank them")
   })
 
+  it("tells the agent to hand off instead of hunting for a tool it does not have", () => {
+    const p = buildRoomPayload(base)
+    expect(p).toContain("do NOT search for a tool or keep retrying")
+    expect(p).toContain("hand that part to the teammate whose role covers it")
+  })
+
   it("gives the receiver the handoff and the last-hop rule", () => {
     const first = buildRoomPayload({ ...base, handoff: { from: "Lex", text: "@Teo cek tiket 123", hop: 1 } })
     expect(first).toContain('<handoff from="Lex" hop="1" max="2">')
