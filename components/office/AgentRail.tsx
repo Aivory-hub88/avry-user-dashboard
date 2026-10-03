@@ -452,7 +452,7 @@ export default function AgentRail({
                               onClick={() => decide(a, "approve")}
                               className="rounded-full bg-white/90 px-3 py-1 text-[11.5px] font-semibold text-black hover:bg-white disabled:opacity-50"
                             >
-                              {deciding?.id === a.id && deciding.decision === "approve" ? "Menyetujui…" : "Setujui"}
+                              {deciding?.id === a.id && deciding.decision === "approve" ? "Approving…" : "Approve"}
                             </button>
                             <button
                               type="button"
@@ -460,7 +460,7 @@ export default function AgentRail({
                               onClick={() => decide(a, "deny")}
                               className="rounded-full border border-white/10 px-3 py-1 text-[11.5px] text-white/70 hover:bg-white/[0.06] hover:text-white/90 disabled:opacity-50"
                             >
-                              {deciding?.id === a.id && deciding.decision === "deny" ? "Membatalkan…" : "Batal"}
+                              {deciding?.id === a.id && deciding.decision === "deny" ? "Denying…" : "Deny"}
                             </button>
                             {decideError?.id === a.id && (
                               <span className="text-[11px] text-red-300/80">{decideError.message}</span>
@@ -468,9 +468,9 @@ export default function AgentRail({
                           </div>
                         )}
                         <span className="text-[12.5px] font-light text-white/55">
-                          {onResolveApproval ? "Atau balas" : "Balas"}{" "}
-                          <span className="font-medium text-white/85">Ya</span> di chat untuk menyetujui,{" "}
-                          <span className="font-medium text-white/85">Batal</span> untuk membatalkan.
+                          {onResolveApproval ? "Or reply" : "Reply"}{" "}
+                          <span className="font-medium text-white/85">Yes</span> in chat to approve,{" "}
+                          <span className="font-medium text-white/85">No</span> to cancel.
                         </span>
                       </div>
                     }
