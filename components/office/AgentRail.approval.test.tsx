@@ -47,31 +47,31 @@ describe("AgentRail approval card", () => {
   it("approves with the card's own button", async () => {
     const resolve = vi.fn(async () => {})
     renderRail(resolve)
-    fireEvent.click(screen.getByRole("button", { name: "Setujui" }))
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }))
     await waitFor(() => expect(resolve).toHaveBeenCalledWith(approval, "approve"))
   })
 
   it("denies with the Batal button", async () => {
     const resolve = vi.fn(async () => {})
     renderRail(resolve)
-    fireEvent.click(screen.getByRole("button", { name: "Batal" }))
+    fireEvent.click(screen.getByRole("button", { name: "Deny" }))
     await waitFor(() => expect(resolve).toHaveBeenCalledWith(approval, "deny"))
   })
 
   it("says so when the decision could not be sent", async () => {
     renderRail(vi.fn(async () => { throw new Error("502") }))
-    fireEvent.click(screen.getByRole("button", { name: "Setujui" }))
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }))
     expect(await screen.findByText(/Couldn't send your decision/)).toBeTruthy()
   })
 
   it("keeps the chat way of deciding next to the buttons", () => {
     renderRail(vi.fn(async () => {}))
-    expect(screen.getByText(/di chat untuk menyetujui/)).toBeTruthy()
+    expect(screen.getByText(/in chat to approve/)).toBeTruthy()
   })
 
   it("shows only the chat hint when no handler is wired", () => {
     renderRail(undefined)
-    expect(screen.queryByRole("button", { name: "Setujui" })).toBeNull()
-    expect(screen.getByText(/di chat untuk menyetujui/)).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull()
+    expect(screen.getByText(/in chat to approve/)).toBeTruthy()
   })
 })
