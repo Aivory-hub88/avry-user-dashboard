@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { DeepDiagnosticService } from '@/services/deepDiagnostic'
+import { hasCompletedDiagnostic } from '@/lib/diagnosticStatus'
 import { useRouterContext } from '@/contexts/RouterContext'
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole'
 import styles from './diagnostics.module.css'
@@ -49,6 +50,17 @@ export default function DiagnosticsPage() {
         setDeepDiagnosticInProgress(true)
       }
     }
+
+    // The local cache can be empty on a fresh browser while the account has a
+    // saved result — confirm against the server.
+    let cancelled = false
+    hasCompletedDiagnostic().then(done => {
+      if (done && !cancelled) {
+        setDeepDiagnosticCompleted(true)
+        setDeepDiagnosticInProgress(false)
+      }
+    })
+    return () => { cancelled = true }
   }, [])
 
   return (

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
 import { DashboardData, getPlaceholderData } from "@/types/dashboard"
 import { DeepDiagnosticService } from "@/services/deepDiagnostic"
+import { hasCompletedDiagnostic } from "@/lib/diagnosticStatus"
 import OverviewCard from "@/components/dashboard/OverviewCard"
 import LifecycleCard from "@/components/dashboard/LifecycleCard"
 import RecentActivity from "@/components/dashboard/RecentActivity"
@@ -55,6 +56,8 @@ export default function DashboardPage() {
     const deepContext = localStorage.getItem('aivory_diagnostic_context')
     if (deepContext) {
       setDeepDiagnosticCompleted(true)
+    } else {
+      hasCompletedDiagnostic().then(done => { if (done) setDeepDiagnosticCompleted(true) })
     }
   }, [])
 
