@@ -1,5 +1,6 @@
 "use client"
 
+import { hasCompletedDiagnostic } from '@/lib/diagnosticStatus'
 import { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
 import { DashboardData, getPlaceholderData } from "@/types/dashboard"
@@ -156,6 +157,8 @@ export default function DashboardPage() {
       // React Compiler style rule; see other documented instances of this.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setDeepDiagnosticCompleted(true)
+    } else {
+      hasCompletedDiagnostic().then(done => { if (done) setDeepDiagnosticCompleted(true) })
     }
   }, [])
 
