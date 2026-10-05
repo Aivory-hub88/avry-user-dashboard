@@ -19,7 +19,7 @@
  * integration):
  *   snapshot    — bought Deep Diagnostic ($79)
  *   blueprint   — bought Blueprint+Roadmap ($249) or Full Stack ($299)
- *   operational — subscription $39/mo
+ *   operational — subscription $20/mo
  *   business    — subscription $99/mo
  *   enterprise  — subscription, sales-assisted
  * plus the pre-rebrand aliases `foundation` and `pro`, which older
@@ -81,7 +81,7 @@ export const TIER_DISPLAY_NAMES: Readonly<Record<SubscriptionTier, string>> = Ob
  * never collect.
  */
 export const TIER_MONTHLY_PRICE_USD: Readonly<Record<string, number>> = Object.freeze({
-  operational: 39,
+  operational: 20,
   business: 99,
 })
 

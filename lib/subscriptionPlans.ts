@@ -27,7 +27,7 @@ export interface Plan {
   name: string
   /** Monthly price in USD, or `null` when there is no published figure. */
   price: number | null
-  /** Ready-to-render price, e.g. `"$39/month"`, `"Custom"`, `"—"`. */
+  /** Ready-to-render price, e.g. `"$20/month"`, `"Custom"`, `"—"`. */
   priceLabel: string
   features: string[]
 }
