@@ -235,7 +235,8 @@ export function ActivateFeaturesSection() {
           features={[
             'Deep Diagnostic',
             'Blueprint',
-            'Roadmap'
+            'Roadmap',
+            'Includes 1 month of Business plan'
           ]}
           savings="Save $29 vs buying separately"
           isActive={hasFullStack}
