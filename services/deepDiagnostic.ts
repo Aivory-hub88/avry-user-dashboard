@@ -385,6 +385,7 @@ import type {
   OpportunityQuadrant,
   OpportunityTrainingTrack,
   ImprovementItem,
+  RfiAnswerKey,
 } from '@/types/diagnostic'
 import { parseCurrencyCode, formatCurrency, type CurrencyCode } from '@/lib/resultFormatters'
 import { getBudgetBands, getLabourBenchmark, resolveBandMidpointUSD } from '@/lib/currencyBands'
@@ -479,6 +480,22 @@ function parseManualHoursWeekly(val: string | undefined): number | null {
   }
   // Try direct lookup first, then normalized key
   return map[val] ?? map[norm] ?? null
+}
+
+// "Over 100 hours/week" is open-ended, and 100 is its floor, not its value.
+// For a large in-scope team that floor undercounts badly (100 h/week across
+// 300 FTEs is 20 minutes each), so the open bucket scales with headcount at a
+// conservative 2 h/FTE/week of repetitive work (5% of a 40 h week). Every
+// bounded bucket is the user's own range and is left untouched.
+const OPEN_BUCKET_HOURS_PER_FTE = 2
+export function reconcileManualHoursWithFte(
+  manualHoursAnswer: string | undefined,
+  hoursWeekly: number | null,
+  fteCount: number | null,
+): number | null {
+  if (hoursWeekly === null || fteCount === null) return hoursWeekly
+  if (normalizeStr(manualHoursAnswer) !== 'Over 100 hours/week') return hoursWeekly
+  return Math.max(hoursWeekly, fteCount * OPEN_BUCKET_HOURS_PER_FTE)
 }
 
 function parseFteCount(val: string | undefined): number | null {
@@ -594,7 +611,6 @@ export function calculateROI(
   if (q.budgetMidpointUSD === null) missing.push('budget')
   if (q.fteCountInScope === null) missing.push('FTE count')
 
-  const hasEnough = missing.length === 0
   const confidence: ROIProjection['confidenceLevel'] =
     missing.length === 0 ? 'high' : missing.length === 1 ? 'medium' : 'low'
 
@@ -652,6 +668,12 @@ export function calculateROI(
   // FIX #4: Cap was 0.5 (50%) — should be 1.0. A user with 10% current
   // automation targeting 90% has a real 80% incremental gap, not 50%.
   const incrementalAutoPct = Math.max(0, Math.min(targetAutoPct - currentAutoPct, 1.0))
+  // Target at/below current automation → nothing left to close. Every input
+  // was given, so this is NOT a missing-data case: it is flagged separately
+  // and the projection is suppressed (no savings → no payback/ROI/NPV)
+  // instead of rendering a "high confidence" −100% scenario range.
+  const noAutomationGap = q.totalManualHoursWeekly !== null && incrementalAutoPct <= 0
+  const hasEnough = missing.length === 0 && !noAutomationGap
 
   // FIX #5: Document efficiency factor explicitly.
   // Formula: weeklyHours × 52 weeks × automation gap × 0.75 efficiency factor.
@@ -662,7 +684,7 @@ export function calculateROI(
     ? Math.round(hoursPerYear * incrementalAutoPct * EFFICIENCY_FACTOR)
     : null
 
-  const annualLaborSavingsUSD = hoursReclaimedPerYear
+  const annualLaborSavingsUSD = hoursReclaimedPerYear && !noAutomationGap
     ? hoursReclaimedPerYear * hourlyRateUSD
     : null
 
@@ -765,7 +787,7 @@ export function calculateROI(
   // Scenario range: vary the efficiency factor conservative..optimistic,
   // on the same horizon and the same year-1-free cost profile.
   const scenarioNetRoi = (eff: number): number | null => {
-    if (!q.totalManualHoursWeekly || annualOngoingCostUSD === null || !budgetUSD || budgetUSD <= 0) return null
+    if (!totalAnnualSavingsUSD || annualOngoingCostUSD === null || !budgetUSD || budgetUSD <= 0) return null
     const reclaimed = hoursPerYear * incrementalAutoPct * eff
     const labor = reclaimed * hourlyRateUSD
     const total = labor + labor * 0.2
@@ -847,6 +869,7 @@ export function calculateROI(
     hasEnoughDataForProjection: hasEnough,
     confidenceLevel: confidence,
     missingInputs: missing,
+    noAutomationGap,
     // Methodology transparency fields — expose the assumptions behind the numbers
     assumedHourlyRateUSD: hourlyRateUSD,
     assumedHourlyRateLocal: hourlyRateUSD * rate,
@@ -1986,6 +2009,17 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores, locale: Lo
  * the result page AND fed into the AI System Blueprint generator as extra
  * context, so it must be deterministic (no LLM / randomness).
  */
+/** Strategy-card goal clause, derived from the actual quantified_goal answer
+ *  (it used to assert "not yet fully quantified" even for users who had
+ *  specific metrics). */
+function goalClause(quantifiedGoal: string | undefined, locale: Locale): string {
+  const id = locale === 'id'
+  if (quantifiedGoal?.includes('specific metrics')) return id ? 'tujuan sudah memiliki metrik spesifik' : 'objectives already have specific metrics'
+  if (quantifiedGoal?.includes('not quantified')) return id ? 'tujuan belum terukur' : 'objectives are not yet quantified'
+  if (quantifiedGoal?.includes('still exploring')) return id ? 'tujuan masih dalam tahap eksplorasi' : 'objectives are still being explored'
+  return id ? 'tujuan belum sepenuhnya terukur' : 'objectives are not yet fully quantified'
+}
+
 function buildRoomForImprovement(
   scores: DimensionScores,
   q: DiagnosticContext['quantitative'],
@@ -2014,7 +2048,7 @@ function buildRoomForImprovement(
           ? `Proses ${humanizeAnswerId('process_documentation', a.process_documentation)} terdokumentasi dan ${(a.workflow_standardization ? humanizeAnswerId('workflow_standardization', a.workflow_standardization) : 'sebagian terstandardisasi').toLowerCase()}.`
           : 'Proses utama hanya sebagian terdokumentasi dan terstandardisasi, sehingga otomasi menjadi rapuh.')
         : (a.process_documentation
-          ? `Processes are ${String(a.process_documentation).toLowerCase()} documented and ${String(a.workflow_standardization || 'partially standardised').toLowerCase()}.`
+          ? `${a.process_documentation} of key processes are documented${a.workflow_standardization ? `; workflow standardisation: ${String(a.workflow_standardization).toLowerCase()}` : ''}.`
           : 'Key processes are only partially documented and standardised, making automation fragile.'),
       recommendedAction: id
         ? 'Petakan 3–5 proses dengan volume tertinggi secara menyeluruh, catat input/output dan aturan pengambilan keputusan, lalu standardisasi variasinya menjadi satu alur baku sebelum melakukan otomasi.'
@@ -2043,7 +2077,7 @@ function buildRoomForImprovement(
           ? `Data ${humanizeAnswerId('data_centralization', a.data_centralization).toLowerCase()}; ${a.data_quality ? humanizeAnswerId('data_quality', a.data_quality).toLowerCase() : 'kualitasnya bervariasi'}.`
           : 'Data tersebar di berbagai sistem dengan kualitas yang tidak konsisten, sehingga membatasi akurasi AI.')
         : (a.data_centralization
-          ? `Data is ${String(a.data_centralization).toLowerCase()}; quality is ${String(a.data_quality || 'mixed').toLowerCase()}.`
+          ? `Data centralisation: ${String(a.data_centralization).toLowerCase()}; data quality: ${String(a.data_quality || 'not assessed').toLowerCase()}.`
           : 'Data is spread across systems with inconsistent quality, limiting AI accuracy.'),
       recommendedAction: id
         ? 'Satukan sumber data yang memasok alur kerja prioritas ke dalam satu sumber kebenaran (atau hubungkan melalui API), lalu tambahkan validasi dasar untuk memperbaiki masalah kualitas sejak data dimasukkan.'
@@ -2107,10 +2141,10 @@ function buildRoomForImprovement(
       priority: priorityFromScore(scores.strategy),
       currentState: id
         ? (a.kpi_tracking
-          ? `Keberhasilan dilacak melalui ${humanizeAnswerId('kpi_tracking', a.kpi_tracking).toLowerCase()}; tujuan belum sepenuhnya terukur.`
+          ? `Pelacakan KPI: ${humanizeAnswerId('kpi_tracking', a.kpi_tracking).toLowerCase()}; ${goalClause(a.quantified_goal, 'id')}.`
           : 'Tujuan belum dikaitkan dengan metrik spesifik yang terlacak.')
         : (a.kpi_tracking
-          ? `Success is tracked via ${String(a.kpi_tracking).toLowerCase()}; objectives are not yet fully quantified.`
+          ? `KPI tracking: ${String(a.kpi_tracking).toLowerCase()}; ${goalClause(a.quantified_goal, 'en')}.`
           : 'Goals are not yet tied to specific, tracked metrics.'),
       recommendedAction: id
         ? 'Tetapkan 2–3 KPI terukur per otomasi (misalnya jam yang dihemat/minggu, waktu siklus, tingkat kesalahan) dan hubungkan ke dashboard otomatis sejak hari pertama.'
@@ -2184,6 +2218,19 @@ function buildRoomForImprovement(
 
 // ---- Main export ----
 
+const RFI_ANSWER_KEYS: RfiAnswerKey[] = [
+  'process_documentation', 'workflow_standardization', 'data_centralization', 'data_quality',
+  'kpi_tracking', 'quantified_goal', 'internal_capability', 'budget_allocated', 'leadership_alignment',
+]
+
+function pickRfiAnswers(answers: DiagnosticAnswers): Partial<Record<RfiAnswerKey, string>> {
+  const out: Partial<Record<RfiAnswerKey, string>> = {}
+  for (const key of RFI_ANSWER_KEYS) {
+    if (typeof answers[key] === 'string' && answers[key]) out[key] = answers[key]
+  }
+  return out
+}
+
 export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticContext {
   const companyName = answers.companyName || answers.company_name || 'Your Organisation'
   const currencyCode = parseCurrencyCode(answers.currency)
@@ -2192,8 +2239,12 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
   const targetAutoPct = answers.target_automation ? parsePct(answers.target_automation) : 70
   const budgetMidpointUSD = parseBudgetMidpointUSD(answers.budget_range, currencyCode)
   const timelineMonths = parseTimelineMonths(answers.success_timeline)
-  const totalManualHoursWeekly = parseManualHoursWeekly(answers.manual_hours_weekly)
   const fteCountInScope = parseFteCount(answers.fte_count)
+  const totalManualHoursWeekly = reconcileManualHoursWithFte(
+    answers.manual_hours_weekly,
+    parseManualHoursWeekly(answers.manual_hours_weekly),
+    fteCountInScope,
+  )
 
   const quantitative: DiagnosticContext['quantitative'] = {
     ticketVolumePerDay: null,
@@ -2269,6 +2320,7 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     // D2 — persisted so upgradeDiagnosticContext can re-apply the confidence
     // damper after any ROI recompute. Narrative/context only; never scored.
     estimateBasis: answers.estimate_basis || '',
+    rfiAnswers: pickRfiAnswers(answers),
   }
 
   const context: DiagnosticContext = {
@@ -2346,13 +2398,19 @@ export function upgradeDiagnosticContext(
   //      was used instead of the industry-aware rate.
   const calc = calculations as Partial<ROIProjection> | undefined
   const storedRate = calc?.assumedHourlyRateUSD
+  // The ≤$15 heuristic alone also matched VALID current-methodology rates
+  // (every IDR/OMR report ≈ US$2–12/hr; USD small teams at $13–15/hr), so
+  // those reports were recomputed at today's FX on every open and drifted
+  // from the saved/PDF'd figures. `rateBenchmarkLabel` is written by every
+  // calculateROI since the per-country wage anchors shipped — its presence
+  // means the stored figures already come from the corrected methodology.
   const needsRoiUpgrade =
     !!context.quantitative &&
     (
       !calc ||
       storedRate === undefined ||
       storedRate === null ||
-      storedRate <= 15   // $8 or $15 = old default fallback, not industry-aware
+      (!calc.rateBenchmarkLabel && storedRate <= 15)   // $8 or $15 = old default fallback, not industry-aware
     )
 
   if (needsRoiUpgrade) {
@@ -2363,7 +2421,7 @@ export function upgradeDiagnosticContext(
     //  2. Stored in qualitative.industry (new contexts)
     //  3. Infer from scores: high strategy (≥70) + high data (≥60) → Tech proxy
     //  4. Use $30/hr default (not $15) if completely unknown
-    let industry = industryHint ?? context.qualitative?.industry ?? undefined
+    let industry = industryHint || context.qualitative?.industry || undefined
 
     if (!industry && context.scores) {
       const { strategy = 0, data = 0, people = 0 } = context.scores
@@ -2392,18 +2450,22 @@ export function upgradeDiagnosticContext(
   }
 
   // Generate Room for Improvement if the stored context predates the feature.
+  // Always regenerated from the latest copy. Contexts stored since
+  // 2026-10-10 carry the quoted answers (qualitative.rfiAnswers), so BOTH
+  // locales regenerate answer-specific; older contexts only have two hints,
+  // so EN falls back to generic copy and the stored ID list is kept.
   let roomForImprovement = context.roomForImprovement
-  if (
-    (true /* always regenerate roomForImprovement from latest logic */) &&
-    context.scores &&
-    context.quantitative
-  ) {
-    roomForImprovement = buildRoomForImprovement(context.scores, context.quantitative, {
-      // Provide whatever descriptive hints we still have; the builder falls
-      // back to generic copy when specific answer fields are absent.
+  let roomForImprovementId = context.roomForImprovementId
+  if (context.scores && context.quantitative) {
+    const rfiAnswers = context.qualitative?.rfiAnswers
+    const hints: DiagnosticAnswers = rfiAnswers ?? {
       internal_capability: context.qualitative?.aiCapability,
       leadership_alignment: context.qualitative?.leadershipAlignment,
-    })
+    }
+    roomForImprovement = buildRoomForImprovement(context.scores, context.quantitative, hints, 'en')
+    if (rfiAnswers) {
+      roomForImprovementId = buildRoomForImprovement(context.scores, context.quantitative, hints, 'id')
+    }
     changed = true
   }
 
@@ -2430,7 +2492,7 @@ export function upgradeDiagnosticContext(
 
   if (!changed) return context
 
-  const upgraded: DiagnosticContext = { ...context, calculations, roomForImprovement, opportunities }
+  const upgraded: DiagnosticContext = { ...context, calculations, roomForImprovement, roomForImprovementId, opportunities }
 
   try {
     localStorage.setItem('aivory_diagnostic_context', JSON.stringify(upgraded))

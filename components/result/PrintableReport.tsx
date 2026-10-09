@@ -9,7 +9,6 @@ import {
   parseCurrencyCode,
   formatDate
 } from '@/lib/resultFormatters'
-import { maturityFromScore } from '@/services/deepDiagnostic'
 import styles from './PrintableReport.module.css'
 import { getRoiHorizonYears, roiLabel, npvLabel } from '@/lib/roiHorizon'
 
@@ -31,12 +30,9 @@ export default function PrintableReport({ context, llmResult }: PrintableReportP
   const costOfInaction90Days = calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR ?? null
   const roiYears = getRoiHorizonYears(calculations)
 
-  const _llmScore =
-    typeof llmResult?.score === 'number' ? llmResult.score
-    : typeof llmResult?.ai_readiness_score === 'number' ? llmResult.ai_readiness_score
-    : null
-  const _composite = _llmScore != null ? Math.round(scores.composite * 0.7 + _llmScore * 0.3) : scores.composite
-  const _maturity = _llmScore != null ? maturityFromScore(_composite) : scores.maturityLevel
+  // Deterministic composite only — same number as the on-screen report.
+  const _composite = scores.composite
+  const _maturity = scores.maturityLevel
 
   const highRiskCount = risks.filter(r => r.severity === 'HIGH').length
   const quickWinCount = opportunities.filter(o => o.quadrant === 'quick_win').length

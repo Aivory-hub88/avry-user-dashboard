@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, Fragment } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { DiagnosticContext } from '@/types/diagnostic'
-import { upgradeDiagnosticContext, DeepDiagnosticService, maturityFromScore, getROISensitivity, humanizeAnswerId } from '@/services/deepDiagnostic'
+import { upgradeDiagnosticContext, DeepDiagnosticService, getROISensitivity, humanizeAnswerId } from '@/services/deepDiagnostic'
 import HeaderBar from '@/components/result/HeaderBar'
 import ScoreRing from '@/components/result/ScoreRing'
 import RadarChart from '@/components/result/RadarChart'
@@ -130,25 +130,11 @@ export default function FinalResultPage() {
       setBlueprintElapsedSec(0)
       if (blueprintTickRef.current) clearInterval(blueprintTickRef.current)
       blueprintTickRef.current = setInterval(() => setBlueprintElapsedSec((s) => s + 1), 1000)
-      // Send the same blended composite the user sees on this page (70%
-      // deterministic + 30% AI assessment) so the blueprint's
-      // ai_readiness_score matches the on-screen report instead of the raw
-      // deterministic composite. Also attach the AI analysis narrative so
-      // blueprint generation can build on it.
-      const llmScore =
-        typeof (llmResult as any)?.score === 'number' ? (llmResult as any).score
-        : typeof (llmResult as any)?.ai_readiness_score === 'number' ? (llmResult as any).ai_readiness_score
-        : null
-      const blendedComposite = llmScore != null
-        ? Math.round(state.context.scores.composite * 0.7 + llmScore * 0.3)
-        : state.context.scores.composite
+      // The readiness score is the deterministic composite only — the same
+      // number the page, PDF and history show. Attach the AI analysis
+      // narrative so blueprint generation can build on it.
       const diagnosticData = {
         ...state.context,
-        scores: {
-          ...state.context.scores,
-          composite: blendedComposite,
-          maturityLevel: llmScore != null ? maturityFromScore(blendedComposite) : state.context.scores.maturityLevel,
-        },
         ...(llmResult ? {
           ai_analysis: {
             summary: (llmResult as any).narrative_summary ?? (llmResult as any).narrative ?? null,
@@ -217,8 +203,11 @@ export default function FinalResultPage() {
           if (!progress?.phases) return undefined
           for (const phase of Object.values(progress.phases)) {
             const rec = phase as unknown as Record<string, unknown>
-            if (rec && typeof rec === 'object' && typeof rec.industry === 'string') {
-              return rec.industry
+            // Each phase is PhaseData { completed, responses } — the answer
+            // lives under `responses`, not on the phase object itself.
+            const responses = rec?.responses as Record<string, unknown> | undefined
+            if (responses && typeof responses.industry === 'string' && responses.industry) {
+              return responses.industry
             }
           }
         } catch { /* ignore */ }
@@ -286,12 +275,9 @@ export default function FinalResultPage() {
   const handleDownloadPdf = async () => {
     setIsExportingPdf(true)
     try {
-      // Pass the same blended scores shown on this page (70% deterministic +
-      // 30% AI assessment) so the PDF's composite matches the on-screen one
-      // instead of silently reverting to the raw deterministic score.
       // llmResult must be forwarded too — without it the PDF silently drops
       // the entire Business Operations Analysis section the user sees on this page.
-      await exportReportToPdf('pdf-print-layout', context.company, { ...context, scores: displayScores }, llmResult, locale)
+      await exportReportToPdf('pdf-print-layout', context.company, context, llmResult, locale)
     } catch (error) {
       console.error('Failed to generate PDF', error)
     } finally {
@@ -331,14 +317,11 @@ export default function FinalResultPage() {
   const quickWinCount = opportunities.filter(o => o.quadrant === 'quick_win').length
 
   // Assessment broken into individual bullet lines matching the screenshot
-  const _llmScore =
-    typeof (llmResult as any)?.score === 'number' ? (llmResult as any).score
-    : typeof (llmResult as any)?.ai_readiness_score === 'number' ? (llmResult as any).ai_readiness_score
-    : null
-  const _blended = _llmScore != null ? Math.round(scores.composite * 0.7 + _llmScore * 0.3) : scores.composite
-  const displayScores = _llmScore != null
-    ? { ...scores, composite: _blended, maturityLevel: maturityFromScore(_blended) }
-    : scores
+  // The headline score is the deterministic composite only: identical answers
+  // must always produce the identical score, and the history sparkline/delta
+  // chip (stored composites) must end on the number shown here. It used to be
+  // blended 70/30 with the LLM's own score, which made it non-reproducible.
+  const displayScores = scores
 
   // Phase E1.1 — industry benchmark overlay (pure display, no score change).
   // null when qualitative.industry is missing/unrecognized — every consumer
@@ -356,7 +339,7 @@ export default function FinalResultPage() {
     : null
 
   // Executive Operational Diagnosis — identical strings to the PDF (shared builders in
-  // lib/readinessNarrative.ts), fed the same blended displayScores the PDF gets.
+  // lib/readinessNarrative.ts), fed the same displayScores the PDF gets.
   const dimScoreOf = (k: string) => Math.round((scores as unknown as Record<string, number>)[k] ?? 0)
   const verdictNarrative = buildVerdictNarrative({
     company: context.company || 'Your organisation',
@@ -446,13 +429,13 @@ export default function FinalResultPage() {
   const riskRegisterCaption = buildRiskRegisterCaption(risks, locale)
 
   const assessmentBullets: { icon: string; color: string; text: string }[] = locale === 'id' ? [
-    { icon: '▲', color: 'var(--color-accent-report)', text: `Perusahaan/organisasi Anda memperoleh skor ${displayScores.composite}/100, berada pada kematangan ${maturityLevelLabel(displayScores.maturityLevel, locale)}.${_llmScore != null ? ' (komposit gabungan 70% deterministik + 30% asesmen AI)' : ''}` },
+    { icon: '▲', color: 'var(--color-accent-report)', text: `Perusahaan/organisasi Anda memperoleh skor ${displayScores.composite}/100, berada pada kematangan ${maturityLevelLabel(displayScores.maturityLevel, locale)}.` },
     { icon: '▲', color: 'var(--color-accent-report)', text: `Dimensi terkuat: ${humanizeDimensionKey(scores.strongestDimension, locale)}.` },
     { icon: '▽', color: '#fbbf24', text: `Kesenjangan terbesar: ${humanizeDimensionKey(scores.weakestDimension, locale)}.` },
     { icon: '▽', color: '#fbbf24', text: `${highRiskCount} risiko tingkat tinggi teridentifikasi.` },
     { icon: '▶', color: 'var(--color-accent-report)', text: `${quickWinCount} peluang quick win tersedia.` },
   ] : [
-    { icon: '▲', color: 'var(--color-accent-report)', text: `Your company / organisation scores ${displayScores.composite}/100, placing it at ${maturityLevelLabel(displayScores.maturityLevel, locale)} maturity.${_llmScore != null ? ' (composite blended 70% deterministic + 30% AI assessment)' : ''}` },
+    { icon: '▲', color: 'var(--color-accent-report)', text: `Your company / organisation scores ${displayScores.composite}/100, placing it at ${maturityLevelLabel(displayScores.maturityLevel, locale)} maturity.` },
     { icon: '▲', color: 'var(--color-accent-report)', text: `Strongest dimension: ${humanizeDimensionKey(scores.strongestDimension, locale)}.` },
     { icon: '▽', color: '#fbbf24', text: `Greatest gap: ${humanizeDimensionKey(scores.weakestDimension, locale)}.` },
     { icon: '▽', color: '#fbbf24', text: `${highRiskCount} high-severity risk${highRiskCount !== 1 ? 's' : ''} identified.` },
@@ -883,7 +866,20 @@ export default function FinalResultPage() {
         <div id="section-financial-case" className={styles.card}>
           <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Analisis Keuangan' : 'Financial Case'}</h2>
 
-          {!calculations.hasEnoughDataForProjection && (
+          {calculations.noAutomationGap && (
+            <div className={styles.confidenceBanner}>
+              <p className={styles.confidenceHeadline}>
+                {locale === 'id' ? 'Tidak ada kesenjangan otomasi yang tersisa' : 'No automation gap left to close'}
+              </p>
+              <p className={styles.confidenceBody}>
+                {locale === 'id'
+                  ? 'Target otomasi yang Anda tetapkan sudah sama dengan atau di bawah tingkat otomasi saat ini, sehingga tidak ada penghematan tambahan yang diproyeksikan. Naikkan target otomasi untuk memodelkan peluang berikutnya.'
+                  : 'Your stated automation target is at or below your current automation level, so no additional savings are projected. Raise the target to model the next opportunity.'}
+              </p>
+            </div>
+          )}
+
+          {!calculations.hasEnoughDataForProjection && !calculations.noAutomationGap && (
             <div className={styles.confidenceBanner}>
               <p className={styles.confidenceHeadline}>
                 {locale === 'id'
