@@ -300,6 +300,11 @@ export interface ROIProjection {
   hasEnoughDataForProjection: boolean
   confidenceLevel: 'high' | 'medium' | 'low'
   missingInputs: string[]
+  /** True when the stated automation target is at or below current
+   *  automation — no incremental gap, so no savings are projected. Distinct
+   *  from missing inputs: every input was given, there is just nothing to
+   *  close. Absent on contexts stored before 2026-10-10. */
+  noAutomationGap?: boolean
   /**
    * Transparency fields (methodology fix): the explicit assumptions behind the
    * savings and ROI numbers so users can see how figures were derived.
@@ -576,7 +581,22 @@ export interface DiagnosticContext {
      *  confidence damper when upgrading stored results. Absent on pre-D2
      *  contexts → treated as neutral (no confidence change). Never scored. */
     estimateBasis?: string
+    /** Raw answers quoted by the Room-for-Improvement copy, persisted so
+     *  upgradeDiagnosticContext can regenerate it (EN + ID) without falling
+     *  back to generic text. Absent on contexts stored before 2026-10-10. */
+    rfiAnswers?: Partial<Record<RfiAnswerKey, string>>
   }
 }
 
 export type DiagnosticAnswers = Record<string, any>
+
+export type RfiAnswerKey =
+  | 'process_documentation'
+  | 'workflow_standardization'
+  | 'data_centralization'
+  | 'data_quality'
+  | 'kpi_tracking'
+  | 'quantified_goal'
+  | 'internal_capability'
+  | 'budget_allocated'
+  | 'leadership_alignment'

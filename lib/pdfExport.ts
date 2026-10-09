@@ -1740,7 +1740,7 @@ function renderCtaSteps(
 }
 
 /** Amber banner mirroring the on-screen low-confidence warning + missing inputs. */
-function renderConfidenceBanner(pdf: jsPDF, y: number, confidence: string, missing: string[], locale: Locale = 'en'): number {
+function renderConfidenceBanner(pdf: jsPDF, y: number, confidence: string, missing: string[], locale: Locale = 'en', overrideMsg?: string): number {
   // Phase 2.3 — Confidence display: inverts the same `missing` list into a
   // "known vs not provided" reasoning clause. Box height below is measured
   // from the final `msg` string, so this needs no separate height math.
@@ -1754,11 +1754,11 @@ function renderConfidenceBanner(pdf: jsPDF, y: number, confidence: string, missi
   // Indonesian copy, on top of duplicating what `reasoning` already says in
   // translated form ("Belum diberikan: ..."). Dropped rather than translated:
   // saying the same thing twice reads as noise, not extra information.
-  const msg = locale === 'id'
+  const msg = overrideMsg ?? (locale === 'id'
     ? `Proyeksi dengan keyakinan ${confidenceLbl.id[confidence] ?? confidence} — angka-angka ini didasarkan pada data input yang terbatas dan benchmark internal, dan mungkin tidak mencerminkan hasil sebenarnya.` +
       (reasoning.length ? ` ${reasoning.join(' · ')}.` : '')
     : `${cap(confidence)} confidence projection — these figures are based on limited input data and internal benchmarks, and may not reflect actual outcomes.` +
-      (reasoning.length ? ` ${reasoning.join(' · ')}.` : '')
+      (reasoning.length ? ` ${reasoning.join(' · ')}.` : ''))
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(8.2)
   pdf.setLineHeightFactor(1.45)
@@ -2889,7 +2889,14 @@ export async function exportReportToPdf(
 
   // Mirror the on-screen low-confidence banner (incl. the missing inputs the
   // page shows) instead of burying confidence in a tile caption.
-  if (!calculations.hasEnoughDataForProjection) {
+  if (calculations.noAutomationGap) {
+    y = renderConfidenceBanner(
+      pdf, y, calculations.confidenceLevel ?? 'low', [], locale,
+      locale === 'id'
+        ? 'Tidak ada kesenjangan otomasi yang tersisa — target otomasi yang Anda tetapkan sudah sama dengan atau di bawah tingkat otomasi saat ini, sehingga tidak ada penghematan tambahan yang diproyeksikan. Naikkan target otomasi untuk memodelkan peluang berikutnya.'
+        : 'No automation gap left to close — your stated automation target is at or below your current automation level, so no additional savings are projected. Raise the target to model the next opportunity.',
+    )
+  } else if (!calculations.hasEnoughDataForProjection) {
     y = renderConfidenceBanner(
       pdf, y,
       calculations.confidenceLevel ?? 'low',
