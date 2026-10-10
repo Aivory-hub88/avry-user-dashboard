@@ -173,7 +173,8 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
           'No growth expected',
           'Up to 25%',
           '25-50%',
-          '50-100%',
+          '50-75%',
+          '75-100%',
           'More than 100%',
           'Not sure'
         ],

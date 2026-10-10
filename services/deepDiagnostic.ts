@@ -506,8 +506,12 @@ function parseVolumeGrowthPct(val: string | undefined): number | null {
     'No growth expected': 0,
     'Up to 25%': 12.5,
     '25-50%': 37.5,
-    '50-100%': 75,
+    '50-75%': 62.5,
+    '75-100%': 87.5,
     'More than 100%': 100,
+    // Legacy band (live briefly on 2026-10-10, before the 25–100% range was
+    // split) — kept so answers saved in that window still resolve.
+    '50-100%': 75,
   }
   if (!val) return null
   return map[val] ?? map[normalizeStr(val)] ?? null
