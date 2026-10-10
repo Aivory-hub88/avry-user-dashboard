@@ -28,7 +28,7 @@ describe('currency band answers', () => {
   })
 
   it('drops a phase-3 dollar budget once the currency is IDR, keeps valid answers', () => {
-    const phases = {
+    const phases: Record<string, { completed: boolean; responses: Record<string, unknown> }> = {
       business_objective_kpi: { completed: true, responses: { currency: 'IDR — Indonesian Rupiah (Rp)', annual_revenue: '$5M – $20M', industry: 'Logistics / Supply Chain' } },
       risk_constraints: { completed: true, responses: { budget_range: '$50K - $100K', risk_tolerance: 'Moderate - balanced approach' } },
     }
