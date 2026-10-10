@@ -40,6 +40,7 @@ import { selectSoftwareRecommendations, formatPickPrice } from '@/lib/softwareCa
 import { getLabourBenchmark } from '@/lib/currencyBands'
 import { netPaybackNotReachedLabel } from '@/lib/resultFormatters'
 import { buildInvestmentComparison, investmentComparisonExplanation, CEILING_PAYBACK_MONTHS } from '@/lib/investmentComparison'
+import { buildRequiredInvestmentView, isRequiredBasis } from '@/lib/requiredInvestmentView'
 import { getIndustryBenchmark, formatVsMedian } from '@/lib/industryBenchmarks'
 import { computeDelta, compositeSeries } from '@/lib/diagnosticHistory'
 import type { DiagnosticHistoryEntry } from '@/types/diagnostic'
@@ -412,7 +413,13 @@ export default function FinalResultPage() {
   // Stated budget vs. investment ceiling (≤24-month payback), same window —
   // shown above the tiles so a negative case reads as "budget too large for
   // this scope", with the numbers that fix it, rather than as an error.
-  const investmentComparison = buildInvestmentComparison(calculations as never, roiYears)
+  // Required basis (new reports): investment = what the recommended scope
+  // costs with Aivory; the budget is the ceiling it's compared against. The
+  // budget-vs-ceiling table and the threshold table only apply to the older
+  // whole-budget basis.
+  const requiredBasis = isRequiredBasis(calculations as never)
+  const requiredView = buildRequiredInvestmentView(calculations as never, (v) => fmtLocal(v), locale)
+  const investmentComparison = requiredBasis ? null : buildInvestmentComparison(calculations as never, roiYears)
   const financialInsight = buildExecutiveInsight('financial', {
     hasBudgetInput: (calculations.assumedBudgetMidpointLocal ?? (calculations as any).assumedBudgetMidpointUSD) != null,
     paybackMonths: calculations.paybackMonths,
@@ -821,11 +828,12 @@ export default function FinalResultPage() {
             const picks = selectSoftwareRecommendations({
               currency: currencyCode,
               industry: context.qualitative?.industry,
+              // topPainPoints is the raw textarea string — one pain point per line.
               painPoints: Array.isArray(context.qualitative?.topPainPoints)
                 ? context.qualitative.topPainPoints
-                : [],
+                : String(context.qualitative?.topPainPoints ?? '').split('\n').map((l) => l.trim()).filter(Boolean),
               opportunityTitles: opportunities.map((o) => o.title),
-              budgetMidpointUSD: calculations.assumedBudgetMidpointUSD ?? null,
+              budgetMidpointUSD: (calculations as any).statedBudgetUSD ?? calculations.assumedBudgetMidpointUSD ?? null,
               fteCountInScope: context.quantitative?.fteCountInScope ?? null,
             })
             if (picks.length === 0) return null
@@ -881,19 +889,19 @@ export default function FinalResultPage() {
               readers took negative tiles for current losses. */}
           <p className={styles.financialTermsNote}>
             {locale === 'id'
-              ? 'Semua angka di bawah adalah proyeksi setelah perbaikan diterapkan — penghematan yang diperkirakan dari otomasi yang direkomendasikan, dibandingkan dengan anggaran yang Anda masukkan. Angka negatif berarti biaya investasi dan biaya berjalan lebih besar dari penghematan yang diproyeksikan, bukan kerugian yang terjadi saat ini.'
-              : 'Every figure below is a projection of the state after the improvements are in place — the savings expected from the recommended automation, set against the budget you entered. A negative figure means the investment and running cost exceed the projected savings, not a loss you are making today.'}
+              ? `Semua angka di bawah adalah proyeksi setelah perbaikan diterapkan — penghematan yang diperkirakan dari otomasi yang direkomendasikan, dibandingkan dengan ${requiredBasis ? 'investasi yang dibutuhkan' : 'anggaran yang Anda masukkan'}. Angka negatif berarti biaya investasi dan biaya berjalan lebih besar dari penghematan yang diproyeksikan, bukan kerugian yang terjadi saat ini.`
+              : `Every figure below is a projection of the state after the improvements are in place — the savings expected from the recommended automation, set against ${requiredBasis ? 'the investment required' : 'the budget you entered'}. A negative figure means the investment and running cost exceed the projected savings, not a loss you are making today.`}
           </p>
 
-          {qualitative.budgetCurrencyMismatch && calculations.assumedBudgetMidpointLocal != null && (
+          {qualitative.budgetCurrencyMismatch && ((calculations as any).statedBudgetLocal ?? calculations.assumedBudgetMidpointLocal) != null && (
             <div className={styles.confidenceBanner}>
               <p className={styles.confidenceHeadline}>
                 {locale === 'id' ? 'Anggaran diisi dalam dolar AS' : 'Budget was entered in US dollars'}
               </p>
               <p className={styles.confidenceBody}>
                 {locale === 'id'
-                  ? `Kisaran anggaran Anda (${qualitative.budgetCurrencyMismatch}) dalam dolar AS, sedangkan laporan ini dalam ${context.currency}, sehingga investasi dihitung sebagai ≈ ${fmtLocal(calculations.assumedBudgetMidpointLocal)}. Jika anggaran sebenarnya dalam ${context.currency}, jalankan ulang diagnostik dan pilih kisaran anggaran dalam ${context.currency} — angka payback, ROI, dan NPV bergantung pada angka ini.`
-                  : `Your budget range (${qualitative.budgetCurrencyMismatch}) is in US dollars while this report is in ${context.currency}, so the investment is priced at ≈ ${fmtLocal(calculations.assumedBudgetMidpointLocal)}. If your real budget is in ${context.currency}, re-run the diagnostic and pick a ${context.currency} budget range — the payback, ROI and NPV figures depend on it.`}
+                  ? `Kisaran anggaran Anda (${qualitative.budgetCurrencyMismatch}) dalam dolar AS, sedangkan laporan ini dalam ${context.currency}, sehingga anggaran Anda dihitung sebagai ≈ ${fmtLocal((calculations as any).statedBudgetLocal ?? calculations.assumedBudgetMidpointLocal)}. Jika anggaran sebenarnya dalam ${context.currency}, jalankan ulang diagnostik dan pilih kisaran anggaran dalam ${context.currency}.`
+                  : `Your budget range (${qualitative.budgetCurrencyMismatch}) is in US dollars while this report is in ${context.currency}, so your budget is read as ≈ ${fmtLocal((calculations as any).statedBudgetLocal ?? calculations.assumedBudgetMidpointLocal)}. If your real budget is in ${context.currency}, re-run the diagnostic and pick a ${context.currency} budget range.`}
               </p>
             </div>
           )}
@@ -937,6 +945,29 @@ export default function FinalResultPage() {
                   {confidenceReasons.join(' · ')}
                 </p>
               )}
+            </div>
+          )}
+
+          {requiredView && (
+            <div className={styles.thresholdBlock} style={{ marginBottom: '1.25rem' }}>
+              <span className={styles.thresholdLabel} style={{ color: '#86efac' }}>
+                {locale === 'id' ? 'Anggaran Anda vs investasi yang dibutuhkan' : 'Your budget vs the investment required'}
+              </span>
+              <p className={styles.thresholdIntro}>{requiredView.explanation}</p>
+              <div className={styles.thresholdTable} style={{ gridTemplateColumns: '1fr auto' }}>
+                {requiredView.rows.map((r) => (
+                  <Fragment key={r.label}>
+                    <span className={styles.thresholdCell} style={r.emphasis ? { fontWeight: 700 } : undefined}>{r.label}</span>
+                    <span
+                      className={`${styles.thresholdCell} ${styles.thresholdCellNum}`}
+                      style={{ fontWeight: r.emphasis ? 700 : undefined, color: r.tone === 'good' ? '#86efac' : r.tone === 'bad' ? '#f87171' : undefined }}
+                    >
+                      {r.value}
+                    </span>
+                  </Fragment>
+                ))}
+              </div>
+              <p className={styles.thresholdFootnote}>{requiredView.footnote}</p>
             </div>
           )}
 
@@ -997,17 +1028,17 @@ export default function FinalResultPage() {
               confidenceLevel={calculations.confidenceLevel}
               locale={locale}
             />
-            <ROIMetricTile label={locale === 'id' ? 'Periode Payback' : 'Payback Period'} value={calculations.paybackMonths} formatter={(v) => formatPaybackCapped(v, locale)} subtitle={locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Periode Payback' : 'Payback Period'} value={calculations.paybackMonths} formatter={(v) => formatPaybackCapped(v, locale)} subtitle={requiredBasis ? (locale === 'id' ? 'Investasi = kebutuhan tahun pertama' : 'Investment = year-1 requirement') : (locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget')} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile
               label={roiLabel(roiYears, locale)}
               value={calculations.threeYearROIPercent}
               formatter={(v) => v >= 999 ? '>999%' : formatPercent(v, locale)}
-              subtitle={locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget'}
+              subtitle={requiredBasis ? (locale === 'id' ? 'Investasi = kebutuhan tahun pertama' : 'Investment = year-1 requirement') : (locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget')}
               confidenceLevel={calculations.confidenceLevel}
               locale={locale}
             />
             <ROIMetricTile label={npvLabel(roiYears, locale)} value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Value kini bersih @ diskonto 10%' : 'Net present value @ 10% discount'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
-            <ROIMetricTile label={locale === 'id' ? 'Biaya Berjalan Tahunan' : 'Annual Ongoing Cost'} value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Estimasi lisensi, pemeliharaan & dukungan' : 'Est. licenses, maintenance & support'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Biaya Berjalan Tahunan' : 'Annual Ongoing Cost'} value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle={requiredBasis ? (locale === 'id' ? 'Plan Aivory, mulai tahun ke-2' : 'Aivory plan, from year 2') : (locale === 'id' ? 'Estimasi lisensi, pemeliharaan & dukungan' : 'Est. licenses, maintenance & support')} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Penghematan Bersih Tahunan' : 'Net Annual Savings'} value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Setelah biaya berjalan' : 'After ongoing cost'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Periode Payback Bersih' : 'Net Payback Period'} value={(calculations as any).netPaybackMonths ?? null} formatter={(v) => formatPaybackCapped(v, locale, roiYears * 12)} subtitle={locale === 'id' ? 'Berdasarkan penghematan bersih' : 'On net savings'} confidenceLevel={calculations.confidenceLevel} locale={locale} nullText={netPaybackNotReachedLabel(calculations as any, locale, roiYears) ?? undefined} />
             {totalAnnualSavingsLocal != null && totalAnnualSavingsLocal > 0 && (
@@ -1053,7 +1084,7 @@ export default function FinalResultPage() {
               only states the verdict leaves the client with a number they
               cannot act on; these two columns turn "your budget is too large"
               into "phase it at X, or widen scope until savings reach Y". */}
-          {calculations.hasEnoughDataForProjection && investmentThresholds.length > 0 && (
+          {!requiredBasis && calculations.hasEnoughDataForProjection && investmentThresholds.length > 0 && (
             <div className={styles.thresholdBlock}>
               <span className={styles.thresholdLabel}>
                 {locale === 'id' ? 'Ambang Investasi — Apa yang Dibutuhkan' : 'Investment Thresholds — What It Would Take'}
@@ -1263,7 +1294,9 @@ export default function FinalResultPage() {
                     <span className={styles.stepValue}>
                       {calculations.paybackMonths != null ? formatPaybackCapped(calculations.paybackMonths, locale) : '—'}{' '}
                       = <strong>{fmtLocal(calculations.assumedBudgetMidpointLocal)}</strong> {locale === 'id' ? 'investasi ÷' : 'investment ÷'} {fmtLocal(calculations.totalAnnualSavingsLocal)}/{locale === 'id' ? 'thn' : 'yr'} × 12
-                      {' '}{locale === 'id' ? '(titik tengah kisaran anggaran yang Anda pilih)' : '(midpoint of your selected budget range)'}
+                      {' '}{requiredBasis
+                        ? (locale === 'id' ? '(investasi yang dibutuhkan tahun pertama)' : '(year-1 investment required)')
+                        : (locale === 'id' ? '(titik tengah kisaran anggaran yang Anda pilih)' : '(midpoint of your selected budget range)')}
                     </span>
                   </li>
                 )}

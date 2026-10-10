@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { buildInvestmentComparison, investmentComparisonExplanation } from './investmentComparison'
-import { buildDiagnosticContext } from '@/services/deepDiagnostic'
+import { buildDiagnosticContext, calculateROI } from '@/services/deepDiagnostic'
 import { getRoiHorizonYears } from './roiHorizon'
 
 beforeEach(() => {
@@ -14,9 +14,15 @@ const answers = {
   automation_current: '10-25%', target_automation: '50-75%', budget_range: '$50K - $100K',
 }
 
+// The ceiling comparison only applies to reports appraised on the whole stated
+// budget (contexts stored before the required-investment basis) — rebuild
+// that basis explicitly.
+const wholeBudgetCalc = () =>
+  calculateROI(buildDiagnosticContext(answers as any).quantitative, 'IDR', 'Logistics / Supply Chain')
+
 describe('buildInvestmentComparison', () => {
   it('reproduces the report tiles in the "your budget" column', () => {
-    const { calculations: k } = buildDiagnosticContext(answers as any)
+    const k = wholeBudgetCalc()
     const H = getRoiHorizonYears(k)
     const c = buildInvestmentComparison(k as any, H)!
     expect(c).not.toBeNull()
@@ -29,7 +35,7 @@ describe('buildInvestmentComparison', () => {
   })
 
   it('sets the ceiling at 2× annual savings, and every ceiling figure is positive', () => {
-    const { calculations: k } = buildDiagnosticContext(answers as any)
+    const k = wholeBudgetCalc()
     const c = buildInvestmentComparison(k as any, getRoiHorizonYears(k))!
     expect(c.ceiling.investmentLocal).toBeCloseTo(k.totalAnnualSavingsLocal! * 2, 0)
     expect(c.ceiling.paybackMonths).toBeCloseTo(24, 6)
@@ -37,6 +43,11 @@ describe('buildInvestmentComparison', () => {
     expect(c.ceiling.netPaybackMonths).toBeGreaterThan(24)
     expect(c.ceiling.roiPercent).toBeGreaterThan(0)
     expect(c.ceiling.npvLocal).toBeGreaterThan(0)
+  })
+
+  it('is null for new reports on the required-investment basis (healthy case)', () => {
+    const { calculations } = buildDiagnosticContext(answers as any)
+    expect(buildInvestmentComparison(calculations as any, getRoiHorizonYears(calculations))).toBeNull()
   })
 
   it('is null when the stated budget already pays back within 24 months, or inputs are missing', () => {

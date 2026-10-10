@@ -86,6 +86,14 @@ export const TIER_MONTHLY_PRICE_USD: Readonly<Record<string, number>> = Object.f
 })
 
 /**
+ * One-time Complete Transformation Package (product `ai_fullstack`) — the
+ * same $299 the settings page sells, and it includes the first month of the
+ * Business plan. Used by the Deep Diagnostic's required-investment estimate.
+ */
+export const FULLSTACK_PACKAGE_PRICE_USD = 299
+export const FULLSTACK_INCLUDED_PLAN_MONTHS = 1
+
+/**
  * Monthly Intelligence Credit allowance per tier.
  *
  * Must equal `TIER_ALLOWANCES` in the backend's `app/services/tiers.py`, which
