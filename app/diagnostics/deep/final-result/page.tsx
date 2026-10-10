@@ -41,6 +41,7 @@ import { getLabourBenchmark } from '@/lib/currencyBands'
 import { netPaybackNotReachedLabel } from '@/lib/resultFormatters'
 import { buildInvestmentComparison, investmentComparisonExplanation, CEILING_PAYBACK_MONTHS } from '@/lib/investmentComparison'
 import { buildRequiredInvestmentView, isRequiredBasis } from '@/lib/requiredInvestmentView'
+import { buildCapacityValueView } from '@/lib/capacityValueView'
 import { getIndustryBenchmark, formatVsMedian } from '@/lib/industryBenchmarks'
 import { computeDelta, compositeSeries } from '@/lib/diagnosticHistory'
 import type { DiagnosticHistoryEntry } from '@/types/diagnostic'
@@ -420,6 +421,8 @@ export default function FinalResultPage() {
   const requiredBasis = isRequiredBasis(calculations as never)
   const requiredView = buildRequiredInvestmentView(calculations as never, (v) => fmtLocal(v), locale)
   const investmentComparison = requiredBasis ? null : buildInvestmentComparison(calculations as never, roiYears)
+  // Capacity value — cost avoidance from expected growth, on its own line.
+  const capacityView = buildCapacityValueView(calculations as never, (v) => fmtLocal(v), locale)
   const financialInsight = buildExecutiveInsight('financial', {
     hasBudgetInput: (calculations.assumedBudgetMidpointLocal ?? (calculations as any).assumedBudgetMidpointUSD) != null,
     paybackMonths: calculations.paybackMonths,
@@ -1065,6 +1068,22 @@ export default function FinalResultPage() {
             />
           </div>
           {roiTilesCaption && <p className={styles.vizCaption}>{roiTilesCaption}</p>}
+
+          {capacityView && (
+            <div className={styles.thresholdBlock} style={{ marginTop: '1.25rem' }}>
+              <span className={styles.thresholdLabel} style={{ color: '#93c5fd' }}>{capacityView.title}</span>
+              <p className={styles.thresholdIntro}>{capacityView.explanation}</p>
+              <div className={styles.thresholdTable} style={{ gridTemplateColumns: '1fr auto' }}>
+                {capacityView.rows.map((r) => (
+                  <Fragment key={r.label}>
+                    <span className={styles.thresholdCell} style={r.emphasis ? { fontWeight: 700 } : undefined}>{r.label}</span>
+                    <span className={`${styles.thresholdCell} ${styles.thresholdCellNum}`} style={r.emphasis ? { fontWeight: 700, color: '#93c5fd' } : undefined}>{r.value}</span>
+                  </Fragment>
+                ))}
+              </div>
+              <p className={styles.thresholdFootnote}>{capacityView.footnote}</p>
+            </div>
+          )}
 
           {/* Bridges "ROI 3 Tahun" above (gross) and "Kisaran ROI 3 Tahun"
               below (net, after ongoing cost) — the two most-flagged-as-

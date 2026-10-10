@@ -500,6 +500,19 @@ export function reconcileManualHoursWithFte(
   return Math.max(hoursWeekly, fteCount * OPEN_BUCKET_HOURS_PER_FTE)
 }
 
+/** volume_growth_12m → % (midpoints; the open top band is floored at 100). 'Not sure'/absent → null. */
+function parseVolumeGrowthPct(val: string | undefined): number | null {
+  const map: Record<string, number> = {
+    'No growth expected': 0,
+    'Up to 25%': 12.5,
+    '25-50%': 37.5,
+    '50-100%': 75,
+    'More than 100%': 100,
+  }
+  if (!val) return null
+  return map[val] ?? map[normalizeStr(val)] ?? null
+}
+
 function parseFteCount(val: string | undefined): number | null {
   if (!val) return null
   const norm = normalizeStr(val)
@@ -830,6 +843,25 @@ export function calculateROI(
   const cumulativeSavingsHorizonUSD =
     totalAnnualSavingsUSD !== null ? totalAnnualSavingsUSD * roiHorizonYears : null
 
+  // ── Capacity value (cost avoidance) ─────────────────────────────────────
+  // Growth adds manual work; automation absorbs the same share of it as of
+  // today's work (gap × efficiency). Only the GROWTH increment is counted —
+  // today's hours are already in the savings above, so nothing is counted
+  // twice — and a 50% realization discount reflects that avoided hiring only
+  // materialises if the growth does (Forrester TEI studies discount freed time
+  // 25–50% for the same reason). Kept off the headline tiles on purpose.
+  const CAPACITY_REALIZATION = 0.5
+  const growthPct = q.volumeGrowthPct ?? null
+  const capacityAvoidedHoursPerYear =
+    growthPct && growthPct > 0 && q.totalManualHoursWeekly && !noAutomationGap
+      ? Math.round(hoursPerYear * (growthPct / 100) * incrementalAutoPct * EFFICIENCY_FACTOR * CAPACITY_REALIZATION)
+      : null
+  const capacityAvoidanceUSD = capacityAvoidedHoursPerYear ? capacityAvoidedHoursPerYear * hourlyRateUSD : null
+  const horizonROIWithCapacityPercent =
+    capacityAvoidanceUSD && totalAnnualSavingsUSD && budgetUSD && budgetUSD > 0
+      ? Math.min((((totalAnnualSavingsUSD + capacityAvoidanceUSD) * roiHorizonYears - budgetUSD) / budgetUSD) * 100, 999)
+      : null
+
   const costOfInaction90DaysUSD = totalAnnualSavingsUSD
     ? totalAnnualSavingsUSD * (90 / 365)
     : null
@@ -935,6 +967,12 @@ export function calculateROI(
     confidenceLevel: confidence,
     missingInputs: missing,
     noAutomationGap,
+    capacityGrowthPct: growthPct,
+    capacityRealizationFactor: CAPACITY_REALIZATION,
+    capacityAvoidedHoursPerYear,
+    capacityAvoidanceUSD,
+    capacityAvoidanceLocal: capacityAvoidanceUSD !== null ? capacityAvoidanceUSD * rate : null,
+    horizonROIWithCapacityPercent,
     // Methodology transparency fields — expose the assumptions behind the numbers
     assumedHourlyRateUSD: hourlyRateUSD,
     assumedHourlyRateLocal: hourlyRateUSD * rate,
@@ -2332,6 +2370,7 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     targetAutomationPct: targetAutoPct,
     budgetMidpointUSD,
     timelineMonths,
+    volumeGrowthPct: parseVolumeGrowthPct(answers.volume_growth_12m),
   }
 
   const scores = calculateDimensionScores(answers)

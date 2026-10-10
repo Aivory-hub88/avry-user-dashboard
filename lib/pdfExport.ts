@@ -56,6 +56,7 @@ import type { CurrencyCode } from '@/lib/resultFormatters'
 import { netPaybackNotReachedLabel } from '@/lib/resultFormatters'
 import { buildInvestmentComparison, investmentComparisonExplanation, CEILING_PAYBACK_MONTHS, type InvestmentComparison } from '@/lib/investmentComparison'
 import { buildRequiredInvestmentView, isRequiredBasis, type RequiredInvestmentView } from '@/lib/requiredInvestmentView'
+import { buildCapacityValueView } from '@/lib/capacityValueView'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
 export const INK       = '#0a1a0f'   // primary text, display values
@@ -1925,12 +1926,12 @@ function renderMetricGrid(
  * reading the PDF and a client reading the page quote the same numbers.
  */
 /** Budget vs investment required — mirrors the on-screen block. */
-function renderRequiredInvestment(pdf: jsPDF, y: number, v: RequiredInvestmentView, locale: Locale = 'en'): number {
+function renderRequiredInvestment(pdf: jsPDF, y: number, v: RequiredInvestmentView, locale: Locale = 'en', heading?: string): number {
   y = ensureSpace(pdf, y, 60)
   setC(pdf, ACCENT, 'text')
   pdf.setFont(FB(), 'bold')
   pdf.setFontSize(6.4)
-  spacedText(pdf, locale === 'id' ? 'ANGGARAN ANDA VS INVESTASI YANG DIBUTUHKAN' : 'YOUR BUDGET VS THE INVESTMENT REQUIRED', ML, y, 0.3)
+  spacedText(pdf, heading ?? (locale === 'id' ? 'ANGGARAN ANDA VS INVESTASI YANG DIBUTUHKAN' : 'YOUR BUDGET VS THE INVESTMENT REQUIRED'), ML, y, 0.3)
   y += 4.5
   setC(pdf, MUTED, 'text')
   pdf.setFont(F(), 'normal')
@@ -3252,6 +3253,16 @@ export async function exportReportToPdf(
       const capLines = pdf.splitTextToSize(roiCaption, CW)
       pdf.text(capLines, ML, y)
       y += capLines.length * 3.2 + 3
+    }
+  }
+
+  // Capacity value — cost avoidance from expected growth, on its own line
+  // (same view model as the page; renders nothing without a growth answer).
+  {
+    const cap = buildCapacityValueView(calculations as never, (v) => fmt(v), locale)
+    if (cap) {
+      y += 2
+      y = renderRequiredInvestment(pdf, y, { explanation: cap.explanation, rows: cap.rows, footnote: cap.footnote }, locale, cap.title.toUpperCase())
     }
   }
 
