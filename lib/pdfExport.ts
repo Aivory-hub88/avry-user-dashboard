@@ -141,13 +141,22 @@ export const SP = { hair: 2, xs: 4, sm: 6, md: 8, lg: 14, transitionGuard: 26 } 
 export const TS = { micro: 6, caption: 6.4, label: 7, small: 7.5, body: 8.5, value: 10, title: 10.5, subhead: 11.5, metric: 11.5, sectionHeadline: 13, display: 19, hero: 30 } as const
 
 // ── Font helpers ───────────────────────────────────────────────────────────────
-// Manrope / Doto are design-intent fonts; helvetica is the jsPDF fallback.
-// To embed true Manrope/Doto, bundle base64-encoded TTF files (follow-up).
+// Manrope / Doto are embedded from public/fonts by loadManrope() below;
+// helvetica is the fallback when that fails. Never call setFont with a literal
+// family or with 'italic' on Manrope — use F()/FB()/FD() and IT().
 let FONT_LOADED = false
 let DOTO_LOADED = false
 export const F  = () => FONT_LOADED ? 'Manrope' : 'helvetica'
 export const FB = () => FONT_LOADED ? 'Manrope' : 'helvetica'
 export const FD = () => DOTO_LOADED ? 'Doto' : 'helvetica' // score ring numbers
+/**
+ * Style for "italic" captions. Manrope ships no italic, so asking jsPDF for
+ * Manrope 'italic' silently fell back to Times-Italic — a serif typeface in
+ * the middle of a Manrope document. With Manrope embedded the captions stay
+ * upright (muted colour/size already set them apart); the Helvetica fallback
+ * keeps its real oblique.
+ */
+export const IT = () => FONT_LOADED ? 'normal' : 'italic'
 
 // ── Utility functions ──────────────────────────────────────────────────────────
 export function hexToRgb(hex: string): [number, number, number] {
@@ -808,7 +817,7 @@ function dimBar(
   pdf.text(String(score), x + w, y + 3, { align: 'right' })
   if (medianVsLabel) {
     setC(pdf, LABEL, 'text')
-    pdf.setFont(F(), 'italic')
+    pdf.setFont(F(), IT())
     pdf.setFontSize(6.2)
     // Sits below the track (barY ± barH/2 ≈ y+5.55..y+6.45) — was previously
     // y+7.5, which overlapped the bar for this font size/leading.
@@ -2485,7 +2494,7 @@ export async function exportReportToPdf(
       strongestKey, strongestScore: scoreOf(strongestKey), strongestLabel: DIM_LABELS[locale][strongestKey] ?? cap(strongestKey),
       weakestKey, weakestScore: scoreOf(weakestKey), weakestLabel: DIM_LABELS[locale][weakestKey] ?? cap(weakestKey),
     }, locale)
-    pdf.setFont(F(), 'italic')
+    pdf.setFont(F(), IT())
     pdf.setFontSize(8.5)
     pdf.setLineHeightFactor(1.5)
     setC(pdf, MUTED, 'text')
@@ -2511,7 +2520,7 @@ export async function exportReportToPdf(
   const industryBenchmark = getIndustryBenchmark(qualitative.industry)
   if (industryBenchmark) {
     setC(pdf, LABEL, 'text')
-    pdf.setFont(F(), 'italic')
+    pdf.setFont(F(), IT())
     pdf.setFontSize(6.4)
     pdf.text(
       formatVsMedian(scores.composite, industryBenchmark.composite, locale) ?? '',
@@ -2550,7 +2559,7 @@ export async function exportReportToPdf(
       by += capLines.length * 3 + 2
     }
     setC(pdf, LABEL, 'text')
-    pdf.setFont(F(), 'italic')
+    pdf.setFont(F(), IT())
     pdf.setFontSize(6)
     pdf.text(BENCHMARK_DISCLAIMER[locale], barX, by + 2, { maxWidth: barW })
     by += 7
@@ -2953,11 +2962,11 @@ export async function exportReportToPdf(
           : `${formatPickPrice(pick.priceUSD, currency, rate, locale, pick.priceBasis)} *`}`
         const body = `${locale === 'id' ? pick.category.id : pick.category.en}. ${locale === 'id' ? pick.reason.id : pick.reason.en}`
         y = ensureSpace(pdf, y, 24)
-        pdf.setFont('helvetica', 'bold')
+        pdf.setFont(FB(), 'bold')
         pdf.setFontSize(10)
         pdf.text(pdf.splitTextToSize(heading, CW)[0], ML, y)
         y += 5
-        pdf.setFont('helvetica', 'normal')
+        pdf.setFont(F(), 'normal')
         pdf.setFontSize(9)
         for (const line of pdf.splitTextToSize(body, CW)) {
           y = ensureSpace(pdf, y, 5.2)
@@ -3351,7 +3360,7 @@ export async function exportReportToPdf(
     tocMark(locale === 'id' ? 'Metodologi' : 'Methodology', true)
     y = sectionLabel(pdf, y, locale === 'id' ? 'Metodologi' : 'Methodology')
 
-    pdf.setFont(F(), 'italic')
+    pdf.setFont(F(), IT())
     pdf.setFontSize(8.5)
     pdf.setLineHeightFactor(1.5)
     setC(pdf, MUTED, 'text')
