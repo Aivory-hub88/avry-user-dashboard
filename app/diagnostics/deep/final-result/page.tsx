@@ -34,7 +34,7 @@ import {
 import { getRoiHorizonYears, roiLabel, npvLabel, horizonNote } from '@/lib/roiHorizon'
 import { getInvestmentThresholds, thresholdTestLabel, THRESHOLD_WINDOW_YEARS, TARGET_PAYBACK_MONTHS } from '@/lib/investmentThresholds'
 import { ensureLiveRates, getFxAsOfLabel, getRate } from '@/lib/liveRates'
-import { selectSoftwareRecommendations, formatPickPrice } from '@/lib/softwareCatalog'
+import { selectSoftwareForContext, formatPick, aivoryIntegrationLabel } from '@/lib/softwareCatalog'
 import { getLabourBenchmark } from '@/lib/currencyBands'
 import { netPaybackNotReachedLabel } from '@/lib/resultFormatters'
 import { buildInvestmentComparison, investmentComparisonExplanation, CEILING_PAYBACK_MONTHS } from '@/lib/investmentComparison'
@@ -829,17 +829,7 @@ export default function FinalResultPage() {
               never LLM-invented. Region-aware (ID vendors for IDR users),
               entry pricing shown in the report currency. */}
           {(() => {
-            const picks = selectSoftwareRecommendations({
-              currency: currencyCode,
-              industry: context.qualitative?.industry,
-              // topPainPoints is the raw textarea string — one pain point per line.
-              painPoints: Array.isArray(context.qualitative?.topPainPoints)
-                ? context.qualitative.topPainPoints
-                : String(context.qualitative?.topPainPoints ?? '').split('\n').map((l) => l.trim()).filter(Boolean),
-              opportunityTitles: opportunities.map((o) => o.title),
-              budgetMidpointUSD: (calculations as any).statedBudgetUSD ?? calculations.assumedBudgetMidpointUSD ?? null,
-              fteCountInScope: context.quantitative?.fteCountInScope ?? null,
-            })
+            const picks = selectSoftwareForContext(context as never, opportunities.map((o) => o.title), currencyCode)
             if (picks.length === 0) return null
             const rate = getRate(currencyCode)
             return (
@@ -855,10 +845,15 @@ export default function FinalResultPage() {
                     <div key={pick.name} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 16px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                         <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{pick.name}</div>
-                        <div style={{ fontSize: '0.82rem', opacity: 0.75 }}>{formatPickPrice(pick.priceUSD, currencyCode, rate, locale, pick.priceBasis)}<span title={locale === 'id' ? 'Harga entry-tier publik, dapat berubah' : 'Public entry-tier price, subject to change'}> *</span></div>
+                        <div style={{ fontSize: '0.82rem', opacity: 0.75 }}>{formatPick(pick, currencyCode, rate, locale)}<span title={locale === 'id' ? 'Harga entry-tier publik, dapat berubah' : 'Public entry-tier price, subject to change'}> *</span></div>
                       </div>
-                      <div style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: 2 }}>
-                        {locale === 'id' ? pick.category.id : pick.category.en}
+                      <div style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: 2, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span>{locale === 'id' ? pick.category.id : pick.category.en}</span>
+                        {pick.aivoryIntegration && (
+                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#86efac', border: '1px solid rgba(134,239,172,0.4)', borderRadius: 999, padding: '1px 8px', opacity: 1 }}>
+                            ✓ {aivoryIntegrationLabel(locale)}
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: '0.88rem', opacity: 0.85, marginTop: 6 }}>
                         {locale === 'id' ? pick.reason.id : pick.reason.en}
@@ -876,8 +871,8 @@ export default function FinalResultPage() {
                 </div>
                 <p style={{ margin: '10px 0 0', opacity: 0.8, fontSize: '0.88rem', fontWeight: 600 }}>
                   {locale === 'id'
-                    ? '* Harga entry-tier publik dan belum termasuk biaya implementasi. Satuannya tertera pada tiap harga: /pengguna/bln dihitung per satu pengguna (kalikan jumlah pengguna Anda), /karyawan/bln per satu karyawan, dan (paket tim) sudah mencakup satu tim. Harga dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
-                    : '* Public entry-tier prices, implementation cost not included. The unit is stated on each price: /user/mo is per single user (multiply by your user count), /employee/mo is per employee, and (team plan) already covers a team. Prices change at any time — always verify with the official vendor before purchasing.'}
+                    ? '* Harga entry-tier publik dan belum termasuk biaya implementasi. Satuannya tertera pada tiap harga: /pengguna/bln dihitung per satu pengguna (kalikan jumlah pengguna Anda), /karyawan/bln per satu karyawan, /outlet/bln per outlet, dan (paket tim) sudah mencakup satu tim; payment gateway dan API dikenakan biaya per transaksi atau per pemakaian. Harga dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
+                    : '* Public entry-tier prices, implementation cost not included. The unit is stated on each price: /user/mo is per single user (multiply by your user count), /employee/mo is per employee, /outlet/mo per outlet, and (team plan) already covers a team; payment gateways and APIs charge per transaction or per use. Prices change at any time — always verify with the official vendor before purchasing.'}
                 </p>
               </div>
             )

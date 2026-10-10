@@ -47,6 +47,25 @@ export const ID_PHASE_COPY: Record<PhaseId, IdPhaseCopy> = {
 }
 
 export const ID_QUESTION_COPY: Record<string, IdQuestionCopy> = {
+  operating_country: {
+    question: 'Di negara mana bisnis Anda terutama beroperasi?',
+    helperText: 'Dipakai untuk merekomendasikan software dan vendor yang tersedia dan sesuai regulasi di negara Anda',
+    options: [
+      'Indonesia',
+      'Singapura',
+      'Malaysia',
+      'Australia',
+      'Uni Emirat Arab',
+      'Arab Saudi',
+      'Oman',
+      'India',
+      'Jepang',
+      'Inggris',
+      'Uni Eropa',
+      'Amerika Serikat',
+      'Lainnya',
+    ],
+  },
   // --- Phase 1: business_objective_kpi ---
   currency: {
     question: 'Mata uang apa yang ingin Anda gunakan untuk estimasi biaya dan ROI?',

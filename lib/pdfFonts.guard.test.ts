@@ -20,6 +20,10 @@ describe('PDF generators only use the embedded Manrope/Doto helpers', () => {
       // (app/roadmap had `const FB = () => 'Helvetica'`).
       const shadowing = [...src.matchAll(/const\s+(F|FB|FD|IT|AKL|AKR)\s*=\s*\(\)\s*=>\s*['"][^'"]+['"]/g)].map((m) => m[0])
       expect(shadowing).toEqual([])
+      // Manrope has no check-mark glyphs — they render as blank boxes in the
+      // PDF. Use '•' (present in Manrope) for status marks.
+      const codeOnly = src.split('\n').filter((l) => !/^\s*(\/\/|\*)/.test(l)).join('\n')
+      expect(codeOnly.match(/[✓✔✗✘]/g) ?? []).toEqual([])
     })
   }
 })

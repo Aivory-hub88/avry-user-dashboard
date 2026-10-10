@@ -46,7 +46,7 @@ import {
 import { getIndustryBenchmark, formatVsMedian, BENCHMARK_DISCLAIMER } from '@/lib/industryBenchmarks'
 import { quantifyPainPoints, formatPainPointHours, displayPainPointCost } from '@/lib/bottleneckQuantification'
 import { getROISensitivity, humanizeAnswerId } from '@/services/deepDiagnostic'
-import { selectSoftwareRecommendations, formatPickPrice } from '@/lib/softwareCatalog'
+import { selectSoftwareForContext, formatPick, aivoryIntegrationLabel } from '@/lib/softwareCatalog'
 import { getRate } from '@/lib/liveRates'
 import { getRoiHorizonYears, roiLabel, npvLabel, horizonNote } from '@/lib/roiHorizon'
 import {
@@ -2297,7 +2297,7 @@ function renderRiskRegister(
     const rLblW = spacedText(pdf, constraintsHeading, ML, y, 0.5)
     setC(pdf, ACCENT, 'text')
     pdf.setFontSize(7)
-    pdf.text('✓', ML + rLblW + 6, y)
+    pdf.text('•', ML + rLblW + 6, y)
     setC(pdf, LABEL, 'text')
     pdf.text(locale === 'id' ? 'Tidak ada risiko yang terdeteksi.' : 'No risks detected.', ML + rLblW + 10, y)
     return y + 8
@@ -3003,16 +3003,7 @@ export async function exportReportToPdf(
   // page, so the PDF and the screen can never disagree.
   // ════════════════════════════════════════════════════════════════════════════
   {
-    const picks = selectSoftwareRecommendations({
-      currency,
-      industry: qualitative?.industry,
-      painPoints: Array.isArray(qualitative?.topPainPoints)
-        ? qualitative.topPainPoints
-        : String(qualitative?.topPainPoints ?? '').split('\n').map((l) => l.trim()).filter(Boolean),
-      opportunityTitles: opportunities.map((o) => o.title),
-      budgetMidpointUSD: cAny.statedBudgetUSD ?? calculations.assumedBudgetMidpointUSD ?? null,
-      fteCountInScope: context.quantitative?.fteCountInScope ?? null,
-    })
+    const picks = selectSoftwareForContext(context as never, opportunities.map((o) => o.title), currency)
     if (picks.length > 0) {
       const rate = getRate(currency)
       y = ensureSpace(pdf, y, locale === 'id' ? 40 : 35)
@@ -3021,9 +3012,7 @@ export async function exportReportToPdf(
         ? 'Dicocokkan dengan jawaban diagnostik Anda — dipilih agar transformasi bisa dimulai dari implementasi yang paling simpel dulu, baru ditingkatkan sesuai kebutuhan. Harga bertanda * adalah entry-tier publik untuk pembanding.'
         : 'Matched to your diagnostic answers — chosen so your transformation can start with the simplest possible implementation first, then scale as needed. Prices marked * are public entry-tier figures for comparison.')
       for (const pick of picks) {
-        const heading = `${pick.name} — ${pick.priceUSD === 0
-          ? (locale === 'id' ? 'gratis / self-host' : 'free / self-host')
-          : `${formatPickPrice(pick.priceUSD, currency, rate, locale, pick.priceBasis)} *`}`
+        const heading = `${pick.name} — ${formatPick(pick, currency, rate, locale)} *`
         const body = `${locale === 'id' ? pick.category.id : pick.category.en}. ${locale === 'id' ? pick.reason.id : pick.reason.en}`
         y = ensureSpace(pdf, y, 24)
         pdf.setFont(FB(), 'bold')
@@ -3038,7 +3027,14 @@ export async function exportReportToPdf(
           y += 5.2
         }
         pdf.setTextColor(90, 110, 200)
-        pdf.text(pdf.splitTextToSize(pick.vendorUrl.replace('https://', ''), CW)[0], ML, y + 1)
+        const urlText = pdf.splitTextToSize(pick.vendorUrl.replace('https://', ''), CW)[0]
+        pdf.text(urlText, ML, y + 1)
+        if (pick.aivoryIntegration) {
+          setC(pdf, ACCENT, 'text')
+          pdf.setFont(FB(), 'bold')
+          pdf.text(`• ${aivoryIntegrationLabel(locale)}`, ML + pdf.getTextWidth(urlText) + 4, y + 1)
+          pdf.setFont(F(), 'normal')
+        }
         pdf.setTextColor(40, 40, 40)
         y += 9
       }
@@ -3051,8 +3047,8 @@ export async function exportReportToPdf(
       pdf.setFontSize(8)
       setC(pdf, MUTED, 'text')
       const disclaimer = locale === 'id'
-        ? '* Harga entry-tier publik dan belum termasuk biaya implementasi. Satuannya tertera pada tiap harga: /pengguna/bln dihitung per satu pengguna (kalikan jumlah pengguna Anda), /karyawan/bln per satu karyawan, dan (paket tim) sudah mencakup satu tim. Harga dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
-        : '* Public entry-tier prices, implementation cost not included. The unit is stated on each price: /user/mo is per single user (multiply by your user count), /employee/mo is per employee, and (team plan) already covers a team. Prices change at any time — always verify with the official vendor before purchasing.'
+        ? '* Harga entry-tier publik dan belum termasuk biaya implementasi. Satuannya tertera pada tiap harga: /pengguna/bln dihitung per satu pengguna (kalikan jumlah pengguna Anda), /karyawan/bln per satu karyawan, /outlet/bln per outlet, dan (paket tim) sudah mencakup satu tim; payment gateway dan API dikenakan biaya per transaksi atau per pemakaian. Harga dapat berubah sewaktu-waktu — selalu verifikasi ke vendor resmi sebelum membeli.'
+        : '* Public entry-tier prices, implementation cost not included. The unit is stated on each price: /user/mo is per single user (multiply by your user count), /employee/mo is per employee, /outlet/mo per outlet, and (team plan) already covers a team; payment gateways and APIs charge per transaction or per use. Prices change at any time — always verify with the official vendor before purchasing.'
       const dLines = pdf.splitTextToSize(disclaimer, CW)
       pdf.text(dLines, ML, y)
       y += dLines.length * 3.8 + 3
@@ -3574,7 +3570,7 @@ export async function exportReportToPdf(
       setC(pdf, ACCENT, 'text')
       pdf.setFont(FB(), 'bold')
       pdf.setFontSize(7.5)
-      pdf.text(locale === 'id' ? `✓  Investasi sepenuhnya kembali dalam ${roiYears} tahun.` : `✓  Investment fully recovered within ${roiYears} years.`, ML + 7, y + 5.5)
+      pdf.text(locale === 'id' ? `•  Investasi sepenuhnya kembali dalam ${roiYears} tahun.` : `•  Investment fully recovered within ${roiYears} years.`, ML + 7, y + 5.5)
       y += 13
     }
 
