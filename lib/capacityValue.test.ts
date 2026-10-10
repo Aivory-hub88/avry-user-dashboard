@@ -17,9 +17,9 @@ const BASE = {
 
 describe('capacity value', () => {
   it('counts only the growth increment, absorbed share × 75% × 50% realization', () => {
-    const k: any = buildDiagnosticContext({ ...BASE, volume_growth_12m: '50-100%' } as any).calculations
-    // 70 × 52 × 0.75 growth × 0.45 gap × 0.75 eff × 0.5 realization
-    expect(k.capacityAvoidedHoursPerYear).toBe(Math.round(70 * 52 * 0.75 * 0.45 * 0.75 * 0.5))
+    const k: any = buildDiagnosticContext({ ...BASE, volume_growth_12m: '50-75%' } as any).calculations
+    // 70 × 52 × 0.625 growth × 0.45 gap × 0.75 eff × 0.5 realization
+    expect(k.capacityAvoidedHoursPerYear).toBe(Math.round(70 * 52 * 0.625 * 0.45 * 0.75 * 0.5))
     expect(k.capacityAvoidanceUSD).toBeCloseTo(k.capacityAvoidedHoursPerYear * k.assumedHourlyRateUSD, 6)
     expect(k.horizonROIWithCapacityPercent).toBeGreaterThan(k.horizonROIPercent)
   })
@@ -37,8 +37,18 @@ describe('capacity value', () => {
       const k: any = buildDiagnosticContext({ ...BASE, volume_growth_12m: v } as any).calculations
       expect(k.capacityAvoidanceUSD).toBeNull()
     }
-    const noGap: any = buildDiagnosticContext({ ...BASE, automation_current: '75-100%', volume_growth_12m: '50-100%' } as any).calculations
+    const noGap: any = buildDiagnosticContext({ ...BASE, automation_current: '75-100%', volume_growth_12m: '75-100%' } as any).calculations
     expect(noGap.capacityAvoidanceUSD).toBeNull()
+  })
+})
+
+describe('growth bands', () => {
+  it('rise monotonically across the 25–100% range; the legacy 50-100% band still resolves', () => {
+    const hours = (v: string) => (buildDiagnosticContext({ ...BASE, volume_growth_12m: v } as any).calculations as any).capacityAvoidedHoursPerYear
+    const series = ['Up to 25%', '25-50%', '50-75%', '75-100%', 'More than 100%'].map(hours)
+    for (let i = 1; i < series.length; i++) expect(series[i]).toBeGreaterThan(series[i - 1])
+    expect(hours('50-100%')).toBeGreaterThan(hours('50-75%'))
+    expect(hours('50-100%')).toBeLessThan(hours('75-100%'))
   })
 })
 
