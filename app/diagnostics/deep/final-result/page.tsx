@@ -22,7 +22,6 @@ import ErrorCard from '@/components/result/ErrorCard'
 import { localizeLlmResult } from '@/lib/llmResultLocale'
 import SectionNavRail from '@/components/result/SectionNavRail'
 import AdvisoryContactModal from '@/components/result/AdvisoryContactModal'
-import { exportReportToPdf } from '@/lib/pdfExport'
 import {
   formatLocalAmount,
   formatPercent,
@@ -284,6 +283,9 @@ export default function FinalResultPage() {
     try {
       // llmResult must be forwarded too — without it the PDF silently drops
       // the entire Business Operations Analysis section the user sees on this page.
+      // Loaded on click: the PDF generator carries ~0.9MB of inline cover
+      // assets (lib/pdfAssets.ts) that the page itself never needs.
+      const { exportReportToPdf } = await import('@/lib/pdfExport')
       await exportReportToPdf(context.company, context, llmView, locale)
     } catch (error) {
       console.error('Failed to generate PDF', error)

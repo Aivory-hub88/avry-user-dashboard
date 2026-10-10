@@ -11,7 +11,11 @@
 import jsPDF from 'jspdf'
 import type { DiagnosticContext, ImprovementItem, OpportunityTrainingTrack } from '@/types/diagnostic'
 import { asset } from '@/lib/asset'
-import { COVER_FRONT_BG, COVER_BACK_BG, COVER_WORDMARK, COVER_MICROGRAPHIC, COVER_FOOTER_BADGE, SIGNATURE_WHITE, SIGNATURE_DARK } from '@/lib/pdfAssets'
+import {
+  COVER_FRONT_BG, COVER_BACK_BG, SIGNATURE_WHITE, SIGNATURE_DARK,
+  COVER_WORDMARK_TRIM, COVER_WORDMARK_TRIM_SIZE, COVER_BACK_LOCKUP, COVER_BACK_LOCKUP_SIZE,
+  COVER_STRIP_RIGHTS, COVER_STRIP_RIGHTS_SIZE, COVER_STRIP_LABS, COVER_STRIP_LABS_SIZE,
+} from '@/lib/pdfAssets'
 import {
   DIM_LABELS,
   fmtGap,
@@ -157,6 +161,14 @@ export const FD = () => DOTO_LOADED ? 'Doto' : 'helvetica' // score ring numbers
  * keeps its real oblique.
  */
 export const IT = () => FONT_LOADED ? 'normal' : 'italic'
+
+// Front-cover typeface (2026-10 cover): Akkurat Light for the title, company
+// and date; Akkurat Regular for the small URL/tagline. Loaded on demand by
+// loadAkkurat(); falls back to Manrope (then Helvetica) if the files fail.
+let AKKURAT_LIGHT_LOADED = false
+let AKKURAT_REGULAR_LOADED = false
+export const AKL = () => AKKURAT_LIGHT_LOADED ? 'AkkuratLight' : F()
+export const AKR = () => AKKURAT_REGULAR_LOADED ? 'Akkurat' : F()
 
 // ── Utility functions ──────────────────────────────────────────────────────────
 export function hexToRgb(hex: string): [number, number, number] {
@@ -314,6 +326,40 @@ export async function loadManrope(pdf: jsPDF): Promise<void> {
   } catch {
     DOTO_LOADED = false
   }
+}
+
+/** Embeds Akkurat Light/Regular (public/fonts) for the front cover. Same
+ *  validation + full-font (no subsetting) treatment as loadManrope. */
+export async function loadAkkurat(pdf: jsPDF): Promise<void> {
+  const [light, regular] = await Promise.all([
+    fetchAsBase64(asset(`/fonts/Akkurat-Light.ttf?v=${AKKURAT_ASSET_VERSION}`)),
+    fetchAsBase64(asset(`/fonts/Akkurat-Regular.ttf?v=${AKKURAT_ASSET_VERSION}`)),
+  ])
+  AKKURAT_LIGHT_LOADED = false
+  AKKURAT_REGULAR_LOADED = false
+  try {
+    if (light) {
+      pdf.addFileToVFS('Akkurat-Light.ttf', light)
+      pdf.addFont('Akkurat-Light.ttf', 'AkkuratLight', 'normal')
+      AKKURAT_LIGHT_LOADED = true
+      disableFontSubsetting(pdf, 'AkkuratLight', ['normal'])
+    }
+    if (regular) {
+      pdf.addFileToVFS('Akkurat-Regular.ttf', regular)
+      pdf.addFont('Akkurat-Regular.ttf', 'Akkurat', 'normal')
+      AKKURAT_REGULAR_LOADED = true
+      disableFontSubsetting(pdf, 'Akkurat', ['normal'])
+    }
+  } catch {
+    // Keep whatever registered; the AKL()/AKR() helpers fall back to Manrope.
+  }
+}
+const AKKURAT_ASSET_VERSION = '20261010'
+
+/** Akkurat ships Latin-1 only — anything outside it (e.g. CJK or Arabic
+ *  company names) is drawn in Manrope instead of rendering blank. */
+function akkuratCovers(text: string): boolean {
+  return /^[\u0020-\u007E\u00A0-\u00FF\u2013\u2014\u2019]*$/.test(text)
 }
 
 // ── Image loaders ──────────────────────────────────────────────────────────────
@@ -1352,82 +1398,100 @@ export async function applyPremiumCovers(
   meta?: { company?: string; date?: string; reportId?: string },
   locale: Locale = 'en',
 ) {
-  // Tighter cover margin (matches the mockups' ~12mm).
-  const CML = 12
+  // 2026-10 cover (design: frontend-nextjs/public/images/"Document Report
+  // Cover "). Positions below are measured from the design mockup in mm on
+  // A4 (210 × 297). Every graphic is an inline base64 image (lib/pdfAssets.ts)
+  // placed by its trimmed size, so nothing depends on a runtime fetch except
+  // the Akkurat font, which falls back to Manrope.
+  const CML = 11
+  const WHITE = '#ffffff'
 
-  // Every graphic on the covers is an INLINE base64 image (see lib/pdfAssets.ts):
-  // pdf.addImage() gets the bytes directly, so a logo/background can never go
-  // missing from a fetch/canvas/basePath failure. All cover TEXT is drawn with
-  // pdf.text() using the Manrope font embedded into the PDF (loadManrope), so it
-  // is vector-crisp and does not depend on the browser having the web font.
-
-  // Full-bleed background
   pdf.addImage(type === 'front' ? COVER_FRONT_BG : COVER_BACK_BG, 'JPEG', 0, 0, PAGE_W, PAGE_H, undefined, 'FAST')
 
-  if (type === 'front') {
-    // Top-right: slim all-white AIVORY wordmark (900x187 → 4.813:1)
-    const wmW = 42
-    const wmH = wmW * (187 / 900)
-    pdf.addImage(COVER_WORDMARK, 'PNG', PAGE_W - CML - wmW, 13, wmW, wmH, undefined, 'FAST')
-
-    // Headline — uppercase, 2 lines, tight leading, lower-left. Width-fitted so
-    // the longest line lands at ~122mm regardless of font metrics.
-    const titleLines = (title || (locale === 'id' ? 'Asesmen Operasional\nBisnis' : 'Business Operations\nAssessment')).toUpperCase().split('\n')
-    setC(pdf, '#ffffff', 'text')
-    pdf.setFont(F(), 'normal')
-    let tfs = 40
-    pdf.setFontSize(tfs)
-    const widest = Math.max(...titleLines.map((l) => pdf.getTextWidth(l)))
-    if (widest > 0) tfs = tfs * (122 / widest)
-    pdf.setFontSize(tfs)
-    const lineGap = tfs * 0.3528 * 1.04 // pt→mm, tight leading
-    const titleTopBaseline = 165 // baseline of first line (mm)
-    titleLines.forEach((l, i) => pdf.text(l, CML, titleTopBaseline + i * lineGap))
-    // (The decorative ring glyph that used to sit right of the second title
-    // line was removed — it read as an unexplained artefact next to the
-    // cover title rather than as brand furniture.)
-
-    // Company Name — large, shrink-to-fit so long names never overflow
-    if (meta?.company) {
-      setC(pdf, '#ffffff', 'text')
-      pdf.setFont(F(), 'normal')
-      let cfs = 26
-      pdf.setFontSize(cfs)
-      const cw = pdf.getTextWidth(meta.company)
-      const maxW = PAGE_W - 2 * CML
-      if (cw > maxW) { cfs = cfs * (maxW / cw); pdf.setFontSize(cfs) }
-      pdf.text(meta.company, CML, 210)
-    }
-
-    // Date — DD MM YY, muted, wide-spaced
-    if (meta?.date) {
-      let fd = meta.date
-      const d = new Date(meta.date)
-      if (!isNaN(d.getTime())) {
-        fd = `${String(d.getDate()).padStart(2, '0')}  ${String(d.getMonth() + 1).padStart(2, '0')}  ${String(d.getFullYear()).slice(-2)}`
-      }
-      setC(pdf, '#a9bfa4', 'text')
-      pdf.setFont(F(), 'normal')
-      pdf.setFontSize(15)
-      spacedText(pdf, fd, CML, 223, 0.4)
-    }
-
-    // Tagline bottom-left
-    setC(pdf, '#ffffff', 'text')
-    pdf.setFont(F(), 'normal')
-    pdf.setFontSize(11)
-    pdf.text('Make AI make sense®', CML, PAGE_H - 14)
-
-    // Footer credential strip, bottom-right (1700x165 → 10.30:1)
-    const fW = 76
-    const fH = fW * (165 / 1700)
-    pdf.addImage(COVER_FOOTER_BADGE, 'PNG', PAGE_W - CML - fW, PAGE_H - 12 - fH, fW, fH, undefined, 'FAST')
-  } else {
-    // Back cover — single centred all-white AIVORY lockup (1900x545 → 3.486:1)
-    const mW = 99
-    const mH = mW * (545 / 1900)
-    pdf.addImage(COVER_MICROGRAPHIC, 'PNG', PAGE_W / 2 - mW / 2, 154 - mH / 2, mW, mH, undefined, 'FAST')
+  if (type === 'back') {
+    // Centred AIVORY | TECH LAB lockup with the micro row beneath it.
+    const w = 83
+    const h = w * (COVER_BACK_LOCKUP_SIZE[1] / COVER_BACK_LOCKUP_SIZE[0])
+    pdf.addImage(COVER_BACK_LOCKUP, 'PNG', PAGE_W / 2 - w / 2, 141.9, w, h, undefined, 'FAST')
+    return
   }
+
+  await loadAkkurat(pdf)
+
+  // ── Top bar ──
+  setC(pdf, WHITE, 'text')
+  pdf.setFont(AKR(), 'normal')
+  pdf.setFontSize(8)
+  pdf.text('www.aivory.uk', CML, 12.2)
+
+  const rw = 19
+  const rh = rw * (COVER_STRIP_RIGHTS_SIZE[1] / COVER_STRIP_RIGHTS_SIZE[0])
+  pdf.addImage(COVER_STRIP_RIGHTS, 'PNG', 91, 8.7, rw, rh, undefined, 'FAST')
+
+  // Circled arrow (vector) + tagline, top-right.
+  const cx = 158.1, cy = 10.3
+  setC(pdf, WHITE, 'draw')
+  pdf.setLineWidth(0.22)
+  pdf.circle(cx, cy, 2.9, 'S')
+  pdf.line(cx - 1.3, cy, cx + 1.3, cy)
+  pdf.line(cx + 0.35, cy - 0.95, cx + 1.3, cy)
+  pdf.line(cx + 0.35, cy + 0.95, cx + 1.3, cy)
+  pdf.setFont(AKR(), 'normal')
+  pdf.setFontSize(8.9)
+  pdf.text('Make AI make sense®', 164.6, 11.3)
+
+  // ── Title: Akkurat Light, all caps, up to 3 lines ──
+  const titleLines = (title || (locale === 'id' ? 'Laporan Asesmen\nOperasional\nBisnis' : 'Business Operation\nAssessment\nReport'))
+    .toUpperCase().split('\n').slice(0, 3)
+  setC(pdf, WHITE, 'text')
+  pdf.setFont(AKL(), 'normal')
+  let tfs = 24
+  pdf.setFontSize(tfs)
+  const maxTitleW = 120
+  const widest = Math.max(...titleLines.map((l) => pdf.getTextWidth(l)))
+  if (widest > maxTitleW) { tfs = tfs * (maxTitleW / widest); pdf.setFontSize(tfs) }
+  const titleGap = 9.4 * (tfs / 24)
+  const lastBaseline = 154.1
+  const firstBaseline = lastBaseline - (titleLines.length - 1) * titleGap
+  titleLines.forEach((l, i) => pdf.text(l, 10.6, firstBaseline + i * titleGap))
+
+  // Rule under the title.
+  setC(pdf, WHITE, 'draw')
+  pdf.setLineWidth(0.2)
+  pdf.line(10.1, 165.5, 95.7, 165.5)
+
+  // ── Company name (mint, caps) + date (DD MM YY) ──
+  if (meta?.company) {
+    const company = meta.company.toUpperCase()
+    setC(pdf, '#c8fdda', 'text')
+    pdf.setFont(akkuratCovers(company) ? AKL() : F(), 'normal')
+    let cfs = 14.8
+    pdf.setFontSize(cfs)
+    const maxW = PAGE_W - 2 * CML
+    const cw = pdf.getTextWidth(company)
+    if (cw > maxW) { cfs = cfs * (maxW / cw); pdf.setFontSize(cfs) }
+    pdf.text(company, 10.5, 179.8)
+  }
+  if (meta?.date) {
+    let fd = meta.date
+    const d = new Date(meta.date)
+    if (!isNaN(d.getTime())) {
+      fd = `${String(d.getDate()).padStart(2, '0')} ${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getFullYear()).slice(-2)}`
+    }
+    setC(pdf, '#e8f6f4', 'text')
+    pdf.setFont(AKL(), 'normal')
+    pdf.setFontSize(14.8)
+    // +0.1mm tracking matches the design's 20.7mm for "DD MM YY".
+    pdf.text(fd.toUpperCase(), 10.7, 188.3, { charSpace: 0.1 })
+  }
+
+  // ── Bottom: wordmark left, design-labs badge right ──
+  const ww = 47.7
+  const wh = ww * (COVER_WORDMARK_TRIM_SIZE[1] / COVER_WORDMARK_TRIM_SIZE[0])
+  pdf.addImage(COVER_WORDMARK_TRIM, 'PNG', 11.3, 287.7 - wh, ww, wh, undefined, 'FAST')
+  const bw = 17.9
+  const bh = bw * (COVER_STRIP_LABS_SIZE[1] / COVER_STRIP_LABS_SIZE[0])
+  pdf.addImage(COVER_STRIP_LABS, 'PNG', 182.8, 288.3 - bh, bw, bh, undefined, 'FAST')
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2349,7 +2413,7 @@ export async function exportReportToPdf(
   // ════════════════════════════════════════════════════════════════════════════
   // PAGE 1 — COVER
   // ════════════════════════════════════════════════════════════════════════════
-  await applyPremiumCovers(pdf, 'front', locale === 'id' ? `Asesmen Operasional\nBisnis` : `Business Operations\nAssessment`, {
+  await applyPremiumCovers(pdf, 'front', locale === 'id' ? `Laporan Asesmen\nOperasional\nBisnis` : `Business Operation\nAssessment\nReport`, {
     company: context.company,
     date: dateStr,
     reportId,
