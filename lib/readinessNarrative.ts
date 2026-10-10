@@ -300,7 +300,28 @@ export function buildMethodologyIntro(locale: Locale = 'en'): string {
  * the same page, and why NPV can read negative while ROI reads positive —
  * the two points flagged as most confusing without this note.
  */
-export function buildFinancialTermsNote(locale: Locale = 'en', horizonYears: number = 3): string {
+export function buildFinancialTermsNote(
+  locale: Locale = 'en',
+  horizonYears: number = 3,
+  /**
+   * 'required' (reports since 2026-10-10): the running cost is the Aivory
+   * plan, not "licenses, maintenance, support" sized off the budget, and a
+   * second ROI (including hiring cost avoided) may sit in the capacity block —
+   * the note must say which ROI it means. Omitted → the original wording.
+   */
+  opts: { basis?: 'required' | 'stated_budget'; hasCapacityRoi?: boolean } = {},
+): string {
+  if (opts.basis === 'required') {
+    const H = horizonYears
+    if (locale === 'id') {
+      return `Kotak ROI ${H} Tahun di atas dihitung SEBELUM biaya berjalan (plan Aivory mulai tahun ke-2); Kisaran ROI ${H} Tahun di bawah dihitung SETELAH biaya itu dikurangi — jadi keduanya wajar berbeda.` +
+        (opts.hasCapacityRoi ? ` ROI di blok nilai kapasitas adalah angka ketiga: sama dengan kotak ROI, ditambah biaya rekrutmen yang dihindari, dan sengaja ditampilkan terpisah.` : '') +
+        ` NPV menghitung nilai waktu uang (diskonto 10%), sehingga angkanya lebih kecil daripada selisih penghematan dan investasi.`
+    }
+    return `The ${H}-Year ROI tile above is calculated BEFORE running costs (the Aivory plan from year 2); the ${H}-Year ROI range below is calculated AFTER them — so the two are expected to differ.` +
+      (opts.hasCapacityRoi ? ` The ROI in the capacity-value block is a third figure: the tile's ROI plus the hiring cost avoided, deliberately shown separately.` : '') +
+      ` NPV prices in the time value of money (10% discount), so it is smaller than the plain gap between savings and investment.`
+  }
   if (locale === 'id') {
     return `ROI ${horizonYears} Tahun di atas dihitung SEBELUM biaya operasional berjalan (lisensi, pemeliharaan, dukungan); Kisaran ROI ${horizonYears} Tahun di bawah dihitung SETELAH biaya itu dikurangi — jadi keduanya wajar berbeda. NPV juga bisa tampak negatif meski ROI positif: NPV menghitung nilai waktu uang dan menjumlahkan untung-rugi dari tahun ke tahun, jadi di periode sebelum modal kembali (payback), angkanya normal masih minus.`
   }
