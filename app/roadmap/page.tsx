@@ -837,7 +837,7 @@ async function exportRoadmapPdf(
     if (phaseCompletes[phase.id]) {
       doc.setFontSize(9);
       doc.setTextColor(76, 175, 80);
-      doc.text(tr('✓ PHASE COMPLETE', '✓ FASE SELESAI'), PAGE_W - ML - 40, ML + 5);
+      doc.text(tr('• PHASE COMPLETE', '• FASE SELESAI'), PAGE_W - ML - 40, ML + 5);
     }
 
     // Description

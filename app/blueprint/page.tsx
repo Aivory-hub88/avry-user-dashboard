@@ -15,7 +15,7 @@ import { useLocaleContext } from '@/hooks/useLocale'
 import { saveRoadmap } from '@/hooks/useRoadmap'
 import { asset } from '@/lib/asset'
 import { generateRoadmapAsync } from '@/lib/roadmapGeneration'
-import { selectSoftwareRecommendations, formatPickPrice } from '@/lib/softwareCatalog'
+import { selectSoftwareForContext, formatPick, aivoryIntegrationLabel } from '@/lib/softwareCatalog'
 import { getRate } from '@/lib/liveRates'
 
 // ── Lucide icons (repo standard; no hand-rolled SVGs) ─────────────────────────
@@ -745,14 +745,7 @@ function BlueprintInsightsSection({
         const opps = (locale === 'id' && Array.isArray(diagCtx.opportunitiesId) && diagCtx.opportunitiesId.length > 0)
           ? diagCtx.opportunitiesId
           : (Array.isArray(diagCtx.opportunities) ? diagCtx.opportunities : [])
-        const picks = selectSoftwareRecommendations({
-          currency: currencyCode,
-          industry: diagCtx.qualitative?.industry,
-          painPoints: Array.isArray(diagCtx.qualitative?.topPainPoints) ? diagCtx.qualitative.topPainPoints : [],
-          opportunityTitles: opps.map((o: any) => o.title).filter(Boolean),
-          budgetMidpointUSD: diagCtx.calculations?.assumedBudgetMidpointUSD ?? null,
-          fteCountInScope: diagCtx.quantitative?.fteCountInScope ?? null,
-        })
+        const picks = selectSoftwareForContext(diagCtx, opps.map((o: any) => o.title).filter(Boolean), currencyCode)
         if (picks.length === 0) return null
         const rate = getRate(currencyCode)
         return (
@@ -769,10 +762,11 @@ function BlueprintInsightsSection({
                   <div key={pick.name} className={styles.trackCard}>
                     <div className={styles.trackRow}>
                       <div className={styles.trackTitle}>{pick.name}</div>
-                      <div className={styles.trackTools}>{formatPickPrice(pick.priceUSD, currencyCode, rate, locale, pick.priceBasis)}<span> *</span></div>
+                      <div className={styles.trackTools}>{formatPick(pick, currencyCode, rate, locale)}<span> *</span></div>
                     </div>
                     <div className={styles.trackTools}>
                       {locale === 'id' ? pick.category.id : pick.category.en}
+                      {pick.aivoryIntegration && <span style={{ marginLeft: 8, color: '#86efac', fontWeight: 700 }}>✓ {aivoryIntegrationLabel(locale)}</span>}
                     </div>
                     <div className={styles.trackBody}>
                       {locale === 'id' ? pick.reason.id : pick.reason.en}

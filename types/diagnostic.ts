@@ -617,6 +617,8 @@ export interface DiagnosticContext {
      *  the report currency isn't USD — the investment is then priced from a
      *  dollar figure, which the report warns about. Absent otherwise. */
     budgetCurrencyMismatch?: string
+    /** Raw operating_country answer (2026-10-11); drives regional software picks. */
+    operatingCountry?: string
   }
 }
 

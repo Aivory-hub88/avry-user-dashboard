@@ -21,6 +21,32 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
     description: 'Define your business goals and how you measure success',
     questions: [
       {
+        // 2026-10-11 — where the business operates. Drives regional software
+        // picks (local POS/payments/accounting/tax vendors) in the report;
+        // falls back to the currency when absent (older answers). Option
+        // strings are load-bearing (lib/softwareCatalog.ts marketFromCountry).
+        id: 'operating_country',
+        question: 'In which country does your business mainly operate?',
+        type: 'select',
+        options: [
+          'Indonesia',
+          'Singapore',
+          'Malaysia',
+          'Australia',
+          'United Arab Emirates',
+          'Saudi Arabia',
+          'Oman',
+          'India',
+          'Japan',
+          'United Kingdom',
+          'European Union',
+          'United States',
+          'Other'
+        ],
+        helperText: 'Used to recommend software and vendors that are available and compliant where you operate',
+        required: true
+      },
+      {
         id: 'currency',
         question: 'Which currency do you want to use for cost and ROI estimates?',
         type: 'select',

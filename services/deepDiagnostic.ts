@@ -2447,6 +2447,7 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     // damper after any ROI recompute. Narrative/context only; never scored.
     estimateBasis: answers.estimate_basis || '',
     rfiAnswers: pickRfiAnswers(answers),
+    operatingCountry: answers.operating_country || undefined,
     budgetCurrencyMismatch:
       typeof answers.budget_range === 'string' &&
       currencyCode !== 'USD' &&
