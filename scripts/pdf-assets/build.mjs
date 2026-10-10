@@ -33,8 +33,11 @@ const ASSETS = [
   // re-encoded here to 150dpi JPEG (1240px, q82) — the PDF never needs more for a gradient.
   { name: 'COVER_FRONT_BG',     file: 'front-bg-src.jpg', kind: 'bg' },
   { name: 'COVER_BACK_BG',      file: 'back-bg-src.jpg',  kind: 'bg' },
-  { name: 'SIGNATURE_WHITE',    file: 'signature-white.svg', kind: 'svg', width: 1000 },
-  { name: 'SIGNATURE_DARK',     file: 'signature-dark.svg',  kind: 'svg', width: 1000 },
+  // Closing-note signatures (AIVORY | TECH LAB): like the back lockup, the
+  // source SVGs carry the OLD wordmark, so it is swapped for the 2026 one,
+  // recoloured to each variant's ink (white / #5b5b5b).
+  { name: 'SIGNATURE_WHITE',    file: 'signature-white.svg', kind: 'signature', width: 1000, color: [255, 255, 255] },
+  { name: 'SIGNATURE_DARK',     file: 'signature-dark.svg',  kind: 'signature', width: 1000, color: [0x5b, 0x5b, 0x5b] },
   // Tightly trimmed pieces for the 2026-10 cover layout — placed by their
   // exact glyph bounds (see *_SIZE exports), so no padding guesswork.
   // wordmark-2026.svg = the landing navbar wordmark (frontend-nextjs-landing
@@ -105,8 +108,36 @@ function dilate(data, w, h, r) {
   return out
 }
 
+/** The 2026 wordmark, trimmed, at `width` px, recoloured to `rgb` (alpha kept). */
+async function wordmark2026(width, rgb = [255, 255, 255]) {
+  const { data, info } = await sharp(readFileSync(join(HERE, 'wordmark-2026.svg')), { density: 1200 })
+    .trim().resize({ width }).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  for (let i = 0; i < data.length; i += 4) { data[i] = rgb[0]; data[i + 1] = rgb[1]; data[i + 2] = rgb[2] }
+  return sharp(data, { raw: info }).png().toBuffer()
+}
+
+async function buildSignature(a) {
+  const { data, info } = await sharp(readFileSync(join(HERE, a.file)), { density: 600 }).resize({ width: a.width }).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  // Old wordmark = everything left of the divider (~59% of the width).
+  const box = alphaBox(data, info, 0, 0, Math.round(info.width * 0.56), info.height)
+  if (!box) throw new Error(`${a.name}: old wordmark not found`)
+  for (let y = box.top; y < box.top + box.height; y++) for (let x = box.left; x < box.left + box.width; x++) data[(y * info.width + x) * 4 + 3] = 0
+  // Fit inside the old box (same footprint), left-aligned, vertically centred.
+  let mark = await wordmark2026(box.width, a.color)
+  let mm = await sharp(mark).metadata()
+  if (mm.height > box.height) {
+    mark = await wordmark2026(Math.floor(box.width * box.height / mm.height), a.color)
+    mm = await sharp(mark).metadata()
+  }
+  const top = box.top + Math.round((box.height - mm.height) / 2)
+  return sharp(data, { raw: info }).composite([{ input: mark, left: box.left, top }]).png({ compressionLevel: 9 }).toBuffer()
+}
+
 async function encode(a) {
   const buf = readFileSync(join(HERE, a.file))
+  if (a.kind === 'signature') {
+    return { mime: 'image/png', b64: (await buildSignature(a)).toString('base64') }
+  }
   if (a.kind === 'backLockup') {
     let png = await buildBackLockup(a)
     if (a.trim) png = await sharp(png).trim().png({ compressionLevel: 9 }).toBuffer()
