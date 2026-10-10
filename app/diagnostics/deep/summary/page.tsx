@@ -8,6 +8,7 @@ import { ID_PHASE_COPY, ID_QUESTION_COPY } from '@/constants/deepDiagnosticQuest
 import { DeepDiagnosticService, buildDiagnosticContext, ensureLiveRates } from '@/services/deepDiagnostic'
 import { useLocaleContext } from '@/hooks/useLocale'
 import type { DiagnosticAnswers } from '@/types/diagnostic'
+import { maturityLevelLabel } from '@/lib/readinessNarrative'
 import styles from './summary.module.css'
 
 const PHASE_ORDER: PhaseId[] = [
@@ -76,23 +77,36 @@ export default function SummaryPage() {
         return acc
       }, {} as Record<PhaseId, Record<string, any>>)
 
-      // AI analysis is best-effort: if the LLM path fails, the user still gets
-      // the full deterministic report (scores/ROI are computed locally anyway).
-      try {
-        const result = await DeepDiagnosticService.submitDiagnostic(companyName, phases)
-        DeepDiagnosticService.saveResult(result)
-      } catch (llmErr) {
-        console.warn('[DeepDiagnostic] AI analysis failed — continuing with local report:', llmErr)
-        DeepDiagnosticService.clearResult()
-      }
-
-      // Build rich DiagnosticContext and write to localStorage for the final-result page
+      // Build the deterministic DiagnosticContext FIRST (it writes the report
+      // to localStorage/Postgres for the final-result page) so its official
+      // score and maturity can be handed to the AI analysis — the narrative
+      // must never name a different score or stage than the report shows.
       const flattenedAnswers: DiagnosticAnswers = {}
       for (const phaseId of PHASE_ORDER) {
         Object.assign(flattenedAnswers, phaseData[phaseId]?.responses ?? {})
       }
       flattenedAnswers['companyName'] = companyName
-      buildDiagnosticContext(flattenedAnswers)
+      const { scores } = buildDiagnosticContext(flattenedAnswers)
+      const phasesWithContext = {
+        ...phases,
+        // Read by vps-bridge lib/diagnosticQueue.js (splitReportContext);
+        // rides inside `phases` so the bridge's enqueue route needs no change.
+        _report_context: {
+          score: scores.composite,
+          maturity_level: scores.maturityLevel,
+          maturity_label_id: maturityLevelLabel(scores.maturityLevel, 'id'),
+        },
+      } as Record<PhaseId, Record<string, any>>
+
+      // AI analysis is best-effort: if the LLM path fails, the user still gets
+      // the full deterministic report (scores/ROI are computed locally anyway).
+      try {
+        const result = await DeepDiagnosticService.submitDiagnostic(companyName, phasesWithContext)
+        DeepDiagnosticService.saveResult(result)
+      } catch (llmErr) {
+        console.warn('[DeepDiagnostic] AI analysis failed — continuing with local report:', llmErr)
+        DeepDiagnosticService.clearResult()
+      }
 
       router.push('/diagnostics/deep/final-result')
     } catch (err) {
