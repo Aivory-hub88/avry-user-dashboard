@@ -20,6 +20,7 @@ import RiskCard from '@/components/result/RiskCard'
 import LoadingState from '@/components/result/LoadingState'
 import ErrorCard from '@/components/result/ErrorCard'
 import PrintableReport from '@/components/result/PrintableReport'
+import { localizeLlmResult } from '@/lib/llmResultLocale'
 import SectionNavRail from '@/components/result/SectionNavRail'
 import AdvisoryContactModal from '@/components/result/AdvisoryContactModal'
 import { exportReportToPdf } from '@/lib/pdfExport'
@@ -270,6 +271,9 @@ export default function FinalResultPage() {
   const opportunities = (locale === 'id' && context.opportunitiesId) ? context.opportunitiesId : context.opportunities
   const risks = (locale === 'id' && context.risksId) ? context.risksId : context.risks
   const roomForImprovement = (locale === 'id' && context.roomForImprovementId) ? context.roomForImprovementId : context.roomForImprovement
+  // AI analysis in the report's language (EN top-level, ID under
+  // translations.id since 2026-10-10; older results stay English + notice).
+  const llmView = localizeLlmResult(llmResult, locale)
   const scoreDriversLocalized = (locale === 'id' && context.scoreDriversId) ? context.scoreDriversId : context.scoreDrivers
 
   const handleDownloadPdf = async () => {
@@ -277,7 +281,7 @@ export default function FinalResultPage() {
     try {
       // llmResult must be forwarded too — without it the PDF silently drops
       // the entire Business Operations Analysis section the user sees on this page.
-      await exportReportToPdf('pdf-print-layout', context.company, context, llmResult, locale)
+      await exportReportToPdf('pdf-print-layout', context.company, context, llmView, locale)
     } catch (error) {
       console.error('Failed to generate PDF', error)
     } finally {
@@ -648,31 +652,31 @@ export default function FinalResultPage() {
         {/* ── Business Operations Analysis (model-generated; numbers stay deterministic) ── */}
         <div id="section-operations-analysis" className={styles.card}>
           <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Analisis Operasional Bisnis' : 'Business Operations Analysis'}</h2>
-          {locale === 'id' && llmResult && (
+          {locale === 'id' && llmView && !llmView.isTranslatedId && (
             <p className={styles.aiLanguageNote}>
-              Analisis naratif di bawah ini saat ini masih dalam Bahasa Inggris — dukungan Bahasa Indonesia untuk bagian ini sedang dalam pengembangan.
+              Analisis naratif di bawah ini masih dalam Bahasa Inggris karena laporan ini dibuat sebelum dukungan Bahasa Indonesia untuk bagian ini tersedia.
             </p>
           )}
-          {llmResult ? (
+          {llmView ? (
             <>
-              {(llmResult.narrative_summary || llmResult.narrative) && (
+              {(llmView.narrative_summary || llmView.narrative) && (
                 <p className={styles.aiNarrative}>
-                  {llmResult.narrative_summary || llmResult.narrative}
+                  {llmView.narrative_summary || llmView.narrative}
                 </p>
               )}
               <div className={styles.aiGrid}>
-                {Array.isArray(llmResult.strengths) && llmResult.strengths.length > 0 && (
+                {Array.isArray(llmView.strengths) && llmView.strengths.length > 0 && (
                   <div>
                     <h3 className={styles.aiColLabel}>{locale === 'id' ? 'Kekuatan' : 'Strengths'}</h3>
                     <ul className={styles.aiList}>
-                      {llmResult.strengths.slice(0, 5).map((s: string, i: number) => (
+                      {llmView.strengths.slice(0, 5).map((s: string, i: number) => (
                         <li key={i}>{s}</li>
                       ))}
                     </ul>
                   </div>
                 )}
                 {(() => {
-                  const constraints = llmResult.primary_constraints ?? llmResult.blockers
+                  const constraints = llmView.primary_constraints ?? llmView.blockers
                   return Array.isArray(constraints) && constraints.length > 0 ? (
                     <div>
                       <h3 className={styles.aiColLabel}>{locale === 'id' ? 'Kendala utama' : 'Primary constraints'}</h3>
@@ -685,7 +689,7 @@ export default function FinalResultPage() {
                   ) : null
                 })()}
                 {(() => {
-                  const opps = llmResult.automation_opportunities ?? llmResult.opportunities
+                  const opps = llmView.automation_opportunities ?? llmView.opportunities
                   return Array.isArray(opps) && opps.length > 0 ? (
                     <div>
                       <h3 className={styles.aiColLabel}>{locale === 'id' ? 'Peluang transformasi' : 'Transformation opportunities'}</h3>
@@ -698,9 +702,9 @@ export default function FinalResultPage() {
                   ) : null
                 })()}
               </div>
-              {llmResult.recommended_next_step && (
+              {llmView.recommended_next_step && (
                 <p className={styles.aiNextStep}>
-                  <strong>{locale === 'id' ? 'Langkah berikutnya yang disarankan:' : 'Recommended next step:'}</strong> {llmResult.recommended_next_step}
+                  <strong>{locale === 'id' ? 'Langkah berikutnya yang disarankan:' : 'Recommended next step:'}</strong> {llmView.recommended_next_step}
                 </p>
               )}
             </>
@@ -1571,7 +1575,7 @@ export default function FinalResultPage() {
 
       {/* Hidden printable layout for PDF generation */}
       <div id="pdf-print-layout" style={{ display: 'none' }}>
-        <PrintableReport context={context} llmResult={llmResult ?? undefined} />
+        <PrintableReport context={context} llmResult={llmView ?? undefined} />
       </div>
 
       <AdvisoryContactModal
