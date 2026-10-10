@@ -2299,7 +2299,6 @@ function renderRiskRegister(
 // ══════════════════════════════════════════════════════════════════════════════
 
 export async function exportReportToPdf(
-  _elementId: string,
   companyName: string,
   context?: DiagnosticContext,
   aiAnalysis?: Record<string, any> | null,

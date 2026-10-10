@@ -19,7 +19,6 @@ import OpportunityCard from '@/components/result/OpportunityCard'
 import RiskCard from '@/components/result/RiskCard'
 import LoadingState from '@/components/result/LoadingState'
 import ErrorCard from '@/components/result/ErrorCard'
-import PrintableReport from '@/components/result/PrintableReport'
 import { localizeLlmResult } from '@/lib/llmResultLocale'
 import SectionNavRail from '@/components/result/SectionNavRail'
 import AdvisoryContactModal from '@/components/result/AdvisoryContactModal'
@@ -285,7 +284,7 @@ export default function FinalResultPage() {
     try {
       // llmResult must be forwarded too — without it the PDF silently drops
       // the entire Business Operations Analysis section the user sees on this page.
-      await exportReportToPdf('pdf-print-layout', context.company, context, llmView, locale)
+      await exportReportToPdf(context.company, context, llmView, locale)
     } catch (error) {
       console.error('Failed to generate PDF', error)
     } finally {
@@ -1654,11 +1653,6 @@ export default function FinalResultPage() {
       </div>
 
       <SectionNavRail sections={navSections} locale={locale} />
-      </div>
-
-      {/* Hidden printable layout for PDF generation */}
-      <div id="pdf-print-layout" style={{ display: 'none' }}>
-        <PrintableReport context={context} llmResult={llmView ?? undefined} />
       </div>
 
       <AdvisoryContactModal
