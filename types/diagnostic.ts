@@ -319,6 +319,19 @@ export interface ROIProjection {
    *  close. Absent on contexts stored before 2026-10-10. */
   noAutomationGap?: boolean
   /**
+   * Capacity value (cost avoidance) — the extra manual hours that expected
+   * volume growth would add, times the share automation absorbs, times a 50%
+   * realization discount. Reported on its own line, NEVER added to the
+   * headline savings/ROI tiles. Null when no growth was given.
+   */
+  capacityGrowthPct?: number | null
+  capacityRealizationFactor?: number
+  capacityAvoidedHoursPerYear?: number | null
+  capacityAvoidanceUSD?: number | null
+  capacityAvoidanceLocal?: number | null
+  /** Horizon ROI with the capacity value added to annual savings (gross, same window as the ROI tile). */
+  horizonROIWithCapacityPercent?: number | null
+  /**
    * Transparency fields (methodology fix): the explicit assumptions behind the
    * savings and ROI numbers so users can see how figures were derived.
    */
@@ -521,6 +534,8 @@ export interface DiagnosticContext {
     targetAutomationPct: number | null
     budgetMidpointUSD: number | null
     timelineMonths: number | null
+    /** Expected 12-month volume growth, % (volume_growth_12m). Absent/null → no capacity line. */
+    volumeGrowthPct?: number | null
   }
   calculations: ROIProjection
   scores: DimensionScores

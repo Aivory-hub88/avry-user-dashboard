@@ -154,6 +154,18 @@ export const ID_QUESTION_COPY: Record<string, IdQuestionCopy> = {
       'Fleksibel/Berkelanjutan',
     ],
   },
+  volume_growth_12m: {
+    question: 'Berapa perkiraan kenaikan volume operasional Anda (pesanan, transaksi, pelanggan) dalam 12 bulan ke depan?',
+    helperText: 'Opsional — memungkinkan laporan menghitung biaya rekrutmen yang bisa dihindari berkat otomasi saat bisnis tumbuh (ditampilkan terpisah, tidak dicampur ke penghematan)',
+    options: [
+      'Tidak ada pertumbuhan',
+      'Hingga 25%',
+      '25-50%',
+      '50-100%',
+      'Lebih dari 100%',
+      'Tidak yakin',
+    ],
+  },
 
   // --- Phase 2: data_process_readiness ---
   data_centralization: {

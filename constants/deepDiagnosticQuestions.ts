@@ -159,6 +159,26 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
           'Flexible/Ongoing'
         ],
         required: true
+      },
+      {
+        // 2026-10-10 — capacity value. Feeds ONLY the separate "hiring cost
+        // avoided" line in the Financial Case (capacityAvoidance in
+        // services/deepDiagnostic.ts), never the headline savings or any
+        // score. Option strings are load-bearing (matched literally) and
+        // frozen once shipped. Optional: absent / 'Not sure' → no line.
+        id: 'volume_growth_12m',
+        question: 'How much do you expect your operational volume (orders, transactions, customers) to grow in the next 12 months?',
+        type: 'select',
+        options: [
+          'No growth expected',
+          'Up to 25%',
+          '25-50%',
+          '50-100%',
+          'More than 100%',
+          'Not sure'
+        ],
+        helperText: 'Optional — lets the report value the hiring that automation helps you avoid as you grow (shown separately, never mixed into the savings)',
+        required: false
       }
     ]
   },
