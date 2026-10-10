@@ -1,21 +1,25 @@
 /**
- * Stated budget vs. recommended investment — the side-by-side that explains a
+ * Stated budget vs. investment ceiling — the side-by-side that explains a
  * negative Financial Case instead of just showing it.
  *
  * A report whose stated budget dwarfs the savings it scoped shows red tiles
  * (negative ROI/NPV/net savings) that readers took for a calculation error.
  * This lays the same metrics out for two investments over the SAME window:
  *   - the budget the user entered (what the tiles already show), and
- *   - the recommended investment: the largest outlay that still pays back
- *     within 24 months at today's savings (= 2 × annual savings, the
- *     report's existing "Break-even Investment" figure).
+ *   - the investment ceiling: the largest outlay that still pays back within
+ *     24 months at today's savings (= 2 × annual savings, the report's
+ *     existing "Break-even Investment" figure).
+ *
+ * The ceiling is derived FROM the savings, so it is a limit, not an estimate
+ * of what the solution costs — it must never be labelled a recommendation
+ * (it was, briefly, and read as "your budget is wrong").
  *
  * Pure arithmetic over fields calculateROI() already stored, reusing its own
  * ongoing-cost rate, start year and discount rate — so the "Your budget"
  * column reproduces the tiles exactly and the two columns can't drift apart.
  */
 
-export const RECOMMENDED_PAYBACK_MONTHS = 24
+export const CEILING_PAYBACK_MONTHS = 24
 
 export interface InvestmentScenario {
   investmentLocal: number
@@ -33,7 +37,7 @@ export interface InvestmentComparison {
   horizonYears: number
   annualSavingsLocal: number
   stated: InvestmentScenario
-  recommended: InvestmentScenario
+  ceiling: InvestmentScenario
 }
 
 interface ComparisonInputs {
@@ -88,8 +92,8 @@ export function buildInvestmentComparison(
   const B = calc.assumedBudgetMidpointLocal
   if (typeof S !== 'number' || !isFinite(S) || S <= 0) return null
   if (typeof B !== 'number' || !isFinite(B) || B <= 0) return null
-  const recommendedInvestment = S * (RECOMMENDED_PAYBACK_MONTHS / 12)
-  if (B <= recommendedInvestment) return null
+  const ceilingInvestment = S * (CEILING_PAYBACK_MONTHS / 12)
+  if (B <= ceilingInvestment) return null
 
   const rate = typeof calc.ongoingCostRate === 'number' ? calc.ongoingCostRate : 0.12
   const start = typeof calc.ongoingCostStartYear === 'number' ? calc.ongoingCostStartYear : 2
@@ -98,7 +102,7 @@ export function buildInvestmentComparison(
     horizonYears,
     annualSavingsLocal: S,
     stated: scenarioAt(B, S, horizonYears, rate, start, d),
-    recommended: scenarioAt(recommendedInvestment, S, horizonYears, rate, start, d),
+    ceiling: scenarioAt(ceilingInvestment, S, horizonYears, rate, start, d),
   }
 }
 
@@ -116,11 +120,11 @@ export function investmentComparisonExplanation(
       (runCostExceeds
         ? `, dan biaya berjalannya (${fmt(c.stated.annualOngoingCostLocal)}/tahun) bahkan lebih besar dari penghematan itu sendiri.`
         : '.') +
-      ` Angka negatif ini benar secara hitungan, bukan error: investasinya terlalu besar untuk skala otomasi yang dinilai. Dengan investasi yang sebanding — maksimal ${fmt(c.recommended.investmentLocal)}, balik modal ≤ ${RECOMMENDED_PAYBACK_MONTHS} bulan — semua angka menjadi positif:`
+      ` Karena laporan ini menganggap seluruh anggaran terpakai, hasilnya negatif — hitungannya benar, bukan error. Sebagai pembanding, kolom kanan adalah batas investasi: jumlah maksimal yang masih balik modal ≤ ${CEILING_PAYBACK_MONTHS} bulan dengan penghematan yang terukur saat ini (${fmt(c.ceiling.investmentLocal)}). Ini batas atas, bukan perkiraan biaya solusi — biaya solusi sebenarnya bisa jauh di bawahnya.`
   }
   return `Projected savings are ${fmt(c.annualSavingsLocal)}/yr, while the budget you entered is ${fmt(c.stated.investmentLocal)} — ${ratioStr}× the annual savings` +
     (runCostExceeds
       ? `, and its running cost (${fmt(c.stated.annualOngoingCostLocal)}/yr) is larger than the savings themselves.`
       : '.') +
-    ` The negative figures are correct arithmetic, not an error: the investment is too large for the scale of automation assessed. At a proportionate investment — up to ${fmt(c.recommended.investmentLocal)}, paying back within ${RECOMMENDED_PAYBACK_MONTHS} months — every figure turns positive:`
+    ` Because this report assumes the whole budget is spent, the result is negative — the arithmetic is correct, not an error. For comparison, the right-hand column is the investment ceiling: the most that still pays back within ${CEILING_PAYBACK_MONTHS} months at today's measured savings (${fmt(c.ceiling.investmentLocal)}). It is an upper limit, not an estimate of what the solution costs — the real cost can be far below it.`
 }

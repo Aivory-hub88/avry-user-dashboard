@@ -300,6 +300,19 @@ export interface ROIProjection {
   hasEnoughDataForProjection: boolean
   confidenceLevel: 'high' | 'medium' | 'low'
   missingInputs: string[]
+  /**
+   * What `assumedBudgetMidpoint*` (the investment every payback/ROI/NPV figure
+   * uses) represents. 'required' (since 2026-10-10): the estimated cost of the
+   * recommended scope with Aivory — see `requiredInvestment`. 'stated_budget':
+   * the user's whole budget, the older behaviour (and still the fallback).
+   * Absent on older contexts → 'stated_budget'.
+   */
+  investmentBasis?: 'required' | 'stated_budget'
+  /** The budget the user entered, kept separate from the investment used. */
+  statedBudgetUSD?: number | null
+  statedBudgetLocal?: number | null
+  /** Breakdown of the required investment (USD); present when basis is 'required'. */
+  requiredInvestment?: RequiredInvestment | null
   /** True when the stated automation target is at or below current
    *  automation — no incremental gap, so no savings are projected. Distinct
    *  from missing inputs: every input was given, there is just nothing to
@@ -593,6 +606,30 @@ export interface DiagnosticContext {
 }
 
 export type DiagnosticAnswers = Record<string, any>
+
+/**
+ * Estimated cost of delivering the recommended automation scope with Aivory
+ * (services/deepDiagnostic.ts estimateRequiredInvestment). All USD; the report
+ * converts with `fxRateUsed`.
+ */
+export interface RequiredInvestment {
+  plan: 'operational' | 'business' | 'enterprise'
+  /** Enterprise is sales-priced: the Business price is used as a floor. */
+  planPriceIsFloor: boolean
+  planMonthlyUSD: number
+  packageUSD: number
+  /** Plan months paid in year 1 (12 minus the months the package includes). */
+  planMonthsYear1: number
+  setupHours: number
+  setupHourlyRateUSD: number
+  setupUSD: number
+  /** Opportunities whose setup is counted (automation only, not training). */
+  setupOpportunities: number
+  /** Year-1 cash: package + setup + plan months in year 1. */
+  initialUSD: number
+  /** From year 2: 12 months of the plan. */
+  annualRecurringUSD: number
+}
 
 export type RfiAnswerKey =
   | 'process_documentation'

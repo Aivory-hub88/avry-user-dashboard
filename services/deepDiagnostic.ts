@@ -389,6 +389,8 @@ import type {
 } from '@/types/diagnostic'
 import { parseCurrencyCode, formatCurrency, type CurrencyCode } from '@/lib/resultFormatters'
 import { getBudgetBands, getLabourBenchmark, resolveBandMidpointUSD, isBandForCurrency } from '@/lib/currencyBands'
+import { TIER_MONTHLY_PRICE_USD, FULLSTACK_PACKAGE_PRICE_USD, FULLSTACK_INCLUDED_PLAN_MONTHS } from '@/lib/tiers'
+import type { RequiredInvestment } from '@/types/diagnostic'
 import { normalizeIndustryKey } from '@/lib/industryBenchmarks'
 
 // ---- String normalization helper ----
@@ -583,6 +585,57 @@ function getRateBenchmarkLabel(currencyCode: CurrencyCode, locale: 'en' | 'id' =
 
 // ---- ROI calculation ----
 
+// ---- Required investment (what the recommended scope costs with Aivory) ----
+//
+// The budget question asks what the client HAS, not what the work costs.
+// Treating the whole budget as spent made every generous budget read as a
+// loss. The report now prices the recommended scope itself — the published
+// Aivory package + plan for the team size, plus the client's own setup time
+// per automation — and keeps the stated budget as the ceiling it is compared
+// against. Every input is a published price or a stated assumption below.
+
+/** Internal setup/integration hours per automation opportunity, by complexity. */
+export const SETUP_HOURS_BY_COMPLEXITY: Record<RankedOpportunity['complexity'], number> = {
+  low: 20,
+  medium: 60,
+  high: 160,
+}
+
+/** Plan by team size: ≤5 FTE Operational, 6–200 Business, >200 Enterprise (sales-priced; Business used as floor). */
+export function aivoryPlanForTeam(fteCountInScope: number | null): Pick<RequiredInvestment, 'plan' | 'planPriceIsFloor' | 'planMonthlyUSD'> {
+  if (fteCountInScope !== null && fteCountInScope <= 5) {
+    return { plan: 'operational', planPriceIsFloor: false, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.operational }
+  }
+  if (fteCountInScope !== null && fteCountInScope > 200) {
+    return { plan: 'enterprise', planPriceIsFloor: true, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.business }
+  }
+  return { plan: 'business', planPriceIsFloor: false, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.business }
+}
+
+export function estimateRequiredInvestment(
+  opportunities: RankedOpportunity[],
+  fteCountInScope: number | null,
+  setupHourlyRateUSD: number,
+): RequiredInvestment {
+  const plan = aivoryPlanForTeam(fteCountInScope)
+  // Training is capability-building, not an automation to set up.
+  const automation = opportunities.filter((o) => !o.trainingTracks)
+  const setupHours = automation.reduce((sum, o) => sum + SETUP_HOURS_BY_COMPLEXITY[o.complexity], 0)
+  const setupUSD = setupHours * setupHourlyRateUSD
+  const planMonthsYear1 = 12 - FULLSTACK_INCLUDED_PLAN_MONTHS
+  return {
+    ...plan,
+    packageUSD: FULLSTACK_PACKAGE_PRICE_USD,
+    planMonthsYear1,
+    setupHours,
+    setupHourlyRateUSD,
+    setupUSD,
+    setupOpportunities: automation.length,
+    initialUSD: FULLSTACK_PACKAGE_PRICE_USD + setupUSD + plan.planMonthlyUSD * planMonthsYear1,
+    annualRecurringUSD: plan.planMonthlyUSD * 12,
+  }
+}
+
 export interface ROIProjectionInternal extends ROIProjection {
   // totalAnnualSavingsUSD is already on ROIProjection (Bug 3 fix)
 }
@@ -600,7 +653,14 @@ export function calculateROI(
    * exactly as before this change — zero numeric change to stored figures
    * (E-invariant 1/3 in docs/OPS-TRANSFORMATION-NARRATIVE-BRIEF.md §8).
    */
-  efficiencyFactorOverride?: number
+  efficiencyFactorOverride?: number,
+  /**
+   * The investment to appraise when known: the required investment for the
+   * recommended scope. Year-1 cash goes up front (where the budget used to),
+   * and its recurring cost replaces the flat 12%-of-budget running cost.
+   * Omitted → the stated budget is the investment (pre-2026-10-10 behaviour).
+   */
+  requiredInvestment?: RequiredInvestment | null,
 ): ROIProjectionInternal {
   // Live FX when available (2h auto-refresh via /api/exchange-rates),
   // static snapshot otherwise.
@@ -608,7 +668,9 @@ export function calculateROI(
   const missing: string[] = []
 
   if (q.totalManualHoursWeekly === null) missing.push('manual hours/week')
-  if (q.budgetMidpointUSD === null) missing.push('budget')
+  // With a required investment the budget is only a ceiling to compare
+  // against — its absence no longer blocks the financial case.
+  if (q.budgetMidpointUSD === null && !requiredInvestment) missing.push('budget')
   if (q.fteCountInScope === null) missing.push('FTE count')
 
   const confidence: ROIProjection['confidenceLevel'] =
@@ -698,7 +760,8 @@ export function calculateROI(
       ? annualLaborSavingsUSD + annualProcessSavingsUSD
       : null
 
-  const budgetUSD = q.budgetMidpointUSD
+  const statedBudgetUSD = q.budgetMidpointUSD
+  const budgetUSD = requiredInvestment ? requiredInvestment.initialUSD : q.budgetMidpointUSD
   const paybackMonths =
     totalAnnualSavingsUSD && budgetUSD
       ? (budgetUSD / totalAnnualSavingsUSD) * 12
@@ -717,7 +780,9 @@ export function calculateROI(
   // stated budget — billing it twice in the same year double-counted.
   const ONGOING_COST_RATE = 0.12
   const ONGOING_COST_START_YEAR = 2
-  const annualOngoingCostUSD = budgetUSD !== null ? Math.round(budgetUSD * ONGOING_COST_RATE) : null
+  const annualOngoingCostUSD = requiredInvestment
+    ? requiredInvestment.annualRecurringUSD
+    : budgetUSD !== null ? Math.round(budgetUSD * ONGOING_COST_RATE) : null
   const netAnnualSavingsUSD =
     totalAnnualSavingsUSD !== null && annualOngoingCostUSD !== null
       ? totalAnnualSavingsUSD - annualOngoingCostUSD
@@ -875,6 +940,10 @@ export function calculateROI(
     assumedHourlyRateLocal: hourlyRateUSD * rate,
     assumedBudgetMidpointUSD: budgetUSD,
     assumedBudgetMidpointLocal: budgetUSD !== null ? budgetUSD * rate : null,
+    investmentBasis: requiredInvestment ? 'required' : 'stated_budget',
+    statedBudgetUSD,
+    statedBudgetLocal: statedBudgetUSD !== null ? statedBudgetUSD * rate : null,
+    requiredInvestment: requiredInvestment ?? null,
     efficiencyFactor: EFFICIENCY_FACTOR,
     smallTeamRateApplied,
     // FX transparency: the exact rate used for the *Local conversions above
@@ -888,7 +957,9 @@ export function calculateROI(
     rateBenchmarkLabel: getRateBenchmarkLabel(currencyCode, 'en'),
     rateBenchmarkLabelId: getRateBenchmarkLabel(currencyCode, 'id'),
     // Ongoing cost + net economics + scenario range
-    ongoingCostRate: ONGOING_COST_RATE,
+    // Effective running-cost rate: the flat 12% on the budget path; the
+    // plan's recurring cost over the year-1 investment on the required path.
+    ongoingCostRate: requiredInvestment && budgetUSD ? (annualOngoingCostUSD ?? 0) / budgetUSD : ONGOING_COST_RATE,
     ongoingCostStartYear: ONGOING_COST_START_YEAR,
     annualOngoingCostUSD,
     annualOngoingCostLocal: annualOngoingCostUSD !== null ? annualOngoingCostUSD * rate : null,
@@ -1002,7 +1073,7 @@ export const EFFICIENCY_SCENARIO_BOUNDS = { low: 0.5, high: 0.9 } as const
  *    since this function has no server-only dependencies)
  */
 export function recomputeROIAtEfficiency(
-  context: Pick<DiagnosticContext, 'quantitative' | 'currency' | 'qualitative'>,
+  context: Pick<DiagnosticContext, 'quantitative' | 'currency' | 'qualitative'> & Partial<Pick<DiagnosticContext, 'calculations'>>,
   efficiencyFactor: number
 ): ROIProjectionInternal | null {
   // Defensive guard matching `upgradeDiagnosticContext`'s own
@@ -1013,7 +1084,10 @@ export function recomputeROIAtEfficiency(
   if (!context.quantitative) return null
   const currencyCode = parseCurrencyCode(context.currency)
   const industry = context.qualitative?.industry
-  return calculateROI(context.quantitative, currencyCode, industry, efficiencyFactor)
+  // Same investment the stored tiles were appraised on — otherwise the slider
+  // and tornado would silently switch back to the whole-budget basis.
+  const required = (context as Partial<DiagnosticContext>).calculations?.requiredInvestment ?? null
+  return calculateROI(context.quantitative, currencyCode, industry, efficiencyFactor, required)
 }
 
 export interface ROISensitivityLever {
@@ -1050,7 +1124,7 @@ export interface ROISensitivityLever {
  * lever here without changing callers.
  */
 export function getROISensitivity(
-  context: Pick<DiagnosticContext, 'quantitative' | 'currency' | 'qualitative'>,
+  context: Pick<DiagnosticContext, 'quantitative' | 'currency' | 'qualitative'> & Partial<Pick<DiagnosticContext, 'calculations'>>,
   locale: Locale = 'en'
 ): ROISensitivityLever[] {
   // Contexts missing `quantitative` (very old stored reports, or contexts
@@ -2262,8 +2336,18 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
 
   const scores = calculateDimensionScores(answers)
 
-  // FIX #3: Pass industry to calculateROI for correct labor rate
-  const calculations = calculateROI(quantitative, currencyCode, answers.industry)
+  // FIX #3: Pass industry to calculateROI for correct labor rate.
+  // Two passes: savings don't depend on the investment, so the first pass
+  // feeds the opportunity ranking; the opportunities then size the required
+  // investment, and the second pass appraises the case on it.
+  const savingsPass = calculateROI(quantitative, currencyCode, answers.industry)
+  const opportunities = rankOpportunities(answers, scores, currencyCode, savingsPass.totalAnnualSavingsUSD, 'en')
+  const requiredInvestment = estimateRequiredInvestment(
+    opportunities,
+    fteCountInScope,
+    savingsPass.assumedHourlyRateUSD ?? DEFAULT_HOURLY_RATE_USD,
+  )
+  const calculations = calculateROI(quantitative, currencyCode, answers.industry, undefined, requiredInvestment)
 
   // D2 — damp the completeness-based confidence by how the manual-hours / FTE
   // estimates were sourced. Absent answer → neutral, so pre-D2 behaviour is
@@ -2276,7 +2360,6 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
 
   const { totalAnnualSavingsUSD } = calculations
 
-  const opportunities = rankOpportunities(answers, scores, currencyCode, totalAnnualSavingsUSD, 'en')
   // Bahasa Indonesia phase 2 — computed once, alongside the English version,
   // and stored on the context (never recomputed on a locale toggle). Same
   // numeric/decision fields as `opportunities`, only the prose differs.

@@ -54,7 +54,8 @@ import {
 } from '@/lib/investmentThresholds'
 import type { CurrencyCode } from '@/lib/resultFormatters'
 import { netPaybackNotReachedLabel } from '@/lib/resultFormatters'
-import { buildInvestmentComparison, investmentComparisonExplanation, RECOMMENDED_PAYBACK_MONTHS, type InvestmentComparison } from '@/lib/investmentComparison'
+import { buildInvestmentComparison, investmentComparisonExplanation, CEILING_PAYBACK_MONTHS, type InvestmentComparison } from '@/lib/investmentComparison'
+import { buildRequiredInvestmentView, isRequiredBasis, type RequiredInvestmentView } from '@/lib/requiredInvestmentView'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
 export const INK       = '#0a1a0f'   // primary text, display values
@@ -1923,7 +1924,48 @@ function renderMetricGrid(
  * Same figures as the on-screen block (one shared pure helper), so a client
  * reading the PDF and a client reading the page quote the same numbers.
  */
-/** Stated budget vs recommended investment — mirrors the on-screen table. */
+/** Budget vs investment required — mirrors the on-screen block. */
+function renderRequiredInvestment(pdf: jsPDF, y: number, v: RequiredInvestmentView, locale: Locale = 'en'): number {
+  y = ensureSpace(pdf, y, 60)
+  setC(pdf, ACCENT, 'text')
+  pdf.setFont(FB(), 'bold')
+  pdf.setFontSize(6.4)
+  spacedText(pdf, locale === 'id' ? 'ANGGARAN ANDA VS INVESTASI YANG DIBUTUHKAN' : 'YOUR BUDGET VS THE INVESTMENT REQUIRED', ML, y, 0.3)
+  y += 4.5
+  setC(pdf, MUTED, 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(7.2)
+  const intro = pdf.splitTextToSize(v.explanation, CW)
+  pdf.text(intro, ML, y)
+  y += intro.length * 3.3 + 3
+  setC(pdf, TRACK, 'draw')
+  pdf.setLineWidth(0.15)
+  pdf.line(ML, y - 1.5, ML + CW, y - 1.5)
+  y += 2.5
+  v.rows.forEach((r) => {
+    pdf.setFontSize(7.4)
+    pdf.setFont(r.emphasis ? FB() : F(), r.emphasis ? 'bold' : 'normal')
+    const labelLines = pdf.splitTextToSize(r.label, CW * 0.72)
+    y = ensureSpace(pdf, y, labelLines.length * 3.3 + 5)
+    setC(pdf, INK, 'text')
+    pdf.text(labelLines, ML, y)
+    setC(pdf, r.tone === 'good' ? ACCENT : r.tone === 'bad' ? '#dc2626' : INK, 'text')
+    pdf.setFont(FB(), 'bold')
+    pdf.text(r.value, ML + CW, y, { align: 'right' })
+    y += (labelLines.length - 1) * 3.3 + 2.4
+    setC(pdf, TRACK, 'draw')
+    pdf.line(ML, y, ML + CW, y)
+    y += 4
+  })
+  setC(pdf, LABEL, 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(6.6)
+  const foot = pdf.splitTextToSize(v.footnote, CW)
+  pdf.text(foot, ML, y)
+  return y + foot.length * 3.0 + 5
+}
+
+/** Stated budget vs investment ceiling — mirrors the on-screen table. */
 function renderInvestmentComparison(
   pdf: jsPDF, y: number,
   c: InvestmentComparison,
@@ -1936,7 +1978,7 @@ function renderInvestmentComparison(
   setC(pdf, WARN_AMB, 'text')
   pdf.setFont(FB(), 'bold')
   pdf.setFontSize(6.4)
-  spacedText(pdf, locale === 'id' ? 'KENAPA ADA ANGKA NEGATIF? — ANGGARAN ANDA VS INVESTASI YANG DIREKOMENDASIKAN' : 'WHY ARE SOME FIGURES NEGATIVE? — YOUR BUDGET VS THE RECOMMENDED INVESTMENT', ML, y, 0.3)
+  spacedText(pdf, locale === 'id' ? 'KENAPA ADA ANGKA NEGATIF? — ANGGARAN ANDA VS BATAS INVESTASI' : 'WHY ARE SOME FIGURES NEGATIVE? — YOUR BUDGET VS THE INVESTMENT CEILING', ML, y, 0.3)
   y += 4.5
 
   setC(pdf, MUTED, 'text')
@@ -1954,7 +1996,7 @@ function renderInvestmentComparison(
   spacedText(pdf, locale === 'id' ? `DINILAI SELAMA ${H} TAHUN` : `OVER ${H} YEARS`, ML, y, 0.25)
   spacedText(pdf, locale === 'id' ? 'ANGGARAN ANDA' : 'YOUR BUDGET', colA, y, 0.25)
   setC(pdf, ACCENT, 'text')
-  spacedText(pdf, locale === 'id' ? `DIREKOMENDASIKAN (≤ ${RECOMMENDED_PAYBACK_MONTHS} BLN)` : `RECOMMENDED (≤ ${RECOMMENDED_PAYBACK_MONTHS}-MO)`, colB, y, 0.25)
+  spacedText(pdf, locale === 'id' ? `BATAS INVESTASI (≤ ${CEILING_PAYBACK_MONTHS} BLN)` : `INVESTMENT CEILING (≤ ${CEILING_PAYBACK_MONTHS}-MO)`, colB, y, 0.25)
   y += 2
   setC(pdf, TRACK, 'draw')
   pdf.setLineWidth(0.15)
@@ -1964,13 +2006,13 @@ function renderInvestmentComparison(
   const pct = (v: number) => v >= 999 ? '>999%' : `${Math.round(v)}%`
   const netPb = (v: number | null) => v == null ? (locale === 'id' ? `Tidak tercapai dlm ${H} thn` : `Not reached in ${H} yrs`) : fmtPayback(v)
   const rows: [string, string, string, number | null, number | null][] = [
-    [locale === 'id' ? 'Investasi' : 'Investment', fmt(c.stated.investmentLocal), fmt(c.recommended.investmentLocal), null, null],
-    [locale === 'id' ? 'Biaya berjalan / tahun' : 'Running cost / yr', fmt(c.stated.annualOngoingCostLocal), fmt(c.recommended.annualOngoingCostLocal), null, null],
-    [locale === 'id' ? 'Penghematan bersih / tahun' : 'Net savings / yr', fmt(c.stated.netAnnualSavingsLocal), fmt(c.recommended.netAnnualSavingsLocal), c.stated.netAnnualSavingsLocal, c.recommended.netAnnualSavingsLocal],
-    ['Payback', fmtPayback(c.stated.paybackMonths), fmtPayback(c.recommended.paybackMonths), null, null],
-    [locale === 'id' ? 'Payback bersih' : 'Net payback', netPb(c.stated.netPaybackMonths), netPb(c.recommended.netPaybackMonths), null, null],
-    [roiLabel(H, locale), pct(c.stated.roiPercent), pct(c.recommended.roiPercent), c.stated.roiPercent, c.recommended.roiPercent],
-    [npvLabel(H, locale), fmt(c.stated.npvLocal), fmt(c.recommended.npvLocal), c.stated.npvLocal, c.recommended.npvLocal],
+    [locale === 'id' ? 'Investasi' : 'Investment', fmt(c.stated.investmentLocal), fmt(c.ceiling.investmentLocal), null, null],
+    [locale === 'id' ? 'Biaya berjalan / tahun' : 'Running cost / yr', fmt(c.stated.annualOngoingCostLocal), fmt(c.ceiling.annualOngoingCostLocal), null, null],
+    [locale === 'id' ? 'Penghematan bersih / tahun' : 'Net savings / yr', fmt(c.stated.netAnnualSavingsLocal), fmt(c.ceiling.netAnnualSavingsLocal), c.stated.netAnnualSavingsLocal, c.ceiling.netAnnualSavingsLocal],
+    ['Payback', fmtPayback(c.stated.paybackMonths), fmtPayback(c.ceiling.paybackMonths), null, null],
+    [locale === 'id' ? 'Payback bersih' : 'Net payback', netPb(c.stated.netPaybackMonths), netPb(c.ceiling.netPaybackMonths), null, null],
+    [roiLabel(H, locale), pct(c.stated.roiPercent), pct(c.ceiling.roiPercent), c.stated.roiPercent, c.ceiling.roiPercent],
+    [npvLabel(H, locale), fmt(c.stated.npvLocal), fmt(c.ceiling.npvLocal), c.stated.npvLocal, c.ceiling.npvLocal],
   ]
   rows.forEach(([label, a, b, va, vb]) => {
     y = ensureSpace(pdf, y, 7)
@@ -1993,8 +2035,8 @@ function renderInvestmentComparison(
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(6.8)
   const foot = pdf.splitTextToSize(locale === 'id'
-    ? `Cara mencapai kolom kanan: jalankan implementasi bertahap — tahap pertama maksimal ${fmt(c.recommended.investmentLocal)}, dimulai dari otomasi berdampak tertinggi — lalu tambah investasi setelah penghematannya terbukti. Atau perluas cakupan otomasi agar penghematan tahunan naik. Angka-angka di bawah menghitung anggaran yang Anda masukkan.`
-    : `How to reach the right-hand column: phase the implementation — a first phase of at most ${fmt(c.recommended.investmentLocal)}, starting with the highest-impact automation — and add investment once its savings are proven. Or widen the automation scope so annual savings rise. The figures below are calculated on the budget you entered.`, CW)
+    ? `Cara membacanya: selama pengeluaran tahap pertama tidak melebihi ${fmt(c.ceiling.investmentLocal)}, investasinya balik modal ≤ ${CEILING_PAYBACK_MONTHS} bulan dari penghematan yang sudah terukur. Menghabiskan seluruh anggaran hanya masuk akal kalau cakupan otomasinya diperluas sehingga penghematan tahunan ikut naik. Angka-angka di bawah menghitung seluruh anggaran yang Anda masukkan.`
+    : `How to read this: as long as first-phase spend stays at or below ${fmt(c.ceiling.investmentLocal)}, it pays back within ${CEILING_PAYBACK_MONTHS} months from savings already measured. Spending the full budget only makes sense if the automation scope widens so annual savings rise with it. The figures below are calculated on the full budget you entered.`, CW)
   pdf.text(foot, ML, y)
   return y + foot.length * 3.1 + 5
 }
@@ -2891,9 +2933,11 @@ export async function exportReportToPdf(
     const picks = selectSoftwareRecommendations({
       currency,
       industry: qualitative?.industry,
-      painPoints: Array.isArray(qualitative?.topPainPoints) ? qualitative.topPainPoints : [],
+      painPoints: Array.isArray(qualitative?.topPainPoints)
+        ? qualitative.topPainPoints
+        : String(qualitative?.topPainPoints ?? '').split('\n').map((l) => l.trim()).filter(Boolean),
       opportunityTitles: opportunities.map((o) => o.title),
-      budgetMidpointUSD: calculations.assumedBudgetMidpointUSD ?? null,
+      budgetMidpointUSD: cAny.statedBudgetUSD ?? calculations.assumedBudgetMidpointUSD ?? null,
       fteCountInScope: context.quantitative?.fteCountInScope ?? null,
     })
     if (picks.length > 0) {
@@ -2972,22 +3016,28 @@ export async function exportReportToPdf(
     pdf.setFont(F(), 'normal')
     pdf.setFontSize(7)
     const projLines = pdf.splitTextToSize(locale === 'id'
-      ? 'Semua angka di bawah adalah proyeksi setelah perbaikan diterapkan — penghematan yang diperkirakan dari otomasi yang direkomendasikan, dibandingkan dengan anggaran yang Anda masukkan. Angka negatif berarti biaya investasi dan biaya berjalan lebih besar dari penghematan yang diproyeksikan, bukan kerugian yang terjadi saat ini.'
-      : 'Every figure below is a projection of the state after the improvements are in place — the savings expected from the recommended automation, set against the budget you entered. A negative figure means the investment and running cost exceed the projected savings, not a loss you are making today.', CW)
+      ? `Semua angka di bawah adalah proyeksi setelah perbaikan diterapkan — penghematan yang diperkirakan dari otomasi yang direkomendasikan, dibandingkan dengan ${isRequiredBasis(calculations as never) ? 'investasi yang dibutuhkan' : 'anggaran yang Anda masukkan'}. Angka negatif berarti biaya investasi dan biaya berjalan lebih besar dari penghematan yang diproyeksikan, bukan kerugian yang terjadi saat ini.`
+      : `Every figure below is a projection of the state after the improvements are in place — the savings expected from the recommended automation, set against ${isRequiredBasis(calculations as never) ? 'the investment required' : 'the budget you entered'}. A negative figure means the investment and running cost exceed the projected savings, not a loss you are making today.`, CW)
     y = ensureSpace(pdf, y, projLines.length * 3.6 + 4)
     pdf.text(projLines, ML, y)
     y += projLines.length * 3.6 + 4
   }
 
-  if (qualitative?.budgetCurrencyMismatch && calculations.assumedBudgetMidpointLocal != null) {
+  const statedBudgetForWarning = cAny.statedBudgetLocal ?? calculations.assumedBudgetMidpointLocal
+  if (qualitative?.budgetCurrencyMismatch && statedBudgetForWarning != null) {
     const mm = qualitative.budgetCurrencyMismatch
     y = renderConfidenceBanner(pdf, y, calculations.confidenceLevel ?? 'low', [], locale, locale === 'id'
-      ? `Anggaran diisi dalam dolar AS (${mm}), sedangkan laporan ini dalam ${currency}, sehingga investasi dihitung sebagai ≈ ${fmt(calculations.assumedBudgetMidpointLocal)}. Jika anggaran sebenarnya dalam ${currency}, jalankan ulang diagnostik dan pilih kisaran anggaran dalam ${currency} — angka payback, ROI, dan NPV bergantung pada angka ini.`
-      : `Budget was entered in US dollars (${mm}) while this report is in ${currency}, so the investment is priced at ≈ ${fmt(calculations.assumedBudgetMidpointLocal)}. If your real budget is in ${currency}, re-run the diagnostic and pick a ${currency} budget range — the payback, ROI and NPV figures depend on it.`)
+      ? `Anggaran diisi dalam dolar AS (${mm}), sedangkan laporan ini dalam ${currency}, sehingga anggaran Anda dihitung sebagai ≈ ${fmt(statedBudgetForWarning)}. Jika anggaran sebenarnya dalam ${currency}, jalankan ulang diagnostik dan pilih kisaran anggaran dalam ${currency}.`
+      : `Budget was entered in US dollars (${mm}) while this report is in ${currency}, so your budget is read as ≈ ${fmt(statedBudgetForWarning)}. If your real budget is in ${currency}, re-run the diagnostic and pick a ${currency} budget range.`)
   }
 
+  const requiredBasis = isRequiredBasis(calculations as never)
   {
-    const comparison = buildInvestmentComparison(calculations as never, roiYears)
+    const requiredView = buildRequiredInvestmentView(calculations as never, (v) => fmt(v), locale)
+    if (requiredView) y = renderRequiredInvestment(pdf, y, requiredView, locale)
+  }
+  {
+    const comparison = requiredBasis ? null : buildInvestmentComparison(calculations as never, roiYears)
     if (comparison) {
       const fmtPb = (v: number | null | undefined): string => {
         if (v == null || !isFinite(v)) return '\u2014'
@@ -3041,10 +3091,10 @@ export async function exportReportToPdf(
     : null
   const roiNarrative = locale === 'id'
     ? (roiComplete
-      ? `Investasi transformasi awal sebesar ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} — seluruh anggaran yang Anda masukkan, diasumsikan sebagai biaya implementasi — diproyeksikan menghasilkan ROI ${roiYears} tahun sebesar ${fmtPct(calculations.threeYearROIPercent, locale)} dan memulihkan ${roiHoursStr} jam kapasitas tim setiap tahun. Model keuangan menunjukkan payback penuh dalam ${roiPaybackStr}, didorong oleh penghematan tahunan berkelanjutan sebesar ${roiSavingsStr}${calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0 ? ` — agar payback terjadi dalam 24 bulan, investasi implementasi idealnya tidak melebihi ${fmt(calculations.totalAnnualSavingsLocal * 2)}` : ''}. Yang terpenting, menunda transformasi ini menimbulkan "biaya keterlambatan operasional" langsung yang totalnya ${roiInactionStr} setiap 90 hari. Memulai eksekusi sekarang menghentikan kebocoran biaya yang terus berjalan ini dan dengan cepat mengalihkan tenaga tim ke pekerjaan strategis yang lebih bernilai.`
+      ? `Investasi transformasi awal sebesar ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} — ${isRequiredBasis(calculations as never) ? 'perkiraan kebutuhan tahun pertama untuk cakupan otomasi yang direkomendasikan' : 'seluruh anggaran yang Anda masukkan, diasumsikan sebagai biaya implementasi'} — diproyeksikan menghasilkan ROI ${roiYears} tahun sebesar ${fmtPct(calculations.threeYearROIPercent, locale)} dan memulihkan ${roiHoursStr} jam kapasitas tim setiap tahun. Model keuangan menunjukkan payback penuh dalam ${roiPaybackStr}, didorong oleh penghematan tahunan berkelanjutan sebesar ${roiSavingsStr}${calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0 ? ` — agar payback terjadi dalam 24 bulan, investasi implementasi idealnya tidak melebihi ${fmt(calculations.totalAnnualSavingsLocal * 2)}` : ''}. Yang terpenting, menunda transformasi ini menimbulkan "biaya keterlambatan operasional" langsung yang totalnya ${roiInactionStr} setiap 90 hari. Memulai eksekusi sekarang menghentikan kebocoran biaya yang terus berjalan ini dan dengan cepat mengalihkan tenaga tim ke pekerjaan strategis yang lebih bernilai.`
       : `Berdasarkan beban kerja manual yang dilaporkan tim Anda, otomasi diproyeksikan memulihkan ${roiHoursStr} jam kapasitas tim setiap tahun${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, senilai estimasi ${roiSavingsStr} dalam penghematan tahunan berkelanjutan` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Menunda transformasi ini membawa estimasi "biaya keterlambatan operasional" sebesar ${roiInactionStr} setiap 90 hari.` : ''} Karena tidak ada anggaran implementasi yang diberikan dalam asesmen, periode payback dan ROI multi-tahun tidak diproyeksikan — memberikan kisaran anggaran akan melengkapi model keuangan ini. Estimasi ini memiliki tingkat keyakinan ${calculations.confidenceLevel === 'low' ? 'rendah' : calculations.confidenceLevel === 'medium' ? 'sedang' : (calculations.confidenceLevel ?? 'rendah')} dan didasarkan pada asumsi benchmark internal, bukan angka spesifik klien.`)
     : (roiComplete
-      ? `An initial transformation investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} — your full stated budget, assumed to be the implementation cost — is projected to generate a ${fmtPct(calculations.threeYearROIPercent, locale)} ${roiYears}-year ROI and reclaim ${roiHoursStr} hours of team capacity annually. The financial model indicates full payback in ${roiPaybackStr}, driven by ${roiSavingsStr} in continuous annual savings${calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0 ? ` — for payback within 24 months, the implementation investment should stay at or under ${fmt(calculations.totalAnnualSavingsLocal * 2)}` : ''}. Crucially, delaying this transformation incurs a direct "operational cost of delay" totaling ${roiInactionStr} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`
+      ? `An initial transformation investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} — ${isRequiredBasis(calculations as never) ? 'the estimated year-1 requirement for the recommended automation scope' : 'your full stated budget, assumed to be the implementation cost'} — is projected to generate a ${fmtPct(calculations.threeYearROIPercent, locale)} ${roiYears}-year ROI and reclaim ${roiHoursStr} hours of team capacity annually. The financial model indicates full payback in ${roiPaybackStr}, driven by ${roiSavingsStr} in continuous annual savings${calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0 ? ` — for payback within 24 months, the implementation investment should stay at or under ${fmt(calculations.totalAnnualSavingsLocal * 2)}` : ''}. Crucially, delaying this transformation incurs a direct "operational cost of delay" totaling ${roiInactionStr} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`
       : `Based on the manual workload your team reported, automation is projected to reclaim ${roiHoursStr} hours of team capacity annually${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, worth an estimated ${roiSavingsStr} in continuous annual savings` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Delaying this transformation carries an estimated "operational cost of delay" of ${roiInactionStr} every 90 days.` : ''} Because no implementation budget was provided in the assessment, payback period and multi-year ROI are not projected — supplying a budget range completes the financial model. These estimates carry ${calculations.confidenceLevel ?? 'low'} confidence and are based on internal benchmark assumptions rather than client-specific figures.`)
   // Bold the figures the financial case hinges on: investment, 3-year ROI,
   // payback, savings, and cost-of-delay — the "so what" of the paragraph.
@@ -3167,20 +3217,20 @@ export async function exportReportToPdf(
   y = renderMetricGrid(pdf, y, locale === 'id' ? [
     { l: 'Value Tenaga Kerja yang Dipulihkan', v: fmt(calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD) },
     { l: 'Value Efisiensi Proses', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
-    { l: 'Periode Payback', v: fmtPaybackCappedPdf(calculations.paybackMonths), n: 'dengan investasi = anggaran yang Anda masukkan' },
+    { l: 'Periode Payback', v: fmtPaybackCappedPdf(calculations.paybackMonths), n: requiredBasis ? 'investasi = kebutuhan tahun pertama' : 'dengan investasi = anggaran yang Anda masukkan' },
     { l: 'Biaya Keterlambatan Operasional (90h)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR), n: 'penghematan yang hilang jika ditunda 90 hari' },
     { l: npvLabel(roiYears, 'id'), v: fmt(cAny.npv3YearLocal), n: 'value kini bersih @ diskonto 10%' },
-    { l: 'Biaya Berjalan Tahunan', v: fmt(cAny.annualOngoingCostLocal), n: 'lisensi, pemeliharaan & dukungan' },
+    { l: 'Biaya Berjalan Tahunan', v: fmt(cAny.annualOngoingCostLocal), n: requiredBasis ? 'plan Aivory, mulai tahun ke-2' : 'lisensi, pemeliharaan & dukungan' },
     { l: 'Penghematan Bersih Tahunan', v: fmt(cAny.netAnnualSavingsLocal), n: 'setelah biaya berjalan' },
     { l: 'Payback Bersih', v: netPaybackNotReachedLabel(cAny, 'id', roiYears) ?? fmtPaybackCappedPdf(cAny.netPaybackMonths), n: 'berdasarkan penghematan bersih' },
     { l: 'Batas Investasi Impas', v: breakEvenInvestmentLocal != null ? fmt(breakEvenInvestmentLocal) : '\u2014', n: 'investasi maksimal agar payback ≤ 24 bulan' },
   ] : [
     { l: 'Recovered Labor Value', v: fmt(calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD) },
     { l: 'Process Efficiency Value', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
-    { l: 'Payback Period', v: fmtPaybackCappedPdf(calculations.paybackMonths), n: 'assumes investment = your full stated budget' },
+    { l: 'Payback Period', v: fmtPaybackCappedPdf(calculations.paybackMonths), n: requiredBasis ? 'investment = year-1 requirement' : 'assumes investment = your full stated budget' },
     { l: 'Operational Cost of Delay (90d)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR), n: 'savings forgone if delayed by 90 days' },
     { l: npvLabel(roiYears, 'en'), v: fmt(cAny.npv3YearLocal), n: 'net present value @ 10% discount' },
-    { l: 'Annual Ongoing Cost', v: fmt(cAny.annualOngoingCostLocal), n: 'licenses, maintenance & support' },
+    { l: 'Annual Ongoing Cost', v: fmt(cAny.annualOngoingCostLocal), n: requiredBasis ? 'Aivory plan, from year 2' : 'licenses, maintenance & support' },
     { l: 'Net Annual Savings', v: fmt(cAny.netAnnualSavingsLocal), n: 'after ongoing cost' },
     { l: 'Net Payback', v: netPaybackNotReachedLabel(cAny, 'en', roiYears) ?? fmtPaybackCappedPdf(cAny.netPaybackMonths), n: 'on net savings' },
     { l: 'Break-even Investment', v: breakEvenInvestmentLocal != null ? fmt(breakEvenInvestmentLocal) : '\u2014', n: 'max outlay for a ≤ 24-month payback' },
@@ -3234,7 +3284,7 @@ export async function exportReportToPdf(
   }
 
   // ── Investment thresholds — the "so what do we do about it" table ──
-  if (calculations.hasEnoughDataForProjection) {
+  if (!requiredBasis && calculations.hasEnoughDataForProjection) {
     const thresholds = getInvestmentThresholds(calculations as never)
     if (thresholds.length > 0) {
       y += 2
