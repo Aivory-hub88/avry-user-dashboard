@@ -10,7 +10,6 @@ import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole'
 import BlueprintHeader from '@/components/blueprint/BlueprintHeader'
 import ScoreRing from '@/components/result/ScoreRing'
 import styles from './blueprint.module.css'
-import { exportBlueprintPDF, exportBlueprintDOCX } from '@/lib/blueprintExport'
 import { useTranslations } from 'next-intl'
 import { useLocaleContext } from '@/hooks/useLocale'
 import { saveRoadmap } from '@/hooks/useRoadmap'
@@ -1284,6 +1283,8 @@ export default function BlueprintPage() {
     setShowDownloadMenu(false)
     setDownloadLoading(true)
     try {
+      // Loaded on click — keeps the inline PDF cover assets out of the page bundle.
+      const { exportBlueprintPDF } = await import('@/lib/blueprintExport')
       await exportBlueprintPDF(blueprint, currentVersionLabel ?? 'Draft', locale)
       showToast(t("downloadSuccess"))
     } catch (e) {
@@ -1298,6 +1299,7 @@ export default function BlueprintPage() {
     setShowDownloadMenu(false)
     setDownloadLoading(true)
     try {
+      const { exportBlueprintDOCX } = await import('@/lib/blueprintExport')
       await exportBlueprintDOCX(blueprint, currentVersionLabel ?? 'Draft', locale)
       showToast(t("downloadSuccess"))
     } catch (e) {
