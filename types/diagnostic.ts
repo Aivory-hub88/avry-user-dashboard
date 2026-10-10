@@ -585,6 +585,10 @@ export interface DiagnosticContext {
      *  upgradeDiagnosticContext can regenerate it (EN + ID) without falling
      *  back to generic text. Absent on contexts stored before 2026-10-10. */
     rfiAnswers?: Partial<Record<RfiAnswerKey, string>>
+    /** Set (to the raw answer) when the budget band is a US-dollar band but
+     *  the report currency isn't USD — the investment is then priced from a
+     *  dollar figure, which the report warns about. Absent otherwise. */
+    budgetCurrencyMismatch?: string
   }
 }
 

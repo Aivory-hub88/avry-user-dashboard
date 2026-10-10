@@ -388,7 +388,7 @@ import type {
   RfiAnswerKey,
 } from '@/types/diagnostic'
 import { parseCurrencyCode, formatCurrency, type CurrencyCode } from '@/lib/resultFormatters'
-import { getBudgetBands, getLabourBenchmark, resolveBandMidpointUSD } from '@/lib/currencyBands'
+import { getBudgetBands, getLabourBenchmark, resolveBandMidpointUSD, isBandForCurrency } from '@/lib/currencyBands'
 import { normalizeIndustryKey } from '@/lib/industryBenchmarks'
 
 // ---- String normalization helper ----
@@ -2321,6 +2321,13 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     // damper after any ROI recompute. Narrative/context only; never scored.
     estimateBasis: answers.estimate_basis || '',
     rfiAnswers: pickRfiAnswers(answers),
+    budgetCurrencyMismatch:
+      typeof answers.budget_range === 'string' &&
+      currencyCode !== 'USD' &&
+      !isBandForCurrency('budget', currencyCode, answers.budget_range) &&
+      isBandForCurrency('budget', 'USD', answers.budget_range)
+        ? answers.budget_range
+        : undefined,
   }
 
   const context: DiagnosticContext = {

@@ -148,7 +148,7 @@ export default function PrintableReport({ context, llmResult }: PrintableReportP
             <div className={styles.tileValue}>{fmtCurrency(((calculations as any).npv3YearLocal) ?? null)}</div>
           </div>
           <div className={styles.tile}>
-            <div className={styles.tileLabel}>Operational Cost of Delay (90 Days)</div>
+            <div className={styles.tileLabel}>Operational Cost of Delay (90 Days) — savings forgone</div>
             <div className={styles.tileValue} style={costOfInaction90Days && costOfInaction90Days < 0 ? { color: '#dc2626' } : undefined}>{fmtCurrency(costOfInaction90Days)}</div>
           </div>
         </div>

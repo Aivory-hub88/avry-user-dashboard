@@ -260,6 +260,40 @@ export function getRevenueBands(currency: CurrencyCode): CurrencyBand[] {
   return REVENUE_BANDS[currency] ?? REVENUE_BANDS.USD ?? []
 }
 
+/**
+ * True when a stored budget/revenue answer is one of THIS currency's band
+ * labels (EN stored or ID display). Used to catch band answers left over from
+ * a different currency — e.g. a "$50k - $100k" USD band on an IDR report,
+ * which silently prices the investment in dollars.
+ */
+export function isBandForCurrency(kind: 'budget' | 'revenue', currency: CurrencyCode, label: string | undefined | null): boolean {
+  if (!label) return true
+  const bands = kind === 'budget' ? getBudgetBands(currency) : getRevenueBands(currency)
+  return bands.some((b) => b.en === label || b.id === label)
+}
+
+/**
+ * Removes annual_revenue / budget_range answers that are not bands of
+ * `currency`, in EVERY phase. Pure — returns a new object. These two answers
+ * live in different phases (revenue with currency in phase 1, budget in
+ * phase 3), so per-phase clearing missed the budget and let a dollar band
+ * survive onto a Rupiah report.
+ */
+export function dropMismatchedBandAnswers<T extends { responses: Record<string, unknown> }>(
+  phases: Record<string, T>,
+  currency: CurrencyCode,
+): Record<string, T> {
+  const out: Record<string, T> = {}
+  for (const [id, phase] of Object.entries(phases)) {
+    if (!phase || typeof phase !== 'object' || !phase.responses) { out[id] = phase; continue }
+    const responses = { ...phase.responses }
+    if (typeof responses.budget_range === 'string' && !isBandForCurrency('budget', currency, responses.budget_range)) delete responses.budget_range
+    if (typeof responses.annual_revenue === 'string' && !isBandForCurrency('revenue', currency, responses.annual_revenue)) delete responses.annual_revenue
+    out[id] = { ...phase, responses }
+  }
+  return out
+}
+
 /** Labour benchmark for a currency; null → US industry-table path. */
 export function getLabourBenchmark(currency: CurrencyCode): LabourBenchmark | null {
   return LABOUR_BENCHMARKS[currency] ?? null
