@@ -16,6 +16,10 @@ describe('PDF generators only use the embedded Manrope/Doto helpers', () => {
       expect(calls.length).toBeGreaterThan(0)
       const bad = calls.filter((args) => /^['"]/.test(args) || /['"]italic['"]/.test(args))
       expect(bad).toEqual([])
+      // …and no local helper that shadows F()/FB() with a literal family
+      // (app/roadmap had `const FB = () => 'Helvetica'`).
+      const shadowing = [...src.matchAll(/const\s+(F|FB|FD|IT|AKL|AKR)\s*=\s*\(\)\s*=>\s*['"][^'"]+['"]/g)].map((m) => m[0])
+      expect(shadowing).toEqual([])
     })
   }
 })

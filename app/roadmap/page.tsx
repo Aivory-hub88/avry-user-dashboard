@@ -747,7 +747,7 @@ async function exportRoadmapPdf(
   companyName: string = 'Company',
 ) {
   const { default: jsPDF } = await import('jspdf');
-  const { applyPremiumCovers, renderAivoryNote, loadManrope, pageBg, pageFooter, sectionLabel, renderNarrative, thinDiv } = await import('@/lib/pdfExport');
+  const { applyPremiumCovers, renderAivoryNote, loadManrope, pageBg, pageFooter, sectionLabel, renderNarrative, thinDiv, F, FB } = await import('@/lib/pdfExport');
 
   const tr = (en: string, id: string) => locale === 'id' ? id : en
 
@@ -809,7 +809,6 @@ async function exportRoadmapPdf(
   thinDiv(doc, y);
 
   // Inner pages
-  const FB = () => 'Helvetica';
 
   const checkPage = (need: number) => {
     if (y + need > PAGE_H - 20) {
@@ -861,7 +860,7 @@ async function exportRoadmapPdf(
       checkPage(8);
       const isChecked = !!phaseChecked[m.id];
       doc.setFontSize(9.5);
-      doc.setFont(FB(), 'normal');
+      doc.setFont(F(), 'normal');
       doc.setTextColor(isChecked ? 136 : 30, isChecked ? 136 : 30, isChecked ? 136 : 30);
       doc.text(`>  ${m.title}`, ML + 2, y);
       y += 6;
@@ -889,7 +888,7 @@ async function exportRoadmapPdf(
         doc.text(k.label, ML + 2, y);
         y += 5;
 
-        doc.setFont(FB(), 'normal');
+        doc.setFont(F(), 'normal');
         doc.setFontSize(9);
         doc.setTextColor(80, 80, 80);
         const targetActualLine = tr(`Target: ${k.target}  ·  Actual: ${actual}`, `Target: ${k.target}  ·  Aktual: ${actual}`);
