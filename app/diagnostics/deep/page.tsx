@@ -6,6 +6,8 @@ import { PhaseId, PhaseData, DeepDiagnosticProgress } from '@/types/deepDiagnost
 import { DEEP_DIAGNOSTIC_PHASES } from '@/constants/deepDiagnosticQuestions'
 import { ID_PHASE_COPY } from '@/constants/deepDiagnosticQuestionsId'
 import { DeepDiagnosticService } from '@/services/deepDiagnostic'
+import { dropMismatchedBandAnswers } from '@/lib/currencyBands'
+import { parseCurrencyCode } from '@/lib/resultFormatters'
 import { useLocaleContext } from '@/hooks/useLocale'
 import PhaseNavigator from '@/components/diagnostics/PhaseNavigator'
 import ProgressTracker from '@/components/diagnostics/ProgressTracker'
@@ -91,7 +93,11 @@ export default function DeepDiagnosticPage() {
     if (!savedProgress) return
     setPhaseData(() => {
       const merged = { ...buildEmptyPhaseData(), ...savedProgress.phases }
-      return merged as Record<PhaseId, PhaseData>
+      // Saved progress can carry band answers from another currency (older
+      // builds didn't clear the phase-3 budget on a currency switch) — drop
+      // them so the user re-picks against the current currency's bands.
+      const currency = parseCurrencyCode(merged.business_objective_kpi?.responses?.currency)
+      return dropMismatchedBandAnswers(merged, currency) as Record<PhaseId, PhaseData>
     })
     setCurrentPhase(savedProgress.currentPhase)
     if (savedProgress.companyName) setCompanyName(savedProgress.companyName)
@@ -126,17 +132,18 @@ export default function DeepDiagnosticPage() {
       // answered — keeping them after a switch would silently mix scales
       // (e.g. an IDR juta label scored as a USD $k band). Clear both so the
       // user re-answers against the new currency's bands.
-      if (questionId === 'currency') {
-        delete nextResponses.annual_revenue
-        delete nextResponses.budget_range
-      }
-      return {
+      const next = {
         ...prev,
         [currentPhase]: {
           ...prev[currentPhase],
           responses: nextResponses,
         },
       }
+      // Both band answers must go, whichever phase holds them — budget_range
+      // lives in phase 3, so clearing only the current phase kept it.
+      return questionId === 'currency'
+        ? dropMismatchedBandAnswers(next, parseCurrencyCode(value)) as Record<PhaseId, PhaseData>
+        : next
     })
     // Clear validation error for this field on change
     setValidationErrors(prev => {

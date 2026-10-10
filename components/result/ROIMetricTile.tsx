@@ -22,9 +22,12 @@ interface ROIMetricTileProps {
    */
   variant?: 'default' | 'hero'
   locale?: 'en' | 'id'
+  /** Shown instead of "Not provided" when a null value means something else
+   *  (e.g. net payback that is never reached, not a missing input). */
+  nullText?: string
 }
 
-export default function ROIMetricTile({ label, value, formatter, subtitle, confidenceLevel, variant = 'default', locale = 'en' }: ROIMetricTileProps) {
+export default function ROIMetricTile({ label, value, formatter, subtitle, confidenceLevel, variant = 'default', locale = 'en', nullText }: ROIMetricTileProps) {
   const confidenceTag = confidenceTileLabel(confidenceLevel, locale)
   const isHero = variant === 'hero'
   return (
@@ -37,7 +40,7 @@ export default function ROIMetricTile({ label, value, formatter, subtitle, confi
           neighbours', which was invisible inside the old bordered cards but
           obvious once the boxes came off and the rows share a hairline. */}
       {value === null ? (
-        <span className={styles.insufficient}>{locale === 'id' ? 'Belum diberikan' : 'Not provided'}</span>
+        <span className={styles.insufficient}>{nullText ?? (locale === 'id' ? 'Belum diberikan' : 'Not provided')}</span>
       ) : (
         <span className={`${styles.value} ${isHero ? styles.valueHero : ''}`} style={value < 0 ? { color: '#f87171' } : undefined}>
           {formatter(value)}

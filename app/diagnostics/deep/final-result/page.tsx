@@ -38,6 +38,7 @@ import { getInvestmentThresholds, thresholdTestLabel, THRESHOLD_WINDOW_YEARS, TA
 import { ensureLiveRates, getFxAsOfLabel, getRate } from '@/lib/liveRates'
 import { selectSoftwareRecommendations, formatPickPrice } from '@/lib/softwareCatalog'
 import { getLabourBenchmark } from '@/lib/currencyBands'
+import { netPaybackNotReachedLabel } from '@/lib/resultFormatters'
 import { getIndustryBenchmark, formatVsMedian } from '@/lib/industryBenchmarks'
 import { computeDelta, compositeSeries } from '@/lib/diagnosticHistory'
 import type { DiagnosticHistoryEntry } from '@/types/diagnostic'
@@ -869,6 +870,28 @@ export default function FinalResultPage() {
         {/* ── Financial Case ── */}
         <div id="section-financial-case" className={styles.card}>
           <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Analisis Keuangan' : 'Financial Case'}</h2>
+          {/* Every tile below is a forward projection of the state AFTER the
+              recommended improvements are in place, set against the stated
+              budget — not a reading of today's numbers. Without this line
+              readers took negative tiles for current losses. */}
+          <p className={styles.financialTermsNote}>
+            {locale === 'id'
+              ? 'Semua angka di bawah adalah proyeksi setelah perbaikan diterapkan — penghematan yang diperkirakan dari otomasi yang direkomendasikan, dibandingkan dengan anggaran yang Anda masukkan. Angka negatif berarti biaya investasi dan biaya berjalan lebih besar dari penghematan yang diproyeksikan, bukan kerugian yang terjadi saat ini.'
+              : 'Every figure below is a projection of the state after the improvements are in place — the savings expected from the recommended automation, set against the budget you entered. A negative figure means the investment and running cost exceed the projected savings, not a loss you are making today.'}
+          </p>
+
+          {qualitative.budgetCurrencyMismatch && calculations.assumedBudgetMidpointLocal != null && (
+            <div className={styles.confidenceBanner}>
+              <p className={styles.confidenceHeadline}>
+                {locale === 'id' ? 'Anggaran diisi dalam dolar AS' : 'Budget was entered in US dollars'}
+              </p>
+              <p className={styles.confidenceBody}>
+                {locale === 'id'
+                  ? `Kisaran anggaran Anda (${qualitative.budgetCurrencyMismatch}) dalam dolar AS, sedangkan laporan ini dalam ${context.currency}, sehingga investasi dihitung sebagai ≈ ${fmtLocal(calculations.assumedBudgetMidpointLocal)}. Jika anggaran sebenarnya dalam ${context.currency}, jalankan ulang diagnostik dan pilih kisaran anggaran dalam ${context.currency} — angka payback, ROI, dan NPV bergantung pada angka ini.`
+                  : `Your budget range (${qualitative.budgetCurrencyMismatch}) is in US dollars while this report is in ${context.currency}, so the investment is priced at ≈ ${fmtLocal(calculations.assumedBudgetMidpointLocal)}. If your real budget is in ${context.currency}, re-run the diagnostic and pick a ${context.currency} budget range — the payback, ROI and NPV figures depend on it.`}
+              </p>
+            </div>
+          )}
 
           {calculations.noAutomationGap && (
             <div className={styles.confidenceBanner}>
@@ -935,7 +958,7 @@ export default function FinalResultPage() {
             <ROIMetricTile label={npvLabel(roiYears, locale)} value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Value kini bersih @ diskonto 10%' : 'Net present value @ 10% discount'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Biaya Berjalan Tahunan' : 'Annual Ongoing Cost'} value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Estimasi lisensi, pemeliharaan & dukungan' : 'Est. licenses, maintenance & support'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Penghematan Bersih Tahunan' : 'Net Annual Savings'} value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Setelah biaya berjalan' : 'After ongoing cost'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
-            <ROIMetricTile label={locale === 'id' ? 'Periode Payback Bersih' : 'Net Payback Period'} value={(calculations as any).netPaybackMonths ?? null} formatter={(v) => formatPaybackCapped(v, locale, roiYears * 12)} subtitle={locale === 'id' ? 'Berdasarkan penghematan bersih' : 'On net savings'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Periode Payback Bersih' : 'Net Payback Period'} value={(calculations as any).netPaybackMonths ?? null} formatter={(v) => formatPaybackCapped(v, locale, roiYears * 12)} subtitle={locale === 'id' ? 'Berdasarkan penghematan bersih' : 'On net savings'} confidenceLevel={calculations.confidenceLevel} locale={locale} nullText={netPaybackNotReachedLabel(calculations as any, locale, roiYears) ?? undefined} />
             {totalAnnualSavingsLocal != null && totalAnnualSavingsLocal > 0 && (
               <ROIMetricTile
                 label={locale === 'id' ? 'Batas Investasi Impas' : 'Break-even Investment'}
@@ -952,12 +975,8 @@ export default function FinalResultPage() {
               formatter={fmtLocal}
               subtitle={
                 locale === 'id'
-                  ? (qualitative.annualRevenue?.toLowerCase().includes('pre-revenue')
-                    ? 'Estimasi biaya peluang jika ditunda'
-                    : 'Pendapatan yang berisiko jika ditunda')
-                  : (qualitative.annualRevenue?.toLowerCase().includes('pre-revenue')
-                    ? 'Estimated opportunity cost if delayed'
-                    : 'Revenue at risk if delayed')
+                  ? 'Penghematan yang hilang jika ditunda 90 hari'
+                  : 'Savings forgone if delayed by 90 days'
               }
               confidenceLevel={calculations.confidenceLevel}
               locale={locale}

@@ -53,6 +53,7 @@ import {
   type InvestmentThreshold,
 } from '@/lib/investmentThresholds'
 import type { CurrencyCode } from '@/lib/resultFormatters'
+import { netPaybackNotReachedLabel } from '@/lib/resultFormatters'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
 export const INK       = '#0a1a0f'   // primary text, display values
@@ -2888,6 +2889,26 @@ export async function exportReportToPdf(
   y = ensureSpace(pdf, y, locale === 'id' ? 82 : 70)
   y = tocSection(y, locale === 'id' ? 'Analisis Keuangan' : 'Financial Case')
 
+  // Same "projection after improvement" framing line as the on-screen page.
+  {
+    setC(pdf, LABEL, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(7)
+    const projLines = pdf.splitTextToSize(locale === 'id'
+      ? 'Semua angka di bawah adalah proyeksi setelah perbaikan diterapkan — penghematan yang diperkirakan dari otomasi yang direkomendasikan, dibandingkan dengan anggaran yang Anda masukkan. Angka negatif berarti biaya investasi dan biaya berjalan lebih besar dari penghematan yang diproyeksikan, bukan kerugian yang terjadi saat ini.'
+      : 'Every figure below is a projection of the state after the improvements are in place — the savings expected from the recommended automation, set against the budget you entered. A negative figure means the investment and running cost exceed the projected savings, not a loss you are making today.', CW)
+    y = ensureSpace(pdf, y, projLines.length * 3.6 + 4)
+    pdf.text(projLines, ML, y)
+    y += projLines.length * 3.6 + 4
+  }
+
+  if (qualitative?.budgetCurrencyMismatch && calculations.assumedBudgetMidpointLocal != null) {
+    const mm = qualitative.budgetCurrencyMismatch
+    y = renderConfidenceBanner(pdf, y, calculations.confidenceLevel ?? 'low', [], locale, locale === 'id'
+      ? `Anggaran diisi dalam dolar AS (${mm}), sedangkan laporan ini dalam ${currency}, sehingga investasi dihitung sebagai ≈ ${fmt(calculations.assumedBudgetMidpointLocal)}. Jika anggaran sebenarnya dalam ${currency}, jalankan ulang diagnostik dan pilih kisaran anggaran dalam ${currency} — angka payback, ROI, dan NPV bergantung pada angka ini.`
+      : `Budget was entered in US dollars (${mm}) while this report is in ${currency}, so the investment is priced at ≈ ${fmt(calculations.assumedBudgetMidpointLocal)}. If your real budget is in ${currency}, re-run the diagnostic and pick a ${currency} budget range — the payback, ROI and NPV figures depend on it.`)
+  }
+
   // Mirror the on-screen low-confidence banner (incl. the missing inputs the
   // page shows) instead of burying confidence in a tile caption.
   if (calculations.noAutomationGap) {
@@ -3058,21 +3079,21 @@ export async function exportReportToPdf(
     { l: 'Value Tenaga Kerja yang Dipulihkan', v: fmt(calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD) },
     { l: 'Value Efisiensi Proses', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
     { l: 'Periode Payback', v: fmtPaybackCappedPdf(calculations.paybackMonths), n: 'dengan investasi = anggaran yang Anda masukkan' },
-    { l: 'Biaya Keterlambatan Operasional (90h)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR) },
+    { l: 'Biaya Keterlambatan Operasional (90h)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR), n: 'penghematan yang hilang jika ditunda 90 hari' },
     { l: npvLabel(roiYears, 'id'), v: fmt(cAny.npv3YearLocal), n: 'value kini bersih @ diskonto 10%' },
     { l: 'Biaya Berjalan Tahunan', v: fmt(cAny.annualOngoingCostLocal), n: 'lisensi, pemeliharaan & dukungan' },
     { l: 'Penghematan Bersih Tahunan', v: fmt(cAny.netAnnualSavingsLocal), n: 'setelah biaya berjalan' },
-    { l: 'Payback Bersih', v: fmtPaybackCappedPdf(cAny.netPaybackMonths), n: 'berdasarkan penghematan bersih' },
+    { l: 'Payback Bersih', v: netPaybackNotReachedLabel(cAny, 'id', roiYears) ?? fmtPaybackCappedPdf(cAny.netPaybackMonths), n: 'berdasarkan penghematan bersih' },
     { l: 'Batas Investasi Impas', v: breakEvenInvestmentLocal != null ? fmt(breakEvenInvestmentLocal) : '\u2014', n: 'investasi maksimal agar payback ≤ 24 bulan' },
   ] : [
     { l: 'Recovered Labor Value', v: fmt(calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD) },
     { l: 'Process Efficiency Value', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
     { l: 'Payback Period', v: fmtPaybackCappedPdf(calculations.paybackMonths), n: 'assumes investment = your full stated budget' },
-    { l: 'Operational Cost of Delay (90d)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR) },
+    { l: 'Operational Cost of Delay (90d)', v: fmt(calculations.costOfInaction90DaysLocal ?? calculations.costOfInaction90DaysIDR), n: 'savings forgone if delayed by 90 days' },
     { l: npvLabel(roiYears, 'en'), v: fmt(cAny.npv3YearLocal), n: 'net present value @ 10% discount' },
     { l: 'Annual Ongoing Cost', v: fmt(cAny.annualOngoingCostLocal), n: 'licenses, maintenance & support' },
     { l: 'Net Annual Savings', v: fmt(cAny.netAnnualSavingsLocal), n: 'after ongoing cost' },
-    { l: 'Net Payback', v: fmtPaybackCappedPdf(cAny.netPaybackMonths), n: 'on net savings' },
+    { l: 'Net Payback', v: netPaybackNotReachedLabel(cAny, 'en', roiYears) ?? fmtPaybackCappedPdf(cAny.netPaybackMonths), n: 'on net savings' },
     { l: 'Break-even Investment', v: breakEvenInvestmentLocal != null ? fmt(breakEvenInvestmentLocal) : '\u2014', n: 'max outlay for a ≤ 24-month payback' },
   ])
 

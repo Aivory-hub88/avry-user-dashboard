@@ -397,6 +397,23 @@ export function formatPaybackCapped(
   return formatMonths(value, locale)
 }
 
+/**
+ * Net payback tile text when there IS no net payback figure because the case
+ * never breaks even (ongoing cost ≥ savings, or break-even past the window) —
+ * as opposed to inputs genuinely missing. Returns null when the figure exists
+ * or when savings/budget are absent (caller keeps its "not provided" text).
+ */
+export function netPaybackNotReachedLabel(
+  calc: { netPaybackMonths?: number | null; totalAnnualSavingsLocal?: number | null; assumedBudgetMidpointLocal?: number | null },
+  locale: ResultLocale = 'en',
+  horizonYears: number = 3,
+): string | null {
+  if (calc.netPaybackMonths != null && isFinite(calc.netPaybackMonths)) return null
+  if (!(calc.totalAnnualSavingsLocal && calc.totalAnnualSavingsLocal > 0)) return null
+  if (!(calc.assumedBudgetMidpointLocal && calc.assumedBudgetMidpointLocal > 0)) return null
+  return locale === 'id' ? `Tidak tercapai dalam ${horizonYears} tahun` : `Not reached in ${horizonYears} yrs`
+}
+
 /** Format an ISO date string as "15 Jun 2025" (id: "15 Jun 2025" with Indonesian month names). */
 export function formatDate(isoString: string | null | undefined, locale: ResultLocale = 'en'): string {
   if (!isoString) return '—'
