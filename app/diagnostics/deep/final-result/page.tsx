@@ -39,7 +39,7 @@ import { ensureLiveRates, getFxAsOfLabel, getRate } from '@/lib/liveRates'
 import { selectSoftwareRecommendations, formatPickPrice } from '@/lib/softwareCatalog'
 import { getLabourBenchmark } from '@/lib/currencyBands'
 import { netPaybackNotReachedLabel } from '@/lib/resultFormatters'
-import { buildInvestmentComparison, investmentComparisonExplanation, RECOMMENDED_PAYBACK_MONTHS } from '@/lib/investmentComparison'
+import { buildInvestmentComparison, investmentComparisonExplanation, CEILING_PAYBACK_MONTHS } from '@/lib/investmentComparison'
 import { getIndustryBenchmark, formatVsMedian } from '@/lib/industryBenchmarks'
 import { computeDelta, compositeSeries } from '@/lib/diagnosticHistory'
 import type { DiagnosticHistoryEntry } from '@/types/diagnostic'
@@ -409,7 +409,7 @@ export default function FinalResultPage() {
   // Prescriptive close of the Financial Case: the investment ceilings and
   // savings floors that turn each red figure green (see lib/investmentThresholds.ts).
   const investmentThresholds = getInvestmentThresholds(calculations as never)
-  // Stated budget vs. recommended (≤24-month payback) investment, same window —
+  // Stated budget vs. investment ceiling (≤24-month payback), same window —
   // shown above the tiles so a negative case reads as "budget too large for
   // this scope", with the numbers that fix it, rather than as an error.
   const investmentComparison = buildInvestmentComparison(calculations as never, roiYears)
@@ -949,25 +949,25 @@ export default function FinalResultPage() {
               ? (locale === 'id' ? `Tidak tercapai dalam ${H} tahun` : `Not reached in ${H} yrs`)
               : formatPaybackCapped(v, locale, H * 12)
             const rows: { label: string; a: string; b: string; ta?: React.CSSProperties; tb?: React.CSSProperties }[] = [
-              { label: locale === 'id' ? 'Investasi' : 'Investment', a: fmtLocal(c.stated.investmentLocal), b: fmtLocal(c.recommended.investmentLocal) },
-              { label: locale === 'id' ? 'Biaya berjalan / tahun' : 'Running cost / yr', a: fmtLocal(c.stated.annualOngoingCostLocal), b: fmtLocal(c.recommended.annualOngoingCostLocal) },
-              { label: locale === 'id' ? 'Penghematan bersih / tahun' : 'Net savings / yr', a: fmtLocal(c.stated.netAnnualSavingsLocal), b: fmtLocal(c.recommended.netAnnualSavingsLocal), ta: tone(c.stated.netAnnualSavingsLocal), tb: tone(c.recommended.netAnnualSavingsLocal) },
-              { label: locale === 'id' ? 'Payback' : 'Payback', a: formatPaybackCapped(c.stated.paybackMonths, locale, H * 12), b: formatPaybackCapped(c.recommended.paybackMonths, locale, H * 12) },
-              { label: locale === 'id' ? 'Payback bersih' : 'Net payback', a: netPb(c.stated.netPaybackMonths), b: netPb(c.recommended.netPaybackMonths) },
-              { label: roiLabel(H, locale), a: pct(c.stated.roiPercent), b: pct(c.recommended.roiPercent), ta: tone(c.stated.roiPercent), tb: tone(c.recommended.roiPercent) },
-              { label: npvLabel(H, locale), a: fmtLocal(c.stated.npvLocal), b: fmtLocal(c.recommended.npvLocal), ta: tone(c.stated.npvLocal), tb: tone(c.recommended.npvLocal) },
+              { label: locale === 'id' ? 'Investasi' : 'Investment', a: fmtLocal(c.stated.investmentLocal), b: fmtLocal(c.ceiling.investmentLocal) },
+              { label: locale === 'id' ? 'Biaya berjalan / tahun' : 'Running cost / yr', a: fmtLocal(c.stated.annualOngoingCostLocal), b: fmtLocal(c.ceiling.annualOngoingCostLocal) },
+              { label: locale === 'id' ? 'Penghematan bersih / tahun' : 'Net savings / yr', a: fmtLocal(c.stated.netAnnualSavingsLocal), b: fmtLocal(c.ceiling.netAnnualSavingsLocal), ta: tone(c.stated.netAnnualSavingsLocal), tb: tone(c.ceiling.netAnnualSavingsLocal) },
+              { label: locale === 'id' ? 'Payback' : 'Payback', a: formatPaybackCapped(c.stated.paybackMonths, locale, H * 12), b: formatPaybackCapped(c.ceiling.paybackMonths, locale, H * 12) },
+              { label: locale === 'id' ? 'Payback bersih' : 'Net payback', a: netPb(c.stated.netPaybackMonths), b: netPb(c.ceiling.netPaybackMonths) },
+              { label: roiLabel(H, locale), a: pct(c.stated.roiPercent), b: pct(c.ceiling.roiPercent), ta: tone(c.stated.roiPercent), tb: tone(c.ceiling.roiPercent) },
+              { label: npvLabel(H, locale), a: fmtLocal(c.stated.npvLocal), b: fmtLocal(c.ceiling.npvLocal), ta: tone(c.stated.npvLocal), tb: tone(c.ceiling.npvLocal) },
             ]
             return (
               <div className={styles.thresholdBlock} style={{ marginBottom: '1.25rem' }}>
                 <span className={styles.thresholdLabel} style={{ color: '#fbbf24' }}>
-                  {locale === 'id' ? 'Kenapa ada angka negatif? — Anggaran Anda vs investasi yang direkomendasikan' : 'Why are some figures negative? — Your budget vs the recommended investment'}
+                  {locale === 'id' ? 'Kenapa ada angka negatif? — Anggaran Anda vs batas investasi' : 'Why are some figures negative? — Your budget vs the investment ceiling'}
                 </span>
                 <p className={styles.thresholdIntro}>{investmentComparisonExplanation(c, fmtLocal, locale)}</p>
                 <div className={styles.thresholdTable}>
                   <span className={styles.thresholdHead}>{locale === 'id' ? `Dinilai selama ${H} tahun` : `Over ${H} years`}</span>
                   <span className={`${styles.thresholdHead} ${styles.thresholdHeadNum}`}>{locale === 'id' ? 'Anggaran Anda' : 'Your budget'}</span>
                   <span className={`${styles.thresholdHead} ${styles.thresholdHeadNum}`} style={{ color: '#86efac' }}>
-                    {locale === 'id' ? `Direkomendasikan (payback ≤ ${RECOMMENDED_PAYBACK_MONTHS} bln)` : `Recommended (≤ ${RECOMMENDED_PAYBACK_MONTHS}-mo payback)`}
+                    {locale === 'id' ? `Batas investasi (payback ≤ ${CEILING_PAYBACK_MONTHS} bln)` : `Investment ceiling (≤ ${CEILING_PAYBACK_MONTHS}-mo payback)`}
                   </span>
                   {rows.map((r) => (
                     <Fragment key={r.label}>
@@ -979,8 +979,8 @@ export default function FinalResultPage() {
                 </div>
                 <p className={styles.thresholdFootnote}>
                   {locale === 'id'
-                    ? `Cara mencapai kolom kanan: jalankan implementasi bertahap — tahap pertama maksimal ${fmtLocal(c.recommended.investmentLocal)}, dimulai dari otomasi berdampak tertinggi — lalu tambah investasi setelah penghematannya terbukti. Atau perluas cakupan otomasi agar penghematan tahunan naik. Kotak-kotak di bawah menghitung anggaran yang Anda masukkan.`
-                    : `How to reach the right-hand column: phase the implementation — a first phase of at most ${fmtLocal(c.recommended.investmentLocal)}, starting with the highest-impact automation — and add investment once its savings are proven. Or widen the automation scope so annual savings rise. The tiles below are calculated on the budget you entered.`}
+                    ? `Cara membacanya: selama pengeluaran tahap pertama tidak melebihi ${fmtLocal(c.ceiling.investmentLocal)}, investasinya balik modal ≤ ${CEILING_PAYBACK_MONTHS} bulan dari penghematan yang sudah terukur. Menghabiskan seluruh anggaran hanya masuk akal kalau cakupan otomasinya diperluas sehingga penghematan tahunan ikut naik. Kotak-kotak di bawah menghitung seluruh anggaran yang Anda masukkan.`
+                    : `How to read this: as long as first-phase spend stays at or below ${fmtLocal(c.ceiling.investmentLocal)}, it pays back within ${CEILING_PAYBACK_MONTHS} months from savings already measured. Spending the full budget only makes sense if the automation scope widens so annual savings rise with it. The tiles below are calculated on the full budget you entered.`}
                 </p>
               </div>
             )

@@ -54,7 +54,7 @@ import {
 } from '@/lib/investmentThresholds'
 import type { CurrencyCode } from '@/lib/resultFormatters'
 import { netPaybackNotReachedLabel } from '@/lib/resultFormatters'
-import { buildInvestmentComparison, investmentComparisonExplanation, RECOMMENDED_PAYBACK_MONTHS, type InvestmentComparison } from '@/lib/investmentComparison'
+import { buildInvestmentComparison, investmentComparisonExplanation, CEILING_PAYBACK_MONTHS, type InvestmentComparison } from '@/lib/investmentComparison'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
 export const INK       = '#0a1a0f'   // primary text, display values
@@ -1923,7 +1923,7 @@ function renderMetricGrid(
  * Same figures as the on-screen block (one shared pure helper), so a client
  * reading the PDF and a client reading the page quote the same numbers.
  */
-/** Stated budget vs recommended investment — mirrors the on-screen table. */
+/** Stated budget vs investment ceiling — mirrors the on-screen table. */
 function renderInvestmentComparison(
   pdf: jsPDF, y: number,
   c: InvestmentComparison,
@@ -1936,7 +1936,7 @@ function renderInvestmentComparison(
   setC(pdf, WARN_AMB, 'text')
   pdf.setFont(FB(), 'bold')
   pdf.setFontSize(6.4)
-  spacedText(pdf, locale === 'id' ? 'KENAPA ADA ANGKA NEGATIF? — ANGGARAN ANDA VS INVESTASI YANG DIREKOMENDASIKAN' : 'WHY ARE SOME FIGURES NEGATIVE? — YOUR BUDGET VS THE RECOMMENDED INVESTMENT', ML, y, 0.3)
+  spacedText(pdf, locale === 'id' ? 'KENAPA ADA ANGKA NEGATIF? — ANGGARAN ANDA VS BATAS INVESTASI' : 'WHY ARE SOME FIGURES NEGATIVE? — YOUR BUDGET VS THE INVESTMENT CEILING', ML, y, 0.3)
   y += 4.5
 
   setC(pdf, MUTED, 'text')
@@ -1954,7 +1954,7 @@ function renderInvestmentComparison(
   spacedText(pdf, locale === 'id' ? `DINILAI SELAMA ${H} TAHUN` : `OVER ${H} YEARS`, ML, y, 0.25)
   spacedText(pdf, locale === 'id' ? 'ANGGARAN ANDA' : 'YOUR BUDGET', colA, y, 0.25)
   setC(pdf, ACCENT, 'text')
-  spacedText(pdf, locale === 'id' ? `DIREKOMENDASIKAN (≤ ${RECOMMENDED_PAYBACK_MONTHS} BLN)` : `RECOMMENDED (≤ ${RECOMMENDED_PAYBACK_MONTHS}-MO)`, colB, y, 0.25)
+  spacedText(pdf, locale === 'id' ? `BATAS INVESTASI (≤ ${CEILING_PAYBACK_MONTHS} BLN)` : `INVESTMENT CEILING (≤ ${CEILING_PAYBACK_MONTHS}-MO)`, colB, y, 0.25)
   y += 2
   setC(pdf, TRACK, 'draw')
   pdf.setLineWidth(0.15)
@@ -1964,13 +1964,13 @@ function renderInvestmentComparison(
   const pct = (v: number) => v >= 999 ? '>999%' : `${Math.round(v)}%`
   const netPb = (v: number | null) => v == null ? (locale === 'id' ? `Tidak tercapai dlm ${H} thn` : `Not reached in ${H} yrs`) : fmtPayback(v)
   const rows: [string, string, string, number | null, number | null][] = [
-    [locale === 'id' ? 'Investasi' : 'Investment', fmt(c.stated.investmentLocal), fmt(c.recommended.investmentLocal), null, null],
-    [locale === 'id' ? 'Biaya berjalan / tahun' : 'Running cost / yr', fmt(c.stated.annualOngoingCostLocal), fmt(c.recommended.annualOngoingCostLocal), null, null],
-    [locale === 'id' ? 'Penghematan bersih / tahun' : 'Net savings / yr', fmt(c.stated.netAnnualSavingsLocal), fmt(c.recommended.netAnnualSavingsLocal), c.stated.netAnnualSavingsLocal, c.recommended.netAnnualSavingsLocal],
-    ['Payback', fmtPayback(c.stated.paybackMonths), fmtPayback(c.recommended.paybackMonths), null, null],
-    [locale === 'id' ? 'Payback bersih' : 'Net payback', netPb(c.stated.netPaybackMonths), netPb(c.recommended.netPaybackMonths), null, null],
-    [roiLabel(H, locale), pct(c.stated.roiPercent), pct(c.recommended.roiPercent), c.stated.roiPercent, c.recommended.roiPercent],
-    [npvLabel(H, locale), fmt(c.stated.npvLocal), fmt(c.recommended.npvLocal), c.stated.npvLocal, c.recommended.npvLocal],
+    [locale === 'id' ? 'Investasi' : 'Investment', fmt(c.stated.investmentLocal), fmt(c.ceiling.investmentLocal), null, null],
+    [locale === 'id' ? 'Biaya berjalan / tahun' : 'Running cost / yr', fmt(c.stated.annualOngoingCostLocal), fmt(c.ceiling.annualOngoingCostLocal), null, null],
+    [locale === 'id' ? 'Penghematan bersih / tahun' : 'Net savings / yr', fmt(c.stated.netAnnualSavingsLocal), fmt(c.ceiling.netAnnualSavingsLocal), c.stated.netAnnualSavingsLocal, c.ceiling.netAnnualSavingsLocal],
+    ['Payback', fmtPayback(c.stated.paybackMonths), fmtPayback(c.ceiling.paybackMonths), null, null],
+    [locale === 'id' ? 'Payback bersih' : 'Net payback', netPb(c.stated.netPaybackMonths), netPb(c.ceiling.netPaybackMonths), null, null],
+    [roiLabel(H, locale), pct(c.stated.roiPercent), pct(c.ceiling.roiPercent), c.stated.roiPercent, c.ceiling.roiPercent],
+    [npvLabel(H, locale), fmt(c.stated.npvLocal), fmt(c.ceiling.npvLocal), c.stated.npvLocal, c.ceiling.npvLocal],
   ]
   rows.forEach(([label, a, b, va, vb]) => {
     y = ensureSpace(pdf, y, 7)
@@ -1993,8 +1993,8 @@ function renderInvestmentComparison(
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(6.8)
   const foot = pdf.splitTextToSize(locale === 'id'
-    ? `Cara mencapai kolom kanan: jalankan implementasi bertahap — tahap pertama maksimal ${fmt(c.recommended.investmentLocal)}, dimulai dari otomasi berdampak tertinggi — lalu tambah investasi setelah penghematannya terbukti. Atau perluas cakupan otomasi agar penghematan tahunan naik. Angka-angka di bawah menghitung anggaran yang Anda masukkan.`
-    : `How to reach the right-hand column: phase the implementation — a first phase of at most ${fmt(c.recommended.investmentLocal)}, starting with the highest-impact automation — and add investment once its savings are proven. Or widen the automation scope so annual savings rise. The figures below are calculated on the budget you entered.`, CW)
+    ? `Cara membacanya: selama pengeluaran tahap pertama tidak melebihi ${fmt(c.ceiling.investmentLocal)}, investasinya balik modal ≤ ${CEILING_PAYBACK_MONTHS} bulan dari penghematan yang sudah terukur. Menghabiskan seluruh anggaran hanya masuk akal kalau cakupan otomasinya diperluas sehingga penghematan tahunan ikut naik. Angka-angka di bawah menghitung seluruh anggaran yang Anda masukkan.`
+    : `How to read this: as long as first-phase spend stays at or below ${fmt(c.ceiling.investmentLocal)}, it pays back within ${CEILING_PAYBACK_MONTHS} months from savings already measured. Spending the full budget only makes sense if the automation scope widens so annual savings rise with it. The figures below are calculated on the full budget you entered.`, CW)
   pdf.text(foot, ML, y)
   return y + foot.length * 3.1 + 5
 }

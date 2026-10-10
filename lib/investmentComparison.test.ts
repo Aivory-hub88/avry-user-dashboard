@@ -28,15 +28,15 @@ describe('buildInvestmentComparison', () => {
     expect(c.stated.roiPercent).toBeLessThan(0)
   })
 
-  it('recommends 2× annual savings, and every recommended figure is positive', () => {
+  it('sets the ceiling at 2× annual savings, and every ceiling figure is positive', () => {
     const { calculations: k } = buildDiagnosticContext(answers as any)
     const c = buildInvestmentComparison(k as any, getRoiHorizonYears(k))!
-    expect(c.recommended.investmentLocal).toBeCloseTo(k.totalAnnualSavingsLocal! * 2, 0)
-    expect(c.recommended.paybackMonths).toBeCloseTo(24, 6)
-    expect(c.recommended.netAnnualSavingsLocal).toBeGreaterThan(0)
-    expect(c.recommended.netPaybackMonths).toBeGreaterThan(24)
-    expect(c.recommended.roiPercent).toBeGreaterThan(0)
-    expect(c.recommended.npvLocal).toBeGreaterThan(0)
+    expect(c.ceiling.investmentLocal).toBeCloseTo(k.totalAnnualSavingsLocal! * 2, 0)
+    expect(c.ceiling.paybackMonths).toBeCloseTo(24, 6)
+    expect(c.ceiling.netAnnualSavingsLocal).toBeGreaterThan(0)
+    expect(c.ceiling.netPaybackMonths).toBeGreaterThan(24)
+    expect(c.ceiling.roiPercent).toBeGreaterThan(0)
+    expect(c.ceiling.npvLocal).toBeGreaterThan(0)
   })
 
   it('is null when the stated budget already pays back within 24 months, or inputs are missing', () => {
@@ -52,7 +52,9 @@ describe('buildInvestmentComparison', () => {
     const id = investmentComparisonExplanation(c, fmt, 'id')
     expect(id).toContain('22,3× penghematan tahunan')
     expect(id).toContain('biaya berjalannya (Rp 161/tahun) bahkan lebih besar')
-    expect(id).toContain('maksimal Rp 120')
+    expect(id).toContain('batas investasi')
+    expect(id).toContain('bukan perkiraan biaya solusi')
+    expect(id).not.toContain('direkomendasikan')
     expect(investmentComparisonExplanation(c, fmt, 'en')).toContain('not an error')
   })
 })
