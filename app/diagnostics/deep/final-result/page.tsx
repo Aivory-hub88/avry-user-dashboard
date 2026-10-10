@@ -904,7 +904,7 @@ export default function FinalResultPage() {
               <p className={styles.confidenceBody}>
                 {locale === 'id'
                   ? `Kisaran anggaran Anda (${qualitative.budgetCurrencyMismatch}) dalam dolar AS, sedangkan laporan ini dalam ${context.currency}, sehingga anggaran Anda dihitung sebagai ≈ ${fmtLocal((calculations as any).statedBudgetLocal ?? calculations.assumedBudgetMidpointLocal)}. Jika anggaran sebenarnya dalam ${context.currency}, jalankan ulang diagnostik dan pilih kisaran anggaran dalam ${context.currency}.`
-                  : `Your budget range (${qualitative.budgetCurrencyMismatch}) is in US dollars while this report is in ${context.currency}, so your budget is read as ≈ ${fmtLocal((calculations as any).statedBudgetLocal ?? calculations.assumedBudgetMidpointLocal)}. If your real budget is in ${context.currency}, re-run the diagnostic and pick a ${context.currency} budget range.`}
+                  : `Your budget range (${qualitative.budgetCurrencyMismatch}) is in US dollars while this report is in ${context.currency}, so your budget is read as ≈ ${fmtLocal((calculations as any).statedBudgetLocal ?? calculations.assumedBudgetMidpointLocal)}. If your real budget is in ${context.currency}, re-run the diagnostic and pick a budget range in ${context.currency}.`}
               </p>
             </div>
           )}
@@ -1091,7 +1091,7 @@ export default function FinalResultPage() {
               contradictory without this note (NPV negative + ROI positive;
               two different ROI figures on the same screen). */}
           {calculations.hasEnoughDataForProjection && (
-            <p className={styles.financialTermsNote}>{buildFinancialTermsNote(locale, roiYears)}</p>
+            <p className={styles.financialTermsNote}>{buildFinancialTermsNote(locale, roiYears, { basis: requiredBasis ? 'required' : 'stated_budget', hasCapacityRoi: !!capacityView })}</p>
           )}
 
           {/* Window disclosure — only when the horizon is NOT the familiar 3

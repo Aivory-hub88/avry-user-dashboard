@@ -3029,7 +3029,7 @@ export async function exportReportToPdf(
     const mm = qualitative.budgetCurrencyMismatch
     y = renderConfidenceBanner(pdf, y, calculations.confidenceLevel ?? 'low', [], locale, locale === 'id'
       ? `Anggaran diisi dalam dolar AS (${mm}), sedangkan laporan ini dalam ${currency}, sehingga anggaran Anda dihitung sebagai ≈ ${fmt(statedBudgetForWarning)}. Jika anggaran sebenarnya dalam ${currency}, jalankan ulang diagnostik dan pilih kisaran anggaran dalam ${currency}.`
-      : `Budget was entered in US dollars (${mm}) while this report is in ${currency}, so your budget is read as ≈ ${fmt(statedBudgetForWarning)}. If your real budget is in ${currency}, re-run the diagnostic and pick a ${currency} budget range.`)
+      : `Budget was entered in US dollars (${mm}) while this report is in ${currency}, so your budget is read as ≈ ${fmt(statedBudgetForWarning)}. If your real budget is in ${currency}, re-run the diagnostic and pick a budget range in ${currency}.`)
   }
 
   const requiredBasis = isRequiredBasis(calculations as never)
@@ -3276,7 +3276,10 @@ export async function exportReportToPdf(
     setC(pdf, MUTED, 'text')
     const windowNote = horizonNote(roiYears, cAny.netBreakEvenYears, locale)
     const financialNoteLines = pdf.splitTextToSize(
-      [windowNote, buildFinancialTermsNote(locale, roiYears)].filter(Boolean).join(' '),
+      [windowNote, buildFinancialTermsNote(locale, roiYears, {
+        basis: isRequiredBasis(calculations as never) ? 'required' : 'stated_budget',
+        hasCapacityRoi: !!buildCapacityValueView(calculations as never, (v) => fmt(v), locale),
+      })].filter(Boolean).join(' '),
       CW,
     )
     y = ensureSpace(pdf, y + 2, financialNoteLines.length * 3.8 + 5)
