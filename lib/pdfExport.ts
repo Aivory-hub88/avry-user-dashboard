@@ -57,6 +57,7 @@ import {
   type InvestmentThreshold,
 } from '@/lib/investmentThresholds'
 import type { CurrencyCode } from '@/lib/resultFormatters'
+import { formatLocalAmount } from '@/lib/resultFormatters'
 import { netPaybackNotReachedLabel } from '@/lib/resultFormatters'
 import { buildInvestmentComparison, investmentComparisonExplanation, CEILING_PAYBACK_MONTHS, type InvestmentComparison } from '@/lib/investmentComparison'
 import { buildRequiredInvestmentView, isRequiredBasis, type RequiredInvestmentView } from '@/lib/requiredInvestmentView'
@@ -186,7 +187,10 @@ type Locale = 'en' | 'id'
 
 function fmtCurrency(v: number | null | undefined, currency = 'USD', locale: Locale = 'en'): string {
   if (v == null || !isFinite(v)) return '\u2014'
-  return new Intl.NumberFormat(locale === 'id' ? 'id-ID' : 'en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(v)
+  // Same formatter as the report page — "Rp 59,673,358" (en) / "Rp 59.673.358"
+  // (id). Intl's en-US style printed "IDR 59,673,358", so the PDF and the page
+  // disagreed on the same figure.
+  return formatLocalAmount(v, currency as CurrencyCode, locale)
 }
 function fmtPct(v: number | null | undefined, locale: Locale = 'en'): string {
   if (v == null || !isFinite(v)) return '\u2014'

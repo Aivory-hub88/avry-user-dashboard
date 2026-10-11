@@ -149,7 +149,7 @@ function deriveFallbackKpiTargets(diagnosticContext: Record<string, any>, locale
   const roiOutcome = typeof calc?.netThreeYearROIPercent === 'number'
     ? `${Math.max(0, Math.round(calc.netThreeYearROIPercent))}% ${tr(`${roiWindowYears}-yr ROI`, `ROI ${roiWindowYears} tahun`)}`
     : typeof calc?.totalAnnualSavingsLocal === 'number'
-      ? `${formatLocalAmount(calc.totalAnnualSavingsLocal, currencyCode)}${tr('/yr savings', '/thn penghematan')}`
+      ? `${formatLocalAmount(calc.totalAnnualSavingsLocal, currencyCode, locale)}${tr('/yr savings', '/thn penghematan')}`
       : tr('Positive return on automation investment', 'Imbal hasil positif atas investasi otomasi')
 
   return { hoursSavedPerWeek, automationCoverage, roiOutcome }

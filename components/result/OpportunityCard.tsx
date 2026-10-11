@@ -58,8 +58,8 @@ export default function OpportunityCard({
   const savingsLine =
     typeof estimatedSavings === 'number'
       ? (locale === 'id'
-        ? `Estimasi penghematan ${formatLocalAmount(estimatedSavings, currencyCode)}/tahun`
-        : `Est. ${formatLocalAmount(estimatedSavings, currencyCode)}/yr savings`)
+        ? `Estimasi penghematan ${formatLocalAmount(estimatedSavings, currencyCode, 'id')}/tahun`
+        : `Est. ${formatLocalAmount(estimatedSavings, currencyCode, 'en')}/yr savings`)
       : null
 
   // Phase 2.1 — "Why This Recommendation": every input is already a field on
