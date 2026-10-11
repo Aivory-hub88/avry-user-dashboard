@@ -115,8 +115,10 @@ export default function OpportunityCard({
       {/* FIX 2 (lanjutan): Tampilkan savings unik per-kartu */}
       {savingsLine && <p className={styles.roiNote}>{savingsLine}</p>}
 
-      {/* projectedROINote tetap tampil sebagai sub-note jika ada */}
-      {opportunity.projectedROINote && (
+      {/* projectedROINote only when there is no savings line: for savings it is
+          the same figure as stored text, so older reports would show it twice
+          (and in the old number format). */}
+      {!savingsLine && opportunity.projectedROINote && (
         <p className={styles.roiSubNote}>{opportunity.projectedROINote}</p>
       )}
 
