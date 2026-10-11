@@ -176,7 +176,7 @@ const CATALOG: CatalogEntry[] = [
     name: 'Google Looker Studio',
     category: { en: 'Reporting & dashboard', id: 'Pelaporan & dashboard' },
     priceUSD: 0,
-    priceBasis: 'self_host',
+    priceBasis: 'flat', // hosted Google service with a free tier — not self-host
     regions: ['global', 'id'],
     signals: ['report', 'laporan', 'manual report', 'spreadsheet', 'visibility', 'visibilitas', 'tracking', 'monitoring'],
     priority: 9,
@@ -836,7 +836,7 @@ export function formatPickPrice(
     if (basis === 'self_host') return locale === 'id' ? 'Gratis / self-host' : 'Free / self-host'
     return locale === 'id' ? 'Paket gratis tersedia' : 'Free plan available'
   }
-  const label = formatCompactLocal(Math.round(priceUSD * rate), currency)
+  const label = formatCompactLocal(Math.round(priceUSD * rate), currency, locale)
   // "~" not "≈": the PDF SDK section draws with base-14 Helvetica (WinAnsi),
   // which has no ≈ glyph — it rendered as garbage ("H). Tilde is safe everywhere.
   // The basis rides INSIDE the price string so it can never be separated from

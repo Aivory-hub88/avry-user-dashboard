@@ -325,24 +325,27 @@ export function resolveBandMidpointUSD(
  * options, KPI tiles). Returns the plain formatted amount for currencies
  * without a compact scale.
  */
-export function formatCompactLocal(value: number, currency: CurrencyCode): string {
+export function formatCompactLocal(value: number, currency: CurrencyCode, locale: 'en' | 'id' = 'id'): string {
   if (!isFinite(value)) return ''
   if (currency === 'IDR') {
-    const juta = value / 1_000_000
+    // Scale words and the decimal mark follow the report language:
+    // "Rp 11,07 juta" (id) vs "Rp 11.07 million" (en).
     if (Math.abs(value) >= 1_000_000_000) {
-      const miliar = value / 1_000_000_000
-      return `Rp ${trimZeros(miliar)} miliar`
+      return `Rp ${trimZeros(value / 1_000_000_000, locale)} ${locale === 'id' ? 'miliar' : 'billion'}`
     }
-    if (Math.abs(value) >= 1_000_000) return `Rp ${trimZeros(juta)} juta`
-    return `Rp ${Math.round(value).toLocaleString('id-ID')}`
+    if (Math.abs(value) >= 1_000_000) {
+      return `Rp ${trimZeros(value / 1_000_000, locale)} ${locale === 'id' ? 'juta' : 'million'}`
+    }
+    return `Rp ${Math.round(value).toLocaleString(locale === 'id' ? 'id-ID' : 'en-US')}`
   }
   const symbol = currency === 'USD' ? '$' : `${currency} `
-  if (Math.abs(value) >= 1_000_000_000) return `${symbol}${trimZeros(value / 1_000_000_000)}B`
-  if (Math.abs(value) >= 1_000_000) return `${symbol}${trimZeros(value / 1_000_000)}M`
-  if (Math.abs(value) >= 1_000) return `${symbol}${trimZeros(value / 1_000)}k`
+  if (Math.abs(value) >= 1_000_000_000) return `${symbol}${trimZeros(value / 1_000_000_000, locale)}B`
+  if (Math.abs(value) >= 1_000_000) return `${symbol}${trimZeros(value / 1_000_000, locale)}M`
+  if (Math.abs(value) >= 1_000) return `${symbol}${trimZeros(value / 1_000, locale)}k`
   return `${symbol}${Math.round(value)}`
 }
 
-function trimZeros(n: number): string {
-  return n.toFixed(2).replace(/\.?0+$/, '')
+function trimZeros(n: number, locale: 'en' | 'id' = 'id'): string {
+  const s = n.toFixed(2).replace(/\.?0+$/, '')
+  return locale === 'id' ? s.replace('.', ',') : s
 }

@@ -101,3 +101,19 @@ describe('formatPick', () => {
     expect(formatPick({ priceUSD: 18, priceBasis: 'per_location' }, 'IDR', 16_600, 'id')).toMatch(/\/outlet\/bln$/)
   })
 })
+
+describe('price labels', () => {
+  it('Looker Studio is a free hosted plan, not self-host', () => {
+    const looker = CATALOG_FOR_TESTS.find((e) => e.name === 'Google Looker Studio')!
+    expect(formatPick(looker, 'IDR', 17_900, 'en')).toBe('Free plan available')
+    expect(formatPick(looker, 'IDR', 17_900, 'id')).toBe('Paket gratis tersedia')
+  })
+  it('IDR scale words and decimal marks follow the report language', () => {
+    const onfleet = CATALOG_FOR_TESTS.find((e) => e.name === 'Onfleet')!
+    expect(formatPick(onfleet, 'IDR', 17_888, 'en')).toBe('~ Rp 11.07 million/mo (team plan)')
+    expect(formatPick(onfleet, 'IDR', 17_888, 'id')).toBe('~ Rp 11,07 juta/bln (paket tim)')
+    const qontak = CATALOG_FOR_TESTS.find((e) => e.name === 'Mekari Qontak')!
+    expect(formatPick(qontak, 'IDR', 17_880, 'en')).toBe('~ Rp 303,960/user/mo')
+    expect(formatPick(qontak, 'IDR', 17_880, 'id')).toBe('~ Rp 303.960/pengguna/bln')
+  })
+})
