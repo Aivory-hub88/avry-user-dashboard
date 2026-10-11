@@ -300,7 +300,7 @@ export default function FinalResultPage() {
   // conversion — formatLocalAmount, not formatCurrency. (The old fmtCurrency
   // here multiplied by the FX rate again, inflating IDR figures 15,600×.)
   const currencyCode: CurrencyCode = parseCurrencyCode(context.currency)
-  const fmtLocal = (v: number | null | undefined) => formatLocalAmount(v, currencyCode)
+  const fmtLocal = (v: number | null | undefined) => formatLocalAmount(v, currencyCode, locale)
 
   // Phase E1.4 — tornado-chart sensitivity data. Pure, display-only
   // re-evaluation of calculateROI at the efficiency factor's scenario
@@ -1245,8 +1245,8 @@ export default function FinalResultPage() {
                           return (
                             <span style={{ display: 'block', opacity: 0.65, fontSize: '0.82rem', marginTop: 4 }}>
                               {locale === 'id'
-                                ? `Benchmark: ${bench.labelId} (Rp ${Math.round(bench.monthlyAnchorLocal).toLocaleString('id-ID')}/bln) · lantai legal: ${bench.floorLabelId} (Rp ${bench.floorMonthlyAnchor.toLocaleString('id-ID')}/bln)`
-                                : `Benchmark: ${bench.labelEn} (${bench.monthlyAnchorLocal.toLocaleString('en-US')}/mo) · legal floor: ${bench.floorLabelEn} (${bench.floorMonthlyAnchor.toLocaleString('en-US')}/mo)`}
+                                ? `Benchmark: ${bench.labelId} (${fmtLocal(bench.monthlyAnchorLocal)}/bln) · lantai legal: ${bench.floorLabelId} (${fmtLocal(bench.floorMonthlyAnchor)}/bln)`
+                                : `Benchmark: ${bench.labelEn} (${fmtLocal(bench.monthlyAnchorLocal)}/mo) · legal floor: ${bench.floorLabelEn} (${fmtLocal(bench.floorMonthlyAnchor)}/mo)`}
                             </span>
                           )
                         })()}

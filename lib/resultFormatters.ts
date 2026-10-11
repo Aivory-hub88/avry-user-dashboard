@@ -77,14 +77,22 @@ export function formatCurrency(
 export function formatLocalAmount(
   value: number | null | undefined,
   currency: CurrencyCode = 'USD',
+  /**
+   * Report language. When given, the thousands mark follows the language,
+   * not the currency: "Rp 59,673,358" in English, "Rp 59.673.358" in
+   * Indonesian — the same rule the PDF uses, so page and PDF never differ.
+   * Omitted → the currency's own convention (legacy callers).
+   */
+  locale?: 'en' | 'id',
 ): string {
   if (value === null || value === undefined || !isFinite(value) || isNaN(value)) {
     return '—'
   }
   const cfg = CURRENCY_MAP[currency] ?? CURRENCY_MAP.USD
+  const thousands = locale === 'id' ? '.' : locale === 'en' ? ',' : cfg.thousands
   const rounded = Math.round(value)
   const sign = rounded < 0 ? '-' : ''
-  const formatted = Math.abs(rounded).toString().replace(/\B(?=(\d{3})+(?!\d))/g, cfg.thousands)
+  const formatted = Math.abs(rounded).toString().replace(/\B(?=(\d{3})+(?!\d))/g, thousands)
   return `${sign}${cfg.symbol}${formatted}`
 }
 

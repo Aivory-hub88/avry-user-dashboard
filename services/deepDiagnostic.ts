@@ -387,7 +387,7 @@ import type {
   ImprovementItem,
   RfiAnswerKey,
 } from '@/types/diagnostic'
-import { parseCurrencyCode, formatCurrency, type CurrencyCode } from '@/lib/resultFormatters'
+import { parseCurrencyCode, formatLocalAmount, type CurrencyCode } from '@/lib/resultFormatters'
 import { getBudgetBands, getLabourBenchmark, resolveBandMidpointUSD, isBandForCurrency } from '@/lib/currencyBands'
 import { TIER_MONTHLY_PRICE_USD, FULLSTACK_PACKAGE_PRICE_USD, FULLSTACK_INCLUDED_PLAN_MONTHS } from '@/lib/tiers'
 import type { RequiredInvestment } from '@/types/diagnostic'
@@ -1913,8 +1913,10 @@ function rankOpportunities(
       const oppSavingsUSD = totalAnnualSavingsUSD * weight
       estimatedSavingsLocal = oppSavingsUSD * rate
       projectedROINote = locale === 'id'
-        ? `Estimasi penghematan ${formatCurrency(oppSavingsUSD, currencyCode)}/tahun pada target otomasi`
-        : `Est. ${formatCurrency(oppSavingsUSD, currencyCode)}/yr savings at target automation`
+        // Same live FX rate as estimatedSavingsLocal and every tile (formatCurrency
+        // used the static snapshot rate, so this note disagreed with the cards).
+        ? `Estimasi penghematan ${formatLocalAmount(estimatedSavingsLocal, currencyCode, 'id')}/tahun pada target otomasi`
+        : `Est. ${formatLocalAmount(estimatedSavingsLocal, currencyCode, 'en')}/yr savings at target automation`
     } else if (c.id === 'opp-sales-intelligence') {
       projectedROINote = locale === 'id' ? 'Estimasi peningkatan pipeline 15-25%' : 'Est. 15-25% pipeline improvement'
     } else {
