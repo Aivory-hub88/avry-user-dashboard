@@ -14,6 +14,9 @@ import { SERVICES } from '@/config/services'
 export function usePayment() {
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
+  // Applied promo code. Only ever sent as a code: the payments service derives
+  // the discount itself, so nothing here can change what is charged.
+  const [promoCode, setPromoCode] = useState('')
 
   const loadMidtransScript = async () => {
     return new Promise<boolean>((resolve) => {
@@ -39,17 +42,14 @@ export function usePayment() {
     isMock: boolean
   ) => {
     try {
-      const confirmResponse = await fetch(`${SERVICES.PAYMENTS}/api/v1/payments/confirm`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_id: orderId,
-          user_id: userId,
-          product,
-          amount,
-          is_mock: isMock,
-        }),
-      })
+      const confirmResponse = await AuthManager.authenticatedFetch(
+        `${SERVICES.PAYMENTS}/api/v1/payments/confirm`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_id: orderId }),
+        }
+      )
 
       if (confirmResponse.ok) {
         setPaymentError(null)
@@ -89,21 +89,32 @@ export function usePayment() {
         throw new Error('Unknown product type')
       }
 
-      const response = await fetch(`${SERVICES.PAYMENTS}/api/v1/payments/midtrans/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userId,
-          amount,
-          product,
-          customer_email: user.email,
-          customer_first_name: user.company_name || 'Customer',
-          custom_field1: `Purchase: ${productName}`,
-          custom_field2: `User: ${user.email}`,
-        }),
-      })
+      const response = await AuthManager.authenticatedFetch(
+        `${SERVICES.PAYMENTS}/api/v1/payments/midtrans/create`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // `amount` is intentionally not sent: the service prices the order.
+          body: JSON.stringify({
+            user_id: userId,
+            product,
+            customer_email: user.email,
+            customer_first_name: user.company_name || 'Customer',
+            custom_field1: `Purchase: ${productName}`,
+            custom_field2: `User: ${user.email}`,
+            promo_code: promoCode || undefined,
+          }),
+        }
+      )
 
-      if (!response.ok) throw new Error(`Backend error: ${response.status}`)
+      if (!response.ok) {
+        // A rejected promo code carries a customer-readable message.
+        const body = await response.json().catch(() => null)
+        const detail = body?.detail
+        const message =
+          typeof detail === 'string' ? detail : detail?.error
+        throw new Error(message || `Backend error: ${response.status}`)
+      }
 
       const data = await response.json()
       if (!data.success) throw new Error(data.error || 'Failed to create payment transaction')
@@ -136,5 +147,5 @@ export function usePayment() {
     }
   }
 
-  return { handlePayment, paymentLoading, paymentError, setPaymentError }
+  return { handlePayment, paymentLoading, paymentError, setPaymentError, promoCode, setPromoCode }
 }

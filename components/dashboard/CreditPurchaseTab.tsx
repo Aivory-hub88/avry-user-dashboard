@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { AuthManager } from "@/lib/authManager"
 import { SERVICES } from "@/config/services"
+import PromoCodeField from "@/components/payment/PromoCodeField"
 
 interface CreditPackage {
   id: string
@@ -24,6 +25,7 @@ export default function CreditPurchaseTab() {
   const [customAmount, setCustomAmount] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [promoCode, setPromoCode] = useState("")
 
   const loadMidtransScript = () => {
     return new Promise((resolve) => {
@@ -77,27 +79,34 @@ export default function CreditPurchaseTab() {
       }
 
       // Create transaction on backend
-      const response = await fetch(
+      const response = await AuthManager.authenticatedFetch(
         `${SERVICES.PAYMENTS}/api/v1/payments/midtrans/create`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
+          // The service prices the order; no amount is sent.
           body: JSON.stringify({
             user_id: userId,
-            amount: price,
             product: product,
             customer_email: user.email,
             customer_first_name: user.company_name || "Customer",
             custom_field1: `${credits} credits`,
             custom_field2: `User: ${user.email}`,
+            promo_code: promoCode || undefined,
           }),
         }
       )
 
       if (!response.ok) {
-        throw new Error("Failed to create payment transaction")
+        // A rejected promo code carries a customer-readable message.
+        const body = await response.json().catch(() => null)
+        const detail = body?.detail
+        throw new Error(
+          (typeof detail === "string" ? detail : detail?.error) ||
+            "Failed to create payment transaction"
+        )
       }
 
       const data = await response.json()
@@ -154,7 +163,7 @@ export default function CreditPurchaseTab() {
     credits: number
   ) => {
     try {
-      const confirmResponse = await fetch(
+      const confirmResponse = await AuthManager.authenticatedFetch(
         `${SERVICES.PAYMENTS}/api/v1/payments/confirm`,
         {
           method: "POST",
@@ -258,6 +267,14 @@ export default function CreditPurchaseTab() {
       <div className="border-t border-white/[0.07] pt-6">
         <h3 className="text-lg font-medium text-white mb-4">Purchase Credits</h3>
         <p className="text-sm text-gray-400 mb-6">Add credits to your account for immediate use</p>
+        <div className="mb-6">
+          <PromoCodeField
+            value={promoCode}
+            onChange={setPromoCode}
+            products={CREDIT_PACKAGES.map((p) => `credits_${p.credits}`)}
+            disabled={loading}
+          />
+        </div>
         <div className="grid grid-cols-2 gap-4">
           {CREDIT_PACKAGES.map((pkg) => (
             <button
