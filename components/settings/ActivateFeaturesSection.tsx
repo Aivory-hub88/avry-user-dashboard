@@ -2,6 +2,7 @@
 
 import { AuthManager } from '@/lib/authManager'
 import { usePayment } from '@/hooks/usePayment'
+import PromoCodeField from '@/components/payment/PromoCodeField'
 import { useState, useRef } from 'react'
 
 function PricingCard({
@@ -167,7 +168,7 @@ function PricingCard({
  * the dashboard's Subscriptions tab and inside the account Settings modal.
  */
 export function ActivateFeaturesSection() {
-  const { handlePayment, paymentLoading, paymentError } = usePayment()
+  const { handlePayment, paymentLoading, paymentError, promoCode, setPromoCode } = usePayment()
   const user = AuthManager.getUser()
   const hasDiagnostic = Boolean(user?.has_diagnostic)
   const hasBlueprint = Boolean(user?.has_blueprint)
@@ -188,6 +189,15 @@ export function ActivateFeaturesSection() {
         <p className="text-[14px] text-gray-400 max-w-2xl leading-relaxed">
           Unlock premium features and enable specific tabs. Choose a single product or get the bundle for the complete experience.
         </p>
+      </div>
+
+      <div className="mb-6 max-w-md">
+        <PromoCodeField
+          value={promoCode}
+          onChange={setPromoCode}
+          products={['ai_diagnostic', 'ai_blueprint', 'ai_fullstack']}
+          disabled={paymentLoading}
+        />
       </div>
 
       <div style={{ zoom: 0.85 }} className="grid grid-cols-1 xl:grid-cols-3 gap-5 lg:gap-6 items-stretch">

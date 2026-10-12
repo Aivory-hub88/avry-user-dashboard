@@ -19,6 +19,7 @@ import { AuthManager } from '@/lib/authManager'
 import { SERVICES } from '@/config/services'
 import { getMarketingUrl } from '@/lib/config'
 import { usePayment } from '@/hooks/usePayment'
+import PromoCodeField from '@/components/payment/PromoCodeField'
 import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
 import {
   TIER_CREDIT_ALLOWANCE,
@@ -89,7 +90,7 @@ export default function DashboardPage() {
   const [authLoading, setAuthLoading] = useState(true)
   const [deepDiagnosticCompleted, setDeepDiagnosticCompleted] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
-  const { handlePayment, paymentLoading, paymentError } = usePayment()
+  const { handlePayment, paymentLoading, paymentError, promoCode, setPromoCode } = usePayment()
   const CONTACT_SALES_URL = `${getMarketingUrl()}/contact`
   const t = useTranslations("dashboard")
 
@@ -372,6 +373,14 @@ export default function DashboardPage() {
             <div className="border-t border-white/[0.07] pt-8">
               <h3 className="text-lg font-medium text-white mb-2">Subscription Plans</h3>
               <p className="text-sm text-gray-400 mb-6">Choose your plan for ongoing credits and features</p>
+              <div className="mb-6 max-w-md">
+                <PromoCodeField
+                  value={promoCode}
+                  onChange={setPromoCode}
+                  products={SUBSCRIPTION_PLAN_CARDS.filter((c) => !c.salesAssisted).map((c) => c.tier)}
+                  disabled={paymentLoading}
+                />
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/*
                   Cards are rendered from SUBSCRIPTION_PLAN_CARDS rather than
