@@ -10,7 +10,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PU
 export interface User {
   user_id: string;
   email: string;
-  account_type: "free" | "demo" | "superadmin";
+  account_type: "free" | "demo" | "partner" | "superadmin";
   company_name?: string;
   created_at: string;
   tier: "free" | "snapshot" | "blueprint" | "enterprise";

@@ -74,7 +74,8 @@ export function UserProfile() {
 
   const displayEmail = user?.email || 'guest@aivory.id'
   const displayUsername = user ? user.email.split('@')[0] : 'Guest'
-  const displayTier = user?.account_type === 'superadmin' ? 'Admin' : 'Pro'
+  const displayTier =
+    user?.account_type === 'superadmin' ? 'Admin' : user?.account_type === 'partner' ? 'Partner' : 'Pro'
 
   return (
     <>

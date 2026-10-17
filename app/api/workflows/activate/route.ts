@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { normalizeN8nBaseUrl } from '@/lib/workflows/credentialStore'
 import { getAuthUser } from '@/lib/serverAuth'
 import { logWorkflowDeployed } from '@/lib/workflows/cogneeGraphLog'
+import { canUseAivoryN8nInstance } from '@/lib/tiers'
 
 /**
  * POST /api/workflows/activate
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ canUseAivoryInstance: false, code: 'UNAUTHENTICATED' }, { status: 401 })
   }
   // Authenticated but not entitled: a plain "no", with no reason disclosed.
-  if (authUser.account_type !== 'superadmin') return deny
+  if (!canUseAivoryN8nInstance(authUser.account_type)) return deny
 
   // Don't advertise the option when the instance isn't actually configured.
   const configured = Boolean((process.env.N8N_BASE_URL ?? '').trim() && (process.env.N8N_API_KEY ?? '').trim())
@@ -140,7 +141,7 @@ export async function POST(req: NextRequest) {
         { status: 401 },
       )
     }
-    if (authUser.account_type !== 'superadmin') {
+    if (!canUseAivoryN8nInstance(authUser.account_type)) {
       return NextResponse.json(
         { success: false, code: 'FORBIDDEN', message: 'The Aivory test instance is restricted to superadmins' },
         { status: 403 },

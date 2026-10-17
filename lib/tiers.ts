@@ -127,6 +127,27 @@ export function toSubscriptionTier(tier: string | null | undefined): Subscriptio
 export const ADMIN_ACCOUNT_TYPES = ['superadmin', 'admin', 'employee'] as const
 
 /**
+ * Distributor-partner accounts, created from the admin dashboard. They hold a
+ * regular Enterprise entitlement (free for the months the admin granted, then
+ * a paid subscription), so every tier gate treats them like any customer on
+ * that plan. They are not staff: no admin powers, no paid-tier bypass.
+ */
+export const PARTNER_ACCOUNT_TYPE = 'partner'
+
+/**
+ * Whether the account may deploy into, or read workflows from, Aivory's own
+ * self-hosted n8n instance (N8N_BASE_URL / N8N_API_KEY). Superadmins only —
+ * it exists for battle-testing. Every other account, partners included,
+ * brings its own n8n.
+ *
+ * Pass the `account_type` claim from the verified JWT, never a value the
+ * browser stored.
+ */
+export function canUseAivoryN8nInstance(accountType: string | null | undefined): boolean {
+  return accountType === 'superadmin'
+}
+
+/**
  * True when `tier` (compared lowercased) is a member of `PAID_TIERS`.
  *
  * Matches the existing `useDashboardAccess.isPaidTier` semantics exactly:

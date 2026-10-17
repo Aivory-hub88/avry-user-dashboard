@@ -13,6 +13,7 @@ import { query } from '@/lib/db'
 import { encryptSecret, decryptSecret } from '@/lib/crypto'
 import { normalizeN8nBaseUrl } from '@/lib/workflows/credentialStore'
 import type { AuthUser } from '@/lib/serverAuth'
+import { canUseAivoryN8nInstance } from '@/lib/tiers'
 
 export interface N8nCredentialRecord {
   instanceUrl: string
@@ -75,7 +76,7 @@ export async function resolveN8nCredentials(
   instanceHint: string | null
 ): Promise<{ instanceUrl: string; apiKey: string } | null> {
   if (instanceHint === 'aivory') {
-    if (user.account_type !== 'superadmin') return null
+    if (!canUseAivoryN8nInstance(user.account_type)) return null
     const envUrl = (process.env.N8N_BASE_URL ?? '').trim()
     const envKey = (process.env.N8N_API_KEY ?? '').trim()
     if (!envUrl || !envKey) return null
