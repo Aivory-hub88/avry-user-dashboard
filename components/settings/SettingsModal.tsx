@@ -153,7 +153,7 @@ export function SettingsModal({ user }: SettingsModalProps) {
   const displayEmail = user?.email || 'loading...'
   const displayUsername = user?.email?.split('@')[0] || 'User'
   const isSuperAdmin = user?.account_type === 'superadmin'
-  const displayTier = isSuperAdmin ? 'Admin' : 'Pro'
+  const displayTier = isSuperAdmin ? 'Admin' : user?.account_type === 'partner' ? 'Partner' : 'Pro'
 
   const sidebarSections = [
     {
