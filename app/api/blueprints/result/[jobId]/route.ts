@@ -12,11 +12,12 @@ import { NextRequest } from 'next/server'
 import { getConfig } from '@/lib/config'
 import { createErrorResponse } from '@/types/errors'
 import { parseBlueprintContent, deriveEstimatedRoiMonths, buildBlueprintFromText, isUsableBlueprint } from '@/lib/blueprintGeneration'
+import { chargeRun } from '@/lib/featureUses'
 
 export const maxDuration = 30
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   const { jobId } = await params
@@ -73,6 +74,11 @@ export async function GET(
       { status: 502 }
     )
   }
+
+  // A blueprint is about to be delivered: charge one of the purchase's runs.
+  // Idempotent on the job id, so polling a finished job again is free.
+  const blocked = await chargeRun(request, 'blueprint', `blueprint:${jobId}`, { jobStatus: 'waiting' })
+  if (blocked) return blocked
 
   const parsed = parseBlueprintContent(content)
   if (parsed && isUsableBlueprint(parsed)) {

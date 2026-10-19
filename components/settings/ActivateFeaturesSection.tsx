@@ -2,6 +2,7 @@
 
 import { AuthManager } from '@/lib/authManager'
 import { usePayment } from '@/hooks/usePayment'
+import { runsLabel, useFeatureUses } from '@/hooks/useFeatureUses'
 import PromoCodeField from '@/components/payment/PromoCodeField'
 import { useState, useRef } from 'react'
 
@@ -170,9 +171,18 @@ function PricingCard({
 export function ActivateFeaturesSection() {
   const { handlePayment, paymentLoading, paymentError, promoCode, setPromoCode } = usePayment()
   const user = AuthManager.getUser()
-  const hasDiagnostic = Boolean(user?.has_diagnostic)
-  const hasBlueprint = Boolean(user?.has_blueprint)
+  // Each purchase includes 3 runs. With the ledger available, a card is
+  // "active" only while runs are left, so a customer who used them all can
+  // buy 3 more; without it, fall back to the old bought-it flags.
+  const uses = useFeatureUses()
+  const snap = uses?.snapshot
+  const bp = uses?.blueprint
+  const live = (u?: { unlimited: boolean; remaining: number }) => Boolean(u && (u.unlimited || u.remaining > 0))
+  const hasDiagnostic = uses ? live(snap) : Boolean(user?.has_diagnostic)
+  const hasBlueprint = uses ? live(bp) : Boolean(user?.has_blueprint)
   const hasFullStack = hasDiagnostic && hasBlueprint
+  const buyAgain = (u?: { granted: number; remaining: number; unlimited: boolean }) =>
+    u && !u.unlimited && u.granted > 0 && u.remaining <= 0 ? 'Buy 3 more runs' : undefined
 
   return (
     <div className="py-1 lg:py-2">
@@ -204,9 +214,10 @@ export function ActivateFeaturesSection() {
         <PricingCard
           title="Business Operations Deep Diagnostic"
           price={79}
-          frequency="/ one time"
+          frequency="/ 3 runs"
           description="Know exactly where your business stands on AI before you build anything."
           features={[
+            '3 assessment runs included',
             'Operational health score',
             'Business objective mapping',
             'Gap & constraint analysis',
@@ -214,6 +225,8 @@ export function ActivateFeaturesSection() {
             'Data & process maturity'
           ]}
           isActive={hasDiagnostic}
+          activeText={snap ? runsLabel(snap) : undefined}
+          actionText={buyAgain(snap)}
           isLoading={paymentLoading}
           onActivate={() => handlePayment('ai_diagnostic', 79, 'Business Operations Deep Diagnostic')}
         />
@@ -221,9 +234,10 @@ export function ActivateFeaturesSection() {
         <PricingCard
           title="Transformation Blueprint + Roadmap"
           price={249}
-          frequency="/ one time"
+          frequency="/ 3 runs"
           description="Your full AI architecture and execution plan, built around your business, not a template."
           features={[
+            '3 blueprint + roadmap runs included',
             'Full transformation blueprint',
             'Workflow architecture',
             'Agent structure design',
@@ -232,6 +246,8 @@ export function ActivateFeaturesSection() {
             'KPI targets per phase'
           ]}
           isActive={hasBlueprint}
+          activeText={bp ? runsLabel(bp) : undefined}
+          actionText={buyAgain(bp)}
           isLoading={paymentLoading}
           onActivate={() => handlePayment('ai_blueprint', 249, 'Transformation Blueprint + Roadmap')}
         />
@@ -240,20 +256,27 @@ export function ActivateFeaturesSection() {
           title="Full Stack Bundle"
           subtitle="Deep Diagnostic + Blueprint + Roadmap"
           price={299}
-          frequency="/ one time"
+          frequency="/ 3 runs"
           description="Everything in one. Know, plan, execute in order."
           features={[
+            '3 full runs: Diagnostic → Blueprint → Roadmap',
             'Deep Diagnostic',
             'Blueprint',
             'Roadmap',
-            'Includes 1 month of Business plan'
+            'Includes 1 month of Business plan (once per purchase)'
           ]}
           savings="Save $29 vs buying separately"
           isActive={hasFullStack}
           isLoading={paymentLoading}
           onActivate={() => handlePayment('ai_fullstack', 299, 'Full Stack Bundle')}
-          activeText="All Tabs Unlocked"
-          actionText="Activate Bundle"
+          activeText={
+            snap && bp
+              ? snap.unlimited && bp.unlimited
+                ? 'Unlimited runs'
+                : `${snap.remaining} diagnostic · ${bp.remaining} blueprint runs left`
+              : 'All Tabs Unlocked'
+          }
+          actionText={snap && bp && (buyAgain(snap) || buyAgain(bp)) ? 'Buy 3 more full runs' : 'Activate Bundle'}
           highlight={!hasFullStack}
         />
       </div>

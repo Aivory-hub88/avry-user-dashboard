@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { VPS_BRIDGE_CONFIG } from '@/lib/config'
+import { chargeRun } from '@/lib/featureUses'
 
 export const maxDuration = 30
 
@@ -16,7 +17,7 @@ const ROI_FIELDS_TO_STRIP = [
 ]
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
   const { jobId } = await params
@@ -60,6 +61,11 @@ export async function GET(
     }
     return NextResponse.json({ status: payload.status }) // waiting | active | delayed
   }
+
+  // Completed: charge one of the purchase's runs before handing it over.
+  // Idempotent on the job id, so polling a finished job again is free.
+  const blocked = await chargeRun(request, 'snapshot', `diagnostic:${jobId}`, { status: 'waiting' })
+  if (blocked) return blocked
 
   // Completed — normalize + strip ROI, then return the same shape the client expects.
   const result: Record<string, any> = payload.result || {}

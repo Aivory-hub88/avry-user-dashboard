@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { VPS_BRIDGE_CONFIG } from '@/lib/config'
+import { requireRunLeft } from '@/lib/featureUses'
 
 // Enqueue is fast; the long LLM work runs in the bridge worker and is polled
 // separately via /api/diagnostics/result/[jobId].
@@ -44,6 +45,11 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     )
   }
+
+  // A purchase includes 3 runs; only start one if the caller has one left.
+  // It is charged when the result is delivered (diagnostics/result).
+  const gate = await requireRunLeft(request, 'snapshot')
+  if (!gate.ok) return gate.response
 
   // Enqueue on the VPS Bridge (returns a job_id immediately, no long wait).
   const controller = new AbortController()

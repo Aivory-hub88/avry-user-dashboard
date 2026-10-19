@@ -16,6 +16,7 @@
 import { NextRequest } from 'next/server'
 import { SERVICES } from '@/config/services'
 import { buildRoadmapPrompt } from '@/lib/roadmapGeneration'
+import { requireFeatureBought } from '@/lib/featureUses'
 
 export const maxDuration = 30
 
@@ -27,6 +28,11 @@ export async function POST(request: NextRequest) {
     const diagnosticContext: Record<string, any> = body.diagnosticContext ?? {}
     const blueprintContext: Record<string, any> = body.blueprintContext ?? {}
     const locale: 'en' | 'id' = body.locale === 'id' ? 'id' : 'en'
+
+    // The roadmap comes with the Blueprint + Roadmap purchase: it needs that
+    // purchase but does not use up one of its runs (the blueprint did).
+    const gate = await requireFeatureBought(request, 'blueprint')
+    if (!gate.ok) return gate.response
 
     const prompt = buildRoadmapPrompt(diagnosticContext, blueprintContext, locale)
 

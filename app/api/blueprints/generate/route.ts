@@ -17,6 +17,7 @@ import { NextRequest } from 'next/server'
 import { getConfig } from '@/lib/config'
 import { createErrorResponse } from '@/types/errors'
 import { buildBlueprintPrompt } from '@/lib/blueprintGeneration'
+import { requireRunLeft } from '@/lib/featureUses'
 
 export const maxDuration = 30
 
@@ -40,6 +41,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // A purchase includes 3 blueprint runs; charged on delivery (blueprints/result).
+    const gate = await requireRunLeft(request, 'blueprint')
+    if (!gate.ok) return gate.response
 
     const config = getConfig()
     const prompt = buildBlueprintPrompt(diagnostic, locale)
