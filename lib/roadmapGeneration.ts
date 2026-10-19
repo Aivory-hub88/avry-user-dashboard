@@ -13,6 +13,8 @@
  */
 import type { AiryRoadmap } from '@/types/roadmap'
 import { asset } from '@/lib/asset'
+// The roadmap route checks the Blueprint + Roadmap purchase, so it needs the token.
+import { authedFetch } from '@/lib/deployAuth'
 import { formatLocalAmount, parseCurrencyCode, type CurrencyCode } from '@/lib/resultFormatters'
 import { getRoiHorizonYears } from '@/lib/roiHorizon'
 
@@ -247,7 +249,7 @@ export interface GenerateRoadmapResult {
  * are short, so the tighter interval keeps perceived latency low.
  */
 export async function generateRoadmapAsync(opts: GenerateRoadmapOptions): Promise<GenerateRoadmapResult> {
-  const submitRes = await fetch(asset('/api/roadmap/generate'), {
+  const submitRes = await authedFetch(asset('/api/roadmap/generate'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

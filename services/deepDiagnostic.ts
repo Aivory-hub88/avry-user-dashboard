@@ -14,6 +14,9 @@ import { getUser } from '@/lib/auth'
 import { FX_AS_OF } from '@/lib/currencyConfig'
 import { getRate, getFxAsOfLabel, ensureLiveRates } from '@/lib/liveRates'
 import { asset } from '@/lib/asset'
+// Generators now check the runs included with a purchase, so they need the
+// caller's token (authedFetch also refreshes it once on a 401).
+import { authedFetch } from '@/lib/deployAuth'
 import { DEEP_DIAGNOSTIC_PHASES } from '@/constants/deepDiagnosticQuestions'
 import { ID_QUESTION_COPY } from '@/constants/deepDiagnosticQuestionsId'
 
@@ -125,7 +128,7 @@ export class DeepDiagnosticService {
     // 1) Enqueue the deep diagnostic — the bridge returns a job_id immediately.
     let submitRes: Response
     try {
-      submitRes = await fetch(asset('/api/diagnostics/run'), {
+      submitRes = await authedFetch(asset('/api/diagnostics/run'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ organization_id: organizationId, mode: 'deep', phases }),
@@ -155,7 +158,7 @@ export class DeepDiagnosticService {
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
       let pollRes: Response
       try {
-        pollRes = await fetch(asset(`/api/diagnostics/result/${jobId}`))
+        pollRes = await authedFetch(asset(`/api/diagnostics/result/${jobId}`))
       } catch {
         continue // transient network blip — keep polling
       }
@@ -263,7 +266,7 @@ export class DeepDiagnosticService {
     try {
       // asset() prepends the /dashboard basePath — raw fetch() paths don't
       // get it automatically (same gotcha as the PDF cover assets).
-      submitRes = await fetch(asset('/api/blueprints/generate'), {
+      submitRes = await authedFetch(asset('/api/blueprints/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -302,7 +305,7 @@ export class DeepDiagnosticService {
       reportProgress()
       let pollRes: Response
       try {
-        pollRes = await fetch(asset(`/api/blueprints/result/${jobId}`))
+        pollRes = await authedFetch(asset(`/api/blueprints/result/${jobId}`))
       } catch {
         continue // transient network blip — keep polling
       }
