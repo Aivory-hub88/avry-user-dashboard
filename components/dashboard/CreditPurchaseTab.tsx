@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { loadSnap } from "@/lib/midtransSnap"
 import { AuthManager } from "@/lib/authManager"
 import { SERVICES } from "@/config/services"
 import PromoCodeField from "@/components/payment/PromoCodeField"
@@ -27,24 +28,8 @@ export default function CreditPurchaseTab() {
   const [error, setError] = useState<string | null>(null)
   const [promoCode, setPromoCode] = useState("")
 
-  const loadMidtransScript = () => {
-    return new Promise((resolve) => {
-      if (window.snap) {
-        resolve(true)
-        return
-      }
-
-      const script = document.createElement("script")
-      script.src = "https://app.sandbox.midtrans.com/snap/snap.js"
-      script.setAttribute(
-        "data-client-key",
-        process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || ""
-      )
-      script.onload = () => resolve(true)
-      script.onerror = () => resolve(false)
-      document.body.appendChild(script)
-    })
-  }
+  // Production Snap with the payments service's own client key (lib/midtransSnap).
+  const loadMidtransScript = loadSnap
 
   const handlePurchasePackage = async (pkg: CreditPackage) => {
     await initiatePurchase(pkg.credits, pkg.price, `credits_${pkg.credits}`)
