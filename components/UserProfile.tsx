@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { User as UserIcon } from 'lucide-react'
 import { logout, getUser } from '@/lib/auth'
 import { getMarketingUrl } from '@/lib/config'
+import { planLabel } from '@/lib/tiers'
 import { SettingsModal, User } from '@/components/settings/SettingsModal'
 import { useSettingsModal } from '@/contexts/SettingsModalContext'
 
@@ -27,6 +28,7 @@ export function UserProfile() {
             user_id: authUser.user_id || 'unknown',
             email: authUser.email || 'unknown',
             account_type: authUser.account_type || 'user',
+            tier: authUser.tier,
           })
         }
       } catch (error) {
@@ -74,8 +76,7 @@ export function UserProfile() {
 
   const displayEmail = user?.email || 'guest@aivory.id'
   const displayUsername = user ? user.email.split('@')[0] : 'Guest'
-  const displayTier =
-    user?.account_type === 'superadmin' ? 'Admin' : user?.account_type === 'partner' ? 'Partner' : 'Pro'
+  const displayTier = planLabel(user?.tier, user?.account_type)
 
   return (
     <>

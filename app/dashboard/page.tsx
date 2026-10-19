@@ -25,6 +25,8 @@ import {
   TIER_CREDIT_ALLOWANCE,
   TIER_DISPLAY_NAMES,
   TIER_MONTHLY_PRICE_USD,
+  accountTypeLabel,
+  planLabel,
   toSubscriptionTier,
   type SubscriptionTier,
 } from '@/lib/tiers'
@@ -310,11 +312,13 @@ export default function DashboardPage() {
               <div className="border-t border-white/[0.07] pt-6 space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-400">Account Type</span>
-                  <span className="text-sm text-white capitalize">{AuthManager.getUser()?.account_type || 'N/A'}</span>
+                  <span className="text-sm text-white">{accountTypeLabel(AuthManager.getUser()?.account_type)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-400">Tier</span>
-                  <span className="text-sm text-accent font-medium">{AuthManager.getUser()?.tier?.toUpperCase() || 'N/A'}</span>
+                  <span className="text-sm text-gray-400">Plan</span>
+                  <span className="text-sm text-accent font-medium">
+                    {planLabel(AuthManager.getUser()?.tier, AuthManager.getUser()?.account_type)}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-400">Subscription Status</span>
