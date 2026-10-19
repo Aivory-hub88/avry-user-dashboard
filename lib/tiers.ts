@@ -175,3 +175,48 @@ export function isSuperAdminAccount(
     (typeof role === 'string' && types.includes(role))
   )
 }
+
+/**
+ * Every Aivory account is paid; there is no free plan. An account with no live
+ * plan (a lapsed subscription, a partner whose free months ended) is "not
+ * activated" until it pays. Internally that state is still the tier value
+ * `free`, because every gate across the services compares against it, but it
+ * must never be shown to anyone as a "Free" plan or account.
+ */
+export const NOT_ACTIVATED_LABEL = 'Not activated'
+export const NOT_ACTIVATED_HINT = 'Activates once you pay'
+
+const ONE_TIME_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  snapshot: 'Assessment',
+  blueprint: 'Blueprint',
+})
+
+/** Whether the account currently holds something paid (or is staff/demo). */
+export function isActivated(
+  tier: string | null | undefined,
+  accountType?: string | null,
+): boolean {
+  if (isSuperAdminAccount(accountType)) return true
+  if (accountType === 'demo') return true
+  return isPaidTier(tier)
+}
+
+/** The plan name to show for an account. Never "Free". */
+export function planLabel(tier: string | null | undefined, accountType?: string | null): string {
+  if (isSuperAdminAccount(accountType)) return 'Admin'
+  if (accountType === 'demo') return 'Demo'
+  if (!isPaidTier(tier)) return NOT_ACTIVATED_LABEL
+  if (accountType === PARTNER_ACCOUNT_TYPE) return 'Partner'
+  const subscription = toSubscriptionTier(tier)
+  if (subscription) return TIER_DISPLAY_NAMES[subscription]
+  return ONE_TIME_LABELS[(tier ?? '').toLowerCase()] ?? NOT_ACTIVATED_LABEL
+}
+
+/** The account kind to show. The internal `free` / `paid` / `user` values all
+ *  read as an ordinary customer account. */
+export function accountTypeLabel(accountType: string | null | undefined): string {
+  if (isSuperAdminAccount(accountType)) return 'Admin'
+  if (accountType === PARTNER_ACCOUNT_TYPE) return 'Partner'
+  if (accountType === 'demo') return 'Demo'
+  return 'Customer'
+}

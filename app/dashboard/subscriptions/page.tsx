@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
 import { AuthManager } from "@/lib/authManager"
 import { PLANS, getPlanDetails, deriveSubscriptionStatus } from "@/lib/subscriptionPlans"
-import { toSubscriptionTier } from "@/lib/tiers"
+import { NOT_ACTIVATED_HINT, NOT_ACTIVATED_LABEL, isActivated, toSubscriptionTier } from "@/lib/tiers"
 import LoadingState from "@/components/dashboard/LoadingState"
 import ErrorState from "@/components/dashboard/ErrorState"
 import styles from "@/app/dashboard/dashboard.module.css"
@@ -75,6 +75,8 @@ export default function SubscriptionsPage() {
   // Canonical form of the user's tier, so an older `foundation`/`pro` row is
   // recognised as the plan it actually is when filtering the upgrade list.
   const currentTier = toSubscriptionTier(userTier)
+  // No free plan exists: without anything paid the account is "not activated".
+  const activated = Boolean(currentTier) || isActivated(userTier, user?.account_type)
 
   return (
     <div className={`${styles.dashboardContainer} bg-bg-primary`}>
@@ -86,7 +88,7 @@ export default function SubscriptionsPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium text-white">Current Plan</h2>
             <span className="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-brand-mint/20 text-brand-mint">
-              {currentPlan.name}
+              {activated ? currentPlan.name : NOT_ACTIVATED_LABEL}
             </span>
           </div>
 
@@ -100,7 +102,9 @@ export default function SubscriptionsPage() {
               {/* Was hardcoded "Active", which reported a subscription even for
                   an account that has never held one. */}
               <p className="text-lg font-medium text-white">
-                {deriveSubscriptionStatus(Boolean(currentTier) && user?.is_subscribed !== false)}
+                {activated
+                  ? deriveSubscriptionStatus(Boolean(currentTier) && user?.is_subscribed !== false)
+                  : NOT_ACTIVATED_HINT}
               </p>
             </div>
           </div>

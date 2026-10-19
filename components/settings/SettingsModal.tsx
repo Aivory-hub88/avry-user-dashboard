@@ -5,6 +5,7 @@ import { logout } from '@/lib/auth'
 import { getMarketingUrl } from '@/lib/config'
 import { useSettingsModal, SettingsTab } from '@/contexts/SettingsModalContext'
 import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
+import { NOT_ACTIVATED_HINT, isActivated, planLabel } from '@/lib/tiers'
 import {
   listMcpImageTokens,
   createMcpImageToken,
@@ -17,6 +18,7 @@ export interface User {
   user_id: string
   email: string
   account_type: string
+  tier?: string
 }
 
 interface SettingsModalProps {
@@ -153,7 +155,8 @@ export function SettingsModal({ user }: SettingsModalProps) {
   const displayEmail = user?.email || 'loading...'
   const displayUsername = user?.email?.split('@')[0] || 'User'
   const isSuperAdmin = user?.account_type === 'superadmin'
-  const displayTier = isSuperAdmin ? 'Admin' : user?.account_type === 'partner' ? 'Partner' : 'Pro'
+  const displayTier = planLabel(user?.tier, user?.account_type)
+  const activated = isActivated(user?.tier, user?.account_type)
 
   const sidebarSections = [
     {
@@ -291,12 +294,18 @@ export function SettingsModal({ user }: SettingsModalProps) {
                 <div className="bg-white/5 border border-white/10 rounded-xl p-5 flex items-center justify-between mb-6">
                   <div>
                     <h4 className="text-sm font-medium flex items-center mb-1">
-                      {isSuperAdmin ? 'Full platform access' : 'Thanks for subscribing to Aivory'} <span className="ml-2 px-2 py-0.5 rounded bg-accent/10 text-accent text-[11px] font-bold uppercase">{displayTier}</span>
+                      {isSuperAdmin
+                        ? 'Full platform access'
+                        : activated
+                          ? 'Thanks for subscribing to Aivory'
+                          : 'Your account is not activated yet'} <span className="ml-2 px-2 py-0.5 rounded bg-accent/10 text-accent text-[11px] font-bold uppercase">{displayTier}</span>
                     </h4>
                     <p className="text-[13px] text-white/60">
                       {isSuperAdmin
                         ? 'Every feature is enabled on this account.'
-                        : <>Explore your new Pro features. <a href="#" className="underline hover:text-white">Learn more</a></>}
+                        : activated
+                          ? <>Explore your {displayTier} features. <a href="#" className="underline hover:text-white">Learn more</a></>
+                          : `${NOT_ACTIVATED_HINT} for a plan.`}
                     </p>
                   </div>
                   {/* A superadmin already has everything, so there is no plan to
@@ -304,8 +313,12 @@ export function SettingsModal({ user }: SettingsModalProps) {
                       read as the account being under-provisioned. */}
                   {!isSuperAdmin && (
                     <div className="flex gap-3">
-                      <button className="px-4 py-2 text-[13px] font-medium border border-white/10 rounded-md hover:bg-white/5 transition-colors">Manage</button>
-                      <button className="px-4 py-2 text-[13px] font-medium bg-white text-black rounded-md hover:bg-white/90 transition-colors">Upgrade plan</button>
+                      {activated && (
+                        <button className="px-4 py-2 text-[13px] font-medium border border-white/10 rounded-md hover:bg-white/5 transition-colors">Manage</button>
+                      )}
+                      <a href="/dashboard/subscriptions" onClick={onClose} className="px-4 py-2 text-[13px] font-medium bg-white text-black rounded-md hover:bg-white/90 transition-colors">
+                        {activated ? 'Upgrade plan' : 'Activate'}
+                      </a>
                     </div>
                   )}
                 </div>
