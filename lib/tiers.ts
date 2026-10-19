@@ -86,6 +86,18 @@ export const TIER_MONTHLY_PRICE_USD: Readonly<Record<string, number>> = Object.f
 })
 
 /**
+ * Annual billing: twelve months paid up front at the monthly price times
+ * twelve. These are separate products (avry-payments prices them, avry-backend
+ * grants 365 days of the same tier), mirroring the marketing site's Operating
+ * Plan toggle.
+ */
+export const ANNUAL_BILLING_MONTHS = 12
+export const TIER_ANNUAL_PRODUCT: Readonly<Record<string, string>> = Object.freeze({
+  operational: 'operational_annual',
+  business: 'business_annual',
+})
+
+/**
  * One-time Complete Transformation Package (product `ai_fullstack`) — the
  * same $299 the settings page sells, and it includes the first month of the
  * Business plan. Used by the Deep Diagnostic's required-investment estimate.

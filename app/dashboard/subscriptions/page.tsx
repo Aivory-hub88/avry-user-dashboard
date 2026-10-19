@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react"
 import { useTranslations } from "next-intl"
 import { AuthManager } from "@/lib/authManager"
-import { PLANS, getPlanDetails, deriveSubscriptionStatus } from "@/lib/subscriptionPlans"
+import { PLANS, getPlanDetails, deriveSubscriptionStatus, planOffer, type Billing } from "@/lib/subscriptionPlans"
+import { usePayment } from "@/hooks/usePayment"
+import PromoCodeField from "@/components/payment/PromoCodeField"
+import { getMarketingUrl } from "@/lib/config"
 import { NOT_ACTIVATED_HINT, NOT_ACTIVATED_LABEL, isActivated, toSubscriptionTier } from "@/lib/tiers"
 import LoadingState from "@/components/dashboard/LoadingState"
 import ErrorState from "@/components/dashboard/ErrorState"
@@ -24,6 +27,8 @@ export default function SubscriptionsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
+  const [billing, setBilling] = useState<Billing>("monthly")
+  const { handlePayment, paymentLoading, paymentError, promoCode, setPromoCode } = usePayment()
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -87,7 +92,7 @@ export default function SubscriptionsPage() {
         <div className="rounded-xl border border-white/[0.07] bg-[#2a2a27] p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium text-white">Current Plan</h2>
-            <span className="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-brand-mint/20 text-brand-mint">
+            <span className="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-accent/20 text-accent">
               {activated ? currentPlan.name : NOT_ACTIVATED_LABEL}
             </span>
           </div>
@@ -124,28 +129,96 @@ export default function SubscriptionsPage() {
 
         {/* Upgrade Options */}
         <div className="rounded-xl border border-white/[0.07] bg-[#2a2a27] p-6">
-          <h2 className="text-lg font-medium text-white mb-4">Upgrade Options</h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-medium text-white">Upgrade Options</h2>
+            {/* Same choice as the marketing site's Operating Plan: annual is
+                twelve months paid up front at twelve monthly prices. */}
+            <div
+              role="radiogroup"
+              aria-label="Billing period"
+              className="inline-flex rounded-full border border-white/[0.1] p-1"
+            >
+              {(["monthly", "annual"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={billing === option}
+                  onClick={() => setBilling(option)}
+                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+                    billing === option ? "bg-accent text-on-accent" : "text-gray-300 hover:bg-white/5"
+                  }`}
+                >
+                  {option === "monthly" ? "Monthly" : "Annually"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-4 max-w-md">
+            <PromoCodeField
+              value={promoCode}
+              onChange={setPromoCode}
+              products={Object.keys(PLANS)
+                .map((tier) => planOffer(tier as keyof typeof PLANS, billing)?.productId)
+                .filter((id): id is string => Boolean(id))}
+              disabled={paymentLoading}
+            />
+          </div>
+
+          {paymentError && (
+            <div className="mb-4 rounded-lg border border-red-500/[0.3] bg-red-500/[0.1] p-3">
+              <p className="text-sm text-red-300">{paymentError}</p>
+            </div>
+          )}
 
           <div className="grid gap-4">
-            {Object.entries(PLANS).filter(([key]) => key !== currentTier).map(([key, plan]) => (
-              <div
-                key={key}
-                className="rounded-lg border border-white/[0.07] bg-[var(--bg-main)]/50 p-4 hover:bg-[var(--bg-main)] transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-medium text-white">{plan.name}</h3>
-                    <p className="text-sm text-gray-400 mt-1">{plan.priceLabel}</p>
-                  </div>
-                  <button
-                    onClick={() => alert(`Upgrade to ${plan.name} - coming soon`)}
-                    className="rounded-lg bg-brand-purple px-4 py-2 text-sm font-medium text-white hover:bg-brand-mint hover:text-bg-primary transition-colors"
+            {/* The current plan stays listed on the annual view: moving a
+                monthly plan to annual billing is a legitimate purchase. */}
+            {Object.entries(PLANS)
+              .filter(([key]) => billing === "annual" || key !== currentTier)
+              .map(([key, plan]) => {
+                const offer = planOffer(key as keyof typeof PLANS, billing)
+                const isCurrent = key === currentTier
+                return (
+                  <div
+                    key={key}
+                    className="rounded-lg border border-white/[0.07] bg-[var(--bg-main)]/50 p-4 hover:bg-[var(--bg-main)] transition-colors"
                   >
-                    Upgrade
-                  </button>
-                </div>
-              </div>
-            ))}
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h3 className="text-base font-medium text-white">{plan.name}</h3>
+                        <p className="text-sm text-gray-400 mt-1">{offer ? offer.priceLabel : plan.priceLabel}</p>
+                        {offer && <p className="text-xs text-gray-500 mt-0.5">{offer.billingNote}</p>}
+                      </div>
+                      {offer ? (
+                        <button
+                          onClick={() =>
+                            handlePayment(
+                              offer.productId,
+                              offer.price,
+                              `${plan.name} Plan${billing === "annual" ? " (Annual)" : ""}`,
+                            )
+                          }
+                          disabled={paymentLoading}
+                          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-btn-hover transition-colors disabled:opacity-50"
+                        >
+                          {paymentLoading ? "Processing..." : isCurrent ? "Switch to annual" : "Upgrade"}
+                        </button>
+                      ) : (
+                        <a
+                          href={`${getMarketingUrl()}/contact`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-lg border border-white/[0.1] px-4 py-2 text-sm font-medium text-gray-200 hover:bg-white/5 transition-colors"
+                        >
+                          Contact Sales
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
           </div>
         </div>
 

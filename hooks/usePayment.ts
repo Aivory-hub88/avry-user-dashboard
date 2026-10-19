@@ -81,7 +81,10 @@ export function usePayment() {
 
       // Canonical 2026 tier ids. The pre-rebrand ids are still accepted so a
       // stale client bundle keeps working; avry-payments aliases them too.
-      const isSubscription = ['operational', 'business', 'foundation', 'pro', 'acceleration'].includes(product)
+      const isSubscription = [
+        'operational', 'business', 'operational_annual', 'business_annual',
+        'foundation', 'pro', 'acceleration',
+      ].includes(product)
       const isOneTimePurchase = product.startsWith('ai_')
       const isCreditTopUp = product.startsWith('credits_')
 
