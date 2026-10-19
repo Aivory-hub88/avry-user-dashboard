@@ -14,7 +14,9 @@
  */
 
 import {
+  ANNUAL_BILLING_MONTHS,
   SUBSCRIPTION_TIERS,
+  TIER_ANNUAL_PRODUCT,
   TIER_DISPLAY_NAMES,
   TIER_MONTHLY_PRICE_USD,
   toSubscriptionTier,
@@ -86,6 +88,43 @@ export const PLANS: Record<SubscriptionTier, Plan> = SUBSCRIPTION_TIERS.reduce(
   },
   {} as Record<SubscriptionTier, Plan>,
 )
+
+export type Billing = "monthly" | "annual"
+
+/** What checking out `tier` on `billing` buys: the product id and its price. */
+export interface PlanOffer {
+  productId: string
+  price: number
+  priceLabel: string
+  /** Shown under the price, e.g. "Billed annually — $20/month". */
+  billingNote: string
+}
+
+/**
+ * The self-serve offer for a plan, or `null` when there is none (Enterprise is
+ * sales-assisted). Annual is a separate product at twelve monthly prices.
+ */
+export function planOffer(tier: SubscriptionTier, billing: Billing): PlanOffer | null {
+  const monthly = TIER_MONTHLY_PRICE_USD[tier]
+  if (monthly === undefined) return null
+  if (billing === "annual") {
+    const productId = TIER_ANNUAL_PRODUCT[tier]
+    if (!productId) return null
+    const price = monthly * ANNUAL_BILLING_MONTHS
+    return {
+      productId,
+      price,
+      priceLabel: `$${price.toLocaleString("en-US")}/year`,
+      billingNote: `Billed annually — $${monthly}/month`,
+    }
+  }
+  return {
+    productId: tier,
+    price: monthly,
+    priceLabel: `$${monthly}/month`,
+    billingNote: "Billed monthly",
+  }
+}
 
 /** What a user with no subscription is shown. */
 export const NO_SUBSCRIPTION: Plan = Object.freeze({
