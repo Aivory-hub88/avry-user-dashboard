@@ -2,6 +2,8 @@
  * Payment Handler - Manages Midtrans payment integration
  */
 
+import { loadSnap } from "@/lib/midtransSnap"
+
 interface PaymentCallback {
   onSuccess?: () => void
   onPending?: () => void
@@ -24,21 +26,7 @@ declare global {
 /**
  * Load Midtrans Snap script
  */
-export const loadMidtransScript = async (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if (window.snap) {
-      resolve(true)
-      return
-    }
-
-    const script = document.createElement("script")
-    script.src = "https://app.sandbox.midtrans.com/snap/snap.js"
-    script.setAttribute("data-client-key", process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "")
-    script.onload = () => resolve(true)
-    script.onerror = () => resolve(false)
-    document.body.appendChild(script)
-  })
-}
+export const loadMidtransScript = (): Promise<boolean> => loadSnap()
 
 /**
  * Create payment transaction

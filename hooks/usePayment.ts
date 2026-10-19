@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { AuthManager } from '@/lib/authManager'
 import { SERVICES } from '@/config/services'
+import { loadSnap } from '@/lib/midtransSnap'
 
 /**
  * Shared Midtrans purchase flow — one-time feature unlocks (ai_diagnostic/
@@ -18,20 +19,8 @@ export function usePayment() {
   // the discount itself, so nothing here can change what is charged.
   const [promoCode, setPromoCode] = useState('')
 
-  const loadMidtransScript = async () => {
-    return new Promise<boolean>((resolve) => {
-      if ((window as any).snap) {
-        resolve(true)
-        return
-      }
-      const script = document.createElement('script')
-      script.src = 'https://app.sandbox.midtrans.com/snap/snap.js'
-      script.setAttribute('data-client-key', process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || '')
-      script.onload = () => resolve(true)
-      script.onerror = () => resolve(false)
-      document.body.appendChild(script)
-    })
-  }
+  // Production Snap with the payments service's own client key (lib/midtransSnap).
+  const loadMidtransScript = loadSnap
 
   const finalizePurchase = async (
     orderId: string,
