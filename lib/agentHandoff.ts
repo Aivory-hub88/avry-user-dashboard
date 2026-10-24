@@ -41,6 +41,11 @@ function norm(s: string): string {
   return s.toLowerCase().replace(/[_-]/g, "")
 }
 
+/** Agent type of the teammate `token` names (display name or type), or null. */
+export function resolveTeammate(token: string, candidates: HandoffCandidate[]): string | null {
+  return resolve(token.replace(/^@/, ""), candidates)
+}
+
 function resolve(token: string, candidates: HandoffCandidate[]): string | null {
   const t = norm(token)
   for (const c of candidates) {

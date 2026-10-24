@@ -14,7 +14,7 @@
 
 import { z } from "zod";
 import { AGENT_ROSTER } from "@/lib/agentRoster";
-import { HANDOFF_MAX_DEPTH } from "@/lib/agentHandoff";
+import { TEAM_MAX_DEPTH } from "@/lib/teamComms";
 
 export const SpaceAgentTaskSchema = z.object({
   id: z.string().min(1),
@@ -33,6 +33,11 @@ export const SpaceAgentTaskSchema = z.object({
   /** Handoff chain (ADR-020): the human message that started it, and hops after it. */
   chainRoot: z.string().nullable().optional(),
   chainDepth: z.number().int().optional(),
+  /** ADR-021: what kind of turn this is, who is waiting on it, and its due date. */
+  kind: z.string().optional(),
+  fromAgent: z.string().nullable().optional(),
+  replyTo: z.string().nullable().optional(),
+  dueAt: z.string().nullable().optional(),
 });
 export type SpaceAgentTask = z.infer<typeof SpaceAgentTaskSchema>;
 
@@ -137,15 +142,18 @@ export function buildSpacePayload({ instruction, history, room, teammates, hop }
   }
 
   if (params_teammates(teammates).length > 0) {
-    lines.push("<handoff_rules>");
+    lines.push("<team_rules>");
     lines.push(
-      `Teammates in this space: ${teammates!.join(", ")}. To hand work to one, write @Name followed by exactly what you need from them; they answer in their own message. ` +
-        "Only do this when you truly need their skills or tools. Never @ someone just to greet or thank them or to repeat what they said. " +
-        (hop !== undefined && hop >= HANDOFF_MAX_DEPTH
-          ? "This is the last hop: do not @mention anyone."
-          : hop ? "If you still need another teammate, @ them; otherwise do not @ anyone." : ""),
+      `Teammates in this space: ${teammates!.join(", ")}. Talk to them with your team tools: ` +
+        "team_ask when you need an answer to continue (you get a new turn with it), team_delegate to assign work " +
+        "(you are told when it is done), team_handoff to pass the conversation over, team_message for an FYI, " +
+        "team_remind to follow up later. Use them only when you truly need a teammate; never just to greet, thank, " +
+        "or repeat what they said. Without the tools, writing @Name hands the work over. " +
+        (hop !== undefined && hop >= TEAM_MAX_DEPTH
+          ? "This is the last hop: do not involve anyone else."
+          : hop ? "Answer what you were asked before involving anyone else." : ""),
     );
-    lines.push("</handoff_rules>");
+    lines.push("</team_rules>");
   }
   lines.push("<instruction>");
   lines.push(instruction.trim());
@@ -178,6 +186,10 @@ export function spaceAgentTaskFromRow(row: Record<string, unknown>): SpaceAgentT
     updatedAt: iso(row.updated_at),
     chainRoot: typeof row.chain_root === "string" && row.chain_root ? row.chain_root : null,
     chainDepth: typeof row.chain_depth === "number" ? row.chain_depth : 0,
+    kind: typeof row.kind === "string" && row.kind ? row.kind : "mention",
+    fromAgent: typeof row.from_agent === "string" && row.from_agent ? row.from_agent : null,
+    replyTo: typeof row.reply_to === "string" && row.reply_to ? row.reply_to : null,
+    dueAt: row.due_at ? iso(row.due_at) || null : null,
   });
   return parsed.success ? parsed.data : null;
 }
