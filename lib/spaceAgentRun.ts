@@ -23,7 +23,18 @@ import {
 import { newId } from "@/lib/spaceWrite";
 import { ingestRoomFiles, loadRoomContext } from "@/lib/roomContext";
 import { linkAgentMentions, planHandoffs } from "@/lib/agentHandoff";
-import { enqueueAgentTasks } from "@/lib/spaceAgentStore";
+import { enqueueAgentTasks, enqueueTeamTask } from "@/lib/spaceAgentStore";
+import {
+  TEAM_MAX_DEPTH,
+  TEAM_MAX_PER_AGENT,
+  TEAM_MAX_TURNS,
+  droppedNote,
+  parseTeamActions,
+  planTeamActions,
+  teamActionMessage,
+  teamTurnInstruction,
+  type PlannedAction,
+} from "@/lib/teamComms";
 import type { WorkspaceCredential } from "@/lib/workspaceAuth";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://backend.aivory.id";
@@ -55,6 +66,181 @@ async function loadSpaceAgents(spaceId: string): Promise<string[]> {
   }
 }
 
+/** Turns used so far in a chain, per agent, and agents with an open turn in the thread. */
+async function loadChainState(spaceId: string, root: string, threadRoot: string) {
+  const used = await query(
+    `SELECT agent_type, count(*)::int AS n FROM dashboard.workspace_agent_tasks
+     WHERE space_id = $1 AND (chain_root = $2 OR (chain_root IS NULL AND trigger_msg = $2))
+     GROUP BY agent_type`,
+    [spaceId, root],
+  );
+  const usedPerAgent: Record<string, number> = {};
+  let usedTotal = 0;
+  for (const r of used.rows as Record<string, unknown>[]) {
+    usedPerAgent[String(r.agent_type)] = Number(r.n);
+    usedTotal += Number(r.n);
+  }
+  const open = await query(
+    `SELECT agent_type FROM dashboard.workspace_agent_tasks
+     WHERE space_id = $1 AND thread_root = $2 AND status IN ('todo', 'in_progress', 'blocked')`,
+    [spaceId, threadRoot],
+  );
+  const busy = (open.rows as Record<string, unknown>[]).map((r) => String(r.agent_type));
+  return { usedPerAgent, usedTotal, busy };
+}
+
+/** Post a message in a thread as `agentType`. Returns the new message id. */
+async function postAgentMessage(
+  spaceId: string,
+  threadRoot: string,
+  agentType: string,
+  body: string,
+  replyTo: string | null,
+): Promise<string> {
+  const stamps = parseSpaceMentions(body);
+  const msgId = newId();
+  await query(
+    `INSERT INTO dashboard.workspace_messages
+       (id, space_id, thread_root, author_kind, author_id, author_name, agent_type,
+        body, mentions, member_ids, here, has_agent, doc_refs, reply_to)
+     VALUES ($1, $2, $3, 'agent', $4, $5, $4, $6, $7, $8, $9, $10, $11, $12)
+     RETURNING id`,
+    [
+      msgId, spaceId, threadRoot, agentType, agentDisplayName(agentType), body,
+      stamps.agentTypes, stamps.memberIds, stamps.here, stamps.hasAgent, stamps.docRefs, replyTo,
+    ],
+  );
+  return msgId;
+}
+
+/** The quoted part of a team-turn instruction (`[Question from X]\n…`), else the whole text. */
+function quotedPart(instruction: string): string {
+  const m = /\n\[(?:Question|Task|Handoff|Answer|Report) from [^\]]+\]\n([\s\S]*)$/.exec(instruction);
+  return (m ? m[1] : instruction).trim();
+}
+
+const agentLink = (type: string) => `[@${agentDisplayName(type)}](#agent:${type})`;
+
+/**
+ * ADR-021: carry out the speech acts an agent made with its team tools. Each one is posted as that
+ * agent's own message (quoting its reply); ask / delegate / handoff also start the teammate's turn,
+ * and remind schedules a reminder. Runs under the same user credential as the chain's first turn.
+ * Best effort: a failure never fails the reply that was already posted.
+ */
+async function executeTeamPlan(opts: {
+  spaceId: string;
+  task: SpaceAgentTask;
+  planned: PlannedAction[];
+  replyMsg: string;
+  credential: Extract<WorkspaceCredential, { kind: "user" }>;
+}): Promise<void> {
+  const { spaceId, task, planned, replyMsg, credential } = opts;
+  const root = task.chainRoot ?? task.triggerMsg;
+  const depth = (task.chainDepth ?? 0) + 1;
+  const fromName = agentDisplayName(task.agentType);
+  const toRun: string[] = [];
+  for (const action of planned) {
+    try {
+      const msgId = await postAgentMessage(
+        spaceId, task.threadRoot, task.agentType, teamActionMessage(action, agentLink), replyMsg,
+      );
+      if (action.kind === "remind") {
+        await query(
+          `INSERT INTO dashboard.workspace_agent_reminders
+             (id, space_id, thread_root, target_agent, from_agent, text, fire_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [newId(), spaceId, task.threadRoot, action.target, task.agentType, action.text, action.fireAt],
+        );
+        continue;
+      }
+      if (action.kind === "message") continue;
+      const created = await enqueueTeamTask({
+        spaceId,
+        threadRoot: task.threadRoot,
+        triggerMsg: msgId,
+        agentType: action.target,
+        instruction: teamTurnInstruction(action.kind, fromName, action.text, {
+          dueAt: action.kind === "delegate" ? action.dueAt : null,
+        }),
+        kind: action.kind,
+        fromAgent: task.agentType,
+        // The asker / delegator is told when this turn finishes; a handoff waits on nobody.
+        replyTo: action.kind === "handoff" ? null : task.id,
+        dueAt: action.kind === "delegate" ? action.dueAt : null,
+        chain: { root, depth },
+        reason: `${action.kind} from ${fromName}`,
+      });
+      if (created) toRun.push(created.id);
+    } catch (error) {
+      console.error("[workspace team action]", action.kind, error);
+    }
+  }
+  if (planned.length > 0) {
+    await recordWorkspaceActivity({
+      docId: spaceId,
+      credential,
+      agentType: task.agentType,
+      action: "agent.team",
+      summary: `${fromName}: ${planned.map((a) => `${a.kind} ${agentDisplayName(a.target)}`).join(", ")}`,
+    }).catch(() => {});
+  }
+  for (const id of toRun) {
+    runAgentTask({ spaceId, taskId: id, credential }).catch((error) =>
+      console.error("[workspace team auto-run]", id, error),
+    );
+  }
+}
+
+/**
+ * ADR-021: when an asked / delegated turn finishes, give the agent that is waiting on it a turn
+ * with the answer, so it can continue its own work. Bounded by the same chain budget.
+ */
+async function routeToWaiter(opts: {
+  spaceId: string;
+  task: SpaceAgentTask;
+  reply: string;
+  replyMsg: string;
+  roomAgents: string[];
+  credential: Extract<WorkspaceCredential, { kind: "user" }>;
+}): Promise<void> {
+  const { spaceId, task, reply, replyMsg, roomAgents, credential } = opts;
+  const waiter = task.fromAgent;
+  if ((task.kind !== "ask" && task.kind !== "delegate") || !waiter || !task.replyTo) return;
+  if (!roomAgents.includes(waiter)) return;
+  try {
+    const root = task.chainRoot ?? task.triggerMsg;
+    const depth = (task.chainDepth ?? 0) + 1;
+    const state = await loadChainState(spaceId, root, task.threadRoot);
+    if (depth > TEAM_MAX_DEPTH || state.usedTotal >= TEAM_MAX_TURNS) return;
+    if ((state.usedPerAgent[waiter] ?? 0) >= TEAM_MAX_PER_AGENT) return;
+    if (state.busy.includes(waiter)) return;
+    const created = await enqueueTeamTask({
+      spaceId,
+      threadRoot: task.threadRoot,
+      triggerMsg: replyMsg,
+      agentType: waiter,
+      instruction: teamTurnInstruction(
+        task.kind === "ask" ? "answer" : "report",
+        agentDisplayName(task.agentType),
+        reply,
+        { original: quotedPart(task.instruction) },
+      ),
+      kind: task.kind === "ask" ? "answer" : "report",
+      fromAgent: task.agentType,
+      replyTo: null,
+      chain: { root, depth },
+      reason: `${task.kind === "ask" ? "answer" : "report"} from ${agentDisplayName(task.agentType)}`,
+    });
+    if (created) {
+      runAgentTask({ spaceId, taskId: created.id, credential }).catch((error) =>
+        console.error("[workspace team answer-run]", created.id, error),
+      );
+    }
+  } catch (error) {
+    console.error("[workspace team answer]", error);
+  }
+}
+
 /**
  * ADR-020: a reply that @mentions a teammate hands work over. Enqueues a task for them
  * (created_by `agent:<type>`) in the same thread and runs it, so they answer in their own
@@ -77,28 +263,12 @@ async function spawnHandoffs(opts: {
   try {
     const root = task.chainRoot ?? task.triggerMsg;
     const depth = task.chainDepth ?? 0;
-    const used = await query(
-      `SELECT agent_type, count(*)::int AS n FROM dashboard.workspace_agent_tasks
-       WHERE space_id = $1 AND (chain_root = $2 OR (chain_root IS NULL AND trigger_msg = $2))
-       GROUP BY agent_type`,
-      [spaceId, root],
-    );
-    const usedPerAgent: Record<string, number> = {};
-    let usedTotal = 0;
-    for (const r of used.rows as Record<string, unknown>[]) {
-      usedPerAgent[String(r.agent_type)] = Number(r.n);
-      usedTotal += Number(r.n);
-    }
-    const open = await query(
-      `SELECT agent_type FROM dashboard.workspace_agent_tasks
-       WHERE space_id = $1 AND thread_root = $2 AND status IN ('todo', 'in_progress', 'blocked')`,
-      [spaceId, task.threadRoot],
-    );
+    const { usedPerAgent, usedTotal, busy } = await loadChainState(spaceId, root, task.threadRoot);
     const next = planHandoffs(linkedReply, candidates, task.agentType, {
       depth,
       usedPerAgent,
       usedTotal,
-      queued: (open.rows as Record<string, unknown>[]).map((r) => String(r.agent_type)),
+      queued: busy,
     });
     if (next.length === 0) return;
 
@@ -237,6 +407,7 @@ export async function runAgentTask(opts: {
 
   let reply = "";
   let pendingApproval: { id: string; tool_name: string; risk_tier: string } | null = null;
+  let teamActionsRaw: unknown = null;
   try {
     // Agents here are the leader's: run the turn in the leader's tenant, billed
     // to them, with this member as requester (backend re-verifies both).
@@ -260,9 +431,11 @@ export async function runAgentTask(opts: {
     const data = (await upstream.json()) as {
       reply?: unknown;
       pending_approval?: { id: string; tool_name: string; risk_tier: string } | null;
+      team_actions?: unknown;
     };
     reply = typeof data.reply === "string" ? data.reply.trim() : "";
     pendingApproval = data.pending_approval ?? null;
+    teamActionsRaw = data.team_actions ?? null;
   } catch (error) {
     const reason = error instanceof Error ? error.message.slice(0, 300) : "agent unreachable";
     await setAgentTask(taskId, "failed", reason);
@@ -293,7 +466,27 @@ export async function runAgentTask(opts: {
   // mention chip and carries the agent stamp (and can hand work over, ADR-020).
   const spaceAgentsForReply = await loadSpaceAgents(id);
   const candidates = spaceAgentsForReply.map((type) => ({ type, name: agentDisplayName(type) }));
-  const linkedReply = linkAgentMentions(reply, candidates);
+
+  // ADR-021: the agent's team actions, planned against the room before its reply is posted so
+  // anything the room cannot carry out is said in that same message.
+  const teamActions = parseTeamActions(teamActionsRaw);
+  let plan: ReturnType<typeof planTeamActions> | null = null;
+  if (teamActions.length > 0) {
+    try {
+      const state = await loadChainState(id, task.chainRoot ?? task.triggerMsg, task.threadRoot);
+      plan = planTeamActions(
+        teamActions,
+        candidates,
+        task.agentType,
+        { depth: task.chainDepth ?? 0, ...state, busy: state.busy.filter((a) => a !== task.agentType) },
+        Date.now(),
+      );
+    } catch (error) {
+      console.error("[workspace team plan]", error);
+    }
+  }
+
+  const linkedReply = linkAgentMentions(reply + (plan ? droppedNote(plan.dropped) : ""), candidates);
   const stamps = parseSpaceMentions(linkedReply);
   const msgId = newId();
   const name = agentDisplayName(task.agentType);
@@ -319,6 +512,13 @@ export async function runAgentTask(opts: {
     action: "agent.replied",
       summary: `${name} replied in the thread`,
   }).catch(() => {});
-  await spawnHandoffs({ spaceId: id, task, linkedReply, msgId, candidates, credential });
+  // An asked / delegated turn answers the agent waiting on it (ADR-021).
+  await routeToWaiter({ spaceId: id, task, reply, replyMsg: msgId, roomAgents: spaceAgentsForReply, credential });
+  if (plan) {
+    await executeTeamPlan({ spaceId: id, task, planned: plan.planned, replyMsg: msgId, credential });
+  } else {
+    // No team tools used: a plain @Name in the reply still hands work over (ADR-020).
+    await spawnHandoffs({ spaceId: id, task, linkedReply, msgId, candidates, credential });
+  }
   return { task: await loadAgentTask(id, taskId), message, status: 200 };
 }

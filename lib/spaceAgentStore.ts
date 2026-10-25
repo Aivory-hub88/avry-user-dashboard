@@ -80,3 +80,52 @@ export async function enqueueAgentTasks(input: EnqueueInput): Promise<SpaceAgent
   }
   return out;
 }
+
+export interface TeamTaskInput {
+  spaceId: string;
+  threadRoot: string;
+  /** The message that carries this turn's request (the asker's ❓ message, a reminder, …). */
+  triggerMsg: string;
+  agentType: string;
+  instruction: string;
+  /** ADR-021 turn kind: ask | answer | delegate | report | handoff | reminder. */
+  kind: string;
+  /** The agent that asked / delegated / reminded (null for a human). */
+  fromAgent: string | null;
+  /** Task id waiting on this one (the asker's / delegator's turn). */
+  replyTo?: string | null;
+  dueAt?: string | null;
+  chain: { root: string; depth: number };
+  reason: string;
+}
+
+/**
+ * One ADR-021 team turn (needs migrations/workspace-agent-comms.sql). Not deduped against open
+ * tasks: the planner already skips teammates with an open turn in the thread.
+ */
+export async function enqueueTeamTask(input: TeamTaskInput): Promise<SpaceAgentTask | null> {
+  const inserted = await query(
+    `INSERT INTO dashboard.workspace_agent_tasks
+       (id, space_id, thread_root, trigger_msg, agent_type, instruction,
+        status, reason, created_by, chain_root, chain_depth, kind, from_agent, reply_to, due_at)
+     VALUES ($1, $2, $3, $4, $5, $6, 'todo', $7, $8, $9, $10, $11, $12, $13, $14)
+     RETURNING *`,
+    [
+      newId(),
+      input.spaceId,
+      input.threadRoot,
+      input.triggerMsg,
+      input.agentType,
+      input.instruction,
+      input.reason,
+      input.fromAgent ? `agent:${input.fromAgent}` : "system:reminder",
+      input.chain.root,
+      input.chain.depth,
+      input.kind,
+      input.fromAgent,
+      input.replyTo ?? null,
+      input.dueAt ?? null,
+    ],
+  );
+  return spaceAgentTaskFromRow(inserted.rows[0] as Record<string, unknown>);
+}

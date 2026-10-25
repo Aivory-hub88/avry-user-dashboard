@@ -13,7 +13,8 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { getDocRole, canRead, checkAgentAccess } from "@/lib/workspaceAccess"
+import { getDocRole, canRead, canWrite, checkAgentAccess } from "@/lib/workspaceAccess"
+import { fireDueReminders } from "@/lib/teamReminders"
 import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
 import { clampLimit, spaceMessageFromRow } from "@/lib/spaceThreads"
 import { spaceAgentTaskFromRow } from "@/lib/spaceAgent"
@@ -27,7 +28,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
   if (await checkAgentAccess(id, credential, req.headers.get("x-agent-type"), "read")) return forbidden()
-  if (!canRead(await getDocRole(credential, id))) return forbidden()
+  const role = await getDocRole(credential, id)
+  if (!canRead(role)) return forbidden()
+  // ADR-021: due agent reminders fire while a member who can write has the room open.
+  // Fire-and-forget: the poll never waits on an agent turn.
+  if (credential.kind === "user" && canWrite(role)) {
+    fireDueReminders(id, credential).catch((error) => {
+      // A missing table means migrations/workspace-agent-comms.sql is not applied yet.
+      if (!String(error).includes("workspace_agent_reminders")) console.error("[workspace reminders]", error)
+    })
+  }
 
   const sp = req.nextUrl.searchParams
   const limit = clampLimit(sp.get("limit"), 100)
