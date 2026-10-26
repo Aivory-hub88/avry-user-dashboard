@@ -38,6 +38,8 @@ export const SpaceAgentTaskSchema = z.object({
   fromAgent: z.string().nullable().optional(),
   replyTo: z.string().nullable().optional(),
   dueAt: z.string().nullable().optional(),
+  /** Waits behind the agent's open turn in the thread; starts when that one ends. */
+  queued: z.boolean().optional(),
 });
 export type SpaceAgentTask = z.infer<typeof SpaceAgentTaskSchema>;
 
@@ -190,6 +192,7 @@ export function spaceAgentTaskFromRow(row: Record<string, unknown>): SpaceAgentT
     fromAgent: typeof row.from_agent === "string" && row.from_agent ? row.from_agent : null,
     replyTo: typeof row.reply_to === "string" && row.reply_to ? row.reply_to : null,
     dueAt: row.due_at ? iso(row.due_at) || null : null,
+    queued: row.queued === true,
   });
   return parsed.success ? parsed.data : null;
 }

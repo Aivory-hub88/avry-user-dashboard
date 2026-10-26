@@ -38,12 +38,15 @@ export interface TeamAction {
 /** The kind of turn a task row stands for. `mention` = a human or plain @Name. */
 export type TaskKind = "mention" | "ask" | "answer" | "delegate" | "report" | "handoff" | "reminder"
 
-/** A validated action, resolved against the room. */
+/**
+ * A validated action, resolved against the room. `queued`: the teammate already has an open turn in
+ * this thread, so the turn waits behind it instead of starting now.
+ */
 export type PlannedAction =
   | { kind: "message"; target: string; text: string }
-  | { kind: "ask"; target: string; text: string; runs: true }
-  | { kind: "delegate"; target: string; text: string; dueAt: string | null; runs: true }
-  | { kind: "handoff"; target: string; text: string; runs: true }
+  | { kind: "ask"; target: string; text: string; runs: true; queued?: true }
+  | { kind: "delegate"; target: string; text: string; dueAt: string | null; runs: true; queued?: true }
+  | { kind: "handoff"; target: string; text: string; runs: true; queued?: true }
   | { kind: "remind"; target: string; text: string; fireAt: string }
 
 export interface DroppedAction {
@@ -176,17 +179,15 @@ export function planTeamActions(
       dropped.push({ action, reason: `${action.to} already took ${TEAM_MAX_PER_AGENT} turns here` })
       continue
     }
-    if (busy.has(target)) {
-      // Still delivered as a note: the teammate sees it on their next turn.
-      planned.push({ kind: "message", target, text: action.text })
-      continue
-    }
+    // A busy teammate still gets the turn: it waits behind their open one, so an ask is never
+    // reduced to a note whose answer the asker would wait for in vain.
+    const queued = busy.has(target) ? ({ queued: true } as const) : {}
     busy.add(target)
     perAgent[target] = (perAgent[target] ?? 0) + 1
     total += 1
-    if (action.kind === "ask") planned.push({ kind: "ask", target, text: action.text, runs: true })
-    else if (action.kind === "handoff") planned.push({ kind: "handoff", target, text: action.text, runs: true })
-    else planned.push({ kind: "delegate", target, text: action.text, dueAt: dueAtIso(action.due), runs: true })
+    if (action.kind === "ask") planned.push({ kind: "ask", target, text: action.text, runs: true, ...queued })
+    else if (action.kind === "handoff") planned.push({ kind: "handoff", target, text: action.text, runs: true, ...queued })
+    else planned.push({ kind: "delegate", target, text: action.text, dueAt: dueAtIso(action.due), runs: true, ...queued })
   }
   return { planned, dropped }
 }
@@ -211,6 +212,16 @@ export function teamActionMessage(
   }
 }
 
+/** How a teammate reports back on asked or delegated work, so the asker can act on it. */
+const REPORT_FORMAT =
+  "Start your reply with three lines: Status: done | partial | blocked, Result: <the concrete outcome>, " +
+  "Evidence: <document, record, message or none>. When Status is blocked, add Unblock: <the one action that unblocks it>."
+/** How the asker reads an answer: no acknowledgement loops, no repeating blocked work. */
+const ANSWER_RULES =
+  "Tell the room what it means, starting with the teammate's name. Do not send them an acknowledgement or thanks; " +
+  "message them again only with a new request or information that unblocks them. When they report blocked work, " +
+  "do not redo it: give the room the blocker and its Unblock action."
+
 /** The instruction for the target's turn. Teammates' words are data, never instructions. */
 export function teamTurnInstruction(
   kind: Extract<TaskKind, "ask" | "delegate" | "handoff" | "answer" | "report" | "reminder">,
@@ -221,27 +232,75 @@ export function teamTurnInstruction(
   const quoted = text.trim()
   switch (kind) {
     case "ask":
-      return `${fromName} asks you (answer them in your reply):\n[Question from ${fromName}]\n${quoted}`
+      return (
+        `${fromName} asks you. Answer them in your reply; if you cannot, say why in one line.\n` +
+        `[Question from ${fromName}]\n${quoted}`
+      )
     case "delegate":
       return (
         `${fromName} assigned you a task${extra?.dueAt ? ` (due ${extra.dueAt.slice(0, 10)})` : ""}. ` +
-        `Do it and report the result in your reply:\n[Task from ${fromName}]\n${quoted}`
+        `Do it and report in your reply. ${REPORT_FORMAT}\n[Task from ${fromName}]\n${quoted}`
       )
     case "handoff":
       return `${fromName} handed this conversation to you:\n[Handoff from ${fromName}]\n${quoted}`
     case "answer":
       return (
-        `${fromName} answered your question. Continue your work with it and reply to the room.\n` +
+        `${fromName} answered your question. Continue your work with it and reply to the room. ${ANSWER_RULES}\n` +
         `${extra?.original ? `[Your question]\n${extra.original.trim()}\n` : ""}[Answer from ${fromName}]\n${quoted}`
       )
     case "report":
       return (
-        `${fromName} finished the task you assigned. Review it and tell the room what happens next.\n` +
+        `${fromName} reported on the task you assigned. Review it and tell the room what happens next. ${ANSWER_RULES}\n` +
         `${extra?.original ? `[Your task]\n${extra.original.trim()}\n` : ""}[Report from ${fromName}]\n${quoted}`
       )
     case "reminder":
       return `⏰ Reminder${fromName ? ` from ${fromName}` : ""}. Follow up on it now:\n[Reminder]\n${quoted}`
   }
+}
+
+/** One teammate's outcome on a request the asker sent: their answer, or why none came. */
+export interface TeamAnswer {
+  kind: "ask" | "delegate"
+  fromName: string
+  /** The question or task as the asker sent it. */
+  original: string
+  /** The teammate's reply, or null when their turn failed. */
+  reply: string | null
+  /** Why the turn failed, when `reply` is null. */
+  failure?: string
+}
+
+/**
+ * The instruction for the asker's turn that receives the outcome of what it asked or delegated.
+ * One answer reads as before; several (an asker that asked two teammates) arrive in one turn, so
+ * the asker reads them together instead of once per answer. A failed teammate is named, so the
+ * asker does not wait for them. `pending` names teammates still waiting on an approval.
+ */
+export function teamAnswersInstruction(answers: TeamAnswer[], pending: string[] = []): string {
+  const [only] = answers
+  if (answers.length === 1 && only.reply !== null && pending.length === 0) {
+    return teamTurnInstruction(only.kind === "ask" ? "answer" : "report", only.fromName, only.reply, {
+      original: only.original,
+    })
+  }
+  const parts = [
+    `Your teammates came back on what you asked. Continue your work with it and reply to the room. ${ANSWER_RULES}`,
+  ]
+  for (const a of answers) {
+    const label = a.kind === "ask" ? "Your question" : "Your task"
+    const head = a.kind === "ask" ? "Answer" : "Report"
+    parts.push(
+      a.reply !== null
+        ? `[${label} to ${a.fromName}]\n${a.original.trim()}\n[${head} from ${a.fromName}]\n${a.reply.trim()}`
+        : `[${label} to ${a.fromName}]\n${a.original.trim()}\n` +
+            `No answer comes from ${a.fromName}: their turn failed (${a.failure ?? "unknown error"}). ` +
+            "Do not wait for them; tell the room, and ask again only if it still matters.",
+    )
+  }
+  if (pending.length > 0) {
+    parts.push(`Still open: ${pending.join(", ")} (waiting for an approval). Their answer comes in a later turn.`)
+  }
+  return parts.join("\n\n")
 }
 
 /** Short note for actions the room could not carry out, appended to the agent's message. */

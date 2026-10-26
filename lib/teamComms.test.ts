@@ -9,6 +9,7 @@ import {
   planTeamActions,
   reminderFireAt,
   teamActionMessage,
+  teamAnswersInstruction,
   teamTurnInstruction,
 } from "./teamComms"
 
@@ -102,10 +103,10 @@ describe("planTeamActions", () => {
     expect(tired.dropped[0].reason).toContain("already took")
   })
 
-  it("turns an ask to a busy teammate into a note instead of a second turn", () => {
+  it("queues an ask to a busy teammate behind their open turn instead of reducing it to a note", () => {
     const { planned } = planTeamActions([{ kind: "ask", to: "Teo", text: "?" }], team, "leads_qualifier",
       { ...base, busy: ["customer_service"] }, NOW)
-    expect(planned).toEqual([{ kind: "message", target: "customer_service", text: "?" }])
+    expect(planned).toEqual([{ kind: "ask", target: "customer_service", text: "?", runs: true, queued: true }])
   })
 
   it("schedules reminders for self within 1 minute to 30 days", () => {
@@ -156,5 +157,29 @@ describe("messages and instructions", () => {
     const ins = teamTurnInstruction("answer", "Teo", "Sudah beres.", { original: "Tiket Alvin?" })
     expect(ins).toContain("[Answer from Teo]\nSudah beres.")
     expect(ins).toContain("[Your question]\nTiket Alvin?")
+  })
+  it("asks a delegate for a Status / Result / Evidence report and the asker not to acknowledge", () => {
+    expect(teamTurnInstruction("delegate", "Lex", "Kirim invoice")).toContain("Status: done | partial | blocked")
+    expect(teamTurnInstruction("report", "Fina", "Status: done")).toContain("Do not send them an acknowledgement")
+  })
+})
+
+describe("teamAnswersInstruction", () => {
+  it("keeps the single-answer form for one answer", () => {
+    const one = teamAnswersInstruction([{ kind: "ask", fromName: "Teo", original: "Tiket?", reply: "Beres." }])
+    expect(one).toBe(teamTurnInstruction("answer", "Teo", "Beres.", { original: "Tiket?" }))
+  })
+  it("gathers several answers, names a teammate whose turn failed, and one still on approval", () => {
+    const ins = teamAnswersInstruction(
+      [
+        { kind: "ask", fromName: "Teo", original: "Tiket?", reply: "Beres." },
+        { kind: "delegate", fromName: "Fina", original: "Invoice", reply: null, failure: "agent-chat 502" },
+      ],
+      ["Aira"],
+    )
+    expect(ins).toContain("[Answer from Teo]\nBeres.")
+    expect(ins).toContain("[Your task to Fina]\nInvoice")
+    expect(ins).toContain("No answer comes from Fina: their turn failed (agent-chat 502)")
+    expect(ins).toContain("Still open: Aira")
   })
 })
