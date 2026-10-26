@@ -2,7 +2,7 @@
  * Agent-to-agent communication in a Team Space room (ADR-021).
  *
  * An agent's team tools (`team_message`, `team_ask`, `team_delegate`,
- * `team_handoff`, `team_remind`, in Cerveau) record speech acts during its
+ * `team_handoff`, `team_remind`, `team_wait`, `team_wait_close`, in Cerveau) record speech acts during its
  * turn; the backend relays them as `team_actions`. This module decides which
  * of them the room carries out and how each one reads as a message. It is
  * pure: the caller (lib/spaceAgentRun.ts) owns the database and the turns.
@@ -23,8 +23,14 @@ export const TEAM_MAX_ACTIONS_PER_TURN = 3
 /** Reminders: at least this far out, at most this far out. */
 export const REMINDER_MIN_MS = 60_000
 export const REMINDER_MAX_MS = 30 * 24 * 60 * 60_000
+/** A reminder claimed later than this after its time is late (ADR-021 §4.1 missed policy). */
+export const REMINDER_LATE_MS = 10 * 60_000
+/** Open waits one agent keeps per thread; a new one closes the oldest. */
+export const WAIT_MAX_OPEN_PER_THREAD = 3
 
-export type TeamActionKind = "message" | "ask" | "delegate" | "handoff" | "remind"
+export type TeamActionKind = "message" | "ask" | "delegate" | "handoff" | "remind" | "wait" | "wait_close"
+
+export type MissedPolicy = "run_once" | "skip"
 
 /** One action as Cerveau records it (agent/tenant.rs `TeamAction`). */
 export interface TeamAction {
@@ -33,10 +39,19 @@ export interface TeamAction {
   text: string
   due?: string
   when?: string
+  /** remind: what happens when it cannot fire on time. */
+  missed_policy?: MissedPolicy
+  /** wait_close: the wait to close; absent = all of the agent's open waits in the thread. */
+  wait_id?: string
 }
 
 /** The kind of turn a task row stands for. `mention` = a human or plain @Name. */
-export type TaskKind = "mention" | "ask" | "answer" | "delegate" | "report" | "handoff" | "reminder"
+export type TaskKind = "mention" | "ask" | "answer" | "delegate" | "report" | "handoff" | "reminder" | "wake"
+
+/** Turns nobody is waiting on: sent as `turn_origin`, so the agent may end them quietly (ADR-021 §4.3). */
+export function unattendedTurnOrigin(kind: string | undefined): "reminder" | "wake" | null {
+  return kind === "reminder" || kind === "wake" ? kind : null
+}
 
 /**
  * A validated action, resolved against the room. `queued`: the teammate already has an open turn in
@@ -47,7 +62,9 @@ export type PlannedAction =
   | { kind: "ask"; target: string; text: string; runs: true; queued?: true }
   | { kind: "delegate"; target: string; text: string; dueAt: string | null; runs: true; queued?: true }
   | { kind: "handoff"; target: string; text: string; runs: true; queued?: true }
-  | { kind: "remind"; target: string; text: string; fireAt: string }
+  | { kind: "remind"; target: string; text: string; fireAt: string; missedPolicy: MissedPolicy }
+  | { kind: "wait"; target: string; text: string; wakeAt: string | null }
+  | { kind: "wait_close"; target: string; text: string; waitId: string | null }
 
 export interface DroppedAction {
   action: TeamAction
@@ -65,7 +82,8 @@ export interface TeamChainState {
   busy?: Iterable<string>
 }
 
-const KINDS: TeamActionKind[] = ["message", "ask", "delegate", "handoff", "remind"]
+const KINDS: TeamActionKind[] = ["message", "ask", "delegate", "handoff", "remind", "wait", "wait_close"]
+const WAIT_ID = /^[A-Za-z0-9_-]{1,64}$/
 
 /** Parse the relayed `team_actions` field defensively (it crossed three services). */
 export function parseTeamActions(raw: unknown): TeamAction[] {
@@ -77,13 +95,17 @@ export function parseTeamActions(raw: unknown): TeamAction[] {
     const kind = typeof a.kind === "string" ? (a.kind as TeamActionKind) : null
     const to = typeof a.to === "string" ? a.to.trim() : ""
     const text = typeof a.text === "string" ? a.text.trim().slice(0, 2000) : ""
-    if (!kind || !KINDS.includes(kind) || !to || !text) continue
+    // Closing a wait needs no text; everything else does.
+    if (!kind || !KINDS.includes(kind) || !to || (!text && kind !== "wait_close")) continue
+    const waitId = typeof a.wait_id === "string" ? a.wait_id.trim() : ""
     out.push({
       kind,
       to,
       text,
       ...(typeof a.due === "string" && a.due.trim() ? { due: a.due.trim() } : {}),
       ...(typeof a.when === "string" && a.when.trim() ? { when: a.when.trim() } : {}),
+      ...(a.missed_policy === "run_once" || a.missed_policy === "skip" ? { missed_policy: a.missed_policy } : {}),
+      ...(WAIT_ID.test(waitId) ? { wait_id: waitId } : {}),
     })
   }
   return out
@@ -137,21 +159,37 @@ export function planTeamActions(
       dropped.push({ action, reason: "too many team messages in one turn" })
       continue
     }
+    const ownAction = action.kind === "wait" || action.kind === "wait_close"
     const target =
-      action.kind === "remind" && action.to.toLowerCase() === "self"
+      ownAction || (action.kind === "remind" && action.to.toLowerCase() === "self")
         ? self
         : resolveTeammate(action.to, candidates)
     if (!target) {
       dropped.push({ action, reason: `${action.to} is not in this room` })
       continue
     }
-    if (target === self && action.kind !== "remind") {
+    if (target === self && action.kind !== "remind" && !ownAction) {
       dropped.push({ action, reason: "an agent cannot message itself" })
       continue
     }
 
     if (action.kind === "message") {
       planned.push({ kind: "message", target, text: action.text })
+      continue
+    }
+    if (action.kind === "wait_close") {
+      planned.push({ kind: "wait_close", target, text: action.text, waitId: action.wait_id ?? null })
+      continue
+    }
+    if (action.kind === "wait") {
+      const wake = action.when ? reminderFireAt(action.when, now) : null
+      if (action.when && wake === null) {
+        dropped.push({ action, reason: "the wait's wake time could not be read" })
+      } else if (wake !== null && (wake - now < REMINDER_MIN_MS || wake - now > REMINDER_MAX_MS)) {
+        dropped.push({ action, reason: "a wait can wake 1 minute to 30 days out" })
+      } else {
+        planned.push({ kind: "wait", target, text: action.text, wakeAt: wake === null ? null : new Date(wake).toISOString() })
+      }
       continue
     }
     if (action.kind === "remind") {
@@ -161,7 +199,13 @@ export function planTeamActions(
       } else if (fire - now < REMINDER_MIN_MS || fire - now > REMINDER_MAX_MS) {
         dropped.push({ action, reason: "a reminder must be 1 minute to 30 days out" })
       } else {
-        planned.push({ kind: "remind", target, text: action.text, fireAt: new Date(fire).toISOString() })
+        planned.push({
+          kind: "remind",
+          target,
+          text: action.text,
+          fireAt: new Date(fire).toISOString(),
+          missedPolicy: action.missed_policy ?? "run_once",
+        })
       }
       continue
     }
@@ -209,7 +253,83 @@ export function teamActionMessage(
       return `${who} 📋 ${action.text}${action.dueAt ? `\n\nDue: ${action.dueAt.slice(0, 10)}` : ""}`
     case "remind":
       return `⏰ Reminder for ${who} at ${action.fireAt.slice(0, 16).replace("T", " ")} UTC: ${action.text}`
+    case "wait":
+      return `⏳ Waiting: ${action.text}${action.wakeAt ? `\n\nI check again at ${utcMinute(action.wakeAt)} UTC.` : ""}`
+    case "wait_close":
+      return `✅ No longer waiting${action.text ? `: ${action.text}` : "."}`
   }
+}
+
+const utcMinute = (iso: string) => iso.slice(0, 16).replace("T", " ")
+
+/**
+ * How a claimed reminder fires (ADR-021 §4.1): on time, late (it fires once and says so), or skipped
+ * when it is late and its policy is `skip`. Mirrors the SQL in lib/teamReminders.ts.
+ */
+export function reminderFireOutcome(
+  fireAt: number,
+  now: number,
+  policy: MissedPolicy = "run_once",
+): "on_time" | "late" | "skipped" {
+  if (now - fireAt <= REMINDER_LATE_MS) return "on_time"
+  return policy === "skip" ? "skipped" : "late"
+}
+
+/** An open wait as the woken turn sees it. */
+export interface OpenWait {
+  id: string
+  requestText: string
+  note: string
+  createdAt: string
+}
+
+/** What woke a wait. */
+export type WakeCause = "reminder" | "delegate" | "webhook"
+
+const WAKE_CAUSE: Record<WakeCause, string> = {
+  reminder: "its time came",
+  delegate: "a teammate finished what you asked or delegated",
+  webhook: "an outside event woke it",
+}
+
+/** One wait, quoted for the woken turn: the original request and the agent's note, both as data. */
+function quotedWait(w: OpenWait): string {
+  return (
+    `[Wait ${w.id} since ${utcMinute(w.createdAt)} UTC]\n` +
+    `[Original request]\n${w.requestText.trim()}\n[Your note]\n${w.note.trim()}`
+  )
+}
+
+/**
+ * The instruction for a turn that a wait woke (team_wait, ADR-021 §4.2). It repeats the original request,
+ * so the agent can pick the work up even when the conversation that set the wait is long gone.
+ */
+export function waitWakeInstruction(waits: OpenWait[], cause: WakeCause, detail?: string): string {
+  return [
+    `⏳ A wait you set woke: ${WAKE_CAUSE[cause]}${detail ? ` (${detail.trim()})` : ""}. ` +
+      "Pick the request up again and reply to the room. When it is done or no longer matters, call " +
+      "team_wait_close with its wait_id; to keep waiting, end the turn without closing it. Nobody is " +
+      "waiting on this turn: if there is still nothing new to tell the room, call run_no_update.",
+    ...waits.map(quotedWait),
+  ].join("\n\n")
+}
+
+/** Open waits appended to an answer / report turn, since a teammate finishing may be what they wait on. */
+export function openWaitsNote(waits: OpenWait[]): string {
+  if (waits.length === 0) return ""
+  return (
+    "\n\nYou also have open waits in this thread. If this resolves one, finish it and call " +
+    "team_wait_close with its wait_id.\n\n" +
+    waits.map(quotedWait).join("\n\n")
+  )
+}
+
+/** The request a turn was working on, as a wait keeps it: a woken turn's original request, else the quoted ask. */
+export function requestTextOf(instruction: string): string {
+  const woken = /\[Original request\]\n([\s\S]*?)\n\[Your note\]/.exec(instruction)
+  if (woken) return woken[1].trim()
+  const m = /\n\[(?:Question|Task|Handoff|Answer|Report|Reminder)(?: from [^\]]+)?\]\n([\s\S]*)$/.exec(instruction)
+  return (m ? m[1] : instruction).trim().slice(0, 4000)
 }
 
 /** How a teammate reports back on asked or delegated work, so the asker can act on it. */
@@ -227,7 +347,7 @@ export function teamTurnInstruction(
   kind: Extract<TaskKind, "ask" | "delegate" | "handoff" | "answer" | "report" | "reminder">,
   fromName: string,
   text: string,
-  extra?: { dueAt?: string | null; original?: string },
+  extra?: { dueAt?: string | null; original?: string; lateSince?: string | null },
 ): string {
   const quoted = text.trim()
   switch (kind) {
@@ -254,7 +374,12 @@ export function teamTurnInstruction(
         `${extra?.original ? `[Your task]\n${extra.original.trim()}\n` : ""}[Report from ${fromName}]\n${quoted}`
       )
     case "reminder":
-      return `⏰ Reminder${fromName ? ` from ${fromName}` : ""}. Follow up on it now:\n[Reminder]\n${quoted}`
+      return (
+        `⏰ Reminder${fromName ? ` from ${fromName}` : ""}. Follow up on it now` +
+        `${extra?.lateSince ? ` (it was due at ${utcMinute(extra.lateSince)} UTC and fires late)` : ""}. ` +
+        "Nobody is waiting on this turn: if there is nothing to report, call run_no_update; if you cannot do it, " +
+        `call run_report_failure.\n[Reminder]\n${quoted}`
+      )
   }
 }
 

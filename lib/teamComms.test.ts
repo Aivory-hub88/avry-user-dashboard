@@ -121,7 +121,7 @@ describe("planTeamActions", () => {
       NOW,
     )
     expect(planned).toEqual([
-      { kind: "remind", target: "leads_qualifier", text: "cek invoice", fireAt: "2026-10-24T12:00:00.000Z" },
+      { kind: "remind", target: "leads_qualifier", text: "cek invoice", fireAt: "2026-10-24T12:00:00.000Z", missedPolicy: "run_once" },
     ])
     expect(dropped[0].reason).toContain("30 days")
   })

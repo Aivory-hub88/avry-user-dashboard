@@ -26,15 +26,19 @@ import { linkAgentMentions, planHandoffs } from "@/lib/agentHandoff";
 import { enqueueAgentTasks, enqueueTeamTask } from "@/lib/spaceAgentStore";
 import {
   droppedNote,
+  openWaitsNote,
   parseTeamActions,
   planTeamActions,
+  requestTextOf,
   teamActionMessage,
   teamAnswersInstruction,
   teamTurnInstruction,
+  unattendedTurnOrigin,
   type PlannedAction,
   type TeamAction,
   type TeamAnswer,
 } from "@/lib/teamComms";
+import { closeWaits, loadOpenWaits, markWoken, openWait } from "@/lib/teamWaits";
 import type { WorkspaceCredential } from "@/lib/workspaceAuth";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://backend.aivory.id";
@@ -145,12 +149,31 @@ async function executeTeamPlan(opts: {
         spaceId, task.threadRoot, task.agentType, teamActionMessage(action, agentLink), replyMsg,
       );
       if (action.kind === "remind") {
-        await query(
-          `INSERT INTO dashboard.workspace_agent_reminders
-             (id, space_id, thread_root, target_agent, from_agent, text, fire_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [newId(), spaceId, task.threadRoot, action.target, task.agentType, action.text, action.fireAt],
-        );
+        await insertReminder(spaceId, task, action, credential.user.user_id);
+        continue;
+      }
+      if (action.kind === "wait") {
+        await openWait({
+          spaceId,
+          threadRoot: task.threadRoot,
+          agentType: task.agentType,
+          taskId: task.id,
+          // Copied by the room, so the request survives the turn and any compaction (ADR-021 §4.2).
+          requestText: requestTextOf(task.instruction),
+          note: action.text,
+          wakeAt: action.wakeAt,
+          credentialOwner: credential.user.user_id,
+        });
+        continue;
+      }
+      if (action.kind === "wait_close") {
+        await closeWaits({
+          spaceId,
+          threadRoot: task.threadRoot,
+          agentType: task.agentType,
+          waitId: action.waitId,
+          note: action.text,
+        });
         continue;
       }
       if (action.kind === "message") continue;
@@ -191,6 +214,47 @@ async function executeTeamPlan(opts: {
     runAgentTask({ spaceId, taskId: id, credential }).catch((error) =>
       console.error("[workspace team auto-run]", id, error),
     );
+  }
+}
+
+/**
+ * Store a reminder with the member whose credential this turn runs under, so the backend sweeper can
+ * fire it with nobody in the room (ADR-021 §4.1). Before the follow-up migration only the room poll fires.
+ */
+async function insertReminder(
+  spaceId: string,
+  task: SpaceAgentTask,
+  action: Extract<PlannedAction, { kind: "remind" }>,
+  owner: string,
+): Promise<void> {
+  const base = [newId(), spaceId, task.threadRoot, action.target, task.agentType, action.text, action.fireAt];
+  try {
+    await query(
+      `INSERT INTO dashboard.workspace_agent_reminders
+         (id, space_id, thread_root, target_agent, from_agent, text, fire_at, credential_owner, missed_policy)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [...base, owner, action.missedPolicy],
+    );
+  } catch (error) {
+    if ((error as { code?: string } | null)?.code !== "42703") throw error;
+    await query(
+      `INSERT INTO dashboard.workspace_agent_reminders
+         (id, space_id, thread_root, target_agent, from_agent, text, fire_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      base,
+    );
+  }
+}
+
+/** The waiter's open waits in this thread, counted as woken: a teammate finishing may be what it waits on. */
+async function wakeWaitsForAnswer(spaceId: string, threadRoot: string, waiter: string): Promise<string> {
+  try {
+    const waits = await loadOpenWaits(spaceId, { threadRoot, agentType: waiter });
+    await markWoken(waits.map((w) => w.id));
+    return openWaitsNote(waits);
+  } catch {
+    // Before migrations/workspace-agent-followup5.sql there are no waits.
+    return "";
   }
 }
 
@@ -271,12 +335,13 @@ async function routeAnswers(opts: {
     const last = claimed[claimed.length - 1];
     const state = await loadChainState(spaceId, task.chainRoot ?? task.triggerMsg, task.threadRoot);
     const queued = state.busy.includes(waiter);
+    const waitsNote = await wakeWaitsForAnswer(spaceId, task.threadRoot, waiter);
     const created = await enqueueTeamTask({
       spaceId,
       threadRoot: task.threadRoot,
       triggerMsg: last.resultMsg ?? last.triggerMsg,
       agentType: waiter,
-      instruction: teamAnswersInstruction(answers, pending),
+      instruction: teamAnswersInstruction(answers, pending) + waitsNote,
       kind,
       fromAgent: last.agentType,
       replyTo: null,
@@ -550,6 +615,8 @@ export async function runAgentTask(opts: {
   let reply = "";
   let pendingApproval: { id: string; tool_name: string; risk_tier: string } | null = null;
   let teamActionsRaw: unknown = null;
+  let runOutcome: { kind: "quiet" } | { kind: "failed"; reason: string } | null = null;
+  const turnOrigin = unattendedTurnOrigin(task.kind);
   try {
     // Agents here are the leader's: run the turn in the leader's tenant, billed
     // to them, with this member as requester (backend re-verifies both).
@@ -566,6 +633,8 @@ export async function runAgentTask(opts: {
         thread_root: task.threadRoot,
         text: prompt,
         ...(actingAs ? { acting_as: actingAs } : {}),
+        // ADR-021 §4.3: nobody waits on a reminder / wake turn, so it may end quietly or as failed.
+        ...(turnOrigin ? { turn_origin: turnOrigin } : {}),
       }),
       signal: AbortSignal.timeout(120_000),
     });
@@ -574,10 +643,18 @@ export async function runAgentTask(opts: {
       reply?: unknown;
       pending_approval?: { id: string; tool_name: string; risk_tier: string } | null;
       team_actions?: unknown;
+      run_outcome?: unknown;
+      run_failure_reason?: unknown;
     };
     reply = typeof data.reply === "string" ? data.reply.trim() : "";
     pendingApproval = data.pending_approval ?? null;
     teamActionsRaw = data.team_actions ?? null;
+    // Only an unattended turn can end quietly or as failed; a conversation turn always answers.
+    if (turnOrigin && data.run_outcome === "quiet") runOutcome = { kind: "quiet" };
+    if (turnOrigin && data.run_outcome === "failed") {
+      const why = typeof data.run_failure_reason === "string" ? data.run_failure_reason.trim().slice(0, 300) : "";
+      runOutcome = { kind: "failed", reason: why || "the agent reported the run as failed" };
+    }
   } catch (error) {
     const reason = error instanceof Error ? error.message.slice(0, 300) : "agent unreachable";
     await setAgentTask(taskId, "failed", reason);
@@ -608,7 +685,9 @@ export async function runAgentTask(opts: {
     return { task: await loadAgentTask(id, taskId), pendingApproval, status: 200 };
   }
 
-  if (!reply) {
+  if (runOutcome?.kind === "quiet") return finishQuietRun(id, task, heldActions, teamActionsRaw, credential);
+
+  if (!reply && runOutcome?.kind !== "failed") {
     await setAgentTask(taskId, "failed", "agent returned empty reply");
     await turnEnded(id, task, credential);
     return { task: await loadAgentTask(id, taskId), error: "empty reply", status: 502 };
@@ -639,7 +718,10 @@ export async function runAgentTask(opts: {
     }
   }
 
-  const linkedReply = linkAgentMentions(reply + (plan ? droppedNote(plan.dropped) : ""), candidates);
+  // A failed unattended run says why first, so the room sees it was not done (ADR-021 §4.3).
+  const failed = runOutcome?.kind === "failed" ? runOutcome.reason : null;
+  const body = failed ? `⚠️ Could not complete this run: ${failed}${reply ? `\n\n${reply}` : ""}` : reply;
+  const linkedReply = linkAgentMentions(body + (plan ? droppedNote(plan.dropped) : ""), candidates);
   const stamps = parseSpaceMentions(linkedReply);
   const msgId = newId();
   const name = agentDisplayName(task.agentType);
@@ -657,13 +739,15 @@ export async function runAgentTask(opts: {
     ],
   );
   const message = spaceMessageFromRow(inserted.rows[0] as Record<string, unknown>, id);
-  await setAgentTask(taskId, "done", "agent reply", { resultMsg: msgId });
+  await setAgentTask(taskId, failed ? "failed" : "done", failed ? `run failed: ${failed}` : "agent reply", {
+    resultMsg: msgId,
+  });
   await recordWorkspaceActivity({
     docId: id,
     credential,
     agentType: task.agentType,
-    action: "agent.replied",
-      summary: `${name} replied in the thread`,
+    action: failed ? "agent.failed" : "agent.replied",
+    summary: failed ? `${name} reported a failed run: ${failed}` : `${name} replied in the thread`,
   }).catch(() => {});
   // An asked / delegated turn answers the agent waiting on it (ADR-021).
   await routeAnswers({ spaceId: id, task, roomAgents: spaceAgentsForReply, credential });
@@ -678,6 +762,45 @@ export async function runAgentTask(opts: {
   }
   await startQueued(id, task.threadRoot, task.agentType, credential);
   return { task: await loadAgentTask(id, taskId), message, status: 200 };
+}
+
+/**
+ * ADR-021 §4.3: an unattended turn (reminder, woken wait) that called run_no_update. Nothing is posted and
+ * nobody is notified; the task is done, and any team actions the turn made (closing a wait, a new
+ * reminder) are still carried out.
+ */
+async function finishQuietRun(
+  spaceId: string,
+  task: SpaceAgentTask,
+  heldActions: TeamAction[],
+  teamActionsRaw: unknown,
+  credential: Extract<WorkspaceCredential, { kind: "user" }>,
+): Promise<RunResult> {
+  await setAgentTask(task.id, "done", "quiet run: nothing to report");
+  const actions = withHeldActions(heldActions, parseTeamActions(teamActionsRaw));
+  if (actions.length > 0) {
+    try {
+      const roomAgents = await loadSpaceAgents(spaceId);
+      const candidates = roomAgents.map((type) => ({ type, name: agentDisplayName(type) }));
+      const state = await loadChainState(spaceId, task.chainRoot ?? task.triggerMsg, task.threadRoot);
+      const plan = planTeamActions(
+        actions,
+        candidates,
+        task.agentType,
+        { depth: task.chainDepth ?? 0, ...state, busy: state.busy.filter((a) => a !== task.agentType) },
+        Date.now(),
+      );
+      // No reply of its own to quote: the actions answer the message that started the turn.
+      await executeTeamPlan({ spaceId, task, planned: plan.planned, replyMsg: task.triggerMsg, credential });
+    } catch (error) {
+      console.error("[workspace quiet run actions]", error);
+    }
+  }
+  if (heldActions.length > 0) {
+    await query(`UPDATE dashboard.workspace_agent_tasks SET held_actions = NULL WHERE id = $1`, [task.id]).catch(() => {});
+  }
+  await turnEnded(spaceId, task, credential);
+  return { task: await loadAgentTask(spaceId, task.id), message: null, status: 200 };
 }
 
 /** A turn failed: the agent waiting on it hears so, and the next queued turn of this agent starts. */
