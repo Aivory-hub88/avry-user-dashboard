@@ -25,15 +25,15 @@ import { ingestRoomFiles, loadRoomContext } from "@/lib/roomContext";
 import { linkAgentMentions, planHandoffs } from "@/lib/agentHandoff";
 import { enqueueAgentTasks, enqueueTeamTask } from "@/lib/spaceAgentStore";
 import {
-  TEAM_MAX_DEPTH,
-  TEAM_MAX_PER_AGENT,
-  TEAM_MAX_TURNS,
   droppedNote,
   parseTeamActions,
   planTeamActions,
   teamActionMessage,
+  teamAnswersInstruction,
   teamTurnInstruction,
   type PlannedAction,
+  type TeamAction,
+  type TeamAnswer,
 } from "@/lib/teamComms";
 import type { WorkspaceCredential } from "@/lib/workspaceAuth";
 
@@ -154,6 +154,7 @@ async function executeTeamPlan(opts: {
         continue;
       }
       if (action.kind === "message") continue;
+      const queued = action.queued === true;
       const created = await enqueueTeamTask({
         spaceId,
         threadRoot: task.threadRoot,
@@ -169,8 +170,10 @@ async function executeTeamPlan(opts: {
         dueAt: action.kind === "delegate" ? action.dueAt : null,
         chain: { root, depth },
         reason: `${action.kind} from ${fromName}`,
+        queued,
       });
-      if (created) toRun.push(created.id);
+      // A queued turn starts when the teammate's open turn in this thread ends.
+      if (created && !queued) toRun.push(created.id);
     } catch (error) {
       console.error("[workspace team action]", action.kind, error);
     }
@@ -191,47 +194,97 @@ async function executeTeamPlan(opts: {
   }
 }
 
+/** A sibling in one of these states is still on the request, so the answers wait for it. */
+const STILL_WORKING = new Set(["todo", "in_progress"]);
+
 /**
- * ADR-021: when an asked / delegated turn finishes, give the agent that is waiting on it a turn
- * with the answer, so it can continue its own work. Bounded by the same chain budget.
+ * ADR-021: when an asked / delegated turn ends, done or failed, give the agent waiting on it a turn
+ * with the outcome, so it can continue its own work.
+ *
+ * - Gathered: when the asker asked several teammates in one turn, the answers wait until the last
+ *   teammate still working ends, then arrive in one turn. A teammate parked on an approval does not
+ *   hold the others; its answer comes in a later turn.
+ * - Never lost: a failed teammate is reported ("no answer comes from …"), and a busy asker gets the
+ *   turn queued behind its open one. The chain budget already paid for the ask, so the answer is not
+ *   counted against it again (an ask at the depth limit could otherwise never be answered).
+ * - Once: the outcomes are claimed atomically (`routed_at`), so two teammates that finish together
+ *   give the asker one turn.
  */
-async function routeToWaiter(opts: {
+async function routeAnswers(opts: {
   spaceId: string;
   task: SpaceAgentTask;
-  reply: string;
-  replyMsg: string;
-  roomAgents: string[];
+  roomAgents?: string[];
   credential: Extract<WorkspaceCredential, { kind: "user" }>;
 }): Promise<void> {
-  const { spaceId, task, reply, replyMsg, roomAgents, credential } = opts;
+  const { spaceId, task, credential } = opts;
   const waiter = task.fromAgent;
-  if ((task.kind !== "ask" && task.kind !== "delegate") || !waiter || !task.replyTo) return;
-  if (!roomAgents.includes(waiter)) return;
+  const waitingOn = task.replyTo;
+  if ((task.kind !== "ask" && task.kind !== "delegate") || !waiter || !waitingOn) return;
   try {
-    const root = task.chainRoot ?? task.triggerMsg;
-    const depth = (task.chainDepth ?? 0) + 1;
-    const state = await loadChainState(spaceId, root, task.threadRoot);
-    if (depth > TEAM_MAX_DEPTH || state.usedTotal >= TEAM_MAX_TURNS) return;
-    if ((state.usedPerAgent[waiter] ?? 0) >= TEAM_MAX_PER_AGENT) return;
-    if (state.busy.includes(waiter)) return;
+    const toTasks = (rows: unknown[]) =>
+      rows
+        .map((r) => spaceAgentTaskFromRow(r as Record<string, unknown>))
+        .filter((t): t is SpaceAgentTask => t !== null);
+    const siblings = toTasks(
+      (
+        await query(
+          `SELECT * FROM dashboard.workspace_agent_tasks
+           WHERE space_id = $1 AND reply_to = $2 AND kind IN ('ask', 'delegate')`,
+          [spaceId, waitingOn],
+        )
+      ).rows,
+    );
+    if (siblings.some((s) => s.id !== task.id && STILL_WORKING.has(s.status))) return;
+    const claimed = toTasks(
+      (
+        await query(
+          `UPDATE dashboard.workspace_agent_tasks SET routed_at = now()
+           WHERE space_id = $1 AND reply_to = $2 AND kind IN ('ask', 'delegate')
+             AND status IN ('done', 'failed') AND routed_at IS NULL
+           RETURNING *`,
+          [spaceId, waitingOn],
+        )
+      ).rows,
+    ).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    if (claimed.length === 0) return;
+    const roomAgents = opts.roomAgents ?? (await loadSpaceAgents(spaceId));
+    if (!roomAgents.includes(waiter)) return;
+
+    const resultIds = claimed.flatMap((t) => (t.status === "done" && t.resultMsg ? [t.resultMsg] : []));
+    const bodies = new Map<string, string>();
+    if (resultIds.length > 0) {
+      const found = await query(`SELECT id, body FROM dashboard.workspace_messages WHERE id = ANY($1)`, [resultIds]);
+      for (const r of found.rows as Record<string, unknown>[]) bodies.set(String(r.id), String(r.body ?? ""));
+    }
+    const answers: TeamAnswer[] = claimed.map((t) => {
+      const reply = t.status === "done" && t.resultMsg ? (bodies.get(t.resultMsg) ?? null) : null;
+      return {
+        kind: t.kind === "delegate" ? "delegate" : "ask",
+        fromName: agentDisplayName(t.agentType),
+        original: quotedPart(t.instruction),
+        reply,
+        ...(reply === null ? { failure: t.status === "failed" ? t.reason : "its reply could not be read" } : {}),
+      };
+    });
+    const pending = siblings.filter((s) => s.status === "blocked").map((s) => agentDisplayName(s.agentType));
+    const kind = claimed.every((t) => t.kind === "delegate") ? "report" : "answer";
+    const last = claimed[claimed.length - 1];
+    const state = await loadChainState(spaceId, task.chainRoot ?? task.triggerMsg, task.threadRoot);
+    const queued = state.busy.includes(waiter);
     const created = await enqueueTeamTask({
       spaceId,
       threadRoot: task.threadRoot,
-      triggerMsg: replyMsg,
+      triggerMsg: last.resultMsg ?? last.triggerMsg,
       agentType: waiter,
-      instruction: teamTurnInstruction(
-        task.kind === "ask" ? "answer" : "report",
-        agentDisplayName(task.agentType),
-        reply,
-        { original: quotedPart(task.instruction) },
-      ),
-      kind: task.kind === "ask" ? "answer" : "report",
-      fromAgent: task.agentType,
+      instruction: teamAnswersInstruction(answers, pending),
+      kind,
+      fromAgent: last.agentType,
       replyTo: null,
-      chain: { root, depth },
-      reason: `${task.kind === "ask" ? "answer" : "report"} from ${agentDisplayName(task.agentType)}`,
+      chain: { root: task.chainRoot ?? task.triggerMsg, depth: Math.max(...claimed.map((t) => t.chainDepth ?? 0)) + 1 },
+      reason: `${kind} from ${claimed.map((t) => agentDisplayName(t.agentType)).join(", ")}`,
+      queued,
     });
-    if (created) {
+    if (created && !queued) {
       runAgentTask({ spaceId, taskId: created.id, credential }).catch((error) =>
         console.error("[workspace team answer-run]", created.id, error),
       );
@@ -239,6 +292,78 @@ async function routeToWaiter(opts: {
   } catch (error) {
     console.error("[workspace team answer]", error);
   }
+}
+
+/**
+ * Start the oldest queued team turn of `agentType` in this thread, once the agent has no other
+ * turn there. Called when one of its turns ends, and from the room poll as a safety net.
+ */
+async function startQueued(
+  spaceId: string,
+  threadRoot: string,
+  agentType: string,
+  credential: Extract<WorkspaceCredential, { kind: "user" }>,
+): Promise<void> {
+  try {
+    const open = await query(
+      `SELECT id FROM dashboard.workspace_agent_tasks
+       WHERE space_id = $1 AND thread_root = $2 AND agent_type = $3
+         AND (status IN ('in_progress', 'blocked') OR (status = 'todo' AND NOT queued))
+       LIMIT 1`,
+      [spaceId, threadRoot, agentType],
+    );
+    if (open.rows.length > 0) return;
+    const next = await query(
+      `UPDATE dashboard.workspace_agent_tasks SET queued = false, updated_at = now()
+       WHERE id = (
+         SELECT id FROM dashboard.workspace_agent_tasks
+         WHERE space_id = $1 AND thread_root = $2 AND agent_type = $3 AND status = 'todo' AND queued
+         ORDER BY created_at ASC LIMIT 1
+         FOR UPDATE SKIP LOCKED
+       )
+       RETURNING id`,
+      [spaceId, threadRoot, agentType],
+    );
+    const nextId = (next.rows[0] as Record<string, unknown> | undefined)?.id;
+    if (typeof nextId === "string") {
+      runAgentTask({ spaceId, taskId: nextId, credential }).catch((error) =>
+        console.error("[workspace queued run]", nextId, error),
+      );
+    }
+  } catch (error) {
+    // Before migrations/workspace-agent-comms-routing.sql there is no `queued` column and nothing waits.
+    console.error("[workspace queued]", error);
+  }
+}
+
+/**
+ * Room poll safety net (ADR-021): start queued team turns whose agent has nothing open in their
+ * thread any more, as after a restart between a turn's end and its queue drain.
+ */
+export async function startIdleQueuedTurns(
+  spaceId: string,
+  credential: Extract<WorkspaceCredential, { kind: "user" }>,
+): Promise<void> {
+  const waiting = await query(
+    `SELECT DISTINCT thread_root, agent_type FROM dashboard.workspace_agent_tasks
+     WHERE space_id = $1 AND status = 'todo' AND queued
+     LIMIT 3`,
+    [spaceId],
+  );
+  for (const r of waiting.rows as Record<string, unknown>[]) {
+    await startQueued(spaceId, String(r.thread_root), String(r.agent_type), credential);
+  }
+}
+
+/** Team actions a parked turn made, merged with the resumed turn's own (same action once). */
+function withHeldActions(held: TeamAction[], fresh: TeamAction[]): TeamAction[] {
+  const seen = new Set<string>();
+  return [...held, ...fresh].filter((a) => {
+    const key = `${a.kind}\u0000${a.to.toLowerCase()}\u0000${a.text}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /**
@@ -356,7 +481,24 @@ export async function runAgentTask(opts: {
     task.status === "todo" || task.status === "failed" || (task.status === "blocked" && !!afterApprovalId);
   if (!runnable) return { task, error: `task ${task.status}`, status: 409 };
 
-  await setAgentTask(taskId, "in_progress", "running");
+  // Claim atomically: the Run button, an auto-run and a queue drain can reach the same task at once,
+  // and only one of them may call the agent (and carry out its team actions).
+  const claim = await query(
+    `UPDATE dashboard.workspace_agent_tasks SET status = 'in_progress', reason = 'running', updated_at = now()
+     WHERE id = $1 AND space_id = $2 AND (status IN ('todo', 'failed') OR (status = 'blocked' AND $3::boolean))
+     RETURNING *`,
+    [taskId, id, !!afterApprovalId],
+  );
+  const claimedRow = claim.rows[0] as Record<string, unknown> | undefined;
+  if (!claimedRow) {
+    const now = await loadAgentTask(id, taskId);
+    return { task: now, error: `task ${now?.status ?? "gone"}`, status: 409 };
+  }
+  const heldActions = parseTeamActions(claimedRow.held_actions);
+  if (task.status === "failed" && task.replyTo) {
+    // A re-run's new answer goes to the asker too, even though the failure was routed already.
+    await query(`UPDATE dashboard.workspace_agent_tasks SET routed_at = NULL WHERE id = $1`, [taskId]).catch(() => {});
+  }
 
   const instruction = afterApprovalId
     ? `${task.instruction}\n\n[Approval ${afterApprovalId} diputuskan ${decision} oleh manusia — lanjutkan turn yang diparkir.]`
@@ -446,10 +588,20 @@ export async function runAgentTask(opts: {
       action: "agent.failed",
       summary: `${agentDisplayName(task.agentType)} failed: ${reason}`,
     }).catch(() => {});
+    await turnEnded(id, task, credential);
     return { task: await loadAgentTask(id, taskId), error: "agent unreachable", status: 502 };
   }
 
   if (pendingApproval) {
+    // Team actions made before the park would be lost: the resumed turn sees them as done in its
+    // history and does not call the tools again. Keep them for the resumed turn to carry out.
+    const parked = withHeldActions(heldActions, parseTeamActions(teamActionsRaw));
+    if (parked.length > 0) {
+      await query(`UPDATE dashboard.workspace_agent_tasks SET held_actions = $2::jsonb WHERE id = $1`, [
+        taskId,
+        JSON.stringify(parked),
+      ]).catch((error) => console.error("[workspace team held]", error));
+    }
     await setAgentTask(taskId, "blocked", `waiting for approval: ${pendingApproval.tool_name}`, {
       approvalRef: pendingApproval,
     });
@@ -458,6 +610,7 @@ export async function runAgentTask(opts: {
 
   if (!reply) {
     await setAgentTask(taskId, "failed", "agent returned empty reply");
+    await turnEnded(id, task, credential);
     return { task: await loadAgentTask(id, taskId), error: "empty reply", status: 502 };
   }
 
@@ -469,7 +622,7 @@ export async function runAgentTask(opts: {
 
   // ADR-021: the agent's team actions, planned against the room before its reply is posted so
   // anything the room cannot carry out is said in that same message.
-  const teamActions = parseTeamActions(teamActionsRaw);
+  const teamActions = withHeldActions(heldActions, parseTeamActions(teamActionsRaw));
   let plan: ReturnType<typeof planTeamActions> | null = null;
   if (teamActions.length > 0) {
     try {
@@ -513,12 +666,26 @@ export async function runAgentTask(opts: {
       summary: `${name} replied in the thread`,
   }).catch(() => {});
   // An asked / delegated turn answers the agent waiting on it (ADR-021).
-  await routeToWaiter({ spaceId: id, task, reply, replyMsg: msgId, roomAgents: spaceAgentsForReply, credential });
+  await routeAnswers({ spaceId: id, task, roomAgents: spaceAgentsForReply, credential });
   if (plan) {
     await executeTeamPlan({ spaceId: id, task, planned: plan.planned, replyMsg: msgId, credential });
   } else {
     // No team tools used: a plain @Name in the reply still hands work over (ADR-020).
     await spawnHandoffs({ spaceId: id, task, linkedReply, msgId, candidates, credential });
   }
+  if (heldActions.length > 0) {
+    await query(`UPDATE dashboard.workspace_agent_tasks SET held_actions = NULL WHERE id = $1`, [taskId]).catch(() => {});
+  }
+  await startQueued(id, task.threadRoot, task.agentType, credential);
   return { task: await loadAgentTask(id, taskId), message, status: 200 };
+}
+
+/** A turn failed: the agent waiting on it hears so, and the next queued turn of this agent starts. */
+async function turnEnded(
+  spaceId: string,
+  task: SpaceAgentTask,
+  credential: Extract<WorkspaceCredential, { kind: "user" }>,
+): Promise<void> {
+  await routeAnswers({ spaceId, task, credential });
+  await startQueued(spaceId, task.threadRoot, task.agentType, credential);
 }

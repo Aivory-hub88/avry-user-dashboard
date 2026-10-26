@@ -74,6 +74,10 @@ beforeEach(() => {
   authMock.mockReset()
   authMock.mockReturnValue(USER)
   queryMock.mockImplementation((sql: string) => {
+    // ADR-021 queue drain / answer routing: nothing waits in these fixtures.
+    if (sql.includes("queued") || sql.includes("routed_at")) return Promise.resolve({ rows: [], rowCount: 0 })
+    // runAgentTask's atomic claim of the task.
+    if (sql.includes("SET status = 'in_progress'")) return Promise.resolve({ rows: [{ ...TASK_ROW, status: "in_progress" }], rowCount: 1 })
     if (sql.includes("FROM dashboard.workspace_agent_tasks") && sql.includes("WHERE id ="))
       return Promise.resolve({ rows: [TASK_ROW] })
     if (sql.includes("FROM dashboard.workspace_agent_tasks"))
@@ -178,6 +182,9 @@ describe("POST /api/workspace/[id]/agent-tasks/[task]/run", () => {
       }),
     )
     queryMock.mockImplementation((sql: string) => {
+      // ADR-021 queue drain / answer routing: nothing waits in these fixtures.
+      if (sql.includes("queued") || sql.includes("routed_at")) return Promise.resolve({ rows: [], rowCount: 0 })
+      if (sql.includes("SET status = 'in_progress'")) return Promise.resolve({ rows: [{ ...TASK_ROW, status: "in_progress" }], rowCount: 1 })
       if (sql.includes("WHERE id =")) return Promise.resolve({ rows: [TASK_ROW] })
       if (sql.includes("FROM dashboard.workspace_messages"))
         return Promise.resolve({
@@ -239,6 +246,9 @@ describe("approvals belong to the space leader (ADR-020)", () => {
   // Owner of the doc is `ownerId`; USER (u1) is an editor unless ownerId === "u1".
   function asRole(ownerId: string, row: Record<string, unknown> = BLOCKED) {
     queryMock.mockImplementation((sql: string) => {
+      // ADR-021 queue drain / answer routing: nothing waits in these fixtures.
+      if (sql.includes("queued") || sql.includes("routed_at")) return Promise.resolve({ rows: [], rowCount: 0 })
+      if (sql.includes("SET status = 'in_progress'")) return Promise.resolve({ rows: [{ ...row, status: "in_progress" }], rowCount: 1 })
       if (sql.includes("FROM dashboard.workspace_docs"))
         return Promise.resolve({ rows: [{ id: "space-1", owner: ownerId, workspace_id: "default" }] })
       if (sql.includes("FROM dashboard.workspace_doc_acl") || sql.includes("FROM dashboard.workspace_members"))

@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { getDocRole, canRead, canWrite, checkAgentAccess } from "@/lib/workspaceAccess"
 import { fireDueReminders } from "@/lib/teamReminders"
+import { startIdleQueuedTurns } from "@/lib/spaceAgentRun"
 import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
 import { clampLimit, spaceMessageFromRow } from "@/lib/spaceThreads"
 import { spaceAgentTaskFromRow } from "@/lib/spaceAgent"
@@ -36,6 +37,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     fireDueReminders(id, credential).catch((error) => {
       // A missing table means migrations/workspace-agent-comms.sql is not applied yet.
       if (!String(error).includes("workspace_agent_reminders")) console.error("[workspace reminders]", error)
+    })
+    // Queued team turns whose agent is free again start here if their drain was missed.
+    startIdleQueuedTurns(id, credential).catch((error) => {
+      // A missing column means migrations/workspace-agent-comms-routing.sql is not applied yet.
+      if (!String(error).includes("queued")) console.error("[workspace queued turns]", error)
     })
   }
 
