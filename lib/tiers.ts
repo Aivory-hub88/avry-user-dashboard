@@ -106,6 +106,20 @@ export const FULLSTACK_PACKAGE_PRICE_USD = 299
 export const FULLSTACK_INCLUDED_PLAN_MONTHS = 1
 
 /**
+ * People an account can have across the workspaces it owns, the owner
+ * included. Must equal `SEAT_LIMITS` in the backend's `app/services/tiers.py`
+ * and the marketing site's plan cards (1 seat / 5 seats / Custom seats (15+)).
+ * Enterprise is a contract: `identity.user_tiers.seat_limit` overrides 15.
+ * An account with no live subscription has one seat, itself.
+ */
+export const TIER_SEAT_LIMIT: Readonly<Record<SubscriptionTier, number>> = Object.freeze({
+  operational: 1,
+  business: 5,
+  enterprise: 15,
+})
+export const NO_PLAN_SEAT_LIMIT = 1
+
+/**
  * Monthly Intelligence Credit allowance per tier.
  *
  * Must equal `TIER_ALLOWANCES` in the backend's `app/services/tiers.py`, which
