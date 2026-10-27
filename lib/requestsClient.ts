@@ -41,7 +41,13 @@ export const teamsApi = {
   list: () => api<{ teams: TeamSummary[] }>("/api/workspaces").then((j) => j.teams),
   create: (name: string) => api<{ team: TeamSummary }>("/api/workspaces", { method: "POST", json: { name } }).then((j) => j.team),
   members: (id: string) =>
-    api<{ name: string; owner: string; members: { user_id: string; role: string; email: string | null; full_name: string | null }[] }>(
+    api<{
+      name: string
+      owner: string
+      members: { user_id: string; role: string; email: string | null; full_name: string | null }[]
+      /** limit null = unlimited; seats null = couldn't be read. */
+      seats: { used: number; limit: number | null } | null
+    }>(
       `/api/workspaces/${id}/members`,
     ),
   addMember: (id: string, email: string, role: "editor" | "viewer" | "owner") =>

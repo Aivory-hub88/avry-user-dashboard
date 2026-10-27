@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
 import { LEGACY_WORKSPACE } from "@/lib/teams"
+import { canTakeSeat, holdsSeat, ownerSeatUsage, type SeatUsage } from "@/lib/seats"
 
 export const runtime = "nodejs"
 
@@ -38,11 +39,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       [id],
     )
     const ws = await query("SELECT name, owner FROM dashboard.workspaces WHERE id = $1", [id])
+    const owner = (ws.rows[0]?.owner as string | undefined) ?? null
+    let seats: SeatUsage | null = null
+    if (owner && id !== LEGACY_WORKSPACE) {
+      try {
+        seats = await ownerSeatUsage(owner)
+      } catch (e) {
+        console.error("[workspaces/members GET seats]", e)
+      }
+    }
     return NextResponse.json({
       workspace: id,
       name: ws.rows[0]?.name ?? id,
-      owner: ws.rows[0]?.owner ?? null,
+      owner,
       members: r.rows,
+      seats,
     })
   } catch (e) {
     console.error("[workspaces/members GET]", e)
@@ -81,6 +92,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     } catch {
       return NextResponse.json({ error: "db" }, { status: 500 })
     }
+  }
+
+  // Seats follow the workspace owner's plan. Fail closed: if the plan or the
+  // count can't be read, nobody new is added.
+  try {
+    const ws = await query("SELECT owner FROM dashboard.workspaces WHERE id = $1", [id])
+    const owner = ws.rows[0]?.owner as string | undefined
+    if (!owner) return NextResponse.json({ error: "workspace not found" }, { status: 404 })
+    const isAdminActor = accountType === "admin" || accountType === "superadmin"
+    if (!isAdminActor) {
+      const [usage, seated] = await Promise.all([ownerSeatUsage(owner), holdsSeat(owner, targetId)])
+      if (!canTakeSeat(usage, seated)) {
+        return NextResponse.json(
+          { error: "seat limit reached", code: "SEAT_LIMIT", seats: usage },
+          { status: 403 },
+        )
+      }
+    }
+  } catch (e) {
+    console.error("[workspaces/members POST seats]", e)
+    return NextResponse.json({ error: "db" }, { status: 500 })
   }
 
   try {

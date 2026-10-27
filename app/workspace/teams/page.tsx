@@ -94,6 +94,7 @@ export default function TeamsPage() {
 function TeamCard({ team, onError }: { team: TeamSummary; onError: (m: string | null) => void }) {
   const isAdmin = team.role === "owner"
   const [members, setMembers] = useState<Member[] | null>(null)
+  const [seats, setSeats] = useState<{ used: number; limit: number | null } | null>(null)
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<"editor" | "viewer" | "owner">("editor")
   const [busy, setBusy] = useState(false)
@@ -101,7 +102,9 @@ function TeamCard({ team, onError }: { team: TeamSummary; onError: (m: string | 
   const load = useCallback(async () => {
     if (!isAdmin) return
     try {
-      setMembers((await teamsApi.members(team.id)).members)
+      const r = await teamsApi.members(team.id)
+      setMembers(r.members)
+      setSeats(r.seats ?? null)
     } catch (e) {
       onError((e as Error).message)
     }
@@ -124,7 +127,13 @@ function TeamCard({ team, onError }: { team: TeamSummary; onError: (m: string | 
       await load()
     } catch (err) {
       const msg = (err as Error).message
-      onError(msg === "user not found" ? `No Aivory account uses ${e}. Ask them to sign up first.` : msg)
+      onError(
+        msg === "user not found"
+          ? `No Aivory account uses ${e}. Ask them to sign up first.`
+          : msg === "seat limit reached"
+            ? "Every seat on your plan is in use. Remove someone or upgrade your plan to invite more people."
+            : msg,
+      )
     }
     setBusy(false)
   }
@@ -191,7 +200,14 @@ function TeamCard({ team, onError }: { team: TeamSummary; onError: (m: string | 
               Invite
             </Button>
           </div>
-          <div className="mt-2 text-[11px] text-white/30">Members submit requests and join every room. Admins also approve requests.</div>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-white/30">
+            <span>Members submit requests and join every room. Admins also approve requests.</span>
+            {seats && seats.limit !== null && (
+              <span className={seats.used >= seats.limit ? "text-amber-300/80" : undefined}>
+                {seats.used} of {seats.limit} {seats.limit === 1 ? "seat" : "seats"} used
+              </span>
+            )}
+          </div>
         </>
       )}
     </div>
