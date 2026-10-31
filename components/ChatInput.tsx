@@ -32,7 +32,7 @@ interface ChatInputProps {
   onAttachClick?: () => void
   /** Console tool/mode strip above the composer; off in shared rooms. */
   showContextToolbar?: boolean
-  /** Monthly credit-usage ring beside the send button. */
+  /** Monthly credit-usage ring in the footer under the composer. */
   showCreditRing?: boolean
 }
 
@@ -284,36 +284,30 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
             </button>
           </div>
         )}
-        {/* Textarea area */}
-        <textarea
-          ref={textareaRef}
-          placeholder={placeholder ?? "Send Message to Aivory..."}
-          value={message}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          rows={2}
-          className="console-textarea w-full px-5 pt-[14px] pb-1 text-[15px]"
-        />
-
-        {/* Bottom toolbar row: icons left, send right */}
-        <div className="flex items-center justify-between px-4 pt-1 pb-3">
-          <div className="flex items-center gap-[6px]">
-            {/* Attach / upload button — + icon */}
-            <button
-              className="console-icon-btn"
-              onClick={() => (onAttachClick ? onAttachClick() : setUploadMenuOpen(o => !o))}
-              aria-label="Upload file"
-              type="button"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 5v14M5 12h14"/>
-              </svg>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-[6px]">
-          {showCreditRing && <CreditUsageRing />}
+        {/* One row, Claude-style: + on the left, the message growing in the
+            middle, send on the right. */}
+        <div className="flex items-end gap-2 px-3 py-[10px]">
+          {/* Attach / upload button — + icon */}
+          <button
+            className="console-icon-btn mb-[2px]"
+            onClick={() => (onAttachClick ? onAttachClick() : setUploadMenuOpen(o => !o))}
+            aria-label="Upload file"
+            type="button"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </button>
+          <textarea
+            ref={textareaRef}
+            placeholder={placeholder ?? "Send Message to Aivory..."}
+            value={message}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            disabled={disabled}
+            rows={1}
+            className="console-textarea console-textarea--inline flex-1 min-w-0 text-[15px]"
+          />
           {/* Send button — morphs into stop while a turn is in flight */}
           {isStreaming && onStop ? (
             <button
@@ -336,9 +330,15 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
               <SendArrowIcon size={16} />
             </button>
           )}
-          </div>
         </div>
       </div>
+
+      {/* Footer under the composer: monthly credit usage, like Claude's. */}
+      {showCreditRing && (
+        <div className="flex justify-end px-2 pt-1.5">
+          <CreditUsageRing />
+        </div>
+      )}
 
       <UploadMenu
         isOpen={uploadMenuOpen}

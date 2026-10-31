@@ -972,6 +972,14 @@ body {
   text-align: left;
 }
 
+/* One-row composer (Claude-style): the textarea sits between the + and send
+   buttons and grows upward from a single line. 24px line + 6px padding top
+   and bottom matches the 36px send button. */
+.console-textarea--inline {
+  min-height: 36px;
+  padding: 6px 0;
+}
+
 .console-textarea::-webkit-scrollbar {
   display: none;
 }
