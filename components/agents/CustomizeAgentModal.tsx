@@ -30,6 +30,7 @@ import {
   listTenantMcpServers,
   registerTenantMcpServer,
   reverifyTenantMcpServer,
+  updateTenantMcpServerAuth,
   updateDisabledTools, credentialDaysLeft } from '@/lib/tenantMcpServers';
 import {
   createDeployLink,
@@ -451,6 +452,9 @@ export default function CustomizeAgentModal({
   const [mcpLoading, setMcpLoading] = useState(false);
   const [mcpListError, setMcpListError] = useState<string | null>(null);
   const [mcpBusyId, setMcpBusyId] = useState<string | null>(null);
+  // Inline "update token" editor: which server it is open on, and the draft.
+  const [mcpTokenEditId, setMcpTokenEditId] = useState<string | null>(null);
+  const [mcpTokenDraft, setMcpTokenDraft] = useState('');
   const [mcpForm, setMcpForm] = useState({ name: '', url: '', transport: 'streamable-http' as 'streamable-http' | 'sse', authHeaderName: '', authHeaderValue: '' });
   // Odoo's own connect fields -- no MCP URL, no server to run: just what
   // the tenant already has (their Odoo URL, database, and an API key).
@@ -923,6 +927,29 @@ export default function CustomizeAgentModal({
         setMcpServers((prev) => prev.map((s) => (s.id === id ? (e.server as TenantMcpServer) : s)));
       } else {
         setMcpListError(e instanceof TenantMcpServerError ? e.message : t('mcpReverifyFailed'));
+      }
+    } finally {
+      setMcpBusyId(null);
+    }
+  };
+
+  const handleUpdateMcpToken = async (id: string) => {
+    const token = mcpTokenDraft.trim();
+    if (mcpBusyId || !token) return;
+    setMcpBusyId(id);
+    setMcpListError(null);
+    try {
+      const result = await updateTenantMcpServerAuth(id, token);
+      setMcpServers((prev) => prev.map((s) => (s.id === id ? result : s)));
+      setMcpTokenEditId(null);
+      setMcpTokenDraft('');
+    } catch (e) {
+      if (e instanceof TenantMcpServerError && e.server) {
+        // Saved, but the new token did not verify either: show the row's
+        // fresh error and keep the editor open for another try.
+        setMcpServers((prev) => prev.map((s) => (s.id === id ? (e.server as TenantMcpServer) : s)));
+      } else {
+        setMcpListError(e instanceof TenantMcpServerError ? e.message : t('mcpUpdateTokenFailed'));
       }
     } finally {
       setMcpBusyId(null);
@@ -1471,6 +1498,21 @@ export default function CustomizeAgentModal({
                                 >
                                   {mcpBusyId === s.id ? t('mcpReverifyWorking') : t('mcpReverify')}
                                 </button>
+                                {/* Odoo rows hold an Od-MCP bearer, not the tenant's Odoo key:
+                                    an expired Odoo key is fixed by reconnecting Odoo. */}
+                                {s.name !== 'odoo' && s.auth_header_name && (
+                                  <button
+                                    type="button"
+                                    disabled={mcpBusyId === s.id}
+                                    onClick={() => {
+                                      setMcpTokenDraft('');
+                                      setMcpTokenEditId(mcpTokenEditId === s.id ? null : s.id);
+                                    }}
+                                    className="text-[var(--color-accent-text)]/70 hover:text-[var(--color-accent-text)] text-[11.5px] disabled:opacity-40"
+                                  >
+                                    {t('mcpUpdateToken')}
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   disabled={mcpBusyId === s.id}
@@ -1480,6 +1522,29 @@ export default function CustomizeAgentModal({
                                   {t('mcpRemove')}
                                 </button>
                               </div>
+                              {mcpTokenEditId === s.id && (
+                                <form
+                                  className="mt-2.5 flex items-center gap-2"
+                                  onSubmit={(e) => { e.preventDefault(); handleUpdateMcpToken(s.id); }}
+                                >
+                                  <input
+                                    type="password"
+                                    autoComplete="off"
+                                    value={mcpTokenDraft}
+                                    maxLength={4000}
+                                    onChange={(e) => setMcpTokenDraft(e.target.value)}
+                                    placeholder={t('mcpUpdateTokenPlaceholder', { header: s.auth_header_name ?? '' })}
+                                    className="min-w-0 flex-1 rounded-lg bg-white/[0.04] border border-white/10 px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 focus:outline-none focus:border-white/25"
+                                  />
+                                  <button
+                                    type="submit"
+                                    disabled={mcpBusyId === s.id || !mcpTokenDraft.trim()}
+                                    className="shrink-0 rounded-lg bg-white/[0.06] hover:bg-white/10 border border-white/10 px-3 py-1.5 text-[11.5px] text-white/80 disabled:opacity-40"
+                                  >
+                                    {mcpBusyId === s.id ? t('mcpReverifyWorking') : t('mcpUpdateTokenSave')}
+                                  </button>
+                                </form>
+                              )}
                             </div>
                           )}
                         </div>
