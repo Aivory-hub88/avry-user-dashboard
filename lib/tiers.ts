@@ -123,14 +123,39 @@ export const NO_PLAN_SEAT_LIMIT = 1
  * Monthly Intelligence Credit allowance per tier.
  *
  * Must equal `TIER_ALLOWANCES` in the backend's `app/services/tiers.py`, which
- * is what is actually granted. The dashboard's plan cards previously
- * advertised 50 / 300 / 2,000 against a backend that grants 80 / 220 / 3,000.
+ * is what is actually granted. A credit is a slice of LLM spend, not a
+ * message: see `TOKENS_PER_CREDIT`.
  */
 export const TIER_CREDIT_ALLOWANCE: Readonly<Record<SubscriptionTier, number>> = Object.freeze({
-  operational: 80,
-  business: 220,
-  enterprise: 3000,
+  operational: 1500,
+  business: 6500,
+  enterprise: 90000,
 })
+
+/**
+ * Tokens one Intelligence Credit buys on DeepSeek V4.1 Flash, at peak and
+ * off-peak rates. Mirrors `TOKENS_PER_CREDIT_PEAK/OFFPEAK` in the backend's
+ * `app/services/tiers.py`, which also returns them with the credit status.
+ */
+export const TOKENS_PER_CREDIT = Object.freeze({ peak: 13000, offpeak: 26000 })
+
+/**
+ * Intelligence Credit top-up packs, in published order. Must equal
+ * `CREDIT_PACKS_USD` in avry-payments' `app/services/pricing.py` and
+ * `CREDIT_PACK_DEFINITIONS` in the landing site's `src/lib/pricing.ts`: the
+ * gateway prices every order from its own table and accepts no amount from
+ * the browser, so a figure shown here that differs is one we never collect.
+ */
+export const CREDIT_PACKS: ReadonlyArray<{ credits: number; price: number; popular?: boolean }> = Object.freeze([
+  { credits: 1000, price: 15 },
+  { credits: 1700, price: 25 },
+  { credits: 3500, price: 50 },
+  { credits: 7200, price: 100, popular: true },
+  { credits: 11000, price: 150 },
+  { credits: 18500, price: 250 },
+  { credits: 37500, price: 500 },
+  { credits: 76000, price: 1000 },
+])
 
 /**
  * Resolve any tier string (canonical, pre-rebrand alias, or cased) onto a

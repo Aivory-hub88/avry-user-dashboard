@@ -84,8 +84,20 @@ export async function uploadKnowledgeDocument(
 export interface CreditStatus {
   unlimited: boolean
   tier: string
+  /** Total spendable: monthly + extra. */
   balance: number | null
   allowance: number | null
+  /** Left of this month's plan allowance; refills on `resets_at`. */
+  monthly_balance?: number
+  /** Bought top-up credits; spent after the monthly balance, never expire. */
+  extra_balance?: number
+  period_start?: string
+  resets_at?: string
+  credits_used_this_period?: number
+  /** Of those, how many came out of the extra balance. */
+  extra_used_this_period?: number
+  tokens_used_this_period?: number
+  tokens_per_credit?: { peak: number; offpeak: number }
 }
 
 export async function getCredits(): Promise<CreditStatus | null> {

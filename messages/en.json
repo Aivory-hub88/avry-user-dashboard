@@ -751,9 +751,9 @@
     "minutesAgo": "{mins}m ago",
     "hoursAgo": "{hours}h ago",
     "daysAgo": "{days}d ago",
-    "creditsTooltip": "AI message credits for your deployed agents this month",
+    "creditsTooltip": "Intelligence Credits for your agents. Click for details.",
     "creditsUnlimited": "Credits: unlimited",
-    "creditsBalance": "Credits: {balance} / {allowance}",
+    "creditsBalance": "Credits: {balance, number} left",
     "generalistTitle": "Generalist Agent",
     "generalistDesc": "One agent carrying every toolkit, deployed inside your communication hubs. It triages, responds, and updates your CRM 24/7.",
     "generalistTools": [
@@ -836,5 +836,21 @@
     "lastUpdated": "Last Updated",
     "nodes": "Nodes",
     "aboutTemplate": "About this template"
+  },
+  "credits": {
+    "title": "Plan usage limits",
+    "topUp": "Top up",
+    "monthlyLimit": "Monthly limit",
+    "resetsOn": "Resets {date}",
+    "monthlyDetail": "{used} of {allowance} credits used",
+    "tokensUsed": "{tokens} tokens this month",
+    "extraCredits": "Extra credits",
+    "extraHelp": "Credits you topped up. They are used only after your monthly limit runs out, and they never expire.",
+    "extraLeft": "{credits} left",
+    "extraNone": "No extra credits. Top up to keep agents running past the monthly limit.",
+    "extraWaiting": "Used after the monthly limit runs out. Never expires.",
+    "extraInUse": "Monthly limit reached: agents are now using extra credits.",
+    "perCredit": "1 credit = about {peak} tokens at peak hours, up to {offpeak} off-peak.",
+    "unlimited": "Unlimited credits"
   }
 }
