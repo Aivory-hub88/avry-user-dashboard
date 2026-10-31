@@ -851,6 +851,7 @@
     "extraWaiting": "Used after the monthly limit runs out. Never expires.",
     "extraInUse": "Monthly limit reached: agents are now using extra credits.",
     "perCredit": "1 credit = about {peak} tokens at peak hours, up to {offpeak} off-peak.",
-    "unlimited": "Unlimited credits"
+    "unlimited": "Unlimited credits",
+    "ringLabel": "Monthly credit limit: {pct}% used"
   }
 }

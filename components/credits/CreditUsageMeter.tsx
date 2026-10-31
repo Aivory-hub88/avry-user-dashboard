@@ -22,7 +22,8 @@ function compactTokens(n: number, locale: string): string {
   return new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
 }
 
-export function useCreditStatus(): CreditStatus | null {
+/** Fetches the credit status on mount, and again whenever `refreshKey` changes. */
+export function useCreditStatus(refreshKey?: unknown): CreditStatus | null {
   const [credits, setCredits] = useState<CreditStatus | null>(null)
   useEffect(() => {
     let cancelled = false
@@ -34,9 +35,26 @@ export function useCreditStatus(): CreditStatus | null {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [refreshKey])
   return credits
 }
+
+/** Monthly-limit numbers shared by the meter and the chat-input ring. */
+export function monthlyUsage(credits: CreditStatus) {
+  const allowance = credits.allowance ?? 0
+  const monthlyLeft = credits.monthly_balance ?? Math.min(credits.balance ?? 0, allowance)
+  const extra = credits.extra_balance ?? Math.max(0, (credits.balance ?? 0) - allowance)
+  const used = Math.max(0, allowance - monthlyLeft)
+  const usedFraction = allowance > 0 ? Math.min(1, used / allowance) : 1
+  // Red only when nothing is left at all; a spent month with extra credits
+  // behind it is a warning, not an outage.
+  const tone: 'ok' | 'warn' | 'empty' =
+    usedFraction >= 1 && extra <= 0 ? 'empty' : usedFraction >= WARN_AT ? 'warn' : 'ok'
+  return { allowance, extra, used, usedFraction, pct: Math.round(usedFraction * 100), tone }
+}
+
+/** Bar/ring colour per tone, as CSS colours so SVG strokes can use them too. */
+export const TONE_COLOR = { ok: '#4a86e8', warn: '#fbbf24', empty: '#f87171' } as const
 
 export default function CreditUsageMeter({
   credits,
@@ -59,12 +77,7 @@ export default function CreditUsageMeter({
     )
   }
 
-  const allowance = credits.allowance ?? 0
-  const monthlyLeft = credits.monthly_balance ?? Math.min(credits.balance ?? 0, allowance)
-  const extra = credits.extra_balance ?? Math.max(0, (credits.balance ?? 0) - allowance)
-  const used = Math.max(0, allowance - monthlyLeft)
-  const usedFraction = allowance > 0 ? Math.min(1, used / allowance) : 1
-  const pct = Math.round(usedFraction * 100)
+  const { allowance, extra, used, usedFraction, pct, tone } = monthlyUsage(credits)
   // Share of the extra credits this period has drawn on, like a prepaid balance.
   const extraUsed = credits.extra_used_this_period ?? 0
   const extraPct = extraUsed + extra > 0 ? Math.round((extraUsed / (extraUsed + extra)) * 100) : 0
@@ -72,10 +85,6 @@ export default function CreditUsageMeter({
   const resets = credits.resets_at
     ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(new Date(`${credits.resets_at}T00:00:00`))
     : null
-  // Red only when nothing is left at all; a spent month with extra credits
-  // behind it is a warning, not an outage.
-  const monthlyBar =
-    usedFraction >= 1 && extra <= 0 ? 'bg-red-400' : usedFraction >= WARN_AT ? 'bg-amber-400' : 'bg-[#4a86e8]'
 
   return (
     <div className={`rounded-2xl border border-white/[0.08] bg-[#262624] p-5 text-white ${className}`}>
@@ -110,7 +119,10 @@ export default function CreditUsageMeter({
           aria-valuemax={100}
           aria-valuenow={pct}
         >
-          <div className={`h-full rounded-full ${monthlyBar} transition-[width] duration-500`} style={{ width: `${pct}%` }} />
+          <div
+            className="h-full rounded-full transition-[width] duration-500"
+            style={{ width: `${pct}%`, backgroundColor: TONE_COLOR[tone] }}
+          />
         </div>
         <p className="mt-2 text-xs text-white/40 tabular-nums">
           {t('monthlyDetail', { used: num(used), allowance: num(allowance) })}

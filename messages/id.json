@@ -851,6 +851,7 @@
     "extraWaiting": "Dipakai setelah limit bulanan habis. Tidak kedaluwarsa.",
     "extraInUse": "Limit bulanan habis: agen sekarang memakai extra credit.",
     "perCredit": "1 credit ≈ {peak} token di jam sibuk, hingga {offpeak} di luar jam sibuk.",
-    "unlimited": "Credit tak terbatas"
+    "unlimited": "Credit tak terbatas",
+    "ringLabel": "Limit credit bulanan: {pct}% terpakai"
   }
 }

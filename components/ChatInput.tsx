@@ -6,6 +6,7 @@ import ContextToolbar from "./input/ContextToolbar"
 import { AttachmentCard } from "./AttachmentCard"
 import AgentMentionMenu from "./console/AgentMentionMenu"
 import { useAgentMention } from "@/hooks/useAgentMention"
+import CreditUsageRing from "./credits/CreditUsageRing"
 import type { MentionCandidate } from "@/lib/agentMentions"
 
 interface ChatInputProps {
@@ -31,16 +32,18 @@ interface ChatInputProps {
   onAttachClick?: () => void
   /** Console tool/mode strip above the composer; off in shared rooms. */
   showContextToolbar?: boolean
+  /** Monthly credit-usage ring beside the send button. */
+  showCreditRing?: boolean
 }
 
-/** Shared send-button glyph: an enter/return arrow (corner-up-left). One
- *  definition so the empty-state composer (console/page.tsx) and the
- *  threaded input here can't drift apart. */
+/** Shared send-button glyph: the enter/return key arrow ⏎ (corner-down-left:
+ *  down from the top right, then left). One definition so the empty-state
+ *  composer (console/page.tsx) and the threaded input here can't drift apart. */
 export function SendArrowIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="9 14 4 9 9 4" />
-      <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+      <polyline points="9 10 4 15 9 20" />
+      <path d="M20 4v7a4 4 0 0 1-4 4H4" />
     </svg>
   )
 }
@@ -58,6 +61,7 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
   onCancelReply,
   onAttachClick,
   showContextToolbar = true,
+  showCreditRing = true,
 }: ChatInputProps) {
   const [message, setMessage] = useState(prefill ?? "")
   const [activeTool, setActiveTool] = useState<string | null>(null)
@@ -308,6 +312,8 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
             </button>
           </div>
 
+          <div className="flex items-center gap-[6px]">
+          {showCreditRing && <CreditUsageRing />}
           {/* Send button — morphs into stop while a turn is in flight */}
           {isStreaming && onStop ? (
             <button
@@ -330,6 +336,7 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
               <SendArrowIcon size={16} />
             </button>
           )}
+          </div>
         </div>
       </div>
 
