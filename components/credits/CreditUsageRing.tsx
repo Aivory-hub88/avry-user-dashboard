@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * Small progress ring for the chat input's toolbar: how much of the monthly
+ * Small progress ring for the footer under the chat input: how much of the monthly
  * credit limit is used, at a glance. Clicking it opens the full
  * CreditUsageMeter above the composer. The status is re-fetched every time
  * the popover opens, so it reflects the turns just sent.
@@ -65,7 +65,7 @@ export default function CreditUsageRing() {
       <button
         ref={buttonRef}
         type="button"
-        className="console-icon-btn"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-full text-white/60 hover:bg-white/[0.06] transition-colors"
         aria-label={t('ringLabel', { pct })}
         title={t('ringLabel', { pct })}
         aria-expanded={open}
