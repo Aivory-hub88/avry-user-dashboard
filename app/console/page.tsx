@@ -8,6 +8,7 @@ import dynamic from "next/dynamic"
 import Image from "next/image"
 import ChatMessage from "@/components/ChatMessage"
 import ChatInput, { SendArrowIcon } from "@/components/ChatInput"
+import CreditUsageRing from "@/components/credits/CreditUsageRing"
 import ConsoleTopBar, { type ConsoleChatMode } from "@/components/console/ConsoleTopBar"
 import AgentMentionMenu from "@/components/console/AgentMentionMenu"
 import SuggestionChips from "@/components/chat/SuggestionChips"
@@ -780,6 +781,8 @@ export default function ConsolePage() {
                       </svg>
                     </button>
                   </div>
+                  <div className="flex items-center gap-[6px]">
+                  <CreditUsageRing />
                   <button
                     onClick={() => {
                       if (isStreaming) {
@@ -804,6 +807,7 @@ export default function ConsolePage() {
                       <SendArrowIcon size={16} />
                     )}
                   </button>
+                  </div>
                 </div>
                 <button
                   onClick={() => setConnectorsOpen(true)}
