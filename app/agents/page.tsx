@@ -10,7 +10,8 @@ import { AGENT_NAMES } from '@/lib/agentRoster';
 import { buildSlackOpenUrl } from '@/lib/slackDeploy';
 import { listAgentActions, AgentAction } from '@/lib/agentActions';
 import { listDeployments, deleteDeployment, AgentDeployment } from '@/lib/agentChat';
-import { getCredits, CreditStatus } from '@/lib/agentProfiles';
+import CreditUsageMeter, { useCreditStatus } from '@/components/credits/CreditUsageMeter';
+import { useSettingsModal } from '@/contexts/SettingsModalContext';
 import CustomizeAgentModal from '@/components/agents/CustomizeAgentModal';
 import { AgentAvatar } from '@/components/office/AgentAvatar';
 
@@ -576,30 +577,62 @@ function AgentActivity() {
 
 function CreditsPill() {
   const t = useTranslations('agents');
-  const [credits, setCredits] = useState<CreditStatus | null>(null);
+  const credits = useCreditStatus();
+  const { openSettingsModal } = useSettingsModal();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    getCredits().then(setCredits).catch(() => {});
-  }, []);
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
   if (!credits) return null;
-  const low = !credits.unlimited && credits.balance !== null && credits.allowance
-    ? credits.balance / credits.allowance < 0.15
+  const monthlyLeft = credits.monthly_balance ?? credits.balance ?? 0;
+  const low = !credits.unlimited && credits.allowance
+    ? monthlyLeft / credits.allowance < 0.15 && !(credits.extra_balance ?? 0)
     : false;
   return (
-    <span
-      title={t('creditsTooltip')}
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium ${
-        low
-          ? 'bg-amber-warn/[0.08] border-amber-warn/25 text-amber-warn/90'
-          : 'bg-white/[0.04] border-white/[0.08] text-white/60'
-      }`}
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-3 h-3 text-accent/90">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-      </svg>
-      {credits.unlimited
-        ? t('creditsUnlimited')
-        : t('creditsBalance', { balance: credits.balance ?? 0, allowance: credits.allowance ?? 0 })}
-    </span>
+    <div ref={wrapRef} className="relative">
+      <button
+        type="button"
+        title={t('creditsTooltip')}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-medium transition-colors ${
+          low
+            ? 'bg-amber-warn/[0.08] border-amber-warn/25 text-amber-warn/90'
+            : 'bg-white/[0.04] border-white/[0.08] text-white/60 hover:text-white/80'
+        }`}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-3 h-3 text-accent/90">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+        </svg>
+        {credits.unlimited
+          ? t('creditsUnlimited')
+          : t('creditsBalance', { balance: credits.balance ?? 0 })}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-2 w-[min(400px,calc(100vw-32px))] shadow-2xl shadow-black/40">
+          <CreditUsageMeter
+            credits={credits}
+            onTopUp={() => {
+              setOpen(false);
+              openSettingsModal('usage');
+            }}
+          />
+        </div>
+      )}
+    </div>
   );
 }
 

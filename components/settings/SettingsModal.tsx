@@ -5,7 +5,8 @@ import { logout } from '@/lib/auth'
 import { getMarketingUrl } from '@/lib/config'
 import { useSettingsModal, SettingsTab } from '@/contexts/SettingsModalContext'
 import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
-import { NOT_ACTIVATED_HINT, isActivated, planLabel } from '@/lib/tiers'
+import { CREDIT_PACKS, NOT_ACTIVATED_HINT, isActivated, planLabel } from '@/lib/tiers'
+import CreditUsageMeter, { useCreditStatus } from '@/components/credits/CreditUsageMeter'
 import {
   listMcpImageTokens,
   createMcpImageToken,
@@ -67,21 +68,8 @@ export function SettingsModal({ user }: SettingsModalProps) {
       setImageTokensLoading(false)
     }
   }, [])
-  // Must match CREDIT_PACKS_USD in avry-payments' app/services/pricing.py and
-  // CREDIT_PACK_DEFINITIONS in the landing site's src/lib/pricing.ts. The
-  // gateway prices every order from its own table and accepts no amount from
-  // the browser, so a figure advertised here that differs from the server's is
-  // simply a price we show and never collect.
-  const creditPackages = [
-    { amount: 50, price: 5 },
-    { amount: 100, price: 9 },
-    { amount: 250, price: 20 },
-    { amount: 500, price: 38 },
-    { amount: 1000, price: 70 },
-    { amount: 2500, price: 165 },
-    { amount: 5000, price: 300, popular: true },
-    { amount: 10000, price: 550 },
-  ]
+  const creditStatus = useCreditStatus()
+  const creditPackages = CREDIT_PACKS.map((p) => ({ amount: p.credits, price: p.price, popular: p.popular }))
 
   useEffect(() => {
     // Load local settings
@@ -349,18 +337,13 @@ export function SettingsModal({ user }: SettingsModalProps) {
                 <span className="block mt-1 text-[13px] font-normal text-white/60">Learn more about how credits work.</span>
               </h2>
               
-              <div className="bg-white/5 border border-white/10 rounded-xl p-5 flex items-center justify-between mb-8">
-                <div>
-                  <p className="text-[13px] text-white/60 mb-1">Available credits</p>
-                  <h3 className="text-3xl font-medium">0</h3>
-                </div>
-                <button 
-                  onClick={() => setIsAddingCredits(!isAddingCredits)}
-                  className="px-4 py-2 text-[13px] font-medium bg-white text-black rounded-md hover:bg-white/90 transition-colors"
-                >
-                  {isAddingCredits ? 'Cancel' : 'Add credits'}
-                </button>
-              </div>
+              {creditStatus && (
+                <CreditUsageMeter
+                  credits={creditStatus}
+                  onTopUp={() => setIsAddingCredits(!isAddingCredits)}
+                  className="mb-8"
+                />
+              )}
 
               {isAddingCredits && (
                 <div className="mb-10 animate-in slide-in-from-top-2 fade-in duration-300">

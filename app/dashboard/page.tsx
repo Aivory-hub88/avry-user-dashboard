@@ -11,6 +11,7 @@ import LoadingState from "@/components/dashboard/LoadingState"
 import ErrorState from "@/components/dashboard/ErrorState"
 import PaymentHistoryTab from "@/components/dashboard/PaymentHistoryTab"
 import CreditPurchaseTab from "@/components/dashboard/CreditPurchaseTab"
+import CreditUsageMeter, { useCreditStatus } from "@/components/credits/CreditUsageMeter"
 import WalletSettings from "@/components/dashboard/WalletSettings"
 import styles from "./dashboard.module.css"
 import { useRouterContext } from '@/contexts/RouterContext'
@@ -351,6 +352,7 @@ export default function DashboardPage() {
         <div className="col-span-2">
           <div className="rounded-xl border border-white/[0.07] bg-[#2a2a27] p-8">
             <h2 className="text-xl font-medium text-white mb-6">Credit</h2>
+            <CreditMeterSection />
             <CreditPurchaseTab />
           </div>
         </div>
@@ -471,4 +473,10 @@ export default function DashboardPage() {
       )}
     </div>
   )
+}
+
+function CreditMeterSection() {
+  const credits = useCreditStatus()
+  if (!credits) return null
+  return <CreditUsageMeter credits={credits} className="mb-8 max-w-xl" />
 }
