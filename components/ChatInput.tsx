@@ -36,14 +36,14 @@ interface ChatInputProps {
   showCreditRing?: boolean
 }
 
-/** Shared send-button glyph: an enter/return arrow (corner-up-left). One
- *  definition so the empty-state composer (console/page.tsx) and the
- *  threaded input here can't drift apart. */
+/** Shared send-button glyph: the enter/return key arrow ⏎ (corner-down-left:
+ *  down from the top right, then left). One definition so the empty-state
+ *  composer (console/page.tsx) and the threaded input here can't drift apart. */
 export function SendArrowIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="9 14 4 9 9 4" />
-      <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+      <polyline points="9 10 4 15 9 20" />
+      <path d="M20 4v7a4 4 0 0 1-4 4H4" />
     </svg>
   )
 }
