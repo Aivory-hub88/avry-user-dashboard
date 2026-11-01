@@ -24,6 +24,7 @@ import PromoCodeField from '@/components/payment/PromoCodeField'
 import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
 import {
   TIER_CREDIT_ALLOWANCE,
+  monthlyTokenRange,
   TIER_DISPLAY_NAMES,
   TIER_MONTHLY_PRICE_USD,
   accountTypeLabel,
@@ -422,7 +423,14 @@ export default function DashboardPage() {
                         )}
                       </div>
                       <ul className="space-y-2 text-sm text-gray-300 mb-6 flex-grow">
-                        <li>✓ {TIER_CREDIT_ALLOWANCE[card.tier].toLocaleString('en-GB')} IC/month</li>
+                        {card.salesAssisted ? (
+                          <li>✓ Custom IC allowance</li>
+                        ) : (
+                          <>
+                            <li>✓ {TIER_CREDIT_ALLOWANCE[card.tier].toLocaleString('en-GB')} IC/month</li>
+                            <li>✓ {monthlyTokenRange(TIER_CREDIT_ALLOWANCE[card.tier])}</li>
+                          </>
+                        )}
                         {card.features.map((feature) => (
                           <li key={feature}>✓ {feature}</li>
                         ))}

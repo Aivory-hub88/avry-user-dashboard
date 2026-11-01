@@ -139,6 +139,12 @@ export const TIER_CREDIT_ALLOWANCE: Readonly<Record<SubscriptionTier, number>> =
  */
 export const TOKENS_PER_CREDIT = Object.freeze({ peak: 13000, offpeak: 26000 })
 
+/** "≈ 85M–169M AI tokens / month" for a monthly credit allowance (peak–off-peak). */
+export function monthlyTokenRange(credits: number): string {
+  const m = (n: number) => `${Math.round(n / 1e6)}M`
+  return `≈ ${m(credits * TOKENS_PER_CREDIT.peak)}–${m(credits * TOKENS_PER_CREDIT.offpeak)} AI tokens / month`
+}
+
 /**
  * Intelligence Credit top-up packs, in published order. Must equal
  * `CREDIT_PACKS_USD` in avry-payments' `app/services/pricing.py` and
