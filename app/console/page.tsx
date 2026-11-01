@@ -8,6 +8,7 @@ import dynamic from "next/dynamic"
 import Image from "next/image"
 import ChatMessage from "@/components/ChatMessage"
 import ChatInput, { SendArrowIcon } from "@/components/ChatInput"
+import CreditUsageRing from "@/components/credits/CreditUsageRing"
 import ConsoleTopBar, { type ConsoleChatMode } from "@/components/console/ConsoleTopBar"
 import AgentMentionMenu from "@/components/console/AgentMentionMenu"
 import SuggestionChips from "@/components/chat/SuggestionChips"
@@ -749,10 +750,20 @@ export default function ConsolePage() {
                     ))}
                   </div>
                 )}
-                <div className="px-5 pt-[14px] pb-1">
+                {/* One row, Claude-style: + left, message middle, send right. */}
+                <div className="flex items-end gap-2 px-3 py-[10px]">
+                  <button
+                    className="console-icon-btn mb-[2px]"
+                    title={t('uploadFileTitle')}
+                    onClick={() => setUploadMenuOpen(o => !o)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                  </button>
                   <textarea
                     ref={textareaRef}
-                    rows={2}
+                    rows={1}
                     value={inputValue}
                     onChange={(e) => {
                       const next = e.target.value
@@ -764,22 +775,9 @@ export default function ConsolePage() {
                     }}
                     onKeyDown={handleEmptyKeyDown}
                     placeholder={inRoom ? t('sendPlaceholderRoom') : t('sendPlaceholder')}
-                    className="console-textarea w-full"
+                    className="console-textarea console-textarea--inline flex-1 min-w-0"
                     disabled={isStreaming}
                   />
-                </div>
-                <div className="flex items-center justify-between px-4 pt-1 pb-3">
-                  <div className="flex items-center gap-[6px]">
-                    <button
-                      className="console-icon-btn"
-                      title={t('uploadFileTitle')}
-                      onClick={() => setUploadMenuOpen(o => !o)}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 5v14M5 12h14"/>
-                      </svg>
-                    </button>
-                  </div>
                   <button
                     onClick={() => {
                       if (isStreaming) {
@@ -844,6 +842,10 @@ export default function ConsolePage() {
                     </div>
                   </div>
                 </button>
+              </div>
+              {/* Footer under the composer: monthly credit usage, like Claude's. */}
+              <div className="flex justify-end px-2 pt-1.5">
+                <CreditUsageRing />
               </div>
               <UploadMenu
                 isOpen={uploadMenuOpen}
@@ -918,6 +920,10 @@ export default function ConsolePage() {
                         role={m.role}
                         content={m.content}
                         isStreaming={m.isStreaming}
+                        statusText={m.statusText}
+                        startedAt={m.startedAt}
+                        endedAt={m.endedAt}
+                        activity={m.activity}
                         attachments={m.attachments}
                         agenticState={m.role === 'assistant' && m.id === messages[messages.length - 1]?.id ? agenticState : undefined}
                         onAcceptRoute={acceptRoute}

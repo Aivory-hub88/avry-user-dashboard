@@ -5,6 +5,7 @@ import { loadSnap } from "@/lib/midtransSnap"
 import { AuthManager } from "@/lib/authManager"
 import { SERVICES } from "@/config/services"
 import PromoCodeField from "@/components/payment/PromoCodeField"
+import { CREDIT_PACKS } from "@/lib/tiers"
 
 interface CreditPackage {
   id: string
@@ -14,12 +15,14 @@ interface CreditPackage {
   popular?: boolean
 }
 
-const CREDIT_PACKAGES: CreditPackage[] = [
-  { id: "100", credits: 100, price: 10, label: "Best for trying" },
-  { id: "500", credits: 500, price: 45, label: "Popular", popular: true },
-  { id: "1000", credits: 1000, price: 85, label: "Better savings" },
-  { id: "5000", credits: 5000, price: 400, label: "Best value" },
-]
+// Same table the gateway prices from (lib/tiers.ts CREDIT_PACKS).
+const CREDIT_PACKAGES: CreditPackage[] = CREDIT_PACKS.map((p, i) => ({
+  id: String(p.credits),
+  credits: p.credits,
+  price: p.price,
+  label: p.popular ? "Popular" : i === 0 ? "Best for trying" : i === CREDIT_PACKS.length - 1 ? "Best value" : "",
+  popular: p.popular,
+}))
 
 export default function CreditPurchaseTab() {
   const [selectedPackage, setSelectedPackage] = useState<CreditPackage | null>(null)
@@ -42,8 +45,8 @@ export default function CreditPurchaseTab() {
     }
 
     const credits = Number(customAmount)
-    // Calculate price: roughly $0.08 per credit for custom
-    const price = Math.round(credits * 0.08 * 100) / 100
+    // Estimate at the smallest pack's rate; the gateway prices the order
+    const price = Math.round(credits * 0.015 * 100) / 100
 
     await initiatePurchase(credits, price, `credits_${Math.floor(credits)}`)
   }

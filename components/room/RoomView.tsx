@@ -21,7 +21,6 @@ import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { PanelRight } from "lucide-react"
 import ChatMessage from "@/components/ChatMessage"
-import { activityLabel } from "@/components/ui/AgentActivity"
 import ChatInput from "@/components/ChatInput"
 import { NotificationCard } from "@/components/office/NotificationCard"
 import RoomPanel, { type Autonomy, type RoomBrief, type RoomPerson } from "@/components/room/RoomPanel"
@@ -40,6 +39,7 @@ import {
   displayBody,
   mentionedAgents,
   openTaskRows,
+  phaseStep,
   personName,
   quoteText,
   tokenizeMentions,
@@ -464,7 +464,8 @@ export default function RoomView({
                       agentName={name}
                       agentType={row.task.agentType}
                       showAgentName
-                      activity={{ label: activityLabel(row.task.status, row.task.reason, name), startedAt: Date.parse(row.task.createdAt) || undefined }}
+                      startedAt={Date.parse(row.task.createdAt) || undefined}
+                      activity={phaseStep(row.task)}
                     />
                   )
                 if (row.kind === "approval") {

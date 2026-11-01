@@ -11,6 +11,7 @@ import LoadingState from "@/components/dashboard/LoadingState"
 import ErrorState from "@/components/dashboard/ErrorState"
 import PaymentHistoryTab from "@/components/dashboard/PaymentHistoryTab"
 import CreditPurchaseTab from "@/components/dashboard/CreditPurchaseTab"
+import CreditUsageMeter, { useCreditStatus } from "@/components/credits/CreditUsageMeter"
 import WalletSettings from "@/components/dashboard/WalletSettings"
 import styles from "./dashboard.module.css"
 import { useRouterContext } from '@/contexts/RouterContext'
@@ -23,6 +24,7 @@ import PromoCodeField from '@/components/payment/PromoCodeField'
 import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
 import {
   TIER_CREDIT_ALLOWANCE,
+  monthlyTokenRange,
   TIER_DISPLAY_NAMES,
   TIER_MONTHLY_PRICE_USD,
   accountTypeLabel,
@@ -351,6 +353,7 @@ export default function DashboardPage() {
         <div className="col-span-2">
           <div className="rounded-xl border border-white/[0.07] bg-[#2a2a27] p-8">
             <h2 className="text-xl font-medium text-white mb-6">Credit</h2>
+            <CreditMeterSection />
             <CreditPurchaseTab />
           </div>
         </div>
@@ -420,7 +423,14 @@ export default function DashboardPage() {
                         )}
                       </div>
                       <ul className="space-y-2 text-sm text-gray-300 mb-6 flex-grow">
-                        <li>✓ {TIER_CREDIT_ALLOWANCE[card.tier].toLocaleString('en-GB')} IC/month</li>
+                        {card.salesAssisted ? (
+                          <li>✓ Custom IC allowance</li>
+                        ) : (
+                          <>
+                            <li>✓ {TIER_CREDIT_ALLOWANCE[card.tier].toLocaleString('en-GB')} IC/month</li>
+                            <li>✓ {monthlyTokenRange(TIER_CREDIT_ALLOWANCE[card.tier])}</li>
+                          </>
+                        )}
                         {card.features.map((feature) => (
                           <li key={feature}>✓ {feature}</li>
                         ))}
@@ -471,4 +481,10 @@ export default function DashboardPage() {
       )}
     </div>
   )
+}
+
+function CreditMeterSection() {
+  const credits = useCreditStatus()
+  if (!credits) return null
+  return <CreditUsageMeter credits={credits} className="mb-8 max-w-xl" />
 }

@@ -57,6 +57,8 @@ beforeEach(() => {
   authMock.mockReset()
   authMock.mockReturnValue(null)
   queryMock.mockImplementation((sql: string, params?: unknown[]) => {
+    // ADR-021 queue drain / answer routing: nothing waits in these fixtures.
+    if (sql.includes("queued") || sql.includes("routed_at")) return Promise.resolve({ rows: [], rowCount: 0 })
     if (sql.includes("INSERT INTO dashboard.workspace_messages"))
       return Promise.resolve({
         rows: [msgRow({ id: params?.[0] as string, thread_root: (params?.[2] as string | null) ?? null })],
@@ -101,6 +103,8 @@ describe("POST /api/workspace/[id]/messages", () => {
 
   it("enqueues one agent task per stamped agent (dispatcher)", async () => {
     queryMock.mockImplementation((sql: string, params?: unknown[]) => {
+      // ADR-021 queue drain / answer routing: nothing waits in these fixtures.
+      if (sql.includes("queued") || sql.includes("routed_at")) return Promise.resolve({ rows: [], rowCount: 0 })
       if (sql.includes("FROM dashboard.workspace_agent_tasks"))
         return Promise.resolve({ rows: [] })
       if (sql.includes("INSERT INTO dashboard.workspace_agent_tasks"))
@@ -169,6 +173,10 @@ describe("POST /api/workspace/[id]/messages", () => {
       body: "Siap.",
     }
     queryMock.mockImplementation((sql: string, params?: unknown[]) => {
+      // ADR-021 queue drain / answer routing: nothing waits in these fixtures.
+      if (sql.includes("queued") || sql.includes("routed_at")) return Promise.resolve({ rows: [], rowCount: 0 })
+      if (sql.includes("SET status = 'in_progress'"))
+        return Promise.resolve({ rows: [{ ...taskRow, status: "in_progress" }], rowCount: 1 })
       if (sql.includes("FROM dashboard.workspace_agent_tasks") && sql.includes("WHERE id ="))
         return Promise.resolve({ rows: [{ ...taskRow, status: "todo" }] })
       if (sql.includes("FROM dashboard.workspace_agent_tasks"))
@@ -204,6 +212,8 @@ describe("POST /api/workspace/[id]/messages", () => {
 
   it("reply un-archives the topic", async () => {
     queryMock.mockImplementation((sql: string) => {
+      // ADR-021 queue drain / answer routing: nothing waits in these fixtures.
+      if (sql.includes("queued") || sql.includes("routed_at")) return Promise.resolve({ rows: [], rowCount: 0 })
       if (sql.includes("FROM dashboard.workspace_messages"))
         return Promise.resolve({ rows: [msgRow({ id: "m1" })] })
       if (sql.includes("UPDATE dashboard.workspace_topics"))
@@ -246,6 +256,8 @@ describe("POST /api/workspace/[id]/messages", () => {
     })
     // Doc owned by someone else, viewer has no ACL/member grant.
     queryMock.mockImplementation((sql: string) => {
+      // ADR-021 queue drain / answer routing: nothing waits in these fixtures.
+      if (sql.includes("queued") || sql.includes("routed_at")) return Promise.resolve({ rows: [], rowCount: 0 })
       if (sql.includes("FROM dashboard.workspace_docs"))
         return Promise.resolve({ rows: [{ id: "space-1", owner: "owner-1", workspace_id: "ws-1" }] })
       return Promise.resolve({ rows: [], rowCount: 0 })
@@ -267,6 +279,8 @@ describe("POST /api/workspace/[id]/messages", () => {
 describe("POST messages with replyTo (rooms, ADR-019 P2)", () => {
   it("joins the target's root and records the exact message answered", async () => {
     queryMock.mockImplementation((sql: string, params?: unknown[]) => {
+      // ADR-021 queue drain / answer routing: nothing waits in these fixtures.
+      if (sql.includes("queued") || sql.includes("routed_at")) return Promise.resolve({ rows: [], rowCount: 0 })
       if (sql.includes("SELECT id, thread_root FROM dashboard.workspace_messages"))
         return Promise.resolve({ rows: params?.[0] === "m-reply" ? [{ id: "m-reply", thread_root: "m-root" }] : [] })
       if (sql.includes("INSERT INTO dashboard.workspace_messages"))

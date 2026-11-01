@@ -97,18 +97,21 @@ export interface TeamTaskInput {
   dueAt?: string | null;
   chain: { root: string; depth: number };
   reason: string;
+  /** The agent already has an open turn in the thread: wait behind it (needs workspace-agent-comms-routing.sql). */
+  queued?: boolean;
 }
 
 /**
  * One ADR-021 team turn (needs migrations/workspace-agent-comms.sql). Not deduped against open
- * tasks: the planner already skips teammates with an open turn in the thread.
+ * tasks: a teammate with an open turn in the thread gets a `queued` one that starts after it.
  */
 export async function enqueueTeamTask(input: TeamTaskInput): Promise<SpaceAgentTask | null> {
+  // Only a queued turn names the column, so the rest keeps working before the routing migration.
   const inserted = await query(
     `INSERT INTO dashboard.workspace_agent_tasks
        (id, space_id, thread_root, trigger_msg, agent_type, instruction,
-        status, reason, created_by, chain_root, chain_depth, kind, from_agent, reply_to, due_at)
-     VALUES ($1, $2, $3, $4, $5, $6, 'todo', $7, $8, $9, $10, $11, $12, $13, $14)
+        status, reason, created_by, chain_root, chain_depth, kind, from_agent, reply_to, due_at${input.queued ? ", queued" : ""})
+     VALUES ($1, $2, $3, $4, $5, $6, 'todo', $7, $8, $9, $10, $11, $12, $13, $14${input.queued ? ", true" : ""})
      RETURNING *`,
     [
       newId(),

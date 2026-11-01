@@ -6,9 +6,11 @@ import { saveSessionMessages, loadSessionMessages, listSessions, getSession, del
 import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
-import { sendAgentMessage, type ConsolePendingApproval } from '@/lib/agentChat'
+import { sendAgentMessage, toolStatusLabel, type ConsolePendingApproval } from '@/lib/agentChat'
+import { applyToolEvent, closeSteps, type ActivityStep } from '@/lib/agentActivity'
 import { notifyApprovalsChanged } from '@/lib/agentApprovals'
 import { planHandoffs } from '@/lib/agentHandoff'
+import { roundRunsInParallel, runRoundTurns } from '@/lib/roomRound'
 import { agentAwaitingApproval, agentNameOf, buildRoomPayload, candidateOf, roomTurnText, type MentionCandidate, type RoomHistoryEntry, type RoundIntent } from '@/lib/agentMentions'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
 import { useMode } from '@/contexts/ModeContext'
@@ -21,6 +23,12 @@ interface Message {
   role: "user" | "assistant"
   content: string
   isStreaming?: boolean
+  /** What the agent is doing right now (tool progress), shown while no reply text has arrived. */
+  statusText?: string
+  /** Live activity of an agent turn: when it started, the tool steps so far, when it ended. */
+  startedAt?: number
+  endedAt?: number
+  activity?: ActivityStep[]
   attachments?: Attachment[]
   pendingApproval?: ConsolePendingApproval | null
   /** Set once the user acts on pendingApproval — hides the buttons, no re-resolve. */
@@ -200,7 +208,7 @@ export function useChat({
 
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: userContent, attachments: atts.length > 0 ? atts : undefined, replyPreview: activeReplyTo ?? undefined }
     const assistantId = (Date.now() + 1).toString()
-    const placeholderMsg: Message = { id: assistantId, role: "assistant", content: "", isStreaming: true }
+    const placeholderMsg: Message = { id: assistantId, role: "assistant", content: "", isStreaming: true, ...(agentTarget ? { startedAt: Date.now(), activity: [] } : {}) }
 
     const allMessages = [...messagesRef.current, userMsg].map(m => ({
       role: m.role,
@@ -232,8 +240,8 @@ export function useChat({
     let finalContent = ""
     let streamError = false
 
-    // Deployable-agent chat: single JSON reply (the agent may run tools
-    // before answering), no SSE stream — the placeholder keeps the typing UI.
+    // Deployable-agent chat: the reply streams in as the agent writes it (the agent
+    // may run tools first, so the placeholder keeps the typing UI until text arrives).
     if (agentTarget) {
       let pendingApproval: ConsolePendingApproval | null = null
       try {
@@ -241,7 +249,22 @@ export function useChat({
           sentAgentTarget as TelegramAgentType,
           agentInputText,
           sentSessionId,
-          signal
+          signal,
+          undefined,
+          // Paint the reply as it is written. Only touch the live thread if it is
+          // still the one on screen (same guard as the final patch below).
+          replySoFar => {
+            if (currentSessionIdRef.current === sentSessionId) {
+              setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: replySoFar, statusText: undefined } : m))
+            }
+          },
+          tool => {
+            if (currentSessionIdRef.current === sentSessionId) {
+              setMessages(p => p.map(m => m.id === assistantId
+                ? { ...m, statusText: tool.status === 'running' ? toolStatusLabel(tool.name) : m.statusText, activity: applyToolEvent(m.activity ?? [], tool, Date.now()) }
+                : m))
+            }
+          }
         )
         // Same guard as the room path: a non-string reply would throw
         // during ChatMessage render and unmount the page.
@@ -254,7 +277,7 @@ export function useChat({
         // the user switched away, this would otherwise patch whatever
         // thread they're now looking at instead of the one that answered.
         if (currentSessionIdRef.current === sentSessionId) {
-          setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, pendingApproval } : m))
+          setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, ...(m.startedAt ? { endedAt: Date.now(), activity: closeSteps(m.activity ?? [], Date.now()) } : {}), pendingApproval } : m))
         }
       } catch (error) {
         if (signal.aborted) {
@@ -282,7 +305,7 @@ export function useChat({
             if (currentSessionIdRef.current === sentSessionId) {
               setMessages(prev => {
                 const updated = prev.map(m =>
-                  m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, pendingApproval } : m
+                  m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, ...(m.startedAt ? { endedAt: Date.now(), activity: closeSteps(m.activity ?? [], Date.now()) } : {}), pendingApproval } : m
                 )
                 saveSessionMessages(sentSessionId, updated, sentAgentTarget)
                 setSessions(listSessions())
@@ -292,7 +315,7 @@ export function useChat({
               // Viewing something else now — persist this thread's own
               // correct history directly, without touching what's on screen.
               const finalList = sentMessagesSnapshot.map(m =>
-                m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, pendingApproval } : m
+                m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, ...(m.startedAt ? { endedAt: Date.now(), activity: closeSteps(m.activity ?? [], Date.now()) } : {}), pendingApproval } : m
               )
               saveSessionMessages(sentSessionId, finalList, sentAgentTarget)
               setSessions(listSessions())
@@ -465,16 +488,18 @@ export function useChat({
     abortRef.current = controller
     const signal = controller.signal
 
-    // Sequential: each speaker sees this round's earlier replies. A failure
-    // drops that bubble but never blocks the rest of the round. A user stop
-    // breaks the chain: answered bubbles stay, unanswered ones are dropped
-    // by the merge below, no error toast.
+    // Sequential by default: each speaker sees this round's earlier replies.
+    // A roll call runs every turn at once (lib/roomRound): each agent answers
+    // for itself, so waiting on the others only added their time to its own.
+    // A failure drops that bubble but never blocks the rest of the round. A
+    // user stop breaks the chain: answered bubbles stay, unanswered ones are
+    // dropped by the merge below, no error toast.
+    const parallel = roundRunsInParallel(intent)
     const roundReplies: RoomHistoryEntry[] = []
     const outcomes = new Map<string, { reply: string; pendingApproval: ConsolePendingApproval | null }>()
-    for (let qi = 0; qi < turns.length; qi++) {
-      const turn = turns[qi]
+    const runTurn = async (turn: RoomTurn, qi: number): Promise<void> => {
       const t = turn.agent
-      if (signal.aborted) break
+      if (signal.aborted) return
       const me = candidateOf(t) ?? { type: t, name: agentNameOf(t), title: t, channels: [] as string[] }
       const peers = [...new Set(turns.map(x => x.agent))].filter(x => x !== t).map(x => candidateOf(x) ?? { type: x, name: agentNameOf(x), title: x, channels: [] as string[] })
       const wrapped = buildRoomPayload({ me, peers, userText, history, roundReplies, ledgerHint, members: roomMembersRef.current, intent, handoff: turn.handoff })
@@ -512,7 +537,7 @@ export function useChat({
         // ADR-020: an @mention in this reply hands work to a teammate, who answers in
         // their own bubble. A parked approval ends this branch; depth, total turns and
         // turns per agent are capped (lib/agentHandoff).
-        if (!result.pendingApproval) {
+        if (!parallel && !result.pendingApproval) {
           const usedPerAgent: Record<string, number> = {}
           for (const x of turns) usedPerAgent[x.agent] = (usedPerAgent[x.agent] ?? 0) + 1
           const next = planHandoffs(result.reply, roomMembersRef.current, t, {
@@ -534,13 +559,14 @@ export function useChat({
             if (currentSessionIdRef.current === sentSessionId) setMessages(p => [...p, ph])
           }
         }
-        setStreamingAgentType(turns[qi + 1]?.agent ?? undefined)
+        if (!parallel) setStreamingAgentType(turns[qi + 1]?.agent ?? undefined)
       } catch {
         // Stopped turns break the chain quietly; failures toast per agent.
-        if (signal.aborted) break
+        if (signal.aborted) return
         addToast("error", `${me.name} is unavailable right now.`)
       }
     }
+    await runRoundTurns(turns, parallel, runTurn, signal)
 
     // Pure merge: successes fill their bubble, failures drop theirs.
     const applyRoomResults = (list: Message[]): Message[] =>

@@ -30,6 +30,12 @@ function taskRow(over: Row): Row {
 queryMock.mockImplementation(async (sql: string, params: unknown[] = []) => {
   const q = sql.replace(/\s+/g, " ")
   if (q.includes("FROM dashboard.workspace_agent_tasks WHERE id = $1")) return { rows: db.tasks.filter((t) => t.id === params[0]) }
+  // runAgentTask's atomic claim.
+  if (q.includes("SET status = 'in_progress'")) {
+    const t = db.tasks.find((x) => x.id === params[0])
+    if (!t || !["todo", "failed"].includes(String(t.status))) return { rows: [] }
+    t.status = "in_progress"; return { rows: [{ ...t }] }
+  }
   if (q.startsWith("UPDATE dashboard.workspace_agent_tasks")) {
     const t = db.tasks.find((x) => x.id === params[0]); if (t) { t.status = params[1] as string }
     return { rows: [], rowCount: 1 }

@@ -533,6 +533,10 @@
     "mcpReverifyWorking": "Memproses…",
     "mcpReverify": "Verifikasi ulang",
     "mcpRemove": "Hapus",
+    "mcpUpdateToken": "Perbarui token",
+    "mcpUpdateTokenPlaceholder": "Nilai {header} baru",
+    "mcpUpdateTokenSave": "Simpan & verifikasi",
+    "mcpUpdateTokenFailed": "Token tidak dapat diperbarui.",
     "mcpAddServer": "+ Tambah MCP server",
     "mcpChooseConnector": "Hubungkan sistem",
     "mcpTemplateOdooName": "Odoo",
@@ -747,9 +751,9 @@
     "minutesAgo": "{mins}m lalu",
     "hoursAgo": "{hours}j lalu",
     "daysAgo": "{days}h lalu",
-    "creditsTooltip": "Kredit pesan AI untuk agen yang Anda deploy bulan ini",
+    "creditsTooltip": "Intelligence Credit untuk agen Anda. Klik untuk detail.",
     "creditsUnlimited": "Kredit: tak terbatas",
-    "creditsBalance": "Kredit: {balance} / {allowance}",
+    "creditsBalance": "Kredit: {balance, number} tersisa",
     "generalistTitle": "Generalist Agent",
     "generalistDesc": "Satu agen yang membawa semua toolkit, di-deploy langsung di hub komunikasi Anda. Ia mentriase, merespons, dan memperbarui CRM Anda 24/7.",
     "generalistTools": [
@@ -832,5 +836,22 @@
     "lastUpdated": "Terakhir Diperbarui",
     "nodes": "Node",
     "aboutTemplate": "Tentang template ini"
+  },
+  "credits": {
+    "title": "Batas pemakaian paket",
+    "topUp": "Top up",
+    "monthlyLimit": "Limit bulanan",
+    "resetsOn": "Reset {date}",
+    "monthlyDetail": "{used} dari {allowance} credit terpakai",
+    "tokensUsed": "{tokens} token bulan ini",
+    "extraCredits": "Extra credit",
+    "extraHelp": "Credit hasil top up. Baru dipakai setelah limit bulanan habis, dan tidak pernah kedaluwarsa.",
+    "extraLeft": "{credits} tersisa",
+    "extraNone": "Belum ada extra credit. Top up agar agen tetap jalan setelah limit bulanan habis.",
+    "extraWaiting": "Dipakai setelah limit bulanan habis. Tidak kedaluwarsa.",
+    "extraInUse": "Limit bulanan habis: agen sekarang memakai extra credit.",
+    "perCredit": "1 credit ≈ {peak} token di jam sibuk, hingga {offpeak} di luar jam sibuk.",
+    "unlimited": "Credit tak terbatas",
+    "ringLabel": "Limit credit bulanan: {pct}% terpakai"
   }
 }
