@@ -497,6 +497,9 @@ export function useChat({
     const parallel = roundRunsInParallel(intent)
     const roundReplies: RoomHistoryEntry[] = []
     const outcomes = new Map<string, { reply: string; pendingApproval: ConsolePendingApproval | null }>()
+    // Close the activity panel of a bubble that had one running ("Selesai dalam …").
+    const finishedActivity = (m: Message): Partial<Message> =>
+      m.startedAt && m.endedAt === undefined ? { endedAt: Date.now(), activity: closeSteps(m.activity ?? [], Date.now()) } : {}
     const runTurn = async (turn: RoomTurn, qi: number): Promise<void> => {
       const t = turn.agent
       if (signal.aborted) return
@@ -510,8 +513,30 @@ export function useChat({
         wrapped,
         awaitingApproval: !turn.handoff && atts.length === 0 && agentAwaitingApproval(messagesRef.current, t),
       })
+      // Timer starts when this agent's turn begins (sequential rounds queue the rest).
+      if (currentSessionIdRef.current === sentSessionId) {
+        setMessages(p => p.map(m => m.id === turn.id ? { ...m, startedAt: Date.now(), activity: [] } : m))
+      }
       try {
-        const result = await sendAgentMessage(t as TelegramAgentType, payload, sentSessionId, signal, teamIdRef.current)
+        const result = await sendAgentMessage(
+          t as TelegramAgentType,
+          payload,
+          sentSessionId,
+          signal,
+          teamIdRef.current,
+          replySoFar => {
+            if (currentSessionIdRef.current === sentSessionId) {
+              setMessages(p => p.map(m => m.id === turn.id ? { ...m, content: replySoFar, statusText: undefined } : m))
+            }
+          },
+          tool => {
+            if (currentSessionIdRef.current === sentSessionId) {
+              setMessages(p => p.map(m => m.id === turn.id
+                ? { ...m, statusText: tool.status === 'running' ? toolStatusLabel(tool.name) : m.statusText, activity: applyToolEvent(m.activity ?? [], tool, Date.now()) }
+                : m))
+            }
+          }
+        )
         // Backend reply is unvalidated (Cerveau may return null/a non-string
         // on odd turns) — a non-string here used to flow into ChatMessage and
         // throw during render, killing the whole page. Treat it as a failed
@@ -531,7 +556,7 @@ export function useChat({
           setMessages(p => p.map(m => {
             if (m.id !== turn.id) return m
             const o = outcomes.get(turn.id)
-            return o ? { ...m, content: o.reply, isStreaming: false, pendingApproval: o.pendingApproval } : m
+            return o ? { ...m, content: o.reply, isStreaming: false, statusText: undefined, ...finishedActivity(m), pendingApproval: o.pendingApproval } : m
           }))
         }
         // ADR-020: an @mention in this reply hands work to a teammate, who answers in
@@ -573,7 +598,7 @@ export function useChat({
       list.flatMap(m => {
         if (!placeholders.some(ph => ph.id === m.id)) return [m]
         const o = outcomes.get(m.id)
-        if (o) return [{ ...m, content: o.reply, isStreaming: false, pendingApproval: o.pendingApproval }]
+        if (o) return [{ ...m, content: o.reply, isStreaming: false, statusText: undefined, ...finishedActivity(m), pendingApproval: o.pendingApproval }]
         return []
       })
 
