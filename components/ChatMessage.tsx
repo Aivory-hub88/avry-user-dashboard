@@ -12,6 +12,8 @@ import type { Attachment } from '@/components/UploadMenu'
 import type { ClassifiedIntent } from '@/lib/intentClassifier'
 import { ThinkingDots } from '@/components/ui/ThinkingDots'
 import { AgentAvatar } from '@/components/office/AgentAvatar'
+import { AgentActivity } from '@/components/console/AgentActivity'
+import type { ActivityStep } from '@/lib/agentActivity'
 
 const WorkflowContainer = dynamic(() => import('@/components/console/WorkflowContainer'), { ssr: false })
 
@@ -21,6 +23,10 @@ interface ChatMessageProps {
   isStreaming?: boolean
   /** What the agent is doing (tool progress); replaces "is thinking..." until reply text arrives. */
   statusText?: string
+  /** Agent turn activity: when it started, tool steps so far, when it ended (undefined = still running). */
+  startedAt?: number
+  endedAt?: number
+  activity?: ActivityStep[]
   agenticState?: AgenticWorkflowState | null
   onRegenerate?: () => void
   onEdit?: () => void
@@ -311,7 +317,7 @@ const markdownComponents = {
 
 /* ── Main component ────────────────────────────────────────────────────────── */
 
-export default memo(function ChatMessage({ role, content, isStreaming = false, statusText, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null, replyPreview, onReply, author, showAgentName = false }: ChatMessageProps) {
+export default memo(function ChatMessage({ role, content, isStreaming = false, statusText, startedAt, endedAt, activity, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null, replyPreview, onReply, author, showAgentName = false }: ChatMessageProps) {
   const noop = useCallback(() => {}, [])
   const hasAgenticPhases = !!(agenticState && agenticState.phases.length > 0)
   const hasTextContent = !!content
@@ -381,7 +387,16 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, s
             <div className="rounded-2xl border border-line bg-white/[0.035] px-5 py-3.5 text-base text-[#f7f7f7] leading-[1.6]">
               {ReplyQuote}
               {/* Thinking indicator */}
-              {isStreaming && !content && !hasAgenticPhases && (
+              {/* Agent activity: live timer + tool steps while the turn runs, a one-line summary after */}
+              {startedAt !== undefined && (isStreaming || endedAt !== undefined) && (
+                <AgentActivity
+                  agentName={agentName}
+                  startedAt={startedAt}
+                  steps={activity ?? []}
+                  endedAt={isStreaming ? undefined : endedAt}
+                />
+              )}
+              {isStreaming && !content && !hasAgenticPhases && startedAt === undefined && (
                 <div className="flex items-center gap-2.5">
                   <ThinkingDots size={16} dotSize={2.5} />
                   <span className="text-sm text-[#a1a1aa]">{statusText ?? `${agentName} is thinking...`}</span>
