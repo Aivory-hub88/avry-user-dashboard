@@ -31,6 +31,19 @@ export interface ConsolePendingApproval {
   risk_tier: string
 }
 
+/** Progress of one tool the agent is running (frame `tool` of /agent-chat/stream). */
+export interface ToolProgress {
+  id: string
+  name: string
+  status: 'running' | 'done'
+}
+
+/** "avry_mail__send_mail" -> "Menjalankan send mail…" (tool names are internal, so keep it generic). */
+export function toolStatusLabel(name: string): string {
+  const pretty = name.split('__').pop()!.replace(/[_-]+/g, ' ').trim().toLowerCase()
+  return pretty ? `Menjalankan ${pretty}…` : 'Menjalankan tool…'
+}
+
 export interface AgentChatResult {
   reply: string
   pendingApproval: ConsolePendingApproval | null
@@ -45,6 +58,8 @@ export async function sendAgentMessage(
   teamId?: string | null,
   /** Called with the reply written so far, each time more text arrives. Enables streaming. */
   onDelta?: (replySoFar: string) => void,
+  /** Called when a tool starts or finishes, so the UI can show what the agent is doing. */
+  onTool?: (tool: ToolProgress) => void,
 ): Promise<AgentChatResult> {
   const init: RequestInit = {
     method: 'POST',
@@ -62,7 +77,7 @@ export async function sendAgentMessage(
   if (onDelta) {
     const res = await authedFetch(`${BACKEND_URL}/api/v1/telegram/agent-chat/stream`, init)
     // A backend that predates the streaming route answers 404/405: use the blocking route.
-    if (res.ok && res.body) return readAgentStream(res.body, onDelta)
+    if (res.ok && res.body) return readAgentStream(res.body, onDelta, onTool)
     if (res.status !== 404 && res.status !== 405) await throwAgentChatError(res)
   }
 
@@ -84,6 +99,7 @@ async function throwAgentChatError(res: Response): Promise<never> {
 async function readAgentStream(
   body: ReadableStream<Uint8Array>,
   onDelta: (replySoFar: string) => void,
+  onTool?: (tool: ToolProgress) => void,
 ): Promise<AgentChatResult> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
@@ -95,7 +111,7 @@ async function readAgentStream(
 
   const handle = (line: string) => {
     if (!line.startsWith('data:')) return
-    let frame: { type?: string; content?: unknown; pending_approval?: ConsolePendingApproval | null; message?: unknown }
+    let frame: { type?: string; content?: unknown; pending_approval?: ConsolePendingApproval | null; message?: unknown; id?: unknown; name?: unknown; status?: unknown }
     try {
       frame = JSON.parse(line.slice(5).trim())
     } catch {
@@ -104,6 +120,10 @@ async function readAgentStream(
     if (frame.type === 'chunk' && typeof frame.content === 'string' && frame.content) {
       reply += frame.content
       onDelta(reply)
+    } else if (frame.type === 'tool' && onTool) {
+      if (typeof frame.name === 'string' && (frame.status === 'running' || frame.status === 'done')) {
+        onTool({ id: typeof frame.id === 'string' ? frame.id : '', name: frame.name, status: frame.status })
+      }
     } else if (frame.type === 'done') {
       pendingApproval = frame.pending_approval ?? null
       finished = true

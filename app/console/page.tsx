@@ -920,6 +920,7 @@ export default function ConsolePage() {
                         role={m.role}
                         content={m.content}
                         isStreaming={m.isStreaming}
+                        statusText={m.statusText}
                         attachments={m.attachments}
                         agenticState={m.role === 'assistant' && m.id === messages[messages.length - 1]?.id ? agenticState : undefined}
                         onAcceptRoute={acceptRoute}

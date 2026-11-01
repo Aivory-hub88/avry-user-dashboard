@@ -6,7 +6,7 @@ import { saveSessionMessages, loadSessionMessages, listSessions, getSession, del
 import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
-import { sendAgentMessage, type ConsolePendingApproval } from '@/lib/agentChat'
+import { sendAgentMessage, toolStatusLabel, type ConsolePendingApproval } from '@/lib/agentChat'
 import { notifyApprovalsChanged } from '@/lib/agentApprovals'
 import { planHandoffs } from '@/lib/agentHandoff'
 import { roundRunsInParallel, runRoundTurns } from '@/lib/roomRound'
@@ -22,6 +22,8 @@ interface Message {
   role: "user" | "assistant"
   content: string
   isStreaming?: boolean
+  /** What the agent is doing right now (tool progress), shown while no reply text has arrived. */
+  statusText?: string
   attachments?: Attachment[]
   pendingApproval?: ConsolePendingApproval | null
   /** Set once the user acts on pendingApproval — hides the buttons, no re-resolve. */
@@ -248,7 +250,14 @@ export function useChat({
           // still the one on screen (same guard as the final patch below).
           replySoFar => {
             if (currentSessionIdRef.current === sentSessionId) {
-              setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: replySoFar } : m))
+              setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: replySoFar, statusText: undefined } : m))
+            }
+          },
+          tool => {
+            if (currentSessionIdRef.current === sentSessionId) {
+              setMessages(p => p.map(m => m.id === assistantId
+                ? { ...m, statusText: tool.status === 'running' ? toolStatusLabel(tool.name) : m.statusText }
+                : m))
             }
           }
         )
@@ -263,7 +272,7 @@ export function useChat({
         // the user switched away, this would otherwise patch whatever
         // thread they're now looking at instead of the one that answered.
         if (currentSessionIdRef.current === sentSessionId) {
-          setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, pendingApproval } : m))
+          setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, pendingApproval } : m))
         }
       } catch (error) {
         if (signal.aborted) {
@@ -291,7 +300,7 @@ export function useChat({
             if (currentSessionIdRef.current === sentSessionId) {
               setMessages(prev => {
                 const updated = prev.map(m =>
-                  m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, pendingApproval } : m
+                  m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, pendingApproval } : m
                 )
                 saveSessionMessages(sentSessionId, updated, sentAgentTarget)
                 setSessions(listSessions())
@@ -301,7 +310,7 @@ export function useChat({
               // Viewing something else now — persist this thread's own
               // correct history directly, without touching what's on screen.
               const finalList = sentMessagesSnapshot.map(m =>
-                m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, pendingApproval } : m
+                m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, pendingApproval } : m
               )
               saveSessionMessages(sentSessionId, finalList, sentAgentTarget)
               setSessions(listSessions())
