@@ -7,6 +7,7 @@ import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
 import { sendAgentMessage, toolStatusLabel, type ConsolePendingApproval } from '@/lib/agentChat'
+import { applyToolEvent, closeSteps, type ActivityStep } from '@/lib/agentActivity'
 import { notifyApprovalsChanged } from '@/lib/agentApprovals'
 import { planHandoffs } from '@/lib/agentHandoff'
 import { roundRunsInParallel, runRoundTurns } from '@/lib/roomRound'
@@ -24,6 +25,10 @@ interface Message {
   isStreaming?: boolean
   /** What the agent is doing right now (tool progress), shown while no reply text has arrived. */
   statusText?: string
+  /** Live activity of an agent turn: when it started, the tool steps so far, when it ended. */
+  startedAt?: number
+  endedAt?: number
+  activity?: ActivityStep[]
   attachments?: Attachment[]
   pendingApproval?: ConsolePendingApproval | null
   /** Set once the user acts on pendingApproval — hides the buttons, no re-resolve. */
@@ -203,7 +208,7 @@ export function useChat({
 
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: userContent, attachments: atts.length > 0 ? atts : undefined, replyPreview: activeReplyTo ?? undefined }
     const assistantId = (Date.now() + 1).toString()
-    const placeholderMsg: Message = { id: assistantId, role: "assistant", content: "", isStreaming: true }
+    const placeholderMsg: Message = { id: assistantId, role: "assistant", content: "", isStreaming: true, ...(agentTarget ? { startedAt: Date.now(), activity: [] } : {}) }
 
     const allMessages = [...messagesRef.current, userMsg].map(m => ({
       role: m.role,
@@ -256,7 +261,7 @@ export function useChat({
           tool => {
             if (currentSessionIdRef.current === sentSessionId) {
               setMessages(p => p.map(m => m.id === assistantId
-                ? { ...m, statusText: tool.status === 'running' ? toolStatusLabel(tool.name) : m.statusText }
+                ? { ...m, statusText: tool.status === 'running' ? toolStatusLabel(tool.name) : m.statusText, activity: applyToolEvent(m.activity ?? [], tool, Date.now()) }
                 : m))
             }
           }
@@ -272,7 +277,7 @@ export function useChat({
         // the user switched away, this would otherwise patch whatever
         // thread they're now looking at instead of the one that answered.
         if (currentSessionIdRef.current === sentSessionId) {
-          setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, pendingApproval } : m))
+          setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, ...(m.startedAt ? { endedAt: Date.now(), activity: closeSteps(m.activity ?? [], Date.now()) } : {}), pendingApproval } : m))
         }
       } catch (error) {
         if (signal.aborted) {
@@ -300,7 +305,7 @@ export function useChat({
             if (currentSessionIdRef.current === sentSessionId) {
               setMessages(prev => {
                 const updated = prev.map(m =>
-                  m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, pendingApproval } : m
+                  m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, ...(m.startedAt ? { endedAt: Date.now(), activity: closeSteps(m.activity ?? [], Date.now()) } : {}), pendingApproval } : m
                 )
                 saveSessionMessages(sentSessionId, updated, sentAgentTarget)
                 setSessions(listSessions())
@@ -310,7 +315,7 @@ export function useChat({
               // Viewing something else now — persist this thread's own
               // correct history directly, without touching what's on screen.
               const finalList = sentMessagesSnapshot.map(m =>
-                m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, pendingApproval } : m
+                m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, ...(m.startedAt ? { endedAt: Date.now(), activity: closeSteps(m.activity ?? [], Date.now()) } : {}), pendingApproval } : m
               )
               saveSessionMessages(sentSessionId, finalList, sentAgentTarget)
               setSessions(listSessions())
