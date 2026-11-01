@@ -233,8 +233,8 @@ export function useChat({
     let finalContent = ""
     let streamError = false
 
-    // Deployable-agent chat: single JSON reply (the agent may run tools
-    // before answering), no SSE stream — the placeholder keeps the typing UI.
+    // Deployable-agent chat: the reply streams in as the agent writes it (the agent
+    // may run tools first, so the placeholder keeps the typing UI until text arrives).
     if (agentTarget) {
       let pendingApproval: ConsolePendingApproval | null = null
       try {
@@ -242,7 +242,15 @@ export function useChat({
           sentAgentTarget as TelegramAgentType,
           agentInputText,
           sentSessionId,
-          signal
+          signal,
+          undefined,
+          // Paint the reply as it is written. Only touch the live thread if it is
+          // still the one on screen (same guard as the final patch below).
+          replySoFar => {
+            if (currentSessionIdRef.current === sentSessionId) {
+              setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: replySoFar } : m))
+            }
+          }
         )
         // Same guard as the room path: a non-string reply would throw
         // during ChatMessage render and unmount the page.

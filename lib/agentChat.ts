@@ -2,8 +2,10 @@
  * Deployable-agent access from the dashboard.
  *
  * - sendAgentMessage(): talk to a prebuilt agent from the AI Console
- *   (backend /api/v1/telegram/agent-chat, JWT). Non-streaming: the agent may
- *   run tools before answering, so a reply can take 5-30s.
+ *   (backend /api/v1/telegram/agent-chat, JWT). The agent may run tools before
+ *   answering, so a reply can take 5-30s. Pass `onDelta` to receive the text as
+ *   it is written (backend /agent-chat/stream, SSE); without it the call blocks
+ *   until the whole reply is ready.
  * - listDeployments()/deleteDeployment(): where each agent is deployed
  *   (Telegram chats + Slack workspaces) and disconnecting them.
  */
@@ -41,6 +43,8 @@ export async function sendAgentMessage(
   signal?: AbortSignal,
   /** Agent Team this Room turn belongs to (ADR-020); omitted = all deployed agents. */
   teamId?: string | null,
+  /** Called with the reply written so far, each time more text arrives. Enables streaming. */
+  onDelta?: (replySoFar: string) => void,
 ): Promise<AgentChatResult> {
   const init: RequestInit = {
     method: 'POST',
@@ -54,16 +58,83 @@ export async function sendAgentMessage(
   // AbortSignal survives authedFetch's init spread (and its 401 retry),
   // so user-initiated stop cancels the in-flight agent call.
   if (signal) init.signal = signal
-  const res = await authedFetch(`${BACKEND_URL}/api/v1/telegram/agent-chat`, init)
-  if (!res.ok) {
-    const detail = await res.json().then((d) => d?.detail).catch(() => null)
-    throw new Error(detail || `Agent chat failed (${res.status})`)
+
+  if (onDelta) {
+    const res = await authedFetch(`${BACKEND_URL}/api/v1/telegram/agent-chat/stream`, init)
+    // A backend that predates the streaming route answers 404/405: use the blocking route.
+    if (res.ok && res.body) return readAgentStream(res.body, onDelta)
+    if (res.status !== 404 && res.status !== 405) await throwAgentChatError(res)
   }
+
+  const res = await authedFetch(`${BACKEND_URL}/api/v1/telegram/agent-chat`, init)
+  if (!res.ok) await throwAgentChatError(res)
   const data = await res.json()
   return {
     reply: data.reply as string,
     pendingApproval: data.pending_approval ?? null,
   }
+}
+
+async function throwAgentChatError(res: Response): Promise<never> {
+  const detail = await res.json().then((d) => d?.detail).catch(() => null)
+  throw new Error(detail || `Agent chat failed (${res.status})`)
+}
+
+/** Frames of /agent-chat/stream: start, chunk (text delta), ping, done, error. */
+async function readAgentStream(
+  body: ReadableStream<Uint8Array>,
+  onDelta: (replySoFar: string) => void,
+): Promise<AgentChatResult> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let reply = ''
+  let pendingApproval: ConsolePendingApproval | null = null
+  let finished = false
+  let failure: string | null = null
+
+  const handle = (line: string) => {
+    if (!line.startsWith('data:')) return
+    let frame: { type?: string; content?: unknown; pending_approval?: ConsolePendingApproval | null; message?: unknown }
+    try {
+      frame = JSON.parse(line.slice(5).trim())
+    } catch {
+      return
+    }
+    if (frame.type === 'chunk' && typeof frame.content === 'string' && frame.content) {
+      reply += frame.content
+      onDelta(reply)
+    } else if (frame.type === 'done') {
+      pendingApproval = frame.pending_approval ?? null
+      finished = true
+    } else if (frame.type === 'error') {
+      failure = typeof frame.message === 'string' && frame.message ? frame.message : 'Agent request failed'
+    }
+  }
+
+  try {
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      let nl: number
+      while ((nl = buffer.indexOf('\n')) >= 0) {
+        handle(buffer.slice(0, nl).replace(/\r$/, ''))
+        buffer = buffer.slice(nl + 1)
+      }
+    }
+    handle(buffer)
+  } finally {
+    reader.releaseLock()
+  }
+
+  if (failure !== null || !finished) {
+    const message = failure ?? 'Agent stream ended unexpectedly'
+    // Nothing written yet: surface it as a failed turn. Otherwise keep what the user already read.
+    if (!reply.trim()) throw new Error(message)
+    reply += `\n\n⚠️ ${message}`
+  }
+  return { reply, pendingApproval }
 }
 
 export interface AgentDeployment {
