@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { tokenizeMentions, mentionedAgents, displayBody, personName, openTaskRows, type TimelineMessage } from "@/lib/roomChat"
+import { tokenizeMentions, mentionedAgents, displayBody, personName, openTaskRows, phaseStep, type TimelineMessage } from "@/lib/roomChat"
 import { parseSpaceMentions } from "@/lib/spaceProtocol"
 import type { SpaceAgentTask } from "@/lib/spaceAgent"
 
@@ -87,5 +87,17 @@ describe("quoteText", () => {
     const { quoteText } = await import("@/lib/roomChat")
     expect(quoteText("I checked **Customer export.xlsx**:\n\n- 29 share an email\n- 12 share a phone\n\n[@Lex](#agent:leads_qualifier) `ok`"))
       .toBe("I checked Customer export.xlsx: 29 share an email 12 share a phone @Lex ok")
+  })
+})
+
+describe("phaseStep", () => {
+  const base = { id: "t1", updatedAt: "2026-11-01T10:00:00Z" } as SpaceAgentTask
+  it("shows nothing while queued", () => {
+    expect(phaseStep({ ...base, status: "todo", reason: "" } as SpaceAgentTask)).toEqual([])
+  })
+  it("shows the phase while running and a short tool name for tool reasons", () => {
+    expect(phaseStep({ ...base, status: "in_progress", reason: "reading the room" } as SpaceAgentTask)[0].label).toBe("reading the room")
+    expect(phaseStep({ ...base, status: "in_progress", reason: "running" } as SpaceAgentTask)[0].label).toBe("thinking")
+    expect(phaseStep({ ...base, status: "in_progress", reason: "tool: avry_mail__send_mail" } as SpaceAgentTask)[0].label).toBe("send mail")
   })
 })
