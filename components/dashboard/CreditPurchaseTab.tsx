@@ -103,6 +103,12 @@ export default function CreditPurchaseTab() {
         throw new Error(data.error || "Failed to generate payment token")
       }
 
+      // A 100% promo: the service granted the order on the spot, with no Snap token.
+      if (data.free) {
+        await confirmPurchase(data.order_id, userId, product, price, credits)
+        return
+      }
+
       if (!data.token) {
         throw new Error("Payment gateway returned no token")
       }
