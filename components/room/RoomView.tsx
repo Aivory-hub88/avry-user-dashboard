@@ -21,6 +21,7 @@ import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { PanelRight } from "lucide-react"
 import ChatMessage from "@/components/ChatMessage"
+import { activityLabel } from "@/components/ui/AgentActivity"
 import ChatInput from "@/components/ChatInput"
 import { NotificationCard } from "@/components/office/NotificationCard"
 import RoomPanel, { type Autonomy, type RoomBrief, type RoomPerson } from "@/components/room/RoomPanel"
@@ -454,7 +455,18 @@ export default function RoomView({
               {taskRows.map((row) => {
                 const name = agentDisplayName(row.task.agentType)
                 if (row.kind === "thinking")
-                  return <ChatMessage key={row.task.id} role="assistant" content="" isStreaming agentName={name} agentType={row.task.agentType} showAgentName />
+                  return (
+                    <ChatMessage
+                      key={row.task.id}
+                      role="assistant"
+                      content=""
+                      isStreaming
+                      agentName={name}
+                      agentType={row.task.agentType}
+                      showAgentName
+                      activity={{ label: activityLabel(row.task.status, row.task.reason, name), startedAt: Date.parse(row.task.createdAt) || undefined }}
+                    />
+                  )
                 if (row.kind === "approval") {
                   const tool = typeof row.task.approvalRef.tool_name === "string" ? row.task.approvalRef.tool_name : "a tool"
                   return (

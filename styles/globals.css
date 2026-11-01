@@ -1268,3 +1268,19 @@ body {
     transform: scale(0.97);
   }
 }
+
+/* Agent activity line — shimmering label that swaps in when the activity changes */
+.activity-shimmer {
+  color: transparent;
+  background: linear-gradient(90deg, #71717a 0%, #71717a 35%, #e4e4e7 50%, #71717a 65%, #71717a 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: activity-shimmer 2.2s linear infinite;
+}
+.activity-enter { animation: activity-shimmer 2.2s linear infinite, activity-in 220ms ease-out; }
+@keyframes activity-shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+@keyframes activity-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .activity-shimmer, .activity-enter { animation: none; color: #a1a1aa; background: none; }
+}

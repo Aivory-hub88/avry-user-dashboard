@@ -11,6 +11,7 @@ import { AttachmentCard } from '@/components/AttachmentCard'
 import type { Attachment } from '@/components/UploadMenu'
 import type { ClassifiedIntent } from '@/lib/intentClassifier'
 import { ThinkingDots } from '@/components/ui/ThinkingDots'
+import { AgentActivity } from '@/components/ui/AgentActivity'
 import { AgentAvatar } from '@/components/office/AgentAvatar'
 
 const WorkflowContainer = dynamic(() => import('@/components/console/WorkflowContainer'), { ssr: false })
@@ -19,6 +20,8 @@ interface ChatMessageProps {
   role: 'user' | 'assistant'
   content: string
   isStreaming?: boolean
+  /** Live activity for the thinking line (Team Space rooms): label + turn start time */
+  activity?: { label: string; startedAt?: number }
   agenticState?: AgenticWorkflowState | null
   onRegenerate?: () => void
   onEdit?: () => void
@@ -309,7 +312,7 @@ const markdownComponents = {
 
 /* ── Main component ────────────────────────────────────────────────────────── */
 
-export default memo(function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null, replyPreview, onReply, author, showAgentName = false }: ChatMessageProps) {
+export default memo(function ChatMessage({ role, content, isStreaming = false, activity, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null, replyPreview, onReply, author, showAgentName = false }: ChatMessageProps) {
   const noop = useCallback(() => {}, [])
   const hasAgenticPhases = !!(agenticState && agenticState.phases.length > 0)
   const hasTextContent = !!content
@@ -380,10 +383,14 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, a
               {ReplyQuote}
               {/* Thinking indicator */}
               {isStreaming && !content && !hasAgenticPhases && (
-                <div className="flex items-center gap-2.5">
-                  <ThinkingDots size={16} dotSize={2.5} />
-                  <span className="text-sm text-[#a1a1aa]">{agentName} is thinking...</span>
-                </div>
+                activity ? (
+                  <AgentActivity label={activity.label} startedAt={activity.startedAt} />
+                ) : (
+                  <div className="flex items-center gap-2.5">
+                    <ThinkingDots size={16} dotSize={2.5} />
+                    <span className="text-sm text-[#a1a1aa]">{agentName} is thinking...</span>
+                  </div>
+                )
               )}
 
               {/* Agentic workflow container */}
