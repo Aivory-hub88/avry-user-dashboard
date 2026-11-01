@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const { authedFetch } = vi.hoisted(() => ({ authedFetch: vi.fn() }))
 vi.mock('./deployAuth', () => ({ authedFetch }))
 
-import { sendAgentMessage } from './agentChat'
+import { sendAgentMessage, toolStatusLabel } from './agentChat'
 
 const enc = new TextEncoder()
 function sse(...parts: string[]) {
@@ -68,5 +68,29 @@ describe('sendAgentMessage streaming', () => {
     )
     const r = await sendAgentMessage('autonomous', 'hi', 'c', undefined, null, vi.fn())
     expect(r.reply).toBe('Sebagian\n\n⚠️ putus')
+  })
+
+  it('reports tool progress while the reply is still empty, and ignores unknown statuses', async () => {
+    authedFetch.mockResolvedValue(
+      sse(
+        'data: {"type":"tool","id":"t1","name":"avry_mail__send_mail","status":"running"}\n\n',
+        'data: {"type":"tool","id":"t1","name":"avry_mail__send_mail","status":"done"}\n\n',
+        'data: {"type":"tool","id":"t2","name":"x","status":"odd"}\n\n',
+        'data: {"type":"chunk","content":"Terkirim"}\n\ndata: {"type":"done","pending_approval":null}\n\n',
+      ),
+    )
+    const tools: unknown[] = []
+    const r = await sendAgentMessage('autonomous', 'hi', 'c', undefined, null, vi.fn(), (t) => tools.push(t))
+    expect(tools).toEqual([
+      { id: 't1', name: 'avry_mail__send_mail', status: 'running' },
+      { id: 't1', name: 'avry_mail__send_mail', status: 'done' },
+    ])
+    expect(r.reply).toBe('Terkirim')
+  })
+
+  it('turns an internal tool name into a short status line', () => {
+    expect(toolStatusLabel('avry_mail__send_mail')).toBe('Menjalankan send mail…')
+    expect(toolStatusLabel('composio__GMAIL-FETCH_EMAILS')).toBe('Menjalankan gmail fetch emails…')
+    expect(toolStatusLabel('')).toBe('Menjalankan tool…')
   })
 })

@@ -19,6 +19,8 @@ interface ChatMessageProps {
   role: 'user' | 'assistant'
   content: string
   isStreaming?: boolean
+  /** What the agent is doing (tool progress); replaces "is thinking..." until reply text arrives. */
+  statusText?: string
   agenticState?: AgenticWorkflowState | null
   onRegenerate?: () => void
   onEdit?: () => void
@@ -309,7 +311,7 @@ const markdownComponents = {
 
 /* ── Main component ────────────────────────────────────────────────────────── */
 
-export default memo(function ChatMessage({ role, content, isStreaming = false, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null, replyPreview, onReply, author, showAgentName = false }: ChatMessageProps) {
+export default memo(function ChatMessage({ role, content, isStreaming = false, statusText, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null, replyPreview, onReply, author, showAgentName = false }: ChatMessageProps) {
   const noop = useCallback(() => {}, [])
   const hasAgenticPhases = !!(agenticState && agenticState.phases.length > 0)
   const hasTextContent = !!content
@@ -382,7 +384,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, a
               {isStreaming && !content && !hasAgenticPhases && (
                 <div className="flex items-center gap-2.5">
                   <ThinkingDots size={16} dotSize={2.5} />
-                  <span className="text-sm text-[#a1a1aa]">{agentName} is thinking...</span>
+                  <span className="text-sm text-[#a1a1aa]">{statusText ?? `${agentName} is thinking...`}</span>
                 </div>
               )}
 
