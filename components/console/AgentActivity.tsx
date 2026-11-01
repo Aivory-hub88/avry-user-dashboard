@@ -48,12 +48,12 @@ export function AgentActivity({ agentName, startedAt, steps, endedAt }: AgentAct
     // Finished turn: one quiet line, steps one click away.
     const total = formatElapsed(endedAt - startedAt)
     if (steps.length === 0) {
-      return <div className="mb-2 text-[12px] text-[#71717a]">Selesai dalam {total}</div>
+      return <div className="mb-2 text-[12px] text-[#71717a]">Done in {total}</div>
     }
     return (
       <details className="mb-2 text-[12px] text-[#71717a]">
         <summary className="cursor-pointer select-none">
-          Selesai dalam {total} · {steps.length} langkah
+          Done in {total} · {steps.length} {steps.length === 1 ? 'step' : 'steps'}
         </summary>
         <ul className="mt-1.5 space-y-0.5 border-l border-line pl-3">
           {steps.map((s) => <StepRow key={s.id} step={s} now={endedAt} />)}
@@ -68,14 +68,14 @@ export function AgentActivity({ agentName, startedAt, steps, endedAt }: AgentAct
     <div className="mb-3" role="status" aria-live="polite">
       <div className="flex items-center gap-2 text-sm text-[#a1a1aa]">
         <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-[#34d399]" aria-hidden />
-        <span>{agentName} sedang bekerja…</span>
+        <span>{agentName} is working…</span>
         <span className="tabular-nums text-[#71717a]">{formatElapsed(now - startedAt)}</span>
       </div>
       {steps.length === 0 ? (
-        <div className="mt-1.5 pl-4 text-[13px] text-[#71717a]">Menyiapkan jawaban…</div>
+        <div className="mt-1.5 pl-4 text-[13px] text-[#71717a]">Preparing a reply…</div>
       ) : (
         <ul className="mt-1.5 space-y-0.5 border-l border-line pl-3">
-          {hidden > 0 && <li className="text-[12px] text-[#71717a]">+{hidden} langkah sebelumnya</li>}
+          {hidden > 0 && <li className="text-[12px] text-[#71717a]">+{hidden} earlier {hidden === 1 ? 'step' : 'steps'}</li>}
           {recent.map((s) => <StepRow key={s.id} step={s} now={now} />)}
         </ul>
       )}
