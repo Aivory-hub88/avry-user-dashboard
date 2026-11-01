@@ -465,15 +465,18 @@ export function useChat({
     // an agent can speak twice in one chain.
     type RoomTurn = { id: string; agent: string; depth: number; handoff: { from: string; text: string; hop: number } | null }
     const turns: RoomTurn[] = targets.map((t, i) => ({ id: `${ts}-room-${t}-${i}`, agent: t, depth: 0, handoff: null }))
-    const placeholderFor = (turn: RoomTurn): Message => ({
+    // Sequential rounds: later speakers wait for the one before them, and say so.
+    const sequential = !roundRunsInParallel(intent)
+    const placeholderFor = (turn: RoomTurn, waitingFor?: string): Message => ({
       id: turn.id,
       role: "assistant",
       content: "",
       isStreaming: true,
       agentType: turn.agent,
       agentName: agentNameOf(turn.agent),
+      ...(sequential && waitingFor ? { statusText: `${agentNameOf(turn.agent)} is waiting for ${waitingFor}...` } : {}),
     })
-    const placeholders: Message[] = turns.map(placeholderFor) // grows when a teammate is handed work
+    const placeholders: Message[] = turns.map((t, i) => placeholderFor(t, i > 0 ? agentNameOf(turns[i - 1].agent) : undefined)) // grows when a teammate is handed work
     const baseMessages = [...messagesRef.current]
     const sentSessionId = currentSessionId
 
@@ -515,7 +518,7 @@ export function useChat({
       })
       // Timer starts when this agent's turn begins (sequential rounds queue the rest).
       if (currentSessionIdRef.current === sentSessionId) {
-        setMessages(p => p.map(m => m.id === turn.id ? { ...m, startedAt: Date.now(), activity: [] } : m))
+        setMessages(p => p.map(m => m.id === turn.id ? { ...m, startedAt: Date.now(), activity: [], statusText: undefined } : m))
       }
       try {
         const result = await sendAgentMessage(
@@ -579,7 +582,7 @@ export function useChat({
               handoff: { from: me.name, text: result.reply, hop: turn.depth + 1 },
             }
             turns.push(handed)
-            const ph = placeholderFor(handed)
+            const ph = placeholderFor(handed, me.name)
             placeholders.push(ph)
             if (currentSessionIdRef.current === sentSessionId) setMessages(p => [...p, ph])
           }
