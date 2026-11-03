@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { workflowRepository } from '@/lib/workflows/repository'
 import { AivoryWorkflowSpec } from '@/types/workflow'
+import { requireModule } from '@/lib/teamAccess'
 
 // GET /api/workflows — list all workflows
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
   try {
     const workflows = workflowRepository.list()
     return NextResponse.json(workflows)
@@ -15,6 +18,8 @@ export async function GET() {
 
 // POST /api/workflows — create a new workflow
 export async function POST(request: NextRequest) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
   try {
     const body = await request.json() as Partial<AivoryWorkflowSpec>
 

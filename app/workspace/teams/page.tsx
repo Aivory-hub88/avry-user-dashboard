@@ -9,9 +9,10 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { X } from "lucide-react"
 import { teamsApi, type TeamSummary } from "@/lib/requestsClient"
+import { TEAM_MODULES, effectiveModules } from "@/lib/workspaceModules"
 import { Button, inputClass } from "@/components/requests/requestUi"
 
-type Member = { user_id: string; role: string; email: string | null; full_name: string | null }
+type Member = { user_id: string; role: string; modules: string[] | null; email: string | null; full_name: string | null }
 
 const ROLE_LABEL: Record<string, string> = { owner: "Admin", editor: "Member", viewer: "Viewer" }
 
@@ -98,6 +99,7 @@ function TeamCard({ team, onError }: { team: TeamSummary; onError: (m: string | 
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<"editor" | "viewer" | "owner">("editor")
   const [busy, setBusy] = useState(false)
+  const [editing, setEditing] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!isAdmin) return
@@ -148,6 +150,19 @@ function TeamCard({ team, onError }: { team: TeamSummary; onError: (m: string | 
     }
   }
 
+  const toggleModule = async (m: Member, key: string) => {
+    const current = effectiveModules(m.role, m.modules) as string[]
+    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key]
+    onError(null)
+    setMembers((cur) => (cur ?? []).map((x) => (x.user_id === m.user_id ? { ...x, modules: next } : x)))
+    try {
+      await teamsApi.setModules(team.id, m.user_id, next)
+    } catch (e) {
+      onError((e as Error).message)
+      await load()
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-line bg-white/[0.02] p-5">
       <div className="flex items-center justify-between gap-3">
@@ -161,25 +176,56 @@ function TeamCard({ team, onError }: { team: TeamSummary; onError: (m: string | 
       ) : (
         <>
           <div className="mt-4 divide-y divide-line rounded-xl border border-line">
-            {(members ?? []).map((m) => (
-              <div key={m.user_id} className="flex items-center gap-3 px-3 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[12px] text-white/80">{m.full_name || m.email || m.user_id}</div>
-                  {m.full_name && m.email && <div className="truncate text-[11px] text-white/30">{m.email}</div>}
+            {(members ?? []).map((m) => {
+              const granted = effectiveModules(m.role, m.modules) as string[]
+              const locked = m.role === "owner"
+              return (
+                <div key={m.user_id} className="px-3 py-2.5">
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[12px] text-white/80">{m.full_name || m.email || m.user_id}</div>
+                      {m.full_name && m.email && <div className="truncate text-[11px] text-white/30">{m.email}</div>}
+                    </div>
+                    <span className="text-[11px] text-white/40">{ROLE_LABEL[m.role] ?? m.role}</span>
+                    {!locked && (
+                      <button
+                        type="button"
+                        onClick={() => setEditing((cur) => (cur === m.user_id ? null : m.user_id))}
+                        aria-expanded={editing === m.user_id}
+                        className="rounded-full px-2.5 py-1 text-[11px] text-white/45 hover:bg-white/[0.06] hover:text-white/75"
+                      >
+                        {granted.length} of {TEAM_MODULES.length} features
+                      </button>
+                    )}
+                    {m.user_id !== team.owner && (
+                      <button
+                        type="button"
+                        onClick={() => remove(m)}
+                        aria-label={`Remove ${m.email ?? m.user_id}`}
+                        className="rounded-full p-1.5 text-white/25 hover:bg-white/[0.06] hover:text-white/70"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {editing === m.user_id && !locked && (
+                    <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
+                      {TEAM_MODULES.map((mod) => (
+                        <label key={mod.key} className="flex cursor-pointer items-center gap-2 text-[12px] text-white/60">
+                          <input
+                            type="checkbox"
+                            checked={granted.includes(mod.key)}
+                            onChange={() => toggleModule(m, mod.key)}
+                            className="h-3.5 w-3.5 accent-white"
+                          />
+                          {mod.label}
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <span className="text-[11px] text-white/40">{ROLE_LABEL[m.role] ?? m.role}</span>
-                {m.user_id !== team.owner && (
-                  <button
-                    type="button"
-                    onClick={() => remove(m)}
-                    aria-label={`Remove ${m.email ?? m.user_id}`}
-                    className="rounded-full p-1.5 text-white/25 hover:bg-white/[0.06] hover:text-white/70"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <input

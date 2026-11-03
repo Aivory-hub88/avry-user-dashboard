@@ -17,11 +17,13 @@
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { AuthManager } from '@/lib/authManager'
-import { isDemoAccount, isPathAllowedForDemo, DEMO_HOME_PATH } from '@/lib/moduleAccess'
+import { isDemoAccount, isPathAllowedForDemo, DEMO_HOME_PATH, isPathAllowedForTeam, teamHomePath } from '@/lib/moduleAccess'
+import { useTeamAccess } from '@/hooks/useTeamAccess'
 
 export function DemoRouteGuard() {
   const pathname = usePathname() || ''
   const router = useRouter()
+  const team = useTeamAccess()
 
   useEffect(() => {
     const user = AuthManager.getUser()
@@ -29,6 +31,12 @@ export function DemoRouteGuard() {
     if (isPathAllowedForDemo(pathname, user?.allowed_modules)) return
     router.replace(DEMO_HOME_PATH)
   }, [pathname, router])
+
+  // Team-granted accounts: lock modules the team admin didn't enable.
+  useEffect(() => {
+    if (!team.restricted || isPathAllowedForTeam(pathname, team.modules)) return
+    router.replace(teamHomePath(team.modules))
+  }, [pathname, router, team])
 
   return null
 }

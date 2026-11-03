@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
+import { normalizeModules } from "@/lib/workspaceModules"
 import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
 
 export const runtime = "nodejs"
@@ -29,23 +30,36 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const accountType = cred.kind === "service" ? "superadmin" : cred.user.account_type
   if (!(await isManager(id, accountType, actor))) return forbidden()
 
-  let body: { role?: string }
+  let body: { role?: string; modules?: unknown }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: "invalid json" }, { status: 400 })
   }
+  const hasRole = body.role !== undefined
   const role = (body.role ?? "").toString()
-  if (!ROLES.has(role)) return NextResponse.json({ error: "invalid role" }, { status: 400 })
+  if (hasRole && !ROLES.has(role)) return NextResponse.json({ error: "invalid role" }, { status: 400 })
+  const hasModules = body.modules !== undefined
+  // null resets the member to their role default.
+  const modules = body.modules === null ? null : normalizeModules(body.modules)
+  if (hasModules && body.modules !== null && modules === null)
+    return NextResponse.json({ error: "invalid modules" }, { status: 400 })
+  if (!hasRole && !hasModules) return NextResponse.json({ error: "role or modules required" }, { status: 400 })
   // owner can't demote themselves via membership (transfer ownership is out of scope)
-  if (userId === actor && role !== "owner") return NextResponse.json({ error: "cannot demote self" }, { status: 400 })
+  if (hasRole && userId === actor && role !== "owner")
+    return NextResponse.json({ error: "cannot demote self" }, { status: 400 })
 
   try {
-    await query(
-      `UPDATE dashboard.workspace_members SET role = $1 WHERE workspace_id = $2 AND user_id = $3`,
-      [role, id, userId],
+    const r = await query(
+      `UPDATE dashboard.workspace_members
+       SET role = CASE WHEN $4 THEN $1 ELSE role END,
+           modules = CASE WHEN $5 THEN $6::text[] ELSE modules END
+       WHERE workspace_id = $2 AND user_id = $3
+       RETURNING role, modules`,
+      [role, id, userId, hasRole, hasModules, modules],
     )
-    return NextResponse.json({ workspace_id: id, user_id: userId, role })
+    if ((r.rowCount ?? 0) === 0) return NextResponse.json({ error: "not a member" }, { status: 404 })
+    return NextResponse.json({ workspace_id: id, user_id: userId, ...r.rows[0] })
   } catch (e) {
     console.error("[workspaces/members PATCH]", e)
     return NextResponse.json({ error: "db" }, { status: 500 })

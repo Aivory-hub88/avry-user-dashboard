@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireModule } from '@/lib/teamAccess'
 
 /**
  * /api/agents
@@ -24,6 +25,8 @@ function token(req: NextRequest): string {
 }
 
 export async function GET(req: NextRequest) {
+  const denied = await requireModule(req, 'agents')
+  if (denied) return denied
   const status = req.nextUrl.searchParams.get('status') || ''
   const qs = status ? `?status=${encodeURIComponent(status)}` : ''
   try {
@@ -44,6 +47,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await requireModule(req, 'agents')
+  if (denied) return denied
   let body: unknown
   try {
     body = await req.json()
