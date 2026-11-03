@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireModule } from '@/lib/teamAccess'
 
 /**
  * POST /api/workflows/aivory-configure
@@ -53,6 +54,9 @@ function schemaGuard(patch: Record<string, any>, current: Record<string, any>): 
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await requireModule(req, 'workflows')
+  if (denied) return denied
+
   let body: Record<string, any>
   try { body = await req.json() } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })

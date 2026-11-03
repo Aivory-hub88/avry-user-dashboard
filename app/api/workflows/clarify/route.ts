@@ -20,6 +20,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { requireModule } from '@/lib/teamAccess'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,9 @@ interface ClarifyRequestBody {
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+
   // ── 1. Parse & validate body ──────────────────────────────────────────────
   let body: ClarifyRequestBody
   try {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { getAuthUser } from '@/lib/serverAuth'
+import { requireModule } from '@/lib/teamAccess'
 
 export const runtime = 'nodejs'
 
@@ -14,6 +15,9 @@ function auth(request: NextRequest) {
 
 /** List pending exception cases for the signed-in reviewer. */
 export async function GET(request: NextRequest) {
+  const denied = await requireModule(request, 'console')
+  if (denied) return denied
+
   const user = auth(request)
   if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
 
@@ -29,6 +33,9 @@ export async function GET(request: NextRequest) {
 
 /** Register a Wait execution once its execution-specific resume URL is known. */
 export async function POST(request: NextRequest) {
+  const denied = await requireModule(request, 'console')
+  if (denied) return denied
+
   const body = await request.json().catch(() => ({})) as Record<string, unknown>
   const internalToken = request.headers.get('x-aivory-approval-token')
   const configuredToken = process.env.APPROVAL_REGISTRATION_TOKEN

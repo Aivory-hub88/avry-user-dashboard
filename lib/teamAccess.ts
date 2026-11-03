@@ -59,9 +59,9 @@ export async function teamAccessFor(userId: string, accountType?: string | null)
  * still apply).
  */
 export async function requireModule(req: NextRequest, key: string): Promise<NextResponse | null> {
-  const user = getAuthUser(req)
-  if (!user) return null // unauthenticated requests are rejected by the route itself
   try {
+    const user = getAuthUser(req)
+    if (!user) return null // unauthenticated requests are rejected by the route itself
     const access = await teamAccessFor(user.user_id, user.account_type)
     if (access.restricted && !access.modules.includes(key)) {
       return NextResponse.json({ error: 'feature not enabled for your team role', code: 'MODULE_DISABLED', module: key }, { status: 403 })

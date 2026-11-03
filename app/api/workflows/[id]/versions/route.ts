@@ -3,6 +3,7 @@ import { listVersions, snapshotVersion, type VersionTriggerReason } from '@/lib/
 import { getAuthUser } from '@/lib/serverAuth'
 import type { AivoryWorkflowSpec } from '@/types/workflow'
 import type { CanvasState } from '@/lib/workflows/canvasRepository'
+import { requireModule } from '@/lib/teamAccess'
 
 // GET  /api/workflows/:id/versions — list version snapshots, newest first.
 // POST /api/workflows/:id/versions — client-triggered snapshot of the
@@ -30,6 +31,9 @@ export async function GET(
   _request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(_request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   try {
     const versions = await listVersions(id)
@@ -44,6 +48,9 @@ export async function POST(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   let body: { spec?: AivoryWorkflowSpec; canvas?: CanvasState | null; reason?: VersionTriggerReason }
   try {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { workflowRepository } from '@/lib/workflows/repository'
 import { canvasRepository } from '@/lib/workflows/canvasRepository'
 import { getVersion, snapshotVersion } from '@/lib/workflows/versionRepository'
+import { requireModule } from '@/lib/teamAccess'
 
 // POST /api/workflows/:id/versions/:version/restore — reapplies a stored
 // snapshot's spec+canvas as the workflow's current state, then immediately
@@ -16,6 +17,9 @@ export async function POST(
   _request: NextRequest,
   ctx: { params: Promise<{ id: string; version: string }> }
 ) {
+  const denied = await requireModule(_request, 'workflows')
+  if (denied) return denied
+
   const { id, version: versionParam } = await ctx.params
   const version = parseInt(versionParam, 10)
   if (!Number.isFinite(version)) {

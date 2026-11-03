@@ -5,6 +5,7 @@ import type {
   WorkflowStepType,
   AivoryWorkflowEdge,
 } from '@/types/workflows'
+import { requireModule } from '@/lib/teamAccess'
 
 /**
  * POST /api/workflows/ai-suggest
@@ -31,6 +32,9 @@ const VPS_BRIDGE_URL = (
 const TIMEOUT_MS = 120_000
 
 export async function POST(req: NextRequest) {
+  const denied = await requireModule(req, 'workflows')
+  if (denied) return denied
+
   let body: Record<string, unknown>
   try {
     body = await req.json()

@@ -9,6 +9,7 @@ import { convertToN8nWorkflow } from '@/lib/workflowConverter'
 import { validateWorkflow as validateN8nWorkflow } from '@/lib/workflows/n8nMcpClient'
 import { llmSemanticReview } from '@/lib/workflows/blueprintLlmValidator'
 import { getAuthUser } from '@/lib/serverAuth'
+import { requireModule } from '@/lib/teamAccess'
 
 /**
  * POST /api/console/workflows/from-blueprint
@@ -91,6 +92,9 @@ async function sandboxValidate(n8nWorkflow: Record<string, unknown>): Promise<Re
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await requireModule(req, 'console')
+  if (denied) return denied
+
   try {
     const body = await req.json().catch(() => ({}))
 

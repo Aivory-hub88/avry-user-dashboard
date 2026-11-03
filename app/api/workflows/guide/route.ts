@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateSetupGuideMarkdown, type GuideStep } from '@/lib/workflows/nodeSetupGuide'
 import { mdToText, mdToPdf } from '@/lib/workflows/guideFormats'
+import { requireModule } from '@/lib/teamAccess'
 
 export const maxDuration = 30
 
@@ -11,6 +12,9 @@ export const maxDuration = 30
  * Deterministic — no LLM call; curated knowledge base per app/node type.
  */
 export async function POST(request: NextRequest) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+
   let body: { workflowName?: string; steps?: GuideStep[]; summary?: string; format?: string }
   try {
     body = await request.json()

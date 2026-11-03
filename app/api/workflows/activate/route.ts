@@ -3,6 +3,7 @@ import { normalizeN8nBaseUrl } from '@/lib/workflows/credentialStore'
 import { getAuthUser } from '@/lib/serverAuth'
 import { logWorkflowDeployed } from '@/lib/workflows/cogneeGraphLog'
 import { canUseAivoryN8nInstance } from '@/lib/tiers'
+import { requireModule } from '@/lib/teamAccess'
 
 /**
  * POST /api/workflows/activate
@@ -28,6 +29,9 @@ export const maxDuration = 60
  * Returns { canUseAivoryInstance: boolean } and never leaks why it is false.
  */
 export async function GET(req: NextRequest) {
+  const denied = await requireModule(req, 'workflows')
+  if (denied) return denied
+
   const deny = NextResponse.json({ canUseAivoryInstance: false })
 
   let authUser
@@ -102,6 +106,9 @@ function buildN8nWorkflow(wfData: any, workflowId: string) {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await requireModule(req, 'workflows')
+  if (denied) return denied
+
   let body: any
   try {
     body = await req.json()

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireModule } from '@/lib/teamAccess'
 
 const BACKEND_URL = process.env.BACKEND_SERVICE_URL || "http://avry-backend:8081";
 
 // GET /api/agent-catalog — published agents from the shared backend.
 export async function GET(request: NextRequest) {
+  const denied = await requireModule(request, 'agents')
+  if (denied) return denied
+
   const token =
     request.cookies.get("aivory_access_token")?.value ||
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");

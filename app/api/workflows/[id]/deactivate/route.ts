@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { workflowRepository } from '@/lib/workflows/repository'
+import { requireModule } from '@/lib/teamAccess'
 
 // POST /api/workflows/:id/deactivate — flips Aivory's own `status` back to
 // 'draft'. This route didn't exist at all before; handleDeactivate()
@@ -15,6 +16,9 @@ export async function POST(
   _request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(_request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   try {
     const updated = workflowRepository.update(id, { status: 'draft' })
