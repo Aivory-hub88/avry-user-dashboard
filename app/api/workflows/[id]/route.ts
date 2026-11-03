@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { workflowRepository } from '@/lib/workflows/repository'
 import { AivoryWorkflowSpec } from '@/types/workflow'
 import { requireModule } from '@/lib/teamAccess'
-import { authorizeWorkflow, canShareInto } from '@/lib/workflows/access'
+import { authorizeWorkflow, canShareInto, describeForActor } from '@/lib/workflows/access'
 
 // GET /api/workflows/:id — fetch a single workflow.
 // PATCH /api/workflows/:id — partial update (title/status/steps/etc).
@@ -27,7 +27,7 @@ export async function GET(
   try {
     const workflow = auth.spec
     if (!workflow) return NextResponse.json({ error: 'Workflow not found' }, { status: 404 })
-    return NextResponse.json(workflow)
+    return NextResponse.json((await describeForActor([workflow], auth.actor))[0])
   } catch (err) {
     console.error(`[GET /api/workflows/${id}]`, err)
     return NextResponse.json({ error: 'Failed to fetch workflow' }, { status: 500 })
@@ -55,6 +55,8 @@ export async function PATCH(
   // into (or out of) a team, and only into a team they can edit in.
   const requested = patch.workspace_id
   delete (patch as { owner?: unknown }).owner
+  delete (patch as { created_by?: unknown }).created_by
+  delete (patch as { access?: unknown }).access
   delete (patch as { workspace_id?: unknown }).workspace_id
   if (requested !== undefined) {
     const isOwner = !auth.spec || auth.spec.owner === auth.actor.userId || (!auth.spec.owner && auth.actor.superadmin)

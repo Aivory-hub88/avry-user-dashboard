@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { workflowRepository } from '@/lib/workflows/repository'
 import { AivoryWorkflowSpec } from '@/types/workflow'
 import { requireModule } from '@/lib/teamAccess'
-import { actorFromRequest, canShareInto, resolveWorkflowAccess } from '@/lib/workflows/access'
+import { actorFromRequest, canShareInto, describeForActor, resolveWorkflowAccess } from '@/lib/workflows/access'
 
 // GET /api/workflows — workflows the caller owns or that are shared into their teams
 export async function GET(request: NextRequest) {
@@ -11,8 +11,8 @@ export async function GET(request: NextRequest) {
   const actor = await actorFromRequest(request)
   if (!actor) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   try {
-    const workflows = workflowRepository.list().filter((w) => resolveWorkflowAccess(w, actor) !== null)
-    return NextResponse.json(workflows)
+    const visible = workflowRepository.list().filter((w) => resolveWorkflowAccess(w, actor) !== null)
+    return NextResponse.json(await describeForActor(visible, actor))
   } catch (err) {
     console.error('[GET /api/workflows]', err)
     return NextResponse.json({ error: 'Failed to list workflows' }, { status: 500 })

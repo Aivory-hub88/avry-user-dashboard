@@ -22,6 +22,8 @@ export type Need = 'read' | 'write' | 'delete'
 export interface Membership {
   role: string
   modules: string[] | null
+  /** The team's admins (workspace owner + owner-role members). */
+  admins?: string[]
 }
 
 export interface WorkflowActor {
@@ -42,9 +44,19 @@ export function resolveWorkflowAccess(
 ): WorkflowAccess {
   if (spec.owner && spec.owner === actor.userId) return 'owner'
   if (!spec.owner && actor.superadmin) return 'owner' // legacy, creator unknown
+  // Shared into a team: access follows the member's team role.
   const m = spec.workspace_id ? actor.memberships.get(spec.workspace_id) : undefined
-  if (!m || !memberCanUse(m.role, m.modules, 'workflows')) return null
-  return m.role === 'owner' ? 'owner' : m.role === 'editor' ? 'editor' : 'viewer'
+  const shared: WorkflowAccess =
+    m && memberCanUse(m.role, m.modules, 'workflows')
+      ? m.role === 'owner' ? 'owner' : m.role === 'editor' ? 'editor' : 'viewer'
+      : null
+  if (shared) return shared
+  // Everything a team admin owns is readable by every member of that team.
+  if (spec.owner) {
+    for (const t of actor.memberships.values())
+      if (t.admins?.includes(spec.owner) && memberCanUse(t.role, t.modules, 'workflows')) return 'viewer'
+  }
+  return null
 }
 
 export function allows(access: WorkflowAccess, need: Need): boolean {
@@ -59,18 +71,29 @@ export async function loadActor(userId: string, accountType?: string | null): Pr
   const memberships = new Map<string, Membership>()
   try {
     const r = await query(
-      `SELECT w.id AS workspace_id, 'owner' AS role, NULL::text[] AS modules
-         FROM dashboard.workspaces w WHERE w.owner = $1 AND w.id <> $2
-       UNION ALL
-       SELECT m.workspace_id, m.role, m.modules
-         FROM dashboard.workspace_members m WHERE m.user_id = $1 AND m.workspace_id <> $2`,
+      `WITH mine AS (
+         SELECT w.id AS workspace_id, 'owner' AS role, NULL::text[] AS modules
+           FROM dashboard.workspaces w WHERE w.owner = $1 AND w.id <> $2
+         UNION ALL
+         SELECT m.workspace_id, m.role, m.modules
+           FROM dashboard.workspace_members m WHERE m.user_id = $1 AND m.workspace_id <> $2
+       )
+       SELECT mine.workspace_id, mine.role, mine.modules,
+              ARRAY(SELECT w.owner FROM dashboard.workspaces w WHERE w.id = mine.workspace_id
+                    UNION SELECT m.user_id FROM dashboard.workspace_members m
+                           WHERE m.workspace_id = mine.workspace_id AND m.role = 'owner') AS admins
+         FROM mine`,
       [userId, LEGACY_WORKSPACE],
     )
     for (const row of r.rows) {
       const id = String(row.workspace_id)
       // owner wins over a duplicate member row
       if (!memberships.has(id) || row.role === 'owner')
-        memberships.set(id, { role: String(row.role), modules: (row.modules as string[] | null) ?? null })
+        memberships.set(id, {
+          role: String(row.role),
+          modules: (row.modules as string[] | null) ?? null,
+          admins: ((row.admins as string[] | null) ?? []).map(String),
+        })
     }
   } catch (e) {
     console.error('[workflows/access] memberships', e) // fail closed on team access: own workflows only
@@ -119,4 +142,36 @@ export async function actorFromRequest(req: NextRequest): Promise<WorkflowActor 
     user = null
   }
   return user ? loadActor(user.user_id, user.account_type) : null
+}
+
+export interface WorkflowCreator {
+  id: string
+  name: string | null
+  email: string | null
+  /** The caller created it. */
+  me: boolean
+}
+
+/** Response-only fields; never persisted (routes strip them from writes). */
+export type WorkflowView = AivoryWorkflowSpec & { created_by: WorkflowCreator | null; access: WorkflowAccess }
+
+/** Attach who created each workflow and what the caller may do with it. */
+export async function describeForActor(specs: AivoryWorkflowSpec[], actor: WorkflowActor): Promise<WorkflowView[]> {
+  const ids = Array.from(new Set(specs.map((s) => s.owner).filter((x): x is string => !!x)))
+  const people = new Map<string, { name: string | null; email: string | null }>()
+  if (ids.length > 0) {
+    try {
+      const r = await query(`SELECT id, full_name, email FROM identity.users WHERE id = ANY($1::text[])`, [ids])
+      for (const row of r.rows) people.set(String(row.id), { name: (row.full_name as string | null) ?? null, email: (row.email as string | null) ?? null })
+    } catch (e) {
+      console.error('[workflows/access] creators', e)
+    }
+  }
+  return specs.map((s) => ({
+    ...s,
+    created_by: s.owner
+      ? { id: s.owner, name: people.get(s.owner)?.name ?? null, email: people.get(s.owner)?.email ?? null, me: s.owner === actor.userId }
+      : null,
+    access: resolveWorkflowAccess(s, actor),
+  }))
 }

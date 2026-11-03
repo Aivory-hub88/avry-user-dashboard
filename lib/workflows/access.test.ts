@@ -58,3 +58,28 @@ describe('allows / canShareInto', () => {
     expect(canShareInto(a('editor', null), 'other')).toBe(false)
   })
 })
+
+describe('team admin workflows', () => {
+  const member = (role: string, modules: string[] | null = null) =>
+    actor({ memberships: new Map([['w1', { role, modules, admins: ['boss'] }]]) })
+
+  it('everything the team admin owns is readable by every member, read-only', () => {
+    expect(resolveWorkflowAccess({ owner: 'boss' }, member('editor'))).toBe('viewer')
+    expect(resolveWorkflowAccess({ owner: 'boss' }, member('viewer', ['workflows']))).toBe('viewer')
+    // a viewer's default grant is Workspace only, so no Workflows until the admin enables it
+    expect(resolveWorkflowAccess({ owner: 'boss' }, member('viewer'))).toBeNull()
+  })
+
+  it('needs the Workflows feature', () => {
+    expect(resolveWorkflowAccess({ owner: 'boss' }, member('editor', ['console']))).toBeNull()
+  })
+
+  it('does not expose a fellow member\'s unshared workflows, or another team\'s admin', () => {
+    expect(resolveWorkflowAccess({ owner: 'peer' }, member('editor'))).toBeNull()
+    expect(resolveWorkflowAccess({ owner: 'other-boss' }, member('editor'))).toBeNull()
+  })
+
+  it('an explicit share still grants edit on top of the read-only default', () => {
+    expect(resolveWorkflowAccess({ owner: 'boss', workspace_id: 'w1' }, member('editor'))).toBe('editor')
+  })
+})

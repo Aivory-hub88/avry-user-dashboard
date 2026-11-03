@@ -79,6 +79,9 @@ export interface AivoryWorkflowSpec {
    *  those count as the superadmin's and are hidden from customers.
    *  Never client-settable. */
   owner?: string | null;
+  /** Response-only: creator details and the caller's rights. Never stored. */
+  created_by?: { id: string; name: string | null; email: string | null; me: boolean } | null;
+  access?: 'owner' | 'editor' | 'viewer' | null;
   /** Team the workflow is shared with (dashboard.workspaces.id); members with
    *  the Workflows feature get access by their team role. */
   workspace_id?: string | null;

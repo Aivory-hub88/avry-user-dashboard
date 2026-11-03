@@ -53,6 +53,8 @@ function specToSaved(spec: AivoryWorkflowSpec): SavedWorkflow {
     n8nId: spec.n8nId,
     n8n_workflow_id: spec.n8n_workflow_id,
     n8n_url: spec.n8n_url,
+    created_by: spec.created_by,
+    access: spec.access,
     created_at: spec.createdAt,
   }
 }
@@ -1753,6 +1755,7 @@ function WorkflowsPageInner() {
                   <span className={styles.wliTitle}>{wf.title}</span>
                   <div className={styles.wliBadges}>
                     <ModeBadge wf={wf} />
+                    {wf.access !== 'viewer' && wf.access !== 'editor' && (
                     <button
                       className={styles.deleteBtn}
                       onClick={(e) => {
@@ -1766,9 +1769,13 @@ function WorkflowsPageInner() {
                     >
                       {Icons.trash}
                     </button>
+                    )}
                   </div>
                 </div>
-                <span className={styles.wliMeta}>{wf.company_name} · {new Date(wf.created_at).toLocaleDateString()}</span>
+                <span className={styles.wliMeta}>
+                  {wf.company_name} · {new Date(wf.created_at).toLocaleDateString()}
+                  {wf.created_by && !wf.created_by.me && ` · by ${wf.created_by.name || wf.created_by.email || 'a teammate'}`}
+                </span>
               </div>
             ))}
           </>
