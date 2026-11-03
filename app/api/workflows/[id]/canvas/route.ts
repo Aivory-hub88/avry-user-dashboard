@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { canvasRepository } from '@/lib/workflows/canvasRepository'
 import { requireModule } from '@/lib/teamAccess'
+import { authorizeWorkflow } from '@/lib/workflows/access'
 
 // GET/PUT/DELETE /api/workflows/:id/canvas — React Flow nodes/edges for a
 // workflow's draft canvas. canvasRepository was entirely dead code (zero
@@ -17,6 +18,10 @@ export async function GET(
   if (denied) return denied
 
   const { id } = await ctx.params
+
+  const wfAuth = await authorizeWorkflow(_request, id, 'read')
+
+  if (!wfAuth.ok) return wfAuth.res
   try {
     const state = canvasRepository.get(id)
     return NextResponse.json(state)
@@ -34,6 +39,10 @@ export async function PUT(
   if (denied) return denied
 
   const { id } = await ctx.params
+
+  const wfAuth = await authorizeWorkflow(request, id, 'write')
+
+  if (!wfAuth.ok) return wfAuth.res
   let body: { nodes?: unknown[]; edges?: unknown[] }
   try {
     body = await request.json()
@@ -61,6 +70,10 @@ export async function DELETE(
   if (denied) return denied
 
   const { id } = await ctx.params
+
+  const wfAuth = await authorizeWorkflow(_request, id, 'write')
+
+  if (!wfAuth.ok) return wfAuth.res
   try {
     canvasRepository.remove(id)
     return NextResponse.json({ success: true })

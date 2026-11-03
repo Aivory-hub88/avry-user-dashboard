@@ -4,6 +4,7 @@ import { resolveN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
 import { getExecutionDetailWithCreds, classifyN8nError } from '@/lib/workflows/n8nClient'
 import { captureFixture, listFixtures } from '@/lib/workflows/fixtureRepository'
 import { requireModule } from '@/lib/teamAccess'
+import { authorizeWorkflow } from '@/lib/workflows/access'
 
 // GET  /api/workflows/:id/fixtures — list captured fixtures for a workflow.
 // POST /api/workflows/:id/fixtures — capture a new fixture from a real n8n
@@ -36,6 +37,10 @@ export async function GET(
   if (denied) return denied
 
   const { id } = await ctx.params
+
+  const wfAuth = await authorizeWorkflow(_request, id, 'read')
+
+  if (!wfAuth.ok) return wfAuth.res
   const auth = authenticate(_request)
   if ('response' in auth) return auth.response
 
@@ -56,6 +61,10 @@ export async function POST(
   if (denied) return denied
 
   const { id } = await ctx.params
+
+  const wfAuth = await authorizeWorkflow(request, id, 'write')
+
+  if (!wfAuth.ok) return wfAuth.res
   const auth = authenticate(request)
   if ('response' in auth) return auth.response
 

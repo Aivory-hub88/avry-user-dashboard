@@ -5,6 +5,7 @@ import { getExecutionDetailWithCreds, classifyN8nError } from '@/lib/workflows/n
 import { listFixtures } from '@/lib/workflows/fixtureRepository'
 import { diffRunData } from '@/lib/workflows/fixtureDiff'
 import { requireModule } from '@/lib/teamAccess'
+import { authorizeWorkflow } from '@/lib/workflows/access'
 
 // POST /api/workflows/:id/fixtures/compare — live re-run comparison, NOT true
 // offline replay (that's Stage C4, a separate VPS-side capability). Diffs the
@@ -37,6 +38,10 @@ export async function POST(
   if (denied) return denied
 
   const { id } = await ctx.params
+
+  const wfAuth = await authorizeWorkflow(request, id, 'write')
+
+  if (!wfAuth.ok) return wfAuth.res
   const auth = authenticate(request)
   if ('response' in auth) return auth.response
 

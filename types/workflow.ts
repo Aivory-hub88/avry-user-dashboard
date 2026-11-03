@@ -75,6 +75,13 @@ export interface AivoryWorkflowSpec {
   notes?: string;
   blueprintId?: string;
   n8nId?: string;
+  /** Creator's user id. Unset on workflows saved before ownership existed:
+   *  those belong to nobody, are hidden from customers, and only platform
+   *  staff see them (to hand over). Never client-settable. */
+  owner?: string | null;
+  /** Team the workflow is shared with (dashboard.workspaces.id); members with
+   *  the Workflows feature get access by their team role. */
+  workspace_id?: string | null;
   // n8n mapping — set by the server after deploy; clients must NOT set these directly
   n8n_workflow_id?: string;          // n8n's internal workflow ID (e.g. "yQv9FEBFXKuNUgeO")
   n8n_url?: string;                  // n8n UI link: <N8N_BASE_URL>/workflow/<n8nWorkflowId>
