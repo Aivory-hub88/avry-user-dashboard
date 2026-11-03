@@ -76,8 +76,8 @@ export interface AivoryWorkflowSpec {
   blueprintId?: string;
   n8nId?: string;
   /** Creator's user id. Unset on workflows saved before ownership existed:
-   *  those belong to nobody, are hidden from customers, and only platform
-   *  staff see them (to hand over). Never client-settable. */
+   *  those count as the superadmin's and are hidden from customers.
+   *  Never client-settable. */
   owner?: string | null;
   /** Team the workflow is shared with (dashboard.workspaces.id); members with
    *  the Workflows feature get access by their team role. */

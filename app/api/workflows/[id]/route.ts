@@ -57,7 +57,7 @@ export async function PATCH(
   delete (patch as { owner?: unknown }).owner
   delete (patch as { workspace_id?: unknown }).workspace_id
   if (requested !== undefined) {
-    const isOwner = !auth.spec || auth.spec.owner === auth.actor.userId || (!auth.spec.owner && auth.actor.platform)
+    const isOwner = !auth.spec || auth.spec.owner === auth.actor.userId || (!auth.spec.owner && auth.actor.superadmin)
     if (!isOwner) return NextResponse.json({ error: 'only the owner can share a workflow' }, { status: 403 })
     if (requested !== null && !canShareInto(auth.actor, String(requested)))
       return NextResponse.json({ error: 'you cannot share into that team' }, { status: 403 })

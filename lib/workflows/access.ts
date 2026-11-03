@@ -1,10 +1,10 @@
 /**
  * Who may touch a workflow. Ownership is the CREATOR (a superadmin's own
  * workflows stay theirs). Customers see their own plus those shared into a
- * team they belong to; platform staff (admin/superadmin) additionally see the
- * unowned legacy ones so they can hand them over. Tenant admin (team owner)
- * and platform staff are different things: staff get no access to a
- * customer's workflows.
+ * team they belong to. Workflows saved before ownership existed have no
+ * creator on record and belong to the superadmin. Tenant admin (team owner)
+ * and Aivory staff are different things: staff get no access to a customer's
+ * workflows.
  *
  * SERVER-ONLY.
  */
@@ -26,12 +26,13 @@ export interface Membership {
 
 export interface WorkflowActor {
   userId: string
-  platform: boolean
+  /** account_type === 'superadmin' (the Aivory owner), not tenant admins or staff admins. */
+  superadmin: boolean
   memberships: Map<string, Membership>
 }
 
-export function isPlatformStaff(accountType?: string | null): boolean {
-  return accountType === 'admin' || accountType === 'superadmin'
+export function isSuperadmin(accountType?: string | null): boolean {
+  return accountType === 'superadmin'
 }
 
 /** Pure. */
@@ -40,7 +41,7 @@ export function resolveWorkflowAccess(
   actor: WorkflowActor,
 ): WorkflowAccess {
   if (spec.owner && spec.owner === actor.userId) return 'owner'
-  if (!spec.owner && actor.platform) return 'owner'
+  if (!spec.owner && actor.superadmin) return 'owner' // legacy, creator unknown
   const m = spec.workspace_id ? actor.memberships.get(spec.workspace_id) : undefined
   if (!m || !memberCanUse(m.role, m.modules, 'workflows')) return null
   return m.role === 'owner' ? 'owner' : m.role === 'editor' ? 'editor' : 'viewer'
@@ -74,7 +75,7 @@ export async function loadActor(userId: string, accountType?: string | null): Pr
   } catch (e) {
     console.error('[workflows/access] memberships', e) // fail closed on team access: own workflows only
   }
-  return { userId, platform: isPlatformStaff(accountType), memberships }
+  return { userId, superadmin: isSuperadmin(accountType), memberships }
 }
 
 export type Authorized =

@@ -7,7 +7,7 @@ import { allows, canShareInto, resolveWorkflowAccess, type WorkflowActor } from 
 
 const actor = (over: Partial<WorkflowActor> = {}): WorkflowActor => ({
   userId: 'u1',
-  platform: false,
+  superadmin: false,
   memberships: new Map(),
   ...over,
 })
@@ -15,17 +15,17 @@ const actor = (over: Partial<WorkflowActor> = {}): WorkflowActor => ({
 describe('resolveWorkflowAccess', () => {
   it('creator owns it, including a superadmin\'s own', () => {
     expect(resolveWorkflowAccess({ owner: 'u1' }, actor())).toBe('owner')
-    expect(resolveWorkflowAccess({ owner: 'su' }, actor({ userId: 'su', platform: true }))).toBe('owner')
+    expect(resolveWorkflowAccess({ owner: 'su' }, actor({ userId: 'su', superadmin: true }))).toBe('owner')
   })
 
-  it('another customer\'s workflow is invisible, even to platform staff', () => {
+  it('another customer\'s workflow is invisible, even to the superadmin', () => {
     expect(resolveWorkflowAccess({ owner: 'u2' }, actor())).toBeNull()
-    expect(resolveWorkflowAccess({ owner: 'u2' }, actor({ platform: true }))).toBeNull()
+    expect(resolveWorkflowAccess({ owner: 'u2' }, actor({ superadmin: true }))).toBeNull()
   })
 
-  it('unowned legacy workflows: staff only', () => {
+  it('unowned legacy workflows belong to the superadmin, nobody else', () => {
     expect(resolveWorkflowAccess({ owner: undefined }, actor())).toBeNull()
-    expect(resolveWorkflowAccess({ owner: null }, actor({ platform: true }))).toBe('owner')
+    expect(resolveWorkflowAccess({ owner: null }, actor({ superadmin: true }))).toBe('owner')
   })
 
   it('team members get their team role, only with the Workflows feature', () => {
