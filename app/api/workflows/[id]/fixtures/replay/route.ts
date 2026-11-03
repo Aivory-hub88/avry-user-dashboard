@@ -5,6 +5,7 @@ import { getWorkflowWithCreds, setWorkflowPinDataWithCreds, getN8nWebhookUrl, cl
 import { listFixtures } from '@/lib/workflows/fixtureRepository'
 import { buildPinDataFromFixtureRunData } from '@/lib/workflows/fixtureDiff'
 import { requireModule } from '@/lib/teamAccess'
+import { authorizeWorkflow } from '@/lib/workflows/access'
 
 // POST /api/workflows/:id/fixtures/replay — true offline replay for an
 // already-deployed workflow (the frontend/n8nClient.ts twin of Stage 15/C4,
@@ -44,6 +45,10 @@ export async function POST(
   if (denied) return denied
 
   const { id } = await ctx.params
+
+  const wfAuth = await authorizeWorkflow(request, id, 'write')
+
+  if (!wfAuth.ok) return wfAuth.res
   const auth = authenticate(request)
   if ('response' in auth) return auth.response
 

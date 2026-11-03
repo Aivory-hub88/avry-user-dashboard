@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, type AuthUser } from '@/lib/serverAuth'
 import { getFixture, deleteFixture } from '@/lib/workflows/fixtureRepository'
 import { requireModule } from '@/lib/teamAccess'
+import { authorizeWorkflow } from '@/lib/workflows/access'
 
 // GET/DELETE /api/workflows/:id/fixtures/:fixtureId — same auth boundary as
 // the sibling list/capture route.
@@ -29,7 +30,9 @@ export async function GET(
   const denied = await requireModule(request, 'workflows')
   if (denied) return denied
 
-  const { fixtureId } = await ctx.params
+  const { id, fixtureId } = await ctx.params
+  const wfAuth = await authorizeWorkflow(request, id, 'read')
+  if (!wfAuth.ok) return wfAuth.res
   const auth = authenticate(request)
   if ('response' in auth) return auth.response
 
@@ -53,7 +56,9 @@ export async function DELETE(
   const denied = await requireModule(request, 'workflows')
   if (denied) return denied
 
-  const { fixtureId } = await ctx.params
+  const { id, fixtureId } = await ctx.params
+  const wfAuth = await authorizeWorkflow(request, id, 'write')
+  if (!wfAuth.ok) return wfAuth.res
   const auth = authenticate(request)
   if ('response' in auth) return auth.response
 

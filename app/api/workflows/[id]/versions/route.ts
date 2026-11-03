@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/serverAuth'
 import type { AivoryWorkflowSpec } from '@/types/workflow'
 import type { CanvasState } from '@/lib/workflows/canvasRepository'
 import { requireModule } from '@/lib/teamAccess'
+import { authorizeWorkflow } from '@/lib/workflows/access'
 
 // GET  /api/workflows/:id/versions — list version snapshots, newest first.
 // POST /api/workflows/:id/versions — client-triggered snapshot of the
@@ -35,6 +36,10 @@ export async function GET(
   if (denied) return denied
 
   const { id } = await ctx.params
+
+  const wfAuth = await authorizeWorkflow(_request, id, 'read')
+
+  if (!wfAuth.ok) return wfAuth.res
   try {
     const versions = await listVersions(id)
     return NextResponse.json(versions)
@@ -52,6 +57,10 @@ export async function POST(
   if (denied) return denied
 
   const { id } = await ctx.params
+
+  const wfAuth = await authorizeWorkflow(request, id, 'write')
+
+  if (!wfAuth.ok) return wfAuth.res
   let body: { spec?: AivoryWorkflowSpec; canvas?: CanvasState | null; reason?: VersionTriggerReason }
   try {
     body = await request.json()

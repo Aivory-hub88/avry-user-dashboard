@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { workflowRepository } from '@/lib/workflows/repository'
 import type { AivoryWorkflowSpec } from '@/types/workflow'
 import { requireModule } from '@/lib/teamAccess'
+import { authorizeWorkflow } from '@/lib/workflows/access'
+
+function stripViewFields(spec: AivoryWorkflowSpec): AivoryWorkflowSpec {
+  const { created_by: _c, access: _a, ...rest } = spec as AivoryWorkflowSpec & { created_by?: unknown; access?: unknown }
+  return rest as AivoryWorkflowSpec
+}
 
 // POST /api/workflows/:id/activate — flips Aivory's own `status` to
 // 'active'. Built for WorkflowRepository interface parity; nothing in the
@@ -19,6 +25,8 @@ export async function POST(
   if (denied) return denied
 
   const { id } = await ctx.params
+  const auth = await authorizeWorkflow(request, id, 'write')
+  if (!auth.ok) return auth.res
   let body: { spec?: AivoryWorkflowSpec } = {}
   try {
     body = await request.json()
@@ -29,7 +37,7 @@ export async function POST(
   try {
     let existing = workflowRepository.get(id)
     if (!existing && body.spec) {
-      existing = workflowRepository.upsert({ ...body.spec, id })
+      existing = workflowRepository.upsert({ ...stripViewFields(body.spec), id, owner: auth.actor.userId, workspace_id: null })
     }
     if (!existing) return NextResponse.json({ error: 'Workflow not found' }, { status: 404 })
 
