@@ -15,6 +15,7 @@ import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { agentDisplayName } from "@/lib/spaceAgent"
 import { displayBody, personName } from "@/lib/roomChat"
+import { useSettingsModal } from "@/contexts/SettingsModalContext"
 import { requestsApi, teamsApi, type RequestWithTeam, type TeamSummary } from "@/lib/requestsClient"
 import { StatusPill, formatDate } from "@/components/requests/requestUi"
 
@@ -48,6 +49,7 @@ function lastLine(r: RoomSummary): string {
 }
 
 export default function WorkspaceHome() {
+  const { openSettingsModal } = useSettingsModal()
   const [rooms, setRooms] = useState<RoomSummary[] | null>(null)
   const [teams, setTeams] = useState<TeamSummary[] | null>(null)
   const [mine, setMine] = useState<RequestWithTeam[]>([])
@@ -91,10 +93,10 @@ export default function WorkspaceHome() {
             <CalendarRange className="h-3.5 w-3.5" />
             <span>Timeline</span>
           </Link>
-          <Link href="/workspace/teams" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
+          <button type="button" onClick={() => openSettingsModal("team")} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
             <Users className="h-3.5 w-3.5" />
             <span>Teams</span>
-          </Link>
+          </button>
           <Link href="/workspace/requests" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
             <span>Requests</span>
             {toReview.length > 0 && <span className="rounded-full bg-amber-500/20 px-1.5 text-[10px] tabular-nums text-amber-200">{toReview.length}</span>}
@@ -145,9 +147,9 @@ export default function WorkspaceHome() {
               </div>
               <div className="mt-6 flex justify-center gap-2">
                 {teams !== null && teams.length === 0 ? (
-                  <Link href="/workspace/teams" className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black">
+                  <button type="button" onClick={() => openSettingsModal("team")} className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black">
                     Create a team
-                  </Link>
+                  </button>
                 ) : (
                   canRequest && (
                     <Link href="/workspace/requests?new=1" className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black">

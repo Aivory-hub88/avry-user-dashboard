@@ -2,7 +2,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react'
 
 export type SettingsTab =
-  | 'account' | 'memory' | 'notifications' | 'usage' | 'purchases'
+  | 'account' | 'memory' | 'notifications' | 'team' | 'usage' | 'purchases'
   | 'upgrade' | 'about' | 'downloads'
 
 interface SettingsModalContextValue {
