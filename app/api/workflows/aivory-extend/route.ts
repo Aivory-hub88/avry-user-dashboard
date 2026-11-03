@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireModule } from '@/lib/teamAccess'
 
 /**
  * POST /api/workflows/aivory-extend
@@ -16,6 +17,9 @@ const BRIDGE = (
 ).replace(/\/$/, '')
 
 export async function POST(req: NextRequest) {
+  const denied = await requireModule(req, 'workflows')
+  if (denied) return denied
+
   try {
     const body = await req.json().catch(() => ({}))
     const workflow = body?.workflow ?? {}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { getAuthUser } from '@/lib/serverAuth'
+import { requireModule } from '@/lib/teamAccess'
 
 export const runtime = 'nodejs'
 
@@ -9,6 +10,9 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
+  const denied = await requireModule(request, 'console')
+  if (denied) return denied
+
   let user
   try {
     user = getAuthUser(request)

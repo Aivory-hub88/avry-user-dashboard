@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { workflowRepository } from '@/lib/workflows/repository'
 import type { AivoryWorkflowSpec } from '@/types/workflow'
+import { requireModule } from '@/lib/teamAccess'
 
 // POST /api/workflows/:id/activate — flips Aivory's own `status` to
 // 'active'. Built for WorkflowRepository interface parity; nothing in the
@@ -14,6 +15,9 @@ export async function POST(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   let body: { spec?: AivoryWorkflowSpec } = {}
   try {

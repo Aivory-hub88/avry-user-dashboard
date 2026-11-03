@@ -121,7 +121,9 @@ export async function getDocRolesBatch(
     if (needMemWs.size > 0) {
       const wsList = Array.from(needMemWs)
       const mem = await query(
-        `SELECT workspace_id, role FROM dashboard.workspace_members WHERE workspace_id = ANY($1) AND user_id = $2`,
+        `SELECT workspace_id, role FROM dashboard.workspace_members
+         WHERE workspace_id = ANY($1) AND user_id = $2
+           AND (role = 'owner' OR modules IS NULL OR 'workspace' = ANY(modules))`,
         [wsList, userId],
       )
       for (const r of mem.rows as any[]) memByWs.set(String(r.workspace_id), String(r.role))

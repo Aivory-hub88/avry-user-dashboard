@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
 import { LEGACY_WORKSPACE } from "@/lib/teams"
+import { normalizeModules } from "@/lib/workspaceModules"
 import { canTakeSeat, holdsSeat, ownerSeatUsage, type SeatUsage } from "@/lib/seats"
 
 export const runtime = "nodejs"
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!(await isManager(id, accountType, userId))) return forbidden()
   try {
     const r = await query(
-      `SELECT m.user_id, m.role, m.created_at, u.email, u.full_name
+      `SELECT m.user_id, m.role, m.modules, m.created_at, u.email, u.full_name
        FROM dashboard.workspace_members m
        LEFT JOIN identity.users u ON u.id = m.user_id
        WHERE m.workspace_id = $1 ORDER BY m.created_at`,
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (id === LEGACY_WORKSPACE)
     return NextResponse.json({ error: "the shared default workspace doesn't take members" }, { status: 400 })
 
-  let body: { email?: string; role?: string; userId?: string }
+  let body: { email?: string; role?: string; userId?: string; modules?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -80,6 +81,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   const role = (body.role ?? "editor").toString()
   if (!ROLES.has(role)) return NextResponse.json({ error: "invalid role" }, { status: 400 })
+
+  // undefined/non-array = keep the role default (NULL); otherwise the admin's pick.
+  const modules = normalizeModules(body.modules)
 
   let targetId = body.userId?.toString().trim()
   if (!targetId) {
@@ -117,12 +121,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   try {
     await query(
-      `INSERT INTO dashboard.workspace_members (workspace_id, user_id, role, added_by)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role, added_by = EXCLUDED.added_by`,
-      [id, targetId, role, userId ?? "service"],
+      `INSERT INTO dashboard.workspace_members (workspace_id, user_id, role, added_by, modules)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role, added_by = EXCLUDED.added_by,
+         modules = COALESCE(EXCLUDED.modules, dashboard.workspace_members.modules)`,
+      [id, targetId, role, userId ?? "service", modules],
     )
-    return NextResponse.json({ workspace_id: id, user_id: targetId, role })
+    return NextResponse.json({ workspace_id: id, user_id: targetId, role, modules })
   } catch (e) {
     console.error("[workspaces/members POST]", e)
     return NextResponse.json({ error: "db" }, { status: 500 })

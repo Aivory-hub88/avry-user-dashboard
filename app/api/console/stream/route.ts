@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getConfig } from '@/lib/config'
+import { requireModule } from '@/lib/teamAccess'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,6 +18,8 @@ function userIdFromAuth(req: NextRequest): string | null {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await requireModule(req, 'console')
+  if (denied) return denied
   try {
     const body = await req.json()
 

@@ -10,10 +10,14 @@ import {
   CopilotStateMachine,
   type CopilotConversationState,
 } from '@/lib/workflows/copilotStateMachine'
+import { requireModule } from '@/lib/teamAccess'
 
 export const maxDuration = 120
 
 export async function POST(request: NextRequest) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+
   try {
     const body = await request.json()
 

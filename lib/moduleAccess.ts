@@ -107,3 +107,35 @@ export function canAccessPath(
   if (!isDemoAccount(accountType)) return true
   return isPathAllowedForDemo(pathname, allowedModules)
 }
+
+// ── Team grants ──────────────────────────────────────────────────────────
+// People who use the dashboard only through a team (see lib/teamAccess.ts)
+// see the modules their team admins granted, plus their own Overview.
+
+const TEAM_PATH_PREFIXES: Record<string, string> = { ...MODULE_PATH_PREFIXES, workspace: '/workspace' }
+
+/** Nav entries a team-restricted account may see. */
+export function isNavKeyAllowedForTeam(key: string, granted: readonly string[]): boolean {
+  if (key === 'profile') return true
+  if (!(key in TEAM_PATH_PREFIXES)) return false // e.g. CRM: not a team module
+  return granted.includes(key)
+}
+
+/**
+ * True when a team-restricted account may visit `pathname`. Only paths that
+ * belong to a module it was NOT granted are blocked; everything else (home,
+ * settings, shared links) stays reachable.
+ */
+export function isPathAllowedForTeam(pathname: string, granted: readonly string[]): boolean {
+  for (const [key, prefix] of Object.entries(TEAM_PATH_PREFIXES)) {
+    if (key === 'profile') continue
+    if (pathname === prefix || pathname.startsWith(prefix + '/')) return granted.includes(key)
+  }
+  return true
+}
+
+/** Where a team-restricted account lands when it hits a locked route. */
+export function teamHomePath(granted: readonly string[]): string {
+  const first = Object.keys(TEAM_PATH_PREFIXES).find((k) => k !== 'profile' && granted.includes(k))
+  return first ? TEAM_PATH_PREFIXES[first] : '/overview'
+}

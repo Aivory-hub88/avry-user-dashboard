@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireModule } from '@/lib/teamAccess'
 
 /**
  * POST /api/console/upload
@@ -14,6 +15,9 @@ export const runtime = 'nodejs'
 const MAX_BYTES = 15 * 1024 * 1024 // 15 MB
 
 export async function POST(req: NextRequest) {
+  const denied = await requireModule(req, 'console')
+  if (denied) return denied
+
   try {
     const form = await req.formData()
     const file = form.get('file') as File | null

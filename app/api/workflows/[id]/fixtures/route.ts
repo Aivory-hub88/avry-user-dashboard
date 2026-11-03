@@ -3,6 +3,7 @@ import { getAuthUser, type AuthUser } from '@/lib/serverAuth'
 import { resolveN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
 import { getExecutionDetailWithCreds, classifyN8nError } from '@/lib/workflows/n8nClient'
 import { captureFixture, listFixtures } from '@/lib/workflows/fixtureRepository'
+import { requireModule } from '@/lib/teamAccess'
 
 // GET  /api/workflows/:id/fixtures — list captured fixtures for a workflow.
 // POST /api/workflows/:id/fixtures — capture a new fixture from a real n8n
@@ -31,6 +32,9 @@ export async function GET(
   _request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(_request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   const auth = authenticate(_request)
   if ('response' in auth) return auth.response
@@ -48,6 +52,9 @@ export async function POST(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   const auth = authenticate(request)
   if ('response' in auth) return auth.response

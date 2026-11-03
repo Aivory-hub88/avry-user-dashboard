@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { workflowRepository } from '@/lib/workflows/repository'
 import { AivoryWorkflowSpec } from '@/types/workflow'
+import { requireModule } from '@/lib/teamAccess'
 
 // GET /api/workflows/:id — fetch a single workflow.
 // PATCH /api/workflows/:id — partial update (title/status/steps/etc).
@@ -16,6 +17,9 @@ export async function GET(
   _request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(_request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   try {
     const workflow = workflowRepository.get(id)
@@ -31,6 +35,9 @@ export async function PATCH(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   let patch: Partial<Omit<AivoryWorkflowSpec, 'id' | 'createdAt'>>
   try {
@@ -53,6 +60,9 @@ export async function DELETE(
   _request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(_request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   try {
     workflowRepository.remove(id)

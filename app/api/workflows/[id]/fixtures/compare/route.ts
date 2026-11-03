@@ -4,6 +4,7 @@ import { resolveN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
 import { getExecutionDetailWithCreds, classifyN8nError } from '@/lib/workflows/n8nClient'
 import { listFixtures } from '@/lib/workflows/fixtureRepository'
 import { diffRunData } from '@/lib/workflows/fixtureDiff'
+import { requireModule } from '@/lib/teamAccess'
 
 // POST /api/workflows/:id/fixtures/compare — live re-run comparison, NOT true
 // offline replay (that's Stage C4, a separate VPS-side capability). Diffs the
@@ -32,6 +33,9 @@ export async function POST(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   const auth = authenticate(request)
   if ('response' in auth) return auth.response

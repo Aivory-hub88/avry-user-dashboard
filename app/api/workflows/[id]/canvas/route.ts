@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { canvasRepository } from '@/lib/workflows/canvasRepository'
+import { requireModule } from '@/lib/teamAccess'
 
 // GET/PUT/DELETE /api/workflows/:id/canvas — React Flow nodes/edges for a
 // workflow's draft canvas. canvasRepository was entirely dead code (zero
@@ -12,6 +13,9 @@ export async function GET(
   _request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(_request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   try {
     const state = canvasRepository.get(id)
@@ -26,6 +30,9 @@ export async function PUT(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   let body: { nodes?: unknown[]; edges?: unknown[] }
   try {
@@ -50,6 +57,9 @@ export async function DELETE(
   _request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(_request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   try {
     canvasRepository.remove(id)
