@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, type AuthUser } from '@/lib/serverAuth'
 import { resolveN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
 import { getWorkflowWithCreds, updateWorkflowWithCreds, classifyN8nError } from '@/lib/workflows/n8nClient'
+import { requireModule } from '@/lib/teamAccess'
 
 export const runtime = 'nodejs'
 
@@ -38,6 +39,9 @@ export async function GET(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   const auth = authenticate(request)
   if ('response' in auth) return auth.response
@@ -66,6 +70,9 @@ export async function PUT(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+
   const { id } = await ctx.params
   const auth = authenticate(request)
   if ('response' in auth) return auth.response

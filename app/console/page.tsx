@@ -8,6 +8,7 @@ import dynamic from "next/dynamic"
 import Image from "next/image"
 import ChatMessage from "@/components/ChatMessage"
 import ChatInput, { SendArrowIcon } from "@/components/ChatInput"
+import CreditUsageRing from "@/components/credits/CreditUsageRing"
 import ConsoleTopBar, { type ConsoleChatMode } from "@/components/console/ConsoleTopBar"
 import AgentMentionMenu from "@/components/console/AgentMentionMenu"
 import SuggestionChips from "@/components/chat/SuggestionChips"
@@ -749,6 +750,10 @@ export default function ConsolePage() {
                     ))}
                   </div>
                 )}
+                {/* Empty-state composer is the taller two-row layout: message on top
+                    (2 rows, grows to 180px), + on the left and send on the right in
+                    a toolbar row underneath. The one-row version stays in ChatInput
+                    (an ongoing conversation). */}
                 <div className="px-5 pt-[14px] pb-1">
                   <textarea
                     ref={textareaRef}
@@ -769,17 +774,15 @@ export default function ConsolePage() {
                   />
                 </div>
                 <div className="flex items-center justify-between px-4 pt-1 pb-3">
-                  <div className="flex items-center gap-[6px]">
-                    <button
-                      className="console-icon-btn"
-                      title={t('uploadFileTitle')}
-                      onClick={() => setUploadMenuOpen(o => !o)}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 5v14M5 12h14"/>
-                      </svg>
-                    </button>
-                  </div>
+                  <button
+                    className="console-icon-btn"
+                    title={t('uploadFileTitle')}
+                    onClick={() => setUploadMenuOpen(o => !o)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                  </button>
                   <button
                     onClick={() => {
                       if (isStreaming) {
@@ -815,7 +818,7 @@ export default function ConsolePage() {
                   >
                     <span>{t('connectToolsTo')}</span>
                     <Image 
-                      src={asset("/Aivory_logo_2026.svg?v=20260920")} 
+                      src={asset("/Aivory_logo_2026.svg?v=20261104")} 
                       alt="Aivory" 
                       width={48} 
                       height={12} 
@@ -844,6 +847,10 @@ export default function ConsolePage() {
                     </div>
                   </div>
                 </button>
+              </div>
+              {/* Footer under the composer: monthly credit usage, like Claude's. */}
+              <div className="flex justify-end px-2 pt-1.5">
+                <CreditUsageRing />
               </div>
               <UploadMenu
                 isOpen={uploadMenuOpen}
@@ -918,6 +925,10 @@ export default function ConsolePage() {
                         role={m.role}
                         content={m.content}
                         isStreaming={m.isStreaming}
+                        statusText={m.statusText}
+                        startedAt={m.startedAt}
+                        endedAt={m.endedAt}
+                        activity={m.activity}
                         attachments={m.attachments}
                         agenticState={m.role === 'assistant' && m.id === messages[messages.length - 1]?.id ? agenticState : undefined}
                         onAcceptRoute={acceptRoute}

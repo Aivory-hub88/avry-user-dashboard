@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, type AuthUser } from '@/lib/serverAuth'
 import { resolveN8nCredentials } from '@/lib/workflows/n8nCredentialsServer'
 import { clearWorkflowPinDataWithCreds, classifyN8nError } from '@/lib/workflows/n8nClient'
+import { requireModule } from '@/lib/teamAccess'
+import { authorizeWorkflow } from '@/lib/workflows/access'
 
 // POST /api/workflows/:id/fixtures/replay/clear — reverts the sibling
 // .../replay route's pin, setting pinData back to {} on the deployed n8n
@@ -25,8 +27,15 @@ function authenticate(request: NextRequest): { user: AuthUser } | { response: Ne
 
 export async function POST(
   request: NextRequest,
-  _ctx: { params: Promise<{ id: string }> }
+  ctx: { params: Promise<{ id: string }> }
 ) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+
+  const { id } = await ctx.params
+  const wfAuth = await authorizeWorkflow(request, id, 'write')
+  if (!wfAuth.ok) return wfAuth.res
+
   const auth = authenticate(request)
   if ('response' in auth) return auth.response
 

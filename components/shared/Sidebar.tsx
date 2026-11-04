@@ -9,7 +9,8 @@ import { useTranslations } from "next-intl"
 import { getWorkflowCount } from "@/hooks/useWorkflows"
 import { useAgentApprovals } from "@/hooks/useAgentApprovals"
 import { AuthManager } from "@/lib/authManager"
-import { canAccessNavKey } from "@/lib/moduleAccess"
+import { canAccessNavKey, isNavKeyAllowedForTeam } from "@/lib/moduleAccess"
+import { useTeamAccess } from "@/hooks/useTeamAccess"
 import LanguagePill from "./LanguagePill"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import UserProfile from "../UserProfile"
@@ -212,6 +213,7 @@ export default function Sidebar() {
   // a hydration mismatch.
   const [accountType, setAccountType] = useState<string | null>(null)
   const [allowedModules, setAllowedModules] = useState<string[] | null | undefined>(null)
+  const team = useTeamAccess()
   const t = useTranslations("nav")
   const { collapsed, toggle } = useSidebarCollapse()
 
@@ -258,6 +260,7 @@ export default function Sidebar() {
     { key: "templates",     href: "/templates", label: "Automation Templates" },
     { key: "profile",       href: "/overview", label: "Overview" },
   ].filter((item) => canAccessNavKey(accountType, item.key, allowedModules))
+    .filter((item) => !team.restricted || isNavKeyAllowedForTeam(item.key, team.modules))
 
   return (
     <aside className={`flex flex-col h-full bg-[var(--bg-elevated)] border-r border-white/5 transition-all duration-300 ${collapsed ? "w-12" : "w-[220px]"}`}>
@@ -266,7 +269,7 @@ export default function Sidebar() {
         {!collapsed ? (
           <div className="flex items-center">
             <Image
-              src={asset("/Aivory_logo_2026.svg?v=20260920")}
+              src={asset("/Aivory_logo_2026.svg?v=20261104")}
               alt="Aivory"
               width={91}
               height={13}
@@ -276,7 +279,7 @@ export default function Sidebar() {
         ) : (
           <div className="flex items-center justify-center w-full py-1">
             <Image
-              src={asset("/Aivory_icon_2026.svg?v=20260920")}
+              src={asset("/Aivory_icon_2026.svg?v=20261104")}
               alt="Aivory"
               width={32}
               height={32}

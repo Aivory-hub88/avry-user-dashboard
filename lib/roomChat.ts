@@ -9,6 +9,7 @@
  * their labels.
  */
 import type { SpaceAgentTask } from "@/lib/spaceAgent"
+import { toolShortName, type ActivityStep } from "@/lib/agentActivity"
 
 export interface RoomAgent {
   type: string
@@ -96,4 +97,15 @@ export function quoteText(body: string): string {
     .replace(/(\*\*|__|\*|_|~~)(\S(?:[^]*?\S)?)\1/g, "$2")
     .replace(/\s+/g, " ")
     .trim()
+}
+
+/**
+ * The one step a room turn shows in the activity panel, from the phase the runner wrote to
+ * the task's `reason` ("reading the room", "thinking", or "tool: <name>"). Queued turns show none.
+ */
+export function phaseStep(task: SpaceAgentTask): ActivityStep[] {
+  if (task.status !== "in_progress") return []
+  const r = task.reason.trim()
+  const label = r.toLowerCase().startsWith("tool:") ? toolShortName(r.slice(5)) : r === "running" || !r ? "thinking" : r
+  return [{ id: `${task.id}:${r}`, label, status: "running", startedAt: Date.parse(task.updatedAt) || Date.now() }]
 }

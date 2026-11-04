@@ -25,6 +25,7 @@
 import type { NextRequest } from 'next/server'
 import type { User } from '@/lib/authManager'
 import { isPaidTier, isSuperAdminAccount } from '@/lib/tiers'
+import { getAuthUserWithToken } from '@/lib/serverAuth'
 
 /**
  * Shared cross-subdomain cookie keys, mirroring `SHARED_COOKIE_KEYS` in
@@ -277,12 +278,36 @@ async function fetchFreshTier(accessToken: string): Promise<string | null> {
  * Requirements: 1.1, 1.5, 2.1, 2.2, 2.3, 2.4, 2.5
  */
 export async function resolveIntegrationUser(req: NextRequest): Promise<IntegrationAuthResult> {
-  const sessionToken = req.cookies.get(SESSION_TOKEN_COOKIE)?.value ?? null
-  const user = parseAivoryUser(req.cookies.get(USER_COOKIE)?.value)
+  let sessionToken = req.cookies.get(SESSION_TOKEN_COOKIE)?.value ?? null
+  let user = parseAivoryUser(req.cookies.get(USER_COOKIE)?.value)
+  let accessToken = req.cookies.get(ACCESS_TOKEN_COOKIE)?.value ?? null
+
+  // The shared cookies are host-only with a 7-day max-age, while the
+  // localStorage session (and its JWT) outlives them. A user who still looks
+  // signed in used to get a silent 401 on every Connect click. Fall back to
+  // the verified JWT (Authorization: Bearer, or any of the token cookies) the
+  // same way the dashboard's other API routes authenticate.
+  if (!sessionToken || !user) {
+    let verified: ReturnType<typeof getAuthUserWithToken> = null
+    try {
+      verified = getAuthUserWithToken(req)
+    } catch {
+      verified = null
+    }
+    if (verified) {
+      sessionToken = verified.token
+      accessToken = verified.token
+      user = {
+        user_id: verified.user.user_id,
+        email: verified.user.email,
+        account_type: verified.user.account_type,
+        role: verified.user.account_type,
+      } as User
+    }
+  }
 
   let tier = 'free'
   if (user) {
-    const accessToken = req.cookies.get(ACCESS_TOKEN_COOKIE)?.value ?? null
     tier = (accessToken ? await fetchFreshTier(accessToken) : null) ?? 'free'
   }
 

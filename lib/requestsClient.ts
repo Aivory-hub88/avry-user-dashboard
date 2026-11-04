@@ -41,11 +41,20 @@ export const teamsApi = {
   list: () => api<{ teams: TeamSummary[] }>("/api/workspaces").then((j) => j.teams),
   create: (name: string) => api<{ team: TeamSummary }>("/api/workspaces", { method: "POST", json: { name } }).then((j) => j.team),
   members: (id: string) =>
-    api<{ name: string; owner: string; members: { user_id: string; role: string; email: string | null; full_name: string | null }[] }>(
+    api<{
+      name: string
+      owner: string
+      members: { user_id: string; role: string; modules: string[] | null; email: string | null; full_name: string | null }[]
+      /** limit null = unlimited; seats null = couldn't be read. */
+      seats: { used: number; limit: number | null } | null
+    }>(
       `/api/workspaces/${id}/members`,
     ),
-  addMember: (id: string, email: string, role: "editor" | "viewer" | "owner") =>
-    api(`/api/workspaces/${id}/members`, { method: "POST", json: { email, role } }),
+  addMember: (id: string, email: string, role: "editor" | "viewer" | "owner", modules?: string[]) =>
+    api(`/api/workspaces/${id}/members`, { method: "POST", json: { email, role, modules } }),
+  /** modules null = back to the role default. */
+  setModules: (id: string, userId: string, modules: string[] | null) =>
+    api(`/api/workspaces/${id}/members/${userId}`, { method: "PATCH", json: { modules } }),
   removeMember: (id: string, userId: string) => api(`/api/workspaces/${id}/members/${userId}`, { method: "DELETE" }),
 }
 

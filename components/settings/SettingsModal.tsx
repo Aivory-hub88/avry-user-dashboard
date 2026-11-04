@@ -5,7 +5,9 @@ import { logout } from '@/lib/auth'
 import { getMarketingUrl } from '@/lib/config'
 import { useSettingsModal, SettingsTab } from '@/contexts/SettingsModalContext'
 import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
-import { NOT_ACTIVATED_HINT, isActivated, planLabel } from '@/lib/tiers'
+import { TeamsManager } from '@/components/workspace/TeamsManager'
+import { CREDIT_PACKS, NOT_ACTIVATED_HINT, isActivated, planLabel } from '@/lib/tiers'
+import CreditUsageMeter, { useCreditStatus } from '@/components/credits/CreditUsageMeter'
 import {
   listMcpImageTokens,
   createMcpImageToken,
@@ -67,21 +69,8 @@ export function SettingsModal({ user }: SettingsModalProps) {
       setImageTokensLoading(false)
     }
   }, [])
-  // Must match CREDIT_PACKS_USD in avry-payments' app/services/pricing.py and
-  // CREDIT_PACK_DEFINITIONS in the landing site's src/lib/pricing.ts. The
-  // gateway prices every order from its own table and accepts no amount from
-  // the browser, so a figure advertised here that differs from the server's is
-  // simply a price we show and never collect.
-  const creditPackages = [
-    { amount: 50, price: 5 },
-    { amount: 100, price: 9 },
-    { amount: 250, price: 20 },
-    { amount: 500, price: 38 },
-    { amount: 1000, price: 70 },
-    { amount: 2500, price: 165 },
-    { amount: 5000, price: 300, popular: true },
-    { amount: 10000, price: 550 },
-  ]
+  const creditStatus = useCreditStatus()
+  const creditPackages = CREDIT_PACKS.map((p) => ({ amount: p.credits, price: p.price, popular: p.popular }))
 
   useEffect(() => {
     // Load local settings
@@ -165,6 +154,7 @@ export function SettingsModal({ user }: SettingsModalProps) {
         { id: 'account', label: 'Account', icon: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></> },
         { id: 'memory', label: 'Memory', icon: <><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></> },
         { id: 'notifications', label: 'Notifications', icon: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></> },
+        { id: 'team', label: 'Team', icon: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></> },
         { id: 'usage', label: 'Usage and credits', icon: <><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></> },
         { id: 'purchases', label: 'Activate Features', icon: <><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></> },
       ]
@@ -349,18 +339,13 @@ export function SettingsModal({ user }: SettingsModalProps) {
                 <span className="block mt-1 text-[13px] font-normal text-white/60">Learn more about how credits work.</span>
               </h2>
               
-              <div className="bg-white/5 border border-white/10 rounded-xl p-5 flex items-center justify-between mb-8">
-                <div>
-                  <p className="text-[13px] text-white/60 mb-1">Available credits</p>
-                  <h3 className="text-3xl font-medium">0</h3>
-                </div>
-                <button 
-                  onClick={() => setIsAddingCredits(!isAddingCredits)}
-                  className="px-4 py-2 text-[13px] font-medium bg-white text-black rounded-md hover:bg-white/90 transition-colors"
-                >
-                  {isAddingCredits ? 'Cancel' : 'Add credits'}
-                </button>
-              </div>
+              {creditStatus && (
+                <CreditUsageMeter
+                  credits={creditStatus}
+                  onTopUp={() => setIsAddingCredits(!isAddingCredits)}
+                  className="mb-8"
+                />
+              )}
 
               {isAddingCredits && (
                 <div className="mb-10 animate-in slide-in-from-top-2 fade-in duration-300">
@@ -601,6 +586,17 @@ docker load -i ${imageName}.tar.gz`}
             </div>
           )}
 
+          {/* TAB: TEAM (invite members, pick which features each can use) */}
+          {activeTab === 'team' && (
+            <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
+              <h2 className="text-2xl font-semibold mb-2">Team</h2>
+              <p className="text-white/50 text-sm mb-8 pb-4 border-b border-white/5">
+                Invite people by email and choose which parts of the dashboard each of them can use.
+              </p>
+              <TeamsManager />
+            </div>
+          )}
+
           {/* TAB: PURCHASES (one-time feature unlocks) */}
           {activeTab === 'purchases' && (
             <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
@@ -610,7 +606,7 @@ docker load -i ${imageName}.tar.gz`}
           )}
 
           {/* GENERIC EMPTY STATE FOR OTHER TABS */}
-          {!['account', 'usage', 'memory', 'purchases', 'downloads'].includes(activeTab) && (
+          {!['account', 'usage', 'memory', 'purchases', 'downloads', 'team'].includes(activeTab) && (
             <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
                <h2 className="text-2xl font-semibold mb-8 pb-4 border-b border-white/5 capitalize">{activeTab}</h2>
                <p className="text-white/50 text-sm">Content for {activeTab} is not available yet.</p>

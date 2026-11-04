@@ -6,9 +6,9 @@ import {
   sanitizeBlueprintModuleInput,
 } from '@/lib/workflows/blueprintPlanner'
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
-import { validateWorkflow as validateN8nWorkflow } from '@/lib/workflows/n8nMcpClient'
 import { llmSemanticReview } from '@/lib/workflows/blueprintLlmValidator'
 import { getAuthUser } from '@/lib/serverAuth'
+import { requireModule } from '@/lib/teamAccess'
 
 /**
  * POST /api/console/workflows/from-blueprint
@@ -91,6 +91,9 @@ async function sandboxValidate(n8nWorkflow: Record<string, unknown>): Promise<Re
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await requireModule(req, 'console')
+  if (denied) return denied
+
   try {
     const body = await req.json().catch(() => ({}))
 
@@ -143,34 +146,28 @@ export async function POST(req: NextRequest) {
       const graphValidation = validateN8nGraph(n8nWorkflow as unknown as Parameters<typeof validateN8nGraph>[0])
       warnings.push(...graphValidation.warnings, ...graphValidation.errors)
 
-      // ── Stage 8c/8d — schema-level + LLM semantic review ──────────────────
+      // ── Stage 8c/8d — LLM semantic review + sandbox execution ──────────────────
       // Skipped when either validator above already found errors — an
-      // already-broken plan doesn't need a paid LLM call or a network round
-      // trip to the n8n-MCP server to tell us it's broken. Both fail open
-      // internally when they DO run (network/config errors never throw, see
-      // n8nMcpClient.ts / blueprintLlmValidator.ts) and run concurrently
-      // since neither depends on the other's result.
+      // already-broken plan doesn't need a paid LLM call or a sandbox run to
+      // tell us it's broken. Both fail open internally when they DO run
+      // (network/config errors never throw, see blueprintLlmValidator.ts) and
+      // run concurrently since neither depends on the other's result.
       const semanticFindings: import('@/lib/workflows/blueprintLlmValidator').SemanticFinding[] = []
       let sandboxResult: Record<string, unknown> | null = null
       if (validation.valid && graphValidation.valid) {
-        // Belt and suspenders: all three validators already fail open
+        // Belt and suspenders: both validators already fail open
         // internally (see their own try/catch), but the core deterministic
         // plan this route exists to produce must NEVER be lost to an optional
         // secondary check misbehaving — so this whole block is its own failure
-        // domain too. n8n schema (MCP) + LLM semantic review + real sandbox
-        // execution all run concurrently.
+        // domain too. LLM semantic review + real sandbox execution run
+        // concurrently.
         try {
-          const [mcpResult, llmResult, sandbox] = await Promise.all([
-            validateN8nWorkflow(n8nWorkflow as unknown as Record<string, unknown>),
+          const [llmResult, sandbox] = await Promise.all([
             llmSemanticReview(planned, title),
             sandboxValidate(n8nWorkflow as unknown as Record<string, unknown>),
           ])
           sandboxResult = sandbox
 
-          if (!mcpResult.valid) {
-            warnings.push(...mcpResult.errors.map((e) => `n8n schema: ${e.node}: ${e.message}`))
-          }
-          warnings.push(...mcpResult.warnings.map((w) => `n8n schema: ${w.node}: ${w.message}`))
           // Structured semantic findings — surfaced as a report (below) and,
           // for error-severity findings, as warnings so the user sees them.
           semanticFindings.push(...llmResult.findings)
@@ -183,8 +180,8 @@ export async function POST(req: NextRequest) {
             warnings.push(`Sandbox execution ${sandbox.status}: ${Array.isArray(sandbox.errors) ? sandbox.errors.join('; ') : ''}`.slice(0, 500))
           }
         } catch (err) {
-          console.warn('[from-blueprint] schema/semantic/sandbox validation pass failed, returning the plan without it:', (err as Error).message)
-          warnings.push('Schema/semantic/sandbox validation was unavailable for this generation.')
+          console.warn('[from-blueprint] semantic/sandbox validation pass failed, returning the plan without it:', (err as Error).message)
+          warnings.push('Semantic/sandbox validation was unavailable for this generation.')
         }
       }
 

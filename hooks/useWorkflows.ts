@@ -69,6 +69,9 @@ export interface SavedWorkflow {
   automation_percentage: string
   error_handling?: string
   notes?: string
+  // Team view (server-filled): who created it and what the caller may do.
+  created_by?: { id: string; name: string | null; email: string | null; me: boolean } | null
+  access?: 'owner' | 'editor' | 'viewer' | null
   // Source identifiers
   blueprintId?: string
   n8nId?: string

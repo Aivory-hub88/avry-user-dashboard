@@ -39,6 +39,7 @@ import {
   displayBody,
   mentionedAgents,
   openTaskRows,
+  phaseStep,
   personName,
   quoteText,
   tokenizeMentions,
@@ -454,7 +455,19 @@ export default function RoomView({
               {taskRows.map((row) => {
                 const name = agentDisplayName(row.task.agentType)
                 if (row.kind === "thinking")
-                  return <ChatMessage key={row.task.id} role="assistant" content="" isStreaming agentName={name} agentType={row.task.agentType} showAgentName />
+                  return (
+                    <ChatMessage
+                      key={row.task.id}
+                      role="assistant"
+                      content=""
+                      isStreaming
+                      agentName={name}
+                      agentType={row.task.agentType}
+                      showAgentName
+                      startedAt={Date.parse(row.task.createdAt) || undefined}
+                      activity={phaseStep(row.task)}
+                    />
+                  )
                 if (row.kind === "approval") {
                   const tool = typeof row.task.approvalRef.tool_name === "string" ? row.task.approvalRef.tool_name : "a tool"
                   return (

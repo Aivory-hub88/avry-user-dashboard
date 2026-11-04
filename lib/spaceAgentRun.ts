@@ -576,6 +576,7 @@ export async function runAgentTask(opts: {
   // backend (binding discussion_* + room session) — tanpa coaching prompt.
   let prompt = instruction;
   try {
+    await setAgentTask(taskId, "in_progress", "reading the room");
     const hist = await query(
       `SELECT * FROM (
          SELECT author_kind, author_id, author_name, agent_type, body, created_at
@@ -612,6 +613,7 @@ export async function runAgentTask(opts: {
     // Konteks best-effort — instruksi polos tetap jalan.
   }
 
+  await setAgentTask(taskId, "in_progress", "thinking").catch(() => {});
   let reply = "";
   let pendingApproval: { id: string; tool_name: string; risk_tier: string } | null = null;
   let teamActionsRaw: unknown = null;

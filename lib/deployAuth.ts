@@ -103,6 +103,42 @@ async function tryRefresh(): Promise<string | null> {
   return tokens.access_token
 }
 
+function tokenExpiresInMs(token: string | null): number | null {
+  if (!token) return null
+  try {
+    const part = token.split('.')[1]
+    if (!part) return null
+    const json = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')))
+    return typeof json.exp === 'number' ? json.exp * 1000 - Date.now() : null
+  } catch {
+    return null
+  }
+}
+
+let keepAliveInFlight: Promise<string | null> | null = null
+
+/**
+ * Silent, proactive refresh: exchange the refresh token while the access token
+ * is still valid (or already expired) so nothing downstream ever sees a stale
+ * token. Server routes read the access-token cookie directly and cannot retry,
+ * so without this a returning user hit silent 401s until some unrelated
+ * authedFetch happened to refresh. No-op when there is no session or the
+ * token has plenty of life left. The session only ends on an explicit logout
+ * or when the server itself rejects the refresh token.
+ */
+export function keepSessionFresh(minRemainingMs = 30 * 60_000): Promise<string | null> {
+  const session = readSession()
+  if (!session?.refresh_token) return Promise.resolve(null)
+  const remaining = tokenExpiresInMs(currentToken())
+  if (remaining !== null && remaining > minRemainingMs) return Promise.resolve(null)
+  if (!keepAliveInFlight) {
+    keepAliveInFlight = tryRefresh().finally(() => {
+      keepAliveInFlight = null
+    })
+  }
+  return keepAliveInFlight
+}
+
 export async function authedFetch(
   input: string,
   init: RequestInit = {}

@@ -162,6 +162,19 @@ export async function reverifyTenantMcpServer(id: string): Promise<RegisterResul
   return res.json()
 }
 
+/** Replace the stored auth header value (an expired or rotated token) and
+ *  re-verify. Same success/failure shape as `reverifyTenantMcpServer`. The
+ *  header name stays as registered; a bare token sent for `Authorization`
+ *  gets `Bearer ` added by the backend. */
+export async function updateTenantMcpServerAuth(id: string, authHeaderValue: string): Promise<RegisterResult> {
+  const res = await authedFetch(`${BACKEND_URL}/api/v1/tenant-mcp-servers/${encodeURIComponent(id)}/auth`, {
+    method: 'PATCH',
+    body: JSON.stringify({ auth_header_value: authHeaderValue }),
+  })
+  if (!res.ok) await parseErrorAndThrow(res)
+  return res.json()
+}
+
 /** Full replacement of the server's disabled-tool set — not a toggle of one
  *  name — since the backend validates the whole list against its stored
  *  tools_json in one pass. Callers should send the complete set they want

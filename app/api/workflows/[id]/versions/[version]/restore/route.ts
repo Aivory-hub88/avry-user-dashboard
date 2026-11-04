@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { workflowRepository } from '@/lib/workflows/repository'
 import { canvasRepository } from '@/lib/workflows/canvasRepository'
 import { getVersion, snapshotVersion } from '@/lib/workflows/versionRepository'
+import { requireModule } from '@/lib/teamAccess'
+import { authorizeWorkflow } from '@/lib/workflows/access'
 
 // POST /api/workflows/:id/versions/:version/restore — reapplies a stored
 // snapshot's spec+canvas as the workflow's current state, then immediately
@@ -16,7 +18,14 @@ export async function POST(
   _request: NextRequest,
   ctx: { params: Promise<{ id: string; version: string }> }
 ) {
+  const denied = await requireModule(_request, 'workflows')
+  if (denied) return denied
+
   const { id, version: versionParam } = await ctx.params
+
+  const wfAuth = await authorizeWorkflow(_request, id, 'write')
+
+  if (!wfAuth.ok) return wfAuth.res
   const version = parseInt(versionParam, 10)
   if (!Number.isFinite(version)) {
     return NextResponse.json({ error: 'Invalid version number' }, { status: 400 })
@@ -26,7 +35,8 @@ export async function POST(
     const snapshot = await getVersion(id, version)
     if (!snapshot) return NextResponse.json({ error: 'Version not found' }, { status: 404 })
 
-    const { id: _specId, createdAt: _createdAt, ...specPatch } = snapshot.spec as any
+    // A snapshot must never change who owns the workflow or where it is shared.
+    const { id: _specId, createdAt: _createdAt, owner: _owner, workspace_id: _ws, ...specPatch } = snapshot.spec as any
     const updated = workflowRepository.update(id, specPatch)
     if (!updated) return NextResponse.json({ error: 'Workflow not found' }, { status: 404 })
 

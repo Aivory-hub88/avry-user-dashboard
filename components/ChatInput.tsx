@@ -6,6 +6,7 @@ import ContextToolbar from "./input/ContextToolbar"
 import { AttachmentCard } from "./AttachmentCard"
 import AgentMentionMenu from "./console/AgentMentionMenu"
 import { useAgentMention } from "@/hooks/useAgentMention"
+import CreditUsageRing from "./credits/CreditUsageRing"
 import type { MentionCandidate } from "@/lib/agentMentions"
 
 interface ChatInputProps {
@@ -31,16 +32,18 @@ interface ChatInputProps {
   onAttachClick?: () => void
   /** Console tool/mode strip above the composer; off in shared rooms. */
   showContextToolbar?: boolean
+  /** Monthly credit-usage ring in the footer under the composer. */
+  showCreditRing?: boolean
 }
 
-/** Shared send-button glyph: an enter/return arrow (corner-up-left). One
- *  definition so the empty-state composer (console/page.tsx) and the
- *  threaded input here can't drift apart. */
+/** Shared send-button glyph: the enter/return key arrow ⏎ (corner-down-left:
+ *  down from the top right, then left). One definition so the empty-state
+ *  composer (console/page.tsx) and the threaded input here can't drift apart. */
 export function SendArrowIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="9 14 4 9 9 4" />
-      <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+      <polyline points="9 10 4 15 9 20" />
+      <path d="M20 4v7a4 4 0 0 1-4 4H4" />
     </svg>
   )
 }
@@ -58,6 +61,7 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
   onCancelReply,
   onAttachClick,
   showContextToolbar = true,
+  showCreditRing = true,
 }: ChatInputProps) {
   const [message, setMessage] = useState(prefill ?? "")
   const [activeTool, setActiveTool] = useState<string | null>(null)
@@ -280,34 +284,30 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
             </button>
           </div>
         )}
-        {/* Textarea area */}
-        <textarea
-          ref={textareaRef}
-          placeholder={placeholder ?? "Send Message to Aivory..."}
-          value={message}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          rows={2}
-          className="console-textarea w-full px-5 pt-[14px] pb-1 text-[15px]"
-        />
-
-        {/* Bottom toolbar row: icons left, send right */}
-        <div className="flex items-center justify-between px-4 pt-1 pb-3">
-          <div className="flex items-center gap-[6px]">
-            {/* Attach / upload button — + icon */}
-            <button
-              className="console-icon-btn"
-              onClick={() => (onAttachClick ? onAttachClick() : setUploadMenuOpen(o => !o))}
-              aria-label="Upload file"
-              type="button"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 5v14M5 12h14"/>
-              </svg>
-            </button>
-          </div>
-
+        {/* One row, Claude-style: + on the left, the message growing in the
+            middle, send on the right. */}
+        <div className="flex items-end gap-2 px-3 py-[10px]">
+          {/* Attach / upload button — + icon */}
+          <button
+            className="console-icon-btn mb-[2px]"
+            onClick={() => (onAttachClick ? onAttachClick() : setUploadMenuOpen(o => !o))}
+            aria-label="Upload file"
+            type="button"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </button>
+          <textarea
+            ref={textareaRef}
+            placeholder={placeholder ?? "Send Message to Aivory..."}
+            value={message}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            disabled={disabled}
+            rows={1}
+            className="console-textarea console-textarea--inline flex-1 min-w-0 text-[15px]"
+          />
           {/* Send button — morphs into stop while a turn is in flight */}
           {isStreaming && onStop ? (
             <button
@@ -332,6 +332,13 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
           )}
         </div>
       </div>
+
+      {/* Footer under the composer: monthly credit usage, like Claude's. */}
+      {showCreditRing && (
+        <div className="flex justify-end px-2 pt-1.5">
+          <CreditUsageRing />
+        </div>
+      )}
 
       <UploadMenu
         isOpen={uploadMenuOpen}

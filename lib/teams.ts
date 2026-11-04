@@ -30,7 +30,8 @@ export const ROOMS_VISIBLE_TO_USER = `d.id NOT LIKE 'workspace:%' AND d.props->>
            OR EXISTS (SELECT 1 FROM dashboard.workspace_doc_acl x WHERE x.doc_id = d.id AND x.user_id = $1)
            OR (d.workspace_id <> 'default' AND (
                 w.owner = $1
-                OR EXISTS (SELECT 1 FROM dashboard.workspace_members m WHERE m.workspace_id = d.workspace_id AND m.user_id = $1)))
+                OR EXISTS (SELECT 1 FROM dashboard.workspace_members m WHERE m.workspace_id = d.workspace_id AND m.user_id = $1
+                  AND (m.role = 'owner' OR m.modules IS NULL OR 'workspace' = ANY(m.modules)))))
          )`
 
 export interface Team {

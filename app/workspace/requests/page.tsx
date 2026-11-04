@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronRight, Plus, Users } from "lucide-react"
+import { useSettingsModal } from "@/contexts/SettingsModalContext"
 import { requestsApi, teamsApi, type RequestWithTeam, type TeamSummary } from "@/lib/requestsClient"
 import { Button, StatusPill, formatDate, inputClass } from "@/components/requests/requestUi"
 import { ROADMAP_DRAFT_KEY, type RequestDraft } from "@/lib/roadmapRequest"
@@ -16,6 +17,7 @@ import { ROADMAP_DRAFT_KEY, type RequestDraft } from "@/lib/roadmapRequest"
 type Tab = "mine" | "inbox"
 
 export default function RequestsPage() {
+  const { openSettingsModal } = useSettingsModal()
   const router = useRouter()
   const search = useSearchParams()
   const [teams, setTeams] = useState<TeamSummary[] | null>(null)
@@ -111,13 +113,14 @@ export default function RequestsPage() {
           <span className="font-medium text-white/80">Requests</span>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href="/workspace/teams"
+          <button
+            type="button"
+            onClick={() => openSettingsModal("team")}
             className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80"
           >
             <Users className="h-3.5 w-3.5" />
             <span>Teams</span>
-          </Link>
+          </button>
           {canRequestIn.length > 0 && (
             <Button tone="primary" onClick={() => setComposing((v) => !v)}>
               <span className="flex items-center gap-1">

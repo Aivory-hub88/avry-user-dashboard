@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { workflowRepository } from '@/lib/workflows/repository'
 import { AivoryWorkflowSpec } from '@/types/workflow'
+import { requireModule } from '@/lib/teamAccess'
+import { actorFromRequest, canShareInto, describeForActor, resolveWorkflowAccess } from '@/lib/workflows/access'
 
-// GET /api/workflows — list all workflows
-export async function GET() {
+// GET /api/workflows — workflows the caller owns or that are shared into their teams
+export async function GET(request: NextRequest) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+  const actor = await actorFromRequest(request)
+  if (!actor) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   try {
-    const workflows = workflowRepository.list()
-    return NextResponse.json(workflows)
+    const visible = workflowRepository.list().filter((w) => resolveWorkflowAccess(w, actor) !== null)
+    return NextResponse.json(await describeForActor(visible, actor))
   } catch (err) {
     console.error('[GET /api/workflows]', err)
     return NextResponse.json({ error: 'Failed to list workflows' }, { status: 500 })
@@ -15,6 +21,10 @@ export async function GET() {
 
 // POST /api/workflows — create a new workflow
 export async function POST(request: NextRequest) {
+  const denied = await requireModule(request, 'workflows')
+  if (denied) return denied
+  const actor = await actorFromRequest(request)
+  if (!actor) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   try {
     const body = await request.json() as Partial<AivoryWorkflowSpec>
 
@@ -38,6 +48,9 @@ export async function POST(request: NextRequest) {
       n8nId: body.n8nId,
       n8n_workflow_id: body.n8n_workflow_id,
       n8n_url: body.n8n_url,
+      // Owner is always the caller; sharing into a team needs edit rights there.
+      owner: actor.userId,
+      workspace_id: body.workspace_id && canShareInto(actor, String(body.workspace_id)) ? String(body.workspace_id) : null,
     })
 
     return NextResponse.json(created, { status: 201 })

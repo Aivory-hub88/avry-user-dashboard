@@ -1209,8 +1209,8 @@ const BUSINESS_ACTION_ONLY: ReadonlySet<StepCategory> = new Set(['BUSINESS_ACTIO
 
 /**
  * Stage 8 — structural checks on a planned workflow before it's handed to
- * the graph builder. Not a full n8n-schema validator (that already exists
- * in lib/workflows/n8nMcpClient.ts, at deploy time) — this checks the
+ * the graph builder. Not a full n8n-schema validator (n8n itself is the
+ * final arbiter at deploy time) — this checks the
  * planner's own contract: trigger present, branches well-formed, no empty
  * action text, exception paths actually reachable *and* terminal, no
  * duplicate conditions, no business action stranded in a dead-end branch,

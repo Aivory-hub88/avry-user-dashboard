@@ -53,6 +53,8 @@ function specToSaved(spec: AivoryWorkflowSpec): SavedWorkflow {
     n8nId: spec.n8nId,
     n8n_workflow_id: spec.n8n_workflow_id,
     n8n_url: spec.n8n_url,
+    created_by: spec.created_by,
+    access: spec.access,
     created_at: spec.createdAt,
   }
 }
@@ -148,7 +150,7 @@ const Icons = {
     </svg>
   ),
   aivoryAvatar: (
-    <Image src={asset("/Aivory_Avatar.svg?v=20260920")} alt="Aivory" width={18} height={18} />
+    <Image src={asset("/Aivory_Avatar.svg?v=20261104")} alt="Aivory" width={18} height={18} />
   ),
   robot: (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -1594,7 +1596,7 @@ function WorkflowsPageInner() {
       <div className={styles.onboardingOverlay}>
         <div className={styles.onboardingContent}>
           <div className={styles.onboardingAvatarWrap}>
-            <Image src={asset("/Aivory_Avatar.svg?v=20260920")} alt="Aivory" width={28} height={28} />
+            <Image src={asset("/Aivory_Avatar.svg?v=20261104")} alt="Aivory" width={28} height={28} />
           </div>
           <h2 className={styles.onboardingTitle}>{t('onboardingTitle')}</h2>
           <p className={styles.onboardingSubtitle}>
@@ -1604,7 +1606,7 @@ function WorkflowsPageInner() {
             className={styles.onboardingCTA}
             onClick={() => {}}
           >
-            <Image src={asset("/Aivory_Avatar.svg?v=20260920")} alt="" width={16} height={16} aria-hidden="true" />
+            <Image src={asset("/Aivory_Avatar.svg?v=20261104")} alt="" width={16} height={16} aria-hidden="true" />
             {t('askAivoryCopilot')}
           </button>
           <p className={styles.onboardingHotkey}>
@@ -1753,6 +1755,7 @@ function WorkflowsPageInner() {
                   <span className={styles.wliTitle}>{wf.title}</span>
                   <div className={styles.wliBadges}>
                     <ModeBadge wf={wf} />
+                    {wf.access !== 'viewer' && wf.access !== 'editor' && (
                     <button
                       className={styles.deleteBtn}
                       onClick={(e) => {
@@ -1766,9 +1769,13 @@ function WorkflowsPageInner() {
                     >
                       {Icons.trash}
                     </button>
+                    )}
                   </div>
                 </div>
-                <span className={styles.wliMeta}>{wf.company_name} · {new Date(wf.created_at).toLocaleDateString()}</span>
+                <span className={styles.wliMeta}>
+                  {wf.company_name} · {new Date(wf.created_at).toLocaleDateString()}
+                  {wf.created_by && !wf.created_by.me && ` · by ${wf.created_by.name || wf.created_by.email || 'a teammate'}`}
+                </span>
               </div>
             ))}
           </>
