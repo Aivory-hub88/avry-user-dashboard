@@ -750,20 +750,14 @@ export default function ConsolePage() {
                     ))}
                   </div>
                 )}
-                {/* One row, Claude-style: + left, message middle, send right. */}
-                <div className="flex items-end gap-2 px-3 py-[10px]">
-                  <button
-                    className="console-icon-btn mb-[2px]"
-                    title={t('uploadFileTitle')}
-                    onClick={() => setUploadMenuOpen(o => !o)}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 5v14M5 12h14"/>
-                    </svg>
-                  </button>
+                {/* Empty-state composer is the taller two-row layout: message on top
+                    (2 rows, grows to 180px), + on the left and send on the right in
+                    a toolbar row underneath. The one-row version stays in ChatInput
+                    (an ongoing conversation). */}
+                <div className="px-5 pt-[14px] pb-1">
                   <textarea
                     ref={textareaRef}
-                    rows={1}
+                    rows={2}
                     value={inputValue}
                     onChange={(e) => {
                       const next = e.target.value
@@ -775,9 +769,20 @@ export default function ConsolePage() {
                     }}
                     onKeyDown={handleEmptyKeyDown}
                     placeholder={inRoom ? t('sendPlaceholderRoom') : t('sendPlaceholder')}
-                    className="console-textarea console-textarea--inline flex-1 min-w-0"
+                    className="console-textarea w-full"
                     disabled={isStreaming}
                   />
+                </div>
+                <div className="flex items-center justify-between px-4 pt-1 pb-3">
+                  <button
+                    className="console-icon-btn"
+                    title={t('uploadFileTitle')}
+                    onClick={() => setUploadMenuOpen(o => !o)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                  </button>
                   <button
                     onClick={() => {
                       if (isStreaming) {
