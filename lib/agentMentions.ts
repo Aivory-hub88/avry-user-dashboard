@@ -327,6 +327,8 @@ export interface RoomPayloadParams {
   userText: string
   /** Set when the user asked every member to answer for themselves (roll call / introductions). */
   intent?: RoundIntent | null
+  /** Set when every answering agent runs at the same time, so none can see the others' replies this round. */
+  simultaneous?: boolean
   /** Set when a teammate handed this turn over with an @mention (ADR-020). `hop` is 1 for the first handoff. */
   handoff?: { from: string; text: string; hop: number } | null
   /**
@@ -358,7 +360,7 @@ function clip(text: string, max: number): string {
   return t.length > max ? `${t.slice(0, max)}…` : t
 }
 
-export function buildRoomPayload({ me, peers, members = [], intent = null, handoff = null, userText, history, roundReplies, ledgerHint }: RoomPayloadParams): string {
+export function buildRoomPayload({ me, peers, members = [], intent = null, simultaneous = false, handoff = null, userText, history, roundReplies, ledgerHint }: RoomPayloadParams): string {
   const lines: string[] = []
   lines.push("<room_context>")
   lines.push(`You are in the "Mission Control Room" group chat on the Aivory dashboard. You are ${me.name} (${me.title}).`)
@@ -400,6 +402,12 @@ export function buildRoomPayload({ me, peers, members = [], intent = null, hando
         "do NOT search for a tool or keep retrying: finish your own part, then hand that part to the teammate whose role covers it. " +
         "Never @ someone just to greet or thank them or to repeat what they already said, " +
         "and do not @ the person who just handed this to you unless you need something new from them. When you only talk ABOUT someone, use their plain name without @.",
+    )
+  }
+  if (simultaneous) {
+    lines.push(
+      "All answering agents are replying at the same moment, so you cannot see their replies to this message. " +
+        "Answer your own part directly; do not wait for, quote or guess what they will say.",
     )
   }
   if (intent === "rollcall") {
