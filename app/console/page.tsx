@@ -813,7 +813,7 @@ export default function ConsolePage() {
                   >
                     <span>{t('connectToolsTo')}</span>
                     <Image 
-                      src={asset("/Aivory_logo_2026.svg?v=20260920")} 
+                      src={asset("/Aivory_logo_2026.svg?v=20261104")} 
                       alt="Aivory" 
                       width={48} 
                       height={12} 
