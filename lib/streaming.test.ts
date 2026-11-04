@@ -124,3 +124,25 @@ describe('typewriterStream stop contract', () => {
     )
   })
 })
+
+describe('typewriterStream delta vs cumulative chunks', () => {
+  async function* src(parts: string[]): AsyncGenerator<{ type: 'chunk'; content: string }> {
+    for (const p of parts) yield { type: 'chunk', content: p }
+  }
+  const last = async (parts: string[]) => {
+    const ev = await collect(typewriterStream(src(parts)))
+    return (ev[ev.length - 1] as { content: string }).content
+  }
+
+  it('reassembles per-token deltas without dropping text', async () => {
+    expect(await last(['', 'Halo', ', ada ', 'yang bisa ', 'saya bantu?'])).toBe('Halo, ada yang bisa saya bantu?')
+  })
+
+  it('keeps a repeated delta (not mistaken for cumulative)', async () => {
+    expect(await last(['ha', 'ha', ' ha'])).toBe('haha ha')
+  })
+
+  it('still handles cumulative chunks', async () => {
+    expect(await last(['Hal', 'Halo, apa', 'Halo, apa kabar?'])).toBe('Halo, apa kabar?')
+  })
+})
