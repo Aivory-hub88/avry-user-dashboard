@@ -9,8 +9,6 @@
  */
 import type { AivoryWorkflowSpec } from '@/types/workflow'
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
-import { validateWorkflow as mcpValidateWorkflow } from '@/lib/workflows/n8nMcpClient'
-import type { N8nWorkflowValidationResult } from '@/lib/workflows/n8nMcpClient'
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -255,17 +253,7 @@ export async function deployAndActivate(
 ): Promise<{ n8nWorkflowId: string; n8nWorkflowUrl: string; n8nWebhookPath: string | null }> {
   const { uiBase } = getConfig()
 
-  // ── Step 0: validate workflow via n8n-MCP (non-blocking) ──────────────────
   const payload = buildPayload(spec)
-  try {
-    const validation = await mcpValidateWorkflow(payload as unknown as Record<string, unknown>)
-    if (!validation.valid && validation.errors.length > 0) {
-      console.warn('[n8nClient] MCP validation found issues:', validation.errors)
-      // Log but don't block — let n8n be the final arbiter
-    }
-  } catch (e) {
-    console.warn('[n8nClient] MCP validation skipped (non-fatal):', e)
-  }
 
   // ── Step 1: create or update draft ──────────────────────────────────────────
   let n8nId: string
@@ -396,16 +384,7 @@ export async function deployAndActivateWithCreds(
 ): Promise<{ n8nWorkflowId: string; n8nWorkflowUrl: string; n8nWebhookPath: string | null }> {
   const { apiBase, uiBase, key } = getConnConfig(conn)
 
-  // ── Step 0: validate workflow via n8n-MCP (non-blocking) ──────────────────
   const payload = buildPayload(spec)
-  try {
-    const validation = await mcpValidateWorkflow(payload as unknown as Record<string, unknown>)
-    if (!validation.valid && validation.errors.length > 0) {
-      console.warn('[n8nClient] MCP validation found issues:', validation.errors)
-    }
-  } catch (e) {
-    console.warn('[n8nClient] MCP validation skipped (non-fatal):', e)
-  }
 
   // ── Step 1: create or update draft ──────────────────────────────────────────
   let n8nId: string

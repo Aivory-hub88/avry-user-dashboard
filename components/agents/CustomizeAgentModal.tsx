@@ -122,6 +122,7 @@ const TOOLKIT_LABELS: Record<string, string> = {
   googledocs: 'Google Docs',
   trello: 'Trello',
   linear: 'Linear',
+  linkedin: 'LinkedIn',
   smartlead: 'Smartlead',
   prospeo: 'Prospeo',
   millionverifier: 'MillionVerifier',
@@ -142,6 +143,7 @@ const TOOLKIT_ICONS: Record<string, string> = {
   googledocs: '/integrations/icons/google-docs.svg',
   trello: '/integrations/trello.svg',
   linear: '/integrations/linear.svg',
+  linkedin: '/integrations/linkedin.svg',
 };
 
 // Registered MCP rows get the same logo as the picker tile they were added
@@ -1220,6 +1222,18 @@ export default function CustomizeAgentModal({
               <div className="py-10 text-center text-white/40 text-[13px]">{t('loadingIntegrations')}</div>
             ) : (
               <div className="space-y-2">
+                {connectFeedback && (
+                  <p
+                    role="status"
+                    className={`px-3 py-2 rounded-lg border text-[12px] ${
+                      connectFeedback.type === 'error'
+                        ? 'border-red-500/25 bg-red-500/10 text-red-300'
+                        : 'border-accent/25 bg-accent/10 text-[var(--color-accent-text)]'
+                    }`}
+                  >
+                    {connectFeedback.message}
+                  </p>
+                )}
                 {(toolScope === undefined ? [] : Object.keys(toolScope?.tools ?? {})).length === 0 &&
                   toolScope !== null && (
                   <div className="py-10 text-center text-white/40 text-[13px]">

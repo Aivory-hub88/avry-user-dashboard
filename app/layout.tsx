@@ -1,3 +1,4 @@
+import SessionKeepAlive from "@/components/auth/SessionKeepAlive"
 import type { Metadata } from "next"
 import { Inter_Tight, Nunito, Manrope } from "next/font/google"
 import Sidebar from "@/components/shared/Sidebar"
@@ -42,6 +43,7 @@ export default function RootLayout({
     <html lang="en" className={`${manrope.variable} ${nunito.variable}`}>
       <body className={`flex h-screen bg-[var(--bg-main)] overflow-hidden ${manrope.className}`}>
         <TokenInitializer />
+        <SessionKeepAlive />
         <LocaleWrapper>
           <ModeProvider>
             <RouterProvider>

@@ -1,5 +1,6 @@
 'use client'
 import { asset } from "@/lib/asset";
+import { authedFetch } from "@/lib/deployAuth";
 
 import Image from 'next/image'
 import { useEffect, useState, useCallback, useRef, Suspense } from 'react'
@@ -30,6 +31,16 @@ interface ProviderButtonProps {
   onPopupOpened?: (appId: string) => void
 }
 
+async function readApiError(res: Response, fallback: string): Promise<string> {
+  try {
+    const j = await res.json()
+    if (j?.error?.message) return `${j.error.message}${j.error.details ? ` (${j.error.details})` : ''}`
+  } catch {
+    /* non-JSON body */
+  }
+  return `${fallback} (${res.status})`
+}
+
 function ProviderButton({ app, onPopupOpened }: ProviderButtonProps) {
   const [loading, setLoading] = useState(false)
 
@@ -37,17 +48,16 @@ function ProviderButton({ app, onPopupOpened }: ProviderButtonProps) {
     setLoading(true)
     try {
       // 1. Get the Composio session — surfaces auth/gating errors server-side
-      const sessionRes = await fetch(asset('/api/integrations/oauth?action=session'))
-      if (!sessionRes.ok) throw new Error('Failed to create session')
+      const sessionRes = await authedFetch(asset('/api/integrations/oauth?action=session'))
+      if (!sessionRes.ok) throw new Error(await readApiError(sessionRes, 'Failed to create session'))
 
       // 2. Initiate Composio OAuth — opens the provider's auth page.
       // The entity is derived from the session server-side; never send a client userId.
-      const connectRes = await fetch(asset('/api/integrations/oauth/connect'), {
+      const connectRes = await authedFetch(asset('/api/integrations/oauth/connect'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ appId: app.id }),
       })
-      if (!connectRes.ok) throw new Error('Failed to initiate connection')
+      if (!connectRes.ok) throw new Error(await readApiError(connectRes, 'Failed to initiate connection'))
       const { redirectUrl } = await connectRes.json()
 
       if (redirectUrl) {
@@ -55,10 +65,13 @@ function ProviderButton({ app, onPopupOpened }: ProviderButtonProps) {
         const popup = window.open(redirectUrl, 'composio-oauth', 'width=600,height=700')
         if (popup) {
           onPopupOpened?.(app.id)
+        } else {
+          window.alert('Your browser blocked the sign-in popup. Allow popups for this site and try again.')
         }
       }
     } catch (err) {
       console.error('[ProviderButton] OAuth error:', err)
+      window.alert(err instanceof Error ? err.message : 'Could not start the connection.')
     } finally {
       setLoading(false)
     }
@@ -387,16 +400,15 @@ function IntegrationsContent() {
 
     if (conn.authType === 'oauth' && app.oauthProvider) {
       try {
-        const sessionRes = await fetch(asset('/api/integrations/oauth?action=session'))
-        if (!sessionRes.ok) throw new Error('Failed to create session')
+        const sessionRes = await authedFetch(asset('/api/integrations/oauth?action=session'))
+        if (!sessionRes.ok) throw new Error(await readApiError(sessionRes, 'Failed to create session'))
 
         // The entity is derived from the session server-side; never send a client userId.
-        const connectRes = await fetch(asset('/api/integrations/oauth/connect'), {
+        const connectRes = await authedFetch(asset('/api/integrations/oauth/connect'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ appId: app.id }),
         })
-        if (!connectRes.ok) throw new Error('Failed to initiate reconnection')
+        if (!connectRes.ok) throw new Error(await readApiError(connectRes, 'Failed to initiate reconnection'))
         const { redirectUrl } = await connectRes.json()
 
         if (redirectUrl) {
@@ -406,6 +418,7 @@ function IntegrationsContent() {
         }
       } catch (err) {
         console.error('[Reconnect] Error:', err)
+        setFeedback({ type: 'error', message: err instanceof Error ? err.message : 'Could not reconnect.' })
       }
     } else {
       setReconnectTarget({ app, connId: conn.id })
