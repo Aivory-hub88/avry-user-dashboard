@@ -226,13 +226,25 @@ export async function* typewriterStream(
   signal?: AbortSignal,
 ): AsyncGenerator<StreamChunk> {
   let displayed = ''
+  // The bridge is inconsistent: the direct OpenRouter paths send per-token
+  // DELTAS, while other paths send the full text so far (cumulative). Treating
+  // deltas as cumulative sliced off `displayed.length` chars from every chunk
+  // after the first, which garbled and truncated replies. Decide once, on the
+  // second non-empty chunk, then stay consistent for the rest of the stream.
+  let mode: 'unknown' | 'delta' | 'cumulative' = 'unknown'
+  let prev = ''
   for await (const ev of source) {
     if (signal?.aborted) return
     if (ev.type === 'chunk' && typeof ev.content === 'string') {
-      // Stream incrementally: animate only the new delta, not the whole accumulated text at once
-      const delta = ev.content.slice(displayed.length)
+      if (ev.content === '') continue // bridge sends an empty priming chunk
+      if (mode === 'unknown' && prev !== '') {
+        mode = ev.content.length > prev.length && ev.content.startsWith(prev) ? 'cumulative' : 'delta'
+      }
+      prev = ev.content
+      // Stream incrementally: animate only the new part, not the whole text at once
+      const delta = mode === 'cumulative' ? ev.content.slice(displayed.length) : ev.content
       if (delta.length === 0) {
-        displayed = ev.content
+        if (mode === 'cumulative') displayed = ev.content
         yield { type: 'chunk', content: displayed } as StreamChunk
         continue
       }
