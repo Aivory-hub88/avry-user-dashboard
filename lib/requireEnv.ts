@@ -1,6 +1,5 @@
-// Fail-fast env loader. Previously these URLs defaulted to the old compromised
-// VPS (43.156.108.96), which silently routed prod traffic to a host running a
-// Monero miner when env vars were absent. Refusing to fall back is intentional:
+// Fail-fast env loader. Previously these URLs defaulted to a retired, compromised
+// VPS, which silently routed prod traffic to it when env vars were absent. Refusing to fall back is intentional:
 // better a loud 500 than quiet traffic leakage.
 //
 // Three contexts to consider:
