@@ -54,7 +54,7 @@ describe("syncAccessTokenCookies", () => {
     syncAccessTokenCookies("new.jwt.value")
     expect(jar.get(ACCESS_COOKIE)).toBe("new.jwt.value")
     expect(JSON.parse(decodeURIComponent(jar.get(SESSION_COOKIE)!))).toBe("new.jwt.value")
-    for (const w of writes) expect(w).toMatch(/; path=\/; max-age=604800; SameSite=Lax$/)
+    for (const w of writes) expect(w).toMatch(/; path=\/; max-age=31536000; SameSite=Lax$/)
     // Host-only, like setAuthCookies: a domain= variant would be a second cookie.
     for (const w of writes) expect(w).not.toMatch(/domain=/i)
   })

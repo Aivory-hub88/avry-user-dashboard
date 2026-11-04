@@ -10,6 +10,18 @@
  */
 
 import { asset } from './asset'
+import { authedFetch } from './deployAuth'
+
+async function failure(res: Response, fallback: string): Promise<Error> {
+  try {
+    const j = await res.json()
+    const msg = j?.error?.message
+    if (msg) return new Error(`${msg}${j?.error?.details ? ` (${j.error.details})` : ''}`)
+  } catch {
+    /* non-JSON body */
+  }
+  return new Error(`${fallback} (${res.status})`)
+}
 
 export interface ConnectedApp {
   id: string
@@ -30,7 +42,7 @@ export interface ConnectableApp {
 }
 
 export async function getConnectedApps(): Promise<ConnectedApp[]> {
-  const res = await fetch(asset('/api/integrations/oauth?action=status'))
+  const res = await authedFetch(asset('/api/integrations/oauth?action=status'))
   if (!res.ok) throw new Error(`Failed to load connections (${res.status})`)
   return res.json()
 }
@@ -46,15 +58,14 @@ export async function getConnectableApps(): Promise<ConnectableApp[]> {
  *  learn when it completes (same "session -> connect -> popup" shape the
  *  full /integrations page's own polling uses). */
 export async function startOAuthConnect(appId: string): Promise<Window | null> {
-  const sessionRes = await fetch(asset('/api/integrations/oauth?action=session'))
-  if (!sessionRes.ok) throw new Error('Failed to create session')
+  const sessionRes = await authedFetch(asset('/api/integrations/oauth?action=session'))
+  if (!sessionRes.ok) throw await failure(sessionRes, 'Failed to create session')
 
-  const connectRes = await fetch(asset('/api/integrations/oauth/connect'), {
+  const connectRes = await authedFetch(asset('/api/integrations/oauth/connect'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ appId }),
   })
-  if (!connectRes.ok) throw new Error('Failed to initiate connection')
+  if (!connectRes.ok) throw await failure(connectRes, 'Failed to initiate connection')
   const { redirectUrl } = await connectRes.json()
   if (!redirectUrl) throw new Error('No redirect URL returned')
 
@@ -62,9 +73,8 @@ export async function startOAuthConnect(appId: string): Promise<Window | null> {
 }
 
 export async function revokeConnectedApp(connectedAccountId: string): Promise<void> {
-  const res = await fetch(asset('/api/integrations/oauth'), {
+  const res = await authedFetch(asset('/api/integrations/oauth'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'revoke', connectedAccountId }),
   })
   if (!res.ok) throw new Error('Failed to revoke connection')
