@@ -10,7 +10,7 @@ import { sendAgentMessage, toolStatusLabel, type ConsolePendingApproval } from '
 import { applyToolEvent, closeSteps, type ActivityStep } from '@/lib/agentActivity'
 import { notifyApprovalsChanged } from '@/lib/agentApprovals'
 import { planHandoffs } from '@/lib/agentHandoff'
-import { roundRunsInParallel, runRoundTurns } from '@/lib/roomRound'
+import { isIndependentRound, MAX_PARALLEL_TURNS, roundRunsInParallel, runRoundTurns } from '@/lib/roomRound'
 import { agentAwaitingApproval, agentNameOf, buildRoomPayload, candidateOf, roomTurnText, type MentionCandidate, type RoomHistoryEntry, type RoundIntent } from '@/lib/agentMentions'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
 import { useMode } from '@/contexts/ModeContext'
@@ -466,7 +466,18 @@ export function useChat({
     type RoomTurn = { id: string; agent: string; depth: number; handoff: { from: string; text: string; hop: number } | null }
     const turns: RoomTurn[] = targets.map((t, i) => ({ id: `${ts}-room-${t}-${i}`, agent: t, depth: 0, handoff: null }))
     // Sequential rounds: later speakers wait for the one before them, and say so.
-    const sequential = !roundRunsInParallel(intent)
+    // Parallel when a roll call, or one plain question to several agents with no
+    // dependency between their answers (lib/roomRound.isIndependentRound).
+    const parallel = roundRunsInParallel(
+      intent,
+      isIndependentRound({
+        text: displayText,
+        targets,
+        candidates: roomMembersRef.current,
+        hasReplyContext: !!activeReplyTo,
+        awaitingApproval: targets.some(t => agentAwaitingApproval(messagesRef.current, t)),
+      }),
+    )
     const placeholderFor = (turn: RoomTurn, waitingFor?: string): Message => ({
       id: turn.id,
       role: "assistant",
@@ -474,9 +485,10 @@ export function useChat({
       isStreaming: true,
       agentType: turn.agent,
       agentName: agentNameOf(turn.agent),
-      ...(sequential && waitingFor ? { statusText: `${agentNameOf(turn.agent)} is waiting for ${waitingFor}...` } : {}),
+      ...(waitingFor ? { statusText: `${agentNameOf(turn.agent)} is waiting for ${waitingFor}...` } : {}),
     })
-    const placeholders: Message[] = turns.map((t, i) => placeholderFor(t, i > 0 ? agentNameOf(turns[i - 1].agent) : undefined)) // grows when a teammate is handed work
+    const initialTurnCount = turns.length
+    const placeholders: Message[] = turns.map((t, i) => placeholderFor(t, !parallel && i > 0 ? agentNameOf(turns[i - 1].agent) : undefined)) // grows when a teammate is handed work
     const baseMessages = [...messagesRef.current]
     const sentSessionId = currentSessionId
 
@@ -497,7 +509,6 @@ export function useChat({
     // A failure drops that bubble but never blocks the rest of the round. A
     // user stop breaks the chain: answered bubbles stay, unanswered ones are
     // dropped by the merge below, no error toast.
-    const parallel = roundRunsInParallel(intent)
     const roundReplies: RoomHistoryEntry[] = []
     const outcomes = new Map<string, { reply: string; pendingApproval: ConsolePendingApproval | null }>()
     // Close the activity panel of a bubble that had one running ("Selesai dalam …").
@@ -508,7 +519,7 @@ export function useChat({
       if (signal.aborted) return
       const me = candidateOf(t) ?? { type: t, name: agentNameOf(t), title: t, channels: [] as string[] }
       const peers = [...new Set(turns.map(x => x.agent))].filter(x => x !== t).map(x => candidateOf(x) ?? { type: x, name: agentNameOf(x), title: x, channels: [] as string[] })
-      const wrapped = buildRoomPayload({ me, peers, userText, history, roundReplies, ledgerHint, members: roomMembersRef.current, intent, handoff: turn.handoff })
+      const wrapped = buildRoomPayload({ me, peers, userText, history, roundReplies, ledgerHint, members: roomMembersRef.current, intent, handoff: turn.handoff, simultaneous: parallel && !turn.handoff && intent !== 'rollcall' })
       // A short "Ya"/"Batal" to an agent that is waiting on an approval must reach the
       // backend as-is: wrapped in the room context it is no longer recognised as an answer.
       const payload = roomTurnText({
@@ -565,7 +576,9 @@ export function useChat({
         // ADR-020: an @mention in this reply hands work to a teammate, who answers in
         // their own bubble. A parked approval ends this branch; depth, total turns and
         // turns per agent are capped (lib/agentHandoff).
-        if (!parallel && !result.pendingApproval) {
+        // Roll call never hands off; an independent parallel round may, and its handoff turns
+        // then run one after another once the parallel turns have settled.
+        if (intent !== 'rollcall' && !result.pendingApproval) {
           const usedPerAgent: Record<string, number> = {}
           for (const x of turns) usedPerAgent[x.agent] = (usedPerAgent[x.agent] ?? 0) + 1
           const next = planHandoffs(result.reply, roomMembersRef.current, t, {
@@ -587,14 +600,14 @@ export function useChat({
             if (currentSessionIdRef.current === sentSessionId) setMessages(p => [...p, ph])
           }
         }
-        if (!parallel) setStreamingAgentType(turns[qi + 1]?.agent ?? undefined)
+        if (!parallel || qi >= initialTurnCount) setStreamingAgentType(turns[qi + 1]?.agent ?? undefined)
       } catch {
         // Stopped turns break the chain quietly; failures toast per agent.
         if (signal.aborted) return
         addToast("error", `${me.name} is unavailable right now.`)
       }
     }
-    await runRoundTurns(turns, parallel, runTurn, signal)
+    await runRoundTurns(turns, parallel, runTurn, signal, parallel && intent !== 'rollcall' ? MAX_PARALLEL_TURNS : undefined)
 
     // Pure merge: successes fill their bubble, failures drop theirs.
     const applyRoomResults = (list: Message[]): Message[] =>
