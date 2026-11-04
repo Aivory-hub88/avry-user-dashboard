@@ -122,6 +122,7 @@ const TOOLKIT_LABELS: Record<string, string> = {
   googledocs: 'Google Docs',
   trello: 'Trello',
   linear: 'Linear',
+  linkedin: 'LinkedIn',
   smartlead: 'Smartlead',
   prospeo: 'Prospeo',
   millionverifier: 'MillionVerifier',
@@ -142,6 +143,7 @@ const TOOLKIT_ICONS: Record<string, string> = {
   googledocs: '/integrations/icons/google-docs.svg',
   trello: '/integrations/trello.svg',
   linear: '/integrations/linear.svg',
+  linkedin: '/integrations/linkedin.svg',
 };
 
 // Registered MCP rows get the same logo as the picker tile they were added
