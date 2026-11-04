@@ -40,7 +40,7 @@ describe("isIndependentRound", () => {
   it("negative: @mention chain / another agent named in the body", () => {
     expect(indep("@Finn get the numbers and ask @Ofira to check them")).toBe(false)
     expect(indep("@Finn @Ofira check with Lex about the quote", ["finance", "ops"])).toBe(false)
-    expect(indep("@Finn tolong cek angka, Ofira yang kirim laporan")).toBe(false)
+    expect(indep("@Finn tolong cek angka, Lex yang kirim laporan")).toBe(false)
   })
   it("negative: handoff / delegation / ordering wording", () => {
     expect(indep("@Finn @Ofira please delegate the invoice check to a teammate")).toBe(false)
@@ -52,7 +52,25 @@ describe("isIndependentRound", () => {
     expect(indep("@Finn @Ofira based on the previous answer, what next?")).toBe(false)
     expect(indep("@Finn @Ofira setuju dengan jawaban tadi?")).toBe(false)
     expect(indep("@Finn @Ofira what do you think of their answers?")).toBe(false)
-    expect(indep("@Finn @Ofira and the second one?", undefined, { hasReplyContext: true })).toBe(false)
+    expect(indep("@Finn @Ofira and the second one?", undefined, { quoted: { role: "assistant", agentName: "Ofira" } })).toBe(false)
+  })
+  it("positive: user's real message quoting Finn, addressing Teo and Geno by @ in the body", () => {
+    const r = [mk("finance_agent", "Finn"), mk("teo", "Teo"), mk("geno", "Geno"), mk("ops", "Ofira")]
+    const text = "kamu tipikal orang finance banget ya, disiplin dalam pembukaan, cocok banget nih kalo @Teo atau @Geno butuh Istri"
+    expect(isIndependentRound({ text, targets: ["teo", "geno"], candidates: r, quoted: { role: "assistant", agentName: "Finn" } })).toBe(true)
+  })
+  it("positive: a quote of the user's own message, or of an agent that is not answering", () => {
+    expect(indep("@Finn @Ofira thoughts?", undefined, { quoted: { role: "user" } })).toBe(true)
+    expect(indep("@Finn @Ofira thoughts?", undefined, { quoted: { role: "assistant", agentName: "Lex" } })).toBe(true)
+  })
+  it("negative: quote of a round-mate's reply, or of an unknown agent", () => {
+    expect(indep("@Finn @Ofira thoughts?", undefined, { quoted: { role: "assistant", agentName: "Finn" } })).toBe(false)
+    expect(indep("@Finn @Ofira thoughts?", undefined, { quoted: { role: "assistant" } })).toBe(false)
+  })
+  it("negative: asking a target about another target, or naming a non-target", () => {
+    expect(indep("@Finn tanya @Ofira soal X")).toBe(false)
+    expect(indep("@Finn and ask @Lex", ["finance", "ops"])).toBe(false)
+    expect(indep("@Finn @Ofira kalo @Lex butuh bantuan gimana?")).toBe(false)
   })
   it("negative: a pending approval keeps the round sequential", () => {
     expect(indep("@Finn @Ofira ya", undefined, { awaitingApproval: true })).toBe(false)
