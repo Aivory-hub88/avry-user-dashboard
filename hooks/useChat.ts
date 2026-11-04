@@ -474,7 +474,7 @@ export function useChat({
         text: displayText,
         targets,
         candidates: roomMembersRef.current,
-        hasReplyContext: !!activeReplyTo,
+        quoted: activeReplyTo ? { role: activeReplyTo.role, agentName: activeReplyTo.agentName } : null,
         awaitingApproval: targets.some(t => agentAwaitingApproval(messagesRef.current, t)),
       }),
     )

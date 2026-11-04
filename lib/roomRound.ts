@@ -86,8 +86,12 @@ export interface IndependentRoundInput {
   targets: string[]
   /** Deployed room members (for recognising names in the message body). */
   candidates: MentionCandidate[]
-  /** The user quoted an earlier message (reply-to). */
-  hasReplyContext?: boolean
+  /**
+   * The message the user quoted (reply-to), if any. A quote is context every agent sees, not a reply
+   * produced inside this round, so it only blocks when it is an agent message whose author is also
+   * answering now (or whose author is unknown).
+   */
+  quoted?: { role: "user" | "assistant"; agentName?: string | null } | null
   /** Some target is waiting on a Yes/No approval, which has its own protocol. */
   awaitingApproval?: boolean
 }
@@ -99,22 +103,43 @@ export interface IndependentRoundInput {
  *
  * Sequential (false) when:
  * - fewer than two agents answer;
- * - the user quotes a previous message, or an agent awaits an approval answer;
- * - the message names an agent anywhere after the leading addressees
- *   ("@Finn ask @Ofira ...", "Finn, check with Ofira ...") or has any other @mention;
+ * - the user quotes a message by an agent that also answers now (or by an unknown agent),
+ *   or an agent awaits an approval answer;
+ * - the message names, after the leading addressees, an agent that is NOT answering this round
+ *   ("@Finn ask @Ofira ..." with Ofira not a target: a handoff turn would be appended), or has an
+ *   unknown @token. Naming an agent that already answers this round is not a handoff;
  * - the wording refers to prior/other answers, asks for ordering, discussion,
  *   delegation or a handoff.
  */
 export function isIndependentRound(input: IndependentRoundInput): boolean {
-  const { text, targets, candidates, hasReplyContext = false, awaitingApproval = false } = input
+  const { text, targets, candidates, quoted = null, awaitingApproval = false } = input
   if (new Set(targets).size < 2) return false
-  if (hasReplyContext || awaitingApproval) return false
+  if (awaitingApproval) return false
+  const targetSet = new Set(targets)
+  const nameOf = (type: string) => candidates.find((c) => c.type === type)?.name.toLowerCase()
+  if (quoted && quoted.role === "assistant") {
+    const author = quoted.agentName?.trim().toLowerCase()
+    if (!author || targets.some((t) => nameOf(t) === author)) return false
+  }
   const body = stripLeadingAddressees(text, candidates).trim()
   if (!body) return false
-  if (/@[A-Za-z0-9_]+/.test(body)) return false
-  const names = candidates.flatMap((c) => [c.name, c.type, c.type.replace(/_/g, "")]).filter(Boolean)
-  const named = new RegExp(`(?:^|[^A-Za-z0-9_])(?:${names.map(escapeRe).join("|")})(?![A-Za-z0-9_])`, "i")
-  if (names.length > 0 && named.test(body)) return false
+  // Any agent named in the body that is not already a target would get a handoff turn.
+  const outsiders = candidates.filter((c) => !targetSet.has(c.type))
+  const isOutsider = (token: string) => {
+    const t = token.toLowerCase()
+    return outsiders.some((c) => [c.name, c.type, c.type.replace(/_/g, "")].some((a) => a && a.toLowerCase() === t))
+  }
+  const isAnyAgent = (token: string) =>
+    GROUP_TOKENS.includes(token.toLowerCase()) ||
+    candidates.some((c) => [c.name, c.type, c.type.replace(/_/g, "")].some((a) => a && a.toLowerCase() === token.toLowerCase()))
+  for (const m of body.matchAll(/@([A-Za-z0-9_]+)/g)) {
+    if (isOutsider(m[1]) || !isAnyAgent(m[1])) return false
+  }
+  const outsiderNames = outsiders.flatMap((c) => [c.name, c.type, c.type.replace(/_/g, "")]).filter(Boolean)
+  if (outsiderNames.length > 0) {
+    const named = new RegExp(`(?:^|[^A-Za-z0-9_])(?:${outsiderNames.map(escapeRe).join("|")})(?![A-Za-z0-9_])`, "i")
+    if (named.test(body)) return false
+  }
   if (DEPENDENT_WORDING.test(body)) return false
   return true
 }
