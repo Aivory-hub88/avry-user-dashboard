@@ -1,7 +1,8 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { getSessionId, clearSession, generateSessionId, saveSession } from '@/lib/session'
-import { streamConsoleResponse, typewriterStream } from '@/lib/streaming'
+import { streamConsoleResponse } from '@/lib/streaming'
+import { createSmoothStream, createChunkAccumulator } from '@/lib/smoothStream'
 import { saveSessionMessages, loadSessionMessages, listSessions, getSession, deleteSession, ChatStorageError } from '@/lib/chatPersistence'
 import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
@@ -244,6 +245,16 @@ export function useChat({
     // may run tools first, so the placeholder keeps the typing UI until text arrives).
     if (agentTarget) {
       let pendingApproval: ConsolePendingApproval | null = null
+      // Chunks arrive in bursts; the smoother paints them at an even pace, at most once per
+      // frame. Only touch the live thread if it is still the one on screen (same guard as
+      // the final patch below).
+      const smooth = createSmoothStream({
+        onUpdate: shown => {
+          if (currentSessionIdRef.current === sentSessionId) {
+            setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: shown, statusText: undefined } : m))
+          }
+        },
+      })
       try {
         const result = await sendAgentMessage(
           sentAgentTarget as TelegramAgentType,
@@ -251,13 +262,7 @@ export function useChat({
           sentSessionId,
           signal,
           undefined,
-          // Paint the reply as it is written. Only touch the live thread if it is
-          // still the one on screen (same guard as the final patch below).
-          replySoFar => {
-            if (currentSessionIdRef.current === sentSessionId) {
-              setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: replySoFar, statusText: undefined } : m))
-            }
-          },
+          replySoFar => smooth.push(replySoFar),
           tool => {
             if (currentSessionIdRef.current === sentSessionId) {
               setMessages(p => p.map(m => m.id === assistantId
@@ -266,6 +271,9 @@ export function useChat({
             }
           }
         )
+        // The finished reply is painted in full below; drop any frame still pending so
+        // it cannot land after (and overwrite) that final patch.
+        smooth.cancel()
         // Same guard as the room path: a non-string reply would throw
         // during ChatMessage render and unmount the page.
         if (typeof result.reply !== "string" || !result.reply.trim()) {
@@ -294,6 +302,7 @@ export function useChat({
           streamError = true
         }
       } finally {
+        smooth.cancel()
         if (abortRef.current === controller) abortRef.current = null
         if (streamingSessionRef.current === sentSessionId) {
           streamingSessionRef.current = ""
@@ -333,26 +342,34 @@ export function useChat({
       return
     }
 
+    // Chunks (deltas or cumulative, see createChunkAccumulator) become the full text so far;
+    // the smoother paints it at an even pace, at most once per frame. Don't paint into
+    // whatever thread happens to be open — only the thread this stream belongs to.
+    const smooth = createSmoothStream({
+      onUpdate: shown => {
+        if (currentSessionIdRef.current === sentSessionId) {
+          setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: shown } : m))
+        }
+      },
+    })
+    const received = createChunkAccumulator()
     try {
       const user = getUser()
-      const baseStream = streamConsoleResponse("/api/console/stream", {
+      const stream = streamConsoleResponse("/api/console/stream", {
         session_id: sentSessionId,
         organization_id: "default",
         user_id: user?.user_id ?? undefined,
         messages: allMessages,
         user_state: formatUserContextForAI(buildUserContextState()),
       }, { signal })
-      const stream = typewriterStream(baseStream, signal)
       for await (const chunk of stream) {
         processEvent(chunk as any)
         if (chunk.type === "chunk" && chunk.content) {
-          finalContent = chunk.content
-          // Don't paint chunks into whatever thread happens to be open —
-          // only the thread this stream actually belongs to.
-          if (currentSessionIdRef.current === sentSessionId) {
-            setMessages(p => p.map(m => m.id === assistantId ? { ...m, content: finalContent } : m))
-          }
+          finalContent = received.add(chunk.content)
+          smooth.push(finalContent)
         } else if (chunk.type === "done") {
+          // The finished reply is painted in full by the final patch below.
+          smooth.cancel()
           const normalized = normalizeAssistantText(finalContent)
           const parsed = parseLLMResponse(normalized)
           finalContent = parsed.reply
@@ -383,6 +400,7 @@ export function useChat({
         setMessages(p => p.map(m => m.id === assistantId ? { ...m, isStreaming: false } : m))
       }
     } finally {
+      smooth.cancel()
       if (abortRef.current === controller) abortRef.current = null
       if (streamingSessionRef.current === sentSessionId) {
         streamingSessionRef.current = ""
@@ -531,6 +549,15 @@ export function useChat({
       if (currentSessionIdRef.current === sentSessionId) {
         setMessages(p => p.map(m => m.id === turn.id ? { ...m, startedAt: Date.now(), activity: [], statusText: undefined } : m))
       }
+      // One smoother per turn: in a parallel round several agents stream at once, and each
+      // paints at most once per frame instead of once per network chunk.
+      const smooth = createSmoothStream({
+        onUpdate: shown => {
+          if (currentSessionIdRef.current === sentSessionId) {
+            setMessages(p => p.map(m => m.id === turn.id ? { ...m, content: shown, statusText: undefined } : m))
+          }
+        },
+      })
       try {
         const result = await sendAgentMessage(
           t as TelegramAgentType,
@@ -538,11 +565,7 @@ export function useChat({
           sentSessionId,
           signal,
           teamIdRef.current,
-          replySoFar => {
-            if (currentSessionIdRef.current === sentSessionId) {
-              setMessages(p => p.map(m => m.id === turn.id ? { ...m, content: replySoFar, statusText: undefined } : m))
-            }
-          },
+          replySoFar => smooth.push(replySoFar),
           tool => {
             if (currentSessionIdRef.current === sentSessionId) {
               setMessages(p => p.map(m => m.id === turn.id
@@ -551,6 +574,9 @@ export function useChat({
             }
           }
         )
+        // The finished reply is painted in full below; a frame still pending must not
+        // land after it.
+        smooth.cancel()
         // Backend reply is unvalidated (Cerveau may return null/a non-string
         // on odd turns) — a non-string here used to flow into ChatMessage and
         // throw during render, killing the whole page. Treat it as a failed
@@ -602,6 +628,7 @@ export function useChat({
         }
         if (!parallel || qi >= initialTurnCount) setStreamingAgentType(turns[qi + 1]?.agent ?? undefined)
       } catch {
+        smooth.cancel()
         // Stopped turns break the chain quietly; failures toast per agent.
         if (signal.aborted) return
         addToast("error", `${me.name} is unavailable right now.`)
