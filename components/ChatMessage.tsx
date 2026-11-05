@@ -10,7 +10,7 @@ import { RoutingSuggestBanner } from './chat/RoutingSuggestBanner'
 import { AttachmentCard } from '@/components/AttachmentCard'
 import type { Attachment } from '@/components/UploadMenu'
 import type { ClassifiedIntent } from '@/lib/intentClassifier'
-import { ThinkingDots } from '@/components/ui/ThinkingDots'
+import { ThinkingStatus } from '@/components/console/ThinkingStatus'
 import { AgentAvatar } from '@/components/office/AgentAvatar'
 import { AgentActivity } from '@/components/console/AgentActivity'
 import type { ActivityStep } from '@/lib/agentActivity'
@@ -397,10 +397,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, s
                 />
               )}
               {isStreaming && !content && !hasAgenticPhases && startedAt === undefined && (
-                <div className="flex items-center gap-2.5">
-                  <ThinkingDots size={16} dotSize={2.5} />
-                  <span className="text-sm text-[#a1a1aa]">{statusText ?? `${agentName} is thinking...`}</span>
-                </div>
+                <ThinkingStatus label={statusText} />
               )}
 
               {/* Agentic workflow container */}
