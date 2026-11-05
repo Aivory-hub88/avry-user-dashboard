@@ -25,7 +25,7 @@ done
 [ "${DRY:-}" = "--dry-run" ] && { echo "dry run only"; exit 0; }
 
 # backup + apply
-bk=/home/ubuntu/website-src-backup-$ts; mkdir -p "$bk"
+bk=/home/ubuntu/website-src-backup-$ts; sudo mkdir -p "$bk"
 sudo cp -a src public next.config.js package.json package-lock.json Dockerfile tailwind.config.ts postcss.config.js tsconfig.json "$bk"/ 2>/dev/null || true
 echo "backup: $bk"
 img=$(sudo docker inspect -f '{{.Image}}' avry-website); repo=$(sudo docker inspect -f '{{.Config.Image}}' avry-website | cut -d: -f1)
