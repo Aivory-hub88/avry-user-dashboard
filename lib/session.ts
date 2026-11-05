@@ -99,3 +99,28 @@ export function clearSession(): void {
     console.warn('Failed to clear session from localStorage:', error);
   }
 }
+
+const ROOM_SESSION_KEY_BASE = 'console_room_session_id'
+
+/**
+ * The thread the Room lives in. Room is its own conversation (a group chat with the
+ * deployed agents), separate from the Direct thread — the pointer is namespaced per
+ * user like the Direct one. null until the Room has been opened once.
+ */
+export function getRoomSessionId(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return localStorage.getItem(claimLegacyKey(ROOM_SESSION_KEY_BASE))
+  } catch {
+    return null
+  }
+}
+
+export function saveRoomSessionId(sessionId: string): void {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(claimLegacyKey(ROOM_SESSION_KEY_BASE), sessionId)
+  } catch (error) {
+    console.warn('Failed to save room session to localStorage:', error)
+  }
+}
