@@ -29,10 +29,10 @@ export const USER_COOKIE = 'aivory_user'
 
 // Same attributes as the landing's setAuthCookies, so this overwrites that
 // cookie instead of adding a second one with a different scope.
-// One year: the session ends on explicit logout (or a server-rejected refresh
+// 33 days (sliding, matches the backend refresh window): the session ends on explicit logout (or a server-rejected refresh
 // token), not because a cookie timed out. The JWT inside is kept fresh by
 // keepSessionFresh().
-const COOKIE_ATTRS = 'path=/; max-age=31536000; SameSite=Lax'
+const COOKIE_ATTRS = 'path=/; max-age=2851200; SameSite=Lax'
 
 function hasCookie(cookieHeader: string, name: string): boolean {
   return cookieHeader
