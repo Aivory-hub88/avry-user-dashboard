@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { formatElapsed } from '@/lib/agentActivity'
 import { ThinkingOrbit } from './ThinkingOrbit'
 
@@ -17,16 +17,20 @@ const BASE = 'rgba(255,255,255,0.55)'
 const SHIMMER = '#ffffff'
 const SHIMMER_MS = 50
 
+const REDUCED_QUERY = '(prefers-reduced-motion: reduce)'
+
+function subscribeReduced(onChange: () => void): () => void {
+  const mq = window.matchMedia(REDUCED_QUERY)
+  mq.addEventListener('change', onChange)
+  return () => mq.removeEventListener('change', onChange)
+}
+
 function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false)
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    setReduced(mq.matches)
-    const on = () => setReduced(mq.matches)
-    mq.addEventListener('change', on)
-    return () => mq.removeEventListener('change', on)
-  }, [])
-  return reduced
+  return useSyncExternalStore(
+    subscribeReduced,
+    () => window.matchMedia(REDUCED_QUERY).matches,
+    () => false,
+  )
 }
 
 interface ThinkingStatusProps {
