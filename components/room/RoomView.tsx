@@ -540,7 +540,6 @@ export default function RoomView({
                   replyTo={replyTo ? { role: replyTo.isAgent ? "assistant" : "user", content: quoteText(replyTo.message.body), name: replyTo.name } : null}
                   onCancelReply={() => setReplyTo(null)}
                   onAttachClick={() => fileInputRef.current?.click()}
-                  showContextToolbar={false}
                 />
               ) : (
                 <div className="rounded-[20px] border border-line px-5 py-4 text-center text-[13px] text-white/40">You can read this room but not post in it.</div>
