@@ -710,27 +710,6 @@ export default function ConsolePage() {
                 </h1>
               </div>
 
-              <div className="mb-2 flex w-full flex-wrap justify-center gap-2 [animation:fadeUp_0.55s_0.07s_cubic-bezier(0.22,1,0.36,1)_both]">
-                <button className="console-pill inline-flex items-center gap-1.5">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
-                  </svg>
-                  {t('attachContext')}
-                </button>
-
-                <button
-                  className="console-pill inline-flex items-center gap-1.5"
-                  onClick={() => setUploadMenuOpen(o => !o)}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                    <polyline points="17 8 12 3 7 8"/>
-                    <line x1="12" y1="3" x2="12" y2="15"/>
-                  </svg>
-                  {t('uploadFile')}
-                </button>
-              </div>
-
               <div className="relative w-full [animation:fadeUp_0.55s_0.13s_cubic-bezier(0.22,1,0.36,1)_both]">
                 {inRoom && <RoomMembers candidates={mentionCandidates} />}
                 {inRoom && roomTeam && mentionCandidates.length > 1 && !isStreaming && (

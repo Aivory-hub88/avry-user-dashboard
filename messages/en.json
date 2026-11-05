@@ -171,8 +171,6 @@
     "welcomeAfternoon": "Good afternoon, what can i do for you?",
     "welcomeEvening": "Good evening, what can i do for you?",
     "welcomeNight": "Good night, what can i do for you?",
-    "attachContext": "Attach Context",
-    "uploadFile": "Upload File",
     "uploadFileTitle": "Upload file",
     "sendPlaceholder": "Send Message to Aivory...",
     "sendPlaceholderRoom": "Message the room — @ to mention an agent...",

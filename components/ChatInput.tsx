@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from "react"
 import UploadMenu, { Attachment } from "./UploadMenu"
-import ContextToolbar from "./input/ContextToolbar"
 import { AttachmentCard } from "./AttachmentCard"
 import AgentMentionMenu from "./console/AgentMentionMenu"
 import { useAgentMention } from "@/hooks/useAgentMention"
@@ -33,8 +32,6 @@ interface ChatInputProps {
   /** Replace the built-in upload menu (e.g. a shared room uploads to its
    *  own file store). When set, the + button calls this instead. */
   onAttachClick?: () => void
-  /** Console tool/mode strip above the composer; off in shared rooms. */
-  showContextToolbar?: boolean
   /** Monthly credit-usage ring in the footer under the composer. */
   showCreditRing?: boolean
 }
@@ -63,11 +60,9 @@ export default function ChatInput({ onSend, disabled = false, prefill, insertTex
   replyTo,
   onCancelReply,
   onAttachClick,
-  showContextToolbar = true,
   showCreditRing = true,
 }: ChatInputProps) {
   const [message, setMessage] = useState(prefill ?? "")
-  const [activeTool, setActiveTool] = useState<string | null>(null)
 
   useEffect(() => {
     if (prefill) {
@@ -210,20 +205,8 @@ export default function ChatInput({ onSend, disabled = false, prefill, insertTex
 
   const canSend = !disabled && !extracting && (!!message.trim() || !!attachment || pendingAttachments.length > 0 || hasPendingFiles)
 
-  const handleToolSelect = (tool: string) => {
-    setActiveTool(tool)
-    // For now, just log the selection - can be extended later
-    console.log(`Tool selected: ${tool}`)
-    if (tool === "upload-file") {
-      setUploadMenuOpen(o => !o)
-    }
-  }
-
   return (
     <div className="relative">
-      {/* Context Toolbar */}
-      {showContextToolbar && <ContextToolbar onToolSelect={handleToolSelect} />}
-
       {/* Pending attachments from drag & drop */}
       {pendingAttachments.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-3">
