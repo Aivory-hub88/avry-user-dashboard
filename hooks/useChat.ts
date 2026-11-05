@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { getSessionId, clearSession, generateSessionId, saveSession } from '@/lib/session'
+import { getSessionId, clearSession, generateSessionId, saveSession, getRoomSessionId, saveRoomSessionId } from '@/lib/session'
 import { streamConsoleResponse, typewriterStream } from '@/lib/streaming'
 import { saveSessionMessages, loadSessionMessages, listSessions, getSession, deleteSession, ChatStorageError } from '@/lib/chatPersistence'
 import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
@@ -109,6 +109,12 @@ export function useChat({
   const [messages, setMessages] = useState<Message[]>([])
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string>("")
+  // The Room's own thread (null until it has been opened once). The console is "in the
+  // Room" exactly when that thread is the open one, so a refresh, a sidebar click or New
+  // chat can never leave the mode and the thread out of step.
+  const [roomSessionId, setRoomSessionId] = useState<string | null>(null)
+  // Where Direct was when the Room was opened, so leaving the Room goes back there.
+  const directPointerRef = useRef<{ sid: string; agent: string | null } | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
   // Which agent a reply is actually coming from — captured at send time, so
   // it stays correct even if the user switches to a different agent while
@@ -173,6 +179,7 @@ export function useChat({
     // React Compiler style rule; see other documented instances of this.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentSessionId(sid)
+    setRoomSessionId(getRoomSessionId())
     const restored = loadSessionMessages(sid)
     if (restored.length > 0) setMessages(restored)
     // Restore which agent this thread belongs to — otherwise a refresh
@@ -655,6 +662,8 @@ export function useChat({
   // carrying pendingApproval on messages only so the rail notification feed
   // can hide approvals already visible in the open thread.
 
+  const inRoom = roomSessionId !== null && currentSessionId === roomSessionId
+
   const handleNewChat = useCallback(() => {
     if (messages.length > 0) {
       session.save(currentSessionId, messages, agentTarget)
@@ -662,12 +671,64 @@ export function useChat({
     clearSession()
     const sid = generateSessionId()
     saveSession(sid)
+    // New chat inside the Room starts a fresh Room thread, not a Direct one.
+    if (inRoom) {
+      saveRoomSessionId(sid)
+      setRoomSessionId(sid)
+    }
     setCurrentSessionId(sid)
     setMessages([])
     clearAttachments()
     resetAgentic()
     setSessions(listSessions())
-  }, [currentSessionId, messages, session, agentTarget, resetAgentic, clearAttachments])
+  }, [currentSessionId, messages, session, agentTarget, inRoom, resetAgentic, clearAttachments])
+
+  // Open the Room: its own thread, separate from Direct. Nothing is mentioned yet, so a
+  // plain message goes to Aivory and @Agent calls a teammate in.
+  const enterRoom = useCallback(() => {
+    if (inRoom) return
+    if (messages.length > 0) {
+      session.save(currentSessionId, messages, agentTarget)
+    }
+    directPointerRef.current = { sid: currentSessionId, agent: agentTarget }
+    const rsid = roomSessionId ?? generateSessionId()
+    if (rsid !== roomSessionId) {
+      saveRoomSessionId(rsid)
+      setRoomSessionId(rsid)
+    }
+    saveSession(rsid)
+    setMessages(session.load(rsid))
+    setCurrentSessionId(rsid)
+    setAgentTarget(null)
+    clearAttachments()
+    resetAgentic()
+    setSessions(listSessions())
+  }, [inRoom, messages, session, currentSessionId, agentTarget, roomSessionId, setAgentTarget, clearAttachments, resetAgentic])
+
+  // Back to Direct: the thread (and agent) that was open before the Room, or the most
+  // recent other thread, or a fresh one after a reload with nothing to go back to.
+  const leaveRoom = useCallback(() => {
+    if (!inRoom) return
+    if (messages.length > 0) {
+      session.save(currentSessionId, messages, null)
+    }
+    const all = listSessions()
+    const back = directPointerRef.current
+    const target =
+      back && back.sid !== roomSessionId
+        ? back
+        : all.find(s => s.id !== roomSessionId)
+          ? { sid: all.find(s => s.id !== roomSessionId)!.id, agent: all.find(s => s.id !== roomSessionId)!.agentType ?? null }
+          : null
+    const sid = target?.sid ?? generateSessionId()
+    saveSession(sid)
+    setMessages(target ? session.load(sid) : [])
+    setCurrentSessionId(sid)
+    setAgentTarget(target ? target.agent : null)
+    clearAttachments()
+    resetAgentic()
+    setSessions(listSessions())
+  }, [inRoom, messages, session, currentSessionId, roomSessionId, setAgentTarget, clearAttachments, resetAgentic])
 
   const switchSession = useCallback((targetSessionId: string) => {
     if (targetSessionId === currentSessionId) return
@@ -732,6 +793,9 @@ export function useChat({
     handleSendRoom,
     stopStreaming,
     handleNewChat,
+    inRoom,
+    enterRoom,
+    leaveRoom,
     switchSession,
     deleteThread,
     replyTo,

@@ -148,7 +148,6 @@ export default function ConsolePage() {
   // (Phase 1's exit gate) — Mission Control is one click away, not the
   // thing that overrides that guarantee.
   const [showMissionControl, setShowMissionControl] = useState(false)
-  const [chatMode, setChatMode] = useState<ConsoleChatMode>("direct")
   // Agent Team the Room is scoped to (ADR-020); none = all deployed agents.
   const {
     teams: agentTeams,
@@ -238,6 +237,9 @@ export default function ConsolePage() {
     handleSendRoom,
     stopStreaming,
     handleNewChat,
+    inRoom,
+    enterRoom,
+    leaveRoom,
     switchSession,
     deleteThread,
     replyTo,
@@ -275,13 +277,16 @@ export default function ConsolePage() {
 
   // Room mode (Mission Control chat room): only deployed agents are
   // mentionable — @ expands to this list, sends fan out in parallel.
-  const inRoom = chatMode === "room"
+  // The Room is its own thread (a group chat with the deployed agents), not a
+  // composer mode over the Direct thread — so the mode simply follows which thread is open.
+  const chatMode: ConsoleChatMode = inRoom ? "room" : "direct"
 
   const changeChatMode = useCallback((mode: ConsoleChatMode) => {
     // No toast here — entering Room is announced by the Room card in the
     // rail notification feed instead (a top toast overlapped the header).
-    setChatMode(mode)
-  }, [])
+    if (mode === "room") enterRoom()
+    else leaveRoom()
+  }, [enterRoom, leaveRoom])
 
   // @mention tracking for the empty-state composer (the threaded view uses
   // ChatInput's own built-in mention support).
@@ -303,6 +308,22 @@ export default function ConsolePage() {
     emptyMention.closeMenu()
     emptyMention.focusAndRestore(applied.caret)
   }, [emptyMention, inputValue])
+
+  // Room: clicking a member's avatar calls them into the message instead of switching
+  // thread. The empty-state composer is page-owned; the threaded ChatInput takes the
+  // token through `insertText` (nonce makes repeated clicks on one agent still fire).
+  const [mentionInsert, setMentionInsert] = useState<{ text: string; nonce: number } | null>(null)
+  const mentionAgent = useCallback((type: string) => {
+    const c = mentionCandidates.find((m) => m.type === type)
+    if (!c) return
+    const token = `@${c.name} `
+    if (messages.length === 0) {
+      setInputValue((v) => (v && !/\s$/.test(v) ? `${v} ` : v) + token)
+      requestAnimationFrame(() => textareaRef.current?.focus())
+    } else {
+      setMentionInsert({ text: token, nonce: Date.now() })
+    }
+  }, [mentionCandidates, messages.length])
 
   // Empty-state composer keys: mention menu first (↑/↓/Enter/Tab/Esc),
   // plain Enter sends (room-aware via handleSendWithWorkspace).
@@ -592,6 +613,8 @@ export default function ConsolePage() {
           streamingAgentType={streamingAgentType}
           activeRunsByAgentType={activeRunsByAgentType}
           setAgentTarget={setAgentTarget}
+          roomMode={inRoom}
+          onMentionAgent={mentionAgent}
           switchSession={switchSession}
           deleteThread={deleteThread}
           handleNewChat={handleNewChat}
@@ -987,6 +1010,7 @@ export default function ConsolePage() {
                   onRemoveAttachment={(i) => setAttachments(prev => prev.filter((_, idx) => idx !== i))}
                   enableMentions={inRoom}
                   mentionCandidates={mentionCandidates}
+                  insertText={mentionInsert}
                   placeholder={inRoom ? t('sendPlaceholderRoom') : undefined}
                   isStreaming={isStreaming}
                   onStop={stopStreaming}

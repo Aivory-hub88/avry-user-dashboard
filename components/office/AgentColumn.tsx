@@ -34,6 +34,10 @@ interface AgentColumnProps {
    *  an agent can be busy" gap MissionControl's isRunningElsewhere fixes. */
   activeRunsByAgentType: Record<string, ActiveAgentRun>
   setAgentTarget: (agent: string | null) => void
+  /** In the Room the column lists the room's members: a click calls that agent into the
+   *  message (onMentionAgent) instead of switching thread, and rows don't expand. */
+  roomMode?: boolean
+  onMentionAgent?: (type: string) => void
   switchSession: (sessionId: string) => void
   handleNewChat: () => void
   deleteThread: (sessionId: string) => void
@@ -71,6 +75,8 @@ export default function AgentColumn({
   streamingAgentType,
   activeRunsByAgentType,
   setAgentTarget,
+  roomMode = false,
+  onMentionAgent,
   switchSession,
   handleNewChat,
   deleteThread,
@@ -130,6 +136,10 @@ export default function AgentColumn({
     type ? [...new Set(deployments.filter((d) => d.agentType === type).map((d) => d.kind))] : []
 
   const openAgent = (row: Row) => {
+    if (roomMode) {
+      if (row.type) onMentionAgent?.(row.type)
+      return
+    }
     const threads = sessionsByAgent[row.key] ?? []
     if (row.type === agentTarget && !missionControlActive) {
       setExpanded((e) => (e === row.key ? "" : row.key))
@@ -187,7 +197,7 @@ export default function AgentColumn({
         </button>
         <div className="flex flex-1 flex-col items-center gap-[6px] overflow-y-auto pb-4">
           {ROWS.map((row) => {
-            const isActiveAgent = !missionControlActive && row.type === agentTarget
+            const isActiveAgent = !roomMode && !missionControlActive && row.type === agentTarget
             const pending = notificationsByAgent[row.key]?.length ?? 0
             const isConsole = row.type === null
             const isThinkingHere = row.type === streamingAgentType
@@ -197,7 +207,7 @@ export default function AgentColumn({
               <button
                 key={row.key}
                 onClick={() => openAgent(row)}
-                title={row.title === row.role ? row.title : `${row.title} — ${row.role}`}
+                title={roomMode && row.type ? `Mention ${row.title} in the room` : row.title === row.role ? row.title : `${row.title} — ${row.role}`}
                 style={isInteracting ? glowStyle(row.type) : undefined}
                 className={`relative grid h-9 w-9 shrink-0 place-items-center rounded-full transition-[background-color,box-shadow] ${
                   isInteracting ? "agent-glow-ring" : ""
@@ -283,8 +293,8 @@ export default function AgentColumn({
         {ROWS.map((row) => {
           const threads = sessionsByAgent[row.key] ?? []
           if (!matchesQuery(row, threads)) return null
-          const isOpen = expanded === row.key
-          const isActiveAgent = !missionControlActive && row.type === agentTarget
+          const isOpen = !roomMode && expanded === row.key
+          const isActiveAgent = !roomMode && !missionControlActive && row.type === agentTarget
           const channels = channelsFor(row.type)
           const pending = notificationsByAgent[row.key]?.length ?? 0
           const mostRecent = threads[0]

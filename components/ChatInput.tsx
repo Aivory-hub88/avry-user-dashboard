@@ -13,6 +13,9 @@ interface ChatInputProps {
   onSend: (message: string, attachments: Attachment[]) => void
   disabled?: boolean
   prefill?: string
+  /** Append this text at the end of the draft each time `nonce` changes (e.g. an @mention
+   *  from clicking a room member). */
+  insertText?: { text: string; nonce: number } | null
   hasPendingFiles?: boolean
   pendingAttachments?: Attachment[]
   onClearPendingAttachments?: () => void
@@ -48,7 +51,7 @@ export function SendArrowIcon({ size = 16 }: { size?: number }) {
   )
 }
 
-export default function ChatInput({ onSend, disabled = false, prefill, hasPendingFiles = false,
+export default function ChatInput({ onSend, disabled = false, prefill, insertText, hasPendingFiles = false,
   pendingAttachments = [],
   onClearPendingAttachments,
   onRemoveAttachment,
@@ -83,6 +86,16 @@ export default function ChatInput({ onSend, disabled = false, prefill, hasPendin
       }, 50)
     }
   }, [prefill])
+  const insertNonce = insertText?.nonce
+  useEffect(() => {
+    if (!insertText) return
+    // Same sync-from-prop pattern as the prefill effect above.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMessage((m) => (m && !/\s$/.test(m) ? `${m} ` : m) + insertText.text)
+    setTimeout(() => textareaRef.current?.focus(), 0)
+    // Keyed on the nonce only — a re-render with the same click must not insert twice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [insertNonce])
   const [uploadMenuOpen, setUploadMenuOpen] = useState(false)
   const [attachment, setAttachment] = useState<Attachment | null>(null)
   const [toast, setToast] = useState("")
