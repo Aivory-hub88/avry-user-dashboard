@@ -84,8 +84,10 @@ describe('the plan card never shows value as a negative number', () => {
     const c = (upgradeDiagnosticContext(legacyReport().legacy) as any).calculations
     const card = buildPlanComparison(c, fmt, 'en')!
     expect(card.valueLine).toMatch(/^Value this scope creates: Rp [\d,]+ per year/)
-    const pct = card.rows.map((r) => r.share)
-    expect(pct.every((s) => typeof s === 'string' && /% of the yearly value$/.test(s as string))).toBe(true)
+    // Business (cost per year known) is compared with the value; Enterprise is sales-priced, so it has no share
+    const biz = card.rows.find((r) => r.plan === 'business')!
+    expect(biz.share).toMatch(/% of the yearly value$/)
+    expect(card.rows.find((r) => r.plan === 'enterprise')!.share).toBeNull()
     expect(JSON.stringify(card)).not.toMatch(/value left|-Rp/i)
     const id = buildPlanComparison(c, fmt, 'id')!
     expect(id.labels.share).toBe('Biaya plan dibanding nilai itu')

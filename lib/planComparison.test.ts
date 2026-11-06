@@ -4,12 +4,13 @@ import { buildPlanComparison } from './planComparison'
 import { buildRequiredInvestmentView } from './requiredInvestmentView'
 import { hasRunningCost } from './runningCost'
 import { buildFinancialTermsNote } from './readinessNarrative'
+import { planForTeam, SOLO_COMPANY_SIZE } from './planForTeam'
 
 beforeEach(() => {
   ;(globalThis as any).localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} }
 })
 
-// Same shape as the reported case: IDR, tech, 6-15 FTEs, small manual workload.
+// The reported case: IDR, tech, 6-15 FTEs, small manual workload (a team, so Business).
 const ANSWERS = {
   currency: 'IDR — Indonesian Rupiah (Rp)', industry: 'Technology / Software',
   manual_hours_weekly: 'Under 10 hours/week', fte_count: '6-15 FTEs',
@@ -17,9 +18,8 @@ const ANSWERS = {
   priority_areas: ['Operations and logistics', 'Customer service/support'],
 }
 const calcOf = (extra: Record<string, unknown> = {}) => buildDiagnosticContext({ ...ANSWERS, ...extra } as any).calculations as any
-// A scope big enough that the Business plan (Rp ~18.5M/yr at test FX) is a small share of the value created.
-const BIG = { manual_hours_weekly: '50-100 hours/week', industry: 'Logistics / Supply Chain' }
 const fmt = (v: number) => `${v < 0 ? '-' : ''}Rp ${Math.abs(Math.round(v)).toLocaleString('en-US')}`
+const MICRO = 'Micro (2–10 employees)'
 
 describe('the Aivory plan is a recommendation, not part of the Financial Case', () => {
   it('investment is package + setup only, with no running cost', () => {
@@ -39,11 +39,10 @@ describe('the Aivory plan is a recommendation, not part of the Financial Case', 
     expect(c.netPaybackMonths).toBeCloseTo(c.paybackMonths, 0)
   })
 
-  it('the case no longer flips negative because of the plan: the reported 6-15 FTE case has positive net savings', () => {
+  it('the reported 6-15 FTE case has positive net savings and the plan is still Business', () => {
     const c = calcOf()
     expect(c.requiredInvestment.plan).toBe('business')
     expect(c.netAnnualSavingsLocal).toBeGreaterThan(0)
-    expect(c.npvHorizonLocal).toBeDefined()
   })
 
   it('stored older reports (plan inside the figures) are still recognised as having a running cost', () => {
@@ -54,70 +53,106 @@ describe('the Aivory plan is a recommendation, not part of the Financial Case', 
   })
 })
 
+describe('planForTeam: solo gets Operational; a team gets Business or Enterprise', () => {
+  it('solo (company size) -> Operational, whatever the employee count says', () => {
+    expect(planForTeam(null, SOLO_COMPANY_SIZE)).toEqual({ plan: 'operational', assumed: false })
+    expect(planForTeam(3, SOLO_COMPANY_SIZE)).toEqual({ plan: 'operational', assumed: false })
+  })
+  it('anyone else is a team: Business, or Enterprise above 200 employees in scope; never Operational', () => {
+    expect(planForTeam(null, MICRO)).toEqual({ plan: 'business', assumed: false })
+    expect(planForTeam(3, MICRO)).toEqual({ plan: 'business', assumed: false })
+    expect(planForTeam(33, 'Small (11–50 employees)')).toEqual({ plan: 'business', assumed: false })
+    expect(planForTeam(300, 'Large (251–1,000 employees)')).toEqual({ plan: 'enterprise', assumed: false })
+  })
+  it('older reports without company size fall back to the employee count; nothing known -> assumed entry plan', () => {
+    expect(planForTeam(1, null)).toEqual({ plan: 'operational', assumed: false })
+    expect(planForTeam(3, null)).toEqual({ plan: 'business', assumed: false })
+    expect(planForTeam(null, null)).toEqual({ plan: 'operational', assumed: true })
+  })
+})
+
 describe('buildPlanComparison (the recommendation card)', () => {
-  it('recommends the plan, states who each is for, and marks the recommended one', () => {
-    const v = buildPlanComparison(calcOf(BIG), fmt, 'en')!
+  it('for a team shows Business and Enterprise (no Operational), recommends Business, and states who each is for', () => {
+    const v = buildPlanComparison(calcOf(), fmt, 'en', { companySize: MICRO, fte: 10 })!
     expect(v.heading).toBe('Recommended Aivory plan')
-    expect(v.recommendation).toBe('We recommend the Business plan: it fits 6–200 employees in scope.')
-    expect(v.rows.map((r) => r.plan)).toEqual(['operational', 'business'])
-    expect(v.rows.find((r) => r.plan === 'business')!.recommended).toBe(true)
-    expect(v.rows[0].who).toBe('1 person (1 seat)')
-    expect(v.rows[1].who).toBe('A team of up to 5 people (5 seats)')
-    expect(v.rows[1].includes).toBe('6,500 Intelligence Credits per month')
-    expect(v.rows[1].price).toMatch(/\/month \(US\$99\)$/)
+    expect(v.rows.map((r) => r.plan)).toEqual(['business', 'enterprise'])
+    expect(v.rows[0].recommended).toBe(true)
+    expect(v.rows[1].recommended).toBe(false)
+    expect(v.recommendation).toBe('We recommend the Business plan: your team is more than one person, and it covers up to 5 seats. If more than 5 people will use Aivory, the option is Enterprise (15+ seats, by contract).')
+    expect(v.rows[0].who).toBe('A team of up to 5 people (5 seats)')
+    expect(v.rows[0].includes).toBe('6,500 Intelligence Credits per month')
+    expect(v.rows[0].price).toMatch(/\/month \(US\$99\)$/)
+    expect(v.rows[1].who).toBe('15+ people, by contract')
+    expect(v.rows[1].price).toMatch(/^Priced by sales \(floor /)
   })
 
-  it('shows what the plan costs per year and what is left of the yearly value, per plan', () => {
-    const c = calcOf(BIG)
-    const v = buildPlanComparison(c, fmt, 'en')!
+  it('shows the Business cost per year and its share of the value; Enterprise is sales-priced, so it has no share', () => {
+    const c = calcOf()
+    const v = buildPlanComparison(c, fmt, 'en', { companySize: MICRO, fte: 10 })!
     const fx = c.fxRateUsed
-    const op = v.rows.find((r) => r.plan === 'operational')!
     const biz = v.rows.find((r) => r.plan === 'business')!
-    expect(op.yearly).toBe(`${fmt(20 * 12 * fx)}/year`)
+    const ent = v.rows.find((r) => r.plan === 'enterprise')!
     expect(biz.yearly).toBe(`${fmt(99 * 12 * fx)}/year`)
-    // value stays a positive number and the plan is the cost compared against it
-    expect(op.share).toBe(`${Math.round((20 * 12 * fx / c.totalAnnualSavingsLocal) * 100)}% of the yearly value`)
     expect(biz.share).toBe(`${Math.round((99 * 12 * fx / c.totalAnnualSavingsLocal) * 100)}% of the yearly value`)
+    expect(ent.yearly).toBe('Priced by sales')
+    expect(ent.share).toBeNull()
     expect(v.valueLine).toBe(`Value this scope creates: ${fmt(c.totalAnnualSavingsLocal)} per year (from the Financial Case).`)
     expect(JSON.stringify(v)).not.toMatch(/value left/i)
-    // the dependence is visible: the cheaper plan leaves more of the value
-    expect(op.shareTone).toBe('good')
   })
 
-  it('steps down to Operational when the team-size match would cost more per year than the scope creates (the reported case)', () => {
-    const c = calcOf() // 6-15 FTEs, small workload: value ~Rp 9M/yr vs Business ~Rp 18.5M/yr at test FX
-    expect(c.requiredInvestment.plan).toBe('business')
-    const v = buildPlanComparison(c, fmt, 'en')!
-    expect(v.rows.find((r) => r.plan === 'operational')!.recommended).toBe(true)
-    expect(v.rows.find((r) => r.plan === 'business')!.recommended).toBe(false)
-    expect(v.recommendation).toMatch(/^We recommend the Operational plan: the Business plan \(the match for your team size\) would cost .* a year, more than the .* a year this scope creates\. Move up to Business when more people need access or usage grows\.$/)
-    const id = buildPlanComparison(c, fmt, 'id')!
-    expect(id.recommendation).toMatch(/^Kami merekomendasikan plan Operational: plan Business/)
-    // and it never recommends a plan that is a net loss when a cheaper one is not
-    expect(v.rows.find((r) => r.recommended)!.shareTone).toBe('good')
+  it('does NOT step a team down to Operational because the plan costs more than the value; it stays honest instead', () => {
+    // small workload: Business costs more per year than the scope creates; teams stay on Business/Enterprise
+    const v = buildPlanComparison(calcOf(), fmt, 'en', { companySize: MICRO, fte: 10 })!
+    const biz = v.rows.find((r) => r.plan === 'business')!
+    expect(v.rows.some((r) => r.plan === 'operational')).toBe(false)
+    expect(biz.recommended).toBe(true)
+    expect(biz.shareTone).toBe('bad') // more than 100% of the value: shown red, not hidden
+    expect(parseInt(biz.share as string, 10)).toBeGreaterThan(100)
   })
 
-  it('says plainly that the plan is not in the figures, and explains the sizing rule', () => {
-    const v = buildPlanComparison(calcOf(), fmt, 'en')!
+  it('solo: Operational recommended, with Business as the step up', () => {
+    const v = buildPlanComparison(calcOf(), fmt, 'en', { companySize: SOLO_COMPANY_SIZE, fte: null })!
+    expect(v.rows.map((r) => r.plan)).toEqual(['operational', 'business'])
+    expect(v.rows[0].recommended).toBe(true)
+    expect(v.recommendation).toBe('We recommend the Operational plan: you work on your own, and it is built for one person (1 seat).')
+    expect(v.rows[0].who).toBe('1 person (1 seat)')
+    expect(v.rows[0].share).toMatch(/% of the yearly value$/)
+  })
+
+  it('over 200 employees in scope: Enterprise recommended, Business shown as the starting point', () => {
+    const v = buildPlanComparison(calcOf(), fmt, 'en', { companySize: 'Large (251–1,000 employees)', fte: 300 })!
+    expect(v.rows.map((r) => r.plan)).toEqual(['business', 'enterprise'])
+    expect(v.rows.find((r) => r.recommended)!.plan).toBe('enterprise')
+    expect(v.recommendation).toMatch(/^We recommend the Enterprise plan: more than 200 employees are in scope/)
+  })
+
+  it('nothing known about the team: assumed Operational, and it says so', () => {
+    const v = buildPlanComparison(calcOf({ fte_count: 'Not sure' }), fmt, 'en', { companySize: null, fte: null })!
+    expect(v.recommendation).toBe('We recommend the Operational plan: your team size is not known, so the entry plan is assumed. If more than one person will use Aivory, choose Business or Enterprise.')
+  })
+
+  it("older reports are judged by today's rule from the team passed in (a 1-5 FTE report is now Business)", () => {
+    const stored = calcOf({ fte_count: '1-5 FTEs' })
+    const v = buildPlanComparison(stored, fmt, 'en', { companySize: null, fte: 3 })!
+    expect(v.rows.find((r) => r.recommended)!.plan).toBe('business')
+    // without a team argument it falls back to the plan stored on the report
+    expect(buildPlanComparison(stored, fmt, 'en')!.rows.find((r) => r.recommended)!.plan).toBe(stored.requiredInvestment.plan)
+  })
+
+  it('says plainly that the plan is not in the figures, and explains the rule', () => {
+    const v = buildPlanComparison(calcOf(), fmt, 'en', { companySize: MICRO, fte: 10 })!
     expect(v.caveat).toMatch(/not part of the Financial Case figures/)
     expect(v.caveat).toMatch(/one-time package and your team's setup time/)
-    expect(v.caveat).toMatch(/1–5 Operational, 6–200 Business, over 200 Enterprise/)
+    expect(v.caveat).toMatch(/working alone Operational \(1 seat\); more than one person Business or Enterprise/)
     expect(v.caveat).toMatch(/how many people use Aivory/)
   })
 
-  it('says the plan is assumed when team size is unknown', () => {
-    const v = buildPlanComparison(calcOf({ fte_count: 'Not sure' }), fmt, 'en')!
-    expect(v.recommendation).toBe('We recommend the Operational plan: your team size was not given, so the entry plan is assumed.')
-  })
-
-  it('adds Enterprise only when it is the recommendation, and is localized', () => {
-    const big = buildPlanComparison(calcOf({ fte_count: 'Over 200 FTEs' }), fmt, 'en')!
-    expect(big.rows.map((r) => r.plan)).toEqual(['operational', 'business', 'enterprise'])
-    expect(big.rows[2].price).toMatch(/Priced by sales/)
-    const id = buildPlanComparison(calcOf(BIG), fmt, 'id')!
+  it('is localized', () => {
+    const id = buildPlanComparison(calcOf(), fmt, 'id', { companySize: MICRO, fte: 10 })!
     expect(id.heading).toBe('Rekomendasi plan Aivory')
-    expect(id.recommendation).toBe('Kami merekomendasikan plan Business: sesuai untuk 6–200 karyawan dalam cakupan.')
-    expect(id.rows[1].who).toBe('Tim hingga 5 orang (5 kursi)')
+    expect(id.recommendation).toMatch(/^Kami merekomendasikan plan Business: tim Anda lebih dari satu orang, dan plan ini mencakup hingga 5 kursi\./)
+    expect(id.rows[0].who).toBe('Tim hingga 5 orang (5 kursi)')
+    expect(id.rows[1].yearly).toBe('Dihargai tim sales')
     expect(id.labels.recommended).toBe('Direkomendasikan')
   })
 
@@ -141,7 +176,7 @@ describe('the investment section no longer lists the plan as a cost', () => {
     expect(labels).toContain('Investment required — year 1')
     expect(v.explanation).toMatch(/the one-time package plus your team's setup time/)
     expect(v.footnote).toMatch(/plan subscription is not part of these figures/)
-    expect(v.planNote).toMatch(/We recommend the Operational plan/) // small reported case: stepped down
+    expect(v.planNote).toMatch(/We recommend the Business plan/)
   })
 
   it('keeps the plan rows for an older stored report whose figures include it', () => {

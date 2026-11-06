@@ -14,6 +14,7 @@
  */
 import type { RequiredInvestment } from '@/types/diagnostic'
 import { TIER_MONTHLY_PRICE_USD, TIER_SEAT_LIMIT, TIER_CREDIT_ALLOWANCE } from '@/lib/tiers'
+import { planForTeam } from '@/lib/planForTeam'
 
 type Locale = 'en' | 'id'
 type PlanId = RequiredInvestment['plan']
@@ -58,6 +59,8 @@ export function buildPlanComparison(
   calc: Calc | null | undefined,
   fmt: (v: number) => string,
   locale: Locale = 'en',
+  /** The team as stored on the report; when given the plan follows the current rule even for older reports. */
+  team?: { companySize?: string | null; fte?: number | null },
 ): PlanCardView | null {
   if (!calc || calc.investmentBasis !== 'required' || !calc.requiredInvestment) return null
   const r = calc.requiredInvestment
@@ -67,19 +70,17 @@ export function buildPlanComparison(
   const planInFigures = r.annualRecurringUSD > 0 // legacy stored report
   const nf = (n: number) => n.toLocaleString(id ? 'id-ID' : 'en-US')
 
-  // The team-size rule can match a plan that costs more per year than the whole scope creates.
-  // Recommending a plan that wipes out the value would repeat the contradiction this card exists
-  // to remove, so step down to Operational in that case (and say when to move up).
   const yearlyOf = (plan: PlanId) =>
     (plan === 'enterprise' ? TIER_MONTHLY_PRICE_USD.business : TIER_MONTHLY_PRICE_USD[plan]) * 12 * fx
-  const steppedDown =
-    r.plan === 'business' && value !== null && yearlyOf('business') > value && yearlyOf('operational') <= value
-  const recPlan: PlanId = steppedDown ? 'operational' : r.plan
+  const team_ = team ? planForTeam(team.fte ?? null, team.companySize ?? null) : { plan: r.plan as PlanId, assumed: r.planAssumed === true }
+  const recPlan: PlanId = team_.plan
+  const assumed = team_.assumed
 
   const rowFor = (plan: PlanId): PlanCardRow => {
     const monthlyUSD = plan === 'enterprise' ? TIER_MONTHLY_PRICE_USD.business : TIER_MONTHLY_PRICE_USD[plan]
     const yearlyLocal = monthlyUSD * 12 * fx
-    const sharePct = value !== null && value > 0 ? Math.round((yearlyLocal / value) * 100) : null
+    const salesPriced = plan === 'enterprise'
+    const sharePct = !salesPriced && value !== null && value > 0 ? Math.round((yearlyLocal / value) * 100) : null
     const seats = TIER_SEAT_LIMIT[plan]
     const credits = TIER_CREDIT_ALLOWANCE[plan]
     const who =
@@ -98,30 +99,32 @@ export function buildPlanComparison(
         : `${fmt(monthlyUSD * fx)}${id ? '/bulan' : '/month'} (US$${monthlyUSD})`
     return {
       plan, name: NAME[plan], who, includes, price,
-      yearly: `${fmt(yearlyLocal)}${id ? '/tahun' : '/year'}`,
+      yearly: salesPriced
+        ? (id ? 'Dihargai tim sales' : 'Priced by sales')
+        : `${fmt(yearlyLocal)}${id ? '/tahun' : '/year'}`,
       share: sharePct === null ? null : (id ? `${sharePct}% dari nilai per tahun` : `${sharePct}% of the yearly value`),
       shareTone: sharePct === null ? null : sharePct > 100 ? 'bad' : 'good',
       recommended: plan === recPlan,
     }
   }
 
-  // Enterprise is sales-priced, so it is only shown when it is the plan recommended.
-  const plans: PlanId[] = r.plan === 'enterprise' ? ['operational', 'business', 'enterprise'] : ['operational', 'business']
+  // Solo: Operational (and Business as the step up). A team: Business and Enterprise.
+  const plans: PlanId[] = recPlan === 'operational' ? ['operational', 'business'] : ['business', 'enterprise']
 
-  const reason = steppedDown ? '' : r.planAssumed
-    ? (id ? 'ukuran tim tidak diisi, jadi plan awal yang diasumsikan' : 'your team size was not given, so the entry plan is assumed')
-    : r.plan === 'operational'
-      ? (id ? 'sesuai untuk 1–5 karyawan dalam cakupan' : 'it fits 1–5 employees in scope')
-      : r.plan === 'business'
-        ? (id ? 'sesuai untuk 6–200 karyawan dalam cakupan' : 'it fits 6–200 employees in scope')
-        : (id ? 'lebih dari 200 karyawan dalam cakupan; Enterprise dihargai lewat tim sales' : 'more than 200 employees are in scope; Enterprise is priced by sales')
-  const recommendation = steppedDown
-    ? (id
-        ? `Kami merekomendasikan plan Operational: plan Business (yang sesuai dengan ukuran tim Anda) akan memakan ${fmt(yearlyOf('business'))} per tahun, lebih besar dari nilai ${fmt(value as number)} per tahun yang dihasilkan cakupan ini. Naik ke Business saat lebih banyak orang butuh akses atau pemakaian bertambah.`
-        : `We recommend the Operational plan: the Business plan (the match for your team size) would cost ${fmt(yearlyOf('business'))} a year, more than the ${fmt(value as number)} a year this scope creates. Move up to Business when more people need access or usage grows.`)
-    : (id
-        ? `Kami merekomendasikan plan ${NAME[recPlan]}: ${reason}.`
-        : `We recommend the ${NAME[recPlan]} plan: ${reason}.`)
+  const seatsBusiness = TIER_SEAT_LIMIT.business
+  const seatsEnterprise = TIER_SEAT_LIMIT.enterprise
+  const recommendation =
+    recPlan === 'operational'
+      ? (assumed
+          ? (id ? 'Kami merekomendasikan plan Operational: ukuran tim tidak diketahui, jadi plan awal yang diasumsikan. Jika lebih dari satu orang yang memakai Aivory, pilih Business atau Enterprise.'
+                : 'We recommend the Operational plan: your team size is not known, so the entry plan is assumed. If more than one person will use Aivory, choose Business or Enterprise.')
+          : (id ? 'Kami merekomendasikan plan Operational: Anda bekerja sendiri, dan plan ini untuk satu orang (1 kursi).'
+                : 'We recommend the Operational plan: you work on your own, and it is built for one person (1 seat).'))
+      : recPlan === 'business'
+        ? (id ? `Kami merekomendasikan plan Business: tim Anda lebih dari satu orang, dan plan ini mencakup hingga ${seatsBusiness} kursi. Jika lebih dari ${seatsBusiness} orang akan memakai Aivory, pilihannya Enterprise (${seatsEnterprise}+ kursi, lewat kontrak).`
+              : `We recommend the Business plan: your team is more than one person, and it covers up to ${seatsBusiness} seats. If more than ${seatsBusiness} people will use Aivory, the option is Enterprise (${seatsEnterprise}+ seats, by contract).`)
+        : (id ? 'Kami merekomendasikan plan Enterprise: lebih dari 200 karyawan dalam cakupan, jadi kursi dan kuota disepakati lewat kontrak. Harga ditentukan tim sales; harga Business ditampilkan sebagai batas bawah. Business adalah titik awal bila kebutuhannya lebih kecil.'
+              : 'We recommend the Enterprise plan: more than 200 employees are in scope, so seats and allowance are agreed by contract. Enterprise is priced by sales; the Business price is shown as a floor. Business is the starting point if the need is smaller.')
 
   const whatItIs = id
     ? 'Plan Aivory adalah langganan bulanan yang menjalankan otomasi Anda setelah paket sekali bayar. Paket sudah mencakup bulan pertama.'
@@ -132,8 +135,8 @@ export function buildPlanComparison(
     : (id ? 'Biaya plan tidak termasuk dalam angka Financial Case (yang hanya mencakup paket sekali bayar dan waktu setup tim). Plan ditampilkan sebagai rekomendasi supaya Anda bisa menilai kecocokannya: bandingkan biaya per tahun dengan nilai yang dihasilkan.'
         : 'The plan cost is not part of the Financial Case figures (those cover the one-time package and your team\'s setup time). It is shown as a recommendation so you can judge the fit: compare the yearly cost with the value created.')
   const how = id
-    ? 'Plan dipilih dari jumlah karyawan yang pekerjaannya diotomasi (1–5 Operational, 6–200 Business, di atas 200 Enterprise). Itu perkiraan: yang sebenarnya menentukan plan adalah berapa orang yang memakai Aivory dan seberapa banyak ia berjalan. Jika satu orang yang mengoperasikan agen, Operational bisa cukup.'
-    : 'The plan is picked from how many employees\' work is automated (1–5 Operational, 6–200 Business, over 200 Enterprise). That is an estimate: what really decides the plan is how many people use Aivory and how much it runs. If one person will operate the agents, Operational may be enough.'
+    ? 'Plan dipilih dari ukuran perusahaan Anda: bekerja sendiri Operational (1 kursi); lebih dari satu orang Business atau Enterprise, dan Enterprise untuk lebih dari 200 karyawan dalam cakupan. Itu perkiraan: yang sebenarnya menentukan plan adalah berapa orang yang memakai Aivory dan seberapa banyak ia berjalan.'
+    : 'The plan is picked from your company size: working alone Operational (1 seat); more than one person Business or Enterprise, with Enterprise above 200 employees in scope. That is an estimate: what really decides the plan is how many people use Aivory and how much it runs.'
 
   return {
     heading: id ? 'Rekomendasi plan Aivory' : 'Recommended Aivory plan',

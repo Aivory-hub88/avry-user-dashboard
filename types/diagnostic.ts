@@ -615,6 +615,8 @@ export interface DiagnosticContext {
      *  confidence damper when upgrading stored results. Absent on pre-D2
      *  contexts → treated as neutral (no confidence change). Never scored. */
     estimateBasis?: string
+    /** The company-size answer (e.g. "Solo / Freelancer (1 person)"); decides the recommended Aivory plan. */
+    companySize?: string
     /** Raw answers quoted by the Room-for-Improvement copy, persisted so
      *  upgradeDiagnosticContext can regenerate it (EN + ID) without falling
      *  back to generic text. Absent on contexts stored before 2026-10-10. */

@@ -25,10 +25,10 @@ const LOGISTICS = {
 }
 
 describe('aivoryPlanForTeam', () => {
-  it('picks the plan by team size; enterprise uses Business as a floor', () => {
-    expect(aivoryPlanForTeam(3)).toMatchObject({ plan: 'operational', planMonthlyUSD: 20, planPriceIsFloor: false })
+  it('solo -> Operational; a team -> Business (Enterprise above 200, Business price as a floor); never Operational for a team', () => {
+    expect(aivoryPlanForTeam(null, 'Solo / Freelancer (1 person)')).toMatchObject({ plan: 'operational', planMonthlyUSD: 20, planPriceIsFloor: false, planAssumed: false })
+    expect(aivoryPlanForTeam(3, 'Micro (2–10 employees)')).toMatchObject({ plan: 'business', planMonthlyUSD: 99, planAssumed: false })
     expect(aivoryPlanForTeam(33)).toMatchObject({ plan: 'business', planMonthlyUSD: 99 })
-    expect(aivoryPlanForTeam(3)).toMatchObject({ planAssumed: false })
     expect(aivoryPlanForTeam(300)).toMatchObject({ plan: 'enterprise', planMonthlyUSD: 99, planPriceIsFloor: true })
   })
 })
@@ -36,6 +36,8 @@ describe('aivoryPlanForTeam', () => {
 describe('unknown team size (FTE question skipped or "Not sure")', () => {
   it('assumes the entry plan instead of the dearest one, and flags it', () => {
     expect(aivoryPlanForTeam(null)).toMatchObject({ plan: 'operational', planMonthlyUSD: 20, planAssumed: true })
+    // but a known team is never an assumption, even when the employee count is unknown
+    expect(aivoryPlanForTeam(null, 'Small (11–50 employees)')).toMatchObject({ plan: 'business', planAssumed: false })
   })
 
   it('does not turn a small scope into a net loss just because team size is unknown', () => {
@@ -59,9 +61,9 @@ describe('unknown team size (FTE question skipped or "Not sure")', () => {
     const calc: any = buildDiagnosticContext(SMALL as any).calculations
     const en = buildRequiredInvestmentView(calc, (v) => String(Math.round(v)), 'en')!
     expect(en.rows.some((r) => /plan/i.test(r.label))).toBe(false)
-    expect(en.planNote).toMatch(/We recommend the Operational plan: your team size was not given, so the entry plan is assumed/)
+    expect(en.planNote).toMatch(/We recommend the Operational plan: your team size is not known, so the entry plan is assumed/)
     const id = buildRequiredInvestmentView(calc, (v) => String(Math.round(v)), 'id')!
-    expect(id.planNote).toMatch(/Kami merekomendasikan plan Operational: ukuran tim tidak diisi/)
+    expect(id.planNote).toMatch(/Kami merekomendasikan plan Operational: ukuran tim tidak diketahui/)
   })
 })
 
@@ -142,7 +144,7 @@ describe('buildRequiredInvestmentView', () => {
   it('hands the PDF a one-paragraph plan recommendation (the full card is covered in planComparison.test.ts)', () => {
     const k: any = buildDiagnosticContext(LOGISTICS as any).calculations // 16-50 FTE -> Business
     const en = buildRequiredInvestmentView(k, fmt, 'en')!.planNote!
-    expect(en).toMatch(/We recommend the Business plan: it fits 6–200 employees in scope\./)
+    expect(en).toMatch(/We recommend the Business plan: your team is more than one person/)
     expect(en).toMatch(/monthly subscription that runs your automations after the one-time package/)
     const id = buildRequiredInvestmentView(k, fmt, 'id')!.planNote!
     expect(id).toMatch(/Kami merekomendasikan plan Business/)
