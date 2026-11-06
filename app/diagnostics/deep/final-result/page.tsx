@@ -425,6 +425,14 @@ export default function FinalResultPage() {
   // budget-vs-ceiling table and the threshold table only apply to the older
   // whole-budget basis.
   const requiredBasis = isRequiredBasis(calculations as never)
+  const rateSourceNote = (() => {
+    const c = calculations as any
+    if (c.hourlyRateSource !== 'benchmark' || c.assumedHourlyRateLocal == null) return null
+    const rejected = c.hourlyCostRejected === true
+    return locale === 'id'
+      ? `Nilai tenaga kerja dihitung dengan ${fmtLocal(c.assumedHourlyRateLocal)} per jam, perkiraan dari benchmark pasar (${c.rateBenchmarkLabelId ?? 'industri'}), ${rejected ? 'karena biaya per jam yang Anda isi tampak di luar kewajaran (mis. gaji bulanan, bukan per jam)' : 'karena biaya per jam tidak diisi'}. Jalankan ulang diagnostic dengan biaya per jam Anda sendiri untuk kasus yang lebih akurat.`
+      : `Labor is valued at ${fmtLocal(c.assumedHourlyRateLocal)} per hour, an estimate from a market benchmark (${c.rateBenchmarkLabel ?? 'industry'}), ${rejected ? 'because the hourly cost you entered looked out of range (e.g. a monthly salary rather than an hourly figure)' : 'because no hourly cost was entered'}. Re-run the diagnostic with your own hourly cost for a more accurate case.`
+  })()
   const planDisplayName = (() => { const p = (calculations as any).requiredInvestment?.plan; return p ? p.charAt(0).toUpperCase() + p.slice(1) : '' })()
   const netVerdict = requiredBasis ? buildNetVerdict({ ...(calculations as any), planName: planDisplayName }, locale, fmtLocal) : null
   const requiredView = buildRequiredInvestmentView(calculations as never, (v) => fmtLocal(v), locale)
@@ -1049,6 +1057,7 @@ export default function FinalResultPage() {
             )
           })()}
 
+          {rateSourceNote && <p className={styles.financialTermsNote}>{rateSourceNote}</p>}
           {netVerdict && <p className={styles.netVerdict}>{netVerdict}</p>}
 
           <div className={styles.roiGrid}>
@@ -1285,7 +1294,9 @@ export default function FinalResultPage() {
                             </span>
                           )
                         })()}
-                        {calculations.smallTeamRateApplied
+                        {(calculations as any).hourlyRateSource === 'user'
+                          ? ' (biaya per jam yang Anda isi)'
+                          : calculations.smallTeamRateApplied
                           ? ` (tarif biaya peluang untuk tim 1–5 FTE — 50% dari benchmark ${calculations.rateBenchmarkLabelId ?? 'industri'})`
                           : ` (benchmark ${calculations.rateBenchmarkLabelId ?? 'industri'})`}
                       </>
@@ -1301,7 +1312,9 @@ export default function FinalResultPage() {
                             </span>
                           )
                         })()}
-                        {calculations.smallTeamRateApplied
+                        {(calculations as any).hourlyRateSource === 'user'
+                          ? ' (your stated hourly cost)'
+                          : calculations.smallTeamRateApplied
                           ? ` (opportunity-cost rate for teams of 1–5 FTEs — 50% of ${calculations.rateBenchmarkLabel ?? 'industry'} benchmark)`
                           : ` (${calculations.rateBenchmarkLabel ?? 'industry'} benchmark)`}
                       </>

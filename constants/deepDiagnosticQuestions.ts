@@ -330,6 +330,19 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
         required: false
       },
       {
+        // Optional. When given, labour savings are valued at this figure instead of a
+        // market benchmark (which can be far off for a given company). The unit is the
+        // currency picked in the first phase. Guarded in calculateROI against a monthly
+        // salary typed into an hourly field.
+        id: 'hourly_cost',
+        question: 'What does one hour of work by the people doing this manual work cost your business?',
+        type: 'number',
+        placeholder: 'e.g. 50000',
+        helperText: 'Per person, in the currency you selected: monthly salary plus benefits, divided by about 173 working hours. Leave empty to use a market benchmark estimate, which is less accurate.',
+        required: false,
+        validation: { min: 1 }
+      },
+      {
         // D2 — confidence-source signal. Qualifies the manual-hours / FTE
         // estimates above: it feeds ONLY the confidence label on the ROI
         // projection (dampConfidenceByEstimateBasis in
