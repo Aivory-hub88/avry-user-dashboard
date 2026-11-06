@@ -811,7 +811,7 @@ export default function FinalResultPage() {
                     <div><dt>{planCard.labels.includes}</dt><dd>{row.includes}</dd></div>
                     <div><dt>{planCard.labels.price}</dt><dd>{row.price}</dd></div>
                     <div><dt>{planCard.labels.yearly}</dt><dd>{row.yearly}</dd></div>
-                    <div><dt>{planCard.labels.share}</dt><dd style={{ fontWeight: 700, color: row.shareTone === 'good' ? '#86efac' : row.shareTone === 'bad' ? '#f87171' : undefined }}>{row.share}</dd></div>
+                    <div><dt>{planCard.labels.share}</dt><dd style={{ fontWeight: 700 }}>{row.share}</dd></div>
                   </dl>
                 </div>
               ))}
