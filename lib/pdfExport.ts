@@ -2035,6 +2035,15 @@ function renderRequiredInvestment(pdf: jsPDF, y: number, v: RequiredInvestmentVi
     pdf.line(ML, y, ML + CW, y)
     y += 4
   })
+  if (v.planNote) {
+    setC(pdf, MUTED, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(7.2)
+    const planNote = pdf.splitTextToSize(v.planNote, CW)
+    y = ensureSpace(pdf, y, planNote.length * 3.3 + 4)
+    pdf.text(planNote, ML, y)
+    y += planNote.length * 3.3 + 3
+  }
   setC(pdf, LABEL, 'text')
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(6.6)

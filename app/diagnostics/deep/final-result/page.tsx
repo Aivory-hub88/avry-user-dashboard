@@ -425,7 +425,8 @@ export default function FinalResultPage() {
   // budget-vs-ceiling table and the threshold table only apply to the older
   // whole-budget basis.
   const requiredBasis = isRequiredBasis(calculations as never)
-  const netVerdict = requiredBasis ? buildNetVerdict(calculations as any, locale, fmtLocal) : null
+  const planDisplayName = (() => { const p = (calculations as any).requiredInvestment?.plan; return p ? p.charAt(0).toUpperCase() + p.slice(1) : '' })()
+  const netVerdict = requiredBasis ? buildNetVerdict({ ...(calculations as any), planName: planDisplayName }, locale, fmtLocal) : null
   const requiredView = buildRequiredInvestmentView(calculations as never, (v) => fmtLocal(v), locale)
   const investmentComparison = requiredBasis ? null : buildInvestmentComparison(calculations as never, roiYears)
   // Capacity value — cost avoidance from expected growth, on its own line.
@@ -997,6 +998,7 @@ export default function FinalResultPage() {
                   </Fragment>
                 ))}
               </div>
+              {requiredView.planNote && <p className={styles.thresholdIntro} style={{ marginTop: '0.9rem' }}>{requiredView.planNote}</p>}
               <p className={styles.thresholdFootnote}>{requiredView.footnote}</p>
             </div>
           )}
@@ -1070,7 +1072,7 @@ export default function FinalResultPage() {
               locale={locale}
             />
             <ROIMetricTile label={npvLabel(roiYears, locale)} value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Value kini bersih @ diskonto 10%' : 'Net present value @ 10% discount'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
-            <ROIMetricTile label={locale === 'id' ? 'Biaya Berjalan Tahunan' : 'Annual Ongoing Cost'} value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle={requiredBasis ? (locale === 'id' ? 'Plan Aivory, mulai tahun ke-2' : 'Aivory plan, from year 2') : (locale === 'id' ? 'Estimasi lisensi, pemeliharaan & dukungan' : 'Est. licenses, maintenance & support')} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Biaya Berjalan Tahunan' : 'Annual Ongoing Cost'} value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle={requiredBasis ? (locale === 'id' ? `Plan Aivory ${planDisplayName}, mulai tahun ke-2` : `Aivory ${planDisplayName} plan, from year 2`) : (locale === 'id' ? 'Estimasi lisensi, pemeliharaan & dukungan' : 'Est. licenses, maintenance & support')} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Penghematan Bersih Tahunan' : 'Net Annual Savings'} value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Setelah biaya berjalan' : 'After ongoing cost'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Periode Payback Bersih' : 'Net Payback Period'} value={(calculations as any).netPaybackMonths ?? null} formatter={(v) => formatPaybackCapped(v, locale, roiYears * 12)} subtitle={locale === 'id' ? 'Berdasarkan penghematan bersih' : 'On net savings'} confidenceLevel={calculations.confidenceLevel} locale={locale} nullText={netPaybackNotReachedLabel(calculations as any, locale, roiYears) ?? undefined} />
             {totalAnnualSavingsLocal != null && totalAnnualSavingsLocal > 0 && (
