@@ -25,6 +25,7 @@ import { buildNetVerdict } from '@/lib/netVerdict'
 import { buildPlanComparison } from '@/lib/planComparison'
 import { hasRunningCost } from '@/lib/runningCost'
 import { describeTeamHours } from '@/lib/teamHours'
+import { unpricedCount, pricedOnlyTag } from '@/lib/pricedCostsOnly'
 import { buildProcessIncrements, formatIncrementsSummary } from '@/lib/processIncrements'
 
 import { splitBold } from '@/lib/boldMarkup'
@@ -443,13 +444,14 @@ export default function FinalResultPage() {
   const runCost = hasRunningCost(calculations as any)
   const headlineNet = (calculations as any).headlineBasis === 'net'
   const transformationModel = (calculations as any).requiredInvestment?.costModel === 'transformation'
-  const investmentBasisNote = headlineNet
+  const pricedTag = pricedOnlyTag(unpricedCount(calculations as any), locale)
+  const investmentBasisNote = (headlineNet
     ? (locale === 'id' ? 'Setelah biaya software yang direkomendasikan' : 'Net of the recommended software cost')
     : runCost
       ? (locale === 'id' ? 'Sebelum biaya berjalan · investasi = kebutuhan tahun pertama' : 'Before running costs · investment = year-1 requirement')
       : transformationModel
         ? (locale === 'id' ? 'Investasi = setup tim + software, tahun pertama' : 'Investment = your setup + software, year 1')
-        : (locale === 'id' ? 'Investasi = paket + setup tahun pertama' : 'Investment = package + setup, year 1')
+        : (locale === 'id' ? 'Investasi = paket + setup tahun pertama' : 'Investment = package + setup, year 1')) + pricedTag
   const increments = buildProcessIncrements(opportunities, calculations as any, context.quantitative)
   const teamHoursNote = describeTeamHours(context.quantitative, locale)
   const incrementsSummary = formatIncrementsSummary(increments, locale)
