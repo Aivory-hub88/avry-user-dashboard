@@ -347,6 +347,10 @@ export interface ROIProjection {
   efficiencyFactor: number
   /** Whether the small-team opportunity-cost rate adjustment was applied. */
   smallTeamRateApplied: boolean
+  /** Where the hourly rate came from: the user's own figure or a market benchmark. */
+  hourlyRateSource?: 'user' | 'benchmark'
+  /** The user typed an hourly cost that looked out of range (e.g. a monthly salary), so the benchmark was used. */
+  hourlyCostRejected?: boolean
   /** USD→local FX rate applied to the *Local fields (live quote when available). */
   fxRateUsed?: number
   /** Human label for when the FX rate was sourced (e.g. "18 Jul 2026 (live)"). */
@@ -536,6 +540,8 @@ export interface DiagnosticContext {
     timelineMonths: number | null
     /** Expected 12-month volume growth, % (volume_growth_12m). Absent/null → no capacity line. */
     volumeGrowthPct?: number | null
+    /** What one hour of the in-scope team's work costs, in the report currency (user-stated; optional). */
+    hourlyCostLocal?: number | null
   }
   calculations: ROIProjection
   scores: DimensionScores

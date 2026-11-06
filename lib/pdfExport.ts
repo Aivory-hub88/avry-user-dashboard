@@ -3447,7 +3447,9 @@ export async function exportReportToPdf(
     const rateBenchmark = locale === 'id'
       ? (calculations.rateBenchmarkLabelId ?? 'industri')
       : (calculations.rateBenchmarkLabel ?? 'industry')
-    const rateNote = locale === 'id'
+    const rateNote = (calculations as any).hourlyRateSource === 'user'
+      ? (locale === 'id' ? ' (biaya per jam yang Anda isi)' : ' (your stated hourly cost)')
+      : locale === 'id'
       ? (calculations.smallTeamRateApplied ? ` (biaya peluang, benchmark ${rateBenchmark})` : ` (benchmark ${rateBenchmark})`)
       : (calculations.smallTeamRateApplied ? ` (opp-cost, ${rateBenchmark})` : ` (${rateBenchmark})`)
 

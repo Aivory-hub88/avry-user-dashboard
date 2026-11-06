@@ -264,6 +264,11 @@ export const ID_QUESTION_COPY: Record<string, IdQuestionCopy> = {
       'Tidak yakin',
     ],
   },
+  hourly_cost: {
+    question: 'Berapa biaya satu jam kerja orang-orang yang mengerjakan pekerjaan manual ini bagi bisnis Anda?',
+    placeholder: 'mis. 50000',
+    helperText: 'Per orang, dalam mata uang yang Anda pilih: gaji bulanan ditambah tunjangan, dibagi sekitar 173 jam kerja. Kosongkan untuk memakai perkiraan benchmark pasar, yang kurang akurat.',
+  },
   estimate_basis: {
     question: 'Bagaimana estimasi waktu dan beban kerja di atas diperoleh?',
     helperText: 'Pelacakan yang lebih ketat meningkatkan tingkat keyakinan pada proyeksi keuangan Anda.',

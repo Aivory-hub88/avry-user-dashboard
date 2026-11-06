@@ -534,6 +534,12 @@ function parseFteCount(val: string | undefined): number | null {
   return map[val] ?? map[norm] ?? null
 }
 
+/** The user's own hourly cost in the report currency, or null when empty/invalid. */
+export function parseHourlyCostLocal(val: unknown): number | null {
+  const n = typeof val === 'number' ? val : typeof val === 'string' && val.trim() !== '' ? Number(val) : NaN
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 // ---- Currency ----
 
 // CURRENCY_RATES + FX_AS_OF now sourced from @/lib/currencyConfig
@@ -739,8 +745,15 @@ export function calculateROI(
   const localRate = getHourlyRateLocal(currencyCode, industry)
   // The flag reflects what was ACTUALLY applied — surfaced in the report's
   // methodology note, so it must never claim a discount that didn't happen.
-  const smallTeamRateApplied = localRate !== null ? false : fteIsSmall
-  if (localRate !== null) {
+  // A user-stated hourly cost beats any benchmark. Guard against a monthly salary typed
+  // into the hourly field: outside US$0.5-200 per hour it is ignored (benchmark used).
+  const statedHourlyUSD = q.hourlyCostLocal != null && rate > 0 ? q.hourlyCostLocal / rate : null
+  const useStatedRate = statedHourlyUSD !== null && statedHourlyUSD >= 0.5 && statedHourlyUSD <= 200
+  const smallTeamRateApplied = useStatedRate ? false : localRate !== null ? false : fteIsSmall
+  if (useStatedRate) {
+    baseHourlyRateUSD = statedHourlyUSD as number
+    hourlyRateUSD = statedHourlyUSD as number
+  } else if (localRate !== null) {
     baseHourlyRateUSD = localRate / rate
     hourlyRateUSD = localRate / rate
   } else {
@@ -1010,6 +1023,8 @@ export function calculateROI(
     // Jakarta, EUR uses an EU average, everything else the US industry
     // table. Surfaced so the report discloses the assumption, not just the
     // number derived from it.
+    hourlyRateSource: useStatedRate ? ('user' as const) : ('benchmark' as const),
+    hourlyCostRejected: q.hourlyCostLocal != null && !useStatedRate,
     rateBenchmarkLabel: getRateBenchmarkLabel(currencyCode, 'en'),
     rateBenchmarkLabelId: getRateBenchmarkLabel(currencyCode, 'id'),
     // Ongoing cost + net economics + scenario range
@@ -2386,6 +2401,7 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     costTargetPerTicket: null,
     totalManualHoursWeekly,
     fteCountInScope,
+    hourlyCostLocal: parseHourlyCostLocal(answers.hourly_cost),
     currentAutomationPct: currentAutoPct,
     targetAutomationPct: targetAutoPct,
     budgetMidpointUSD,
