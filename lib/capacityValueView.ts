@@ -4,6 +4,7 @@
  * returns null when the user gave no growth (or nothing is absorbable), so
  * neither surface renders an empty block.
  */
+import { formatRoi } from '@/lib/roiDisplay'
 type Locale = 'en' | 'id'
 
 interface Calc {
@@ -42,7 +43,7 @@ export function buildCapacityValueView(
   const eff = Math.round((calc.efficiencyFactor ?? 0.75) * 100)
   const fte = hours / FTE_HOURS_PER_YEAR
   const num = (v: number, digits = 1) => id ? v.toFixed(digits).replace('.', ',') : v.toFixed(digits)
-  const pct = (v: number) => v >= 999 ? '>999%' : `${num(v)}%`
+  const pct = (v: number) => formatRoi(v, locale, (n) => `${num(n)}%`)
   const growthLabel = growth >= 100 ? (id ? '100% atau lebih' : '100% or more') : `±${num(growth, growth % 1 ? 1 : 0)}%`
 
   const rows: CapacityValueView['rows'] = [
