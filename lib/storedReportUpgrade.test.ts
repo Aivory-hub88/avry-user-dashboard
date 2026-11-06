@@ -17,15 +17,22 @@ const ANSWERS = {
 }
 const fmt = (v: number) => `${v < 0 ? '-' : ''}Rp ${Math.abs(Math.round(v)).toLocaleString('en-US')}`
 
-/** What a report saved BEFORE 2026-11-06 looks like: the Aivory plan inside the figures. */
-function legacyReport() {
+/** An old stored requiredInvestment: no costModel, no software lines (what every report saved before the transformation model has). */
+const oldRI = (ri: any, plan: boolean) => ({
+  ...ri,
+  costModel: undefined,
+  softwareLines: undefined,
+  softwareAnnualUSD: undefined,
+  unpriced: undefined,
+  initialUSD: ri.packageUSD + ri.setupUSD + (plan ? ri.planMonthlyUSD * ri.planMonthsYear1 : 0),
+  annualRecurringUSD: plan ? ri.planMonthlyUSD * 12 : 0,
+})
+
+/** What a report saved BEFORE 2026-11-06 looks like: the Aivory plan inside the figures (plan = true),
+ *  or, from 2026-11-06 until the transformation model, only Aivory's package + setup (plan = false). */
+function legacyReport(plan = true) {
   const ctx: any = buildDiagnosticContext(ANSWERS as any)
-  const ri = ctx.calculations.requiredInvestment
-  const legacyRI = {
-    ...ri,
-    initialUSD: ri.packageUSD + ri.setupUSD + ri.planMonthlyUSD * ri.planMonthsYear1,
-    annualRecurringUSD: ri.planMonthlyUSD * 12,
-  }
+  const legacyRI = oldRI(ctx.calculations.requiredInvestment, plan)
   const calculations = calculateROI(ctx.quantitative, 'IDR', ctx.qualitative?.industry, undefined, legacyRI)
   return { fresh: ctx, legacy: { ...ctx, calculations } as any }
 }
@@ -38,17 +45,25 @@ describe('opening a report saved with the plan inside its figures', () => {
     expect(legacy.calculations.npvHorizonLocal).toBeLessThan(0)
   })
 
-  it('is re-priced on the new basis: package + setup only, no running cost, one basis', () => {
+  it('is re-priced on the transformation basis: your own setup + recommended software; no Aivory package or plan in the figures', () => {
     const { legacy } = legacyReport()
     const up: any = upgradeDiagnosticContext(legacy)
     const c = up.calculations
     const r = c.requiredInvestment
-    expect(r.annualRecurringUSD).toBe(0)
-    expect(r.initialUSD).toBe(r.packageUSD + r.setupUSD)
-    expect(hasRunningCost(c)).toBe(false)
-    expect(c.netAnnualSavingsUSD).toBe(c.totalAnnualSavingsUSD) // net == gross
+    expect(r.costModel).toBe('transformation')
+    expect(r.initialUSD).toBe(r.setupUSD + r.softwareAnnualUSD)
+    expect(r.annualRecurringUSD).toBe(r.softwareAnnualUSD)
+    expect(c.netAnnualSavingsUSD).toBeCloseTo(c.totalAnnualSavingsUSD - r.softwareAnnualUSD, 6)
     expect(c.netAnnualSavingsLocal).toBeGreaterThan(0)
     expect(c.npvHorizonLocal).toBeGreaterThan(0) // no longer -Rp 30.9M
+  })
+
+  it('a report priced on Aivory package + setup (the previous model) is re-priced too', () => {
+    const { legacy } = legacyReport(false)
+    expect(legacy.calculations.requiredInvestment.costModel).toBeUndefined()
+    const r = (upgradeDiagnosticContext(legacy) as any).calculations.requiredInvestment
+    expect(r.costModel).toBe('transformation')
+    expect(r.initialUSD).toBe(r.setupUSD + r.softwareAnnualUSD)
   })
 
   it('keeps the user-stated hourly cost and the scope; only the plan leaves the figures', () => {
@@ -67,7 +82,7 @@ describe('opening a report saved with the plan inside its figures', () => {
     expect(card.caveat).toMatch(/not part of the Financial Case figures/)
     expect(card.caveat).not.toMatch(/already counted/)
     const labels = buildRequiredInvestmentView(c, fmt, 'en')!.rows.map((r) => r.label)
-    expect(labels.some((l) => /plan/i.test(l))).toBe(false)
+    expect(labels.some((l) => /Aivory|Business plan|Operational plan|Enterprise plan/.test(l))).toBe(false)
   })
 
   it('is idempotent and leaves an already-new report untouched', () => {

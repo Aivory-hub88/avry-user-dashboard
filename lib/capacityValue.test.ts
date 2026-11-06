@@ -26,7 +26,7 @@ describe('capacity value', () => {
   })
 
   it('adds to the ROI when the headline ROI is below the cap', () => {
-    const small = { ...BASE, manual_hours_weekly: '10-25 hours/week', volume_growth_12m: '50-75%' }
+    const small = { ...BASE, manual_hours_weekly: 'Under 10 hours/week', fte_count: '1-5 FTEs', volume_growth_12m: '50-75%' }
     const k: any = buildDiagnosticContext(small as any).calculations
     expect(k.horizonROIPercent).toBeLessThan(999)
     expect(k.horizonROIWithCapacityPercent).toBeGreaterThan(k.horizonROIPercent)

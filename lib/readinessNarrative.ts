@@ -309,8 +309,20 @@ export function buildFinancialTermsNote(
    * second ROI (including hiring cost avoided) may sit in the capacity block —
    * the note must say which ROI it means. Omitted → the original wording.
    */
-  opts: { basis?: 'required' | 'stated_budget'; hasCapacityRoi?: boolean; hasRunningCost?: boolean } = {},
+  opts: { basis?: 'required' | 'stated_budget'; hasCapacityRoi?: boolean; hasRunningCost?: boolean; headlineNet?: boolean } = {},
 ): string {
+  if (opts.basis === 'required' && opts.headlineNet) {
+    // Transformation cost model with a running cost: every headline figure already deducts it.
+    const H = horizonYears
+    if (locale === 'id') {
+      return `Kotak Payback, kotak ROI ${H} Tahun, dan Kisaran ROI ${H} Tahun semuanya sudah mengurangkan biaya tahunan software yang direkomendasikan mulai tahun ke-2; kisarannya hanya memvariasikan asumsi efisiensi (konservatif, dasar, optimis).` +
+        (opts.hasCapacityRoi ? ` ROI di blok nilai kapasitas adalah angka ketiga: sama dengan kotak ROI, ditambah biaya rekrutmen yang dihindari, dan sengaja ditampilkan terpisah.` : '') +
+        ` NPV menghitung nilai waktu uang (diskonto 10%), sehingga angkanya lebih kecil daripada selisih penghematan dan investasi. Paket dan plan Aivory tidak termasuk dalam angka ini; ia ditampilkan sebagai salah satu cara mengerjakan otomasinya.`
+    }
+    return `The Payback tile, the ${H}-Year ROI tile and the ${H}-Year ROI range all deduct the yearly cost of the recommended software from year 2; the range only varies the efficiency assumption (conservative, base, optimistic).` +
+      (opts.hasCapacityRoi ? ` The ROI in the capacity-value block is a third figure: the tile's ROI plus the hiring cost avoided, deliberately shown separately.` : '') +
+      ` NPV prices in the time value of money (10% discount), so it is smaller than the plain gap between savings and investment. The Aivory package and plan are not part of these figures; Aivory is shown as one way to deliver the automation.`
+  }
   if (opts.basis === 'required' && opts.hasRunningCost === false) {
     // No running cost in the figures (the Aivory plan is a recommendation): one basis everywhere.
     const H = horizonYears

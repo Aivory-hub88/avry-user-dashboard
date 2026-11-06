@@ -2036,6 +2036,15 @@ function renderRequiredInvestment(pdf: jsPDF, y: number, v: RequiredInvestmentVi
     pdf.line(ML, y, ML + CW, y)
     y += 4
   })
+  if (v.unpricedNote) {
+    setC(pdf, MUTED, 'text')
+    pdf.setFont(F(), 'normal')
+    pdf.setFontSize(7.2)
+    const unpriced = pdf.splitTextToSize(v.unpricedNote, CW)
+    y = ensureSpace(pdf, y, unpriced.length * 3.3 + 4)
+    pdf.text(unpriced, ML, y)
+    y += unpriced.length * 3.3 + 3
+  }
   if (v.planNote) {
     setC(pdf, MUTED, 'text')
     pdf.setFont(F(), 'normal')
@@ -3299,7 +3308,12 @@ export async function exportReportToPdf(
     : null
   // No running cost in the figures (the plan is a recommendation): drop the tiles that would read 0 / duplicate.
   const dropNetTiles = <T extends { l: string }>(tiles: T[]): T[] =>
-    hasRunningCost(cAny) ? tiles : tiles.filter((t) => !RUNNING_COST_TILE_LABELS.includes(t.l))
+    !hasRunningCost(cAny)
+      ? tiles.filter((t) => !RUNNING_COST_TILE_LABELS.includes(t.l))
+      // headline already net: the separate Net Payback tile would repeat the Payback tile
+      : cAny.headlineBasis === 'net'
+        ? tiles.filter((t) => t.l !== 'Net Payback' && t.l !== 'Payback Bersih')
+        : tiles
   y = renderMetricGrid(pdf, y, dropNetTiles(locale === 'id' ? [
     { l: 'Value Tenaga Kerja yang Dipulihkan', v: fmt(calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD) },
     { l: 'Value Efisiensi Proses', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
