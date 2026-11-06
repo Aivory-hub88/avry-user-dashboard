@@ -22,6 +22,8 @@ import ErrorCard from '@/components/result/ErrorCard'
 import { localizeLlmResult } from '@/lib/llmResultLocale'
 import { buildWebsiteInsightsView } from '@/lib/websiteInsightsView'
 import { buildNetVerdict } from '@/lib/netVerdict'
+
+import { splitBold } from '@/lib/boldMarkup'
 import SectionNavRail from '@/components/result/SectionNavRail'
 import AdvisoryContactModal from '@/components/result/AdvisoryContactModal'
 import {
@@ -739,7 +741,9 @@ export default function FinalResultPage() {
                   {webView.insights.length > 0 && (
                     <ul className={styles.aiList}>
                       {webView.insights.map((s, i) => (
-                        <li key={i}>{s}</li>
+                        <li key={i}>
+                          {splitBold(s).map((seg, j) => (seg.bold ? <strong key={j}>{seg.text}</strong> : <span key={j}>{seg.text}</span>))}
+                        </li>
                       ))}
                     </ul>
                   )}

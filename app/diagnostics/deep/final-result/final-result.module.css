@@ -1108,3 +1108,5 @@
   border-left: 3px solid rgb(255 196 77 / 0.9);
   background: rgb(255 196 77 / 0.07);
 }
+
+.webInsights .aiList strong { font-weight: 700; color: var(--color-text-primary, inherit); }
