@@ -82,6 +82,8 @@ export interface DeepDiagnosticResponse {
   /** Present only when a website was sent and the bridge feature is on. */
   web_context?: 'ok' | 'partial' | 'unavailable' | 'social_only'
   web_profile?: Record<string, unknown>
+  /** 0-3 observations tying the website to the user's answers (only with a profile). */
+  website_insights?: string[]
 }
 
 // localStorage result storage

@@ -1059,3 +1059,40 @@
   line-height: 1.6;
   color: var(--dd-muted, #9ca3af);
 }
+
+/* ── Website context block (ADR-022) ─────────────────────── */
+.webInsights {
+  margin: 0 0 0.9rem;
+  padding: 12px 14px;
+  border: 1px solid rgb(from var(--color-accent-report) r g b / 0.2);
+  border-radius: 8px;
+  background: rgb(from var(--color-accent-report) r g b / 0.04);
+}
+.webInsights[data-state='unavailable'],
+.webInsights[data-state='social_only'] {
+  background: transparent;
+  border-style: dashed;
+}
+.webFacts {
+  margin: 0 0 0.6rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.5rem 1rem;
+}
+.webFact dt {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.webFact dd {
+  margin: 2px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.webNote {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  opacity: 0.65;
+}

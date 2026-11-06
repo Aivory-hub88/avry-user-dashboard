@@ -20,6 +20,7 @@ import RiskCard from '@/components/result/RiskCard'
 import LoadingState from '@/components/result/LoadingState'
 import ErrorCard from '@/components/result/ErrorCard'
 import { localizeLlmResult } from '@/lib/llmResultLocale'
+import { buildWebsiteInsightsView } from '@/lib/websiteInsightsView'
 import SectionNavRail from '@/components/result/SectionNavRail'
 import AdvisoryContactModal from '@/components/result/AdvisoryContactModal'
 import {
@@ -276,6 +277,7 @@ export default function FinalResultPage() {
   // AI analysis in the report's language (EN top-level, ID under
   // translations.id since 2026-10-10; older results stay English + notice).
   const llmView = localizeLlmResult(llmResult, locale)
+  const webView = buildWebsiteInsightsView(llmView, locale)
   const scoreDriversLocalized = (locale === 'id' && context.scoreDriversId) ? context.scoreDriversId : context.scoreDrivers
 
   const handleDownloadPdf = async () => {
@@ -719,6 +721,29 @@ export default function FinalResultPage() {
                   ) : null
                 })()}
               </div>
+              {webView && (
+                <div className={styles.webInsights} data-state={webView.state}>
+                  <h3 className={styles.aiColLabel}>{locale === 'id' ? 'Website Anda' : 'Your website'}</h3>
+                  {webView.facts.length > 0 && (
+                    <dl className={styles.webFacts}>
+                      {webView.facts.map(f => (
+                        <div key={f.label} className={styles.webFact}>
+                          <dt>{f.label}</dt>
+                          <dd>{f.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                  {webView.insights.length > 0 && (
+                    <ul className={styles.aiList}>
+                      {webView.insights.map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {webView.note && <p className={styles.webNote}>{webView.note}</p>}
+                </div>
+              )}
               {llmView.recommended_next_step && (
                 <p className={styles.aiNextStep}>
                   <strong>{locale === 'id' ? 'Langkah berikutnya yang disarankan:' : 'Recommended next step:'}</strong> {llmView.recommended_next_step}
