@@ -382,6 +382,9 @@ export interface ROIProjection {
   netHorizonROIPercent?: number | null
   /** Conservative / base / optimistic net ROI range over `roiHorizonYears` (%). */
   scenarioHorizonROI?: { low: number | null; base: number | null; high: number | null }
+  /** NPV (USD) at the low / base / high efficiency scenarios, same window and cash profile as the ROI range. */
+  scenarioHorizonNPV?: { low: number | null; base: number | null; high: number | null }
+  scenarioHorizonNPVLocal?: { low: number | null; base: number | null; high: number | null }
   /** @deprecated Legacy name for `netHorizonROIPercent` — same value. */
   netThreeYearROIPercent?: number | null
   /** @deprecated Legacy name for `scenarioHorizonROI` — same value. */

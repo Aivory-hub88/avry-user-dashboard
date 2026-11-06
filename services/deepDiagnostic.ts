@@ -1024,6 +1024,22 @@ export function calculateROI(
         )
       : null
 
+  // NPV at the same low / high efficiency scenarios as the ROI range, on the same cash profile (year 1 carries no
+  // running cost, later years do). NPV leads the financial case; ROI is the companion, because ROI is a ratio over
+  // the counted investment and saturates when that investment is small.
+  const scenarioNpv = (eff: number): number | null => {
+    if (!totalAnnualSavingsUSD || annualOngoingCostUSD === null || !budgetUSD || budgetUSD <= 0) return null
+    const labor = hoursPerYear * incrementalAutoPct * eff * hourlyRateUSD
+    const total = labor + labor * 0.2
+    let pv = 0
+    for (let t = 1; t <= roiHorizonYears; t++) {
+      pv += (t < ONGOING_COST_START_YEAR ? total : total - annualOngoingCostUSD) / Math.pow(1 + DISCOUNT_RATE, t)
+    }
+    return Math.round(pv - budgetUSD)
+  }
+  const scenarioHorizonNPV = { low: scenarioNpv(0.5), base: npvHorizonUSD, high: scenarioNpv(0.9) }
+  const toLocal = (v: number | null) => (v === null ? null : v * rate)
+
   // Bug 3 — Audit log: always log budgetMidpointUSD alongside the ROI result
   // so the formula is auditable:
   // ((totalAnnualSavingsUSD × roiHorizonYears − investment) / investment) × 100
@@ -1131,6 +1147,12 @@ export function calculateROI(
     netPaybackMonths,
     netHorizonROIPercent,
     scenarioHorizonROI,
+    scenarioHorizonNPV,
+    scenarioHorizonNPVLocal: {
+      low: toLocal(scenarioHorizonNPV.low),
+      base: toLocal(scenarioHorizonNPV.base),
+      high: toLocal(scenarioHorizonNPV.high),
+    },
     discountRate: DISCOUNT_RATE,
     npvHorizonUSD,
     npvHorizonLocal: npvHorizonUSD !== null ? npvHorizonUSD * rate : null,

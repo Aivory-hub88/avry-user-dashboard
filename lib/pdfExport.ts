@@ -62,6 +62,7 @@ import { netPaybackNotReachedLabel } from '@/lib/resultFormatters'
 import { buildInvestmentComparison, investmentComparisonExplanation, CEILING_PAYBACK_MONTHS, type InvestmentComparison } from '@/lib/investmentComparison'
 import { buildRequiredInvestmentView, isRequiredBasis, type RequiredInvestmentView } from '@/lib/requiredInvestmentView'
 import { hasRunningCost, RUNNING_COST_TILE_LABELS } from '@/lib/runningCost'
+import { formatRoi } from '@/lib/roiDisplay'
 import { buildCapacityValueView } from '@/lib/capacityValueView'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
@@ -2100,7 +2101,7 @@ function renderInvestmentComparison(
   pdf.line(ML, y, ML + CW, y)
   y += 4.2
 
-  const pct = (v: number) => v >= 999 ? '>999%' : `${Math.round(v)}%`
+  const pct = (v: number) => formatRoi(v, locale)
   const netPb = (v: number | null) => v == null ? (locale === 'id' ? `Tidak tercapai dlm ${H} thn` : `Not reached in ${H} yrs`) : fmtPayback(v)
   const rows: [string, string, string, number | null, number | null][] = [
     [locale === 'id' ? 'Investasi' : 'Investment', fmt(c.stated.investmentLocal), fmt(c.ceiling.investmentLocal), null, null],
@@ -2242,30 +2243,36 @@ function renderScenarioRange(
   locale: Locale = 'en',
   horizonYears: number = 3,
   grossRoiPercent?: number | null,
+  /** NPV per scenario (local currency): when present it is the headline of the range and ROI is the companion line. */
+  npv?: { low?: number | null; base?: number | null; high?: number | null } | null,
+  fmtMoney?: (v: number | null | undefined) => string,
 ): number {
-  const roiFmt = (v: number | null | undefined): string =>
-    v == null || !isFinite(v) ? '—' : v >= 999 ? '>999%' : `${Math.round(v)}%`
-  const cells: Array<{ l: string; v: string; bg: string; tx: string }> = locale === 'id' ? [
-    { l: 'KONSERVATIF', v: roiFmt(sc.low), bg: '#f4f4f0', tx: MUTED },
-    { l: 'DASAR', v: roiFmt(sc.base), bg: '#eaf5e4', tx: ACCENT },
-    { l: 'OPTIMISTIS', v: roiFmt(sc.high), bg: '#f4f4f0', tx: MUTED },
+  const hasNpv = !!npv && !!fmtMoney && [npv.low, npv.base, npv.high].some((v) => v != null)
+  const roiFmt = (v: number | null | undefined): string => formatRoi(v, locale, undefined, '—')
+  const headline = (k: 'low' | 'base' | 'high'): string => (hasNpv ? fmtMoney!(npv![k]) : roiFmt(sc[k]))
+  const companion = (k: 'low' | 'base' | 'high'): string | null => (hasNpv ? `ROI ${roiFmt(sc[k])}` : null)
+  const cells: Array<{ l: string; v: string; sub: string | null; bg: string; tx: string }> = locale === 'id' ? [
+    { l: 'KONSERVATIF', v: headline('low'), sub: companion('low'), bg: '#f4f4f0', tx: MUTED },
+    { l: 'DASAR', v: headline('base'), sub: companion('base'), bg: '#eaf5e4', tx: ACCENT },
+    { l: 'OPTIMISTIS', v: headline('high'), sub: companion('high'), bg: '#f4f4f0', tx: MUTED },
   ] : [
-    { l: 'CONSERVATIVE', v: roiFmt(sc.low), bg: '#f4f4f0', tx: MUTED },
-    { l: 'BASE', v: roiFmt(sc.base), bg: '#eaf5e4', tx: ACCENT },
-    { l: 'OPTIMISTIC', v: roiFmt(sc.high), bg: '#f4f4f0', tx: MUTED },
+    { l: 'CONSERVATIVE', v: headline('low'), sub: companion('low'), bg: '#f4f4f0', tx: MUTED },
+    { l: 'BASE', v: headline('base'), sub: companion('base'), bg: '#eaf5e4', tx: ACCENT },
+    { l: 'OPTIMISTIC', v: headline('high'), sub: companion('high'), bg: '#f4f4f0', tx: MUTED },
   ]
-  y = ensureSpace(pdf, y, 38)
+  const boxH = hasNpv ? 18 : 14
+  y = ensureSpace(pdf, y, 42)
   setC(pdf, INK, 'text')
   pdf.setFont(FB(), 'bold')
   pdf.setFontSize(6.4)
-  spacedText(pdf, locale === 'id' ? `KISARAN ROI ${horizonYears} TAHUN` : `${horizonYears}-YEAR ROI RANGE`, ML, y, 0.32)
+  spacedText(pdf, locale === 'id' ? `KISARAN ${hasNpv ? 'NPV' : 'ROI'} ${horizonYears} TAHUN` : `${horizonYears}-YEAR ${hasNpv ? 'NPV' : 'ROI'} RANGE`, ML, y, 0.32)
   y += 4
   const gapX = 4
   const w = (CW - gapX * 2) / 3
   cells.forEach((c, i) => {
     const x = ML + i * (w + gapX)
     setC(pdf, c.bg, 'fill')
-    pdf.roundedRect(x, y, w, 14, 1.5, 1.5, 'F')
+    pdf.roundedRect(x, y, w, boxH, 1.5, 1.5, 'F')
     setC(pdf, INK, 'text')
     pdf.setFont(FB(), 'bold')
     pdf.setFontSize(5.6)
@@ -2274,8 +2281,12 @@ function renderScenarioRange(
     pdf.setFont(F(), 'normal')
     pdf.setFontSize(11)
     pdf.text(c.v, x + 4, y + 11)
+    if (c.sub) {
+      pdf.setFontSize(6.4)
+      pdf.text(c.sub, x + 4, y + 15.5)
+    }
   })
-  y += 18
+  y += boxH + 4
   setC(pdf, LABEL, 'text')
   pdf.setFont(F(), 'normal')
   pdf.setFontSize(6.4)
@@ -2286,7 +2297,7 @@ function renderScenarioRange(
   // a calculation error.
   const grossRoiFmt = grossRoiPercent == null || !isFinite(grossRoiPercent)
     ? null
-    : grossRoiPercent >= 999 ? '>999%' : `${Math.round(grossRoiPercent)}%`
+    : formatRoi(grossRoiPercent, locale)
   const scenarioCaption = locale === 'id'
     ? `Kisaran mencerminkan efisiensi otomasi 50%–90%; skenario dasar menggunakan ${effPct}%. Angka ini sudah dikurangi biaya operasional berjalan — berbeda dari ROI ${horizonYears} Tahun di atas${grossRoiFmt ? ` (kotor, sebelum biaya berjalan, = ${grossRoiFmt})` : ''}, yang belum dikurangi biaya tersebut.`
     : `Range reflects 50%–90% automation efficiency; base case uses ${effPct}%. These figures are net of ongoing operating costs — different from the ${horizonYears}-Year ROI above${grossRoiFmt ? ` (gross, before ongoing costs, = ${grossRoiFmt})` : ''}, which is not.`
@@ -3393,7 +3404,7 @@ export async function exportReportToPdf(
   const scenario = cAny.scenarioThreeYearROI
   if (scenario && [scenario.low, scenario.base, scenario.high].some((v: unknown) => v != null)) {
     y += 2
-    y = renderScenarioRange(pdf, y, scenario, effPct, locale, roiYears, calculations.threeYearROIPercent)
+    y = renderScenarioRange(pdf, y, scenario, effPct, locale, roiYears, calculations.threeYearROIPercent, cAny.scenarioHorizonNPVLocal ?? null, fmt)
   }
 
   // ── Investment thresholds — the "so what do we do about it" table ──

@@ -24,6 +24,7 @@ import { buildWebsiteInsightsView } from '@/lib/websiteInsightsView'
 import { buildNetVerdict } from '@/lib/netVerdict'
 import { buildPlanComparison } from '@/lib/planComparison'
 import { hasRunningCost } from '@/lib/runningCost'
+import { formatRoi } from '@/lib/roiDisplay'
 import { describeTeamHours } from '@/lib/teamHours'
 import { unpricedCount, pricedOnlyTag } from '@/lib/pricedCostsOnly'
 import { buildProcessIncrements, formatIncrementsSummary } from '@/lib/processIncrements'
@@ -110,8 +111,7 @@ type PageState =
   | { status: 'error'; message: string }
   | { status: 'loaded'; context: DiagnosticContext }
 
-const fmtRoi = (v: number | null | undefined): string =>
-  v == null ? 'N/A' : v >= 999 ? '>999%' : `${Math.round(v)}%`
+const fmtRoi = (v: number | null | undefined, locale: 'en' | 'id' = 'en'): string => formatRoi(v, locale)
 
 export default function FinalResultPage() {
   const router = useRouter()
@@ -1067,7 +1067,7 @@ export default function FinalResultPage() {
             const c = investmentComparison
             const H = c.horizonYears
             const tone = (v: number | null) => v == null ? undefined : { color: v < 0 ? '#f87171' : '#86efac' }
-            const pct = (v: number) => v >= 999 ? '>999%' : formatPercent(v, locale)
+            const pct = (v: number) => formatRoi(v, locale, (n) => formatPercent(n, locale))
             const netPb = (v: number | null) => v == null
               ? (locale === 'id' ? `Tidak tercapai dalam ${H} tahun` : `Not reached in ${H} yrs`)
               : formatPaybackCapped(v, locale, H * 12)
@@ -1125,15 +1125,15 @@ export default function FinalResultPage() {
               locale={locale}
             />
             <ROIMetricTile label={locale === 'id' ? 'Periode Payback' : 'Payback Period'} value={calculations.paybackMonths} formatter={(v) => formatPaybackCapped(v, locale, headlineNet ? roiYears * 12 : undefined)} nullText={headlineNet ? (netPaybackNotReachedLabel(calculations as any, locale, roiYears) ?? undefined) : undefined} subtitle={requiredBasis ? investmentBasisNote : (locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget')} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={npvLabel(roiYears, locale)} value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Value kini bersih @ diskonto 10%' : 'Net present value @ 10% discount'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile
               label={roiLabel(roiYears, locale)}
               value={calculations.threeYearROIPercent}
-              formatter={(v) => v >= 999 ? '>999%' : formatPercent(v, locale)}
+              formatter={(v) => formatRoi(v, locale, (n) => formatPercent(n, locale))}
               subtitle={requiredBasis ? investmentBasisNote : (locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget')}
               confidenceLevel={calculations.confidenceLevel}
               locale={locale}
             />
-            <ROIMetricTile label={npvLabel(roiYears, locale)} value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Value kini bersih @ diskonto 10%' : 'Net present value @ 10% discount'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             {runCost && (
               <>
             <ROIMetricTile label={locale === 'id' ? 'Biaya Berjalan Tahunan' : 'Annual Ongoing Cost'} value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle={requiredBasis ? (transformationModel ? (locale === 'id' ? 'Software yang direkomendasikan, mulai tahun ke-2' : 'Recommended software, from year 2') : (locale === 'id' ? `Plan Aivory ${planDisplayName}, mulai tahun ke-2` : `Aivory ${planDisplayName} plan, from year 2`)) : (locale === 'id' ? 'Estimasi lisensi, pemeliharaan & dukungan' : 'Est. licenses, maintenance & support')} confidenceLevel={calculations.confidenceLevel} locale={locale} />
@@ -1255,46 +1255,54 @@ export default function FinalResultPage() {
             </div>
           )}
 
-          {(calculations as any).scenarioThreeYearROI && (
-            <div className={styles.scenarioRow}>
-              <span className={styles.scenarioLabel}>{locale === 'id' ? `Kisaran ${roiLabel(roiYears, 'id')}` : `${roiLabel(roiYears, 'en')} range`}</span>
-              <div className={styles.scenarioGrid}>
-                <div className={`${styles.scenarioCell} ${styles.scenarioCellLow}`}>
-                  <span className={styles.scenarioCellLabel}>{locale === 'id' ? 'Konservatif' : 'Conservative'}</span>
-                  <span className={styles.scenarioCellValue}>{fmtRoi((calculations as any).scenarioThreeYearROI.low)}</span>
+          {(calculations as any).scenarioThreeYearROI && (() => {
+            const c = calculations as any
+            const npv = c.scenarioHorizonNPVLocal as { low: number | null; base: number | null; high: number | null } | undefined
+            const hasNpv = !!npv && [npv.low, npv.base, npv.high].some((v) => v != null)
+            const cells: Array<{ key: 'low' | 'base' | 'high'; cls: string; label: string }> = [
+              { key: 'low', cls: styles.scenarioCellLow, label: locale === 'id' ? 'Konservatif' : 'Conservative' },
+              { key: 'base', cls: styles.scenarioCellBase, label: locale === 'id' ? 'Dasar' : 'Base' },
+              { key: 'high', cls: styles.scenarioCellHigh, label: locale === 'id' ? 'Optimistis' : 'Optimistic' },
+            ]
+            return (
+              <div className={styles.scenarioRow}>
+                <span className={styles.scenarioLabel}>
+                  {hasNpv
+                    ? (locale === 'id' ? `Kisaran ${npvLabel(roiYears, 'id')}` : `${npvLabel(roiYears, 'en')} range`)
+                    : (locale === 'id' ? `Kisaran ${roiLabel(roiYears, 'id')}` : `${roiLabel(roiYears, 'en')} range`)}
+                </span>
+                <div className={styles.scenarioGrid}>
+                  {cells.map((cell) => (
+                    <div key={cell.key} className={`${styles.scenarioCell} ${cell.cls}`}>
+                      <span className={styles.scenarioCellLabel}>{cell.label}</span>
+                      <span className={styles.scenarioCellValue}>
+                        {hasNpv ? fmtLocal(npv![cell.key]) : fmtRoi(c.scenarioThreeYearROI[cell.key], locale)}
+                      </span>
+                      {hasNpv && (
+                        <span className={styles.scenarioCellSub}>
+                          {locale === 'id' ? 'ROI ' : 'ROI '}{fmtRoi(c.scenarioThreeYearROI[cell.key], locale)}
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <div className={`${styles.scenarioCell} ${styles.scenarioCellBase}`}>
-                  <span className={styles.scenarioCellLabel}>{locale === 'id' ? 'Dasar' : 'Base'}</span>
-                  <span className={styles.scenarioCellValue}>{fmtRoi((calculations as any).scenarioThreeYearROI.base)}</span>
-                </div>
-                <div className={`${styles.scenarioCell} ${styles.scenarioCellHigh}`}>
-                  <span className={styles.scenarioCellLabel}>{locale === 'id' ? 'Optimistis' : 'Optimistic'}</span>
-                  <span className={styles.scenarioCellValue}>{fmtRoi((calculations as any).scenarioThreeYearROI.high)}</span>
-                </div>
+                <span className={styles.scenarioNote}>
+                  {locale === 'id'
+                    ? `Kisaran mencerminkan efisiensi otomasi 50%–90%; skenario dasar menggunakan ${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%. NPV dan payback adalah angka utama; ROI adalah pendamping dan bisa sangat tinggi karena dihitung atas biaya yang bisa diberi harga saja.`
+                    : `Range reflects 50%–90% automation efficiency; base case uses ${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%. NPV and payback are the headline; ROI is the companion and can be very high because it is computed over the costs that could be priced.`}
+                </span>
+                {/* Only when a running cost exists AND the headline is not already net: otherwise there is no gross figure
+                    to bridge to, and saying the scenarios are "net of running costs" would describe a cost that is not there. */}
+                {runCost && !headlineNet && (
+                  <span className={styles.scenarioNote}>
+                    {locale === 'id'
+                      ? `Skenario di atas bersifat bersih (NET, setelah biaya operasional berjalan). ${roiLabel(roiYears, 'id')} kotor (sebelum biaya berjalan, lihat Metodologi Langkah 6 di bawah) = ${fmtRoi(calculations.threeYearROIPercent, locale)} — bukan kesalahan, dua ukuran yang berbeda.`
+                      : `The scenarios above are NET (after ongoing running costs). The gross ${roiLabel(roiYears, 'en')} (before ongoing costs, see Methodology Step 6 below) = ${fmtRoi(calculations.threeYearROIPercent, locale)} — not an error, just a different measure.`}
+                  </span>
+                )}
               </div>
-              {runCost && (
-              <span className={styles.scenarioNote}>
-                {locale === 'id'
-                  ? `Kisaran mencerminkan efisiensi otomasi 50%–90%; skenario dasar menggunakan ${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%.`
-                  : `Range reflects 50%–90% automation efficiency; base case uses ${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%.`}
-              </span>
-              )}
-              {/* Without this line, "Dasar" here (net, after ongoing cost)
-                  and the "ROI N Tahun" hero tile + Methodology Step 6 (gross,
-                  before ongoing cost) read as two contradictory numbers for
-                  the same 75%-efficiency case — the gap between this card
-                  and the financial-terms note above (right after the ROI
-                  tile grid) is long enough that a reader lands here having
-                  forgotten it, and this card alone offers no reason the two
-                  don't match. Repeating the actual gross figure right here
-                  closes that gap without requiring a scroll back up. */}
-              <span className={styles.scenarioNote}>
-                {locale === 'id'
-                  ? `Skenario di atas bersifat bersih (NET, setelah biaya operasional berjalan). ${roiLabel(roiYears, 'id')} kotor (sebelum biaya berjalan, lihat Metodologi Langkah 6 di bawah) = ${fmtRoi(calculations.threeYearROIPercent)} — bukan kesalahan, dua ukuran yang berbeda.`
-                  : `The scenarios above are NET (after ongoing running costs). The gross ${roiLabel(roiYears, 'en')} (before ongoing costs, see Methodology Step 6 below) = ${fmtRoi(calculations.threeYearROIPercent)} — not an error, just a different measure.`}
-              </span>
-            </div>
-          )}
+            )
+          })()}
 
           {calculations.hasEnoughDataForProjection && (
             <ROISensitivityTornado

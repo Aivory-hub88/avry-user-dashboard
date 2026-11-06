@@ -4,7 +4,8 @@ import { useMemo, useState } from 'react'
 import type { DiagnosticContext, ROIProjection } from '@/types/diagnostic'
 import { recomputeROIAtEfficiency, EFFICIENCY_SCENARIO_BOUNDS } from '@/services/deepDiagnostic'
 import styles from './EfficiencyWhatIfSlider.module.css'
-import { getRoiHorizonYears, roiLabel } from '@/lib/roiHorizon'
+import { getRoiHorizonYears, roiLabel, npvLabel } from '@/lib/roiHorizon'
+import { formatRoi } from '@/lib/roiDisplay'
 import { unpricedCount, pricedOnlyNote } from '@/lib/pricedCostsOnly'
 
 interface EfficiencyWhatIfSliderProps {
@@ -126,11 +127,17 @@ export default function EfficiencyWhatIfSlider({
           <span className={styles.tileValue}>{formatMonths(display.paybackMonths)}</span>
         </div>
         <div className={styles.tile}>
+          <span className={styles.tileLabel}>{npvLabel(getRoiHorizonYears(display), locale)}</span>
+          <span className={styles.tileValue}>
+            {(display as { npvHorizonLocal?: number | null }).npvHorizonLocal != null
+              ? fmtLocal((display as { npvHorizonLocal?: number | null }).npvHorizonLocal)
+              : '—'}
+          </span>
+        </div>
+        <div className={styles.tile}>
           <span className={styles.tileLabel}>{roiLabel(getRoiHorizonYears(display), locale)}</span>
           <span className={styles.tileValue}>
-            {display.threeYearROIPercent != null
-              ? (display.threeYearROIPercent >= 999 ? '>999%' : formatPercent(display.threeYearROIPercent))
-              : '—'}
+            {formatRoi(display.threeYearROIPercent, locale, (v) => formatPercent(v), '—')}
           </span>
         </div>
       </div>
