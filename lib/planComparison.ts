@@ -34,9 +34,9 @@ export interface PlanCardRow {
   price: string
   /** What the plan costs per year. */
   yearly: string
-  /** Value created per year minus this plan's yearly cost. */
-  kept: string | null
-  keptTone: 'good' | 'bad' | null
+  /** This plan's yearly cost as a share of the yearly value the scope creates (value stays positive; the plan is the cost). */
+  share: string | null
+  shareTone: 'good' | 'bad' | null
   recommended: boolean
 }
 
@@ -44,9 +44,11 @@ export interface PlanCardView {
   heading: string
   /** One sentence: which plan, and why. */
   recommendation: string
+  /** The value the scope creates per year (from the Financial Case), stated once, plainly. */
+  valueLine: string | null
   whatItIs: string
   rows: PlanCardRow[]
-  labels: { who: string; includes: string; price: string; yearly: string; kept: string; recommended: string }
+  labels: { who: string; includes: string; price: string; yearly: string; share: string; recommended: string }
   caveat: string
 }
 
@@ -77,7 +79,7 @@ export function buildPlanComparison(
   const rowFor = (plan: PlanId): PlanCardRow => {
     const monthlyUSD = plan === 'enterprise' ? TIER_MONTHLY_PRICE_USD.business : TIER_MONTHLY_PRICE_USD[plan]
     const yearlyLocal = monthlyUSD * 12 * fx
-    const kept = value === null ? null : value - yearlyLocal
+    const sharePct = value !== null && value > 0 ? Math.round((yearlyLocal / value) * 100) : null
     const seats = TIER_SEAT_LIMIT[plan]
     const credits = TIER_CREDIT_ALLOWANCE[plan]
     const who =
@@ -97,8 +99,8 @@ export function buildPlanComparison(
     return {
       plan, name: NAME[plan], who, includes, price,
       yearly: `${fmt(yearlyLocal)}${id ? '/tahun' : '/year'}`,
-      kept: kept === null ? null : fmt(kept),
-      keptTone: kept === null ? null : kept >= 0 ? 'good' : 'bad',
+      share: sharePct === null ? null : (id ? `${sharePct}% dari nilai per tahun` : `${sharePct}% of the yearly value`),
+      shareTone: sharePct === null ? null : sharePct > 100 ? 'bad' : 'good',
       recommended: plan === recPlan,
     }
   }
@@ -136,11 +138,12 @@ export function buildPlanComparison(
   return {
     heading: id ? 'Rekomendasi plan Aivory' : 'Recommended Aivory plan',
     recommendation,
+    valueLine: value === null ? null : (id ? `Nilai yang dihasilkan cakupan ini: ${fmt(value)} per tahun (dari Financial Case).` : `Value this scope creates: ${fmt(value)} per year (from the Financial Case).`),
     whatItIs,
     rows: plans.map(rowFor),
     labels: id
-      ? { who: 'Untuk siapa', includes: 'Isi', price: 'Harga', yearly: 'Biaya per tahun', kept: 'Nilai per tahun setelah dikurangi plan', recommended: 'Direkomendasikan' }
-      : { who: 'Who it is for', includes: 'Includes', price: 'Price', yearly: 'Cost per year', kept: 'Yearly value left after the plan', recommended: 'Recommended' },
+      ? { who: 'Untuk siapa', includes: 'Isi', price: 'Harga', yearly: 'Biaya per tahun', share: 'Biaya plan dibanding nilai itu', recommended: 'Direkomendasikan' }
+      : { who: 'Who it is for', includes: 'Includes', price: 'Price', yearly: 'Cost per year', share: 'Plan cost compared with that value', recommended: 'Recommended' },
     caveat: `${scope} ${how}`,
   }
 }
