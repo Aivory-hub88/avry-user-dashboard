@@ -2774,6 +2774,27 @@ export function upgradeDiagnosticContext(
     changed = true
   }
 
+  // Reports priced on the transformation model before the NPV range existed carry no scenario NPV, so the page would
+  // fall back to a ROI range that saturates into three identical numbers. Re-run the same calculation with the stored
+  // investment so the NPV range exists. Idempotent: once the fields are present this is skipped.
+  if (context.quantitative && calculations && calc?.investmentBasis === 'required' && calc.requiredInvestment
+      && calc.requiredInvestment.costModel === 'transformation'
+      && !(calculations as Partial<ROIProjection>).scenarioHorizonNPVLocal) {
+    const currencyCode = parseCurrencyCode(context.currency)
+    const reRun = calculateROI(
+      context.quantitative,
+      currencyCode,
+      context.qualitative?.industry,
+      undefined,
+      calc.requiredInvestment,
+    )
+    calculations = {
+      ...reRun,
+      confidenceLevel: dampConfidenceByEstimateBasis(reRun.confidenceLevel, context.qualitative?.estimateBasis),
+    }
+    changed = true
+  }
+
   // Generate Room for Improvement if the stored context predates the feature.
   // Always regenerated from the latest copy. Contexts stored since
   // 2026-10-10 carry the quoted answers (qualitative.rfiAnswers), so BOTH

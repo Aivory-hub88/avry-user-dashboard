@@ -94,3 +94,23 @@ function ctx2() {
     priority_areas: ['Operations and logistics'],
   } as any) as any).calculations
 }
+
+describe('stored reports without scenario NPV', () => {
+  it('get the NPV range when opened, so the range is never three identical saturated ROIs', async () => {
+    const { upgradeDiagnosticContext } = await import('@/services/deepDiagnostic')
+    const ctx: any = buildDiagnosticContext({
+      currency: 'IDR — Indonesian Rupiah (Rp)', industry: 'Technology / Software', hourly_cost: 75000,
+      manual_hours_per_person: 'Over 20 hours/person/week', fte_count: '6-15 FTEs', company_size: 'Micro (2–10 employees)',
+      automation_current: '10-25%', target_automation: '50-75%',
+      priority_areas: ['Operations and logistics', 'Customer service/support'],
+    } as any)
+    const stored = JSON.parse(JSON.stringify(ctx))
+    delete stored.calculations.scenarioHorizonNPV
+    delete stored.calculations.scenarioHorizonNPVLocal
+    const up: any = upgradeDiagnosticContext(stored)
+    const n = up.calculations.scenarioHorizonNPVLocal
+    expect(n).toBeTruthy()
+    expect(n.low).toBeLessThan(n.base)
+    expect(n.base).toBeLessThan(n.high)
+  })
+})
