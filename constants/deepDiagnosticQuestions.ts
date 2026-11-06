@@ -129,7 +129,6 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
         helperText: 'Be as specific as possible',
         required: true,
         validation: {
-          minLength: 20,
           maxLength: 500
         }
       },
@@ -543,7 +542,6 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
         helperText: 'Be specific about what causes delays, errors, or inefficiencies',
         required: true,
         validation: {
-          minLength: 30,
           maxLength: 1000
         }
       },
@@ -555,7 +553,6 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
         helperText: 'Include approximate time spent per week if known',
         required: true,
         validation: {
-          minLength: 20,
           maxLength: 1000
         }
       },
