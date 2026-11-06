@@ -349,6 +349,11 @@ export interface ROIProjection {
   smallTeamRateApplied: boolean
   /** Where the hourly rate came from: the user's own figure or a market benchmark. */
   hourlyRateSource?: 'user' | 'benchmark'
+  /** 'net' when the headline Payback / ROI already deduct the running cost (transformation cost model). */
+  headlineBasis?: 'net' | 'gross'
+  /** Payback and ROI before running costs, kept when the headline is net. */
+  grossPaybackMonths?: number | null
+  grossHorizonROIPercent?: number | null
   /** The user typed an hourly cost that looked out of range (e.g. a monthly salary), so the benchmark was used. */
   hourlyCostRejected?: boolean
   /** USD→local FX rate applied to the *Local fields (live quote when available). */
@@ -655,10 +660,46 @@ export interface RequiredInvestment {
   setupUSD: number
   /** Opportunities whose setup is counted (automation only, not training). */
   setupOpportunities: number
-  /** Year-1 cash: package + setup. (Reports stored before 2026-11-06 also include the plan months.) */
+  /**
+   * Year-1 cash. `costModel: 'transformation'`: your team's setup effort + the first year of the
+   * recommended software that is priced for a whole team. Older stored reports: package + setup
+   * (+ plan months before 2026-11-06).
+   */
   initialUSD: number
-  /** Running cost counted in the figures: 0 now (the plan is a recommendation). Older stored reports: 12 plan months. */
+  /**
+   * Running cost counted in the figures. `costModel: 'transformation'`: the yearly cost of the
+   * recommended software priced for a whole team (0 if none). Older stored reports: 12 plan months.
+   */
   annualRecurringUSD: number
+  /**
+   * 'transformation' = the case prices the user's actual transformation (own setup effort + recommended
+   * software); the Aivory package and plan are one delivery option shown next to it, not part of it.
+   * Absent on older stored reports, which are re-priced when opened.
+   */
+  costModel?: 'transformation'
+  /** Recommended software and what each contributes to the figures. */
+  softwareLines?: SoftwareCostLine[]
+  softwareAnnualUSD?: number
+  /** Things the report recommends but cannot price without inventing a number. */
+  unpriced?: UnpricedItem[]
+}
+
+export interface SoftwareCostLine {
+  name: string
+  category: { en: string; id: string }
+  priceBasis: string
+  /** Entry list price, USD per month (per seat / outlet when the basis says so). */
+  priceUSD: number
+  /** 12 x list price when the price covers a whole team (flat or self-hosted); null when per seat, per outlet, metered, a fee or a quote. */
+  annualUSD: number | null
+}
+
+export interface UnpricedItem {
+  kind: 'software' | 'training' | 'data_prep'
+  /** The product name (software) or the opportunity title (training, data preparation). */
+  title: string
+  /** For software: why it has no price in the figures (its price basis). */
+  basis?: string
 }
 
 export type RfiAnswerKey =

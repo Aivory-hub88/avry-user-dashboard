@@ -394,7 +394,8 @@ import { parseCurrencyCode, formatLocalAmount, type CurrencyCode } from '@/lib/r
 import { getBudgetBands, getLabourBenchmark, resolveBandMidpointUSD, isBandForCurrency } from '@/lib/currencyBands'
 import { TIER_MONTHLY_PRICE_USD, FULLSTACK_PACKAGE_PRICE_USD, FULLSTACK_INCLUDED_PLAN_MONTHS } from '@/lib/tiers'
 import { planForTeam } from '@/lib/planForTeam'
-import type { RequiredInvestment } from '@/types/diagnostic'
+import type { RequiredInvestment, SoftwareCostLine, UnpricedItem } from '@/types/diagnostic'
+import { selectSoftwareRecommendations, selectSoftwareForContext, resolveMarket, type SoftwarePick } from '@/lib/softwareCatalog'
 import { normalizeIndustryKey } from '@/lib/industryBenchmarks'
 
 // ---- String normalization helper ----
@@ -648,6 +649,8 @@ export function estimateRequiredInvestment(
   fteCountInScope: number | null,
   setupHourlyRateUSD: number,
   companySize?: string | null,
+  /** The software the report recommends (lib/softwareCatalog), so the case can price it. */
+  software: SoftwarePick[] = [],
 ): RequiredInvestment {
   const plan = aivoryPlanForTeam(fteCountInScope, companySize)
   // Training is capability-building, not an automation to set up.
@@ -655,20 +658,47 @@ export function estimateRequiredInvestment(
   const setupHours = automation.reduce((sum, o) => sum + SETUP_HOURS_BY_COMPLEXITY[o.complexity], 0)
   const setupUSD = setupHours * setupHourlyRateUSD
   const planMonthsYear1 = 12 - FULLSTACK_INCLUDED_PLAN_MONTHS
+
+  // The case prices the user's ACTUAL transformation, not an Aivory quote: their own setup effort plus the
+  // software the report recommends. Only software whose list price covers a whole team (flat or free /
+  // self-hosted) is priced; per-seat, per-outlet, metered, fee and quote products need a count or a vendor
+  // quote the report does not have, so they are listed as not priced instead of getting an invented number.
+  // Training and data preparation have no price in the catalog, so they are listed the same way.
+  const softwareLines: SoftwareCostLine[] = software.map((p) => ({
+    name: p.name,
+    category: p.category,
+    priceBasis: p.priceBasis,
+    priceUSD: p.priceUSD,
+    // A free tier costs nothing whatever its basis; otherwise only a price that covers a whole team is priced.
+    annualUSD: p.priceBasis === 'flat' || p.priceBasis === 'self_host'
+      ? p.priceUSD * 12
+      : p.priceUSD === 0 && (p.priceBasis === 'per_user' || p.priceBasis === 'per_employee' || p.priceBasis === 'per_location')
+        ? 0
+        : null,
+  }))
+  const softwareAnnualUSD = softwareLines.reduce((sum, l) => sum + (l.annualUSD ?? 0), 0)
+  const unpriced: UnpricedItem[] = [
+    ...softwareLines.filter((l) => l.annualUSD === null).map((l) => ({ kind: 'software' as const, title: l.name, basis: l.priceBasis })),
+    ...opportunities.filter((o) => o.trainingTracks).map((o) => ({ kind: 'training' as const, title: o.title })),
+    ...automation.filter((o) => o.dataReadiness !== 'ready').map((o) => ({ kind: 'data_prep' as const, title: o.title })),
+  ]
+
   return {
     ...plan,
+    // Aivory's own package and plan stay on the object: they are ONE delivery option shown next to the case
+    // (lib/planComparison.ts), not part of its figures.
     packageUSD: FULLSTACK_PACKAGE_PRICE_USD,
     planMonthsYear1,
     setupHours,
     setupHourlyRateUSD,
     setupUSD,
     setupOpportunities: automation.length,
-    // The Aivory subscription is a RECOMMENDATION shown next to the report (lib/planComparison.ts), not
-    // a cost inside the Financial Case: the case values the scope against the one-time package and the
-    // team's setup time. With no running cost, Payback / ROI / NPV all sit on one basis (no gross vs
-    // net split). plan / planMonthlyUSD / planMonthsYear1 stay on the object for the recommendation.
-    initialUSD: FULLSTACK_PACKAGE_PRICE_USD + setupUSD,
-    annualRecurringUSD: 0,
+    costModel: 'transformation',
+    softwareLines,
+    softwareAnnualUSD,
+    unpriced,
+    initialUSD: setupUSD + softwareAnnualUSD,
+    annualRecurringUSD: softwareAnnualUSD,
   }
 }
 
@@ -977,6 +1007,17 @@ export function calculateROI(
     })
   }
 
+  // With a running cost in the case (recommended software), the headline Payback and ROI must already deduct it,
+  // or the page shows a flattering gross ROI next to a negative net figure. The gross values stay available.
+  const headlineNet = requiredInvestment?.costModel === 'transformation' && (annualOngoingCostUSD ?? 0) > 0
+  const headlinePaybackMonths = headlineNet ? netPaybackMonths : paybackMonths
+  const headlineROIPercent = headlineNet ? netHorizonROIPercent : horizonROIPercent
+  const headlineROIWithCapacityPercent = headlineNet
+    ? (capacityAvoidanceUSD && totalAnnualSavingsUSD && budgetUSD && budgetUSD > 0 && annualOngoingCostUSD !== null
+        ? Math.min(((cumulativeNet(totalAnnualSavingsUSD + capacityAvoidanceUSD, annualOngoingCostUSD, roiHorizonYears) - budgetUSD) / budgetUSD) * 100, 999)
+        : null)
+    : horizonROIWithCapacityPercent
+
   return {
     // Bug 1 fix: currency-neutral field names (*Local instead of *IDR)
     annualLaborSavingsLocal: annualLaborSavingsUSD ? annualLaborSavingsUSD * rate : null,
@@ -986,16 +1027,19 @@ export function calculateROI(
     // Bug 3 fix: expose raw USD field so formula verification never needs division
     totalAnnualSavingsUSD,
     hoursReclaimedPerYear,
-    paybackMonths,
+    paybackMonths: headlinePaybackMonths,
+    headlineBasis: headlineNet ? ('net' as const) : ('gross' as const),
+    grossPaybackMonths: paybackMonths,
+    grossHorizonROIPercent: horizonROIPercent,
     // Adaptive ROI window — drives every "N-Year ROI/NPV" label in the report.
     roiHorizonYears,
     netBreakEvenYears,
-    horizonROIPercent,
+    horizonROIPercent: headlineROIPercent,
     cumulativeSavingsHorizonUSD,
     cumulativeSavingsHorizonLocal: cumulativeSavingsHorizonUSD !== null ? cumulativeSavingsHorizonUSD * rate : null,
     // Legacy name, same value — kept so contexts/readers written against the
     // old fixed-3-year field keep working. The window is roiHorizonYears.
-    threeYearROIPercent: horizonROIPercent,
+    threeYearROIPercent: headlineROIPercent,
     hasEnoughDataForProjection: hasEnough,
     confidenceLevel: confidence,
     missingInputs: missing,
@@ -1005,7 +1049,7 @@ export function calculateROI(
     capacityAvoidedHoursPerYear,
     capacityAvoidanceUSD,
     capacityAvoidanceLocal: capacityAvoidanceUSD !== null ? capacityAvoidanceUSD * rate : null,
-    horizonROIWithCapacityPercent,
+    horizonROIWithCapacityPercent: headlineROIWithCapacityPercent,
     // Methodology transparency fields — expose the assumptions behind the numbers
     assumedHourlyRateUSD: hourlyRateUSD,
     assumedHourlyRateLocal: hourlyRateUSD * rate,
@@ -2419,11 +2463,21 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
   // investment, and the second pass appraises the case on it.
   const savingsPass = calculateROI(quantitative, currencyCode, answers.industry)
   const opportunities = rankOpportunities(answers, scores, currencyCode, savingsPass.totalAnnualSavingsUSD, 'en')
+  const recommendedSoftware = selectSoftwareRecommendations({
+    currency: currencyCode,
+    industry: answers.industry,
+    painPoints: String(answers.pain_points ?? '').split('\n').map((l) => l.trim()).filter(Boolean),
+    opportunityTitles: opportunities.map((o) => o.title),
+    budgetMidpointUSD,
+    fteCountInScope,
+    market: resolveMarket(answers.operating_country, currencyCode),
+  })
   const requiredInvestment = estimateRequiredInvestment(
     opportunities,
     fteCountInScope,
     savingsPass.assumedHourlyRateUSD ?? DEFAULT_HOURLY_RATE_USD,
     answers.company_size,
+    recommendedSoftware,
   )
   const calculations = calculateROI(quantitative, currencyCode, answers.industry, undefined, requiredInvestment)
 
@@ -2619,19 +2673,28 @@ export function upgradeDiagnosticContext(
     changed = true
   }
 
-  // Reports saved before 2026-11-06 carry the Aivory plan INSIDE their figures (plan months in the
-  // year-1 investment, a running cost from year 2). The plan is now a recommendation, so those
-  // reports are re-priced on the same basis as new ones whenever they are opened. Otherwise the
-  // same page mixes the old negative NPV / net savings with the new recommendation card.
-  // Uses the stored answers (quantitative, incl. a user-stated hourly cost) and the stored scope
-  // (package + setup); nothing is invented. Idempotent: a re-priced report has no running cost.
-  if (!needsRoiUpgrade && context.quantitative && calc?.investmentBasis === 'required'
-      && calc.requiredInvestment && calc.requiredInvestment.annualRecurringUSD > 0) {
+  // Reports saved before the transformation cost model price the case on Aivory's own SKUs: either with the
+  // plan inside the figures (before 2026-11-06) or with only Aivory's package + setup (2026-11-06 to now).
+  // Those are re-priced when opened, from their stored answers and scope: the user's own setup effort plus the
+  // software the report recommends, with Aivory shown as a delivery option next to it. Otherwise the same page
+  // would mix the old figures with the new recommendation. Idempotent: a re-priced report carries
+  // costModel 'transformation' and is left alone. Needs the stored opportunities (the scope).
+  if (!needsRoiUpgrade && context.quantitative && Array.isArray(context.opportunities) && context.opportunities.length > 0
+      && calc?.investmentBasis === 'required' && calc.requiredInvestment
+      && calc.requiredInvestment.costModel !== 'transformation') {
     const ri = calc.requiredInvestment
-    const repriced = { ...ri, initialUSD: ri.packageUSD + ri.setupUSD, annualRecurringUSD: 0 }
+    const currencyCode = parseCurrencyCode(context.currency)
+    const picks = selectSoftwareForContext(context as never, context.opportunities.map((o) => o.title), currencyCode)
+    const repriced = estimateRequiredInvestment(
+      context.opportunities,
+      context.quantitative.fteCountInScope ?? null,
+      ri.setupHourlyRateUSD,
+      context.qualitative?.companySize,
+      picks,
+    )
     const reRun = calculateROI(
       context.quantitative,
-      parseCurrencyCode(context.currency),
+      currencyCode,
       context.qualitative?.industry,
       undefined,
       repriced,

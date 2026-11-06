@@ -45,6 +45,8 @@ export interface PlanCardView {
   heading: string
   /** One sentence: which plan, and why. */
   recommendation: string
+  /** What delivering the automation with Aivory costs: the one-time package plus the plan. */
+  optionLine: string
   /** The value the scope creates per year (from the Financial Case), stated once, plainly. */
   valueLine: string | null
   whatItIs: string
@@ -130,7 +132,17 @@ export function buildPlanComparison(
     ? 'Plan Aivory adalah langganan bulanan yang menjalankan otomasi Anda setelah paket sekali bayar. Paket sudah mencakup bulan pertama.'
     : 'The Aivory plan is the monthly subscription that runs your automations after the one-time package. The package already covers the first month.'
 
-  const scope = planInFigures
+  const pkgLocal = r.packageUSD * fx
+  const recYearly = recPlan === 'enterprise' ? null : yearlyOf(recPlan)
+  const optionLine = id
+    ? `Jika dikerjakan dengan Aivory: Complete Transformation Package ${fmt(pkgLocal)} (sekali bayar, sudah mencakup bulan pertama)${recYearly === null ? ', ditambah plan Enterprise yang dihargai tim sales' : `, lalu plan ${NAME[recPlan]} ${fmt(recYearly)} per tahun`}.`
+    : `If you deliver it with Aivory: the Complete Transformation Package ${fmt(pkgLocal)} (one-time, covers the first month)${recYearly === null ? ', plus the Enterprise plan, priced by sales' : `, then the ${NAME[recPlan]} plan at ${fmt(recYearly)} a year`}.`
+
+  const transformation = r.costModel === 'transformation'
+  const scope = transformation
+    ? (id ? 'Biaya Aivory ini tidak termasuk dalam angka Financial Case di atas (yang mencakup usaha setup tim Anda dan software yang direkomendasikan laporan). Aivory adalah salah satu cara mengerjakan otomasinya: bandingkan biaya per tahun dengan nilai yang dihasilkan.'
+          : "These Aivory costs are not part of the Financial Case figures above (those cover your team's own setup effort and the software the report recommends). Aivory is one way to deliver the automation: compare the yearly cost with the value created.")
+    : planInFigures
     ? (id ? 'Pada laporan ini biaya plan sudah dihitung di biaya berjalan dan angka bersih di atas.' : 'In this report the plan cost is already counted in the running cost and the net figures above.')
     : (id ? 'Biaya plan tidak termasuk dalam angka Financial Case (yang hanya mencakup paket sekali bayar dan waktu setup tim). Plan ditampilkan sebagai rekomendasi supaya Anda bisa menilai kecocokannya: bandingkan biaya per tahun dengan nilai yang dihasilkan.'
         : 'The plan cost is not part of the Financial Case figures (those cover the one-time package and your team\'s setup time). It is shown as a recommendation so you can judge the fit: compare the yearly cost with the value created.')
@@ -139,8 +151,9 @@ export function buildPlanComparison(
     : 'The plan is picked from your company size: working alone Operational (1 seat); more than one person Business or Enterprise, with Enterprise above 200 employees in scope. That is an estimate: what really decides the plan is how many people use Aivory and how much it runs.'
 
   return {
-    heading: id ? 'Rekomendasi plan Aivory' : 'Recommended Aivory plan',
+    heading: id ? 'Mengerjakannya dengan Aivory: salah satu opsi' : 'Delivering it with Aivory: one option',
     recommendation,
+    optionLine,
     valueLine: value === null ? null : (id ? `Nilai yang dihasilkan cakupan ini: ${fmt(value)} per tahun (dari Financial Case).` : `Value this scope creates: ${fmt(value)} per year (from the Financial Case).`),
     whatItIs,
     rows: plans.map(rowFor),

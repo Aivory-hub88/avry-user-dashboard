@@ -60,7 +60,7 @@ describe('unknown team size (FTE question skipped or "Not sure")', () => {
     const SMALL = { ...LOGISTICS, manual_hours_weekly: 'Under 10 hours/week', fte_count: 'Not sure' }
     const calc: any = buildDiagnosticContext(SMALL as any).calculations
     const en = buildRequiredInvestmentView(calc, (v) => String(Math.round(v)), 'en')!
-    expect(en.rows.some((r) => /plan/i.test(r.label))).toBe(false)
+    expect(en.rows.some((r) => /Aivory|Business plan|Operational plan|Enterprise plan/.test(r.label))).toBe(false)
     expect(en.planNote).toMatch(/We recommend the Operational plan: your team size is not known, so the entry plan is assumed/)
     const id = buildRequiredInvestmentView(calc, (v) => String(Math.round(v)), 'id')!
     expect(id.planNote).toMatch(/Kami merekomendasikan plan Operational: ukuran tim tidak diketahui/)
@@ -68,16 +68,56 @@ describe('unknown team size (FTE question skipped or "Not sure")', () => {
 })
 
 describe('estimateRequiredInvestment', () => {
-  it('= package + setup hours by complexity; the plan is a recommendation, not a cost; training is not set up', () => {
+  const pick = (name: string, priceBasis: string, priceUSD: number) =>
+    ({ name, category: { en: 'Cat', id: 'Kat' }, priceBasis, priceUSD, regions: ['global'], reason: { en: '', id: '' }, vendorUrl: '', priceCheckedAt: '2026-08-27', matchedSignal: 'x' }) as any
+  const prepOpp = (title: string, complexity: RankedOpportunity['complexity'], dataReadiness: string, training = false) =>
+    ({ title, complexity, dataReadiness, ...(training ? { trainingTracks: [] } : {}) }) as unknown as RankedOpportunity
+
+  it('= your own setup effort by complexity; Aivory package and plan are NOT in it; training is not set up', () => {
     const r = estimateRequiredInvestment([opp('low'), opp('medium'), opp('high'), opp('low', true)], 33, 10)
+    expect(r.costModel).toBe('transformation')
     expect(r.setupOpportunities).toBe(3)
     expect(r.setupHours).toBe(20 + 60 + 160)
     expect(r.setupUSD).toBe(2400)
-    expect(r.planMonthsYear1).toBe(11) // kept for the recommendation text
-    expect(r.initialUSD).toBe(299 + 2400)
+    expect(r.initialUSD).toBe(2400) // no package, no plan months
     expect(r.annualRecurringUSD).toBe(0)
-    expect(r.plan).toBe('business') // still recommended, just not charged inside the case
+    // Aivory stays on the object as ONE delivery option, with its own numbers
+    expect(r.packageUSD).toBe(299)
+    expect(r.planMonthsYear1).toBe(11)
+    expect(r.plan).toBe('business')
     expect(r.planMonthlyUSD).toBe(99)
+  })
+
+  it('prices only software whose list price covers a team (or is free); everything else is listed as not priced, never guessed', () => {
+    const r = estimateRequiredInvestment([opp('low')], 10, 10, undefined, [
+      pick('Flat tool', 'flat', 20),
+      pick('Self hosted', 'self_host', 0),
+      pick('Free CRM', 'per_user', 0),
+      pick('Seat tool', 'per_user', 17),
+      pick('Fee tool', 'transaction_fee', 0),
+      pick('Quote tool', 'quote', 0),
+    ])
+    const annual = Object.fromEntries(r.softwareLines!.map((l) => [l.name, l.annualUSD]))
+    expect(annual).toEqual({ 'Flat tool': 240, 'Self hosted': 0, 'Free CRM': 0, 'Seat tool': null, 'Fee tool': null, 'Quote tool': null })
+    expect(r.softwareAnnualUSD).toBe(240)
+    expect(r.initialUSD).toBe(r.setupUSD + 240) // year 1 = setup + 12 months of the priced software
+    expect(r.annualRecurringUSD).toBe(240)
+    expect(r.unpriced!.filter((i) => i.kind === 'software').map((i) => i.title)).toEqual(['Seat tool', 'Fee tool', 'Quote tool'])
+  })
+
+  it('lists training and data preparation as not priced (the catalog has no price for them)', () => {
+    const r = estimateRequiredInvestment([
+      prepOpp('Order intake', 'low', 'ready'),
+      prepOpp('Reporting', 'medium', 'needs_prep'),
+      prepOpp('Ticket triage', 'medium', 'not_ready'),
+      prepOpp('Team training', 'low', 'ready', true),
+    ], 10, 10)
+    expect(r.unpriced).toEqual([
+      { kind: 'training', title: 'Team training' },
+      { kind: 'data_prep', title: 'Reporting' },
+      { kind: 'data_prep', title: 'Ticket triage' },
+    ])
+    expect(r.setupOpportunities).toBe(3) // training is not an automation to set up
   })
 })
 
@@ -125,7 +165,8 @@ describe('buildRequiredInvestmentView', () => {
     const k: any = buildDiagnosticContext(LOGISTICS as any).calculations
     const v = buildRequiredInvestmentView(k, fmt, 'id')!
     const labels = v.rows.map((r) => r.label)
-    expect(labels[0]).toContain('Complete Transformation Package')
+    expect(labels[0]).toContain('Setup & integrasi oleh tim Anda')
+    expect(labels.some((l) => /Complete Transformation Package|Aivory/.test(l))).toBe(false)
     expect(labels).toContain('Investasi yang dibutuhkan — tahun pertama')
     expect(labels).toContain('Anggaran yang Anda siapkan')
     // a positive remainder next to a possibly net-negative case was misleading, so it is not a row
