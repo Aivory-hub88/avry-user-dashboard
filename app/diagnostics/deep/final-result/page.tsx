@@ -22,6 +22,7 @@ import ErrorCard from '@/components/result/ErrorCard'
 import { localizeLlmResult } from '@/lib/llmResultLocale'
 import { buildWebsiteInsightsView } from '@/lib/websiteInsightsView'
 import { buildNetVerdict } from '@/lib/netVerdict'
+import { buildPlanComparison } from '@/lib/planComparison'
 
 import { splitBold } from '@/lib/boldMarkup'
 import SectionNavRail from '@/components/result/SectionNavRail'
@@ -433,6 +434,7 @@ export default function FinalResultPage() {
       ? `Nilai tenaga kerja dihitung dengan ${fmtLocal(c.assumedHourlyRateLocal)} per jam, perkiraan dari benchmark pasar (${c.rateBenchmarkLabelId ?? 'industri'}), ${rejected ? 'karena biaya per jam yang Anda isi tampak di luar kewajaran (mis. gaji bulanan, bukan per jam)' : 'karena biaya per jam tidak diisi'}. Jalankan ulang diagnostic dengan biaya per jam Anda sendiri untuk kasus yang lebih akurat.`
       : `Labor is valued at ${fmtLocal(c.assumedHourlyRateLocal)} per hour, an estimate from a market benchmark (${c.rateBenchmarkLabel ?? 'industry'}), ${rejected ? 'because the hourly cost you entered looked out of range (e.g. a monthly salary rather than an hourly figure)' : 'because no hourly cost was entered'}. Re-run the diagnostic with your own hourly cost for a more accurate case.`
   })()
+  const planCard = requiredBasis ? buildPlanComparison(calculations as any, (v) => fmtLocal(v), locale) : null
   const planDisplayName = (() => { const p = (calculations as any).requiredInvestment?.plan; return p ? p.charAt(0).toUpperCase() + p.slice(1) : '' })()
   const netVerdict = requiredBasis ? buildNetVerdict({ ...(calculations as any), planName: planDisplayName }, locale, fmtLocal) : null
   const requiredView = buildRequiredInvestmentView(calculations as never, (v) => fmtLocal(v), locale)
@@ -1006,7 +1008,31 @@ export default function FinalResultPage() {
                   </Fragment>
                 ))}
               </div>
-              {requiredView.planNote && <p className={styles.thresholdIntro} style={{ marginTop: '0.9rem' }}>{requiredView.planNote}</p>}
+              {planCard && (
+                <div className={styles.planCard}>
+                  <h3 className={styles.planHeading}>{planCard.heading}</h3>
+                  <p className={styles.planWhat}>{planCard.whatItIs}</p>
+                  <div className={styles.planGrid}>
+                    {planCard.rows.map((row) => (
+                      <div key={row.plan} className={`${styles.planOption} ${row.used ? styles.planOptionUsed : ''}`}>
+                        <div className={styles.planOptionHead}>
+                          <strong>{row.name}</strong>
+                          {row.used && <span className={styles.planBadge}>{planCard.labels.used}</span>}
+                        </div>
+                        <dl className={styles.planFacts}>
+                          <div><dt>{planCard.labels.who}</dt><dd>{row.who}</dd></div>
+                          <div><dt>{planCard.labels.includes}</dt><dd>{row.includes}</dd></div>
+                          <div><dt>{planCard.labels.price}</dt><dd>{row.price}</dd></div>
+                          <div><dt>{planCard.labels.investment}</dt><dd>{row.investment}</dd></div>
+                          <div><dt>{planCard.labels.net}</dt><dd style={{ fontWeight: 700, color: row.netTone === 'good' ? '#86efac' : row.netTone === 'bad' ? '#f87171' : undefined }}>{row.net}</dd></div>
+                          <div><dt>{planCard.labels.payback}</dt><dd style={{ fontWeight: 700, color: row.paybackTone === 'good' ? '#86efac' : '#f87171' }}>{row.payback}</dd></div>
+                        </dl>
+                      </div>
+                    ))}
+                  </div>
+                  <p className={styles.planCaveat}>{planCard.caveat}</p>
+                </div>
+              )}
               <p className={styles.thresholdFootnote}>{requiredView.footnote}</p>
             </div>
           )}
