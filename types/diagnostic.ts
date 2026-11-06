@@ -633,6 +633,11 @@ export interface RequiredInvestment {
   plan: 'operational' | 'business' | 'enterprise'
   /** Enterprise is sales-priced: the Business price is used as a floor. */
   planPriceIsFloor: boolean
+  /**
+   * True when the team size was not given (the FTE question is optional), so the
+   * plan is an assumption (Operational) rather than derived from the answer.
+   */
+  planAssumed?: boolean
   planMonthlyUSD: number
   packageUSD: number
   /** Plan months paid in year 1 (12 minus the months the package includes). */

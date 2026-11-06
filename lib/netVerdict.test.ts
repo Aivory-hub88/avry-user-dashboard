@@ -13,6 +13,12 @@ describe('buildNetVerdict', () => {
     expect(t).toMatch(/about 205 recovered hours per year \(this scope recovers 166\)/)
     expect(t).toMatch(/before running costs/)
   })
+  it('names the plan so the cost is not a mystery line', () => {
+    const t = buildNetVerdict({ ...LOSS, planName: 'Business' }, 'en', fmt)!
+    expect(t).toMatch(/Aivory Business plan costs/)
+    expect(t).toMatch(/explained in the investment section above/)
+    expect(buildNetVerdict({ ...LOSS, planName: 'Business' }, 'id', fmt)!).toMatch(/plan Aivory Business memakan/)
+  })
   it('is localized', () => {
     expect(buildNetVerdict(LOSS, 'id', fmt)!).toMatch(/belum menutup biayanya sendiri/)
   })
