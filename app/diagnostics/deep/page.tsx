@@ -46,6 +46,7 @@ export default function DeepDiagnosticPage() {
   const [storageWarning, setStorageWarning] = useState(false)
 
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const phaseScrollRef = useRef<HTMLDivElement | null>(null)
 
   // On mount: check for saved progress. Only stage it in `savedProgress` for
   // the resume/start-fresh banner — do NOT apply companyName (or anything
@@ -91,6 +92,18 @@ export default function DeepDiagnosticPage() {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
   }, [phaseData, currentPhase, companyName, websiteUrl])
+
+  // Every phase change (Next/Previous, sidebar click, Resume) swaps the questions
+  // inside an internally scrolling pane, so the previous phase's scroll position
+  // would otherwise carry over and land the user mid-page. Reset it to the top.
+  // Ancestors are reset too, for the stacked mobile layout where the page scrolls.
+  useEffect(() => {
+    let el: HTMLElement | null = phaseScrollRef.current
+    while (el) {
+      if (el.scrollTop > 0) el.scrollTop = 0
+      el = el.parentElement
+    }
+  }, [currentPhase])
 
   const handleResume = () => {
     if (!savedProgress) return
@@ -315,7 +328,7 @@ export default function DeepDiagnosticPage() {
             currentPhase={currentPhaseIndex}
           />
 
-          <div className={styles.phaseContentWrapper}>
+          <div ref={phaseScrollRef} className={styles.phaseContentWrapper}>
             {currentPhase === PHASE_ORDER[0] && (
               <div className={styles.companyNameField}>
                 <label htmlFor="companyName" className={styles.companyNameLabel}>
