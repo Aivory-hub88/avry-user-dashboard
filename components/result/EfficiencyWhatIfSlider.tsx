@@ -5,6 +5,7 @@ import type { DiagnosticContext, ROIProjection } from '@/types/diagnostic'
 import { recomputeROIAtEfficiency, EFFICIENCY_SCENARIO_BOUNDS } from '@/services/deepDiagnostic'
 import styles from './EfficiencyWhatIfSlider.module.css'
 import { getRoiHorizonYears, roiLabel } from '@/lib/roiHorizon'
+import { unpricedCount, pricedOnlyNote } from '@/lib/pricedCostsOnly'
 
 interface EfficiencyWhatIfSliderProps {
   /** Only the fields the ROI formula needs — never the whole page context, to make the read-only contract obvious at the call site. */
@@ -52,6 +53,8 @@ export default function EfficiencyWhatIfSlider({
   const [sliderPct, setSliderPct] = useState(defaultPct)
 
   const isSimulating = sliderPct !== defaultPct
+  // A very high ROI here is a ratio over the costs that could be priced; say so when some could not.
+  const pricedNote = pricedOnlyNote(unpricedCount(calculations), locale)
 
   // Recomputed client-side only, from the shared pure formula. This is a
   // fresh object every render — it is never written back onto `context` or
@@ -131,6 +134,7 @@ export default function EfficiencyWhatIfSlider({
           </span>
         </div>
       </div>
+      {pricedNote && <p className={styles.note}>{pricedNote}</p>}
     </div>
   )
 }

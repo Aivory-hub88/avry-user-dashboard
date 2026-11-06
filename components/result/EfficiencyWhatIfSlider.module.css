@@ -129,3 +129,10 @@
   font-weight: 700;
   color: #e5e5e3;
 }
+
+.note {
+  margin: 0.75rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #a3a39c;
+}
