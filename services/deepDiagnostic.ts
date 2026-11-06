@@ -393,6 +393,7 @@ import type {
 import { parseCurrencyCode, formatLocalAmount, type CurrencyCode } from '@/lib/resultFormatters'
 import { getBudgetBands, getLabourBenchmark, resolveBandMidpointUSD, isBandForCurrency } from '@/lib/currencyBands'
 import { TIER_MONTHLY_PRICE_USD, FULLSTACK_PACKAGE_PRICE_USD, FULLSTACK_INCLUDED_PLAN_MONTHS } from '@/lib/tiers'
+import { planForTeam } from '@/lib/planForTeam'
 import type { RequiredInvestment } from '@/types/diagnostic'
 import { normalizeIndustryKey } from '@/lib/industryBenchmarks'
 
@@ -628,30 +629,27 @@ export const SETUP_HOURS_BY_COMPLEXITY: Record<RankedOpportunity['complexity'], 
 }
 
 /** Plan by team size: ≤5 FTE Operational, 6–200 Business, >200 Enterprise (sales-priced; Business used as floor). */
-export function aivoryPlanForTeam(fteCountInScope: number | null): Pick<RequiredInvestment, 'plan' | 'planPriceIsFloor' | 'planMonthlyUSD' | 'planAssumed'> {
-  // Team size is an OPTIONAL question ("Not sure" / skipped → null). Unknown used to fall
-  // through to Business ($99/mo, the dearest non-enterprise plan), which silently priced
-  // every such report against its most expensive case and made Net Annual Savings, NPV
-  // and Net Payback read negative. Unknown now means the entry plan, flagged as an
-  // assumption in the report so the reader can see (and correct) it.
-  if (fteCountInScope === null) {
-    return { plan: 'operational', planPriceIsFloor: false, planAssumed: true, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.operational }
+export function aivoryPlanForTeam(
+  fteCountInScope: number | null,
+  companySize?: string | null,
+): Pick<RequiredInvestment, 'plan' | 'planPriceIsFloor' | 'planMonthlyUSD' | 'planAssumed'> {
+  // The plan is a RECOMMENDATION (it is not in the Financial Case figures). Solo -> Operational
+  // (1 seat); more than one person -> Business (or Enterprise above 200 employees in scope).
+  // See lib/planForTeam.ts for the rule and why company size, not employees in scope, is the signal.
+  const { plan, assumed } = planForTeam(fteCountInScope, companySize)
+  if (plan === 'enterprise') {
+    return { plan, planPriceIsFloor: true, planAssumed: false, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.business }
   }
-  if (fteCountInScope <= 5) {
-    return { plan: 'operational', planPriceIsFloor: false, planAssumed: false, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.operational }
-  }
-  if (fteCountInScope > 200) {
-    return { plan: 'enterprise', planPriceIsFloor: true, planAssumed: false, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.business }
-  }
-  return { plan: 'business', planPriceIsFloor: false, planAssumed: false, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.business }
+  return { plan, planPriceIsFloor: false, planAssumed: assumed, planMonthlyUSD: TIER_MONTHLY_PRICE_USD[plan] }
 }
 
 export function estimateRequiredInvestment(
   opportunities: RankedOpportunity[],
   fteCountInScope: number | null,
   setupHourlyRateUSD: number,
+  companySize?: string | null,
 ): RequiredInvestment {
-  const plan = aivoryPlanForTeam(fteCountInScope)
+  const plan = aivoryPlanForTeam(fteCountInScope, companySize)
   // Training is capability-building, not an automation to set up.
   const automation = opportunities.filter((o) => !o.trainingTracks)
   const setupHours = automation.reduce((sum, o) => sum + SETUP_HOURS_BY_COMPLEXITY[o.complexity], 0)
@@ -2425,6 +2423,7 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     opportunities,
     fteCountInScope,
     savingsPass.assumedHourlyRateUSD ?? DEFAULT_HOURLY_RATE_USD,
+    answers.company_size,
   )
   const calculations = calculateROI(quantitative, currencyCode, answers.industry, undefined, requiredInvestment)
 
@@ -2474,6 +2473,7 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     dataResidency: answers.data_residency || '',
     annualRevenue: answers.annual_revenue || '',
     industry: answers.industry || '',
+    companySize: answers.company_size || '',
     // Slice-2 optional answers — context/narrative only, never read by any
     // scoreX() function or the driver table above.
     kpiBaseline: answers.kpi_baseline || '',

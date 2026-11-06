@@ -435,7 +435,7 @@ export default function FinalResultPage() {
       ? `Nilai tenaga kerja dihitung dengan ${fmtLocal(c.assumedHourlyRateLocal)} per jam, perkiraan dari benchmark pasar (${c.rateBenchmarkLabelId ?? 'industri'}), ${rejected ? 'karena biaya per jam yang Anda isi tampak di luar kewajaran (mis. gaji bulanan, bukan per jam)' : 'karena biaya per jam tidak diisi'}. Jalankan ulang diagnostic dengan biaya per jam Anda sendiri untuk kasus yang lebih akurat.`
       : `Labor is valued at ${fmtLocal(c.assumedHourlyRateLocal)} per hour, an estimate from a market benchmark (${c.rateBenchmarkLabel ?? 'industry'}), ${rejected ? 'because the hourly cost you entered looked out of range (e.g. a monthly salary rather than an hourly figure)' : 'because no hourly cost was entered'}. Re-run the diagnostic with your own hourly cost for a more accurate case.`
   })()
-  const planCard = requiredBasis ? buildPlanComparison(calculations as any, (v) => fmtLocal(v), locale) : null
+  const planCard = requiredBasis ? buildPlanComparison(calculations as any, (v) => fmtLocal(v), locale, { companySize: (qualitative as any)?.companySize || null, fte: context.quantitative?.fteCountInScope ?? null }) : null
   // Reports computed since 2026-11-06 have no running cost (the Aivory plan is a recommendation), so
   // Payback / ROI / NPV share one basis; stored older reports still show their running-cost tiles.
   const runCost = hasRunningCost(calculations as any)
