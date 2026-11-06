@@ -6,6 +6,7 @@ import { PhaseId, PhaseData, DeepDiagnosticQuestion } from '@/types/deepDiagnost
 import { DEEP_DIAGNOSTIC_PHASES } from '@/constants/deepDiagnosticQuestions'
 import { ID_PHASE_COPY, ID_QUESTION_COPY } from '@/constants/deepDiagnosticQuestionsId'
 import { DeepDiagnosticService, buildDiagnosticContext, ensureLiveRates } from '@/services/deepDiagnostic'
+import { normalizeWebsiteInput } from '@/lib/websiteUrl'
 import { useLocaleContext } from '@/hooks/useLocale'
 import type { DiagnosticAnswers } from '@/types/diagnostic'
 import { maturityLevelLabel } from '@/lib/readinessNarrative'
@@ -39,6 +40,7 @@ export default function SummaryPage() {
   const { locale, setLocale } = useLocaleContext()
   const [phaseData, setPhaseData] = useState<Record<PhaseId, PhaseData> | null>(null)
   const [companyName, setCompanyName] = useState('demo_org')
+  const [websiteUrl, setWebsiteUrl] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -55,6 +57,7 @@ export default function SummaryPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhaseData(progress.phases)
     if (progress.companyName?.trim()) setCompanyName(progress.companyName.trim())
+    if (progress.websiteUrl?.trim()) setWebsiteUrl(progress.websiteUrl.trim())
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -96,6 +99,9 @@ export default function SummaryPage() {
           maturity_level: scores.maturityLevel,
           maturity_label_id: maturityLevelLabel(scores.maturityLevel, 'id'),
         },
+        // Optional company website (ADR-022). Same smuggling trick as above;
+        // vps-bridge strips it and only passes a validated profile to the model.
+        ...(normalizeWebsiteInput(websiteUrl) ? { _website_url: normalizeWebsiteInput(websiteUrl) } : {}),
       } as Record<PhaseId, Record<string, any>>
 
       // AI analysis is best-effort: if the LLM path fails, the user still gets

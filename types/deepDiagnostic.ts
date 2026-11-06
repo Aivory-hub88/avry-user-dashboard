@@ -50,6 +50,8 @@ export interface DeepDiagnosticProgress {
   currentPhase: PhaseId
   lastUpdated: string
   companyName?: string
+  /** Optional company website, forwarded to the bridge as `_website_url` (ADR-022). */
+  websiteUrl?: string
 }
 
 // API Request payload
@@ -77,6 +79,9 @@ export interface DeepDiagnosticResponse {
   narrative: string
   recommendations: string[]
   timestamp: string
+  /** Present only when a website was sent and the bridge feature is on. */
+  web_context?: 'ok' | 'partial' | 'unavailable' | 'social_only'
+  web_profile?: Record<string, unknown>
 }
 
 // localStorage result storage

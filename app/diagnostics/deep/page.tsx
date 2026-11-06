@@ -6,6 +6,7 @@ import { PhaseId, PhaseData, DeepDiagnosticProgress } from '@/types/deepDiagnost
 import { DEEP_DIAGNOSTIC_PHASES } from '@/constants/deepDiagnosticQuestions'
 import { ID_PHASE_COPY } from '@/constants/deepDiagnosticQuestionsId'
 import { DeepDiagnosticService } from '@/services/deepDiagnostic'
+import { normalizeWebsiteInput } from '@/lib/websiteUrl'
 import { dropMismatchedBandAnswers } from '@/lib/currencyBands'
 import { parseCurrencyCode } from '@/lib/resultFormatters'
 import { useLocaleContext } from '@/hooks/useLocale'
@@ -37,6 +38,8 @@ export default function DeepDiagnosticPage() {
   const [phaseData, setPhaseData] = useState<Record<PhaseId, PhaseData>>(buildEmptyPhaseData)
   const [companyName, setCompanyName] = useState('')
   const [companyNameError, setCompanyNameError] = useState('')
+  const [websiteUrl, setWebsiteUrl] = useState('')
+  const [websiteUrlError, setWebsiteUrlError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [savedProgress, setSavedProgress] = useState<DeepDiagnosticProgress | null>(null)
@@ -79,7 +82,7 @@ export default function DeepDiagnosticPage() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => {
       try {
-        DeepDiagnosticService.saveProgress({ phases: phaseData, currentPhase, lastUpdated: new Date().toISOString(), companyName })
+        DeepDiagnosticService.saveProgress({ phases: phaseData, currentPhase, lastUpdated: new Date().toISOString(), companyName, websiteUrl })
       } catch {
         setStorageWarning(true)
       }
@@ -87,7 +90,7 @@ export default function DeepDiagnosticPage() {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
-  }, [phaseData, currentPhase, companyName])
+  }, [phaseData, currentPhase, companyName, websiteUrl])
 
   const handleResume = () => {
     if (!savedProgress) return
@@ -101,6 +104,7 @@ export default function DeepDiagnosticPage() {
     })
     setCurrentPhase(savedProgress.currentPhase)
     if (savedProgress.companyName) setCompanyName(savedProgress.companyName)
+    if (savedProgress.websiteUrl) setWebsiteUrl(savedProgress.websiteUrl)
     setSavedProgress(null)
   }
 
@@ -173,6 +177,11 @@ export default function DeepDiagnosticPage() {
       setCompanyNameError(locale === 'id' ? 'Nama perusahaan wajib diisi' : 'Company name is required')
       return
     }
+    // Optional website: only block when something was typed but isn't a plausible address
+    if (currentPhase === PHASE_ORDER[0] && websiteUrl.trim() && !normalizeWebsiteInput(websiteUrl)) {
+      setWebsiteUrlError(locale === 'id' ? 'Alamat website tidak valid. Kosongkan jika tidak ada.' : 'That website address looks invalid. Leave it empty if you have none.')
+      return
+    }
 
     const currentPhaseConfig = DEEP_DIAGNOSTIC_PHASES.find(p => p.id === currentPhase)!
     const responses = phaseData[currentPhase].responses
@@ -201,6 +210,7 @@ export default function DeepDiagnosticPage() {
         currentPhase,
         lastUpdated: new Date().toISOString(),
         companyName,
+        websiteUrl,
       })
       router.push('/diagnostics/deep/summary')
     } else {
@@ -329,6 +339,29 @@ export default function DeepDiagnosticPage() {
                     {companyNameError}
                   </p>
                 )}
+                <label htmlFor="websiteUrl" className={styles.companyNameLabel} style={{ marginTop: 14 }}>
+                  {locale === 'id' ? 'Website Perusahaan (opsional)' : 'Company Website (optional)'}
+                </label>
+                <input
+                  id="websiteUrl"
+                  type="text"
+                  inputMode="url"
+                  autoComplete="url"
+                  className={`${styles.companyNameInput} ${websiteUrlError ? styles.companyNameInputError : ''}`}
+                  placeholder={locale === 'id' ? 'contoh: perusahaananda.co.id' : 'e.g. yourcompany.com'}
+                  value={websiteUrl}
+                  onChange={e => {
+                    setWebsiteUrl(e.target.value)
+                    if (websiteUrlError) setWebsiteUrlError('')
+                  }}
+                  aria-describedby="websiteUrlHelp"
+                  aria-invalid={!!websiteUrlError}
+                />
+                <p id="websiteUrlHelp" className={websiteUrlError ? styles.companyNameError : undefined} role={websiteUrlError ? 'alert' : undefined} style={websiteUrlError ? undefined : { margin: '6px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-manrope), sans-serif' }}>
+                  {websiteUrlError || (locale === 'id'
+                    ? 'Jika diisi, kami membaca halaman publik website Anda untuk membuat analisis lebih akurat. Tidak mengubah skor.'
+                    : 'If provided, we read your public website pages to make the analysis more accurate. It does not change your score.')}
+                </p>
               </div>
             )}
             <PhaseContent
