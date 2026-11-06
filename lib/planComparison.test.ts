@@ -161,7 +161,8 @@ describe('buildPlanComparison: Aivory as ONE delivery option', () => {
     const biz = v.rows.find((r) => r.plan === 'business')!
     expect(v.rows.some((r) => r.plan === 'operational')).toBe(false)
     expect(biz.recommended).toBe(true)
-    expect(biz.shareTone).toBe('bad')
+    // the share above 100% is stated as a plain fact, not colour-coded
+    expect('shareTone' in biz).toBe(false)
     expect(parseInt(biz.share as string, 10)).toBeGreaterThan(100)
   })
 
