@@ -393,7 +393,7 @@ import type {
 import { parseCurrencyCode, formatLocalAmount, type CurrencyCode } from '@/lib/resultFormatters'
 import { getBudgetBands, getLabourBenchmark, resolveBandMidpointUSD, isBandForCurrency } from '@/lib/currencyBands'
 import { TIER_MONTHLY_PRICE_USD, FULLSTACK_PACKAGE_PRICE_USD, FULLSTACK_INCLUDED_PLAN_MONTHS } from '@/lib/tiers'
-import { planForTeam } from '@/lib/planForTeam'
+import { planForTeam, SOLO_COMPANY_SIZE } from '@/lib/planForTeam'
 import type { RequiredInvestment, SoftwareCostLine, UnpricedItem } from '@/types/diagnostic'
 import { selectSoftwareRecommendations, selectSoftwareForContext, resolveMarket, type SoftwarePick } from '@/lib/softwareCatalog'
 import { normalizeIndustryKey } from '@/lib/industryBenchmarks'
@@ -487,6 +487,52 @@ function parseManualHoursWeekly(val: string | undefined): number | null {
   }
   // Try direct lookup first, then normalized key
   return map[val] ?? map[norm] ?? null
+}
+
+/** Per-person weekly hours on repetitive manual work: midpoints of the per-person buckets (the open top is a floor). */
+const PER_PERSON_HOURS: Record<string, number> = {
+  'Under 2 hours/person/week': 1,
+  '2-5 hours/person/week': 3.5,
+  '5-10 hours/person/week': 7.5,
+  '10-20 hours/person/week': 15,
+  'Over 20 hours/person/week': 25,
+}
+
+function parsePerPersonHours(val: string | undefined): number | null {
+  if (!val) return null
+  return PER_PERSON_HOURS[val] ?? PER_PERSON_HOURS[normalizeStr(val)] ?? null
+}
+
+/**
+ * The team's total manual hours per week.
+ *
+ * New answers are PER PERSON and are multiplied by the team size, so the value scales with how many people
+ * there are (a single team-wide bucket treated 1 person and 50 people alike). Solo = 1 person; otherwise the
+ * employees-in-scope answer (bucket midpoint); when that is not given the hours are counted for ONE person and
+ * the report says so. Answers saved before 2026-11-06 are a team-wide bucket and are read as before.
+ */
+export function resolveManualHours(
+  answers: { manual_hours_per_person?: string; manual_hours_weekly?: string; company_size?: string },
+  fteCountInScope: number | null,
+): {
+  totalWeekly: number | null
+  perPerson: number | null
+  people: number | null
+  source: 'solo' | 'fte' | 'assumed_one' | 'team_total'
+} {
+  const perPerson = parsePerPersonHours(answers.manual_hours_per_person)
+  if (perPerson === null) {
+    const legacy = reconcileManualHoursWithFte(
+      answers.manual_hours_weekly,
+      parseManualHoursWeekly(answers.manual_hours_weekly),
+      fteCountInScope,
+    )
+    return { totalWeekly: legacy, perPerson: null, people: null, source: 'team_total' }
+  }
+  const solo = (answers.company_size ?? '').trim() === SOLO_COMPANY_SIZE
+  const people = solo ? 1 : fteCountInScope ?? 1
+  const source = solo ? 'solo' : fteCountInScope !== null ? 'fte' : 'assumed_one'
+  return { totalWeekly: perPerson * people, perPerson, people, source }
 }
 
 // "Over 100 hours/week" is open-ended, and 100 is its floor, not its value.
@@ -2139,7 +2185,7 @@ function classifyRisks(a: DiagnosticAnswers, scores: DimensionScores, locale: Lo
 
   // Solo operator single point of failure
   const ftes = parseFteCount(a.fte_count)
-  const manualHrs = parseManualHoursWeekly(a.manual_hours_weekly)
+  const manualHrs = resolveManualHours(a, ftes).totalWeekly
   if ((ftes !== null && ftes <= 1) && (manualHrs !== null && manualHrs >= 10)) {
     risks.push({
       id: 'risk-solo-operator',
@@ -2433,11 +2479,8 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
   const budgetMidpointUSD = parseBudgetMidpointUSD(answers.budget_range, currencyCode)
   const timelineMonths = parseTimelineMonths(answers.success_timeline)
   const fteCountInScope = parseFteCount(answers.fte_count)
-  const totalManualHoursWeekly = reconcileManualHoursWithFte(
-    answers.manual_hours_weekly,
-    parseManualHoursWeekly(answers.manual_hours_weekly),
-    fteCountInScope,
-  )
+  const manualHours = resolveManualHours(answers, fteCountInScope)
+  const totalManualHoursWeekly = manualHours.totalWeekly
 
   const quantitative: DiagnosticContext['quantitative'] = {
     ticketVolumePerDay: null,
@@ -2446,6 +2489,9 @@ export function buildDiagnosticContext(answers: DiagnosticAnswers): DiagnosticCo
     costCurrentPerTicket: null,
     costTargetPerTicket: null,
     totalManualHoursWeekly,
+    manualHoursPerPersonWeekly: manualHours.perPerson,
+    teamSizeCounted: manualHours.people,
+    teamSizeSource: manualHours.source,
     fteCountInScope,
     hourlyCostLocal: parseHourlyCostLocal(answers.hourly_cost),
     currentAutomationPct: currentAutoPct,

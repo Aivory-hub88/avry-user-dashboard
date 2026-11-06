@@ -24,6 +24,7 @@ import { buildWebsiteInsightsView } from '@/lib/websiteInsightsView'
 import { buildNetVerdict } from '@/lib/netVerdict'
 import { buildPlanComparison } from '@/lib/planComparison'
 import { hasRunningCost } from '@/lib/runningCost'
+import { describeTeamHours } from '@/lib/teamHours'
 import { unpricedCount, pricedOnlyTag } from '@/lib/pricedCostsOnly'
 import { buildProcessIncrements, formatIncrementsSummary } from '@/lib/processIncrements'
 
@@ -452,6 +453,7 @@ export default function FinalResultPage() {
         ? (locale === 'id' ? 'Investasi = setup tim + software, tahun pertama' : 'Investment = your setup + software, year 1')
         : (locale === 'id' ? 'Investasi = paket + setup tahun pertama' : 'Investment = package + setup, year 1')) + pricedTag
   const increments = buildProcessIncrements(opportunities, calculations as any, context.quantitative)
+  const teamHoursNote = describeTeamHours(context.quantitative, locale)
   const incrementsSummary = formatIncrementsSummary(increments, locale)
   const planDisplayName = (() => { const p = (calculations as any).requiredInvestment?.plan; return p ? p.charAt(0).toUpperCase() + p.slice(1) : '' })()
   const netVerdict = requiredBasis ? buildNetVerdict({ ...(calculations as any), planName: planDisplayName, headlineNet, costLabel: transformationModel ? { en: 'the recommended software', id: 'software yang direkomendasikan' } : null }, locale, fmtLocal) : null
@@ -1116,6 +1118,7 @@ export default function FinalResultPage() {
             <ROIMetricTile label={locale === 'id' ? 'Value Efisiensi Proses' : 'Process Efficiency Value'} value={annualProcessSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile
               label={locale === 'id' ? 'Kapasitas Tim yang Dipulihkan' : 'Recovered Team Capacity'}
+              subtitle={teamHoursNote ?? undefined}
               value={calculations.hoursReclaimedPerYear}
               formatter={(v) => locale === 'id' ? `${Math.round(v).toLocaleString('id-ID')} jam` : `${Math.round(v).toLocaleString('en-US')} hours`}
               confidenceLevel={calculations.confidenceLevel}

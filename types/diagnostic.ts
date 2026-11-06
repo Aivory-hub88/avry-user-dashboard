@@ -538,6 +538,11 @@ export interface DiagnosticContext {
     costCurrentPerTicket: number | null
     costTargetPerTicket: number | null
     totalManualHoursWeekly: number | null
+    /** Hours per person per week as answered (the new per-person question); null for answers saved as a team total. */
+    manualHoursPerPersonWeekly?: number | null
+    /** How many people the per-person hours were multiplied by, and where that number came from. */
+    teamSizeCounted?: number | null
+    teamSizeSource?: 'solo' | 'fte' | 'assumed_one' | 'team_total'
     fteCountInScope: number | null
     currentAutomationPct: number | null
     targetAutomationPct: number | null
