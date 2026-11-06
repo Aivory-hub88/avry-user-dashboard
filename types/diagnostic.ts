@@ -653,9 +653,9 @@ export interface RequiredInvestment {
   setupUSD: number
   /** Opportunities whose setup is counted (automation only, not training). */
   setupOpportunities: number
-  /** Year-1 cash: package + setup + plan months in year 1. */
+  /** Year-1 cash: package + setup. (Reports stored before 2026-11-06 also include the plan months.) */
   initialUSD: number
-  /** From year 2: 12 months of the plan. */
+  /** Running cost counted in the figures: 0 now (the plan is a recommendation). Older stored reports: 12 plan months. */
   annualRecurringUSD: number
 }
 
