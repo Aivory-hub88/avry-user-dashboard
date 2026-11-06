@@ -622,14 +622,22 @@ export const SETUP_HOURS_BY_COMPLEXITY: Record<RankedOpportunity['complexity'], 
 }
 
 /** Plan by team size: ≤5 FTE Operational, 6–200 Business, >200 Enterprise (sales-priced; Business used as floor). */
-export function aivoryPlanForTeam(fteCountInScope: number | null): Pick<RequiredInvestment, 'plan' | 'planPriceIsFloor' | 'planMonthlyUSD'> {
-  if (fteCountInScope !== null && fteCountInScope <= 5) {
-    return { plan: 'operational', planPriceIsFloor: false, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.operational }
+export function aivoryPlanForTeam(fteCountInScope: number | null): Pick<RequiredInvestment, 'plan' | 'planPriceIsFloor' | 'planMonthlyUSD' | 'planAssumed'> {
+  // Team size is an OPTIONAL question ("Not sure" / skipped → null). Unknown used to fall
+  // through to Business ($99/mo, the dearest non-enterprise plan), which silently priced
+  // every such report against its most expensive case and made Net Annual Savings, NPV
+  // and Net Payback read negative. Unknown now means the entry plan, flagged as an
+  // assumption in the report so the reader can see (and correct) it.
+  if (fteCountInScope === null) {
+    return { plan: 'operational', planPriceIsFloor: false, planAssumed: true, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.operational }
   }
-  if (fteCountInScope !== null && fteCountInScope > 200) {
-    return { plan: 'enterprise', planPriceIsFloor: true, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.business }
+  if (fteCountInScope <= 5) {
+    return { plan: 'operational', planPriceIsFloor: false, planAssumed: false, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.operational }
   }
-  return { plan: 'business', planPriceIsFloor: false, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.business }
+  if (fteCountInScope > 200) {
+    return { plan: 'enterprise', planPriceIsFloor: true, planAssumed: false, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.business }
+  }
+  return { plan: 'business', planPriceIsFloor: false, planAssumed: false, planMonthlyUSD: TIER_MONTHLY_PRICE_USD.business }
 }
 
 export function estimateRequiredInvestment(

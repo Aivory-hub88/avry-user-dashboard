@@ -28,8 +28,40 @@ describe('aivoryPlanForTeam', () => {
   it('picks the plan by team size; enterprise uses Business as a floor', () => {
     expect(aivoryPlanForTeam(3)).toMatchObject({ plan: 'operational', planMonthlyUSD: 20, planPriceIsFloor: false })
     expect(aivoryPlanForTeam(33)).toMatchObject({ plan: 'business', planMonthlyUSD: 99 })
-    expect(aivoryPlanForTeam(null)).toMatchObject({ plan: 'business' })
+    expect(aivoryPlanForTeam(3)).toMatchObject({ planAssumed: false })
     expect(aivoryPlanForTeam(300)).toMatchObject({ plan: 'enterprise', planMonthlyUSD: 99, planPriceIsFloor: true })
+  })
+})
+
+describe('unknown team size (FTE question skipped or "Not sure")', () => {
+  it('assumes the entry plan instead of the dearest one, and flags it', () => {
+    expect(aivoryPlanForTeam(null)).toMatchObject({ plan: 'operational', planMonthlyUSD: 20, planAssumed: true })
+  })
+
+  it('does not turn a small scope into a net loss just because team size is unknown', () => {
+    // ~4 recoverable h/week at IDR rates: Business ($99/mo) would exceed the savings, Operational does not.
+    const SMALL = { ...LOGISTICS, manual_hours_weekly: 'Under 10 hours/week', fte_count: 'Not sure' }
+    const c: any = buildDiagnosticContext(SMALL as any).calculations
+    expect(c.requiredInvestment.plan).toBe('operational')
+    expect(c.requiredInvestment.planAssumed).toBe(true)
+    expect(c.netAnnualSavingsLocal).toBeGreaterThan(0)
+    expect(c.netPaybackMonths).not.toBeNull()
+  })
+
+  it('still prices a stated 6-200 FTE team on Business (not an assumption)', () => {
+    const c: any = buildDiagnosticContext({ ...LOGISTICS, fte_count: '16-50 FTEs' } as any).calculations
+    expect(c.requiredInvestment.plan).toBe('business')
+    expect(c.requiredInvestment.planAssumed).toBe(false)
+  })
+
+  it('tells the reader the plan is an assumption', () => {
+    const SMALL = { ...LOGISTICS, manual_hours_weekly: 'Under 10 hours/week', fte_count: 'Not sure' }
+    const calc: any = buildDiagnosticContext(SMALL as any).calculations
+    const en = buildRequiredInvestmentView(calc, (v) => String(Math.round(v)), 'en')!
+    expect(en.rows.some((r) => /assumed, team size not given/.test(r.label))).toBe(true)
+    expect(en.footnote).toMatch(/Operational plan is assumed/)
+    const id = buildRequiredInvestmentView(calc, (v) => String(Math.round(v)), 'id')!
+    expect(id.footnote).toMatch(/plan Operasional diasumsikan/)
   })
 })
 

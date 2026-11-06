@@ -43,6 +43,8 @@ export function buildRequiredInvestmentView(
   const L = (usd: number) => usd * fx
   const id = locale === 'id'
   const planName = PLAN_NAME[r.plan]
+  const assumed = r.planAssumed === true
+  const assumedTag = assumed ? (id ? ' — diasumsikan, ukuran tim tidak diisi' : ' — assumed, team size not given') : ''
   const initial = L(r.initialUSD)
   const stated = calc.statedBudgetLocal ?? null
   const remaining = stated !== null ? stated - initial : null
@@ -55,8 +57,8 @@ export function buildRequiredInvestmentView(
     },
     {
       label: id
-        ? `Plan ${planName} × ${r.planMonthsYear1} bulan (bulan pertama termasuk paket)${r.planPriceIsFloor ? ' — harga minimum' : ''}`
-        : `${planName} plan × ${r.planMonthsYear1} months (first month included in the package)${r.planPriceIsFloor ? ' — minimum price' : ''}`,
+        ? `Plan ${planName} × ${r.planMonthsYear1} bulan (bulan pertama termasuk paket)${r.planPriceIsFloor ? ' — harga minimum' : ''}${assumedTag}`
+        : `${planName} plan × ${r.planMonthsYear1} months (first month included in the package)${r.planPriceIsFloor ? ' — minimum price' : ''}${assumedTag}`,
       value: fmt(L(r.planMonthlyUSD * r.planMonthsYear1)),
     },
     {
@@ -71,7 +73,7 @@ export function buildRequiredInvestmentView(
       emphasis: true,
     },
     {
-      label: id ? `Biaya rutin mulai tahun ke-2 (Plan ${planName} 12 bulan)` : `Recurring from year 2 (${planName} plan, 12 months)`,
+      label: id ? `Biaya rutin mulai tahun ke-2 (Plan ${planName} 12 bulan)${assumedTag}` : `Recurring from year 2 (${planName} plan, 12 months)${assumedTag}`,
       value: `${fmt(L(r.annualRecurringUSD))}${id ? '/tahun' : '/yr'}`,
     },
   ]
@@ -99,8 +101,8 @@ export function buildRequiredInvestmentView(
   }
 
   const footnote = id
-    ? `Asumsi: harga paket dan plan sesuai harga publik Aivory; jam setup per otomasi menurut kerumitan (rendah 20, sedang 60, tinggi 160 jam), dihargai dengan biaya per jam yang sama dengan perhitungan penghematan.${r.planPriceIsFloor ? ' Plan Enterprise dihargai lewat tim sales — harga Business dipakai sebagai batas bawah.' : ''} Software pendukung di bagian rekomendasi software bersifat opsional (jika belum dimiliki) dan tidak termasuk.`
-    : `Assumptions: package and plan at Aivory's published prices; setup hours per automation by complexity (low 20, medium 60, high 160), priced at the same hourly cost used for the savings.${r.planPriceIsFloor ? ' The Enterprise plan is sales-priced — the Business price is used as a floor.' : ''} Supporting software in the software recommendations is optional (if you don't already have it) and not included.`
+    ? `Asumsi: harga paket dan plan sesuai harga publik Aivory; jam setup per otomasi menurut kerumitan (rendah 20, sedang 60, tinggi 160 jam), dihargai dengan biaya per jam yang sama dengan perhitungan penghematan.${r.planPriceIsFloor ? ' Plan Enterprise dihargai lewat tim sales — harga Business dipakai sebagai batas bawah.' : ''} Software pendukung di bagian rekomendasi software bersifat opsional (jika belum dimiliki) dan tidak termasuk.${assumed ? ' Ukuran tim tidak diisi, jadi plan Operasional diasumsikan; jika lebih dari 5 karyawan masuk cakupan, plan Business berlaku dan angka bersih di bawah akan berubah.' : ''}`
+    : `Assumptions: package and plan at Aivory's published prices; setup hours per automation by complexity (low 20, medium 60, high 160), priced at the same hourly cost used for the savings.${r.planPriceIsFloor ? ' The Enterprise plan is sales-priced — the Business price is used as a floor.' : ''} Supporting software in the software recommendations is optional (if you don't already have it) and not included.${assumed ? ' Team size was not provided, so the Operational plan is assumed; if more than 5 employees are in scope, the Business plan applies and the net figures below change.' : ''}`
 
   return { explanation, rows, footnote }
 }
