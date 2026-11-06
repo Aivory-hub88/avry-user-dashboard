@@ -14,6 +14,7 @@ const LOCALIZED_FIELDS = [
   'primary_constraints',
   'automation_opportunities',
   'recommended_next_step',
+  'website_insights',
 ] as const
 
 export function hasIndonesianAnalysis(result: LlmResult | null | undefined): boolean {
