@@ -265,7 +265,7 @@ describe('the investment section', () => {
 describe('the financial-terms note', () => {
   it('headline net: Payback, ROI tile and range all deduct the recommended software, and Aivory is one option', () => {
     const t = buildFinancialTermsNote('en', 3, { basis: 'required', hasRunningCost: true, headlineNet: true })
-    expect(t).toMatch(/Payback tile, the 3-Year ROI tile and the 3-Year ROI range all deduct the yearly cost of the recommended software/)
+    expect(t).toMatch(/Payback tile, the NPV tile, the 3-Year ROI tile and the 3-Year NPV range all deduct the yearly cost of the recommended software/)
     expect(t).not.toMatch(/BEFORE running costs/)
     expect(t).toMatch(/Aivory is shown as one way to deliver the automation/)
     expect(buildFinancialTermsNote('id', 3, { basis: 'required', hasRunningCost: true, headlineNet: true })).toMatch(/sudah mengurangkan biaya tahunan software/)
