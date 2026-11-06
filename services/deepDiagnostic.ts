@@ -665,8 +665,12 @@ export function estimateRequiredInvestment(
     setupHourlyRateUSD,
     setupUSD,
     setupOpportunities: automation.length,
-    initialUSD: FULLSTACK_PACKAGE_PRICE_USD + setupUSD + plan.planMonthlyUSD * planMonthsYear1,
-    annualRecurringUSD: plan.planMonthlyUSD * 12,
+    // The Aivory subscription is a RECOMMENDATION shown next to the report (lib/planComparison.ts), not
+    // a cost inside the Financial Case: the case values the scope against the one-time package and the
+    // team's setup time. With no running cost, Payback / ROI / NPV all sit on one basis (no gross vs
+    // net split). plan / planMonthlyUSD / planMonthsYear1 stay on the object for the recommendation.
+    initialUSD: FULLSTACK_PACKAGE_PRICE_USD + setupUSD,
+    annualRecurringUSD: 0,
   }
 }
 

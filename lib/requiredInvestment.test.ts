@@ -54,26 +54,28 @@ describe('unknown team size (FTE question skipped or "Not sure")', () => {
     expect(c.requiredInvestment.planAssumed).toBe(false)
   })
 
-  it('tells the reader the plan is an assumption', () => {
+  it('tells the reader the recommended plan is an assumption (the plan is no longer a line in the investment)', () => {
     const SMALL = { ...LOGISTICS, manual_hours_weekly: 'Under 10 hours/week', fte_count: 'Not sure' }
     const calc: any = buildDiagnosticContext(SMALL as any).calculations
     const en = buildRequiredInvestmentView(calc, (v) => String(Math.round(v)), 'en')!
-    expect(en.rows.some((r) => /assumed, team size not given/.test(r.label))).toBe(true)
-    expect(en.footnote).toMatch(/Operational plan is assumed/)
+    expect(en.rows.some((r) => /plan/i.test(r.label))).toBe(false)
+    expect(en.planNote).toMatch(/We recommend the Operational plan: your team size was not given, so the entry plan is assumed/)
     const id = buildRequiredInvestmentView(calc, (v) => String(Math.round(v)), 'id')!
-    expect(id.footnote).toMatch(/plan Operasional diasumsikan/)
+    expect(id.planNote).toMatch(/Kami merekomendasikan plan Operational: ukuran tim tidak diisi/)
   })
 })
 
 describe('estimateRequiredInvestment', () => {
-  it('= package + setup hours by complexity + 11 plan months; training is not set up', () => {
+  it('= package + setup hours by complexity; the plan is a recommendation, not a cost; training is not set up', () => {
     const r = estimateRequiredInvestment([opp('low'), opp('medium'), opp('high'), opp('low', true)], 33, 10)
     expect(r.setupOpportunities).toBe(3)
     expect(r.setupHours).toBe(20 + 60 + 160)
     expect(r.setupUSD).toBe(2400)
-    expect(r.planMonthsYear1).toBe(11)
-    expect(r.initialUSD).toBe(299 + 2400 + 99 * 11)
-    expect(r.annualRecurringUSD).toBe(99 * 12)
+    expect(r.planMonthsYear1).toBe(11) // kept for the recommendation text
+    expect(r.initialUSD).toBe(299 + 2400)
+    expect(r.annualRecurringUSD).toBe(0)
+    expect(r.plan).toBe('business') // still recommended, just not charged inside the case
+    expect(r.planMonthlyUSD).toBe(99)
   })
 })
 
@@ -85,7 +87,7 @@ describe('report on the required basis', () => {
     expect(k.requiredInvestment.plan).toBe('business')
     expect(k.assumedBudgetMidpointUSD).toBeCloseTo(k.requiredInvestment.initialUSD, 6)
     expect(k.statedBudgetUSD).toBe(75_000)
-    expect(k.annualOngoingCostUSD).toBe(99 * 12)
+    expect(k.annualOngoingCostUSD).toBe(0) // the plan is a recommendation, not a running cost in the case
     expect(k.netAnnualSavingsLocal).toBeGreaterThan(0)
     expect(k.horizonROIPercent).toBeGreaterThan(0)
     expect(k.npvHorizonUSD).toBeGreaterThan(0)
@@ -137,27 +139,13 @@ describe('buildRequiredInvestmentView', () => {
     expect(v.explanation).toMatch(/ceiling, not the cost of the project/)
     expect(v.explanation).not.toMatch(/unspent|leaving/)
   })
-  it('explains what the Aivory plan is: price, seats, credits, why this plan', () => {
+  it('hands the PDF a one-paragraph plan recommendation (the full card is covered in planComparison.test.ts)', () => {
     const k: any = buildDiagnosticContext(LOGISTICS as any).calculations // 16-50 FTE -> Business
     const en = buildRequiredInvestmentView(k, fmt, 'en')!.planNote!
+    expect(en).toMatch(/We recommend the Business plan: it fits 6–200 employees in scope\./)
     expect(en).toMatch(/monthly subscription that runs your automations after the one-time package/)
-    expect(en).toMatch(/The Business plan \(.*\/month \(US\$99\)\) includes up to 5 team seats and 6,500 Intelligence Credits per month/)
-    expect(en).toMatch(/only recurring cost counted in this report/)
-    expect(en).toMatch(/year 1 carries 11 months, and from year 2 it is 12 months/)
-    expect(en).toMatch(/Business plan fits 6–200 employees in scope/)
     const id = buildRequiredInvestmentView(k, fmt, 'id')!.planNote!
-    expect(id).toMatch(/langganan bulanan yang menjalankan otomasi Anda/)
-    expect(id).toMatch(/Plan Business sesuai untuk 6–200 karyawan/)
-  })
-  it('says the plan is an assumption when team size is unknown, and why Enterprise is a floor', () => {
-    const unknown: any = buildDiagnosticContext({ ...LOGISTICS, fte_count: 'Not sure' } as any).calculations
-    const a = buildRequiredInvestmentView(unknown, fmt, 'en')!.planNote!
-    expect(a).toMatch(/The Operational plan/)
-    expect(a).toMatch(/team size was not given, so the entry plan is assumed/)
-    const big: any = buildDiagnosticContext({ ...LOGISTICS, fte_count: 'Over 200 FTEs' } as any).calculations
-    const e = buildRequiredInvestmentView(big, fmt, 'en')!.planNote!
-    expect(e).toMatch(/Enterprise is priced by sales, so the Business price is used as a floor/)
-    expect(e).not.toMatch(/team seats/)
+    expect(id).toMatch(/Kami merekomendasikan plan Business/)
   })
   it('flags a shortfall when the budget is smaller than the requirement', () => {
     const k: any = { ...buildDiagnosticContext(LOGISTICS as any).calculations }

@@ -309,8 +309,20 @@ export function buildFinancialTermsNote(
    * second ROI (including hiring cost avoided) may sit in the capacity block —
    * the note must say which ROI it means. Omitted → the original wording.
    */
-  opts: { basis?: 'required' | 'stated_budget'; hasCapacityRoi?: boolean } = {},
+  opts: { basis?: 'required' | 'stated_budget'; hasCapacityRoi?: boolean; hasRunningCost?: boolean } = {},
 ): string {
+  if (opts.basis === 'required' && opts.hasRunningCost === false) {
+    // No running cost in the figures (the Aivory plan is a recommendation): one basis everywhere.
+    const H = horizonYears
+    if (locale === 'id') {
+      return `Kotak ROI ${H} Tahun dan Kisaran ROI ${H} Tahun memakai investasi yang sama (paket sekali bayar ditambah waktu setup tim Anda); kisarannya hanya memvariasikan asumsi efisiensi (konservatif, dasar, optimis).` +
+        (opts.hasCapacityRoi ? ` ROI di blok nilai kapasitas adalah angka ketiga: sama dengan kotak ROI, ditambah biaya rekrutmen yang dihindari, dan sengaja ditampilkan terpisah.` : '') +
+        ` NPV menghitung nilai waktu uang (diskonto 10%), sehingga angkanya lebih kecil daripada selisih penghematan dan investasi. Langganan plan Aivory tidak termasuk dalam angka ini; ia ditampilkan sebagai rekomendasi.`
+    }
+    return `The ${H}-Year ROI tile and the ${H}-Year ROI range use the same investment (the one-time package plus your team's setup time); the range only varies the efficiency assumption (conservative, base, optimistic).` +
+      (opts.hasCapacityRoi ? ` The ROI in the capacity-value block is a third figure: the tile's ROI plus the hiring cost avoided, deliberately shown separately.` : '') +
+      ` NPV prices in the time value of money (10% discount), so it is smaller than the plain gap between savings and investment. The Aivory plan subscription is not part of these figures; it is shown as a recommendation.`
+  }
   if (opts.basis === 'required') {
     const H = horizonYears
     if (locale === 'id') {

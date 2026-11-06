@@ -61,6 +61,7 @@ import { formatLocalAmount } from '@/lib/resultFormatters'
 import { netPaybackNotReachedLabel } from '@/lib/resultFormatters'
 import { buildInvestmentComparison, investmentComparisonExplanation, CEILING_PAYBACK_MONTHS, type InvestmentComparison } from '@/lib/investmentComparison'
 import { buildRequiredInvestmentView, isRequiredBasis, type RequiredInvestmentView } from '@/lib/requiredInvestmentView'
+import { hasRunningCost, RUNNING_COST_TILE_LABELS } from '@/lib/runningCost'
 import { buildCapacityValueView } from '@/lib/capacityValueView'
 
 // ── Inner-page palette ─────────────────────────────────────────────────────────
@@ -3296,7 +3297,10 @@ export async function exportReportToPdf(
   const breakEvenInvestmentLocal = calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0
     ? calculations.totalAnnualSavingsLocal * 2
     : null
-  y = renderMetricGrid(pdf, y, locale === 'id' ? [
+  // No running cost in the figures (the plan is a recommendation): drop the tiles that would read 0 / duplicate.
+  const dropNetTiles = <T extends { l: string }>(tiles: T[]): T[] =>
+    hasRunningCost(cAny) ? tiles : tiles.filter((t) => !RUNNING_COST_TILE_LABELS.includes(t.l))
+  y = renderMetricGrid(pdf, y, dropNetTiles(locale === 'id' ? [
     { l: 'Value Tenaga Kerja yang Dipulihkan', v: fmt(calculations.annualLaborSavingsLocal ?? cAny.annualLaborSavingsUSD) },
     { l: 'Value Efisiensi Proses', v: fmt(calculations.annualProcessSavingsLocal ?? cAny.annualProcessSavingsUSD) },
     { l: 'Periode Payback', v: fmtPaybackCappedPdf(calculations.paybackMonths), n: requiredBasis ? 'investasi = kebutuhan tahun pertama' : 'dengan investasi = anggaran yang Anda masukkan' },
@@ -3316,7 +3320,7 @@ export async function exportReportToPdf(
     { l: 'Net Annual Savings', v: fmt(cAny.netAnnualSavingsLocal), n: 'after ongoing cost' },
     { l: 'Net Payback', v: netPaybackNotReachedLabel(cAny, 'en', roiYears) ?? fmtPaybackCappedPdf(cAny.netPaybackMonths), n: 'on net savings' },
     { l: 'Break-even Investment', v: breakEvenInvestmentLocal != null ? fmt(breakEvenInvestmentLocal) : '\u2014', n: 'max outlay for a ≤ 24-month payback' },
-  ])
+  ]))
 
   // Phase E2.6 — same builder as the on-screen ROI tile grid caption, so
   // the labor-vs-process split reads identically on both surfaces.
@@ -3480,7 +3484,7 @@ export async function exportReportToPdf(
         ? [roiLabel(roiYears, 'id'), `${fmtPct(calculations.threeYearROIPercent, locale)} = (penghematan×${roiYears} − investasi) ÷ investasi × 100`]
         : [roiLabel(roiYears, 'en'), `${fmtPct(calculations.threeYearROIPercent, locale)} = (savings×${roiYears} − investment) ÷ investment × 100`])
     }
-    if (cAny.annualOngoingCostLocal != null) {
+    if (cAny.annualOngoingCostLocal != null && hasRunningCost(cAny)) {
       stepsRaw.push(locale === 'id'
         ? ['Biaya operasional berjalan', `${fmt(cAny.annualOngoingCostLocal)}/thn = ${Math.round((cAny.ongoingCostRate ?? 0.2) * 100)}% dari investasi awal, mulai tahun ke-${cAny.ongoingCostStartYear ?? 1}`]
         : ['Ongoing run cost', `${fmt(cAny.annualOngoingCostLocal)}/yr = ${Math.round((cAny.ongoingCostRate ?? 0.2) * 100)}% of initial investment, from year ${cAny.ongoingCostStartYear ?? 1}`])

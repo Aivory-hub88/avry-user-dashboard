@@ -21,6 +21,14 @@ describe('capacity value', () => {
     // 70 × 52 × 0.625 growth × 0.45 gap × 0.75 eff × 0.5 realization
     expect(k.capacityAvoidedHoursPerYear).toBe(Math.round(70 * 52 * 0.625 * 0.45 * 0.75 * 0.5))
     expect(k.capacityAvoidanceUSD).toBeCloseTo(k.capacityAvoidedHoursPerYear * k.assumedHourlyRateUSD, 6)
+    // This scope is large against a package + setup investment, so both ROIs sit on the 999% display cap.
+    expect(k.horizonROIWithCapacityPercent).toBeGreaterThanOrEqual(k.horizonROIPercent)
+  })
+
+  it('adds to the ROI when the headline ROI is below the cap', () => {
+    const small = { ...BASE, manual_hours_weekly: '10-25 hours/week', volume_growth_12m: '50-75%' }
+    const k: any = buildDiagnosticContext(small as any).calculations
+    expect(k.horizonROIPercent).toBeLessThan(999)
     expect(k.horizonROIWithCapacityPercent).toBeGreaterThan(k.horizonROIPercent)
   })
 

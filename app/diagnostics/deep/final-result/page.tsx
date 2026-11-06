@@ -22,6 +22,8 @@ import ErrorCard from '@/components/result/ErrorCard'
 import { localizeLlmResult } from '@/lib/llmResultLocale'
 import { buildWebsiteInsightsView } from '@/lib/websiteInsightsView'
 import { buildNetVerdict } from '@/lib/netVerdict'
+import { buildPlanComparison } from '@/lib/planComparison'
+import { hasRunningCost } from '@/lib/runningCost'
 
 import { splitBold } from '@/lib/boldMarkup'
 import SectionNavRail from '@/components/result/SectionNavRail'
@@ -433,6 +435,13 @@ export default function FinalResultPage() {
       ? `Nilai tenaga kerja dihitung dengan ${fmtLocal(c.assumedHourlyRateLocal)} per jam, perkiraan dari benchmark pasar (${c.rateBenchmarkLabelId ?? 'industri'}), ${rejected ? 'karena biaya per jam yang Anda isi tampak di luar kewajaran (mis. gaji bulanan, bukan per jam)' : 'karena biaya per jam tidak diisi'}. Jalankan ulang diagnostic dengan biaya per jam Anda sendiri untuk kasus yang lebih akurat.`
       : `Labor is valued at ${fmtLocal(c.assumedHourlyRateLocal)} per hour, an estimate from a market benchmark (${c.rateBenchmarkLabel ?? 'industry'}), ${rejected ? 'because the hourly cost you entered looked out of range (e.g. a monthly salary rather than an hourly figure)' : 'because no hourly cost was entered'}. Re-run the diagnostic with your own hourly cost for a more accurate case.`
   })()
+  const planCard = requiredBasis ? buildPlanComparison(calculations as any, (v) => fmtLocal(v), locale) : null
+  // Reports computed since 2026-11-06 have no running cost (the Aivory plan is a recommendation), so
+  // Payback / ROI / NPV share one basis; stored older reports still show their running-cost tiles.
+  const runCost = hasRunningCost(calculations as any)
+  const investmentBasisNote = runCost
+    ? (locale === 'id' ? 'Sebelum biaya berjalan · investasi = kebutuhan tahun pertama' : 'Before running costs · investment = year-1 requirement')
+    : (locale === 'id' ? 'Investasi = paket + setup tahun pertama' : 'Investment = package + setup, year 1')
   const planDisplayName = (() => { const p = (calculations as any).requiredInvestment?.plan; return p ? p.charAt(0).toUpperCase() + p.slice(1) : '' })()
   const netVerdict = requiredBasis ? buildNetVerdict({ ...(calculations as any), planName: planDisplayName }, locale, fmtLocal) : null
   const requiredView = buildRequiredInvestmentView(calculations as never, (v) => fmtLocal(v), locale)
@@ -774,6 +783,32 @@ export default function FinalResultPage() {
           )}
         </div>
 
+        {planCard && (
+          <div id="section-aivory-plan" className={styles.card}>
+            <h2 className={styles.sectionLabel}>{planCard.heading}</h2>
+            <p className={styles.planWhat}><strong>{planCard.recommendation}</strong></p>
+            <p className={styles.planWhat}>{planCard.whatItIs}</p>
+            <div className={styles.planGrid}>
+              {planCard.rows.map((row) => (
+                <div key={row.plan} className={`${styles.planOption} ${row.recommended ? styles.planOptionUsed : ''}`}>
+                  <div className={styles.planOptionHead}>
+                    <strong>{row.name}</strong>
+                    {row.recommended && <span className={styles.planBadge}>{planCard.labels.recommended}</span>}
+                  </div>
+                  <dl className={styles.planFacts}>
+                    <div><dt>{planCard.labels.who}</dt><dd>{row.who}</dd></div>
+                    <div><dt>{planCard.labels.includes}</dt><dd>{row.includes}</dd></div>
+                    <div><dt>{planCard.labels.price}</dt><dd>{row.price}</dd></div>
+                    <div><dt>{planCard.labels.yearly}</dt><dd>{row.yearly}</dd></div>
+                    <div><dt>{planCard.labels.kept}</dt><dd style={{ fontWeight: 700, color: row.keptTone === 'good' ? '#86efac' : row.keptTone === 'bad' ? '#f87171' : undefined }}>{row.kept}</dd></div>
+                  </dl>
+                </div>
+              ))}
+            </div>
+            <p className={styles.planCaveat}>{planCard.caveat}</p>
+          </div>
+        )}
+
         {/* ── Operational Constraints (was Risk Register) — C5: standalone
               only with ≥2 risks; a single risk is folded into the diagnosis
               above, 0 risks render nothing. ── */}
@@ -1006,7 +1041,6 @@ export default function FinalResultPage() {
                   </Fragment>
                 ))}
               </div>
-              {requiredView.planNote && <p className={styles.thresholdIntro} style={{ marginTop: '0.9rem' }}>{requiredView.planNote}</p>}
               <p className={styles.thresholdFootnote}>{requiredView.footnote}</p>
             </div>
           )}
@@ -1071,19 +1105,23 @@ export default function FinalResultPage() {
               confidenceLevel={calculations.confidenceLevel}
               locale={locale}
             />
-            <ROIMetricTile label={locale === 'id' ? 'Periode Payback' : 'Payback Period'} value={calculations.paybackMonths} formatter={(v) => formatPaybackCapped(v, locale)} subtitle={requiredBasis ? (locale === 'id' ? 'Sebelum biaya berjalan · investasi = kebutuhan tahun pertama' : 'Before running costs · investment = year-1 requirement') : (locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget')} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Periode Payback' : 'Payback Period'} value={calculations.paybackMonths} formatter={(v) => formatPaybackCapped(v, locale)} subtitle={requiredBasis ? investmentBasisNote : (locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget')} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile
               label={roiLabel(roiYears, locale)}
               value={calculations.threeYearROIPercent}
               formatter={(v) => v >= 999 ? '>999%' : formatPercent(v, locale)}
-              subtitle={requiredBasis ? (locale === 'id' ? 'Sebelum biaya berjalan · investasi = kebutuhan tahun pertama' : 'Before running costs · investment = year-1 requirement') : (locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget')}
+              subtitle={requiredBasis ? investmentBasisNote : (locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget')}
               confidenceLevel={calculations.confidenceLevel}
               locale={locale}
             />
             <ROIMetricTile label={npvLabel(roiYears, locale)} value={(calculations as any).npv3YearLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Value kini bersih @ diskonto 10%' : 'Net present value @ 10% discount'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            {runCost && (
+              <>
             <ROIMetricTile label={locale === 'id' ? 'Biaya Berjalan Tahunan' : 'Annual Ongoing Cost'} value={(calculations as any).annualOngoingCostLocal ?? null} formatter={fmtLocal} subtitle={requiredBasis ? (locale === 'id' ? `Plan Aivory ${planDisplayName}, mulai tahun ke-2` : `Aivory ${planDisplayName} plan, from year 2`) : (locale === 'id' ? 'Estimasi lisensi, pemeliharaan & dukungan' : 'Est. licenses, maintenance & support')} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Penghematan Bersih Tahunan' : 'Net Annual Savings'} value={(calculations as any).netAnnualSavingsLocal ?? null} formatter={fmtLocal} subtitle={locale === 'id' ? 'Setelah biaya berjalan' : 'After ongoing cost'} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Periode Payback Bersih' : 'Net Payback Period'} value={(calculations as any).netPaybackMonths ?? null} formatter={(v) => formatPaybackCapped(v, locale, roiYears * 12)} subtitle={locale === 'id' ? 'Berdasarkan penghematan bersih' : 'On net savings'} confidenceLevel={calculations.confidenceLevel} locale={locale} nullText={netPaybackNotReachedLabel(calculations as any, locale, roiYears) ?? undefined} />
+              </>
+            )}
             {totalAnnualSavingsLocal != null && totalAnnualSavingsLocal > 0 && (
               <ROIMetricTile
                 label={locale === 'id' ? 'Batas Investasi Impas' : 'Break-even Investment'}
@@ -1131,7 +1169,7 @@ export default function FinalResultPage() {
               contradictory without this note (NPV negative + ROI positive;
               two different ROI figures on the same screen). */}
           {calculations.hasEnoughDataForProjection && (
-            <p className={styles.financialTermsNote}>{buildFinancialTermsNote(locale, roiYears, { basis: requiredBasis ? 'required' : 'stated_budget', hasCapacityRoi: !!capacityView })}</p>
+            <p className={styles.financialTermsNote}>{buildFinancialTermsNote(locale, roiYears, { basis: requiredBasis ? 'required' : 'stated_budget', hasCapacityRoi: !!capacityView, hasRunningCost: runCost })}</p>
           )}
 
           {/* Window disclosure — only when the horizon is NOT the familiar 3
@@ -1213,11 +1251,13 @@ export default function FinalResultPage() {
                   <span className={styles.scenarioCellValue}>{fmtRoi((calculations as any).scenarioThreeYearROI.high)}</span>
                 </div>
               </div>
+              {runCost && (
               <span className={styles.scenarioNote}>
                 {locale === 'id'
                   ? `Kisaran mencerminkan efisiensi otomasi 50%–90%; skenario dasar menggunakan ${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%.`
                   : `Range reflects 50%–90% automation efficiency; base case uses ${Math.round((calculations.efficiencyFactor ?? 0.75) * 100)}%.`}
               </span>
+              )}
               {/* Without this line, "Dasar" here (net, after ongoing cost)
                   and the "ROI N Tahun" hero tile + Methodology Step 6 (gross,
                   before ongoing cost) read as two contradictory numbers for
@@ -1329,6 +1369,7 @@ export default function FinalResultPage() {
                       : `${fmtLocal(calculations.annualProcessSavingsLocal)} = 20% of labor savings (operational overhead reduction — internal benchmark estimate)`}
                   </span>
                 </li>
+                {runCost && (
                 <li className={styles.stepRow}>
                   <span className={styles.stepLabel}>{locale === 'id' ? 'Biaya operasional berjalan' : 'Ongoing run cost'}</span>
                   <span className={styles.stepValue}>
@@ -1337,6 +1378,7 @@ export default function FinalResultPage() {
                       : `${fmtLocal((calculations as any).annualOngoingCostLocal)} / year = ${Math.round(((calculations as any).ongoingCostRate ?? 0.2) * 100)}% of the initial investment (licenses, maintenance, support). Net figures and payback are computed after this cost.`}
                   </span>
                 </li>
+                )}
                 <li className={styles.stepRow}>
                   <span className={styles.stepLabel}>{locale === 'id' ? 'Mata uang & sumber' : 'Currency & sources'}</span>
                   <span className={styles.stepValue}>
