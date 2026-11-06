@@ -35,9 +35,12 @@ export interface PlanCardRow {
   price: string
   /** What the plan costs per year. */
   yearly: string
-  /** This plan's yearly cost as a share of the yearly value the scope creates (value stays positive; the plan is the cost). */
+  /**
+   * This plan's yearly cost as a share of the yearly value the scope creates (value stays positive; the plan
+   * is the cost). A plain fact: deliberately NOT colour-coded, because a red 144% read as an error rather
+   * than as "this plan costs more than a small scope creates".
+   */
   share: string | null
-  shareTone: 'good' | 'bad' | null
   recommended: boolean
 }
 
@@ -105,7 +108,6 @@ export function buildPlanComparison(
         ? (id ? 'Dihargai tim sales' : 'Priced by sales')
         : `${fmt(yearlyLocal)}${id ? '/tahun' : '/year'}`,
       share: sharePct === null ? null : (id ? `${sharePct}% dari nilai per tahun` : `${sharePct}% of the yearly value`),
-      shareTone: sharePct === null ? null : sharePct > 100 ? 'bad' : 'good',
       recommended: plan === recPlan,
     }
   }
