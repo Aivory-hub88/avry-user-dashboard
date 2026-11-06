@@ -75,10 +75,13 @@ describe('buildPlanComparison (the recommendation card)', () => {
     const biz = v.rows.find((r) => r.plan === 'business')!
     expect(op.yearly).toBe(`${fmt(20 * 12 * fx)}/year`)
     expect(biz.yearly).toBe(`${fmt(99 * 12 * fx)}/year`)
-    expect(op.kept).toBe(fmt(c.totalAnnualSavingsLocal - 20 * 12 * fx))
-    expect(biz.kept).toBe(fmt(c.totalAnnualSavingsLocal - 99 * 12 * fx))
+    // value stays a positive number and the plan is the cost compared against it
+    expect(op.share).toBe(`${Math.round((20 * 12 * fx / c.totalAnnualSavingsLocal) * 100)}% of the yearly value`)
+    expect(biz.share).toBe(`${Math.round((99 * 12 * fx / c.totalAnnualSavingsLocal) * 100)}% of the yearly value`)
+    expect(v.valueLine).toBe(`Value this scope creates: ${fmt(c.totalAnnualSavingsLocal)} per year (from the Financial Case).`)
+    expect(JSON.stringify(v)).not.toMatch(/value left/i)
     // the dependence is visible: the cheaper plan leaves more of the value
-    expect(op.keptTone).toBe('good')
+    expect(op.shareTone).toBe('good')
   })
 
   it('steps down to Operational when the team-size match would cost more per year than the scope creates (the reported case)', () => {
@@ -91,7 +94,7 @@ describe('buildPlanComparison (the recommendation card)', () => {
     const id = buildPlanComparison(c, fmt, 'id')!
     expect(id.recommendation).toMatch(/^Kami merekomendasikan plan Operational: plan Business/)
     // and it never recommends a plan that is a net loss when a cheaper one is not
-    expect(v.rows.find((r) => r.recommended)!.keptTone).toBe('good')
+    expect(v.rows.find((r) => r.recommended)!.shareTone).toBe('good')
   })
 
   it('says plainly that the plan is not in the figures, and explains the sizing rule', () => {

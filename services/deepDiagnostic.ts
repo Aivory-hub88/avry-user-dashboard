@@ -2619,6 +2619,30 @@ export function upgradeDiagnosticContext(
     changed = true
   }
 
+  // Reports saved before 2026-11-06 carry the Aivory plan INSIDE their figures (plan months in the
+  // year-1 investment, a running cost from year 2). The plan is now a recommendation, so those
+  // reports are re-priced on the same basis as new ones whenever they are opened. Otherwise the
+  // same page mixes the old negative NPV / net savings with the new recommendation card.
+  // Uses the stored answers (quantitative, incl. a user-stated hourly cost) and the stored scope
+  // (package + setup); nothing is invented. Idempotent: a re-priced report has no running cost.
+  if (!needsRoiUpgrade && context.quantitative && calc?.investmentBasis === 'required'
+      && calc.requiredInvestment && calc.requiredInvestment.annualRecurringUSD > 0) {
+    const ri = calc.requiredInvestment
+    const repriced = { ...ri, initialUSD: ri.packageUSD + ri.setupUSD, annualRecurringUSD: 0 }
+    const reRun = calculateROI(
+      context.quantitative,
+      parseCurrencyCode(context.currency),
+      context.qualitative?.industry,
+      undefined,
+      repriced,
+    )
+    calculations = {
+      ...reRun,
+      confidenceLevel: dampConfidenceByEstimateBasis(reRun.confidenceLevel, context.qualitative?.estimateBasis),
+    }
+    changed = true
+  }
+
   // Generate Room for Improvement if the stored context predates the feature.
   // Always regenerated from the latest copy. Contexts stored since
   // 2026-10-10 carry the quoted answers (qualitative.rfiAnswers), so BOTH

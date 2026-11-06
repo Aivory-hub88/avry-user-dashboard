@@ -787,6 +787,7 @@ export default function FinalResultPage() {
           <div id="section-aivory-plan" className={styles.card}>
             <h2 className={styles.sectionLabel}>{planCard.heading}</h2>
             <p className={styles.planWhat}><strong>{planCard.recommendation}</strong></p>
+            {planCard.valueLine && <p className={styles.planWhat}>{planCard.valueLine}</p>}
             <p className={styles.planWhat}>{planCard.whatItIs}</p>
             <div className={styles.planGrid}>
               {planCard.rows.map((row) => (
@@ -800,7 +801,7 @@ export default function FinalResultPage() {
                     <div><dt>{planCard.labels.includes}</dt><dd>{row.includes}</dd></div>
                     <div><dt>{planCard.labels.price}</dt><dd>{row.price}</dd></div>
                     <div><dt>{planCard.labels.yearly}</dt><dd>{row.yearly}</dd></div>
-                    <div><dt>{planCard.labels.kept}</dt><dd style={{ fontWeight: 700, color: row.keptTone === 'good' ? '#86efac' : row.keptTone === 'bad' ? '#f87171' : undefined }}>{row.kept}</dd></div>
+                    <div><dt>{planCard.labels.share}</dt><dd style={{ fontWeight: 700, color: row.shareTone === 'good' ? '#86efac' : row.shareTone === 'bad' ? '#f87171' : undefined }}>{row.share}</dd></div>
                   </dl>
                 </div>
               ))}
