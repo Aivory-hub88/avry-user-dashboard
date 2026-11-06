@@ -300,18 +300,21 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
         required: true
       },
       {
-        id: 'manual_hours_weekly',
-        question: 'Approximately how many manual hours per week does your team spend on repetitive tasks?',
+        // Replaces the team-wide `manual_hours_weekly` (still read for answers saved before 2026-11-06). A single
+        // team-total bucket ignored how many people there were: "under 10 hours" meant 5 hours for 1 person or for 50.
+        // The team total is now per-person hours x the team size answered below (lib/teamHours.ts).
+        id: 'manual_hours_per_person',
+        question: 'On average, how many hours per week does ONE person on your team spend on repetitive manual tasks?',
         type: 'select',
         options: [
-          'Under 10 hours/week',
-          '10-25 hours/week',
-          '25-50 hours/week',
-          '50-100 hours/week',
-          'Over 100 hours/week',
+          'Under 2 hours/person/week',
+          '2-5 hours/person/week',
+          '5-10 hours/person/week',
+          '10-20 hours/person/week',
+          'Over 20 hours/person/week',
           'Not sure'
         ],
-        helperText: 'Across all team members in scope — used to calculate ROI projections',
+        helperText: 'Per person, not for the whole team. Your team size (next questions) is multiplied in automatically and shown in the report.',
         required: false
       },
       {
@@ -326,7 +329,7 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
           'Over 200 FTEs',
           'Not sure'
         ],
-        helperText: 'Used to calibrate ROI and savings estimates',
+        helperText: 'Multiplied by the hours per person above to get the team\'s total manual hours, which drives the savings estimate',
         required: false
       },
       {

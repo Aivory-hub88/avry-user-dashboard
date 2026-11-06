@@ -240,21 +240,21 @@ export const ID_QUESTION_COPY: Record<string, IdQuestionCopy> = {
   automation_current: {
     question: 'Berapa persen proses Anda yang saat ini sudah terotomasi?',
   },
-  manual_hours_weekly: {
-    question: 'Kira-kira berapa jam manual per minggu yang dihabiskan tim Anda untuk tugas berulang?',
-    helperText: 'Mencakup semua anggota tim yang relevan — digunakan untuk menghitung proyeksi ROI',
+  manual_hours_per_person: {
+    question: 'Rata-rata, berapa jam per minggu yang dihabiskan SATU orang di tim Anda untuk tugas manual yang berulang?',
+    helperText: 'Per orang, bukan untuk seluruh tim. Ukuran tim (pertanyaan berikutnya) dikalikan otomatis dan ditampilkan di laporan.',
     options: [
-      'Di bawah 10 jam/minggu',
-      '10-25 jam/minggu',
-      '25-50 jam/minggu',
-      '50-100 jam/minggu',
-      'Di atas 100 jam/minggu',
+      'Di bawah 2 jam/orang/minggu',
+      '2-5 jam/orang/minggu',
+      '5-10 jam/orang/minggu',
+      '10-20 jam/orang/minggu',
+      'Di atas 20 jam/orang/minggu',
       'Tidak yakin',
     ],
   },
   fte_count: {
     question: 'Berapa jumlah karyawan penuh waktu (FTE) yang termasuk dalam cakupan otomasi?',
-    helperText: 'Digunakan untuk mengkalibrasi estimasi ROI dan penghematan',
+    helperText: 'Dikalikan dengan jam per orang di atas untuk mendapatkan total jam manual tim, yang menentukan estimasi penghematan',
     options: [
       '1-5 FTE',
       '6-15 FTE',
