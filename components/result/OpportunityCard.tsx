@@ -1,6 +1,7 @@
 import type { RankedOpportunity } from '@/types/diagnostic'
 import { formatLocalAmount, humanizeQuadrant, type CurrencyCode } from '@/lib/resultFormatters'
 import { buildWhyThisRecommendation } from '@/lib/readinessNarrative'
+import { formatIncrementLine, type ProcessIncrement } from '@/lib/processIncrements'
 import styles from './OpportunityCard.module.css'
 
 interface OpportunityCardProps {
@@ -9,6 +10,8 @@ interface OpportunityCardProps {
   colorIndex?: number
   currencyCode: CurrencyCode
   locale?: 'en' | 'id'
+  /** This process's share of the improvement and of today's manual workload it removes. */
+  increment?: ProcessIncrement | null
 }
 
 // Must stay in sync with DOT_COLORS in OpportunityMatrix.tsx
@@ -45,6 +48,7 @@ export default function OpportunityCard({
   colorIndex = 0,
   currencyCode,
   locale = 'en',
+  increment = null,
 }: OpportunityCardProps) {
   const color = DOT_COLORS[colorIndex % DOT_COLORS.length]
   const cardStyle = isHighlighted
@@ -114,6 +118,7 @@ export default function OpportunityCard({
 
       {/* FIX 2 (lanjutan): Tampilkan savings unik per-kartu */}
       {savingsLine && <p className={styles.roiNote}>{savingsLine}</p>}
+      {increment && <p className={styles.roiNote} data-increment>{formatIncrementLine(increment, locale)}</p>}
 
       {/* projectedROINote only when there is no savings line: for savings it is
           the same figure as stored text, so older reports would show it twice

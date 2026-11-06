@@ -24,6 +24,7 @@ import { buildWebsiteInsightsView } from '@/lib/websiteInsightsView'
 import { buildNetVerdict } from '@/lib/netVerdict'
 import { buildPlanComparison } from '@/lib/planComparison'
 import { hasRunningCost } from '@/lib/runningCost'
+import { buildProcessIncrements, formatIncrementsSummary } from '@/lib/processIncrements'
 
 import { splitBold } from '@/lib/boldMarkup'
 import SectionNavRail from '@/components/result/SectionNavRail'
@@ -448,6 +449,8 @@ export default function FinalResultPage() {
       : transformationModel
         ? (locale === 'id' ? 'Investasi = setup tim + software, tahun pertama' : 'Investment = your setup + software, year 1')
         : (locale === 'id' ? 'Investasi = paket + setup tahun pertama' : 'Investment = package + setup, year 1')
+  const increments = buildProcessIncrements(opportunities, calculations as any, context.quantitative)
+  const incrementsSummary = formatIncrementsSummary(increments, locale)
   const planDisplayName = (() => { const p = (calculations as any).requiredInvestment?.plan; return p ? p.charAt(0).toUpperCase() + p.slice(1) : '' })()
   const netVerdict = requiredBasis ? buildNetVerdict({ ...(calculations as any), planName: planDisplayName, headlineNet, costLabel: transformationModel ? { en: 'the recommended software', id: 'software yang direkomendasikan' } : null }, locale, fmtLocal) : null
   const requiredView = buildRequiredInvestmentView(calculations as never, (v) => fmtLocal(v), locale)
@@ -835,6 +838,7 @@ export default function FinalResultPage() {
         {/* ── Transformation Opportunities ── */}
         <div id="section-transformation-opportunities" className={styles.card}>
           <h2 className={styles.sectionLabel}>{locale === 'id' ? 'Peluang Transformasi' : 'Transformation Opportunities'}</h2>
+          {incrementsSummary && opportunities.length > 0 && <p className={styles.vizCaption}>{incrementsSummary}</p>}
           {opportunities.length === 0 ? (
             <p className={styles.emptyMessage}>{locale === 'id' ? 'Belum ada peluang yang teridentifikasi.' : 'No opportunities identified.'}</p>
           ) : (
@@ -857,6 +861,7 @@ export default function FinalResultPage() {
                     colorIndex={idx}
                     currencyCode={currencyCode}
                     locale={locale}
+                    increment={increments.byId[opp.id] ?? null}
                   />
                 ))}
               </div>
