@@ -340,7 +340,7 @@ export class DeepDiagnosticService {
       if (!question.required) continue
       const value = responses[question.id]
 
-      if (value === undefined || value === null || value === '') {
+      if (value === undefined || value === null || value === '' || (typeof value === 'string' && value.trim() === '')) {
         errors[question.id] = 'This field is required'
         continue
       }
