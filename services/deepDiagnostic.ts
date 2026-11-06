@@ -834,7 +834,10 @@ export function calculateROI(
   const ROI_HORIZON_MIN_YEARS = 3
   const ROI_HORIZON_MAX_YEARS = 7
   const roiHorizonYears = (() => {
-    const breakEven = netBreakEvenYears ?? (totalAnnualSavingsUSD && budgetUSD ? budgetUSD / totalAnnualSavingsUSD : null)
+    // Only a real NET break-even may extend the window. Falling back to the gross
+    // payback (investment / savings, ignoring running costs) "extended" the window to
+    // contain a break-even that the net case never reaches.
+    const breakEven = netBreakEvenYears
     if (breakEven === null || !isFinite(breakEven) || breakEven <= 0) return ROI_HORIZON_MIN_YEARS
     return Math.max(ROI_HORIZON_MIN_YEARS, Math.min(ROI_HORIZON_MAX_YEARS, Math.ceil(breakEven) + 1))
   })()

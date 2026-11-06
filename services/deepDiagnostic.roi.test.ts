@@ -337,9 +337,14 @@ describe('adaptive ROI horizon', () => {
     expect(r.roiHorizonYears).toBe(Math.min(7, Math.ceil(r.netBreakEvenYears!) + 1))
   })
 
-  it('the window is capped at 7 years — hopeless cases stay honestly negative', () => {
+  it('a case with no NET break-even keeps the standard window instead of being "extended to contain" one', () => {
+    // Savings are far below the investment and below the running cost, so the net
+    // case never breaks even. The window used to stretch to 7 years using the
+    // GROSS payback (ignoring running costs), and the report then claimed the
+    // longer window "contains the break-even point" — which it never reaches.
     const r = calculateROI(q({ totalManualHoursWeekly: 5, fteCountInScope: 2, currentAutomationPct: 40, targetAutomationPct: 50, budgetMidpointUSD: 300000 }), 'USD')
-    expect(r.roiHorizonYears).toBe(7)
+    expect(r.netBreakEvenYears).toBeNull()
+    expect(r.roiHorizonYears).toBe(3)
     expect(r.threeYearROIPercent!).toBeLessThan(0)
   })
 

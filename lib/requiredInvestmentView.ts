@@ -78,7 +78,7 @@ export function buildRequiredInvestmentView(
   if (stated !== null) {
     rows.push({ label: id ? 'Anggaran yang Anda siapkan' : 'Budget you set aside', value: fmt(stated) })
     rows.push(remaining! >= 0
-      ? { label: id ? 'Sisa anggaran' : 'Budget left over', value: fmt(remaining!), emphasis: true, tone: 'good' }
+      ? { label: id ? 'Ruang anggaran (tidak terpakai untuk cakupan ini)' : 'Budget headroom (not needed for this scope)', value: fmt(remaining!) }
       : { label: id ? 'Kekurangan anggaran' : 'Budget shortfall', value: fmt(-remaining!), emphasis: true, tone: 'bad' })
   }
 
@@ -90,8 +90,8 @@ export function buildRequiredInvestmentView(
   } else if (remaining! >= 0) {
     const share = Math.max(1, Math.round((initial / stated) * 100))
     explanation = id
-      ? `Anda menyiapkan anggaran ${fmt(stated)}. Untuk cakupan otomasi yang direkomendasikan, investasi yang dibutuhkan dengan Aivory diperkirakan ${fmt(initial)} di tahun pertama — sekitar ${share}% dari anggaran Anda, jadi sisa ${fmt(remaining!)} tidak perlu dipakai untuk cakupan ini. Semua angka keuangan di bawah dihitung dari investasi yang dibutuhkan, bukan dari seluruh anggaran.`
-      : `You set aside ${fmt(stated)}. For the recommended automation scope, the investment required with Aivory is an estimated ${fmt(initial)} in year 1 — about ${share}% of your budget, leaving ${fmt(remaining!)} unspent for this scope. Every financial figure below is calculated on the required investment, not on the whole budget.`
+      ? `Anda menyiapkan anggaran ${fmt(stated)}. Untuk cakupan otomasi yang direkomendasikan, investasi yang dibutuhkan dengan Aivory diperkirakan ${fmt(initial)} di tahun pertama — sekitar ${share}% dari anggaran Anda, jadi ${fmt(remaining!)} sisanya tidak dibutuhkan untuk cakupan ini. Semua angka keuangan di bawah dihitung dari investasi yang dibutuhkan, bukan dari seluruh anggaran.`
+      : `You set aside ${fmt(stated)}. For the recommended automation scope, the investment required with Aivory is an estimated ${fmt(initial)} in year 1 — about ${share}% of your budget, so the other ${fmt(remaining!)} is not needed for this scope. Every financial figure below is calculated on the required investment, not on the whole budget.`
   } else {
     explanation = id
       ? `Anda menyiapkan anggaran ${fmt(stated)}, sedangkan investasi yang dibutuhkan untuk cakupan otomasi yang direkomendasikan diperkirakan ${fmt(initial)} di tahun pertama — kurang ${fmt(-remaining!)}. Pertimbangkan menjalankan otomasi berdampak tertinggi lebih dulu. Semua angka keuangan di bawah dihitung dari investasi yang dibutuhkan.`
