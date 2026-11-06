@@ -21,6 +21,8 @@ import LoadingState from '@/components/result/LoadingState'
 import ErrorCard from '@/components/result/ErrorCard'
 import { localizeLlmResult } from '@/lib/llmResultLocale'
 import { buildWebsiteInsightsView } from '@/lib/websiteInsightsView'
+import { buildNetVerdict } from '@/lib/netVerdict'
+
 import { splitBold } from '@/lib/boldMarkup'
 import SectionNavRail from '@/components/result/SectionNavRail'
 import AdvisoryContactModal from '@/components/result/AdvisoryContactModal'
@@ -423,6 +425,7 @@ export default function FinalResultPage() {
   // budget-vs-ceiling table and the threshold table only apply to the older
   // whole-budget basis.
   const requiredBasis = isRequiredBasis(calculations as never)
+  const netVerdict = requiredBasis ? buildNetVerdict(calculations as any, locale, fmtLocal) : null
   const requiredView = buildRequiredInvestmentView(calculations as never, (v) => fmtLocal(v), locale)
   const investmentComparison = requiredBasis ? null : buildInvestmentComparison(calculations as never, roiYears)
   // Capacity value — cost avoidance from expected growth, on its own line.
@@ -1044,6 +1047,8 @@ export default function FinalResultPage() {
             )
           })()}
 
+          {netVerdict && <p className={styles.netVerdict}>{netVerdict}</p>}
+
           <div className={styles.roiGrid}>
             <ROIMetricTile label={locale === 'id' ? 'Value Bisnis yang Dihasilkan' : 'Business Value Created'} value={totalAnnualSavingsLocal} formatter={fmtLocal} variant="hero" confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile label={locale === 'id' ? 'Value Tenaga Kerja yang Dipulihkan' : 'Recovered Labor Value'} value={annualLaborSavingsLocal} formatter={fmtLocal} confidenceLevel={calculations.confidenceLevel} locale={locale} />
@@ -1055,12 +1060,12 @@ export default function FinalResultPage() {
               confidenceLevel={calculations.confidenceLevel}
               locale={locale}
             />
-            <ROIMetricTile label={locale === 'id' ? 'Periode Payback' : 'Payback Period'} value={calculations.paybackMonths} formatter={(v) => formatPaybackCapped(v, locale)} subtitle={requiredBasis ? (locale === 'id' ? 'Investasi = kebutuhan tahun pertama' : 'Investment = year-1 requirement') : (locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget')} confidenceLevel={calculations.confidenceLevel} locale={locale} />
+            <ROIMetricTile label={locale === 'id' ? 'Periode Payback' : 'Payback Period'} value={calculations.paybackMonths} formatter={(v) => formatPaybackCapped(v, locale)} subtitle={requiredBasis ? (locale === 'id' ? 'Sebelum biaya berjalan · investasi = kebutuhan tahun pertama' : 'Before running costs · investment = year-1 requirement') : (locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget')} confidenceLevel={calculations.confidenceLevel} locale={locale} />
             <ROIMetricTile
               label={roiLabel(roiYears, locale)}
               value={calculations.threeYearROIPercent}
               formatter={(v) => v >= 999 ? '>999%' : formatPercent(v, locale)}
-              subtitle={requiredBasis ? (locale === 'id' ? 'Investasi = kebutuhan tahun pertama' : 'Investment = year-1 requirement') : (locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget')}
+              subtitle={requiredBasis ? (locale === 'id' ? 'Sebelum biaya berjalan · investasi = kebutuhan tahun pertama' : 'Before running costs · investment = year-1 requirement') : (locale === 'id' ? 'Dengan investasi = anggaran yang Anda masukkan' : 'Assumes investment = your full stated budget')}
               confidenceLevel={calculations.confidenceLevel}
               locale={locale}
             />

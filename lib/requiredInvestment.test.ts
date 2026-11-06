@@ -91,7 +91,7 @@ describe('buildRequiredInvestmentView', () => {
     const labels = v.rows.map((r) => r.label)
     expect(labels[0]).toContain('Complete Transformation Package')
     expect(labels).toContain('Investasi yang dibutuhkan — tahun pertama')
-    expect(labels).toContain('Sisa anggaran')
+    expect(labels).toContain('Ruang anggaran (tidak terpakai untuk cakupan ini)')
     expect(v.explanation).toContain('bukan dari seluruh anggaran')
     expect(v.footnote).toContain('rendah 20, sedang 60, tinggi 160')
   })
