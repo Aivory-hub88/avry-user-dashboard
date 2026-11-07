@@ -1,7 +1,9 @@
 /* Chat-style Deep Diagnostic (prototype) */
 
 .page {
-  --accent: var(--color-accent-report, #8ea2ff);
+  /* Neutral monochrome: white on dark glass, no hue. The dashboard's olive
+     report accent read as cheap on these surfaces. */
+  --accent: #f4f4f5;
   --line: rgba(255, 255, 255, 0.09);
   --glass: rgba(255, 255, 255, 0.045);
   height: 100%;
@@ -78,18 +80,18 @@
   max-width: 80%;
   padding: 10px 16px;
   text-align: left;
-  font: inherit; font-size: 0.92rem; line-height: 1.5; color: #fff;
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  font: inherit; font-size: 0.92rem; line-height: 1.5; font-weight: 500; color: #0b0b10;
+  background: #f4f4f5;
+  border: 1px solid transparent;
   border-radius: 18px 18px 4px 18px;
   cursor: pointer;
   white-space: pre-wrap; overflow-wrap: anywhere;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
-.user:hover { border-color: var(--accent); }
-.userEditing { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 34%, transparent); }
+.user:hover { background: #ffffff; }
+.userEditing { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35); }
 .editHint {
-  display: block; margin-top: 2px; font-size: 0.68rem; color: rgba(255, 255, 255, 0.45);
+  display: block; margin-top: 2px; font-size: 0.68rem; color: rgba(11, 11, 16, 0.5);
   max-height: 0; opacity: 0; overflow: hidden; transition: all 0.15s ease;
 }
 .user:hover .editHint { max-height: 16px; opacity: 1; }
@@ -104,7 +106,7 @@
 @keyframes bounce { 0%, 60%, 100% { transform: none; opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
 
 .divider { margin: 18px 0 6px; padding-top: 14px; border-top: 1px solid var(--line); text-align: center; animation: rise 0.3s ease both; }
-.dividerRecap { font-size: 0.78rem; color: var(--accent); margin-bottom: 8px; }
+.dividerRecap { font-size: 0.78rem; color: rgba(255, 255, 255, 0.6); margin-bottom: 8px; }
 .dividerTitle { font-weight: 700; font-size: 0.9rem; }
 .dividerDesc { margin-top: 2px; font-size: 0.8rem; color: rgba(255, 255, 255, 0.5); }
 
@@ -126,7 +128,7 @@
 .composerFoot:empty { display: none; }
 .spacer { flex: 1; }
 .err { color: #f87171; font-size: 0.8rem; }
-.editTag { font-size: 0.75rem; color: var(--accent); margin-bottom: 8px; }
+.editTag { font-size: 0.75rem; color: rgba(255, 255, 255, 0.6); margin-bottom: 8px; }
 .counter { text-align: right; font-size: 0.7rem; color: rgba(255, 255, 255, 0.4); margin-top: 4px; }
 
 .input, .textarea, .filterInput {
@@ -145,9 +147,9 @@
   padding: 10px 14px; cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
 }
-.option:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.option:hover { border-color: rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.07); }
 .option:active { transform: scale(0.99); }
-.optionOn { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.optionOn { border-color: rgba(255, 255, 255, 0.65); background: rgba(255, 255, 255, 0.1); }
 .select {
   width: 100%; color-scheme: dark;
   appearance: none; -webkit-appearance: none;
@@ -156,7 +158,7 @@
   border: 1px solid var(--line); border-radius: 12px;
   padding: 12px 40px 12px 14px; cursor: pointer; outline: none;
 }
-.select:hover, .select:focus, .selectOpen { border-color: var(--accent); }
+.select:hover, .select:focus, .selectOpen { border-color: rgba(255, 255, 255, 0.45); }
 .select { text-align: left; }
 .selectPh { color: rgba(255, 255, 255, 0.45); }
 
@@ -182,15 +184,15 @@
   background: transparent; border: none; border-radius: 9px;
   padding: 9px 12px; cursor: pointer;
 }
-.ddItem:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
-.ddItemOn { background: color-mix(in srgb, var(--accent) 26%, transparent); font-weight: 600; }
+.ddItem:hover { background: rgba(255, 255, 255, 0.08); }
+.ddItemOn { background: rgba(255, 255, 255, 0.14); font-weight: 600; }
 
 .cardHead { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .chip {
-  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
+  font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em;
   padding: 3px 10px; border-radius: 999px;
-  color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  color: rgba(255, 255, 255, 0.8); background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--line);
 }
 .hint { font-size: 0.75rem; color: rgba(255, 255, 255, 0.45); }
 .cardHead .editTag { margin: 0 0 0 auto; }
@@ -236,7 +238,7 @@
 .facts { display: flex; flex-direction: column; gap: 10px; }
 .company { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .companyName { font-weight: 700; font-size: 1.05rem; }
-.companySite { font-size: 0.8rem; color: var(--accent); margin-top: 2px; overflow-wrap: anywhere; }
+.companySite { font-size: 0.8rem; color: rgba(255, 255, 255, 0.55); margin-top: 2px; overflow-wrap: anywhere; }
 .fact { display: flex; flex-direction: column; gap: 2px; animation: rise 0.3s ease both; }
 .factLabel { font-size: 0.7rem; color: rgba(255, 255, 255, 0.4); }
 .factValue { font-size: 0.875rem; line-height: 1.4; overflow-wrap: anywhere; }
