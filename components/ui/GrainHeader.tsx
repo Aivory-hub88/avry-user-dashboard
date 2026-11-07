@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * The grainy-gradient header used on the report-style pages (Diagnostic result, Blueprint, Roadmap in teal; Agents in sunset).
+ * The grainy-gradient header used on the report-style pages (Diagnostic result and Blueprint in teal; Agents and Roadmap in sunset).
  * It is the pricing cards' "tri" scene (one dominant field, one large soft shape, a small glow in the far
  * corner, mixed in Oklab) with the Fibonacci circles on the right edge, from the Aivory gradient system.
  * Type on it is white; primary actions are solid white with dark-blue text; secondary ones are frosted.
@@ -28,9 +28,9 @@ const ramp = (colors: readonly [string, string, string, string, string, string],
 export type GrainWorld = 'teal' | 'sunset' | 'lagoon' | 'harbour' | 'aubergine'
 
 export const GRAIN_HEADER_WORLDS: Record<GrainWorld, BokehScene> = {
-  /** Report-style pages (Diagnostic result, Blueprint, Roadmap): deep teal into sea green, a touch of amber. */
+  /** Diagnostic result and Blueprint: deep teal into sea green, a touch of amber. */
   teal: ramp(['#06252d', '#0a3a46', '#12566a', '#217a86', '#3b9a98', '#d6a15c'], 6.2, 0.3, 0.9),
-  /** Agents: blue into violet, magenta and coral. */
+  /** Agents and Roadmap: blue into violet, magenta and coral. */
   sunset: ramp(['#0e1f5c', '#22388e', '#5a3fa4', '#9e4a98', '#d0626e', '#ee9560'], 3.3, 0.3, 0.88),
   /** For other pages: teal into copper and coral. */
   lagoon: ramp(['#06303a', '#0f5360', '#2a8088', '#b9885a', '#e0705f', '#f09a6a'], 4.1, 0.3, 0.84),
