@@ -333,3 +333,18 @@
 .composerInline .consoleRow { flex-shrink: 0; min-height: 0; gap: 10px; }
 .composerInline .consoleLeft { gap: 10px; }
 .composerInline .err { max-width: 42vw; font-size: 0.75rem; line-height: 1.3; }
+
+
+/* Caret while the welcome message streams in */
+.streamCaret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  opacity: 0.7;
+  animation: streamBlink 0.9s steps(1) infinite;
+}
+@keyframes streamBlink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .streamCaret { animation: none; } }
