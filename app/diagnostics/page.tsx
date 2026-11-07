@@ -7,6 +7,8 @@ import { DeepDiagnosticService } from '@/services/deepDiagnostic'
 import { hasCompletedDiagnostic } from '@/lib/diagnosticStatus'
 import { useRouterContext } from '@/contexts/RouterContext'
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole'
+import GrainHeader from '@/components/ui/GrainHeader'
+import PoweredByAether from '@/components/ui/PoweredByAether'
 import styles from './diagnostics.module.css'
 
 export default function DiagnosticsPage() {
@@ -75,54 +77,47 @@ export default function DiagnosticsPage() {
         <header className={styles.pageHeader}>
           <h1 className={styles.pageTitle}>{t('title')}</h1>
           <p className={styles.pageDescription}>
-            Take our comprehensive deep dive assessment to generate a full business operations report.
+            Take our comprehensive deep dive analysis to generate a full business operations report.
           </p>
         </header>
 
-        {/* Deep Diagnostic Section */}
-        <div className={styles.diagnosticSection}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>{t('deepDiagnostic')}</h2>
-            <p className={styles.sectionDescription}>
-              4-phase comprehensive assessment covering business objectives, data maturity, risk constraints, and AI opportunity mapping. Generates a full business operations report with ROI projections.
-            </p>
-          </div>
+        {/* Deep Diagnostic: one grainy-gradient hero card with the status and the next action */}
+        <GrainHeader world="harbour" className="rounded-[22px] p-7 md:p-10 shadow-[0_12px_40px_rgba(0,0,0,0.35)]">
+          <div className="relative z-10 flex flex-col gap-7 md:flex-row md:items-end md:justify-between">
+            <div className="max-w-xl">
+              <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] mb-4 px-3 py-1 rounded-full bg-white/[0.14] border border-white/[0.3] backdrop-blur-md">
+                {deepDiagnosticCompleted ? 'Report ready' : deepDiagnosticInProgress ? 'In progress' : '4-phase business analysis'}
+              </span>
+              <h2 className="text-white" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.2, letterSpacing: '-0.4px', margin: '0 0 12px' }}>
+                {t('deepDiagnostic')}
+              </h2>
+              <p style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.95)', lineHeight: 1.6, margin: 0 }}>
+                Covers business objectives, data maturity, risk constraints, and AI opportunity mapping, then turns your answers into a full business operations report with ROI projections.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-5">
+                {['Business objectives', 'Data maturity', 'Risk constraints', 'AI opportunities'].map(label => (
+                  <span key={label} className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-white/[0.1] border border-white/[0.22] text-white/90">
+                    {label}
+                  </span>
+                ))}
+              </div>
+              <PoweredByAether className="mt-6" />
+            </div>
 
-          <div className={styles.deepDiagnosticContent}>
-            {deepDiagnosticCompleted ? (
-              <div className={styles.completedState}>
-                <div className={styles.scoreDisplay}>
-                  <span className={styles.scoreLabel}>Status:</span>
-                  <span className={styles.scoreValue} style={{ color: 'var(--color-accent-report)', fontSize: '0.9rem' }}>Report Ready</span>
-                </div>
-                <div className={styles.completedActions}>
-                  <Link href="/diagnostics/deep/final-result" className={styles.diagnosticCta}>
-                    View Full Report
-                  </Link>
-                  <Link href="/diagnostics/deep" className={styles.retakeButton} style={{ display: 'inline-block', textAlign: 'center' }}>
-                    Retake Diagnostic
-                  </Link>
-                </div>
-              </div>
-            ) : deepDiagnosticInProgress ? (
-              <div className={styles.completedState}>
-                <div className={styles.scoreDisplay}>
-                  <span className={styles.scoreLabel}>Status:</span>
-                  <span className={styles.scoreValue} style={{ color: '#fbbf24', fontSize: '0.9rem' }}>In Progress</span>
-                </div>
-                <div className={styles.completedActions}>
-                  <Link href="/diagnostics/deep" className={styles.diagnosticCta}>
-                    Continue Diagnostic
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <Link href="/diagnostics/deep" className={styles.diagnosticCta}>
-                {t('startDeep')}
-              </Link>
-            )}
+            <div className="flex flex-wrap gap-3 shrink-0">
+              {deepDiagnosticCompleted ? (
+                <>
+                  <Link href="/diagnostics/deep/final-result" className={styles.heroPrimary}>View Full Report</Link>
+                  <Link href="/diagnostics/deep" className={styles.heroGhost}>Retake Diagnostic</Link>
+                </>
+              ) : deepDiagnosticInProgress ? (
+                <Link href="/diagnostics/deep" className={styles.heroPrimary}>Continue Diagnostic</Link>
+              ) : (
+                <Link href="/diagnostics/deep" className={styles.heroPrimary}>{t('startDeep')}</Link>
+              )}
+            </div>
           </div>
-        </div>
+        </GrainHeader>
       </div>
     </div>
   )

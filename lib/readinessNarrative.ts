@@ -316,11 +316,11 @@ export function buildFinancialTermsNote(
     const H = horizonYears
     if (locale === 'id') {
       return `Kotak Payback, kotak NPV, kotak ROI ${H} Tahun, dan Kisaran NPV ${H} Tahun semuanya sudah mengurangkan biaya tahunan software yang direkomendasikan mulai tahun ke-2; kisarannya hanya memvariasikan asumsi efisiensi (konservatif, dasar, optimis).` +
-        (opts.hasCapacityRoi ? ` ROI di blok nilai kapasitas adalah angka ketiga: sama dengan kotak ROI, ditambah biaya rekrutmen yang dihindari, dan sengaja ditampilkan terpisah.` : '') +
+        (opts.hasCapacityRoi ? ` Blok nilai kapasitas menambahkan biaya rekrutmen yang dihindari di atas nilai Financial Case, dan sengaja ditampilkan terpisah.` : '') +
         ` NPV menghitung nilai waktu uang (diskonto 10%), sehingga angkanya lebih kecil daripada selisih penghematan dan investasi. Paket dan plan Aivory tidak termasuk dalam angka ini; ia ditampilkan sebagai salah satu cara mengerjakan otomasinya.`
     }
     return `The Payback tile, the NPV tile, the ${H}-Year ROI tile and the ${H}-Year NPV range all deduct the yearly cost of the recommended software from year 2; the range only varies the efficiency assumption (conservative, base, optimistic).` +
-      (opts.hasCapacityRoi ? ` The ROI in the capacity-value block is a third figure: the tile's ROI plus the hiring cost avoided, deliberately shown separately.` : '') +
+      (opts.hasCapacityRoi ? ` The capacity-value block adds the hiring cost avoided on top of the Financial Case value, deliberately shown separately.` : '') +
       ` NPV prices in the time value of money (10% discount), so it is smaller than the plain gap between savings and investment. The Aivory package and plan are not part of these figures; Aivory is shown as one way to deliver the automation.`
   }
   if (opts.basis === 'required' && opts.hasRunningCost === false) {
@@ -328,22 +328,22 @@ export function buildFinancialTermsNote(
     const H = horizonYears
     if (locale === 'id') {
       return `Kotak NPV, kotak ROI ${H} Tahun, dan Kisaran NPV ${H} Tahun memakai investasi yang sama (paket sekali bayar ditambah waktu setup tim Anda); kisarannya hanya memvariasikan asumsi efisiensi (konservatif, dasar, optimis).` +
-        (opts.hasCapacityRoi ? ` ROI di blok nilai kapasitas adalah angka ketiga: sama dengan kotak ROI, ditambah biaya rekrutmen yang dihindari, dan sengaja ditampilkan terpisah.` : '') +
+        (opts.hasCapacityRoi ? ` Blok nilai kapasitas menambahkan biaya rekrutmen yang dihindari di atas nilai Financial Case, dan sengaja ditampilkan terpisah.` : '') +
         ` NPV menghitung nilai waktu uang (diskonto 10%), sehingga angkanya lebih kecil daripada selisih penghematan dan investasi. Langganan plan Aivory tidak termasuk dalam angka ini; ia ditampilkan sebagai rekomendasi.`
     }
     return `The NPV tile, the ${H}-Year ROI tile and the ${H}-Year NPV range use the same investment (the one-time package plus your team's setup time); the range only varies the efficiency assumption (conservative, base, optimistic).` +
-      (opts.hasCapacityRoi ? ` The ROI in the capacity-value block is a third figure: the tile's ROI plus the hiring cost avoided, deliberately shown separately.` : '') +
+      (opts.hasCapacityRoi ? ` The capacity-value block adds the hiring cost avoided on top of the Financial Case value, deliberately shown separately.` : '') +
       ` NPV prices in the time value of money (10% discount), so it is smaller than the plain gap between savings and investment. The Aivory plan subscription is not part of these figures; it is shown as a recommendation.`
   }
   if (opts.basis === 'required') {
     const H = horizonYears
     if (locale === 'id') {
       return `Kotak ROI ${H} Tahun di atas dihitung SEBELUM biaya berjalan (plan Aivory mulai tahun ke-2); Kisaran ROI ${H} Tahun di bawah dihitung SETELAH biaya itu dikurangi — jadi keduanya wajar berbeda.` +
-        (opts.hasCapacityRoi ? ` ROI di blok nilai kapasitas adalah angka ketiga: sama dengan kotak ROI, ditambah biaya rekrutmen yang dihindari, dan sengaja ditampilkan terpisah.` : '') +
+        (opts.hasCapacityRoi ? ` Blok nilai kapasitas menambahkan biaya rekrutmen yang dihindari di atas nilai Financial Case, dan sengaja ditampilkan terpisah.` : '') +
         ` NPV menghitung nilai waktu uang (diskonto 10%), sehingga angkanya lebih kecil daripada selisih penghematan dan investasi.`
     }
     return `The ${H}-Year ROI tile above is calculated BEFORE running costs (the Aivory plan from year 2); the ${H}-Year ROI range below is calculated AFTER them — so the two are expected to differ.` +
-      (opts.hasCapacityRoi ? ` The ROI in the capacity-value block is a third figure: the tile's ROI plus the hiring cost avoided, deliberately shown separately.` : '') +
+      (opts.hasCapacityRoi ? ` The capacity-value block adds the hiring cost avoided on top of the Financial Case value, deliberately shown separately.` : '') +
       ` NPV prices in the time value of money (10% discount), so it is smaller than the plain gap between savings and investment.`
   }
   if (locale === 'id') {
@@ -492,7 +492,7 @@ export function buildFirstMoves(m: FirstMovesInputs, locale: Locale = 'en'): Fir
     if (!m.hasBudgetInput) {
       moves.push({
         title: 'Tentukan besaran anggaran',
-        body: 'Tidak ada anggaran implementasi yang diberikan dalam asesmen. Memberikan kisaran anggaran akan melengkapi model payback dan ROI, serta mengubah estimasi ini menjadi kasus bisnis yang siap untuk keputusan.',
+        body: 'Tidak ada anggaran implementasi yang diberikan dalam analisis. Memberikan kisaran anggaran akan melengkapi model payback dan ROI, serta mengubah estimasi ini menjadi kasus bisnis yang siap untuk keputusan.',
       })
     } else {
       moves.push({ title: 'Dapatkan dukungan Executive', body: m.leadershipClause })
@@ -515,7 +515,7 @@ export function buildFirstMoves(m: FirstMovesInputs, locale: Locale = 'en'): Fir
   if (!m.hasBudgetInput) {
     moves.push({
       title: 'Size the budget',
-      body: 'No implementation budget was provided in the assessment. Supplying a budget range completes the payback and ROI model and turns these estimates into a decision-ready business case.',
+      body: 'No implementation budget was provided in the analysis. Supplying a budget range completes the payback and ROI model and turns these estimates into a decision-ready business case.',
     })
   } else {
     moves.push({ title: 'Secure the mandate', body: m.leadershipClause })
@@ -573,7 +573,7 @@ export function buildExecutiveSummary(
   const weakLabel = DIM_LABELS[locale][v.weakestKey] ?? cap(v.weakestKey)
 
   if (locale === 'id') {
-    const opening = `${v.company} memperoleh skor ${Math.round(v.composite)} dari 100 berdasarkan metodologi penilaian Kematangan Operasional Aivory — posisi "${levelLabel}", di mana ${posture}.`
+    const opening = `${v.company} memperoleh skor ${Math.round(v.composite)} dari 100 berdasarkan metodologi analisis Kematangan Operasional Aivory — posisi "${levelLabel}", di mana ${posture}.`
 
     let valueSentence = ''
     if (v.businessValueLabel && v.topOpportunityTitle) {
@@ -590,7 +590,7 @@ export function buildExecutiveSummary(
   }
 
   const article = /^[AEIOU]/i.test(level) ? 'an' : 'a'
-  const opening = `${v.company} scores ${Math.round(v.composite)} out of 100 under Aivory's Operational Maturity Assessment methodology — ${article} "${levelLabel}" posture, where ${posture}.`
+  const opening = `${v.company} scores ${Math.round(v.composite)} out of 100 under Aivory's Operational Maturity Analysis methodology — ${article} "${levelLabel}" posture, where ${posture}.`
 
   let valueSentence = ''
   if (v.businessValueLabel && v.topOpportunityTitle) {

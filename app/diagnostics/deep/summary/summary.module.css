@@ -1,4 +1,12 @@
 .pageContainer {
+  /* Neutral monochrome for the Deep Diagnostic flow: the dashboard's olive
+     accents read as cheap on these surfaces. Scoped here, not global. */
+  --color-accent: #e4e4e7;
+  --color-accent-report: #f4f4f5;
+  --color-accent-report-hover: #ffffff;
+  --color-accent-workflow: #f4f4f5;
+  --color-accent-soft: #d4d4d8;
+  --color-accent-text: #e4e4e7;
   height: 100%;
   overflow-y: auto;
   background-color: var(--bg-main);

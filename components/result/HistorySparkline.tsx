@@ -44,8 +44,8 @@ export default function HistorySparkline({ series, locale = 'en' }: HistorySpark
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="img"
         aria-label={locale === 'id'
-          ? `Tren skor komposit selama ${series.length} asesmen terakhir, dari ${series[0]} ke ${series[series.length - 1]}`
-          : `Composite score trend across last ${series.length} assessments, from ${series[0]} to ${series[series.length - 1]}`}
+          ? `Tren skor komposit selama ${series.length} analisis terakhir, dari ${series[0]} ke ${series[series.length - 1]}`
+          : `Composite score trend across last ${series.length} analysiss, from ${series[0]} to ${series[series.length - 1]}`}
       >
         <path d={path} className={styles.line} fill="none" />
         {points.map((p, i) => (
@@ -54,8 +54,8 @@ export default function HistorySparkline({ series, locale = 'en' }: HistorySpark
       </svg>
       <span className={styles.caption}>
         {locale === 'id'
-          ? `${series.length} asesmen terakhir · terbaru ${last ? Math.round(series[series.length - 1]) : '—'}`
-          : `Last ${series.length} assessments · latest ${last ? Math.round(series[series.length - 1]) : '—'}`}
+          ? `${series.length} analisis terakhir · terbaru ${last ? Math.round(series[series.length - 1]) : '—'}`
+          : `Last ${series.length} analysiss · latest ${last ? Math.round(series[series.length - 1]) : '—'}`}
       </span>
     </div>
   )

@@ -249,7 +249,7 @@
     "primaryConstraints": "Primary constraints",
     "saveBlueprintVersion": "Save Blueprint Version",
     "saveVersionDesc": "Give this version a name. It will be saved locally.",
-    "saveVersionPlaceholder": "e.g. V1, Initial Assessment",
+    "saveVersionPlaceholder": "e.g. V1, Initial Analysis",
     "emptyText": "Run a deep diagnostic first and we'll generate a personalized Transformation Blueprint for your organization.",
     "corruptedTitle": "Blueprint data is corrupted",
     "corruptedText": "Regenerate it from your latest diagnostic.",

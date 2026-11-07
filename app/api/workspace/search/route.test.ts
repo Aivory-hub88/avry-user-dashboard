@@ -108,4 +108,49 @@ describe('GET /api/workspace/search', () => {
     expect((await res.json()).hits).toEqual([])
     expect(queryMock).not.toHaveBeenCalled()
   })
+
+  it('scopes the title query to workspace_id when given, and passes null otherwise', async () => {
+    const titleParams = () =>
+      queryMock.mock.calls.find((c) => String(c[0]).includes('similarity(title'))![1] as unknown[]
+    await GET(new NextRequest('http://localhost/api/workspace/search?q=launch&workspace_id=ws-a', { headers: svc }))
+    expect(titleParams()[3]).toBe('ws-a')
+    queryMock.mockClear()
+    await GET(new NextRequest('http://localhost/api/workspace/search?q=launch', { headers: svc }))
+    expect(titleParams()[3]).toBeNull()
+  })
+
+  it('bounds semantic chunk lookup to the workspaces of readable docs', async () => {
+    process.env.OPENROUTER_EMBEDDING_KEY = 'k'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [{ embedding: Array.from({ length: 40 }, () => 0.1) }] }),
+        arrayBuffer: async () => new ArrayBuffer(0),
+      }),
+    )
+    try {
+      await GET(new NextRequest('http://localhost/api/workspace/search?q=launch', { headers: svc }))
+      const sem = queryMock.mock.calls.find((c) => String(c[0]).includes('FROM dashboard.workspace_chunks'))
+      expect(sem).toBeTruthy()
+      expect(String(sem![0])).toContain('c.workspace_id = ANY($3::text[])')
+      expect(sem![1][2]).toEqual(['default'])
+    } finally {
+      delete process.env.OPENROUTER_EMBEDDING_KEY
+    }
+  })
+
+  it('rejects service calls without a known agent type (fail closed)', async () => {
+    const cases: Record<string, string>[] = [
+      { 'x-service-token': 'test-service-token' },
+      { 'x-service-token': 'test-service-token', 'x-agent-type': 'not_a_real_agent' },
+    ]
+    for (const headers of cases) {
+      queryMock.mockClear()
+      const res = await GET(new NextRequest('http://localhost/api/workspace/search?q=launch', { headers }))
+      expect(res.status).toBe(403)
+      expect(queryMock).not.toHaveBeenCalled()
+    }
+  })
 })

@@ -4,7 +4,6 @@
  * returns null when the user gave no growth (or nothing is absorbable), so
  * neither surface renders an empty block.
  */
-import { formatRoi } from '@/lib/roiDisplay'
 type Locale = 'en' | 'id'
 
 interface Calc {
@@ -12,9 +11,8 @@ interface Calc {
   capacityRealizationFactor?: number
   capacityAvoidedHoursPerYear?: number | null
   capacityAvoidanceLocal?: number | null
-  horizonROIPercent?: number | null
-  horizonROIWithCapacityPercent?: number | null
-  roiHorizonYears?: number
+  /** The yearly value the Financial Case reports (local currency), before any cost avoided. */
+  totalAnnualSavingsLocal?: number | null
   efficiencyFactor?: number
 }
 
@@ -38,12 +36,10 @@ export function buildCapacityValueView(
   const growth = calc?.capacityGrowthPct
   if (!calc || !hours || !value || !growth) return null
   const id = locale === 'id'
-  const H = calc.roiHorizonYears ?? 3
   const realization = Math.round((calc.capacityRealizationFactor ?? 0.5) * 100)
   const eff = Math.round((calc.efficiencyFactor ?? 0.75) * 100)
   const fte = hours / FTE_HOURS_PER_YEAR
   const num = (v: number, digits = 1) => id ? v.toFixed(digits).replace('.', ',') : v.toFixed(digits)
-  const pct = (v: number) => formatRoi(v, locale, (n) => `${num(n)}%`)
   const growthLabel = growth >= 100 ? (id ? '100% atau lebih' : '100% or more') : `±${num(growth, growth % 1 ? 1 : 0)}%`
 
   const rows: CapacityValueView['rows'] = [
@@ -54,10 +50,12 @@ export function buildCapacityValueView(
     },
     { label: id ? 'Biaya rekrutmen yang dihindari' : 'Hiring cost avoided', value: `${fmt(value)}${id ? '/tahun' : '/yr'}`, emphasis: true },
   ]
-  if (calc.horizonROIWithCapacityPercent != null && calc.horizonROIPercent != null) {
+  // One plain figure instead of a second ROI: the yearly value of the Financial Case plus the hiring cost avoided.
+  const base = calc.totalAnnualSavingsLocal
+  if (base != null && base > 0) {
     rows.push({
-      label: id ? `ROI ${H} tahun termasuk biaya yang dihindari` : `${H}-year ROI including cost avoided`,
-      value: `${pct(calc.horizonROIWithCapacityPercent)} ${id ? `(tanpa: ${pct(calc.horizonROIPercent)})` : `(without: ${pct(calc.horizonROIPercent)})`}`,
+      label: id ? 'Total nilai per tahun bila pertumbuhan terjadi' : 'Total yearly value if the growth happens',
+      value: `${fmt(base + value)}${id ? '/tahun' : '/yr'} (${id ? `${fmt(base)} nilai cakupan + ${fmt(value)} biaya yang dihindari` : `${fmt(base)} scope value + ${fmt(value)} cost avoided`})`,
     })
   }
 

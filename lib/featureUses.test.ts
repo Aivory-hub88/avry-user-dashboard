@@ -43,7 +43,7 @@ describe('featureUses gate', () => {
     }
     vi.stubGlobal('fetch', uses({ remaining: 0, granted: 0, used: 0, unlimited: false }))
     gate = await requireRunLeft(req, 'snapshot')
-    if (!gate.ok) expect((await gate.response.json()).message).toMatch(/Purchase the Business Operations Assessment/)
+    if (!gate.ok) expect((await gate.response.json()).message).toMatch(/Purchase the Business Operations Analysis/)
   })
 
   it('treats unlimited (partner / superadmin) as always allowed', async () => {

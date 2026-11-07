@@ -1,6 +1,8 @@
 import { useTranslations } from 'next-intl'
 import { ArrowRight, Download } from 'lucide-react'
 import styles from './BlueprintHeader.module.css'
+import GrainHeader from '@/components/ui/GrainHeader'
+import PoweredByAether from '@/components/ui/PoweredByAether'
 
 interface BlueprintVersion {
   version: string
@@ -64,6 +66,7 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
         </div>
       )}
 
+      <GrainHeader world="teal" className="rounded-[18px] p-8 md:p-10">
       <div className={styles.headerContent}>
         {/* LEFT: company + blueprint meta */}
         <div className={styles.blueprintHeaderLeft}>
@@ -95,6 +98,8 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
             <span className={styles.versionDot} aria-hidden="true" />
             <span className={styles.draftPill}>{status}</span>
           </div>
+
+          <PoweredByAether className="mt-5 mb-5" />
 
           <div className={styles.pillsRow}>
             <div className={styles.pill}>
@@ -142,6 +147,7 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
           </div>
         </div>
       </div>
+      </GrainHeader>
     </div>
   )
 }

@@ -41,6 +41,7 @@ export default function SummaryPage() {
   const [phaseData, setPhaseData] = useState<Record<PhaseId, PhaseData> | null>(null)
   const [companyName, setCompanyName] = useState('demo_org')
   const [websiteUrl, setWebsiteUrl] = useState('')
+  const [documentText, setDocumentText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -58,6 +59,7 @@ export default function SummaryPage() {
     setPhaseData(progress.phases)
     if (progress.companyName?.trim()) setCompanyName(progress.companyName.trim())
     if (progress.websiteUrl?.trim()) setWebsiteUrl(progress.websiteUrl.trim())
+    if (progress.documentText?.trim()) setDocumentText(progress.documentText)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -102,6 +104,8 @@ export default function SummaryPage() {
         // Optional company website (ADR-022). Same smuggling trick as above;
         // vps-bridge strips it and only passes a validated profile to the model.
         ...(normalizeWebsiteInput(websiteUrl) ? { _website_url: normalizeWebsiteInput(websiteUrl) } : {}),
+        // Optional attached document: text only, handled by the bridge exactly like scraped website text.
+        ...(documentText.trim() ? { _document_text: documentText } : {}),
       } as Record<PhaseId, Record<string, any>>
 
       // AI analysis is best-effort: if the LLM path fails, the user still gets

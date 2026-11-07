@@ -54,10 +54,11 @@
   color: #e8e8e4;
 }
 
+/* On the grainy gradient: solid white with dark-blue text */
 .btnFilled {
-  background: var(--color-accent);
-  border: 1px solid var(--color-accent);
-  color: var(--color-on-accent);
+  background: #fff;
+  border: 1px solid #fff;
+  color: #06232b;
 }
 
 @media (max-width: 640px) {
