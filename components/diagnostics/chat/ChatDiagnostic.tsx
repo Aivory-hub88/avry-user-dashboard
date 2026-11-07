@@ -60,7 +60,7 @@ const COPY = {
     title: 'Deep Diagnostic',
     hello: 'Welcome to the Aivory Deep Diagnostic, powered by Aivory Aether. Over four phases we will assess how your business operates today: objectives, data and processes, risks, and bottlenecks. We will use your answers to prepare your analysis report. You can revise any answer at any time.',
     askCompany: "Let's begin. What is your company's name?",
-    askWebsite: 'Do you have a company website? I can read its public pages to make the analysis more accurate. It does not change your score.',
+    askWebsite: 'Do you have a company website? I can read its public pages to make the analysis more accurate. It does not change your score. Paste your company website link.',
     companyPh: 'Company name…',
     websitePh: 'e.g. yourcompany.com',
     send: 'Send',
@@ -115,7 +115,7 @@ const COPY = {
     title: 'Deep Diagnostic',
     hello: 'Selamat datang di Aivory Deep Diagnostic, powered by Aivory Aether. Dalam empat fase, kami akan menilai cara bisnis Anda beroperasi saat ini: tujuan, data dan proses, risiko, serta hambatan. Jawaban Anda akan kami susun menjadi laporan analisis. Anda dapat mengubah jawaban kapan saja.',
     askCompany: 'Mari kita mulai. Siapa nama perusahaan Anda?',
-    askWebsite: 'Apakah perusahaan Anda punya website? Saya bisa membaca halaman publiknya agar analisis lebih akurat. Tidak mengubah skor.',
+    askWebsite: 'Apakah perusahaan Anda punya website? Saya bisa membaca halaman publiknya agar analisis lebih akurat. Tidak mengubah skor. Tempel tautan website perusahaan Anda.',
     companyPh: 'Nama perusahaan…',
     websitePh: 'contoh: perusahaananda.co.id',
     send: 'Kirim',
@@ -711,7 +711,7 @@ export default function ChatDiagnostic() {
     // AI-console style composer: borderless field on top, action row below
     // (secondary actions left, round arrow send button right).
     return (
-      <div className={styles.composer}>
+      <div className={`${styles.composer} ${multiline ? '' : styles.composerInline}`}>
         {isEdit && <div className={styles.editTag}>{c.editing}</div>}
         {multiline ? (
           <textarea
