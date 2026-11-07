@@ -8,6 +8,7 @@ import { hasCompletedDiagnostic } from '@/lib/diagnosticStatus'
 import { useRouterContext } from '@/contexts/RouterContext'
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole'
 import GrainHeader from '@/components/ui/GrainHeader'
+import { asset } from '@/lib/asset'
 import styles from './diagnostics.module.css'
 
 export default function DiagnosticsPage() {
@@ -76,7 +77,7 @@ export default function DiagnosticsPage() {
         <header className={styles.pageHeader}>
           <h1 className={styles.pageTitle}>{t('title')}</h1>
           <p className={styles.pageDescription}>
-            Take our comprehensive deep dive assessment to generate a full business operations report.
+            Take our comprehensive deep dive analysis to generate a full business operations report.
           </p>
         </header>
 
@@ -85,7 +86,7 @@ export default function DiagnosticsPage() {
           <div className="relative z-10 flex flex-col gap-7 md:flex-row md:items-end md:justify-between">
             <div className="max-w-xl">
               <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] mb-4 px-3 py-1 rounded-full bg-white/[0.14] border border-white/[0.3] backdrop-blur-md">
-                {deepDiagnosticCompleted ? 'Report ready' : deepDiagnosticInProgress ? 'In progress' : '4-phase assessment'}
+                {deepDiagnosticCompleted ? 'Report ready' : deepDiagnosticInProgress ? 'In progress' : '4-phase business analysis'}
               </span>
               <h2 className="text-white" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.2, letterSpacing: '-0.4px', margin: '0 0 12px' }}>
                 {t('deepDiagnostic')}
@@ -99,6 +100,11 @@ export default function DiagnosticsPage() {
                     {label}
                   </span>
                 ))}
+              </div>
+              <div className="flex items-center gap-2.5 mt-6 text-white/75" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>
+                <span>Powered by</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={asset('/Aivory_Aether_white.svg')} alt="Aivory Aether" style={{ height: 12, width: 'auto', opacity: 0.95 }} />
               </div>
             </div>
 

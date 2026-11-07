@@ -61,8 +61,8 @@ export default function AdvisoryContactModal({ open, onClose, companyName, local
   const canSubmit = name.trim().length > 0 && email.trim().length > 0 && state !== 'submitting'
 
   const defaultMessage = locale === 'id'
-    ? 'Saya ingin menjadwalkan sesi untuk membahas Business Operations Assessment saya.'
-    : 'I would like to schedule a session to walk through my Business Operations Assessment.'
+    ? 'Saya ingin menjadwalkan sesi untuk membahas Business Operations Analysis saya.'
+    : 'I would like to schedule a session to walk through my Business Operations Analysis.'
 
   const mailtoFallback = () => {
     const subject = `Advisory session request — ${company.trim() || name.trim()}`

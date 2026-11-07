@@ -249,7 +249,7 @@
     "primaryConstraints": "Kendala utama",
     "saveBlueprintVersion": "Simpan Versi Cetak Biru",
     "saveVersionDesc": "Beri nama versi ini. Akan disimpan secara lokal.",
-    "saveVersionPlaceholder": "contoh: V1, Penilaian Awal",
+    "saveVersionPlaceholder": "contoh: V1, Analisis Awal",
     "emptyText": "Jalankan diagnostik mendalam terlebih dahulu dan kami akan membuat Cetak Biru Transformasi yang dipersonalisasi untuk organisasi Anda.",
     "corruptedTitle": "Data cetak biru rusak",
     "corruptedText": "Buat ulang dari diagnostik terbaru Anda.",

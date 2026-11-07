@@ -492,7 +492,7 @@ export function buildFirstMoves(m: FirstMovesInputs, locale: Locale = 'en'): Fir
     if (!m.hasBudgetInput) {
       moves.push({
         title: 'Tentukan besaran anggaran',
-        body: 'Tidak ada anggaran implementasi yang diberikan dalam asesmen. Memberikan kisaran anggaran akan melengkapi model payback dan ROI, serta mengubah estimasi ini menjadi kasus bisnis yang siap untuk keputusan.',
+        body: 'Tidak ada anggaran implementasi yang diberikan dalam analisis. Memberikan kisaran anggaran akan melengkapi model payback dan ROI, serta mengubah estimasi ini menjadi kasus bisnis yang siap untuk keputusan.',
       })
     } else {
       moves.push({ title: 'Dapatkan dukungan Executive', body: m.leadershipClause })
@@ -515,7 +515,7 @@ export function buildFirstMoves(m: FirstMovesInputs, locale: Locale = 'en'): Fir
   if (!m.hasBudgetInput) {
     moves.push({
       title: 'Size the budget',
-      body: 'No implementation budget was provided in the assessment. Supplying a budget range completes the payback and ROI model and turns these estimates into a decision-ready business case.',
+      body: 'No implementation budget was provided in the analysis. Supplying a budget range completes the payback and ROI model and turns these estimates into a decision-ready business case.',
     })
   } else {
     moves.push({ title: 'Secure the mandate', body: m.leadershipClause })
@@ -573,7 +573,7 @@ export function buildExecutiveSummary(
   const weakLabel = DIM_LABELS[locale][v.weakestKey] ?? cap(v.weakestKey)
 
   if (locale === 'id') {
-    const opening = `${v.company} memperoleh skor ${Math.round(v.composite)} dari 100 berdasarkan metodologi penilaian Kematangan Operasional Aivory — posisi "${levelLabel}", di mana ${posture}.`
+    const opening = `${v.company} memperoleh skor ${Math.round(v.composite)} dari 100 berdasarkan metodologi analisis Kematangan Operasional Aivory — posisi "${levelLabel}", di mana ${posture}.`
 
     let valueSentence = ''
     if (v.businessValueLabel && v.topOpportunityTitle) {
@@ -590,7 +590,7 @@ export function buildExecutiveSummary(
   }
 
   const article = /^[AEIOU]/i.test(level) ? 'an' : 'a'
-  const opening = `${v.company} scores ${Math.round(v.composite)} out of 100 under Aivory's Operational Maturity Assessment methodology — ${article} "${levelLabel}" posture, where ${posture}.`
+  const opening = `${v.company} scores ${Math.round(v.composite)} out of 100 under Aivory's Operational Maturity Analysis methodology — ${article} "${levelLabel}" posture, where ${posture}.`
 
   let valueSentence = ''
   if (v.businessValueLabel && v.topOpportunityTitle) {

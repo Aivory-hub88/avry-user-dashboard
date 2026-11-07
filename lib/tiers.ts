@@ -244,7 +244,7 @@ export const NOT_ACTIVATED_LABEL = 'Not activated'
 export const NOT_ACTIVATED_HINT = 'Activates once you pay'
 
 const ONE_TIME_LABELS: Readonly<Record<string, string>> = Object.freeze({
-  snapshot: 'Assessment',
+  snapshot: 'Analysis',
   blueprint: 'Blueprint',
 })
 

@@ -1,5 +1,5 @@
 /**
- * Aivory Business Operations Assessment Report — Premium Editorial PDF Generator
+ * Aivory Business Operations Analysis Report — Premium Editorial PDF Generator
  *
  * Premium consultancy-grade design (McKinsey / BCG / Deloitte tier).
  * Cover/back: dark background images preserved. Inner pages: white editorial.
@@ -1447,7 +1447,7 @@ export async function applyPremiumCovers(
   pdf.text('Make AI make sense®', 164.6, 11.3)
 
   // ── Title: Akkurat Light, all caps, up to 3 lines ──
-  const titleLines = (title || (locale === 'id' ? 'Laporan Asesmen\nOperasional\nBisnis' : 'Business Operation\nAssessment\nReport'))
+  const titleLines = (title || (locale === 'id' ? 'Laporan Analisis\nOperasional\nBisnis' : 'Business Operation\nAssessment\nReport'))
     .toUpperCase().split('\n').slice(0, 3)
   setC(pdf, WHITE, 'text')
   pdf.setFont(AKL(), 'normal')
@@ -1536,8 +1536,8 @@ function editorialSpread(pdf: jsPDF, context: DiagnosticContext, locale: Locale 
   pdf.setLineHeightFactor(1.7)
 
   const p1 = locale === 'id'
-    ? `Terima kasih telah menyelesaikan Business Operations Assessment. Berikut ini adalah diagnostik mengenai posisi ${companyLabel} saat ini: bukan skor generik, melainkan pembacaan atas jawaban Anda sendiri, tujuan Anda, kendala Anda, dan kesenjangan antara posisi Anda saat ini dengan tujuan yang ingin Anda capai.`
-    : `Thank you for completing the Business Operations Assessment. What follows is a diagnostic of where ${companyLabel} stands today: not a generic scorecard, but a reading of your own answers, your goals, your constraints, and the gap between where you are and where you're aiming to be.`
+    ? `Terima kasih telah menyelesaikan Business Operations Analysis. Berikut ini adalah diagnostik mengenai posisi ${companyLabel} saat ini: bukan skor generik, melainkan pembacaan atas jawaban Anda sendiri, tujuan Anda, kendala Anda, dan kesenjangan antara posisi Anda saat ini dengan tujuan yang ingin Anda capai.`
+    : `Thank you for completing the Business Operations Analysis. What follows is a diagnostic of where ${companyLabel} stands today: not a generic scorecard, but a reading of your own answers, your goals, your constraints, and the gap between where you are and where you're aiming to be.`
   const p1Lines = pdf.splitTextToSize(p1, CW - 10)
   pdf.text(p1Lines, cx, 94)
   let ny = 94 + p1Lines.length * 6.3 + 8
@@ -2447,7 +2447,7 @@ export async function exportReportToPdf(
   // ════════════════════════════════════════════════════════════════════════════
   // PAGE 1 — COVER
   // ════════════════════════════════════════════════════════════════════════════
-  await applyPremiumCovers(pdf, 'front', locale === 'id' ? `Laporan Asesmen\nOperasional\nBisnis` : `Business Operation\nAssessment\nReport`, {
+  await applyPremiumCovers(pdf, 'front', locale === 'id' ? `Laporan Analisis\nOperasional\nBisnis` : `Business Operation\nAssessment\nReport`, {
     company: context.company,
     date: dateStr,
     reportId,
@@ -2856,8 +2856,8 @@ export async function exportReportToPdf(
   // ════════════════════════════════════════════════════════════════════════════
   y = ensureSpace(pdf, y, SP.transitionGuard)
   y = renderTransition(pdf, y, locale === 'id'
-    ? 'Diagnosis tersebut didasarkan pada konteks spesifik yang digambarkan tim Anda dalam asesmen ini.'
-    : 'That diagnosis rests on the specific context your team described in this assessment.')
+    ? 'Diagnosis tersebut didasarkan pada konteks spesifik yang digambarkan tim Anda dalam analisis ini.'
+    : 'That diagnosis rests on the specific context your team described in this analysis.')
 
   y = ensureSpace(pdf, y, locale === 'id' ? 52 : 45)
   y = tocSection(y, locale === 'id' ? 'Konteks Bisnis' : 'Business Context')
@@ -2958,8 +2958,8 @@ export async function exportReportToPdf(
     // relief" narrative and then contradicted it with "No opportunities
     // identified." on the next line.
     y = renderNarrative(pdf, y, locale === 'id'
-      ? `Tidak ada peluang otomasi yang dapat diperoleh dari data asesmen yang tersimpan. Ini biasanya berarti asesmen diselesaikan pada versi mesin analisis yang lebih lama — menjalankan ulang Diagnostik Mendalam akan menghasilkan sekumpulan peluang terprioritas dan terurut untuk ${company}.`
-      : `No automation opportunities could be derived from the stored assessment data. This usually means the assessment was completed on an earlier version of the analysis engine — re-running the Deep Diagnostic will generate a prioritised, ranked opportunity set for ${company}.`)
+      ? `Tidak ada peluang otomasi yang dapat diperoleh dari data analisis yang tersimpan. Ini biasanya berarti analisis diselesaikan pada versi mesin analisis yang lebih lama — menjalankan ulang Diagnostik Mendalam akan menghasilkan sekumpulan peluang terprioritas dan terurut untuk ${company}.`
+      : `No automation opportunities could be derived from the stored analysis data. This usually means the analysis was completed on an earlier version of the analysis engine — re-running the Deep Diagnostic will generate a prioritised, ranked opportunity set for ${company}.`)
   } else {
     const painPoints = qstr(qualitative.topPainPoints).trim()
     const oppQuickWins = opportunities.filter((o) => o.quadrant === 'quick_win')
@@ -3007,7 +3007,7 @@ export async function exportReportToPdf(
   // RECOMMENDED TRAINING PROGRAM — the capability-building opportunity card
   // above only has room for a one-line teaser (fixed 52-59mm card height, same
   // as every other opportunity), so the actual per-audience breakdown (topics
-  // + tools, tailored to this assessment's specific gaps) gets its own
+  // + tools, tailored to this analysis's specific gaps) gets its own
   // properly-wrapped, paginated section rather than being truncated mid-word.
   // ════════════════════════════════════════════════════════════════════════════
   {
@@ -3021,8 +3021,8 @@ export async function exportReportToPdf(
       y = ensureSpace(pdf, y + 12, locale === 'id' ? 40 : 35)
       y = tocSection(y, locale === 'id' ? 'Program Pelatihan yang Direkomendasikan' : 'Recommended Training Program')
       y = renderNarrative(pdf, y, locale === 'id'
-        ? `${trainingOpp.title} di atas terurai menjadi jalur pelatihan berikut, masing-masing disesuaikan dengan temuan spesifik asesmen ini.`
-        : `${trainingOpp.title} above breaks down into the following tracks, each tailored to this assessment's specific findings.`)
+        ? `${trainingOpp.title} di atas terurai menjadi jalur pelatihan berikut, masing-masing disesuaikan dengan temuan spesifik analisis ini.`
+        : `${trainingOpp.title} above breaks down into the following tracks, each tailored to this analysis's specific findings.`)
       for (const track of trainingOpp.trainingTracks) {
         y = trainingTrackRow(pdf, y, track, locale)
       }
@@ -3031,7 +3031,7 @@ export async function exportReportToPdf(
 
   // ════════════════════════════════════════════════════════════════════════════
   // RECOMMENDED SDK & SOFTWARE — catalog-backed (lib/softwareCatalog.ts),
-  // deterministic keyword match over this assessment's own pain points,
+  // deterministic keyword match over this analysis's own pain points,
   // opportunity titles, and industry. Region-aware (Indonesian vendors for
   // IDR reports). Dashboard parity: the same picks render on the final-result
   // page, so the PDF and the screen can never disagree.
@@ -3195,10 +3195,10 @@ export async function exportReportToPdf(
   const roiNarrative = locale === 'id'
     ? (roiComplete
       ? `Investasi transformasi awal sebesar ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} — ${isRequiredBasis(calculations as never) ? 'perkiraan kebutuhan tahun pertama untuk cakupan otomasi yang direkomendasikan' : 'seluruh anggaran yang Anda masukkan, diasumsikan sebagai biaya implementasi'} — diproyeksikan menghasilkan ROI ${roiYears} tahun sebesar ${fmtPct(calculations.threeYearROIPercent, locale)} dan memulihkan ${roiHoursStr} jam kapasitas tim setiap tahun. Model keuangan menunjukkan payback penuh dalam ${roiPaybackStr}, didorong oleh penghematan tahunan berkelanjutan sebesar ${roiSavingsStr}${calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0 ? ` — agar payback terjadi dalam 24 bulan, investasi implementasi idealnya tidak melebihi ${fmt(calculations.totalAnnualSavingsLocal * 2)}` : ''}. Yang terpenting, menunda transformasi ini menimbulkan "biaya keterlambatan operasional" langsung yang totalnya ${roiInactionStr} setiap 90 hari. Memulai eksekusi sekarang menghentikan kebocoran biaya yang terus berjalan ini dan dengan cepat mengalihkan tenaga tim ke pekerjaan strategis yang lebih bernilai.`
-      : `Berdasarkan beban kerja manual yang dilaporkan tim Anda, otomasi diproyeksikan memulihkan ${roiHoursStr} jam kapasitas tim setiap tahun${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, senilai estimasi ${roiSavingsStr} dalam penghematan tahunan berkelanjutan` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Menunda transformasi ini membawa estimasi "biaya keterlambatan operasional" sebesar ${roiInactionStr} setiap 90 hari.` : ''} Karena tidak ada anggaran implementasi yang diberikan dalam asesmen, periode payback dan ROI multi-tahun tidak diproyeksikan — memberikan kisaran anggaran akan melengkapi model keuangan ini. Estimasi ini memiliki tingkat keyakinan ${calculations.confidenceLevel === 'low' ? 'rendah' : calculations.confidenceLevel === 'medium' ? 'sedang' : (calculations.confidenceLevel ?? 'rendah')} dan didasarkan pada asumsi benchmark internal, bukan angka spesifik klien.`)
+      : `Berdasarkan beban kerja manual yang dilaporkan tim Anda, otomasi diproyeksikan memulihkan ${roiHoursStr} jam kapasitas tim setiap tahun${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, senilai estimasi ${roiSavingsStr} dalam penghematan tahunan berkelanjutan` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Menunda transformasi ini membawa estimasi "biaya keterlambatan operasional" sebesar ${roiInactionStr} setiap 90 hari.` : ''} Karena tidak ada anggaran implementasi yang diberikan dalam analisis, periode payback dan ROI multi-tahun tidak diproyeksikan — memberikan kisaran anggaran akan melengkapi model keuangan ini. Estimasi ini memiliki tingkat keyakinan ${calculations.confidenceLevel === 'low' ? 'rendah' : calculations.confidenceLevel === 'medium' ? 'sedang' : (calculations.confidenceLevel ?? 'rendah')} dan didasarkan pada asumsi benchmark internal, bukan angka spesifik klien.`)
     : (roiComplete
       ? `An initial transformation investment of ${fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)} — ${isRequiredBasis(calculations as never) ? 'the estimated year-1 requirement for the recommended automation scope' : 'your full stated budget, assumed to be the implementation cost'} — is projected to generate a ${fmtPct(calculations.threeYearROIPercent, locale)} ${roiYears}-year ROI and reclaim ${roiHoursStr} hours of team capacity annually. The financial model indicates full payback in ${roiPaybackStr}, driven by ${roiSavingsStr} in continuous annual savings${calculations.totalAnnualSavingsLocal != null && calculations.totalAnnualSavingsLocal > 0 ? ` — for payback within 24 months, the implementation investment should stay at or under ${fmt(calculations.totalAnnualSavingsLocal * 2)}` : ''}. Crucially, delaying this transformation incurs a direct "operational cost of delay" totaling ${roiInactionStr} every 90 days. Committing to execution now halts this ongoing capital bleed and rapidly shifts human resources toward higher-value, strategic work.`
-      : `Based on the manual workload your team reported, automation is projected to reclaim ${roiHoursStr} hours of team capacity annually${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, worth an estimated ${roiSavingsStr} in continuous annual savings` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Delaying this transformation carries an estimated "operational cost of delay" of ${roiInactionStr} every 90 days.` : ''} Because no implementation budget was provided in the assessment, payback period and multi-year ROI are not projected — supplying a budget range completes the financial model. These estimates carry ${calculations.confidenceLevel ?? 'low'} confidence and are based on internal benchmark assumptions rather than client-specific figures.`)
+      : `Based on the manual workload your team reported, automation is projected to reclaim ${roiHoursStr} hours of team capacity annually${calculations.totalAnnualSavingsLocal != null || calculations.totalAnnualSavingsUSD != null ? `, worth an estimated ${roiSavingsStr} in continuous annual savings` : ''}.${calculations.costOfInaction90DaysLocal != null ? ` Delaying this transformation carries an estimated "operational cost of delay" of ${roiInactionStr} every 90 days.` : ''} Because no implementation budget was provided in the analysis, payback period and multi-year ROI are not projected — supplying a budget range completes the financial model. These estimates carry ${calculations.confidenceLevel ?? 'low'} confidence and are based on internal benchmark assumptions rather than client-specific figures.`)
   // Bold the figures the financial case hinges on: investment, 3-year ROI,
   // payback, savings, and cost-of-delay — the "so what" of the paragraph.
   const roiInvestmentStr = fmt(calculations.assumedBudgetMidpointLocal ?? calculations.assumedBudgetMidpointUSD)
@@ -3440,10 +3440,10 @@ export async function exportReportToPdf(
       const sensitivityText = locale === 'id'
         ? `Sensitivitas — Value Bisnis yang Dihasilkan berkisar dari ${fmt(lever.lowValueLocal)} pada efisiensi ${lever.lowBoundLabel} hingga ` +
           `${fmt(lever.highValueLocal)} pada efisiensi ${lever.highBoundLabel} (skenario dasar ${effPct}%: ${fmt(calculations.totalAnnualSavingsLocal ?? cAny.totalAnnualSavingsUSD)}). ` +
-          `Tarif per jam dan kesenjangan otomasi adalah input tetap untuk asesmen ini, tidak disimulasikan.`
+          `Tarif per jam dan kesenjangan otomasi adalah input tetap untuk analisis ini, tidak disimulasikan.`
         : `Sensitivity — Business Value Created ranges from ${fmt(lever.lowValueLocal)} at ${lever.lowBoundLabel} efficiency to ` +
           `${fmt(lever.highValueLocal)} at ${lever.highBoundLabel} efficiency (base case ${effPct}%: ${fmt(calculations.totalAnnualSavingsLocal ?? cAny.totalAnnualSavingsUSD)}). ` +
-          `Hourly rate and automation gap are fixed inputs for this assessment, not swept.`
+          `Hourly rate and automation gap are fixed inputs for this analysis, not swept.`
       const sensitivityLines = pdf.splitTextToSize(sensitivityText, CW)
       pdf.text(sensitivityLines, ML, y)
       y += sensitivityLines.length * 3.6 + 4
@@ -3841,8 +3841,8 @@ export async function exportReportToPdf(
     // inside an unrelated larger number elsewhere in the same paragraph.
     const closingScorePhrase = locale === 'id' ? `skor ${Math.round(scores.composite)}` : `score of ${Math.round(scores.composite)}`
     const closingTopOppClause = locale === 'id'
-      ? (closingTopOpp ? closingTopOpp.title.toLowerCase() : 'peluang berdampak tertinggi yang teridentifikasi dalam asesmen ini')
-      : (closingTopOpp ? closingTopOpp.title.toLowerCase() : 'the highest-impact opportunity identified in this assessment')
+      ? (closingTopOpp ? closingTopOpp.title.toLowerCase() : 'peluang berdampak tertinggi yang teridentifikasi dalam analisis ini')
+      : (closingTopOpp ? closingTopOpp.title.toLowerCase() : 'the highest-impact opportunity identified in this analysis')
     const closingGapClause = nsGap > 0 ? (locale === 'id' ? `kesenjangan otomasi ${fmtGap(nsGap, locale)}` : `${fmtGap(nsGap, locale)} automation gap`) : null
     const closingText = locale === 'id'
       ? `${company} memasuki fase berikutnya dengan kesehatan operasional komposit ${closingScorePhrase} — ${foundationClause}. Jalan ke depan tidak abstrak: dimulai dengan ${closingTopOppClause}${closingGapClause ? `, dan menutup ${closingGapClause}` : ''} satu fase pada satu waktu. Setiap angka dalam laporan ini merujuk kembali pada jawaban yang diberikan tim Anda, dan setiap rekomendasi disesuaikan dengan apa yang secara realistis dapat dicapai dalam siklus perencanaan berikutnya.`

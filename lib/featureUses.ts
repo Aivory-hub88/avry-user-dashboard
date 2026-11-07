@@ -2,7 +2,7 @@
  * Server-side gate for the runs included with a purchase.
  *
  * Each one-time product includes 3 runs (avry-backend app/services/
- * feature_uses.py): the Assessment 3 diagnostics, the Blueprint + Roadmap 3
+ * feature_uses.py): the Analysis 3 diagnostics, the Blueprint + Roadmap 3
  * blueprints, the Complete package 3 of each. The generator routes used to
  * forward to the VPS bridge with no check at all; now a run may only start
  * with a run left, and is charged when its result is delivered — so a failed
@@ -28,13 +28,13 @@ export interface FeatureUse {
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'
 
 const NOT_BOUGHT: Record<Feature, string> = {
-  snapshot: 'Purchase the Business Operations Assessment to run a diagnostic.',
+  snapshot: 'Purchase the Business Operations Analysis to run a diagnostic.',
   blueprint: 'Purchase the Transformation Blueprint + Roadmap to generate a blueprint.',
 }
 
 const USED_UP: Record<Feature, string> = {
   snapshot:
-    'You have used all 3 assessment runs included with your purchase. Buy the Assessment again for 3 more.',
+    'You have used all 3 analysis runs included with your purchase. Buy the Analysis again for 3 more.',
   blueprint:
     'You have used all 3 blueprint runs included with your purchase. Buy the Blueprint + Roadmap again for 3 more.',
 }

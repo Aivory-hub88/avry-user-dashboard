@@ -17,7 +17,7 @@ describe('plan labels — there is no free plan', () => {
   })
 
   it('names one-time purchases', () => {
-    expect(planLabel('snapshot', 'paid')).toBe('Assessment')
+    expect(planLabel('snapshot', 'paid')).toBe('Analysis')
     expect(planLabel('blueprint', 'paid')).toBe('Blueprint')
   })
 
