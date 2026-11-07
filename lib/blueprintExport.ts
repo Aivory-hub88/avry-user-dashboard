@@ -93,8 +93,8 @@ export async function exportBlueprintPDF(
     greeting: tr(`Dear ${companyName},`, `Kepada ${companyName},`),
     paragraphs: [
       tr(
-        `This Transformation Blueprint turns your business operations assessment into a concrete build. What follows is not a generic architecture, but the specific system your operation needs: the data sources it draws on, the agents that do the work, and the sequence in which to deploy them.`,
-        `Blueprint Transformasi ini mengubah asesmen operasional bisnis Anda menjadi rancangan bangun yang konkret. Yang mengikuti bukanlah arsitektur generik, melainkan sistem spesifik yang dibutuhkan operasi Anda: sumber data yang digunakan, agen yang menjalankan pekerjaan, dan urutan penerapannya.`
+        `This Transformation Blueprint turns your business operations analysis into a concrete build. What follows is not a generic architecture, but the specific system your operation needs: the data sources it draws on, the agents that do the work, and the sequence in which to deploy them.`,
+        `Blueprint Transformasi ini mengubah analisis operasional bisnis Anda menjadi rancangan bangun yang konkret. Yang mengikuti bukanlah arsitektur generik, melainkan sistem spesifik yang dibutuhkan operasi Anda: sumber data yang digunakan, agen yang menjalankan pekerjaan, dan urutan penerapannya.`
       ),
       tr(
         `Every module and phase ahead is scoped to your objectives and constraints, so your team can align stakeholders, sequence the technical work, and start executing with confidence.`,
@@ -115,8 +115,8 @@ export async function exportBlueprintPDF(
   // ── Introduction ─────────────────────────────────────────
   y = sectionLabel(doc, y, tr('Document Introduction', 'Pendahuluan Dokumen'))
   y = renderNarrative(doc, y, tr(
-    "This Transformation Blueprint serves as the definitive architectural roadmap derived directly from your Business Operations Assessment. It translates identified operational bottlenecks into a concrete, phased implementation strategy. Use this document to align stakeholders, sequence technical deployments, and establish precise performance benchmarks for your automation initiatives.",
-    "Blueprint Transformasi ini menjadi peta jalan arsitektur definitif yang diturunkan langsung dari Asesmen Operasional Bisnis Anda. Dokumen ini menerjemahkan hambatan operasional yang teridentifikasi menjadi strategi implementasi bertahap yang konkret. Gunakan dokumen ini untuk menyelaraskan pemangku kepentingan, mengurutkan penerapan teknis, dan menetapkan tolok ukur kinerja yang presisi untuk inisiatif otomasi Anda."
+    "This Transformation Blueprint serves as the definitive architectural roadmap derived directly from your Business Operations Analysis. It translates identified operational bottlenecks into a concrete, phased implementation strategy. Use this document to align stakeholders, sequence technical deployments, and establish precise performance benchmarks for your automation initiatives.",
+    "Blueprint Transformasi ini menjadi peta jalan arsitektur definitif yang diturunkan langsung dari Analisis Operasional Bisnis Anda. Dokumen ini menerjemahkan hambatan operasional yang teridentifikasi menjadi strategi implementasi bertahap yang konkret. Gunakan dokumen ini untuk menyelaraskan pemangku kepentingan, mengurutkan penerapan teknis, dan menetapkan tolok ukur kinerja yang presisi untuk inisiatif otomasi Anda."
   ), checkPage)
   gap(6)
 

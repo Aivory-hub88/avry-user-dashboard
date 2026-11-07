@@ -51,8 +51,8 @@ const LS_PHASE_COMPLETE = 'aivory_roadmap_phase_complete';
 // Framed around the business-operations transformation, not "AI" as the
 // subject — AI/automation is the mechanism, not the headline.
 const COVER_INTRO: Record<'en' | 'id', string> = {
-  en: 'This Transformation Roadmap translates the findings from your Business Operations Assessment and the architectural decisions captured in your Transformation Blueprint into a phased, milestone-driven execution plan. Use it to track deployment progress by checking off milestones, recording KPI actuals against targets, and exporting a snapshot at the end of each phase for stakeholder review.',
-  id: 'Roadmap Transformasi ini menerjemahkan temuan dari Asesmen Operasional Bisnis Anda dan keputusan arsitektur yang tertuang dalam Blueprint Transformasi Anda menjadi rencana eksekusi bertahap berbasis milestone. Gunakan dokumen ini untuk melacak progres penerapan dengan mencentang milestone, mencatat KPI aktual terhadap target, dan mengekspor ringkasan pada akhir setiap fase untuk ditinjau pemangku kepentingan.',
+  en: 'This Transformation Roadmap translates the findings from your Business Operations Analysis and the architectural decisions captured in your Transformation Blueprint into a phased, milestone-driven execution plan. Use it to track deployment progress by checking off milestones, recording KPI actuals against targets, and exporting a snapshot at the end of each phase for stakeholder review.',
+  id: 'Roadmap Transformasi ini menerjemahkan temuan dari Analisis Operasional Bisnis Anda dan keputusan arsitektur yang tertuang dalam Blueprint Transformasi Anda menjadi rencana eksekusi bertahap berbasis milestone. Gunakan dokumen ini untuk melacak progres penerapan dengan mencentang milestone, mencatat KPI aktual terhadap target, dan mengekspor ringkasan pada akhir setiap fase untuk ditinjau pemangku kepentingan.',
 };
 
 // ─── Contextual phase descriptions (Feature 3) ───────────────

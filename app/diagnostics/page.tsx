@@ -76,7 +76,7 @@ export default function DiagnosticsPage() {
         <header className={styles.pageHeader}>
           <h1 className={styles.pageTitle}>{t('title')}</h1>
           <p className={styles.pageDescription}>
-            Take our comprehensive deep dive assessment to generate a full business operations report.
+            Take our comprehensive deep dive analysis to generate a full business operations report.
           </p>
         </header>
 
@@ -85,7 +85,7 @@ export default function DiagnosticsPage() {
           <div className="relative z-10 flex flex-col gap-7 md:flex-row md:items-end md:justify-between">
             <div className="max-w-xl">
               <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] mb-4 px-3 py-1 rounded-full bg-white/[0.14] border border-white/[0.3] backdrop-blur-md">
-                {deepDiagnosticCompleted ? 'Report ready' : deepDiagnosticInProgress ? 'In progress' : '4-phase assessment'}
+                {deepDiagnosticCompleted ? 'Report ready' : deepDiagnosticInProgress ? 'In progress' : '4-phase business analysis'}
               </span>
               <h2 className="text-white" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.2, letterSpacing: '-0.4px', margin: '0 0 12px' }}>
                 {t('deepDiagnostic')}

@@ -217,7 +217,7 @@ export function ActivateFeaturesSection() {
           frequency="/ 3 runs"
           description="Know exactly where your business stands on AI before you build anything."
           features={[
-            '3 assessment runs included',
+            '3 analysis runs included',
             'Operational health score',
             'Business objective mapping',
             'Gap & constraint analysis',
