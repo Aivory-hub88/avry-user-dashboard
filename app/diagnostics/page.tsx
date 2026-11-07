@@ -8,6 +8,7 @@ import { hasCompletedDiagnostic } from '@/lib/diagnosticStatus'
 import { useRouterContext } from '@/contexts/RouterContext'
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole'
 import GrainHeader from '@/components/ui/GrainHeader'
+import { asset } from '@/lib/asset'
 import styles from './diagnostics.module.css'
 
 export default function DiagnosticsPage() {
@@ -99,6 +100,11 @@ export default function DiagnosticsPage() {
                     {label}
                   </span>
                 ))}
+              </div>
+              <div className="flex items-center gap-2.5 mt-6 text-white/75" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>
+                <span>Powered by</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={asset('/Aivory_Aether_white.svg')} alt="Aivory Aether" style={{ height: 12, width: 'auto', opacity: 0.95 }} />
               </div>
             </div>
 
