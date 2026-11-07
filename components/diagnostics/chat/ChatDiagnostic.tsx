@@ -711,7 +711,7 @@ export default function ChatDiagnostic() {
     // AI-console style composer: borderless field on top, action row below
     // (secondary actions left, round arrow send button right).
     return (
-      <div className={styles.composer}>
+      <div className={`${styles.composer} ${multiline ? '' : styles.composerInline}`}>
         {isEdit && <div className={styles.editTag}>{c.editing}</div>}
         {multiline ? (
           <textarea

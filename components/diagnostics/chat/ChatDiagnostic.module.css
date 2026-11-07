@@ -316,3 +316,11 @@
 /* Aivory Aether mark under the composer, right-aligned like the Console */
 .aetherRow { max-width: 720px; margin: 8px auto 0; display: flex; justify-content: flex-end; padding-right: 4px; }
 .aetherMark { height: 11px; width: auto; opacity: 0.7; user-select: none; pointer-events: none; }
+
+/* single-line answers: field and send button share one compact row */
+.composerInline { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 6px 8px 6px 16px; }
+.composerInline .editTag { flex: 0 0 100%; margin: 4px 0 0; }
+.composerInline .consoleField { flex: 1; min-width: 0; width: auto; padding: 6px 0; min-height: 0; }
+.composerInline .consoleRow { flex-shrink: 0; min-height: 0; gap: 10px; }
+.composerInline .consoleLeft { gap: 10px; }
+.composerInline .err { max-width: 42vw; font-size: 0.75rem; line-height: 1.3; }
