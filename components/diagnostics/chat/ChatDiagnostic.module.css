@@ -218,6 +218,13 @@
   font: inherit; font-size: 0.8rem; padding: 7px 14px; border-radius: 10px;
 }
 .ghost:hover { border-color: rgba(255, 255, 255, 0.3); color: #fff; }
+/* Skip chip shown under an optional question */
+.skipChip {
+  border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); color: rgba(255, 255, 255, 0.85); cursor: pointer;
+  font: inherit; font-size: 0.85rem; padding: 7px 16px; border-radius: 999px;
+}
+.skipChip:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.35); color: #fff; }
+.skipChip:disabled { opacity: 0.5; cursor: default; }
 
 /* ── side panel ── */
 .panel {
