@@ -248,6 +248,9 @@ export default function ChatDiagnostic() {
   const [cursor, setCursor] = useState(0)
   const [editKey, setEditKey] = useState<string | null>(null)
   const [typing, setTyping] = useState(false)
+  // The welcome message streams in word by word on a fresh start; everything below waits until it is done.
+  const [helloStreaming, setHelloStreaming] = useState(true)
+  const [helloCount, setHelloCount] = useState(0)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState<DeepDiagnosticProgress | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -302,11 +305,34 @@ export default function ChatDiagnostic() {
   // ── typing indicator whenever a new question arrives ──
   useEffect(() => {
     if (!ready) return
+    if (helloStreaming) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setTyping(true)
     const t = setTimeout(() => setTyping(false), cursor === 0 ? 350 : 550)
     return () => clearTimeout(t)
-  }, [cursor, ready])
+  }, [cursor, ready, helloStreaming])
+
+  // Stream the welcome message once, on a fresh start only. A resumed or revisited conversation, and
+  // anyone who prefers reduced motion, gets it at once.
+  useEffect(() => {
+    if (!ready || !helloStreaming) return
+    const words = c.hello.split(' ').length
+    const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (saved || cursor > 0 || reduced) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHelloCount(words)
+      setHelloStreaming(false)
+      return
+    }
+    const id = setInterval(() => {
+      setHelloCount(n => {
+        if (n + 1 >= words) { clearInterval(id); setHelloStreaming(false); return words }
+        return n + 1
+      })
+    }, 38)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, saved, helloStreaming])
 
   // ── reset draft when the active step changes ──
   const activeKey = activeStep?.key
@@ -961,7 +987,16 @@ export default function ChatDiagnostic() {
     }
   }
 
-  rows.push(<div key="hello" className={styles.botRow}><div className={styles.bot}>{c.hello}</div></div>)
+  const helloWords = c.hello.split(' ')
+  const helloText = helloStreaming ? helloWords.slice(0, helloCount).join(' ') : c.hello
+  rows.push(
+    <div key="hello" className={styles.botRow}>
+      <div className={styles.bot} onClick={() => { if (helloStreaming) { setHelloCount(helloWords.length); setHelloStreaming(false) } }}>
+        {helloText}
+        {helloStreaming && <span className={styles.streamCaret} aria-hidden="true" />}
+      </div>
+    </div>
+  )
 
   history.forEach(({ s }) => {
     pushPhaseIfNew(s.phase)
@@ -1054,7 +1089,7 @@ export default function ChatDiagnostic() {
     )
   }
 
-  const composerVisible = !!activeStep && (editKey || (showCurrent && !typing))
+  const composerVisible = !helloStreaming && !!activeStep && (editKey || (showCurrent && !typing))
 
   return (
     <div className={`${styles.page} font-manrope`}>
@@ -1090,7 +1125,7 @@ export default function ChatDiagnostic() {
         <section className={styles.chat}>
           <div className={styles.scroll}>
             <div className={styles.thread}>
-              {rows}
+              {helloStreaming ? rows.slice(0, 1) : rows}
               <div ref={endRef} className={styles.endAnchor} />
             </div>
           </div>
