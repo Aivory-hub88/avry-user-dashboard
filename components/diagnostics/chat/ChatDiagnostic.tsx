@@ -222,6 +222,11 @@ function isEmpty(v: any) {
     (typeof v === 'string' && v.trim() === '')
 }
 
+/** Steps the user may skip: the website, the document, and every question that is not required. */
+function isOptionalStep(step: Step): boolean {
+  return step.kind === 'website' || step.kind === 'document' || (step.kind === 'question' && !step.q!.required)
+}
+
 function isSkipped(step: Step, phases: PhaseMap) {
   return step.q?.id === 'target_metrics' &&
     String(phases.business_objective_kpi.responses.quantified_goal ?? '').startsWith('No')
@@ -558,7 +563,6 @@ export default function ChatDiagnostic() {
     if (!activeStep) return null
     const s = activeStep
     const isEdit = !!editKey
-    const optional = s.kind === 'website' || s.kind === 'document' || (s.kind === 'question' && !s.q!.required)
     const type = s.kind === 'question' ? s.q!.type : 'text'
 
     const footer = (
@@ -567,9 +571,6 @@ export default function ChatDiagnostic() {
         <span className={styles.spacer} />
         {isEdit && (
           <button type="button" className={styles.ghost} onClick={() => setEditKey(null)}>{c.cancel}</button>
-        )}
-        {optional && !isEdit && (
-          <button type="button" className={styles.ghost} onClick={() => commit(s, '', true)}>{c.skip}</button>
         )}
       </div>
     )
@@ -617,9 +618,6 @@ export default function ChatDiagnostic() {
               </label>
               {isEdit && (
                 <button type="button" className={styles.ghost} onClick={() => setEditKey(null)}>{c.cancel}</button>
-              )}
-              {!isEdit && (
-                <button type="button" className={styles.ghost} disabled={docBusy} onClick={() => commit(s, '', true)}>{c.skip}</button>
               )}
               {error && <span className={styles.err} role="alert">{error}</span>}
             </div>
@@ -772,9 +770,6 @@ export default function ChatDiagnostic() {
               {isEdit && (
                 <button type="button" className={styles.ghost} onClick={() => setEditKey(null)}>{c.cancel}</button>
               )}
-              {optional && !isEdit && (
-                <button type="button" className={styles.ghost} onClick={() => commit(s, [], true)}>{c.skip}</button>
-              )}
               <button type="button" className={styles.primary} onClick={() => commit(s, sel)}>
                 {isEdit ? c.saveEdit : c.next}
               </button>
@@ -832,9 +827,6 @@ export default function ChatDiagnostic() {
           <div className={styles.consoleLeft}>
             {isEdit && (
               <button type="button" className={styles.ghost} onClick={() => setEditKey(null)}>{c.cancel}</button>
-            )}
-            {optional && !isEdit && (
-              <button type="button" className={styles.ghost} onClick={() => commit(s, '', true)}>{c.skip}</button>
             )}
             {error && <span className={styles.err} role="alert">{error}</span>}
             {!error && multiline && max && (
@@ -1027,6 +1019,18 @@ export default function ChatDiagnostic() {
           <div className={styles.bot}>
             {stepPrompt(current)}
             {helper && <div className={styles.helper}>{helper}</div>}
+            {isOptionalStep(current) && (
+              <div className={styles.inlineActions}>
+                <button
+                  type="button"
+                  className={styles.skipChip}
+                  disabled={docBusy}
+                  onClick={() => commit(current, current.q?.type === 'multiselect' ? [] : '', true)}
+                >
+                  {c.skip}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )
