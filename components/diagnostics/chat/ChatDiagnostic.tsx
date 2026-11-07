@@ -95,6 +95,7 @@ const COPY = {
     ackWebsite: "Got it. I'll read your public pages in the background.",
     ackNoTarget: "No problem — we'll explore first, so I'll skip the target-metrics question.",
     phaseDone: (n: number, a: number, t: number) => `Phase ${n} done — ${a} of ${t} answered.`,
+    doneSummary: (a: number, t: number) => `All four phases complete — ${a} of ${t} questions answered.`,
     langLabel: 'Language',
     facts: {
       operating_country: 'Country',
@@ -148,6 +149,7 @@ const COPY = {
     ackWebsite: 'Siap. Saya baca halaman publiknya di latar belakang.',
     ackNoTarget: 'Tidak apa-apa — kita eksplor dulu, jadi pertanyaan target metrik saya lewati.',
     phaseDone: (n: number, a: number, t: number) => `Fase ${n} selesai — ${a} dari ${t} terjawab.`,
+    doneSummary: (a: number, t: number) => `Keempat fase selesai — ${a} dari ${t} pertanyaan terjawab.`,
     langLabel: 'Bahasa',
     facts: {
       operating_country: 'Negara',
@@ -787,19 +789,42 @@ export default function ChatDiagnostic() {
   const history = STEPS.map((s, i) => ({ s, i })).filter(({ s, i }) => i < cursor && !isSkipped(s, phases))
   const showCurrent = !!current && !editKey
 
+  // Echo a few captured answers back, e.g. "Country: Indonesia · Industry: Retail."
+  const highlights = (only?: PhaseId): string => {
+    const parts = FACT_KEYS
+      .map(k => {
+        const st = STEPS.find(x => x.key === k)
+        if (!st || (only && st.phase !== only)) return null
+        if (k === 'primary_objective' || isEmpty(getValue(st))) return null
+        return `${c.facts[k] ?? k}: ${display(st)}`
+      })
+      .filter(Boolean)
+    return parts.length ? parts.join(' · ') + '.' : ''
+  }
+
   const phaseDivider = (phase: PhaseId, prevPhase: PhaseId | null) => {
     const n = PHASE_ORDER.indexOf(phase) + 1
     const cfg = DEEP_DIAGNOSTIC_PHASES.find(p => p.id === phase)!
     const title = (L === 'id' ? ID_PHASE_COPY[phase]?.title : undefined) ?? cfg.title
     const desc = (L === 'id' ? ID_PHASE_COPY[phase]?.description : undefined) ?? cfg.description
     const prev = prevPhase ? phaseStats.find(p => p.id === prevPhase) : null
+    if (prev && prevPhase) {
+      // Summary card: muted recap of what was just captured, then the lead line in white.
+      const hl = highlights(prevPhase)
+      return (
+        <div className={styles.botRow} key={`div-${phase}`}>
+          <div className={styles.summaryCard}>
+            <p className={styles.summaryMuted}>
+              {c.phaseDone(PHASE_ORDER.indexOf(prevPhase) + 1, prev.answered, prev.total)}
+              {hl ? ` ${hl}` : ''}
+            </p>
+            <p className={styles.summaryLead}>{c.phase} {n} · {title} — {desc}</p>
+          </div>
+        </div>
+      )
+    }
     return (
       <div className={styles.divider} key={`div-${phase}`}>
-        {prev && prevPhase && (
-          <div className={styles.dividerRecap}>
-            {c.phaseDone(PHASE_ORDER.indexOf(prevPhase) + 1, prev.answered, prev.total)}
-          </div>
-        )}
         <div className={styles.dividerTitle}>{c.phase} {n} · {title}</div>
         <div className={styles.dividerDesc}>{desc}</div>
       </div>
@@ -882,8 +907,12 @@ export default function ChatDiagnostic() {
   if (!current && !editKey) {
     rows.push(
       <div key="done" className={styles.botRow}>
-        <div className={styles.bot}>
-          {c.done}
+        <div className={styles.summaryCard}>
+          <p className={styles.summaryMuted}>
+            {c.doneSummary(answeredVisible, totalVisible)}
+            {highlights() ? ` ${highlights()}` : ''}
+          </p>
+          <p className={styles.summaryLead}>{c.done}</p>
           <div className={styles.inlineActions}>
             <button type="button" className={styles.primary} onClick={finish}>{c.finish}</button>
           </div>

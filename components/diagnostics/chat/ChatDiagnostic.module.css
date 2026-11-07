@@ -271,3 +271,15 @@
   .botRow, .userRow, .divider, .composer, .fact { animation: none; }
   .typing i { animation: none; }
 }
+
+/* ── summary card: muted recap on top, white lead line below ── */
+.summaryCard {
+  width: 100%; box-sizing: border-box;
+  background: #1b1b1d;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 18px;
+  padding: 18px 22px;
+}
+.summaryMuted { margin: 0; font-size: 0.95rem; line-height: 1.7; color: rgba(255, 255, 255, 0.5); }
+.summaryLead { margin: 14px 0 0; font-size: 0.97rem; line-height: 1.6; color: #f1f1f2; }
+.summaryCard .inlineActions { margin-top: 16px; }
