@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { workspaceCredential, authorizeDocFallback, unauthorized } from "@/lib/workspaceAuth"
+import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden } from "@/lib/workspaceAuth"
 import { getDocRolesBatch, canRead, isKnownAgentType } from "@/lib/workspaceAccess"
 import { loadDbDoc, rowsFromDbDoc, WorkspaceDenied } from "@/lib/workspaceDb"
 import { embed, embeddingsConfigured } from "@/lib/embeddings"
@@ -45,14 +45,13 @@ export async function GET(req: NextRequest) {
   if (q.length < 2) return NextResponse.json({ q, hits: [] })
   const agent = req.headers.get("x-agent-type") ?? undefined
   const assertedAgent = cred.kind === "service" && isKnownAgentType(agent) ? agent : undefined
-  // Optional tenant scope. Service callers (Cerveau) should always send it:
-  // without it AND without a known agent grant, a service credential sees
-  // every workspace's docs (legacy behaviour kept so existing callers don't
-  // break). Users are already gated per doc; this only narrows further.
+  // Optional tenant scope (narrowing only; the per-doc/agent gate below is
+  // what authorizes).
   const scopeWs = (req.nextUrl.searchParams.get("workspace_id") ?? "").trim().slice(0, 64) || null
-  if (cred.kind === "service" && !isKnownAgentType(assertedAgent) && !scopeWs) {
-    console.warn("[workspace/search] service call without workspace_id or agent type: unscoped across tenants")
-  }
+  // Fail closed: a service credential without a known X-Agent-Type used to
+  // skip the per-doc gate and see every tenant's docs. The workspace_collab
+  // skill already mandates the header on every call.
+  if (cred.kind === "service" && !isKnownAgentType(assertedAgent)) return forbidden()
   const limit = Math.min(30, Math.max(1, parseInt(req.nextUrl.searchParams.get("limit") ?? "30", 10) || 30))
 
   try {
@@ -83,18 +82,14 @@ export async function GET(req: NextRequest) {
     // lookup, but it's now a single ANY($1) query rather than one per doc.
     let readableIds: string[]
     if (cred.kind === "service") {
-      if (!isKnownAgentType(assertedAgent)) {
-        readableIds = bareIds
-      } else {
-        const acl = await query(
-          `SELECT doc_id, role FROM dashboard.workspace_agent_acl WHERE doc_id = ANY($1) AND agent_type = $2`,
-          [bareIds, assertedAgent],
-        )
-        const readable = new Set(
-          acl.rows.filter((r) => r.role === "editor" || r.role === "viewer").map((r) => String(r.doc_id)),
-        )
-        readableIds = bareIds.filter((id) => readable.has(id))
-      }
+      const acl = await query(
+        `SELECT doc_id, role FROM dashboard.workspace_agent_acl WHERE doc_id = ANY($1) AND agent_type = $2`,
+        [bareIds, assertedAgent],
+      )
+      const readable = new Set(
+        acl.rows.filter((r) => r.role === "editor" || r.role === "viewer").map((r) => String(r.doc_id)),
+      )
+      readableIds = bareIds.filter((id) => readable.has(id))
     } else {
       const roles = await getDocRolesBatch(cred, bareIds)
       readableIds = bareIds.filter((id) => canRead(roles.get(id) ?? null))

@@ -140,4 +140,17 @@ describe('GET /api/workspace/search', () => {
       delete process.env.OPENROUTER_EMBEDDING_KEY
     }
   })
+
+  it('rejects service calls without a known agent type (fail closed)', async () => {
+    const cases: Record<string, string>[] = [
+      { 'x-service-token': 'test-service-token' },
+      { 'x-service-token': 'test-service-token', 'x-agent-type': 'not_a_real_agent' },
+    ]
+    for (const headers of cases) {
+      queryMock.mockClear()
+      const res = await GET(new NextRequest('http://localhost/api/workspace/search?q=launch', { headers }))
+      expect(res.status).toBe(403)
+      expect(queryMock).not.toHaveBeenCalled()
+    }
+  })
 })
