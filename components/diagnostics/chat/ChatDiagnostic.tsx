@@ -312,13 +312,13 @@ export default function ChatDiagnostic() {
     return () => clearTimeout(t)
   }, [cursor, ready, helloStreaming])
 
-  // Stream the welcome message once, on a fresh start only. A resumed or revisited conversation, and
-  // anyone who prefers reduced motion, gets it at once.
+  // Stream the welcome message each time the conversation opens at its start (also when saved progress offers
+  // to resume: the offer comes after it). Only a conversation that is already under way skips it. It is a
+  // 2-second reveal that a click completes, so reduced-motion users get it too: nothing moves, text just arrives.
   useEffect(() => {
     if (!ready || !helloStreaming) return
     const words = c.hello.split(' ').length
-    const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    if (saved || cursor > 0 || reduced) {
+    if (cursor > 0) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setHelloCount(words)
       setHelloStreaming(false)
@@ -332,7 +332,7 @@ export default function ChatDiagnostic() {
     }, 38)
     return () => clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, saved, helloStreaming])
+  }, [ready, helloStreaming])
 
   // ── reset draft when the active step changes ──
   const activeKey = activeStep?.key
