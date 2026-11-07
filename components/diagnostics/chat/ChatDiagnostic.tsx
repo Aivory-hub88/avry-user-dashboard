@@ -57,8 +57,8 @@ const STEPS: Step[] = [
 const COPY = {
   en: {
     title: 'Deep Diagnostic',
-    hello: "Hi, I'm Aivory. I'll walk you through a short diagnostic of how your business runs today — about 10 minutes. You can change any answer later.",
-    askCompany: 'First, what is your company called?',
+    hello: 'Welcome to the Aivory Deep Diagnostic. Over four phases we will assess how your business operates today — objectives, data and processes, risks, and bottlenecks — and use your answers to prepare your analysis report. You can revise any answer at any time.',
+    askCompany: "Let's begin. What is your company's name?",
     askWebsite: 'Do you have a company website? I can read its public pages to make the analysis more accurate. It does not change your score.',
     companyPh: 'Company name…',
     websitePh: 'e.g. yourcompany.com',
@@ -112,8 +112,8 @@ const COPY = {
   },
   id: {
     title: 'Deep Diagnostic',
-    hello: 'Hai, saya Aivory. Saya akan memandu Anda lewat diagnostik singkat tentang cara bisnis Anda berjalan saat ini — sekitar 10 menit. Jawaban apa pun bisa diubah nanti.',
-    askCompany: 'Pertama, siapa nama perusahaan Anda?',
+    hello: 'Selamat datang di Aivory Deep Diagnostic. Dalam empat fase, kami akan menilai cara bisnis Anda beroperasi saat ini — tujuan, data dan proses, risiko, serta hambatan — lalu menyusun jawaban Anda menjadi laporan analisis. Anda dapat mengubah jawaban kapan saja.',
+    askCompany: 'Mari kita mulai. Siapa nama perusahaan Anda?',
     askWebsite: 'Apakah perusahaan Anda punya website? Saya bisa membaca halaman publiknya agar analisis lebih akurat. Tidak mengubah skor.',
     companyPh: 'Nama perusahaan…',
     websitePh: 'contoh: perusahaananda.co.id',
