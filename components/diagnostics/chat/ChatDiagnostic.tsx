@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { PhaseData, PhaseId, DeepDiagnosticProgress, DeepDiagnosticQuestion } from '@/types/deepDiagnostic'
-import { DEEP_DIAGNOSTIC_PHASES } from '@/constants/deepDiagnosticQuestions'
+import { DEEP_DIAGNOSTIC_PHASES, EN_OPTION_DISPLAY } from '@/constants/deepDiagnosticQuestions'
 import { ID_PHASE_COPY, ID_QUESTION_COPY } from '@/constants/deepDiagnosticQuestionsId'
 import { DeepDiagnosticService } from '@/services/deepDiagnostic'
 import { normalizeWebsiteInput } from '@/lib/websiteUrl'
@@ -180,7 +180,7 @@ function getOptions(q: DeepDiagnosticQuestion, responses: Record<string, any>, l
     return bands.map(b => ({ value: b.en, label: locale === 'id' ? b.id : b.en }))
   }
   const t = locale === 'id' ? ID_QUESTION_COPY[q.id] : undefined
-  return q.options.map((o, i) => ({ value: o, label: t?.options?.[i] ?? o }))
+  return q.options.map((o, i) => ({ value: o, label: t?.options?.[i] ?? EN_OPTION_DISPLAY[o] ?? o }))
 }
 
 /**

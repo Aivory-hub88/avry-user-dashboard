@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { PhaseConfig, DeepDiagnosticQuestion } from '@/types/deepDiagnostic'
 import { useLocaleContext } from '@/hooks/useLocale'
 import { ID_PHASE_COPY, ID_QUESTION_COPY } from '@/constants/deepDiagnosticQuestionsId'
+import { EN_OPTION_DISPLAY } from '@/constants/deepDiagnosticQuestions'
 import { parseCurrencyCode } from '@/lib/resultFormatters'
 import { getBudgetBands, getRevenueBands } from '@/lib/currencyBands'
 import styles from './PhaseContent.module.css'
@@ -80,7 +81,7 @@ export default function PhaseContent({
     // translated label — so the scorer and stored answers are unaffected.
     const t = locale === 'id' ? ID_QUESTION_COPY[question.id] : undefined
     const displayPlaceholder = t?.placeholder ?? question.placeholder
-    let displayOptions = question.options?.map((option, i) => t?.options?.[i] ?? option)
+    let displayOptions = question.options?.map((option, i) => t?.options?.[i] ?? EN_OPTION_DISPLAY[option] ?? option)
 
     // Currency-aware band questions (annual_revenue, budget_range): options
     // come from the per-currency band tables (lib/currencyBands.ts), not the
