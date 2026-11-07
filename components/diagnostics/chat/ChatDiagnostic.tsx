@@ -1091,7 +1091,7 @@ export default function ChatDiagnostic() {
           <div className={styles.scroll}>
             <div className={styles.thread}>
               {rows}
-              <div ref={endRef} />
+              <div ref={endRef} className={styles.endAnchor} />
             </div>
           </div>
           {composerVisible && (
