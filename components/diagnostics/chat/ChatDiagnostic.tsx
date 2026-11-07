@@ -322,35 +322,6 @@ export default function ChatDiagnostic() {
     if (!typing) inputRef.current?.focus({ preventScroll: true })
   }, [typing, activeKey])
 
-  // ── keyboard: 1–9 picks the numbered option card ──
-  const choiceType = activeStep?.kind === 'question' ? activeStep.q!.type : null
-  const isChoice = choiceType === 'radio' || choiceType === 'multiselect'
-  useEffect(() => {
-    if (!isChoice || !activeStep || typing) return
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-      const n = Number(e.key)
-      if (!Number.isInteger(n) || n < 1 || n > 9) return
-      const opts = getOptions(activeStep.q!, phases[activeStep.phase].responses, L)
-      const o = opts[n - 1]
-      if (!o) return
-      e.preventDefault()
-      if (choiceType === 'multiselect') {
-        setDraft((d: any) => {
-          const cur: string[] = Array.isArray(d) ? d : []
-          return cur.includes(o.value) ? cur.filter(v => v !== o.value) : [...cur, o.value]
-        })
-        setError('')
-      } else {
-        commit(activeStep, o.value)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isChoice, activeKey, typing, phases, L, choiceType, cursor, editKey])
 
   // ── derived: visible steps / counts ──
   const visibleIdx = useMemo(
@@ -470,6 +441,36 @@ export default function ChatDiagnostic() {
     if (st.kind === 'website') return changed.kind === 'website' ? changedValue : websiteUrl
     return ph[st.phase].responses[st.q!.id]
   }
+
+  // ── keyboard: 1–9 picks the numbered option card ──
+  const choiceType = activeStep?.kind === 'question' ? activeStep.q!.type : null
+  const isChoice = choiceType === 'radio' || choiceType === 'multiselect'
+  useEffect(() => {
+    if (!isChoice || !activeStep || typing) return
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const n = Number(e.key)
+      if (!Number.isInteger(n) || n < 1 || n > 9) return
+      const opts = getOptions(activeStep.q!, phases[activeStep.phase].responses, L)
+      const o = opts[n - 1]
+      if (!o) return
+      e.preventDefault()
+      if (choiceType === 'multiselect') {
+        setDraft((d: any) => {
+          const cur: string[] = Array.isArray(d) ? d : []
+          return cur.includes(o.value) ? cur.filter(v => v !== o.value) : [...cur, o.value]
+        })
+        setError('')
+      } else {
+        commit(activeStep, o.value)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isChoice, activeKey, typing, phases, L, choiceType, cursor, editKey])
 
   const handleResume = () => {
     if (!saved) return
