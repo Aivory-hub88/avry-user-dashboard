@@ -37,3 +37,14 @@ describe('buildWebsiteInsightsView', () => {
     expect(buildWebsiteInsightsView({ web_context: 'ok' }, 'en')!.state).toBe('unavailable')
   })
 })
+
+describe('profile from an attached document', () => {
+  it('status "document" renders as a found profile titled by its source, with its own note', () => {
+    const v = buildWebsiteInsightsView({ web_context: 'document', web_profile: { industry: 'retail_ecommerce', business_model: 'b2b', products: ['Kopi'], tech_signals: [] }, website_insights: ['Dokumen Anda menyebut **toko online**.'] }, 'id')!
+    expect(v.state).toBe('document')
+    expect(v.source).toBe('document')
+    expect(v.facts.length).toBeGreaterThan(0)
+    expect(v.note).toMatch(/dokumen yang Anda lampirkan/)
+    expect(buildWebsiteInsightsView({ web_context: 'ok', web_profile: { industry: 'retail_ecommerce' } }, 'en')!.source).toBe('website')
+  })
+})

@@ -52,6 +52,9 @@ export interface DeepDiagnosticProgress {
   companyName?: string
   /** Optional company website, forwarded to the bridge as `_website_url` (ADR-022). */
   websiteUrl?: string
+  /** Optional company document: text extracted on the server, forwarded as `_document_text`. Never required. */
+  documentText?: string
+  documentName?: string
 }
 
 // API Request payload
@@ -80,7 +83,7 @@ export interface DeepDiagnosticResponse {
   recommendations: string[]
   timestamp: string
   /** Present only when a website was sent and the bridge feature is on. */
-  web_context?: 'ok' | 'partial' | 'unavailable' | 'social_only'
+  web_context?: 'ok' | 'partial' | 'unavailable' | 'social_only' | 'document'
   web_profile?: Record<string, unknown>
   /** 0-3 observations tying the website to the user's answers (only with a profile). */
   website_insights?: string[]
