@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { buildDiagnosticContext } from '@/services/deepDiagnostic'
-import { buildPlanComparison } from './planComparison'
+import { buildPlanComparison, sellingLine } from './planComparison'
 import { buildRequiredInvestmentView } from './requiredInvestmentView'
 import { hasRunningCost } from './runningCost'
 import { buildFinancialTermsNote } from './readinessNarrative'
@@ -149,7 +149,8 @@ describe('buildPlanComparison: Aivory as ONE delivery option', () => {
     const biz = v.rows.find((r) => r.plan === 'business')!
     const ent = v.rows.find((r) => r.plan === 'enterprise')!
     expect(biz.yearly).toBe(`${fmt(99 * 12 * fx)}/year`)
-    expect(biz.share).toBe(`${Math.round((99 * 12 * fx / c.totalAnnualSavingsLocal) * 100)}% of the yearly value`)
+    expect(biz.share).toBe(sellingLine(c.totalAnnualSavingsLocal / (99 * 12 * fx), false))
+    expect(biz.share).not.toMatch(/%/)
     expect(ent.yearly).toBe('Priced by sales')
     expect(ent.share).toBeNull()
     expect(v.valueLine).toBe(`Value this scope creates: ${fmt(c.totalAnnualSavingsLocal)} per year (from the Financial Case).`)
@@ -163,7 +164,7 @@ describe('buildPlanComparison: Aivory as ONE delivery option', () => {
     expect(biz.recommended).toBe(true)
     // the share above 100% is stated as a plain fact, not colour-coded
     expect('shareTone' in biz).toBe(false)
-    expect(parseInt(biz.share as string, 10)).toBeGreaterThan(100)
+    expect(biz.share).not.toMatch(/%/)
   })
 
   it('solo: Operational recommended, with Business as the step up', () => {
@@ -279,5 +280,15 @@ describe('the financial-terms note', () => {
   it('older stored reports keep the before/after running cost explanation', () => {
     expect(buildFinancialTermsNote('en', 3, { basis: 'required', hasRunningCost: true })).toMatch(/BEFORE running costs/)
     expect(buildFinancialTermsNote('en', 3, { basis: 'required' })).toMatch(/BEFORE running costs/)
+  })
+})
+
+describe('the selling line under a plan', () => {
+  it('speaks in multiples, never a percentage, and never quotes a number it cannot back', () => {
+    expect(sellingLine(195.4, false)).toBe('The value you create is about 195x what this plan costs each year. For every 1 you invest, about 195 comes back.')
+    expect(sellingLine(195.4, true)).toMatch(/195x lipat/)
+    expect(sellingLine(1.4, false)).toMatch(/already covers this plan/)
+    expect(sellingLine(0.4, false)).toMatch(/right place to start/)
+    for (const m of [0.4, 1.4, 6, 300]) for (const id of [false, true]) expect(sellingLine(m, id)).not.toMatch(/%|-\d/)
   })
 })

@@ -101,11 +101,12 @@ describe('the plan card never shows value as a negative number', () => {
     expect(card.valueLine).toMatch(/^Value this scope creates: Rp [\d,]+ per year/)
     // Business (cost per year known) is compared with the value; Enterprise is sales-priced, so it has no share
     const biz = card.rows.find((r) => r.plan === 'business')!
-    expect(biz.share).toMatch(/% of the yearly value$/)
+    expect(biz.share).toBeTruthy()
+    expect(biz.share).not.toMatch(/%/)
     expect(card.rows.find((r) => r.plan === 'enterprise')!.share).toBeNull()
     expect(JSON.stringify(card)).not.toMatch(/value left|-Rp/i)
     const id = buildPlanComparison(c, fmt, 'id')!
-    expect(id.labels.share).toBe('Biaya plan dibanding nilai itu')
+    expect(id.labels.share).toBe('Kenapa layak')
     expect(id.valueLine).toMatch(/^Nilai yang dihasilkan cakupan ini:/)
   })
 })

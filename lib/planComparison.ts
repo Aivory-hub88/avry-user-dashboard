@@ -58,6 +58,28 @@ export interface PlanCardView {
   caveat: string
 }
 
+/**
+ * The line under a plan: why it is worth it, in the report's own numbers. Always positive in tone and never a
+ * percentage of cost. A value that covers the plan many times over says so; a small scope gets a line that does
+ * not quote a number it cannot back.
+ */
+export function sellingLine(multiple: number, id: boolean): string {
+  if (multiple >= 2) {
+    const x = Math.floor(multiple)
+    return id
+      ? `Nilai yang tercipta sekitar ${x}x lipat dari biaya plan ini setiap tahun. Setiap 1 yang Anda investasikan, kembali sekitar ${x}.`
+      : `The value you create is about ${x}x what this plan costs each year. For every 1 you invest, about ${x} comes back.`
+  }
+  if (multiple >= 1) {
+    return id
+      ? 'Nilai yang tercipta sudah menutup biaya plan ini, dan makin besar seiring otomasi Anda bertambah.'
+      : 'The value you create already covers this plan, and it grows with every automation you add.'
+  }
+  return id
+    ? 'Titik awal yang tepat: makin banyak proses yang Anda otomasikan, makin jauh plan ini terbayar.'
+    : 'The right place to start: the more processes you automate, the further this plan pays back.'
+}
+
 const NAME: Record<PlanId, string> = { operational: 'Operational', business: 'Business', enterprise: 'Enterprise' }
 
 export function buildPlanComparison(
@@ -85,7 +107,8 @@ export function buildPlanComparison(
     const monthlyUSD = plan === 'enterprise' ? TIER_MONTHLY_PRICE_USD.business : TIER_MONTHLY_PRICE_USD[plan]
     const yearlyLocal = monthlyUSD * 12 * fx
     const salesPriced = plan === 'enterprise'
-    const sharePct = !salesPriced && value !== null && value > 0 ? Math.round((yearlyLocal / value) * 100) : null
+    // How many times the yearly value covers this plan's yearly cost. Priced-by-sales plans have no figure to compare.
+    const multiple = !salesPriced && value !== null && value > 0 && yearlyLocal > 0 ? value / yearlyLocal : null
     const seats = TIER_SEAT_LIMIT[plan]
     const credits = TIER_CREDIT_ALLOWANCE[plan]
     const who =
@@ -107,7 +130,7 @@ export function buildPlanComparison(
       yearly: salesPriced
         ? (id ? 'Dihargai tim sales' : 'Priced by sales')
         : `${fmt(yearlyLocal)}${id ? '/tahun' : '/year'}`,
-      share: sharePct === null ? null : (id ? `${sharePct}% dari nilai per tahun` : `${sharePct}% of the yearly value`),
+      share: multiple === null ? null : sellingLine(multiple, id),
       recommended: plan === recPlan,
     }
   }
@@ -160,8 +183,8 @@ export function buildPlanComparison(
     whatItIs,
     rows: plans.map(rowFor),
     labels: id
-      ? { who: 'Untuk siapa', includes: 'Isi', price: 'Harga', yearly: 'Biaya per tahun', share: 'Biaya plan dibanding nilai itu', recommended: 'Direkomendasikan' }
-      : { who: 'Who it is for', includes: 'Includes', price: 'Price', yearly: 'Cost per year', share: 'Plan cost compared with that value', recommended: 'Recommended' },
+      ? { who: 'Untuk siapa', includes: 'Isi', price: 'Harga', yearly: 'Biaya per tahun', share: 'Kenapa layak', recommended: 'Direkomendasikan' }
+      : { who: 'Who it is for', includes: 'Includes', price: 'Price', yearly: 'Cost per year', share: 'Why it is worth it', recommended: 'Recommended' },
     caveat: `${scope} ${how}`,
   }
 }
