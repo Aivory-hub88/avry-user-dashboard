@@ -76,13 +76,14 @@ describe('NPV per scenario leads the range; ROI is the companion', () => {
   })
 })
 
-describe('the capacity-value line no longer prints a capped ROI', () => {
-  it('says "Very high" instead of ">999%"', () => {
+describe('the capacity-value block states one plain total, not a second ROI', () => {
+  it('shows the yearly value plus the cost avoided, without any ROI or the capped number', () => {
     const c = ctx2()
-    const view = buildCapacityValueView({ ...c, horizonROIWithCapacityPercent: 1200, horizonROIPercent: 1000 } as never, (v: number) => String(Math.round(v)), 'en')
+    const view = buildCapacityValueView(c as never, (v: number) => `$${Math.round(v)}`, 'en')!
     const text = JSON.stringify(view)
-    expect(text).not.toMatch(/>999/)
-    expect(text).toMatch(/Very high \(without: Very high\)/)
+    expect(text).not.toMatch(/ROI|>999|Very high/)
+    const total = view.rows.find((r) => /Total yearly value/.test(r.label))!
+    expect(total.value).toBe(`$${Math.round(c.totalAnnualSavingsLocal + c.capacityAvoidanceLocal)}/yr ($${Math.round(c.totalAnnualSavingsLocal)} scope value + $${Math.round(c.capacityAvoidanceLocal)} cost avoided)`)
   })
 })
 

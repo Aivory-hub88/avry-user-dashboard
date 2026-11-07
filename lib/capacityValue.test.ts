@@ -62,14 +62,16 @@ describe('growth bands', () => {
 
 describe('buildCapacityValueView', () => {
   const fmt = (v: number) => `Rp ${Math.round(v).toLocaleString('id-ID')}`
-  it('renders the separate line with FTE equivalent and ROI with/without, in Indonesian', () => {
+  it('renders the separate line with FTE equivalent and one total yearly value, in Indonesian', () => {
     const k: any = buildDiagnosticContext({ ...BASE, volume_growth_12m: 'More than 100%' } as any).calculations
     const v = buildCapacityValueView(k, fmt, 'id')!
     expect(v.title).toContain('bergantung pada pertumbuhan')
     expect(v.explanation).toContain('tidak dimasukkan ke angka-angka di atas')
     expect(v.rows.map((r) => r.label)).toContain('Biaya rekrutmen yang dihindari')
     expect(v.rows.find((r) => r.label.startsWith('Jam kerja'))!.value).toMatch(/FTE/)
-    expect(v.rows.at(-1)!.value).toContain('tanpa:')
+    expect(v.rows.at(-1)!.label).toBe('Total nilai per tahun bila pertumbuhan terjadi')
+    expect(v.rows.at(-1)!.value).toMatch(/nilai cakupan \+ .* biaya yang dihindari\)$/)
+    expect(JSON.stringify(v)).not.toMatch(/ROI/)
     expect(v.footnote).toContain('potongan realisasi 50%')
   })
   it('is null without a growth answer', () => {

@@ -10,8 +10,8 @@ describe('buildFinancialTermsNote', () => {
     expect(buildFinancialTermsNote('id', 3, { basis: 'required' })).toContain('plan Aivory mulai tahun ke-2')
   })
   it('explains the third ROI when the capacity block is shown', () => {
-    expect(buildFinancialTermsNote('en', 3, { basis: 'required', hasCapacityRoi: true })).toContain('capacity-value block is a third figure')
-    expect(buildFinancialTermsNote('id', 3, { basis: 'required', hasCapacityRoi: true })).toContain('blok nilai kapasitas adalah angka ketiga')
+    expect(buildFinancialTermsNote('en', 3, { basis: 'required', hasCapacityRoi: true })).toContain('capacity-value block adds the hiring cost avoided')
+    expect(buildFinancialTermsNote('id', 3, { basis: 'required', hasCapacityRoi: true })).toContain('Blok nilai kapasitas menambahkan biaya rekrutmen yang dihindari')
   })
   it('keeps the original wording for whole-budget reports', () => {
     expect(buildFinancialTermsNote('en', 7)).toContain('licenses, maintenance, support')
