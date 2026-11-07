@@ -73,6 +73,7 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
         type: 'select',
         options: [
           'Technology / Software',
+          'Professional Services / Consulting',
           'E-commerce / Retail',
           'Financial Services / Fintech',
           'Healthcare / Medtech',
@@ -82,7 +83,6 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
           'Education / Edtech',
           'Media / Entertainment',
           'Real Estate / Property',
-          'Professional Services / Consulting',
           'Government / Public Sector',
           'Non-profit / NGO',
           'Other'
@@ -665,3 +665,11 @@ export const DEEP_DIAGNOSTIC_PHASES: PhaseConfig[] = [
     ]
   }
 ]
+
+/**
+ * Display-only English label overrides, keyed by the canonical option string.
+ * The stored value (and industryBenchmarks / scorer keys) never change.
+ */
+export const EN_OPTION_DISPLAY: Record<string, string> = {
+  'Professional Services / Consulting': 'Consulting / Professional Services',
+}

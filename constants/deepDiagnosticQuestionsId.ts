@@ -89,6 +89,7 @@ export const ID_QUESTION_COPY: Record<string, IdQuestionCopy> = {
     question: 'Di industri apa perusahaan Anda beroperasi?',
     options: [
       'Teknologi / Perangkat Lunak',
+      'Konsultasi / Jasa Profesional',
       'E-commerce / Ritel',
       'Jasa Keuangan / Fintech',
       'Kesehatan / Medtech',
@@ -98,7 +99,6 @@ export const ID_QUESTION_COPY: Record<string, IdQuestionCopy> = {
       'Pendidikan / Edtech',
       'Media / Hiburan',
       'Real Estat / Properti',
-      'Jasa Profesional / Konsultasi',
       'Pemerintahan / Sektor Publik',
       'Nirlaba / LSM',
       'Lainnya',
