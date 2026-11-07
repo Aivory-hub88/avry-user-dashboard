@@ -1,5 +1,13 @@
 /* ─── Page shell ─────────────────────────────────────────────────────────── */
 .page {
+  /* Neutral monochrome: the dashboard's olive accents read as cheap on the
+     Deep Diagnostic screens. Scoped to this page root, not global. */
+  --color-accent: #e4e4e7;
+  --color-accent-report: #f4f4f5;
+  --color-accent-report-hover: #ffffff;
+  --color-accent-workflow: #f4f4f5;
+  --color-accent-soft: #d4d4d8;
+  --color-accent-text: #e4e4e7;
   min-height: 100vh;
   background: var(--bg-main);
   color: #e5e5e3;
@@ -635,7 +643,7 @@
 }
 
 .generateBlueprintButton:hover:not(:disabled) {
-  background-color: #bdd8a4;
+  background-color: #ffffff;
 }
 
 .generateBlueprintButton:active:not(:disabled) {
@@ -942,7 +950,7 @@
   gap: 8px 20px;
 }
 .glossaryItem { margin: 0; }
-.glossaryTerm { font-size: 12.5px; font-weight: 600; color: #c8e0bb; }
+.glossaryTerm { font-size: 12.5px; font-weight: 600; color: #d4d4d8; }
 .glossaryDefinition { margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; color: #a3a39c; }
 .executiveInsight {
   font-size: 0.92rem;

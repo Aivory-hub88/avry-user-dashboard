@@ -144,7 +144,7 @@
 }
 
 .submitBtn:hover:not(:disabled) {
-  background-color: #bad08c;
+  background-color: #ffffff;
 }
 
 .submitBtn:disabled {

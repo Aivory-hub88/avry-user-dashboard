@@ -21,8 +21,8 @@
 }
 
 .vertexDot {
-  fill: #eef6e6;
-  stroke: #7fae6f;
+  fill: #f4f4f5;
+  stroke: #a1a1aa;
   stroke-width: 1;
 }
 
@@ -70,7 +70,7 @@
   width: 12px;
   height: 2px;
   border-radius: 1px;
-  background: #7fae6f;
+  background: #a1a1aa;
   margin-left: 8px;
 }
 
