@@ -10,6 +10,7 @@ import { useRouterContext } from '@/contexts/RouterContext';
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole';
 import { asset } from '@/lib/asset'
 import GrainHeader from '@/components/ui/GrainHeader'
+import PoweredByAether from '@/components/ui/PoweredByAether'
 import { generateRoadmapAsync } from '@/lib/roadmapGeneration'
 
 // ─── colour tokens ────────────────────────────────────────────
@@ -1248,6 +1249,7 @@ export default function RoadmapPage() {
             <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.75)', margin: 0 }}>
               {t("subtitle")}
             </p>
+            <PoweredByAether className="mt-3" />
           </div>
           {roadmap && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10, flexShrink: 0 }}>

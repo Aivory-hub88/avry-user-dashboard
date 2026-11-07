@@ -2,6 +2,7 @@ import { useTranslations } from 'next-intl'
 import { ArrowRight, Download } from 'lucide-react'
 import styles from './BlueprintHeader.module.css'
 import GrainHeader from '@/components/ui/GrainHeader'
+import PoweredByAether from '@/components/ui/PoweredByAether'
 
 interface BlueprintVersion {
   version: string
@@ -97,6 +98,8 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
             <span className={styles.versionDot} aria-hidden="true" />
             <span className={styles.draftPill}>{status}</span>
           </div>
+
+          <PoweredByAether className="mb-3" />
 
           <div className={styles.pillsRow}>
             <div className={styles.pill}>
