@@ -16,7 +16,7 @@ interface HeaderBarProps {
 
 export default function HeaderBar({ company, submittedAt, onDownloadPdf, isExportingPdf, delta, locale = 'en' }: HeaderBarProps) {
   return (
-    <GrainHeader world="blue" className="w-full rounded-[18px] p-8 md:p-12 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+    <GrainHeader world="teal" className="w-full rounded-[18px] p-8 md:p-12 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
       <div className="relative z-10 max-w-2xl flex flex-col gap-2">
         <span className="text-white/70 text-xs uppercase tracking-wider font-semibold">
           {locale === 'id' ? 'ASESMEN OPERASIONAL BISNIS' : 'BUSINESS OPERATIONS ASSESSMENT'}

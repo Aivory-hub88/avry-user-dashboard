@@ -65,7 +65,7 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
         </div>
       )}
 
-      <GrainHeader world="blue" className="rounded-[18px] p-8 md:p-10">
+      <GrainHeader world="teal" className="rounded-[18px] p-8 md:p-10">
       <div className={styles.headerContent}>
         {/* LEFT: company + blueprint meta */}
         <div className={styles.blueprintHeaderLeft}>
