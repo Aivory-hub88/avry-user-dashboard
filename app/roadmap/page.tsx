@@ -9,6 +9,7 @@ import type { AiryRoadmap, AiryRoadmapPhase, AiryRoadmapKpi, AiryRoadmapMileston
 import { useRouterContext } from '@/contexts/RouterContext';
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole';
 import { asset } from '@/lib/asset'
+import GrainHeader from '@/components/ui/GrainHeader'
 import { generateRoadmapAsync } from '@/lib/roadmapGeneration'
 
 // ─── colour tokens ────────────────────────────────────────────
@@ -648,8 +649,10 @@ function PhaseSection({ phase, index, open, phaseRef, onToggle, onWorkflow, chec
 }
 
 // ─── Button primitives ────────────────────────────────────────
-function BtnGhost({ onClick, disabled, title, children }: {
+function BtnGhost({ onClick, disabled, title, children, onGrain }: {
   onClick?: () => void; disabled?: boolean; title?: string; children: React.ReactNode;
+  /** Sitting on the grainy-gradient header: frosted white instead of the theme's green outline. */
+  onGrain?: boolean;
 }) {
   const [h, setH] = useState(false);
   return (
@@ -657,8 +660,9 @@ function BtnGhost({ onClick, disabled, title, children }: {
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{
         fontSize: 12, fontWeight: 500, padding: '7px 14px', borderRadius: 8,
-        border: `1px solid ${h && !disabled ? T.borderGreen : T.border}`,
-        background: 'transparent', color: h && !disabled ? T.green : T.textSub,
+        border: onGrain ? `1px solid ${h && !disabled ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.28)'}` : `1px solid ${h && !disabled ? T.borderGreen : T.border}`,
+        background: onGrain ? (h && !disabled ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.12)') : 'transparent',
+        color: onGrain ? '#fff' : (h && !disabled ? T.green : T.textSub),
         cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
         transition: 'all 0.15s', opacity: disabled ? 0.35 : 1, whiteSpace: 'nowrap',
       }}>{children}</button>
@@ -693,21 +697,23 @@ function BtnComplete({ active, onClick, children }: { active: boolean; onClick: 
   );
 }
 
-function BtnPrimary({ onClick, disabled, loading, children }: {
+function BtnPrimary({ onClick, disabled, loading, children, onGrain }: {
   onClick: () => void; disabled?: boolean; loading?: boolean; children: React.ReactNode;
+  /** Sitting on the grainy-gradient header: solid white with dark-blue text. */
+  onGrain?: boolean;
 }) {
   const [h, setH] = useState(false);
   return (
     <button onClick={onClick} disabled={disabled}
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{
-        background: disabled ? T.green : `linear-gradient(to bottom, ${h ? 'var(--color-accent-hover-start)' : 'var(--color-accent-soft)'}, ${h ? 'var(--color-accent-hover-end)' : 'var(--color-accent)'})`,
-        color: 'var(--color-on-accent)', border: 'none', borderRadius: 9,
+        background: onGrain ? '#fff' : disabled ? T.green : `linear-gradient(to bottom, ${h ? 'var(--color-accent-hover-start)' : 'var(--color-accent-soft)'}, ${h ? 'var(--color-accent-hover-end)' : 'var(--color-accent)'})`,
+        color: onGrain ? '#0a1838' : 'var(--color-on-accent)', border: 'none', borderRadius: 9,
         padding: '9px 22px', fontSize: '0.8125rem', fontWeight: 600,
         fontFamily: 'inherit', cursor: disabled ? 'not-allowed' : 'pointer',
         display: 'flex', alignItems: 'center', gap: 8,
         transition: 'all 0.15s', opacity: disabled ? 0.6 : 1,
-        boxShadow: disabled ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.4), 0 4px 14px rgb(from var(--color-accent) r g b / 0.25)',
+        boxShadow: disabled || onGrain ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.4), 0 4px 14px rgb(from var(--color-accent) r g b / 0.25)',
       }}>
       {loading && (
         <span style={{
@@ -1233,12 +1239,13 @@ export default function RoadmapPage() {
         </div>
 
         {/* header */}
-        <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', paddingBottom: 24, borderBottom: `1px solid ${T.border}` }}>
+        <GrainHeader world="blue" className="rounded-[18px] p-8 md:p-10">
+        <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <h1 style={{ fontSize: '1.625rem', fontWeight: 300, color: T.text, margin: '0 0 5px', letterSpacing: '-0.3px', lineHeight: 1.3 }}>
+            <h1 style={{ fontSize: '1.625rem', fontWeight: 300, color: '#fff', margin: '0 0 5px', letterSpacing: '-0.3px', lineHeight: 1.3 }}>
               {t("pageTitle")}
             </h1>
-            <p style={{ fontSize: '0.9rem', color: T.textSub, margin: 0 }}>
+            <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.75)', margin: 0 }}>
               {t("subtitle")}
             </p>
           </div>
@@ -1247,22 +1254,23 @@ export default function RoadmapPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{
                   fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20,
-                  background: T.greenDim, color: T.green, border: `1px solid ${T.borderGreen}`,
+                  background: 'rgba(255,255,255,0.14)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)',
                   letterSpacing: '0.6px', textTransform: 'uppercase',
                 }}>{t("oneTimeService")}</span>
-                <span style={{ fontSize: 12, color: T.textMuted }}>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)' }}>
                   {t("updated", { date: new Date(roadmap.createdAt).toLocaleDateString() })}
                 </span>
               </div>
-              <BtnGhost onClick={handleGenerate} disabled={generating}>
+              <BtnGhost onClick={handleGenerate} disabled={generating} onGrain>
                 {generating ? t("regenerating") : t("regenerateRoadmap")}
               </BtnGhost>
-              <BtnPrimary onClick={handleMakeProject} disabled={importing} loading={importing}>
+              <BtnPrimary onClick={handleMakeProject} disabled={importing} loading={importing} onGrain>
                 {importing ? "Opening request…" : "Request as a project →"}
               </BtnPrimary>
             </div>
           )}
         </header>
+        </GrainHeader>
 
         {roadmap ? (
           <>

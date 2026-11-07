@@ -1,6 +1,7 @@
 import { useTranslations } from 'next-intl'
 import { ArrowRight, Download } from 'lucide-react'
 import styles from './BlueprintHeader.module.css'
+import GrainHeader from '@/components/ui/GrainHeader'
 
 interface BlueprintVersion {
   version: string
@@ -64,6 +65,7 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
         </div>
       )}
 
+      <GrainHeader world="blue" className="rounded-[18px] p-8 md:p-10">
       <div className={styles.headerContent}>
         {/* LEFT: company + blueprint meta */}
         <div className={styles.blueprintHeaderLeft}>
@@ -142,6 +144,7 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
           </div>
         </div>
       </div>
+      </GrainHeader>
     </div>
   )
 }
