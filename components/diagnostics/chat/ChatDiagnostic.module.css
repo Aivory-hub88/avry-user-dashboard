@@ -312,3 +312,7 @@
 }
 .sendBtnOn { background: #17171b; color: #fff; border-color: #52525b; }
 .sendBtnOn:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* Aivory Aether mark under the composer, right-aligned like the Console */
+.aetherRow { max-width: 720px; margin: 8px auto 0; display: flex; justify-content: flex-end; padding-right: 4px; }
+.aetherMark { height: 11px; width: auto; opacity: 0.7; user-select: none; pointer-events: none; }

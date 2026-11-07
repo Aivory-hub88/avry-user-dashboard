@@ -19,6 +19,7 @@ import { normalizeWebsiteInput } from '@/lib/websiteUrl'
 import { dropMismatchedBandAnswers, getBudgetBands, getRevenueBands } from '@/lib/currencyBands'
 import { parseCurrencyCode } from '@/lib/resultFormatters'
 import { useLocaleContext } from '@/hooks/useLocale'
+import { asset } from '@/lib/asset'
 import styles from './ChatDiagnostic.module.css'
 
 const PHASE_ORDER: PhaseId[] = [
@@ -57,7 +58,7 @@ const STEPS: Step[] = [
 const COPY = {
   en: {
     title: 'Deep Diagnostic',
-    hello: 'Welcome to the Aivory Deep Diagnostic. Over four phases we will assess how your business operates today — objectives, data and processes, risks, and bottlenecks — and use your answers to prepare your analysis report. You can revise any answer at any time.',
+    hello: 'Welcome to the Aivory Deep Diagnostic, powered by Aivory Aether. Over four phases we will assess how your business operates today: objectives, data and processes, risks, and bottlenecks. We will use your answers to prepare your analysis report. You can revise any answer at any time.',
     askCompany: "Let's begin. What is your company's name?",
     askWebsite: 'Do you have a company website? I can read its public pages to make the analysis more accurate. It does not change your score.',
     companyPh: 'Company name…',
@@ -94,9 +95,9 @@ const COPY = {
     websiteBad: 'That address looks invalid. Skip it if you have none.',
     ackCompany: (n: string) => `Nice to meet ${n}.`,
     ackWebsite: "Got it. I'll read your public pages in the background.",
-    ackNoTarget: "No problem — we'll explore first, so I'll skip the target-metrics question.",
-    phaseDone: (n: number, a: number, t: number) => `Phase ${n} done — ${a} of ${t} answered.`,
-    doneSummary: (a: number, t: number) => `All four phases complete — ${a} of ${t} questions answered.`,
+    ackNoTarget: "No problem. We'll explore first, so I'll skip the target-metrics question.",
+    phaseDone: (n: number, a: number, t: number) => `Phase ${n} done: ${a} of ${t} answered.`,
+    doneSummary: (a: number, t: number) => `All four phases complete: ${a} of ${t} questions answered.`,
     langLabel: 'Language',
     facts: {
       operating_country: 'Country',
@@ -112,7 +113,7 @@ const COPY = {
   },
   id: {
     title: 'Deep Diagnostic',
-    hello: 'Selamat datang di Aivory Deep Diagnostic. Dalam empat fase, kami akan menilai cara bisnis Anda beroperasi saat ini — tujuan, data dan proses, risiko, serta hambatan — lalu menyusun jawaban Anda menjadi laporan analisis. Anda dapat mengubah jawaban kapan saja.',
+    hello: 'Selamat datang di Aivory Deep Diagnostic, powered by Aivory Aether. Dalam empat fase, kami akan menilai cara bisnis Anda beroperasi saat ini: tujuan, data dan proses, risiko, serta hambatan. Jawaban Anda akan kami susun menjadi laporan analisis. Anda dapat mengubah jawaban kapan saja.',
     askCompany: 'Mari kita mulai. Siapa nama perusahaan Anda?',
     askWebsite: 'Apakah perusahaan Anda punya website? Saya bisa membaca halaman publiknya agar analisis lebih akurat. Tidak mengubah skor.',
     companyPh: 'Nama perusahaan…',
@@ -149,9 +150,9 @@ const COPY = {
     websiteBad: 'Alamat tidak valid. Lewati jika tidak ada.',
     ackCompany: (n: string) => `Senang berkenalan dengan ${n}.`,
     ackWebsite: 'Siap. Saya baca halaman publiknya di latar belakang.',
-    ackNoTarget: 'Tidak apa-apa — kita eksplor dulu, jadi pertanyaan target metrik saya lewati.',
-    phaseDone: (n: number, a: number, t: number) => `Fase ${n} selesai — ${a} dari ${t} terjawab.`,
-    doneSummary: (a: number, t: number) => `Keempat fase selesai — ${a} dari ${t} pertanyaan terjawab.`,
+    ackNoTarget: 'Tidak apa-apa. Kita eksplor dulu, jadi pertanyaan target metrik saya lewati.',
+    phaseDone: (n: number, a: number, t: number) => `Fase ${n} selesai: ${a} dari ${t} terjawab.`,
+    doneSummary: (a: number, t: number) => `Keempat fase selesai: ${a} dari ${t} pertanyaan terjawab.`,
     langLabel: 'Bahasa',
     facts: {
       operating_country: 'Negara',
@@ -190,16 +191,19 @@ function getOptions(q: DeepDiagnosticQuestion, responses: Record<string, any>, l
  * stays the canonical option string.
  */
 function splitLabel(label: string, plain: boolean): { title: string; desc?: string } {
-  if (plain) return { title: label }
+  if (plain) return { title: noEm(label) }
   const dash = label.split(' — ')
-  if (dash.length >= 2) return { title: dash[0].trim(), desc: dash.slice(1).join(' — ').trim() }
+  if (dash.length >= 2) return { title: noEm(dash[0].trim()), desc: noEm(dash.slice(1).join(' — ').trim()) }
   const m = label.match(/^(.*?)\s*\(([^()]{4,})\)\s*$/)
-  if (m && m[1]) return { title: m[1].trim(), desc: m[2].trim() }
-  return { title: label }
+  if (m && m[1]) return { title: noEm(m[1].trim()), desc: noEm(m[2].trim()) }
+  return { title: noEm(label) }
 }
 
+/** UI text has no em dashes: question copy and option labels come from shared constants. */
+const noEm = (t: string) => t.replace(/\s+—\s+/g, ': ').replace(/—/g, '-')
+
 function questionText(q: DeepDiagnosticQuestion, locale: Locale) {
-  return (locale === 'id' ? ID_QUESTION_COPY[q.id]?.question : undefined) ?? q.question
+  return noEm((locale === 'id' ? ID_QUESTION_COPY[q.id]?.question : undefined) ?? q.question)
 }
 
 function isEmpty(v: any) {
@@ -350,9 +354,9 @@ export default function ChatDiagnostic() {
     if (isEmpty(v)) return c.skipped
     if (s.kind !== 'question') return String(v)
     const opts = getOptions(s.q!, ph[s.phase].responses, L)
-    if (Array.isArray(v)) return v.map(x => opts.find(o => o.value === x)?.label ?? x).join(', ')
+    if (Array.isArray(v)) return noEm(v.map(x => opts.find(o => o.value === x)?.label ?? x).join(', '))
     const hit = opts.find(o => o.value === v)
-    if (hit) return hit.label
+    if (hit) return noEm(hit.label)
     if (s.q!.id === 'hourly_cost') return `${v}`
     return String(v)
   }
@@ -362,7 +366,7 @@ export default function ChatDiagnostic() {
 
   const stepHelper = (s: Step) =>
     s.kind === 'question'
-      ? ((L === 'id' ? ID_QUESTION_COPY[s.q!.id]?.helperText : undefined) ?? s.q!.helperText)
+      ? (() => { const h = (L === 'id' ? ID_QUESTION_COPY[s.q!.id]?.helperText : undefined) ?? s.q!.helperText; return h ? noEm(h) : h })()
       : undefined
 
   const ack = (s: Step): string | null => {
@@ -567,7 +571,7 @@ export default function ChatDiagnostic() {
               onClick={() => { setDdOpen(o => !o); setFilter('') }}
             >
               <span className={draft ? '' : styles.selectPh}>
-                {opts.find(o => o.value === draft)?.label ?? c.selectPh}
+                {noEm(opts.find(o => o.value === draft)?.label ?? c.selectPh)}
               </span>
             </button>
             {ddOpen && (
@@ -598,7 +602,7 @@ export default function ChatDiagnostic() {
                         className={`${styles.ddItem} ${draft === o.value ? styles.ddItemOn : ''}`}
                         onClick={() => { setDdOpen(false); commit(s, o.value) }}
                       >
-                        {o.label}
+                        {noEm(o.label)}
                       </button>
                     ))}
                 </div>
@@ -700,7 +704,7 @@ export default function ChatDiagnostic() {
     const max = s.kind === 'question' ? s.q!.validation?.maxLength : undefined
     const placeholder = s.kind === 'company' ? c.companyPh
       : s.kind === 'website' ? c.websitePh
-      : ((L === 'id' ? ID_QUESTION_COPY[s.q!.id]?.placeholder : undefined) ?? s.q!.placeholder ?? c.typeHere)
+      : noEm((L === 'id' ? ID_QUESTION_COPY[s.q!.id]?.placeholder : undefined) ?? s.q!.placeholder ?? c.typeHere)
     const send = () => commit(s, type === 'number' ? (draft === '' ? '' : Number(draft)) : draft)
 
     const hasContent = String(draft).trim() !== ''
@@ -791,7 +795,7 @@ export default function ChatDiagnostic() {
       <div className={styles.facts}>
         {(companyName || websiteUrl) && (
           <div className={styles.company}>
-            <div className={styles.companyName}>{companyName || '—'}</div>
+            <div className={styles.companyName}>{companyName || '-'}</div>
             {websiteUrl && <div className={styles.companySite}>{websiteUrl}</div>}
           </div>
         )}
@@ -858,7 +862,7 @@ export default function ChatDiagnostic() {
               {c.phaseDone(PHASE_ORDER.indexOf(prevPhase) + 1, prev.answered, prev.total)}
               {hl ? ` ${hl}` : ''}
             </p>
-            <p className={styles.summaryLead}>{c.phase} {n} · {title} — {desc}</p>
+            <p className={styles.summaryLead}>{c.phase} {n} · {title}: {desc}</p>
           </div>
         </div>
       )
@@ -1001,7 +1005,15 @@ export default function ChatDiagnostic() {
               <div ref={endRef} />
             </div>
           </div>
-          {composerVisible && <div className={styles.composerWrap}>{renderComposer()}</div>}
+          {composerVisible && (
+            <div className={styles.composerWrap}>
+              {renderComposer()}
+              <div className={styles.aetherRow}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={asset('/Aivory_Aether_white.svg')} alt="Aivory Aether" className={styles.aetherMark} />
+              </div>
+            </div>
+          )}
         </section>
 
         <aside className={`${styles.panel} ${sheetOpen ? styles.panelOpen : ''}`}>{panel}</aside>
