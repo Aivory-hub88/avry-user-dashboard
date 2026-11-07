@@ -283,3 +283,8 @@
 .summaryMuted { margin: 0; font-size: 0.95rem; line-height: 1.7; color: rgba(255, 255, 255, 0.5); }
 .summaryLead { margin: 14px 0 0; font-size: 0.97rem; line-height: 1.6; color: #f1f1f2; }
 .summaryCard .inlineActions { margin-top: 16px; }
+
+/* number fields: drop the native spinner, it looks out of place on dark glass */
+.input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.input[type="number"]::-webkit-outer-spin-button,
+.input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
