@@ -1249,7 +1249,7 @@ export default function RoadmapPage() {
             <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.75)', margin: 0 }}>
               {t("subtitle")}
             </p>
-            <PoweredByAether className="mt-3" />
+            <PoweredByAether className="mt-5" />
           </div>
           {roadmap && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10, flexShrink: 0 }}>

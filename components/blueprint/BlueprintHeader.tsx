@@ -99,7 +99,7 @@ export default function BlueprintHeader(props: BlueprintHeaderProps) {
             <span className={styles.draftPill}>{status}</span>
           </div>
 
-          <PoweredByAether className="mb-3" />
+          <PoweredByAether className="mt-5 mb-5" />
 
           <div className={styles.pillsRow}>
             <div className={styles.pill}>
