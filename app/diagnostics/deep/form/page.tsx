@@ -7,6 +7,8 @@ import { DEEP_DIAGNOSTIC_PHASES } from '@/constants/deepDiagnosticQuestions'
 import { ID_PHASE_COPY } from '@/constants/deepDiagnosticQuestionsId'
 import { DeepDiagnosticService } from '@/services/deepDiagnostic'
 import { normalizeWebsiteInput } from '@/lib/websiteUrl'
+import { asset } from '@/lib/asset'
+import { authedFetch } from '@/lib/deployAuth'
 import { DOCUMENT_ACCEPT, documentErrorMessage, precheckDocument, type DocumentError } from '@/lib/documentContext'
 import { dropMismatchedBandAnswers } from '@/lib/currencyBands'
 import { parseCurrencyCode } from '@/lib/resultFormatters'
@@ -159,7 +161,7 @@ export default function DeepDiagnosticPage() {
     try {
       const body = new FormData()
       body.append('file', file)
-      const res = await fetch('/api/diagnostics/document-text', { method: 'POST', body })
+      const res = await authedFetch(asset('/api/diagnostics/document-text'), { method: 'POST', body })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || typeof data.text !== 'string') {
         const code = (['TOO_LARGE', 'UNSUPPORTED', 'NO_TEXT', 'UNREADABLE'] as const).includes(data.code) ? data.code : 'FAILED'
