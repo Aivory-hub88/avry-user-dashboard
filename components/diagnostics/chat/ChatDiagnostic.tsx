@@ -227,6 +227,8 @@ export default function ChatDiagnostic() {
 
   const [draft, setDraft] = useState<any>('')
   const [filter, setFilter] = useState('')
+  const [ddOpen, setDdOpen] = useState(false)
+  const ddRef = useRef<HTMLDivElement | null>(null)
   const endRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null)
   const firstSave = useRef(true)
@@ -284,9 +286,25 @@ export default function ChatDiagnostic() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft(isEmpty(v) ? (activeStep.q?.type === 'multiselect' ? [] : '') : v)
     setFilter('')
+    setDdOpen(false)
     setError('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKey])
+
+  // close the dropdown on outside click / Escape
+  useEffect(() => {
+    if (!ddOpen) return
+    const onDown = (e: MouseEvent) => {
+      if (ddRef.current && !ddRef.current.contains(e.target as Node)) setDdOpen(false)
+    }
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setDdOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onEsc)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onEsc)
+    }
+  }, [ddOpen])
 
   // ── keep the latest message in view ──
   useEffect(() => {
@@ -531,16 +549,57 @@ export default function ChatDiagnostic() {
             <span className={styles.hint}>{c.pickDropdown}</span>
             {isEdit && <span className={styles.editTag}>{c.editing}</span>}
           </div>
-          <select
-            ref={el => { inputRef.current = el as any }}
-            className={styles.select}
-            value={typeof draft === 'string' ? draft : ''}
-            onChange={e => { if (e.target.value) commit(s, e.target.value) }}
-            aria-label={questionText(s.q!, L)}
-          >
-            <option value="">{c.selectPh}</option>
-            {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          {/* Custom dropdown that always opens UPWARD: the composer sits at the
+              bottom of the viewport, where a native <select> popup gets clipped. */}
+          <div className={styles.ddWrap} ref={ddRef}>
+            <button
+              type="button"
+              ref={el => { inputRef.current = el as any }}
+              className={`${styles.select} ${ddOpen ? styles.selectOpen : ''}`}
+              aria-haspopup="listbox"
+              aria-expanded={ddOpen}
+              aria-label={questionText(s.q!, L)}
+              onClick={() => { setDdOpen(o => !o); setFilter('') }}
+            >
+              <span className={draft ? '' : styles.selectPh}>
+                {opts.find(o => o.value === draft)?.label ?? c.selectPh}
+              </span>
+            </button>
+            {ddOpen && (
+              <div className={styles.ddPanel} role="listbox">
+                <input
+                  autoFocus
+                  className={styles.ddSearch}
+                  placeholder={c.filter}
+                  value={filter}
+                  onChange={e => setFilter(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') { setDdOpen(false); return }
+                    if (e.key === 'Enter') {
+                      const first = opts.filter(o => o.label.toLowerCase().includes(filter.toLowerCase()))[0]
+                      if (first) { setDdOpen(false); commit(s, first.value) }
+                    }
+                  }}
+                />
+                <div className={styles.ddList}>
+                  {opts
+                    .filter(o => !filter || o.label.toLowerCase().includes(filter.toLowerCase()))
+                    .map(o => (
+                      <button
+                        key={o.value}
+                        type="button"
+                        role="option"
+                        aria-selected={draft === o.value}
+                        className={`${styles.ddItem} ${draft === o.value ? styles.ddItemOn : ''}`}
+                        onClick={() => { setDdOpen(false); commit(s, o.value) }}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
           {footer}
         </div>
       )
