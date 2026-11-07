@@ -45,25 +45,36 @@ export async function GET(req: NextRequest) {
   if (q.length < 2) return NextResponse.json({ q, hits: [] })
   const agent = req.headers.get("x-agent-type") ?? undefined
   const assertedAgent = cred.kind === "service" && isKnownAgentType(agent) ? agent : undefined
+  // Optional tenant scope. Service callers (Cerveau) should always send it:
+  // without it AND without a known agent grant, a service credential sees
+  // every workspace's docs (legacy behaviour kept so existing callers don't
+  // break). Users are already gated per doc; this only narrows further.
+  const scopeWs = (req.nextUrl.searchParams.get("workspace_id") ?? "").trim().slice(0, 64) || null
+  if (cred.kind === "service" && !isKnownAgentType(assertedAgent) && !scopeWs) {
+    console.warn("[workspace/search] service call without workspace_id or agent type: unscoped across tenants")
+  }
   const limit = Math.min(30, Math.max(1, parseInt(req.nextUrl.searchParams.get("limit") ?? "30", 10) || 30))
 
   try {
     // 1. Title candidates, trigram-ranked (ILIKE prefilter + similarity order).
     const like = `%${q.replace(/[%_\\]/g, "\\$&")}%`
     const cand = await query(
-      `SELECT id, title FROM dashboard.workspace_docs
+      `SELECT id, title, workspace_id FROM dashboard.workspace_docs
        WHERE deleted_at IS NULL AND title ILIKE $1
+         AND ($4::text IS NULL OR workspace_id = $4)
        ORDER BY similarity(title, $2) DESC, updated_at DESC
        LIMIT $3`,
-      [like, q, MAX_DOC_CANDIDATES],
+      [like, q, MAX_DOC_CANDIDATES, scopeWs],
     )
     const titles = new Map<string, string>()
+    const wsByDoc = new Map<string, string>()
     const bareIds: string[] = []
     for (const row of cand.rows) {
       const raw = row.id as string
       const bare = raw.replace(/^workspace:(room:|db:)?/, "").replace(/^db:/, "")
       if (bare === "room" || titles.has(bare)) continue
       titles.set(bare, (row.title as string) ?? bare)
+      wsByDoc.set(bare, (row.workspace_id as string | null) || "default")
       bareIds.push(bare)
     }
 
@@ -147,14 +158,18 @@ export async function GET(req: NextRequest) {
       if (qvec) {
         try {
           const seen = new Set(hits.filter((h) => h.kind === "row" && h.row_id).map((h) => `${h.doc_id}:${h.row_id}`))
+          // Defence in depth: chunks are also bounded to the workspaces of
+          // the docs that passed the gate, not just their ids.
+          const readableWs = Array.from(new Set(readableIds.map((id) => wsByDoc.get(id) ?? "default")))
           const sem = await query(
             `SELECT c.doc_id, c.row_id, c.text, 1 - (c.embedding <=> $1::vector) AS sim
              FROM dashboard.workspace_chunks c
-             WHERE c.doc_id = ANY($2::text[]) AND c.embedding IS NOT NULL
+             WHERE c.doc_id = ANY($2::text[]) AND c.workspace_id = ANY($3::text[])
+               AND c.embedding IS NOT NULL
                AND c.row_id NOT LIKE 'file:%' -- room file chunks (ADR-019 P3) aren't tasks
              ORDER BY c.embedding <=> $1::vector
              LIMIT 20`,
-            [`[${qvec.join(",")}]`, readableIds],
+            [`[${qvec.join(",")}]`, readableIds, readableWs],
           )
           for (const row of sem.rows) {
             if (hits.length >= MAX_RESULTS) break
