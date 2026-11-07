@@ -2,7 +2,7 @@ import { formatDate } from '@/lib/resultFormatters'
 import type { DiagnosticDelta } from '@/lib/diagnosticHistory'
 import DeltaChip from './DeltaChip'
 import GrainHeader from '@/components/ui/GrainHeader'
-import { asset } from '@/lib/asset'
+import PoweredByAether from '@/components/ui/PoweredByAether'
 import styles from './HeaderBar.module.css'
 
 interface HeaderBarProps {
@@ -27,11 +27,7 @@ export default function HeaderBar({ company, submittedAt, onDownloadPdf, isExpor
         </h1>
         <span className="text-white/75 text-base font-light">{formatDate(submittedAt, locale)}</span>
         <DeltaChip delta={delta ?? null} locale={locale} />
-        <div className="flex items-center gap-2.5 mt-2 text-white/70" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>
-          <span>{locale === 'id' ? 'Didukung oleh' : 'Powered by'}</span>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={asset('/Aivory_Aether_white.svg')} alt="Aivory Aether" style={{ height: 12, width: 'auto', opacity: 0.95 }} />
-        </div>
+        <PoweredByAether className="mt-2" />
       </div>
 
       <div className="relative z-10">

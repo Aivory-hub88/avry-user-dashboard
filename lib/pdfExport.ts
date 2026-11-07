@@ -15,6 +15,7 @@ import {
   COVER_FRONT_BG, COVER_BACK_BG, SIGNATURE_WHITE, SIGNATURE_DARK,
   COVER_WORDMARK_TRIM, COVER_WORDMARK_TRIM_SIZE, COVER_BACK_LOCKUP, COVER_BACK_LOCKUP_SIZE,
   COVER_STRIP_RIGHTS, COVER_STRIP_RIGHTS_SIZE, COVER_STRIP_LABS, COVER_STRIP_LABS_SIZE,
+  AETHER_WHITE, AETHER_DARK, AETHER_SIZE,
 } from '@/lib/pdfAssets'
 import {
   DIM_LABELS,
@@ -383,6 +384,19 @@ async function loadImage(url: string): Promise<string | null> {
   } catch {
     return null
   }
+}
+
+/** "Powered by [Aivory Aether]" line: white mark on the dark letter page, dark mark on the light closing page. */
+function drawPoweredByAether(pdf: jsPDF, x: number, y: number, tone: 'white' | 'dark', locale: Locale) {
+  setC(pdf, tone === 'white' ? '#8fb87f' : '#6b7a80', 'text')
+  pdf.setFont(F(), 'normal')
+  pdf.setFontSize(7.5)
+  const label = locale === 'id' ? 'DIDUKUNG OLEH' : 'POWERED BY'
+  pdf.text(label, x, y, { charSpace: 0.4 })
+  const lw = pdf.getTextWidth(label) + label.length * 0.4 * 0.3528 + 3
+  const w = 30
+  const h = w * (AETHER_SIZE[1] / AETHER_SIZE[0])
+  pdf.addImage(tone === 'white' ? AETHER_WHITE : AETHER_DARK, 'PNG', x + lw, y - h + 0.6, w, h, undefined, 'FAST')
 }
 
 export async function loadSvgAsPngDataUrl(
@@ -1564,6 +1578,7 @@ function editorialSpread(pdf: jsPDF, context: DiagnosticContext, locale: Locale 
     const sigW = 46
     const sigH = sigW * (62.9 / 498.7)
     pdf.addImage(SIGNATURE_WHITE, 'PNG', cx, ny + 8, sigW, sigH, undefined, 'FAST')
+    drawPoweredByAether(pdf, cx, ny + 8 + sigH + 12, 'white', locale)
   }
 
   // Bottom supporting data strip — composite score as a grounding stat
@@ -3882,6 +3897,7 @@ export async function exportReportToPdf(
     const sigW = 46
     const sigH = sigW * (62.9 / 498.7)
     pdf.addImage(SIGNATURE_DARK, 'PNG', ML, y + 6, sigW, sigH, undefined, 'FAST')
+    drawPoweredByAether(pdf, ML, y + 6 + sigH + 12, 'dark', locale)
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -3899,5 +3915,5 @@ export async function exportReportToPdf(
   renderContents(pdf, toc, locale)
   pdf.setPage(pdf.getNumberOfPages())
 
-  pdf.save(`Business_Operations_Assessment_${companyName.replace(/\s+/g, '_')}.pdf`)
+  pdf.save(`Business_Operations_Analysis_${companyName.replace(/\s+/g, '_')}.pdf`)
 }
