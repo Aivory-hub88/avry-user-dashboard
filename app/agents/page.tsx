@@ -1,5 +1,6 @@
 'use client';
 import { asset } from "@/lib/asset";
+import GrainHeader from '@/components/ui/GrainHeader';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
@@ -141,36 +142,10 @@ const AGENTS = [
 
 function HeroBanner() {
   const t = useTranslations('agents');
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const heroRef = useRef<HTMLDivElement>(null);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!heroRef.current) return;
-    const rect = heroRef.current.getBoundingClientRect();
-    setMousePosition({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-  };
-
   return (
-    <div
-      ref={heroRef}
-      onMouseMove={handleMouseMove}
-      className="rounded-2xl p-6 md:p-8 mb-8 shadow-lg relative overflow-hidden border border-white/[0.06]"
-      style={{
-        background: [
-          'radial-gradient(ellipse 90% 120% at 12% 0%, rgb(from var(--color-accent) r g b / 0.16) 0%, transparent 55%)',
-          'radial-gradient(ellipse 70% 90% at 92% 100%, rgba(221,218,197,0.10) 0%, transparent 55%)',
-          'linear-gradient(135deg, #46483f 0%, #3a3c34 55%, #2c2e27 100%)',
-        ].join(', '),
-      }}
-    >
-      <NoiseOverlay />
-      {/* Cursor-tracked highlight — same spotlight language as the agent cards below */}
-      <div
-        className="pointer-events-none absolute inset-0 z-[3] opacity-0 hover:opacity-100 transition-opacity duration-300"
-        style={{ background: `radial-gradient(600px circle at ${mousePosition.x}px ${mousePosition.y}px, rgba(255,255,255,0.05), transparent 45%)` }}
-      />
+    <GrainHeader world="indigo" className="rounded-2xl p-6 md:p-8 mb-8 shadow-lg">
       <div className="relative z-10">
-        <span className="inline-block text-[10px] font-semibold text-[#dddac5]/80 uppercase tracking-[0.12em] mb-3 px-2.5 py-[3px] rounded-full bg-white/[0.06] border border-white/[0.08]">
+        <span className="inline-block text-[10px] font-semibold text-white/90 uppercase tracking-[0.12em] mb-3 px-2.5 py-[3px] rounded-full bg-white/[0.14] border border-white/[0.3] backdrop-blur-md">
           {t('heroBadge')}
         </span>
         <h2
@@ -179,14 +154,11 @@ function HeroBanner() {
         >
           {t('heroTitle')}
         </h2>
-        <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, margin: 0, maxWidth: '36rem' }}>
+        <p style={{ fontSize: 13, fontWeight: 300, color: 'rgba(255,255,255,0.8)', lineHeight: 1.6, margin: 0, maxWidth: '36rem' }}>
           {t('heroSubtitle')}
         </p>
       </div>
-      {/* Decorative background glows */}
-      <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-accent/[0.06] rounded-full blur-3xl" />
-      <div className="absolute -top-16 -left-12 w-56 h-56 bg-white/[0.04] rounded-full blur-3xl" />
-    </div>
+    </GrainHeader>
   );
 }
 

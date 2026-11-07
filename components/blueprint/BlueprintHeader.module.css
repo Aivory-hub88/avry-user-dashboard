@@ -321,3 +321,41 @@
     border-left: none;
   }
 }
+
+
+/* ── On the grainy gradient (same treatment as the Diagnostic result header) ── */
+.companyLabel { color: rgba(255,255,255,0.7); }
+.companyName { color: rgba(255,255,255,0.85); }
+.blueprintTitle { color: #fff; }
+.versionText { color: rgba(255,255,255,0.8); }
+.versionDot { background: rgba(255,255,255,0.5); }
+.versionDropdown {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.28);
+  color: #fff;
+  backdrop-filter: blur(6px);
+}
+.versionDropdown:hover { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.4); }
+.draftPill {
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.3);
+  color: #fff;
+}
+.draftPill::before { background: #fff; }
+.pillsRow { border-top-color: rgba(255,255,255,0.22); }
+.pill + .pill { border-left-color: rgba(255,255,255,0.22); }
+.pillLabel { color: rgba(255,255,255,0.7); }
+.pillValue { color: #fff; }
+.headerActionBtn {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.28);
+  color: #fff;
+  backdrop-filter: blur(6px);
+}
+.headerActionBtn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.2);
+  border-color: rgba(255,255,255,0.4);
+  color: #fff;
+}
+.generateRoadmapBtn { background: #fff; color: #0a1838; box-shadow: none; }
+.generateRoadmapBtn:hover:not(:disabled) { background: #fff; filter: brightness(0.95); }
