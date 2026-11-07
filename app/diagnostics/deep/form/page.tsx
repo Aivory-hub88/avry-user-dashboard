@@ -7,6 +7,7 @@ import { DEEP_DIAGNOSTIC_PHASES } from '@/constants/deepDiagnosticQuestions'
 import { ID_PHASE_COPY } from '@/constants/deepDiagnosticQuestionsId'
 import { DeepDiagnosticService } from '@/services/deepDiagnostic'
 import { normalizeWebsiteInput } from '@/lib/websiteUrl'
+import { DOCUMENT_ACCEPT, documentErrorMessage, precheckDocument, type DocumentError } from '@/lib/documentContext'
 import { dropMismatchedBandAnswers } from '@/lib/currencyBands'
 import { parseCurrencyCode } from '@/lib/resultFormatters'
 import { useLocaleContext } from '@/hooks/useLocale'
@@ -40,6 +41,10 @@ export default function DeepDiagnosticPage() {
   const [companyNameError, setCompanyNameError] = useState('')
   const [websiteUrl, setWebsiteUrl] = useState('')
   const [websiteUrlError, setWebsiteUrlError] = useState('')
+  const [documentText, setDocumentText] = useState('')
+  const [documentName, setDocumentName] = useState('')
+  const [documentBusy, setDocumentBusy] = useState(false)
+  const [documentError, setDocumentError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [savedProgress, setSavedProgress] = useState<DeepDiagnosticProgress | null>(null)
@@ -83,7 +88,7 @@ export default function DeepDiagnosticPage() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => {
       try {
-        DeepDiagnosticService.saveProgress({ phases: phaseData, currentPhase, lastUpdated: new Date().toISOString(), companyName, websiteUrl })
+        DeepDiagnosticService.saveProgress({ phases: phaseData, currentPhase, lastUpdated: new Date().toISOString(), companyName, websiteUrl, documentText, documentName })
       } catch {
         setStorageWarning(true)
       }
@@ -91,7 +96,7 @@ export default function DeepDiagnosticPage() {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
-  }, [phaseData, currentPhase, companyName, websiteUrl])
+  }, [phaseData, currentPhase, companyName, websiteUrl, documentText, documentName])
 
   // Every phase change (Next/Previous, sidebar click, Resume) swaps the questions
   // inside an internally scrolling pane, so the previous phase's scroll position
@@ -118,6 +123,7 @@ export default function DeepDiagnosticPage() {
     setCurrentPhase(savedProgress.currentPhase)
     if (savedProgress.companyName) setCompanyName(savedProgress.companyName)
     if (savedProgress.websiteUrl) setWebsiteUrl(savedProgress.websiteUrl)
+    if (savedProgress.documentText) { setDocumentText(savedProgress.documentText); setDocumentName(savedProgress.documentName ?? '') }
     setSavedProgress(null)
   }
 
@@ -137,6 +143,37 @@ export default function DeepDiagnosticPage() {
     setValidationErrors({})
     setSavedProgress(null)
   }, [locale])
+
+  const clearDocument = () => {
+    setDocumentText('')
+    setDocumentName('')
+    setDocumentError('')
+  }
+
+  // Optional and never blocking: any failure just says so and the user carries on without a document.
+  const attachDocument = async (file: File) => {
+    setDocumentError('')
+    const pre = precheckDocument(file)
+    if (pre) { setDocumentError(documentErrorMessage(pre, locale)); return }
+    setDocumentBusy(true)
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      const res = await fetch('/api/diagnostics/document-text', { method: 'POST', body })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || typeof data.text !== 'string') {
+        const code = (['TOO_LARGE', 'UNSUPPORTED', 'NO_TEXT', 'UNREADABLE'] as const).includes(data.code) ? data.code : 'FAILED'
+        setDocumentError(documentErrorMessage(code as DocumentError, locale))
+        return
+      }
+      setDocumentText(data.text)
+      setDocumentName(file.name)
+    } catch {
+      setDocumentError(documentErrorMessage('FAILED', locale))
+    } finally {
+      setDocumentBusy(false)
+    }
+  }
 
   const handleResponseChange = useCallback((questionId: string, value: any) => {
     setPhaseData(prev => {
@@ -224,6 +261,8 @@ export default function DeepDiagnosticPage() {
         lastUpdated: new Date().toISOString(),
         companyName,
         websiteUrl,
+        documentText,
+        documentName,
       })
       router.push('/diagnostics/deep/summary')
     } else {
@@ -374,6 +413,34 @@ export default function DeepDiagnosticPage() {
                   {websiteUrlError || (locale === 'id'
                     ? 'Jika diisi, kami membaca halaman publik website Anda untuk membuat analisis lebih akurat. Tidak mengubah skor.'
                     : 'If provided, we read your public website pages to make the analysis more accurate. It does not change your score.')}
+                </p>
+                <label htmlFor="companyDocument" className={styles.companyNameLabel} style={{ marginTop: 14 }}>
+                  {locale === 'id' ? 'Dokumen perusahaan (opsional)' : 'Company document (optional)'}
+                </label>
+                {documentName ? (
+                  <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.8)', fontFamily: 'var(--font-manrope), sans-serif' }}>
+                    {documentName}{' '}
+                    <button type="button" onClick={clearDocument} style={{ background: 'none', border: 'none', padding: 0, marginLeft: 8, color: 'rgba(255,255,255,0.55)', textDecoration: 'underline', cursor: 'pointer', fontSize: 12 }}>
+                      {locale === 'id' ? 'Hapus' : 'Remove'}
+                    </button>
+                  </p>
+                ) : (
+                  <input
+                    id="companyDocument"
+                    type="file"
+                    accept={DOCUMENT_ACCEPT}
+                    disabled={documentBusy}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) void attachDocument(f); e.target.value = '' }}
+                    aria-describedby="companyDocumentHelp"
+                    style={{ marginTop: 6, fontSize: 13, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-manrope), sans-serif' }}
+                  />
+                )}
+                <p id="companyDocumentHelp" className={documentError ? styles.companyNameError : undefined} role={documentError ? 'alert' : undefined} style={documentError ? undefined : { margin: '6px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-manrope), sans-serif' }}>
+                  {documentError || (documentBusy
+                    ? (locale === 'id' ? 'Membaca dokumen...' : 'Reading the document...')
+                    : (locale === 'id'
+                      ? 'Bisa dilewati. Company profile atau deck (PDF, DOCX, TXT, MD, maks 5 MB) membantu profiling, terutama bila website tidak bisa dibaca. Hanya teksnya yang dibaca, filenya tidak disimpan, dan tidak mengubah skor.'
+                      : 'Skippable. A company profile or deck (PDF, DOCX, TXT, MD, max 5 MB) helps profiling, especially when your website cannot be read. Only the text is read, the file is not stored, and it does not change your score.'))}
                 </p>
               </div>
             )}

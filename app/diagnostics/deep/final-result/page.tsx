@@ -758,7 +758,7 @@ export default function FinalResultPage() {
               </div>
               {webView && (
                 <div className={styles.webInsights} data-state={webView.state}>
-                  <h3 className={styles.aiColLabel}>{locale === 'id' ? 'Website Anda' : 'Your website'}</h3>
+                  <h3 className={styles.aiColLabel}>{webView.source === 'document' ? (locale === 'id' ? 'Dokumen Anda' : 'Your document') : (locale === 'id' ? 'Website Anda' : 'Your website')}</h3>
                   {webView.facts.length > 0 && (
                     <dl className={styles.webFacts}>
                       {webView.facts.map(f => (

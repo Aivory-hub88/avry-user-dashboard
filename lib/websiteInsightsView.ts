@@ -9,7 +9,9 @@ type Locale = 'en' | 'id'
 type LlmResult = Record<string, any>
 
 export interface WebsiteInsightsView {
-  state: 'found' | 'partial' | 'unavailable' | 'social_only'
+  state: 'found' | 'partial' | 'unavailable' | 'social_only' | 'document'
+  /** Where the profile came from; the block title follows it. */
+  source: 'website' | 'document'
   facts: { label: string; value: string }[]
   insights: string[]
   note: string | null
@@ -61,7 +63,7 @@ export function buildWebsiteInsightsView(llm: LlmResult | null | undefined, loca
 
   if (status === 'social_only') {
     return {
-      state: 'social_only', facts: [], insights: [],
+      state: 'social_only', source: 'website', facts: [], insights: [],
       note: id
         ? 'Alamat yang Anda berikan adalah halaman media sosial atau marketplace, yang tidak kami baca. Analisis ini hanya berdasarkan jawaban Anda.'
         : 'The address you gave is a social-media or marketplace page, which we do not read. This analysis is based on your answers only.',
@@ -69,9 +71,9 @@ export function buildWebsiteInsightsView(llm: LlmResult | null | undefined, loca
   }
 
   const p = llm.web_profile && typeof llm.web_profile === 'object' ? llm.web_profile : null
-  if (!p || (status !== 'ok' && status !== 'partial')) {
+  if (!p || (status !== 'ok' && status !== 'partial' && status !== 'document')) {
     return {
-      state: 'unavailable', facts: [], insights: [],
+      state: 'unavailable', source: 'website', facts: [], insights: [],
       note: id
         ? 'Kami tidak dapat membaca website Anda, jadi analisis ini hanya berdasarkan jawaban Anda. Skor Anda tidak terpengaruh.'
         : 'We could not read your website, so this analysis is based on your answers only. Your score is not affected.',
@@ -92,8 +94,18 @@ export function buildWebsiteInsightsView(llm: LlmResult | null | undefined, loca
   const insights = (Array.isArray(llm.website_insights) ? llm.website_insights : [])
     .filter((x: unknown): x is string => typeof x === 'string' && x.trim().length > 0).slice(0, 3)
 
+  if (status === 'document') {
+    return {
+      state: 'document', source: 'document', facts, insights,
+      note: id
+        ? 'Dibaca otomatis dari dokumen yang Anda lampirkan dan bisa tidak lengkap. Tidak mengubah skor Anda.'
+        : 'Read automatically from the document you attached and may be incomplete. It does not change your score.',
+    }
+  }
+
   return {
     state: status === 'ok' ? 'found' : 'partial',
+    source: 'website',
     facts, insights,
     note: id
       ? 'Dibaca otomatis dari halaman publik website Anda dan bisa tidak lengkap. Tidak mengubah skor Anda.'
