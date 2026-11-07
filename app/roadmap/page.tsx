@@ -708,7 +708,7 @@ function BtnPrimary({ onClick, disabled, loading, children, onGrain }: {
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{
         background: onGrain ? '#fff' : disabled ? T.green : `linear-gradient(to bottom, ${h ? 'var(--color-accent-hover-start)' : 'var(--color-accent-soft)'}, ${h ? 'var(--color-accent-hover-end)' : 'var(--color-accent)'})`,
-        color: onGrain ? '#06232b' : 'var(--color-on-accent)', border: 'none', borderRadius: 9,
+        color: onGrain ? '#1b1038' : 'var(--color-on-accent)', border: 'none', borderRadius: 9,
         padding: '9px 22px', fontSize: '0.8125rem', fontWeight: 600,
         fontFamily: 'inherit', cursor: disabled ? 'not-allowed' : 'pointer',
         display: 'flex', alignItems: 'center', gap: 8,
@@ -1239,7 +1239,7 @@ export default function RoadmapPage() {
         </div>
 
         {/* header */}
-        <GrainHeader world="teal" className="rounded-[18px] p-8 md:p-10">
+        <GrainHeader world="sunset" className="rounded-[18px] p-8 md:p-10">
         <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <h1 style={{ fontSize: '1.625rem', fontWeight: 300, color: '#fff', margin: '0 0 5px', letterSpacing: '-0.3px', lineHeight: 1.3 }}>
