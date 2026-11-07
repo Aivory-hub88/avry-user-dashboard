@@ -703,44 +703,67 @@ export default function ChatDiagnostic() {
       : ((L === 'id' ? ID_QUESTION_COPY[s.q!.id]?.placeholder : undefined) ?? s.q!.placeholder ?? c.typeHere)
     const send = () => commit(s, type === 'number' ? (draft === '' ? '' : Number(draft)) : draft)
 
+    const hasContent = String(draft).trim() !== ''
+    // AI-console style composer: borderless field on top, action row below
+    // (secondary actions left, round arrow send button right).
     return (
       <div className={styles.composer}>
         {isEdit && <div className={styles.editTag}>{c.editing}</div>}
-        <div className={styles.composerRow}>
-          {multiline ? (
-            <textarea
-              ref={el => { inputRef.current = el }}
-              className={styles.textarea}
-              rows={3}
-              placeholder={placeholder}
-              value={draft}
-              onChange={e => { setDraft(e.target.value); setError('') }}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
-              }}
-            />
-          ) : (
-            <input
-              ref={el => { inputRef.current = el }}
-              className={styles.input}
-              type={type === 'number' ? 'number' : 'text'}
-              inputMode={s.kind === 'website' ? 'url' : undefined}
-              min={s.kind === 'question' ? s.q!.validation?.min : undefined}
-              max={s.kind === 'question' ? s.q!.validation?.max : undefined}
-              placeholder={placeholder}
-              value={draft}
-              onChange={e => { setDraft(e.target.value); setError('') }}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); send() } }}
-            />
-          )}
-          <button type="button" className={styles.primary} onClick={send}>
-            {isEdit ? c.saveEdit : c.send}
+        {multiline ? (
+          <textarea
+            ref={el => { inputRef.current = el }}
+            className={styles.consoleField}
+            rows={1}
+            placeholder={placeholder}
+            value={draft}
+            onChange={e => { setDraft(e.target.value); setError('') }}
+            onInput={e => {
+              const el = e.currentTarget
+              el.style.height = 'auto'
+              el.style.height = `${Math.min(el.scrollHeight, 140)}px`
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
+            }}
+          />
+        ) : (
+          <input
+            ref={el => { inputRef.current = el }}
+            className={styles.consoleField}
+            type={type === 'number' ? 'number' : 'text'}
+            inputMode={s.kind === 'website' ? 'url' : undefined}
+            min={s.kind === 'question' ? s.q!.validation?.min : undefined}
+            max={s.kind === 'question' ? s.q!.validation?.max : undefined}
+            placeholder={placeholder}
+            value={draft}
+            onChange={e => { setDraft(e.target.value); setError('') }}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); send() } }}
+          />
+        )}
+        <div className={styles.consoleRow}>
+          <div className={styles.consoleLeft}>
+            {isEdit && (
+              <button type="button" className={styles.ghost} onClick={() => setEditKey(null)}>{c.cancel}</button>
+            )}
+            {optional && !isEdit && (
+              <button type="button" className={styles.ghost} onClick={() => commit(s, '', true)}>{c.skip}</button>
+            )}
+            {error && <span className={styles.err} role="alert">{error}</span>}
+            {!error && multiline && max && (
+              <span className={styles.counterInline}>{String(draft).length}/{max}</span>
+            )}
+          </div>
+          <button
+            type="button"
+            className={`${styles.sendBtn} ${hasContent ? styles.sendBtnOn : ''}`}
+            onClick={send}
+            aria-label={isEdit ? c.saveEdit : c.send}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 19V5M5 12l7-7 7 7" />
+            </svg>
           </button>
         </div>
-        {multiline && max && (
-          <div className={styles.counter}>{String(draft).length}/{max}</div>
-        )}
-        {footer}
       </div>
     )
   }
