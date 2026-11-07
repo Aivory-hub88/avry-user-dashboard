@@ -57,22 +57,20 @@
 .body { flex: 1; min-height: 0; display: flex; }
 .chat { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 20px 12px; scroll-behavior: smooth; }
-.thread { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.thread { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
 .botRow, .userRow { display: flex; animation: rise 0.28s ease both; }
 .userRow { justify-content: flex-end; }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 .bot {
-  max-width: 88%;
-  padding: 12px 16px;
-  background: var(--glass);
-  border: 1px solid var(--line);
-  border-radius: 4px 18px 18px 18px;
-  font-size: 0.95rem; line-height: 1.55;
-  backdrop-filter: blur(14px);
+  /* Aivory speaks bubble-less: plain text on the canvas. */
+  max-width: 92%;
+  padding: 2px 0;
+  background: none; border: none; border-radius: 0;
+  font-size: 0.97rem; line-height: 1.65; color: #ececee;
 }
-.botSoft { color: rgba(255, 255, 255, 0.62); font-size: 0.875rem; background: transparent; border-style: dashed; }
+.botSoft { color: rgba(255, 255, 255, 0.55); font-size: 0.875rem; }
 .helper { margin-top: 6px; font-size: 0.8rem; color: rgba(255, 255, 255, 0.5); }
 
 .user {
@@ -80,23 +78,23 @@
   max-width: 80%;
   padding: 10px 16px;
   text-align: left;
-  font: inherit; font-size: 0.92rem; line-height: 1.5; font-weight: 500; color: #0b0b10;
-  background: #f4f4f5;
-  border: 1px solid transparent;
+  font: inherit; font-size: 0.92rem; line-height: 1.5; color: #f1f1f2;
+  background: #2b2b2f;
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 18px 18px 4px 18px;
   cursor: pointer;
   white-space: pre-wrap; overflow-wrap: anywhere;
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
-.user:hover { background: #ffffff; }
-.userEditing { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35); }
+.user:hover { background: #343439; }
+.userEditing { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3); }
 .editHint {
-  display: block; margin-top: 2px; font-size: 0.68rem; color: rgba(11, 11, 16, 0.5);
+  display: block; margin-top: 2px; font-size: 0.68rem; color: rgba(255, 255, 255, 0.4);
   max-height: 0; opacity: 0; overflow: hidden; transition: all 0.15s ease;
 }
 .user:hover .editHint { max-height: 16px; opacity: 1; }
 
-.typing { display: inline-flex; gap: 5px; align-items: center; padding: 14px 16px; }
+.typing { display: inline-flex; gap: 5px; align-items: center; padding: 10px 0; }
 .typing i {
   width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.55);
   animation: bounce 1s infinite ease-in-out;
