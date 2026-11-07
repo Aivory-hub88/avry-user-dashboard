@@ -357,5 +357,5 @@
   border-color: rgba(255,255,255,0.4);
   color: #fff;
 }
-.generateRoadmapBtn { background: #fff; color: #0a1838; box-shadow: none; }
+.generateRoadmapBtn { background: #fff; color: #06232b; box-shadow: none; }
 .generateRoadmapBtn:hover:not(:disabled) { background: #fff; filter: brightness(0.95); }

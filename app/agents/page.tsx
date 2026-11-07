@@ -143,7 +143,7 @@ const AGENTS = [
 function HeroBanner() {
   const t = useTranslations('agents');
   return (
-    <GrainHeader world="indigo" className="rounded-2xl p-6 md:p-8 mb-8 shadow-lg">
+    <GrainHeader world="sunset" className="rounded-2xl p-6 md:p-8 mb-8 shadow-lg">
       <div className="relative z-10">
         <span className="inline-block text-[10px] font-semibold text-white/90 uppercase tracking-[0.12em] mb-3 px-2.5 py-[3px] rounded-full bg-white/[0.14] border border-white/[0.3] backdrop-blur-md">
           {t('heroBadge')}
