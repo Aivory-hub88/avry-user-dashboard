@@ -27,7 +27,7 @@ export default function HeaderBar({ company, submittedAt, onDownloadPdf, isExpor
         </h1>
         <span className="text-white/75 text-base font-light">{formatDate(submittedAt, locale)}</span>
         <DeltaChip delta={delta ?? null} locale={locale} />
-        <PoweredByAether className="mt-2" />
+        <PoweredByAether className="mt-4" />
       </div>
 
       <div className="relative z-10">
