@@ -137,9 +137,9 @@ export const TIER_CREDIT_ALLOWANCE: Readonly<Record<SubscriptionTier, number>> =
  * off-peak rates. Mirrors `TOKENS_PER_CREDIT_PEAK/OFFPEAK` in the backend's
  * `app/services/tiers.py`, which also returns them with the credit status.
  */
-export const TOKENS_PER_CREDIT = Object.freeze({ peak: 13000, offpeak: 26000 })
+export const TOKENS_PER_CREDIT = Object.freeze({ peak: 28000, offpeak: 43334 })
 
-/** "≈ 85M–169M AI tokens / month" for a monthly credit allowance (peak–off-peak). */
+/** "≈ 42M–65M AI tokens / month" (Operational, 1,500 credits) for a monthly credit allowance (peak–off-peak). */
 export function monthlyTokenRange(credits: number): string {
   const m = (n: number) => `${Math.round(n / 1e6)}M`
   return `≈ ${m(credits * TOKENS_PER_CREDIT.peak)}–${m(credits * TOKENS_PER_CREDIT.offpeak)} AI tokens / month`
