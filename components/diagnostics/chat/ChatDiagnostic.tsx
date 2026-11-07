@@ -16,10 +16,12 @@ import { DEEP_DIAGNOSTIC_PHASES, EN_OPTION_DISPLAY } from '@/constants/deepDiagn
 import { ID_PHASE_COPY, ID_QUESTION_COPY } from '@/constants/deepDiagnosticQuestionsId'
 import { DeepDiagnosticService } from '@/services/deepDiagnostic'
 import { normalizeWebsiteInput } from '@/lib/websiteUrl'
+import { asset } from '@/lib/asset'
+import { authedFetch } from '@/lib/deployAuth'
+import { DOCUMENT_ACCEPT, documentErrorMessage, precheckDocument, type DocumentError } from '@/lib/documentContext'
 import { dropMismatchedBandAnswers, getBudgetBands, getRevenueBands } from '@/lib/currencyBands'
 import { parseCurrencyCode } from '@/lib/resultFormatters'
 import { useLocaleContext } from '@/hooks/useLocale'
-import { asset } from '@/lib/asset'
 import styles from './ChatDiagnostic.module.css'
 
 const PHASE_ORDER: PhaseId[] = [
@@ -34,7 +36,7 @@ type PhaseMap = Record<PhaseId, PhaseData>
 
 interface Step {
   key: string
-  kind: 'company' | 'website' | 'question'
+  kind: 'company' | 'website' | 'document' | 'question'
   phase: PhaseId
   q?: DeepDiagnosticQuestion
 }
@@ -50,6 +52,7 @@ const emptyPhases = (): PhaseMap =>
 const STEPS: Step[] = [
   { key: '_company', kind: 'company', phase: PHASE_ORDER[0] },
   { key: '_website', kind: 'website', phase: PHASE_ORDER[0] },
+  { key: '_document', kind: 'document', phase: PHASE_ORDER[0] },
   ...DEEP_DIAGNOSTIC_PHASES.flatMap(p =>
     p.questions.map<Step>(q => ({ key: q.id, kind: 'question', phase: p.id as PhaseId, q }))
   ),
@@ -95,6 +98,10 @@ const COPY = {
     websiteBad: 'That address looks invalid. Skip it if you have none.',
     ackCompany: (n: string) => `Nice to meet ${n}.`,
     ackWebsite: "Got it. I'll read your public pages in the background.",
+    askDocument: 'Optional: you can also attach a company document (company profile or deck, PDF, DOCX, TXT or MD, up to 5 MB). It helps profiling, especially if your website cannot be read. Only the text is read, the file is not stored, and it does not change your score. Skip it if you prefer.',
+    docPick: 'Choose a file',
+    docBusy: 'Reading the document…',
+    ackDocument: 'Got it. I read the text of your document.',
     ackNoTarget: "No problem. We'll explore first, so I'll skip the target-metrics question.",
     phaseDone: (n: number, a: number, t: number) => `Phase ${n} done: ${a} of ${t} answered.`,
     doneSummary: (a: number, t: number) => `All four phases complete: ${a} of ${t} questions answered.`,
@@ -150,6 +157,10 @@ const COPY = {
     websiteBad: 'Alamat tidak valid. Lewati jika tidak ada.',
     ackCompany: (n: string) => `Senang berkenalan dengan ${n}.`,
     ackWebsite: 'Siap. Saya baca halaman publiknya di latar belakang.',
+    askDocument: 'Opsional: Anda juga bisa melampirkan dokumen perusahaan (company profile atau deck, PDF, DOCX, TXT atau MD, maks 5 MB). Ini membantu profiling, terutama bila website tidak bisa dibaca. Hanya teksnya yang dibaca, filenya tidak disimpan, dan tidak mengubah skor. Lewati saja bila tidak perlu.',
+    docPick: 'Pilih file',
+    docBusy: 'Membaca dokumen…',
+    ackDocument: 'Siap. Teks dokumen Anda sudah saya baca.',
     ackNoTarget: 'Tidak apa-apa. Kita eksplor dulu, jadi pertanyaan target metrik saya lewati.',
     phaseDone: (n: number, a: number, t: number) => `Fase ${n} selesai: ${a} dari ${t} terjawab.`,
     doneSummary: (a: number, t: number) => `Keempat fase selesai: ${a} dari ${t} pertanyaan terjawab.`,
@@ -226,6 +237,9 @@ export default function ChatDiagnostic() {
   const [phases, setPhases] = useState<PhaseMap>(emptyPhases)
   const [companyName, setCompanyName] = useState('')
   const [websiteUrl, setWebsiteUrl] = useState('')
+  const [documentText, setDocumentText] = useState('')
+  const [documentName, setDocumentName] = useState('')
+  const [docBusy, setDocBusy] = useState(false)
   const [cursor, setCursor] = useState(0)
   const [editKey, setEditKey] = useState<string | null>(null)
   const [typing, setTyping] = useState(false)
@@ -254,8 +268,9 @@ export default function ChatDiagnostic() {
   const getValue = useCallback((s: Step, ph: PhaseMap = phases) => {
     if (s.kind === 'company') return companyName
     if (s.kind === 'website') return websiteUrl
+    if (s.kind === 'document') return documentName
     return ph[s.phase].responses[s.q!.id]
-  }, [phases, companyName, websiteUrl])
+  }, [phases, companyName, websiteUrl, documentName])
 
   const current: Step | undefined = STEPS[cursor]
   const activeStep: Step | undefined = editKey ? STEPS.find(s => s.key === editKey) : current
@@ -271,11 +286,13 @@ export default function ChatDiagnostic() {
           lastUpdated: new Date().toISOString(),
           companyName,
           websiteUrl,
+          documentText,
+          documentName,
         })
       } catch { /* ignore */ }
     }, 500)
     return () => clearTimeout(t)
-  }, [phases, cursor, companyName, websiteUrl, current])
+  }, [phases, cursor, companyName, websiteUrl, documentText, documentName, current])
 
   // ── typing indicator whenever a new question arrives ──
   useEffect(() => {
@@ -362,7 +379,7 @@ export default function ChatDiagnostic() {
   }
 
   const stepPrompt = (s: Step) =>
-    s.kind === 'company' ? c.askCompany : s.kind === 'website' ? c.askWebsite : questionText(s.q!, L)
+    s.kind === 'company' ? c.askCompany : s.kind === 'website' ? c.askWebsite : s.kind === 'document' ? c.askDocument : questionText(s.q!, L)
 
   const stepHelper = (s: Step) =>
     s.kind === 'question'
@@ -372,6 +389,7 @@ export default function ChatDiagnostic() {
   const ack = (s: Step): string | null => {
     if (s.kind === 'company') return companyName.trim() ? c.ackCompany(companyName.trim()) : null
     if (s.kind === 'website') return websiteUrl.trim() ? c.ackWebsite : null
+    if (s.kind === 'document') return documentText ? c.ackDocument : null
     if (s.q!.id === 'quantified_goal' && String(getValue(s) ?? '').startsWith('No')) return c.ackNoTarget
     return null
   }
@@ -382,6 +400,7 @@ export default function ChatDiagnostic() {
     if (s.kind === 'website') {
       return String(value).trim() && !normalizeWebsiteInput(String(value)) ? c.websiteBad : ''
     }
+    if (s.kind === 'document') return ''
     const errs = DeepDiagnosticService.validatePhase(
       { id: s.phase, title: '', description: '', questions: [s.q!] },
       { [s.q!.id]: value }
@@ -404,6 +423,10 @@ export default function ChatDiagnostic() {
     let nextPhases = phases
     if (s.kind === 'company') setCompanyName(String(value).trim())
     else if (s.kind === 'website') setWebsiteUrl(String(value).trim())
+    else if (s.kind === 'document') {
+      // Skipping (or an empty value) clears any earlier attachment; a successful attach already set the text.
+      if (skip || !String(value).trim()) { setDocumentText(''); setDocumentName('') }
+    }
     else {
       const qid = s.q!.id
       nextPhases = {
@@ -443,6 +466,7 @@ export default function ChatDiagnostic() {
   const getValueFrom = (st: Step, ph: PhaseMap, changed: Step, changedValue: any) => {
     if (st.kind === 'company') return changed.kind === 'company' ? changedValue : companyName
     if (st.kind === 'website') return changed.kind === 'website' ? changedValue : websiteUrl
+    if (st.kind === 'document') return changed.kind === 'document' ? changedValue : documentName
     return ph[st.phase].responses[st.q!.id]
   }
 
@@ -486,10 +510,12 @@ export default function ChatDiagnostic() {
     setPhases(cleaned)
     setCompanyName(name)
     setWebsiteUrl(site)
+    setDocumentText(saved.documentText ?? '')
+    setDocumentName(saved.documentName ?? '')
     const firstMissing = STEPS.findIndex(st => {
       if (isSkipped(st, cleaned)) return false
       if (st.kind === 'company') return !name.trim()
-      if (st.kind === 'website') return false
+      if (st.kind === 'website' || st.kind === 'document') return false
       return st.q!.required && isEmpty(cleaned[st.phase].responses[st.q!.id])
     })
     setCursor(firstMissing === -1 ? STEPS.length : firstMissing)
@@ -503,6 +529,8 @@ export default function ChatDiagnostic() {
     setPhases(emptyPhases())
     setCompanyName('')
     setWebsiteUrl('')
+    setDocumentText('')
+    setDocumentName('')
     setCursor(0)
     setEditKey(null)
     setSaved(null)
@@ -519,6 +547,8 @@ export default function ChatDiagnostic() {
       lastUpdated: new Date().toISOString(),
       companyName,
       websiteUrl,
+      documentText,
+      documentName,
     })
     router.push('/diagnostics/deep/summary')
   }
@@ -528,7 +558,7 @@ export default function ChatDiagnostic() {
     if (!activeStep) return null
     const s = activeStep
     const isEdit = !!editKey
-    const optional = s.kind === 'website' || (s.kind === 'question' && !s.q!.required)
+    const optional = s.kind === 'website' || s.kind === 'document' || (s.kind === 'question' && !s.q!.required)
     const type = s.kind === 'question' ? s.q!.type : 'text'
 
     const footer = (
@@ -543,6 +573,60 @@ export default function ChatDiagnostic() {
         )}
       </div>
     )
+
+    // Optional document: a file picker and Skip. Any failure just says so; the user can skip.
+    if (s.kind === 'document') {
+      const pick = async (file: File) => {
+        setError('')
+        const pre = precheckDocument(file)
+        if (pre) { setError(documentErrorMessage(pre, L)); return }
+        setDocBusy(true)
+        try {
+          const body = new FormData()
+          body.append('file', file)
+          const res = await authedFetch(asset('/api/diagnostics/document-text'), { method: 'POST', body })
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok || typeof data.text !== 'string') {
+            const code = (['TOO_LARGE', 'UNSUPPORTED', 'NO_TEXT', 'UNREADABLE'] as const).includes(data.code) ? data.code : 'FAILED'
+            setError(documentErrorMessage(code as DocumentError, L))
+            return
+          }
+          setDocumentText(data.text)
+          setDocumentName(file.name)
+          commit(s, file.name)
+        } catch {
+          setError(documentErrorMessage('FAILED', L))
+        } finally {
+          setDocBusy(false)
+        }
+      }
+      return (
+        <div className={styles.composer}>
+          {isEdit && <div className={styles.editTag}>{c.editing}</div>}
+          <div className={styles.consoleRow}>
+            <div className={styles.consoleLeft}>
+              <label className={styles.ghost} style={{ cursor: docBusy ? 'default' : 'pointer' }}>
+                {docBusy ? c.docBusy : c.docPick}
+                <input
+                  type="file"
+                  accept={DOCUMENT_ACCEPT}
+                  disabled={docBusy}
+                  style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void pick(f) }}
+                />
+              </label>
+              {isEdit && (
+                <button type="button" className={styles.ghost} onClick={() => setEditKey(null)}>{c.cancel}</button>
+              )}
+              {!isEdit && (
+                <button type="button" className={styles.ghost} disabled={docBusy} onClick={() => commit(s, '', true)}>{c.skip}</button>
+              )}
+              {error && <span className={styles.err} role="alert">{error}</span>}
+            </div>
+          </div>
+        </div>
+      )
+    }
 
     // `select` questions keep the form's dropdown; picking a value sends it.
     if (type === 'select') {
@@ -793,10 +877,11 @@ export default function ChatDiagnostic() {
         <button type="button" className={styles.sheetClose} onClick={() => setSheetOpen(false)}>{c.close}</button>
       </div>
       <div className={styles.facts}>
-        {(companyName || websiteUrl) && (
+        {(companyName || websiteUrl || documentName) && (
           <div className={styles.company}>
             <div className={styles.companyName}>{companyName || '-'}</div>
             {websiteUrl && <div className={styles.companySite}>{websiteUrl}</div>}
+            {documentName && <div className={styles.companySite}>{documentName}</div>}
           </div>
         )}
         {facts.length === 0 && !companyName && <p className={styles.muted}>{c.nothing}</p>}
