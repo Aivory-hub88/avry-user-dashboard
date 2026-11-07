@@ -81,6 +81,8 @@ const COPY = {
     done: "That's everything. I have what I need to build your report.",
     finish: 'Review & finish',
     edit: 'Tap to edit',
+    pickDropdown: 'Choose from the list',
+    selectPh: 'Select an option…',
     pickOne: 'Pick one · press 1–9',
     pickMany: 'Pick all that apply · press 1–9',
     editing: 'Editing this answer',
@@ -132,6 +134,8 @@ const COPY = {
     done: 'Itu semuanya. Saya sudah punya cukup data untuk menyusun laporan Anda.',
     finish: 'Tinjau & selesai',
     edit: 'Ketuk untuk ubah',
+    pickDropdown: 'Pilih dari daftar',
+    selectPh: 'Pilih salah satu…',
     pickOne: 'Pilih satu · tekan 1–9',
     pickMany: 'Pilih semua yang sesuai · tekan 1–9',
     editing: 'Mengubah jawaban ini',
@@ -298,7 +302,7 @@ export default function ChatDiagnostic() {
 
   // ── keyboard: 1–9 picks the numbered option card ──
   const choiceType = activeStep?.kind === 'question' ? activeStep.q!.type : null
-  const isChoice = choiceType === 'radio' || choiceType === 'select' || choiceType === 'multiselect'
+  const isChoice = choiceType === 'radio' || choiceType === 'multiselect'
   useEffect(() => {
     if (!isChoice || !activeStep || typing) return
     const onKey = (e: KeyboardEvent) => {
@@ -513,7 +517,36 @@ export default function ChatDiagnostic() {
       </div>
     )
 
-    if (type === 'radio' || type === 'select' || type === 'multiselect') {
+    // `select` questions keep the form's dropdown; picking a value sends it.
+    if (type === 'select') {
+      const opts = getOptions(s.q!, phases[s.phase].responses, L)
+      const qNum = STEPS.filter((x, i) => x.phase === s.phase && !isSkipped(x, phases) && i <= STEPS.indexOf(s)).length
+      const qTotal = STEPS.filter(x => x.phase === s.phase && !isSkipped(x, phases)).length
+      return (
+        <div className={styles.composer}>
+          <div className={styles.cardHead}>
+            <span className={styles.chip}>
+              {c.phase} {PHASE_ORDER.indexOf(s.phase) + 1} · {qNum}/{qTotal}
+            </span>
+            <span className={styles.hint}>{c.pickDropdown}</span>
+            {isEdit && <span className={styles.editTag}>{c.editing}</span>}
+          </div>
+          <select
+            ref={el => { inputRef.current = el as any }}
+            className={styles.select}
+            value={typeof draft === 'string' ? draft : ''}
+            onChange={e => { if (e.target.value) commit(s, e.target.value) }}
+            aria-label={questionText(s.q!, L)}
+          >
+            <option value="">{c.selectPh}</option>
+            {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          {footer}
+        </div>
+      )
+    }
+
+    if (type === 'radio' || type === 'multiselect') {
       const opts = getOptions(s.q!, phases[s.phase].responses, L)
       const multi = type === 'multiselect'
       const searchable = opts.length > 9
