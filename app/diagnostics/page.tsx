@@ -90,7 +90,7 @@ export default function DiagnosticsPage() {
               <h2 className="text-white" style={{ fontSize: 30, fontWeight: 300, lineHeight: 1.2, letterSpacing: '-0.4px', margin: '0 0 12px' }}>
                 {t('deepDiagnostic')}
               </h2>
-              <p style={{ fontSize: 14, fontWeight: 300, color: 'rgba(255,255,255,0.85)', lineHeight: 1.65, margin: 0 }}>
+              <p style={{ fontSize: 15, fontWeight: 600, color: 'rgba(255,255,255,0.95)', lineHeight: 1.6, margin: 0 }}>
                 Covers business objectives, data maturity, risk constraints, and AI opportunity mapping, then turns your answers into a full business operations report with ROI projections.
               </p>
               <div className="flex flex-wrap gap-2 mt-5">
