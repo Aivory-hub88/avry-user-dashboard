@@ -200,7 +200,7 @@
   font-size: 0.75rem; font-weight: 700; color: rgba(255, 255, 255, 0.6);
   background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line);
 }
-.numBox { border-radius: 6px; color: #0b0b10; border-color: rgba(255, 255, 255, 0.35); background: transparent; }
+/* multi-select shares the numbered badge; selected fills and shows a tick */
 .optionOn .num { background: var(--accent); border-color: var(--accent); color: #0b0b10; }
 .optText { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .optTitle { font-weight: 600; }
@@ -213,7 +213,6 @@
   padding: 9px 18px; border-radius: 10px;
 }
 .primary:hover { filter: brightness(1.08); }
-.composer > .composerRow:has(> .primary:only-child) { margin-top: 10px; justify-content: flex-end; }
 .ghost {
   border: 1px solid var(--line); background: transparent; color: rgba(255, 255, 255, 0.75); cursor: pointer;
   font: inherit; font-size: 0.8rem; padding: 7px 14px; border-radius: 10px;

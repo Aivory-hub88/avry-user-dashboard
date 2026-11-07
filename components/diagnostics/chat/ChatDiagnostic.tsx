@@ -81,6 +81,7 @@ const COPY = {
     done: "That's everything. I have what I need to build your report.",
     finish: 'Review & finish',
     edit: 'Tap to edit',
+    selectedCount: (n: number) => `${n} selected`,
     pickDropdown: 'Choose from the list',
     selectPh: 'Select an option…',
     pickOne: 'Pick one · press 1–9',
@@ -135,6 +136,7 @@ const COPY = {
     done: 'Itu semuanya. Saya sudah punya cukup data untuk menyusun laporan Anda.',
     finish: 'Tinjau & selesai',
     edit: 'Ketuk untuk ubah',
+    selectedCount: (n: number) => `${n} dipilih`,
     pickDropdown: 'Pilih dari daftar',
     selectPh: 'Pilih salah satu…',
     pickOne: 'Pilih satu · tekan 1–9',
@@ -650,7 +652,10 @@ export default function ChatDiagnostic() {
                   className={`${styles.option} ${on ? styles.optionOn : ''}`}
                   onClick={() => {
                     if (multi) {
-                      setDraft(on ? sel.filter(v => v !== o.value) : [...sel, o.value])
+                      setDraft((d: any) => {
+                        const cur: string[] = Array.isArray(d) ? d : []
+                        return cur.includes(o.value) ? cur.filter(v => v !== o.value) : [...cur, o.value]
+                      })
                       setError('')
                     } else {
                       commit(s, o.value)
@@ -658,7 +663,7 @@ export default function ChatDiagnostic() {
                   }}
                 >
                   <span className={`${styles.num} ${multi ? styles.numBox : ''}`}>
-                    {multi ? (on ? '✓' : '') : (num <= 9 ? num : '')}
+                    {multi && on ? '✓' : (num <= 9 ? num : '')}
                   </span>
                   <span className={styles.optText}>
                     <span className={styles.optTitle}>{title}</span>
@@ -668,14 +673,24 @@ export default function ChatDiagnostic() {
               )
             })}
           </div>
-          {multi && (
-            <div className={styles.composerRow}>
+          {multi ? (
+            <div className={styles.composerFoot}>
+              {error && <span className={styles.err} role="alert">{error}</span>}
+              {!error && sel.length > 0 && (
+                <span className={styles.hint}>{c.selectedCount(sel.length)}</span>
+              )}
+              <span className={styles.spacer} />
+              {isEdit && (
+                <button type="button" className={styles.ghost} onClick={() => setEditKey(null)}>{c.cancel}</button>
+              )}
+              {optional && !isEdit && (
+                <button type="button" className={styles.ghost} onClick={() => commit(s, [], true)}>{c.skip}</button>
+              )}
               <button type="button" className={styles.primary} onClick={() => commit(s, sel)}>
                 {isEdit ? c.saveEdit : c.next}
               </button>
             </div>
-          )}
-          {footer}
+          ) : footer}
         </div>
       )
     }
