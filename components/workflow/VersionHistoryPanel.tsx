@@ -84,7 +84,7 @@ export function VersionHistoryPanel({ open, workflowId, onClose, onRestored }: V
         {loading && <p className={styles.hint}>Loading…</p>}
         {error && <p className={styles.error}>{error}</p>}
         {!loading && !error && versions.length === 0 && (
-          <p className={styles.hint}>No versions yet — one is captured automatically each time the Copilot applies changes, or you edit a step, title, or status.</p>
+          <p className={styles.hint}>No versions yet — one is captured automatically each time Aether applies changes, or you edit a step, title, or status.</p>
         )}
 
         <div className={styles.list}>

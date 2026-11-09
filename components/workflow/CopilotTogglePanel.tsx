@@ -37,16 +37,11 @@ function getFileIcon(name: string) {
   return FILE_ICONS.default
 }
 
-function AivoryLogo() {
+/* The workflow assistant is branded Aivory Aether, like the Deep Diagnostic. */
+function AetherLogo({ className = 'h-[15px] w-auto' }: { className?: string }) {
   return (
-    <Image
-      src={asset("/Aivory_logo_2026.svg?v=20261104")}
-      alt="Aivory"
-      width={96}
-      height={24}
-      className="h-6 object-contain"
-      aria-label="Aivory"
-    />
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={asset('/Aivory_Aether_white.svg')} alt="Aivory Aether" className={className} />
   )
 }
 
@@ -119,10 +114,9 @@ function CopilotBarCollapsed({ onClick }: { onClick: () => void }) {
     <button
       className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-3 border border-white/10 text-[#f7f7f7] text-[13px] font-medium cursor-pointer shadow-lg hover:border-zinc-600 hover:shadow-xl transition-all duration-150 select-none"
       onClick={onClick}
-      aria-label="Open Aivory Copilot"
+      aria-label="Open Aivory Aether"
     >
-      <Image src={asset("/Aivory_logo_2026.svg?v=20261104")} alt="" width={64} height={16} className="h-4 object-contain" aria-hidden="true" />
-      <span>Aivory Copilot</span>
+      <AetherLogo className="h-[13px] w-auto" />
       <span className="text-[11px] text-[#a1a1aa] ml-1">/ or &#8984;K</span>
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#a1a1aa] ml-0.5">
         <polyline points="6 9 12 15 18 9"/>
@@ -260,12 +254,12 @@ function CopilotPanelExpanded({
       className="w-[520px] max-w-[90vw] rounded-2xl overflow-hidden flex flex-col border border-white/[0.08] shadow-2xl"
       style={{ background: '#3a3a38', maxHeight: 'calc(100vh - 160px)' }}
       role="dialog"
-      aria-label="Aivory Copilot"
+      aria-label="Aivory Aether"
     >
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.08] shrink-0">
         <div className="flex items-center gap-3">
-          <AivoryLogo />
+          <AetherLogo />
           {/* Active stage badge */}
           {stageLabel[stage] && (
             <span className="text-[10px] text-[#a1a1aa] font-light animate-pulse">
@@ -297,7 +291,7 @@ function CopilotPanelExpanded({
             className="text-white/40 hover:text-white/80 p-1 rounded-md transition-colors"
             onClick={onClose}
             title="Collapse"
-            aria-label="Collapse copilot"
+            aria-label="Collapse Aether"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="18 15 12 9 6 15"/>

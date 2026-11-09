@@ -30,7 +30,7 @@ export const ApplyTargetDialog: React.FC<ApplyTargetDialogProps> = ({
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
-          <h2 className={styles.title}>Apply Copilot suggestion</h2>
+          <h2 className={styles.title}>Apply Aether suggestion</h2>
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
             ✕
           </button>
