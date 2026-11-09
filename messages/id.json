@@ -803,6 +803,14 @@
       "Forecast penjualan",
       "Penanda anomali"
     ],
+    "operationsTitle": "Operations & Inventory Agent",
+    "operationsDesc": "Pengecekan stok harian, saran reorder lengkap dengan hitungannya, dan draf purchase order. Tidak ada yang dikonfirmasi atau dikirim tanpa persetujuan Anda.",
+    "operationsTools": [
+      "Daftar stok menipis",
+      "Saran reorder",
+      "Draf purchase order",
+      "Pengiriman terlambat"
+    ],
     "chiefOfStaffTitle": "Chief of Staff Agent",
     "chiefOfStaffDesc": "Mengatur tim AI, meneruskan pekerjaan ke spesialis yang tepat, dan memberi satu hasil terpadu dengan approval tetap terjaga.",
     "chiefOfStaffTools": [
