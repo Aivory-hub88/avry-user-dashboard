@@ -63,6 +63,12 @@ COPY --from=builder /app/public ./public
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
+# Runtime data dir (workflows.json, canvas_states.json). Created here, owned by
+# the app user, so a named volume mounted at /app/.data inherits writable
+# ownership. Without a volume every redeploy wipes it — which is how deleted
+# workflows came back after each deploy.
+RUN mkdir -p .data && chown nextjs:nodejs .data
+
 # Automatically leverage output traces to reduce image size
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
