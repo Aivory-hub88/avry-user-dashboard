@@ -6,7 +6,7 @@ import { useEffect, useState, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import {
-  loadWorkflows, updateWorkflow, deleteWorkflow, saveWorkflow, SavedWorkflow,
+  loadWorkflows, updateWorkflow, deleteWorkflow, saveWorkflow, SavedWorkflow, isLocalCopyOf,
   useWorkflowList, createWorkflow, patchWorkflow, removeWorkflow,
   deactivateWorkflow,
 } from '@/hooks/useWorkflows'
@@ -957,17 +957,36 @@ function WorkflowsPageInner() {
   }
 
   const handleDelete = async (id: string) => {
+    // A workflow can live in BOTH stores (server list + this browser's
+    // localStorage copy, e.g. from the offline fallback or the Blueprint
+    // page). Deleting from only the one it was found in left the other copy
+    // behind, and the list merge then showed it again as soon as the first
+    // was gone — the "deleted workflow respawns" bug. Always remove from both.
+    let serverFailed = false
     if (apiWorkflows.find(aw => aw.id === id)) {
       try {
         await removeWorkflow(id)
-        await refreshWorkflows()
-      } catch (err) { console.error('[handleDelete]', err) }
-    } else {
-      deleteWorkflow(id)
-      setLocalWorkflows(loadWorkflows())
+      } catch (err) {
+        serverFailed = true
+        console.error('[handleDelete]', err)
+      }
     }
+    if (serverFailed) {
+      // Keep the local copy too: the workflow is still on the server, and
+      // hiding it here would just make it reappear on the next refresh.
+      showToast('Could not delete this workflow. Please try again.', 'error')
+      setShowMore(false)
+      return
+    }
+    // Remove every local copy of THIS workflow: the exact id and the "-vN"
+    // duplicates saveWorkflow() creates when the id was already taken.
+    // (Named saved versions are separate, deliberate snapshots — kept.)
+    const isCopyOf = (wid: string) => isLocalCopyOf(id, wid)
+    loadWorkflows().filter(w => isCopyOf(w.workflow_id)).forEach(w => deleteWorkflow(w.workflow_id))
+    setLocalWorkflows(loadWorkflows())
+    await refreshWorkflows()
     clearCanvasState(id)
-    const remaining = [...apiWorkflows.map(specToSaved), ...localWorkflows].filter(w => w.workflow_id !== id)
+    const remaining = [...apiWorkflows.map(specToSaved), ...localWorkflows].filter(w => !isCopyOf(w.workflow_id))
     if (selectedId === id) setSelectedId(remaining[0]?.workflow_id ?? null)
     setShowMore(false)
   }

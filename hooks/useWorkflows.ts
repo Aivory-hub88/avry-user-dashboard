@@ -133,6 +133,15 @@ export function updateWorkflow(workflow_id: string, updates: Partial<SavedWorkfl
   }
 }
 
+/**
+ * Is `candidate` a local copy of workflow `id`? True for the id itself and
+ * for the "-vN" duplicates saveWorkflow() creates when the id is taken. Named
+ * saved versions ("<id>-before-launch") are separate snapshots and don't match.
+ */
+export function isLocalCopyOf(id: string, candidate: string): boolean {
+  return candidate === id || (candidate.startsWith(`${id}-v`) && /^\d+$/.test(candidate.slice(id.length + 2)))
+}
+
 export function deleteWorkflow(workflow_id: string): void {
   const existing = loadWorkflows().filter(w => w.workflow_id !== workflow_id)
   localStorage.setItem(STORAGE_KEY, JSON.stringify(existing))
