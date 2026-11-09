@@ -20,6 +20,7 @@ export type NodeIntent =
   | 'hubspot'
   | 'zendesk'
   | 'asana'
+  | 'googleDrive'
   | 'http'
   | 'database'
   | 'ftp'
@@ -82,6 +83,7 @@ const INTENT_PATTERNS: Record<NodeIntent, RegExp> = {
   hubspot: /hubspot/i,
   zendesk: /zendesk/i,
   asana: /asana/i,
+  googleDrive: /google\s*drive|\bgdrive\b|\bg-drive\b/i,
   messaging: /slack|discord|telegram|whatsapp|\bsms\b|\bteams\b|pesan\b/i,
   // Recurring/cron trigger only — plain "jadwal"/"schedule" without a
   // calendar-event keyword above.
@@ -90,7 +92,9 @@ const INTENT_PATTERNS: Record<NodeIntent, RegExp> = {
   http: /\bhttp\b|\bapi\b|request\b|fetch\b|call.*endpoint|webhook.*call|post.*to|get.*from|ambil data|mengambil data|dapatkan data|dari sistem|dari crm|\bcrm\b/i,
   transform: /transform|convert|format\b|parse\b|extract\b|set.*value|ubah\b|konversi|format ulang/i,
   database: /mysql|postgres|postgresql|sql\b|database|db\b|query|insert|select.*from|basis data/i,
-  ftp: /ftp|sftp|file.*transfer|upload.*file|download.*file|file.*server/i,
+  // Only explicit FTP wording: bare "download files" used to land here and
+  // produced a credential-less FTP node in Drive/HTTP workflows.
+  ftp: /\bs?ftp\b|file.*transfer|file.*server/i,
   compress: /compress|zip\b|tar\b|gzip|rar\b|archive|unzip|extract.*file|decompress/i,
   ssh: /\bssh\b|\bscp\b|\bexec\b|remote.*command|run.*command|shell\b|execute.*server/i,
   cleanup: /delete\b|remove\b|cleanup|clean.*up|purge\b|clear\b|truncate|drop\b|erase\b|hapus\b/i,
@@ -115,6 +119,7 @@ export function detectNodeIntent(action: string, tool?: string): NodeIntent {
   if (INTENT_PATTERNS.hubspot.test(text)) return 'hubspot'
   if (INTENT_PATTERNS.zendesk.test(text)) return 'zendesk'
   if (INTENT_PATTERNS.asana.test(text)) return 'asana'
+  if (INTENT_PATTERNS.googleDrive.test(text)) return 'googleDrive'
   if (INTENT_PATTERNS.messaging.test(text)) return 'messaging'
   if (INTENT_PATTERNS.respond.test(text)) return 'respond'
   // switch/code checked before filter — filter's "branch" wording would
@@ -143,6 +148,45 @@ export function detectNodeIntent(action: string, tool?: string): NodeIntent {
   // spinning up an AI Agent node — 'ai' is only ever returned above, from an
   // explicit reasoning-signal match.
   return 'http'
+}
+
+/**
+ * Workflow-level context for intent detection. Step text is written per step,
+ * so "Download files to temporary storage" in a Google Drive backup flow never
+ * names Drive itself — without this it fell through to an FTP node (regex
+ * `download.*file`) or the generic HTTP fallback.
+ */
+export interface IntentContext {
+  /** Some step (or the workflow title/trigger) names Google Drive. */
+  googleDrive?: boolean
+}
+
+const FILE_OP_TEXT = /\bfiles?\b|\bfolder\b|backup|upload|download|unggah|unduh|berkas/i
+
+/** Re-target file-shaped steps at the service the workflow is built around. */
+export function refineIntentForContext(
+  intent: NodeIntent,
+  action: string,
+  tool: string | undefined,
+  ctx: IntentContext
+): NodeIntent {
+  if (!ctx.googleDrive) return intent
+  const text = `${action} ${tool || ''}`
+  // Cleanup of temporary storage stays a cleanup (no-op): n8n keeps binaries
+  // in the execution, so there is nothing on Drive to delete.
+  if (intent === 'cleanup' && /temp|temporary|sementara/i.test(text)) return intent
+  if ((intent === 'ftp' || intent === 'http' || intent === 'cleanup') && FILE_OP_TEXT.test(text)) {
+    return 'googleDrive'
+  }
+  return intent
+}
+
+/** Pick the Google Drive node operation from step text. */
+export function googleDriveOperation(text: string): 'list' | 'download' | 'upload' | 'delete' {
+  if (/download|unduh|fetch.*file|get.*file/i.test(text)) return 'download'
+  if (/upload|unggah|backup|copy|save|simpan|store/i.test(text)) return 'upload'
+  if (/delete|remove|hapus|clean/i.test(text)) return 'delete'
+  return 'list'
 }
 
 interface WorkflowStep {
@@ -588,13 +632,16 @@ export function mapIntentToN8nNode(
         },
       }
 
+    // Native Compression node — Execute Command is disabled by default on
+    // n8n 2.x (prod runs n8nio/n8n:latest), so a shell `zip` rendered as an
+    // unknown "?" node.
     case 'compress':
       return {
         ...baseNode,
-        type: 'n8n-nodes-base.executeCommand',
-        typeVersion: 1,
+        type: 'n8n-nodes-base.compression',
+        typeVersion: 1.1,
         parameters: {
-          command: step.inputs?.command || 'zip -r archive.zip ./files',
+          operation: /unzip|decompress|extract/i.test(step.action) ? 'decompress' : 'compress',
         },
       }
 
@@ -609,15 +656,78 @@ export function mapIntentToN8nNode(
         },
       }
 
+    // Cleanup used to be Execute Command `rm -rf /tmp/workflow_*`: disabled on
+    // n8n 2.x (unknown "?" node) and pointless anyway, since n8n keeps binary
+    // data inside the execution. A No-Op keeps the step visible and valid.
     case 'cleanup':
       return {
         ...baseNode,
-        type: 'n8n-nodes-base.executeCommand',
+        type: 'n8n-nodes-base.noOp',
         typeVersion: 1,
+        parameters: {},
+        notes: notes || `${step.action} — n8n discards temporary binary data when the execution ends; no action needed.`,
+      }
+
+    case 'googleDrive': {
+      const op = googleDriveOperation(`${step.action} ${step.tool || ''}`)
+      const credentials = { googleDriveOAuth2Api: { id: '', name: 'Google Drive account' } }
+      if (op === 'list') {
+        return {
+          ...baseNode,
+          type: 'n8n-nodes-base.googleDrive',
+          typeVersion: 3,
+          credentials,
+          parameters: {
+            resource: 'fileFolder',
+            searchMethod: 'name',
+            queryString: step.inputs?.query || '',
+            filter: {
+              folderId: { __rl: true, mode: 'list', value: step.inputs?.folderId || 'root', cachedResultName: '/ (Root folder)' },
+            },
+            returnAll: true,
+            options: {},
+          },
+        }
+      }
+      if (op === 'download') {
+        return {
+          ...baseNode,
+          type: 'n8n-nodes-base.googleDrive',
+          typeVersion: 3,
+          credentials,
+          parameters: {
+            operation: 'download',
+            fileId: { __rl: true, mode: 'id', value: '={{ $json.id }}' },
+            options: {},
+          },
+        }
+      }
+      if (op === 'delete') {
+        return {
+          ...baseNode,
+          type: 'n8n-nodes-base.googleDrive',
+          typeVersion: 3,
+          credentials,
+          parameters: {
+            operation: 'deleteFile',
+            fileId: { __rl: true, mode: 'id', value: '={{ $json.id }}' },
+            options: {},
+          },
+        }
+      }
+      return {
+        ...baseNode,
+        type: 'n8n-nodes-base.googleDrive',
+        typeVersion: 3,
+        credentials,
         parameters: {
-          command: step.inputs?.command || 'rm -rf /tmp/workflow_*',
+          name: '={{ $binary.data.fileName }}',
+          driveId: { __rl: true, mode: 'list', value: 'My Drive' },
+          folderId: { __rl: true, mode: 'id', value: step.inputs?.folderId || '' },
+          options: {},
         },
       }
+    }
 
     case 'ai':
     default: {

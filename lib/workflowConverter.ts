@@ -9,7 +9,7 @@
  * Trigger node always uses Webhook with auto-generated path.
  */
 
-import { detectNodeIntent, mapIntentToN8nNode, mapIntentToN8nNodes, buildNodeName } from '@/lib/workflows/nodeMapper'
+import { detectNodeIntent, mapIntentToN8nNode, mapIntentToN8nNodes, buildNodeName, refineIntentForContext, type IntentContext } from '@/lib/workflows/nodeMapper'
 import type { NodeIntent, MapContext } from '@/lib/workflows/nodeMapper'
 
 // Intents whose n8n node can return multiple items — when immediately
@@ -231,6 +231,11 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
   }
 
   // 2. Step nodes — classified via nodeMapper engine
+  const flatten = (steps: WorkflowStep[]): WorkflowStep[] =>
+    steps.flatMap((s) => [s, ...flatten((s.branches || []).flatMap((b) => b.steps))])
+  const contextText = [workflow.title, workflow.trigger, workflow.trigger_description,
+    ...flatten(workflow.steps || []).map((s) => `${s.action} ${s.tool || ''}`)].join(' ')
+  const intentCtx: IntentContext = { googleDrive: /google\s*drive|\bgdrive\b|\bg-drive\b/i.test(contextText) }
   let aiNodeCount = 0
   let globalStepCounter = 0
 
@@ -303,7 +308,7 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
         primary = mapIntentToN8nNode('filter', step, ctx)
         console.log(`[workflowConverter] Step ${ctx.stepIndex}: condition with ${step.branches!.length} branch(es)`)
       } else {
-        intent = step.forceIntent ?? detectNodeIntent(step.action, step.tool)
+        intent = step.forceIntent ?? refineIntentForContext(detectNodeIntent(step.action, step.tool), step.action, step.tool, intentCtx)
         console.log(`[workflowConverter] Step ${globalStepCounter}: action="${step.action}" tool="${step.tool}" → intent="${intent}"${step.forceIntent ? ' (forced)' : ''} isLast=${isLast}`)
         // Only override last step to respondToWebhook for webhook-triggered workflows.
         // Scheduled workflows have no webhook to respond to — keep the detected intent.
