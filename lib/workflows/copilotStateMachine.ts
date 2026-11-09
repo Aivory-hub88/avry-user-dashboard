@@ -542,9 +542,10 @@ export class CopilotStateMachine {
     canvas?: CanvasEditContext | null,
   ): Promise<CopilotConversationState> {
     this.discardIfStale()
+    const idleMs = Date.now() - new Date(this.state.updatedAt).getTime()
     this.addMessage('user', userMessage)
 
-    if (canvas && this.shouldEditCanvas(userMessage, canvas)) {
+    if (canvas && this.shouldEditCanvas(userMessage, canvas, idleMs)) {
       return this.enterCanvasEdit(userMessage, canvas)
     }
 
@@ -611,7 +612,7 @@ export class CopilotStateMachine {
    * the user switched to a different workflow mid-conversation. An explicit
    * "new workflow" request and small talk keep the normal path.
    */
-  private shouldEditCanvas(userMessage: string, canvas: CanvasEditContext): boolean {
+  private shouldEditCanvas(userMessage: string, canvas: CanvasEditContext, idleMs = 0): boolean {
     if (!canvas.workflowId || !Array.isArray(canvas.workflow?.steps)) return false
     if (countSteps(canvas.workflow.steps) < 1) return false
     if (isNewWorkflowRequest(userMessage)) return false
@@ -619,7 +620,15 @@ export class CopilotStateMachine {
     const atRest = this.state.stage === 'IDLE' || this.state.stage === 'COMPLETED' || this.state.stage === 'ERROR'
     const switched = !!this.state.canvasTarget && this.state.canvasTarget.workflowId !== canvas.workflowId
     const busy = this.state.stage === 'SANDBOX_TESTING' || this.state.stage === 'FIXING' || this.state.stage === 'GENERATING'
-    return atRest || (switched && !busy)
+    // A not-yet-applied proposal that isn't about this canvas (e.g. left over
+    // from an earlier chat) only keeps the conversation while it is fresh,
+    // and never when the user explicitly points at the open workflow.
+    const unrelatedProposal = !this.state.canvasTarget && !!this.state.generatedWorkflow && !busy
+    const mentionsCanvas =
+      /\b(this|current|open)\s+(workflow|canvas|flow)\b|\b(workflow|canvas|alur)\s+(ini|yang (dibuka|terbuka|sekarang))\b|\bdi canvas\b/i.test(userMessage) ||
+      (!!canvas.title && canvas.title.length > 3 && userMessage.toLowerCase().includes(canvas.title.toLowerCase()))
+    const STALE_PROPOSAL_MS = 30 * 60 * 1000
+    return atRest || (switched && !busy) || (unrelatedProposal && (mentionsCanvas || idleMs > STALE_PROPOSAL_MS))
   }
 
   private async enterCanvasEdit(

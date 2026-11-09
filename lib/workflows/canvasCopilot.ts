@@ -177,6 +177,29 @@ function isSubEdge(e: Edge): boolean {
  * parameters, credentials, inspector config, error handling — and their AI
  * sub-nodes; the freshly generated sub-nodes for that node are dropped.
  */
+/**
+ * The edit engine keeps each step's `id` (= the original canvas node id from
+ * canvasToGeneratedWorkflow) but freely rewrites titles of steps it didn't
+ * touch ("Send" -> "Send Slack Message"). Map every edited step title back to
+ * the original node id it came from, so the merge matches on identity first.
+ */
+export function stepIdAliases(
+  editedSteps: GeneratedWorkflowStep[],
+  originalNodes: RFNode[],
+): Map<string, string> {
+  const ids = new Set(originalNodes.map((n) => n.id))
+  const out = new Map<string, string>()
+  const visit = (steps: GeneratedWorkflowStep[]) => {
+    for (const s of steps) {
+      const key = normalizeStepTitle(s.title)
+      if (s.id && ids.has(s.id) && key && !out.has(key)) out.set(key, s.id)
+      for (const b of s.branches || []) visit(b.steps)
+    }
+  }
+  visit(editedSteps)
+  return out
+}
+
 function isTriggerNode(n: RFNode): boolean {
   const type = n.data?.rawN8n?.type
   return typeof type === 'string' ? isTriggerType(type) : n.data?.category === 'trigger'
@@ -189,6 +212,8 @@ export function mergeEditedNodes(
     /** The edit left the trigger step alone — keep the original trigger node
      *  even though the converter rebuilt it under a generic title. */
     keepTrigger?: boolean
+    /** normalized edited title -> original node id (see stepIdAliases). */
+    idAliases?: Map<string, string>
   } = {},
 ): { nodes: RFNode[]; edges: Edge[]; kept: number; added: number; removed: number } {
   const origSubIds = new Set(original.edges.filter(isSubEdge).map((e) => e.source))
@@ -206,7 +231,9 @@ export function mergeEditedNodes(
   for (const n of next.nodes) {
     if (nextSubIds.has(n.id)) continue
     const key = normalizeStepTitle(n.data?.title || n.data?.label || '')
-    const orig = key ? origByTitle.get(key) : undefined
+    const aliasId = key ? options.idAliases?.get(key) : undefined
+    const byId = aliasId ? original.nodes.find((o) => o.id === aliasId && !origSubIds.has(o.id)) : undefined
+    const orig = byId ?? (key ? origByTitle.get(key) : undefined)
     if (orig && !usedOrig.has(orig.id)) {
       matched.set(n.id, orig)
       usedOrig.add(orig.id)
