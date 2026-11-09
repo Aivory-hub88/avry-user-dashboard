@@ -295,3 +295,66 @@ export function mergeEditedNodes(
     removed: mainOrig - matched.size,
   }
 }
+
+// ── Change preview ────────────────────────────────────────────────────────
+
+export type StepChangeKind = 'added' | 'removed' | 'kept' | 'renamed'
+
+export interface StepChange {
+  kind: StepChangeKind
+  title: string
+  /** Previous title — only for 'renamed'. */
+  from?: string
+  /** Nesting depth (branch steps are indented in the preview). */
+  depth: number
+}
+
+export interface ChangePreview {
+  changes: StepChange[]
+  added: number
+  removed: number
+  kept: number
+  renamed: number
+}
+
+function flattenSteps(steps: GeneratedWorkflowStep[], depth = 0): { step: GeneratedWorkflowStep; depth: number }[] {
+  return steps.flatMap((s) => [
+    { step: s, depth },
+    ...flattenSteps((s.branches || []).flatMap((b) => b.steps), depth + 1),
+  ])
+}
+
+/**
+ * What applying `edited` would do to the canvas that currently holds
+ * `original`. Steps are matched on id first (the edit engine keeps ids but
+ * may rewrite titles), then on normalized title. Matches the same rules as
+ * mergeEditedNodes, so the preview never promises a node is kept when the
+ * merge would rebuild it.
+ */
+export function diffSteps(original: GeneratedWorkflowStep[], edited: GeneratedWorkflowStep[]): ChangePreview {
+  const orig = flattenSteps(original)
+  const used = new Set<number>()
+  const changes: StepChange[] = []
+
+  for (const { step, depth } of flattenSteps(edited)) {
+    let idx = step.id ? orig.findIndex((o, i) => !used.has(i) && o.step.id === step.id) : -1
+    if (idx < 0) {
+      const key = normalizeStepTitle(step.title)
+      idx = orig.findIndex((o, i) => !used.has(i) && normalizeStepTitle(o.step.title) === key)
+    }
+    if (idx < 0) {
+      changes.push({ kind: 'added', title: step.title, depth })
+      continue
+    }
+    used.add(idx)
+    const before = orig[idx].step.title
+    const renamed = normalizeStepTitle(before) !== normalizeStepTitle(step.title)
+    changes.push(renamed ? { kind: 'renamed', title: step.title, from: before, depth } : { kind: 'kept', title: step.title, depth })
+  }
+  orig.forEach(({ step, depth }, i) => {
+    if (!used.has(i)) changes.push({ kind: 'removed', title: step.title, depth })
+  })
+
+  const count = (k: StepChangeKind) => changes.filter((c) => c.kind === k).length
+  return { changes, added: count('added'), removed: count('removed'), kept: count('kept'), renamed: count('renamed') }
+}

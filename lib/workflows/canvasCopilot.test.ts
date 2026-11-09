@@ -18,7 +18,7 @@ vi.mock('./bridgeCopilot', () => ({
   }),
 }))
 
-import { canvasToGeneratedWorkflow, mergeEditedNodes, normalizeStepTitle, countSteps, stepIdAliases } from './canvasCopilot'
+import { canvasToGeneratedWorkflow, mergeEditedNodes, normalizeStepTitle, countSteps, stepIdAliases, diffSteps } from './canvasCopilot'
 import { CopilotStateMachine, isNewWorkflowRequest } from './copilotStateMachine'
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
 import { n8nToReactFlow } from '@/lib/n8nMapper'
@@ -244,5 +244,29 @@ describe('CopilotStateMachine — leftover proposal vs open canvas', () => {
   it('pointing at the open workflow wins even when the proposal is fresh', async () => {
     const st = await new CopilotStateMachine('s', pending(2)).processMessage('tambah step email di workflow ini', canvas())
     expect(st.canvasTarget?.workflowId).toBe('wf-1')
+  })
+})
+
+describe('diffSteps', () => {
+  const base = canvasToGeneratedWorkflow(driveBackup).steps
+
+  it('reports added, kept and removed steps', () => {
+    const edited = [...base.slice(0, 2), { id: 'n', type: 'action' as const, title: 'Notify team on Slack', testable: true }]
+    const d = diffSteps(base, edited)
+    expect([d.added, d.removed, d.kept]).toEqual([1, 1, 2])
+    expect(d.changes.find((c) => c.kind === 'removed')?.title).toBe('Upload Backup to Backup Folder')
+    expect(d.changes.find((c) => c.kind === 'added')?.title).toBe('Notify team on Slack')
+  })
+
+  it('treats a retitled step with the same id as renamed, not added+removed', () => {
+    const edited = base.map((s, i) => (i === 1 ? { ...s, title: 'List invoice files' } : s))
+    const d = diffSteps(base, edited)
+    expect([d.added, d.removed, d.renamed, d.kept]).toEqual([0, 0, 1, 2])
+    expect(d.changes[1]).toMatchObject({ kind: 'renamed', from: 'List Google Drive Files', title: 'List invoice files' })
+  })
+
+  it('is empty-change when nothing differs', () => {
+    const d = diffSteps(base, base)
+    expect([d.added, d.removed, d.renamed]).toEqual([0, 0, 0])
   })
 })

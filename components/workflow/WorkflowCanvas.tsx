@@ -74,8 +74,10 @@ type SyncState = 'idle' | 'loading' | 'saving' | 'saved' | 'error';
 export interface CanvasCopilotBridge {
   /** Live canvas: React Flow nodes/edges plus the same graph as n8n JSON. */
   snapshot: () => { nodes: Node<WorkflowNodeData>[]; edges: Edge[]; n8n: any };
-  /** Replace the whole canvas (pushes one undo step first). */
-  replace: (nodes: Node[], edges: Edge[]) => void;
+  /** Replace the whole canvas (pushes one undo step first). With
+   *  `save: true` on a deployed workflow it also pushes the result to n8n and
+   *  resolves with whether that succeeded (null = nothing to save). */
+  replace: (nodes: Node[], edges: Edge[], opts?: { save?: boolean }) => Promise<boolean | null>;
 }
 
 // ── Shared header bar style — matches canvasHeader in workflows.module.css ──
@@ -372,6 +374,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
   // ── Copilot bridge (Aivory Aether edits the open canvas) ──
   const liveRef = useRef<{ nodes: Node<WorkflowNodeData>[]; edges: Edge[]; raw: any }>({ nodes: [], edges: [], raw: null });
   useEffect(() => { liveRef.current = { nodes, edges, raw: rawWorkflow }; }, [nodes, edges, rawWorkflow]);
+  const isActiveRef = useRef(isActive);
+  const saveGraphRef = useRef<(n: Node<WorkflowNodeData>[], e: Edge[]) => Promise<boolean>>(async () => false);
   useEffect(() => {
     if (!onRegisterCopilotBridge) return;
     onRegisterCopilotBridge({
@@ -380,13 +384,16 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
         const base = raw && Array.isArray(raw.nodes) ? raw : { name: fallbackTitle || 'Workflow', nodes: [], connections: {} };
         return { nodes: n, edges: e, n8n: reactFlowToN8n(n, e, base) };
       },
-      replace: (newNodes: Node[], newEdges: Edge[]) => {
+      replace: async (newNodes: Node[], newEdges: Edge[], opts?: { save?: boolean }) => {
         const { nodes: n, edges: e } = liveRef.current;
         pushHistory(n, e);
         const rehydrated = rehydrate(newNodes);
+        const normalized = normalizeEdges(newEdges, rehydrated);
         setNodes(rehydrated);
-        setEdges(normalizeEdges(newEdges, rehydrated));
+        setEdges(normalized);
         setIsEmpty(newNodes.length === 0);
+        if (!opts?.save || !isActiveRef.current) return null;
+        return saveGraphRef.current(rehydrated as Node<WorkflowNodeData>[], normalized);
       },
     });
     return () => onRegisterCopilotBridge(null);
@@ -708,12 +715,15 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
   }, [isActive, n8nWorkflowId, workflowId, n8nInstanceHint, JSON.stringify(fallbackSteps)]);
 
   // ── Save to n8n ──────────────────────────────────────────
-  const handleSave = useCallback(async () => {
-    if (!rawWorkflow || !isActive) return;
+  // Saves an explicit graph (not the React state) so a caller that has just
+  // replaced the canvas — Aether's "Update & save" — can persist it without
+  // waiting for a re-render. Returns whether n8n accepted it.
+  const saveGraph = useCallback(async (saveNodes: Node<WorkflowNodeData>[], saveEdges: Edge[]): Promise<boolean> => {
+    if (!rawWorkflow || !isActive) return false;
     const saveId = n8nWorkflowId || workflowId;
     setSyncState('saving'); setErrorMsg(null);
     try {
-      const payload = reactFlowToN8n(nodes, edges, rawWorkflow);
+      const payload = reactFlowToN8n(saveNodes, saveEdges, rawWorkflow);
       // 2026-08-25: never ship a trigger-less workflow to n8n — activation
       // fails with "No node to start the workflow from could be found" and
       // the retry loop that followed produced duplicate workflows on prod.
@@ -747,10 +757,15 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       const updated = await res.json();
       setRawWorkflow(updated); setSyncState('saved');
       setTimeout(() => setSyncState('idle'), 1500);
+      return true;
     } catch (err: any) {
       setErrorMsg(err?.message ?? 'Save failed'); setSyncState('error');
+      return false;
     }
-  }, [rawWorkflow, nodes, edges, workflowId, isActive, n8nWorkflowId, instanceQuery]);
+  }, [rawWorkflow, workflowId, isActive, n8nWorkflowId, instanceQuery]);
+
+  const handleSave = useCallback(async () => { await saveGraph(nodes, edges); }, [saveGraph, nodes, edges]);
+  useEffect(() => { saveGraphRef.current = saveGraph; isActiveRef.current = isActive; }, [saveGraph, isActive]);
 
   const handleInspectorChange = useCallback(
     (nodeId: string, updates: Partial<WorkflowNodeData>) => {
