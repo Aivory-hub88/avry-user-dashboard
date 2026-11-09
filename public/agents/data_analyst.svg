@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PLACEHOLDER portrait for Ivo (data_analyst). Replace with the illustrated bust
+     in the same style as the other public/agents/*.svg (circle clip, 354.6 box). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 354.6 354.6">
+  <defs>
+    <clipPath id="clip"><circle cx="177.3" cy="177.3" r="177.3"/></clipPath>
+  </defs>
+  <circle cx="177.3" cy="177.3" r="177.3" fill="#2d6bad"/>
+  <g clip-path="url(#clip)">
+    <path d="M60 354.6c6-62 52-100 117.300-100s111.300 38 117.300 100z" fill="#1b4b77"/>
+    <rect x="152" y="196" width="50.600" height="46" rx="22" fill="#e9b79b"/>
+    <circle cx="177.300" cy="148" r="58" fill="#f2c7ad"/>
+    <path d="M118 140c0-38 25-62 59.300-62s59.300 24 59.300 62c-14-22-34-30-59.300-30s-45.300 8-59.300 30z" fill="#2b2118"/>
+    <g fill="#fefeff" opacity=".92">
+      <rect x="128" y="290" width="18" height="40" rx="4"/>
+      <rect x="168" y="270" width="18" height="60" rx="4"/>
+      <rect x="208" y="280" width="18" height="50" rx="4"/>
+    </g>
+  </g>
+</svg>

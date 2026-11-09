@@ -13,5 +13,6 @@ export const AGENT_ROSTER_RAW = [
   { type: "leads_qualifier", name: "Lex", title: "Sales and Lead Agent" },
   { type: "finance_invoice_ops", name: "Finn", title: "Finance & Invoice Ops Agent" },
   { type: "office_assistant", name: "Ofira", title: "Office Assistant" },
+  { type: "data_analyst", name: "Ivo", title: "Data & Reporting Analyst" },
   { type: "chief_of_staff", name: "Aira", title: "Chief of Staff Agent" },
 ] as const

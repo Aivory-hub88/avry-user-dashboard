@@ -795,6 +795,14 @@
       "Alert Slack",
       "Log Sheets"
     ],
+    "analystTitle": "Data & Reporting Analyst",
+    "analystDesc": "Laporan bisnis mingguan, jawaban KPI lengkap dengan sumbernya, forecast penjualan, dan peringatan dini. Hanya membaca: tidak pernah mengubah data Anda.",
+    "analystTools": [
+      "Laporan mingguan",
+      "KPI dengan sumber",
+      "Forecast penjualan",
+      "Penanda anomali"
+    ],
     "chiefOfStaffTitle": "Chief of Staff Agent",
     "chiefOfStaffDesc": "Mengatur tim AI, meneruskan pekerjaan ke spesialis yang tepat, dan memberi satu hasil terpadu dengan approval tetap terjaga.",
     "chiefOfStaffTools": [
