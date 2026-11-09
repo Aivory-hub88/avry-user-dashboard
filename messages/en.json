@@ -795,6 +795,14 @@
       "Slack alerts",
       "Sheets log"
     ],
+    "analystTitle": "Data & Reporting Analyst",
+    "analystDesc": "Weekly business reports, KPI answers with their sources, sales forecasts and early warnings. Read-only: it never changes your data.",
+    "analystTools": [
+      "Weekly report",
+      "KPIs with sources",
+      "Sales forecast",
+      "Anomaly flags"
+    ],
     "chiefOfStaffTitle": "Chief of Staff Agent",
     "chiefOfStaffDesc": "Coordinate your AI team, route work to the right specialist, and receive one coherent outcome with approvals kept in the loop.",
     "chiefOfStaffTools": [

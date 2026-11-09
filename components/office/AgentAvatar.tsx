@@ -43,6 +43,7 @@ export const AGENT_VISUALS: Record<AgentType | "null", AgentVisual> = {
   leads_qualifier: { portraitSrc: "/agents/leads_qualifier.svg" }, // Leads Qualifier Agent
   finance_invoice_ops: { portraitSrc: "/agents/finance_invoice_ops.svg" }, // Finance & Invoice Ops Agent
   office_assistant: { portraitSrc: "/agents/office_assistant.svg" },
+  data_analyst: { portraitSrc: "/agents/data_analyst.svg" }, // Data & Reporting Analyst (placeholder portrait)
   chief_of_staff: { portraitSrc: "/agents/chief_of_staff.svg" },
 }
 
