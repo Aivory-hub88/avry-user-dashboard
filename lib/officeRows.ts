@@ -48,8 +48,8 @@ export const AGENT_GLOW_COLOR: Record<string, string> = {
   finance_invoice_ops: "#8faf82", // Finn — green card header
   office_assistant: "#e86936", // Ofira — orange card header
   data_analyst: "#2d6bad", // Ivo — blue card header
-  operations_inventory: "#6962a5", // Juno — purple card header
-  marketing_content: "#de1f5b", // Mira — pink card header
+  operations_inventory: "#c8962b", // Juno — amber card header
+  marketing_content: "#a24d9c", // Mira — orchid card header
   chief_of_staff: "#d6c2ad", // Aira — Silver card header
 }
 

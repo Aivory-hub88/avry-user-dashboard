@@ -57,8 +57,8 @@ const AGENT_HEADER_IMAGES = {
   finance: '/agent-card-headers/green.svg',
   office: '/agent-card-headers/orange.svg',
   analyst: '/agent-card-headers/blue.svg',
-  operations: '/agent-card-headers/purple.svg',
-  marketing: '/agent-card-headers/pink.svg',
+  operations: '/agent-card-headers/amber.svg',
+  marketing: '/agent-card-headers/orchid.svg',
 };
 
 const AGENTS = [
