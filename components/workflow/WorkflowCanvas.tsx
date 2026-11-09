@@ -185,7 +185,7 @@ function normalizeEdges(edges: Edge[], nodes?: Node[]): Edge[] {
       ...e,
       type: 'n8nAdaptive',
       animated: false,
-      markerEnd: (e.markerEnd as any) || { type: MarkerType.ArrowClosed, width: 12, height: 12, color: '#9ca3af' },
+      markerEnd: (e.markerEnd as any) || { type: MarkerType.ArrowClosed, width: 12, height: 12, color: 'rgba(255,255,255,0.4)' },
     };
   });
 }
@@ -346,7 +346,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
         ...params,
         animated: false,
         type: 'n8nAdaptive',
-        markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12, color: '#9ca3af' },
+        markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12, color: 'rgba(255,255,255,0.4)' },
       }, eds));
     },
     [setEdges, pushHistory, nodes, edges]
@@ -914,7 +914,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
   const defaultEdgeOptions = useMemo(() => ({
     type: 'n8nAdaptive' as const,
     animated: false,
-    markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12, color: '#9ca3af' },
+    markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12, color: 'rgba(255,255,255,0.4)' },
   }), []);
   const edgeTypes = useMemo(() => ({
     n8nAdaptive: N8NAdaptiveEdge,
@@ -1339,7 +1339,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                   target: edge.to,
                   animated: false,
                   type: 'n8nAdaptive' as const,
-                  markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12, color: '#9ca3af' },
+                  markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12, color: 'rgba(255,255,255,0.4)' },
                 }));
                 setNodes((nds) => [...nds, ...newSteps]);
                 setEdges((eds) => [...eds, ...normalizeEdges(newEdges, newSteps)]);
