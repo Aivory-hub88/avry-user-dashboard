@@ -10,7 +10,9 @@ import {
   useWorkflowList, createWorkflow, patchWorkflow, removeWorkflow,
   deactivateWorkflow,
 } from '@/hooks/useWorkflows'
-import { WorkflowCanvas as N8nWorkflowCanvas } from '@/components/workflow/WorkflowCanvas'
+import { WorkflowCanvas as N8nWorkflowCanvas, type CanvasCopilotBridge } from '@/components/workflow/WorkflowCanvas'
+import { canvasToGeneratedWorkflow, mergeEditedNodes, normalizeStepTitle, type CanvasEditContext } from '@/lib/workflows/canvasCopilot'
+import type { CopilotApplyTarget } from '@/components/workflow/CopilotTogglePanel'
 import { CopilotTogglePanel } from '@/components/workflow/CopilotTogglePanel'
 import { WorkflowGenerationModal } from '@/components/workflow/WorkflowGenerationModal'
 import { retrieveWorkflowSpec, clearWorkflowSpec, convertHandoffToNodes } from '@/lib/workflowHandoff'
@@ -682,6 +684,9 @@ function WorkflowsPageInner() {
   const undoCanvasRef = useRef<(() => void) | null>(null)
   // Copilot "Apply" while a workflow is already open — holds the built
   // nodes/edges until the user picks update-existing vs save-as-new-draft.
+  // Live canvas access for Aivory Aether's edit mode (snapshot + replace).
+  const canvasBridgeRef = useRef<CanvasCopilotBridge | null>(null)
+  const registerCopilotBridge = useCallback((b: CanvasCopilotBridge | null) => { canvasBridgeRef.current = b }, [])
   const [pendingApply, setPendingApply] = useState<{
     rfNodes: any[]
     rfEdges: any[]
@@ -1331,7 +1336,24 @@ function WorkflowsPageInner() {
   // If a workflow is already open, ask whether to update it in place or save
   // as a separate new draft — see ApplyTargetDialog. With nothing open
   // (blank canvas / onboarding), goes straight to "new draft" as before.
-  const handleCopilotApply = async (workflow: import('@/lib/workflows/copilotClient').GeneratedWorkflow) => {
+  // What Aether sees on every message while a workflow is open: the live
+  // canvas as a step tree, so it edits this workflow instead of starting over.
+  const getCanvasContext = useCallback((): CanvasEditContext | null => {
+    const bridge = canvasBridgeRef.current
+    if (!bridge || !selected) return null
+    const snap = bridge.snapshot()
+    if (!snap.nodes.length) return null
+    return {
+      workflowId: selected.workflow_id,
+      title: selected.title,
+      workflow: canvasToGeneratedWorkflow({ ...snap.n8n, name: selected.title }),
+    }
+  }, [selected])
+
+  const handleCopilotApply = async (
+    workflow: import('@/lib/workflows/copilotClient').GeneratedWorkflow,
+    target: CopilotApplyTarget = null,
+  ) => {
     // Build the canvas nodes/edges via the SAME conversion pipeline already
     // used elsewhere in this app for correct n8n typing — NOT the old ad-hoc
     // icon-only heuristic, which never set rawN8n/typed config on the nodes
@@ -1382,12 +1404,17 @@ function WorkflowsPageInner() {
     // Date.now() here runs inside handleCopilotApply, an async event
     // handler invoked on user action — not during render — so this isn't
     // the render-purity violation the rule is designed to catch.
+    // Aether edited the workflow that is open right now — replace that canvas
+    // in place (unchanged steps keep their nodes, settings and credentials).
+    const editingOpenCanvas = !!target && !!selected && target.workflowId === selected.workflow_id && !!canvasBridgeRef.current
+
     const n8nWorkflow = convertToN8nWorkflow({
       // eslint-disable-next-line react-hooks/purity
       workflow_id: `copilot-${Date.now()}`,
       title,
       trigger: workflow.steps[0]?.title || '',
       steps: workflow.steps.slice(1).map(toConverterStep),
+      keepLastStepIntent: editingOpenCanvas,
     })
 
     // convertToN8nWorkflow()/n8nToReactFlow() declare their own local
@@ -1395,6 +1422,34 @@ function WorkflowsPageInner() {
     // lib/workflowConverter.ts, lib/workflows/nodeMapper.ts and lib/n8n.ts)
     // that are structurally identical but not nominally the same type.
     const { nodes: rfNodes, edges: rfEdges } = n8nToReactFlow(n8nWorkflow as unknown as N8nWorkflow)
+
+    if (editingOpenCanvas && canvasBridgeRef.current && selected) {
+      const bridge = canvasBridgeRef.current
+      const snap = bridge.snapshot()
+      const before = canvasToGeneratedWorkflow(snap.n8n)
+      const keepTrigger =
+        before.steps[0]?.type === 'trigger' &&
+        normalizeStepTitle(before.steps[0].title) === normalizeStepTitle(workflow.steps[0]?.title || '')
+      snapshotBeforeChange('ai_apply')
+      const merged = mergeEditedNodes(
+        { nodes: snap.nodes, edges: snap.edges },
+        { nodes: rfNodes as any, edges: rfEdges },
+        { keepTrigger },
+      )
+      bridge.replace(merged.nodes, merged.edges)
+      const parts = [
+        merged.added ? `${merged.added} added/changed` : '',
+        merged.removed ? `${merged.removed} removed` : '',
+        `${merged.kept} kept`,
+      ].filter(Boolean).join(', ')
+      showToast(
+        isActiveWorkflow(selected)
+          ? `Aether updated the canvas (${parts}). Press Save to push it to n8n.`
+          : `Aether updated the canvas (${parts}).`,
+        'success',
+      )
+      return
+    }
 
     // A workflow is already open — ask whether to merge into it or fork a
     // new draft, instead of always silently forking (which orphaned the
@@ -2028,6 +2083,7 @@ function WorkflowsPageInner() {
             <CopilotTogglePanel
               currentSpec={selected ? selected : null}
               currentWorkflowName={selected?.title}
+              getCanvasContext={getCanvasContext}
               onApplySuggestion={handleCopilotApply}
             />
             <N8nWorkflowCanvas
@@ -2049,6 +2105,7 @@ function WorkflowsPageInner() {
                   fn(pNodes, pEdges)
                 }
               }}
+              onRegisterCopilotBridge={registerCopilotBridge}
               onHistoryChange={setCanvasCanUndo}
               registerUndo={(fn) => { undoCanvasRef.current = fn }}
             />

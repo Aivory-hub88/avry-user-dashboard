@@ -62,11 +62,21 @@ type Props = {
   // env (superadmin test instance) instead of the caller's stored BYO creds.
   n8nInstanceHint?: 'aivory' | 'byo';
   onInjectNodes?: (inject: (nodes: Node[], edges: Edge[]) => void) => void;
+  /** Gives Aivory Aether read access to the live canvas and a way to replace
+   *  it with an edited version (one undo step). */
+  onRegisterCopilotBridge?: (bridge: CanvasCopilotBridge | null) => void;
   onHistoryChange?: (canUndo: boolean) => void;
   registerUndo?: (undoFn: () => void) => void;
 };
 
 type SyncState = 'idle' | 'loading' | 'saving' | 'saved' | 'error';
+
+export interface CanvasCopilotBridge {
+  /** Live canvas: React Flow nodes/edges plus the same graph as n8n JSON. */
+  snapshot: () => { nodes: Node<WorkflowNodeData>[]; edges: Edge[]; n8n: any };
+  /** Replace the whole canvas (pushes one undo step first). */
+  replace: (nodes: Node[], edges: Edge[]) => void;
+}
 
 // ── Shared header bar style — matches canvasHeader in workflows.module.css ──
 const innerHeaderStyle: React.CSSProperties = {
@@ -239,7 +249,7 @@ const STANDARD_ICON_TO_N8N: Record<string, string> = {
   respond: 'n8n-nodes-base.respondToWebhook',
 };
 
-export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fallbackSteps, fallbackTrigger, fallbackTitle, fallbackSkipAutoLimit, n8nInstanceHint, onInjectNodes, onHistoryChange, registerUndo }: Props) {
+export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fallbackSteps, fallbackTrigger, fallbackTitle, fallbackSkipAutoLimit, n8nInstanceHint, onInjectNodes, onRegisterCopilotBridge, onHistoryChange, registerUndo }: Props) {
   const instanceQuery = n8nInstanceHint === 'aivory' ? '?instance=aivory' : '';
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<WorkflowNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -358,6 +368,30 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onInjectNodes]);
+
+  // ── Copilot bridge (Aivory Aether edits the open canvas) ──
+  const liveRef = useRef<{ nodes: Node<WorkflowNodeData>[]; edges: Edge[]; raw: any }>({ nodes: [], edges: [], raw: null });
+  useEffect(() => { liveRef.current = { nodes, edges, raw: rawWorkflow }; }, [nodes, edges, rawWorkflow]);
+  useEffect(() => {
+    if (!onRegisterCopilotBridge) return;
+    onRegisterCopilotBridge({
+      snapshot: () => {
+        const { nodes: n, edges: e, raw } = liveRef.current;
+        const base = raw && Array.isArray(raw.nodes) ? raw : { name: fallbackTitle || 'Workflow', nodes: [], connections: {} };
+        return { nodes: n, edges: e, n8n: reactFlowToN8n(n, e, base) };
+      },
+      replace: (newNodes: Node[], newEdges: Edge[]) => {
+        const { nodes: n, edges: e } = liveRef.current;
+        pushHistory(n, e);
+        const rehydrated = rehydrate(newNodes);
+        setNodes(rehydrated);
+        setEdges(normalizeEdges(newEdges, rehydrated));
+        setIsEmpty(newNodes.length === 0);
+      },
+    });
+    return () => onRegisterCopilotBridge(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onRegisterCopilotBridge]);
 
   // ── Drag and drop support ────────────────────────────────
   const rfInstanceRef = useRef<ReactFlowInstance<Node<WorkflowNodeData>, Edge> | null>(null);

@@ -95,6 +95,13 @@ interface AivoryWorkflow {
   created_at?: string
   tags?: string[]
   /**
+   * Keep every step's detected intent, even the last one. By default a
+   * webhook-triggered workflow's last step becomes Respond to Webhook; when
+   * Aether edits an existing canvas that would silently retype a step the
+   * user just added (e.g. "update the sheet" at the end).
+   */
+  keepLastStepIntent?: boolean
+  /**
    * Skip the automatic Limit-node insertion (see MULTI_ITEM_INTENTS below).
    * That heuristic exists for copilot-chat-generated steps, where an 'http'/
    * 'rss'/'database' step's real shape is unknown and might return many
@@ -312,7 +319,7 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
         console.log(`[workflowConverter] Step ${globalStepCounter}: action="${step.action}" tool="${step.tool}" → intent="${intent}"${step.forceIntent ? ' (forced)' : ''} isLast=${isLast}`)
         // Only override last step to respondToWebhook for webhook-triggered workflows.
         // Scheduled workflows have no webhook to respond to — keep the detected intent.
-        if (isLast && !isSchedule && intent !== 'respond' && intent !== 'filter' && intent !== 'email' && intent !== 'messaging') {
+        if (isLast && !isSchedule && !workflow.keepLastStepIntent && intent !== 'respond' && intent !== 'filter' && intent !== 'email' && intent !== 'messaging') {
           console.log(`[workflowConverter] Step ${globalStepCounter}: overriding intent from "${intent}" to "respond" (last step, webhook workflow)`)
           intent = 'respond'
         }
