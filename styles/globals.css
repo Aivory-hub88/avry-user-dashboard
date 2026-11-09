@@ -1180,8 +1180,6 @@ body {
 
 /* ── Workflow node bottom panel — force black text ── */
 /* Must be at bottom of file to win specificity over all global rules */
-[class*="restTitle"],
-[class*="descriptionText"],
 [class*="bottomSection"] p {
   color: #1a1a18 !important;
 }
