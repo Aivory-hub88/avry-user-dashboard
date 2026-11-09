@@ -1352,7 +1352,9 @@ export class CopilotStateMachine {
       `${testSummary}\n\n` +
       `---\n📌 **Workflow Summary:**\n${wf.summary}` +
       nodeDetails +
-      `\n\n---\n🚀 **The workflow "${wf.workflowName}" is ready to be applied. Click the Apply to canvas button to place it onto the canvas.**` +
+      (this.state.canvasTarget
+        ? `\n\n---\n🚀 **The changes to "${this.state.canvasTarget.title}" are ready. Review them below, then click Update canvas.**`
+        : `\n\n---\n🚀 **The workflow "${wf.workflowName}" is ready to be applied. Click the Apply to canvas button to place it onto the canvas.**`) +
       `\n\n_Note: once deployed to n8n, you can open any node there and adjust its exact configuration — credentials, field mappings, the precise data source — yourself; I set up the workflow's structure, but node-level details are easiest to finish directly in n8n._`
     )
   }

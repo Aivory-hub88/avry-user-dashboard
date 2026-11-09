@@ -21,7 +21,7 @@ import { useCopilotPanel } from '@/hooks/useCopilotPanel'
 import { useWorkflowCopilot } from '@/hooks/useWorkflowCopilot'
 import type { CopilotMessage } from '@/hooks/useWorkflowCopilot'
 import type { GeneratedWorkflow } from '@/lib/workflows/copilotClient'
-import type { CanvasEditContext } from '@/lib/workflows/canvasCopilot'
+import type { CanvasEditContext, ChangePreview } from '@/lib/workflows/canvasCopilot'
 import { ThinkingDots } from '@/components/ui/ThinkingDots'
 
 // File icon helpers
@@ -54,11 +54,15 @@ interface CopilotTogglePanelProps {
   currentWorkflowName?: string
   /** Live snapshot of the workflow open on the canvas — enables edit mode. */
   getCanvasContext?: () => CanvasEditContext | null
+  /** What applying `workflow` would change on the open canvas (edit mode). */
+  getChangePreview?: (workflow: GeneratedWorkflow) => ChangePreview | null
+  /** The open workflow is deployed to n8n — Update also saves it there. */
+  isDeployed?: boolean
   onApplyWorkflow?: (workflow: GeneratedWorkflow, target: CopilotApplyTarget) => void
   onApplySuggestion?: (workflow: GeneratedWorkflow, target: CopilotApplyTarget) => void
 }
 
-export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, onApplyWorkflow, onApplySuggestion }: CopilotTogglePanelProps) {
+export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, getChangePreview, isDeployed, onApplyWorkflow, onApplySuggestion }: CopilotTogglePanelProps) {
   const { isOpen, open, close } = useCopilotPanel()
   const {
     messages,
@@ -111,6 +115,8 @@ export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, onAp
           onApplyWorkflow={applyHandler}
           onClear={reset}
           canvasTarget={canvasTarget}
+          getChangePreview={getChangePreview}
+          isDeployed={isDeployed}
           canvasName={getCanvasContext ? currentWorkflowName : undefined}
         />
       ) : (
@@ -158,6 +164,8 @@ interface CopilotPanelExpandedProps {
   onApplyWorkflow?: (workflow: GeneratedWorkflow) => void
   onClear?: () => void
   canvasTarget?: CopilotApplyTarget
+  getChangePreview?: (workflow: GeneratedWorkflow) => ChangePreview | null
+  isDeployed?: boolean
   /** Name of the workflow open on the canvas, when Aether can edit it. */
   canvasName?: string
 }
@@ -166,7 +174,7 @@ function CopilotPanelExpanded({
   onClose, messages, loading, loadingHint, isStreamingReply, error,
   stage, isTesting, workflow, canApply, isCompleted,
   onSendMessage, onEditMessage, onDeleteMessage, onApplyWorkflow, onClear,
-  canvasTarget, canvasName,
+  canvasTarget, canvasName, getChangePreview, isDeployed,
 }: CopilotPanelExpandedProps) {
   const [input, setInput] = useState('')
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
@@ -203,6 +211,10 @@ function CopilotPanelExpanded({
   useEffect(() => {
     setTimeout(() => textareaRef.current?.focus(), 80)
   }, [])
+
+  // Recomputed each render while the banner is up — cheap, and it reads the
+  // live canvas, so a manual edit made after the proposal is reflected.
+  const preview = canApply && workflow && canvasTarget && getChangePreview ? getChangePreview(workflow) : null
 
   const hasMessages = messages.length > 0 || loading
   const hasContent = input.trim().length > 0 || attachedFiles.length > 0
@@ -350,7 +362,9 @@ function CopilotPanelExpanded({
 
       {/* ── Apply banner — shown only when server says canApply (workflow ready) ── */}
       {canApply && workflow && onApplyWorkflow && (
-        <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-[var(--bg-main)]/60 border-t border-zinc-600/40 shrink-0 rounded-xl mx-3 mb-2">
+        <div className="flex flex-col gap-2 px-4 py-2.5 bg-[var(--bg-main)]/60 border-t border-zinc-600/40 shrink-0 rounded-xl mx-3 mb-2">
+          {canvasTarget && preview && <ChangePreviewList preview={preview} />}
+          <div className="flex items-center justify-between gap-3">
           <div className="flex flex-col text-left">
             <span className="text-[13px] text-[#f7f7f7] font-medium">
               {canvasTarget
@@ -365,8 +379,9 @@ function CopilotPanelExpanded({
             className="text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-[#6c5ce7] text-white cursor-pointer hover:bg-[#5b4bd6] transition-colors duration-150"
             onClick={() => onApplyWorkflow(workflow)}
           >
-            {canvasTarget ? 'Update canvas' : 'Apply to canvas'}
+            {canvasTarget ? (isDeployed ? 'Update & save' : 'Update canvas') : 'Apply to canvas'}
           </button>
+          </div>
         </div>
       )}
 
@@ -631,6 +646,51 @@ function MessageRow({
         {!busy && <ActionBtn label="Edit and resend" onClick={startEdit}>{ICONS.edit}</ActionBtn>}
         <ActionBtn label="Delete message" onClick={() => onDelete(index)}>{ICONS.trash}</ActionBtn>
       </div>
+    </div>
+  )
+}
+
+/* ── Change preview (edit mode) ───────────────────────── */
+
+function ChangePreviewList({ preview }: { preview: ChangePreview }) {
+  const summary = [
+    preview.added ? `${preview.added} added` : '',
+    preview.removed ? `${preview.removed} removed` : '',
+    preview.renamed ? `${preview.renamed} renamed` : '',
+    `${preview.kept} kept`,
+  ].filter(Boolean).join(', ')
+
+  return (
+    <div className="flex flex-col gap-1 text-left" data-testid="aether-change-preview">
+      <span className="text-[11px] uppercase tracking-wide text-[#a1a1aa]">Changes · {summary}</span>
+      <ul className="m-0 p-0 list-none max-h-[132px] overflow-y-auto [scrollbar-width:thin] flex flex-col gap-0.5">
+        {preview.changes.map((c, i) => (
+          <li
+            key={`${c.kind}-${i}-${c.title}`}
+            style={{ paddingLeft: c.depth * 14 }}
+            className={
+              'text-[12px] leading-snug flex gap-1.5 ' +
+              (c.kind === 'added' ? 'text-emerald-400'
+                : c.kind === 'removed' ? 'text-red-400 line-through'
+                : c.kind === 'renamed' ? 'text-[#a1a1aa]'
+                : 'text-white/40')
+            }
+          >
+            <span className="w-3 shrink-0 no-underline" aria-hidden="true">
+              {c.kind === 'added' ? '+' : c.kind === 'removed' ? '−' : c.kind === 'renamed' ? '~' : ''}
+            </span>
+            <span className="min-w-0 break-words">
+              {c.title}
+              {c.kind === 'renamed' && c.from ? <span className="text-white/30"> (was {c.from})</span> : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {preview.removed > 0 && (
+        <span className="text-[11px] text-red-400/90">
+          {preview.removed === 1 ? '1 step will be deleted' : `${preview.removed} steps will be deleted`} — you can Undo on the canvas.
+        </span>
+      )}
     </div>
   )
 }
