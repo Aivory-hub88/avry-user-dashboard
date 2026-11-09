@@ -4,7 +4,7 @@
  * new calendar/humanReview/audit node types the blueprint planner relies on.
  */
 import { describe, it, expect } from 'vitest'
-import { detectNodeIntent, mapIntentToN8nNode, mapIntentToN8nNodes, type MapContext } from './nodeMapper'
+import { detectNodeIntent, mapIntentToN8nNode, mapIntentToN8nNodes, refineIntentForContext, type MapContext } from './nodeMapper'
 
 const ctx: MapContext = { stepIndex: 0, aiNodeCount: 0, isLast: false }
 const step = (action: string, tool = '') => ({ step: 1, action, tool, output: '' })
@@ -98,5 +98,47 @@ describe('mapIntentToN8nNodes — ai still expands into Agent + Chat Model', () 
     expect(result.primary.type).toBe('@n8n/n8n-nodes-langchain.agent')
     expect(result.extraNodes?.length).toBe(1)
     expect(result.extraConnections?.[0].type).toBe('ai_languageModel')
+  })
+})
+
+describe('Google Drive backup workflow — no FTP/HTTP/unknown nodes', () => {
+  const steps = [
+    'List Google Drive Files',
+    'Download Files to Temporary Storage',
+    'Upload Backup to Backup Folder',
+    'Clean Up Temporary Storage',
+  ]
+  const ctx = { googleDrive: true }
+  const intents = steps.map((a) => refineIntentForContext(detectNodeIntent(a, ''), a, '', ctx))
+
+  it('maps file steps to Google Drive and temp cleanup to a no-op', () => {
+    expect(intents).toEqual(['googleDrive', 'googleDrive', 'googleDrive', 'cleanup'])
+  })
+
+  it('builds native Drive nodes with the right operations', () => {
+    const nodes = steps.map((a, i) =>
+      mapIntentToN8nNode(intents[i], { step: i + 1, action: a, tool: '', output: '' }, { stepIndex: i, aiNodeCount: 0, isLast: false })
+    )
+    expect(nodes.map((n) => n.type)).toEqual([
+      'n8n-nodes-base.googleDrive',
+      'n8n-nodes-base.googleDrive',
+      'n8n-nodes-base.googleDrive',
+      'n8n-nodes-base.noOp',
+    ])
+    expect(nodes[0].parameters.resource).toBe('fileFolder')
+    expect(nodes[1].parameters.operation).toBe('download')
+    expect(nodes[2].parameters.operation).toBeUndefined() // v3 default = upload
+  })
+
+  it('never emits Execute Command (disabled on n8n 2.x)', () => {
+    for (const intent of ['cleanup', 'compress'] as const) {
+      const n = mapIntentToN8nNode(intent, { step: 1, action: 'x', tool: '', output: '' }, { stepIndex: 0, aiNodeCount: 0, isLast: false })
+      expect(n.type).not.toBe('n8n-nodes-base.executeCommand')
+    }
+  })
+
+  it('does not treat a bare "download files" as FTP', () => {
+    expect(detectNodeIntent('Download Files to Temporary Storage', '')).not.toBe('ftp')
+    expect(detectNodeIntent('Upload report to SFTP server', '')).toBe('ftp')
   })
 })

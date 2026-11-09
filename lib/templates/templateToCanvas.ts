@@ -18,6 +18,7 @@ const INTENT_TO_CATEGORY: Record<NodeIntent, string> = {
   hubspot: "http",
   zendesk: "http",
   asana: "http",
+  googleDrive: "http",
   respond: "channel",
   filter: "condition",
   switch: "condition",
