@@ -11,7 +11,7 @@ import {
   deactivateWorkflow,
 } from '@/hooks/useWorkflows'
 import { WorkflowCanvas as N8nWorkflowCanvas, type CanvasCopilotBridge } from '@/components/workflow/WorkflowCanvas'
-import { canvasToGeneratedWorkflow, mergeEditedNodes, normalizeStepTitle, stepIdAliases, type CanvasEditContext } from '@/lib/workflows/canvasCopilot'
+import { canvasToGeneratedWorkflow, diffSteps, mergeEditedNodes, normalizeStepTitle, stepIdAliases, type CanvasEditContext } from '@/lib/workflows/canvasCopilot'
 import type { CopilotApplyTarget } from '@/components/workflow/CopilotTogglePanel'
 import { CopilotTogglePanel } from '@/components/workflow/CopilotTogglePanel'
 import { WorkflowGenerationModal } from '@/components/workflow/WorkflowGenerationModal'
@@ -1369,6 +1369,19 @@ function WorkflowsPageInner() {
     }
   }, [selected])
 
+  // What "Update canvas" would do to the workflow that is open right now —
+  // shown in the Aether panel before the user applies anything.
+  const getChangePreview = useCallback(
+    (workflow: import('@/lib/workflows/copilotClient').GeneratedWorkflow) => {
+      const bridge = canvasBridgeRef.current
+      if (!bridge) return null
+      const snap = bridge.snapshot()
+      if (!snap.nodes.length) return null
+      return diffSteps(canvasToGeneratedWorkflow(snap.n8n).steps, workflow.steps)
+    },
+    [],
+  )
+
   const handleCopilotApply = async (
     workflow: import('@/lib/workflows/copilotClient').GeneratedWorkflow,
     target: CopilotApplyTarget = null,
@@ -1456,18 +1469,17 @@ function WorkflowsPageInner() {
         { nodes: rfNodes as any, edges: rfEdges },
         { keepTrigger, idAliases: stepIdAliases(workflow.steps, snap.nodes) },
       )
-      bridge.replace(merged.nodes, merged.edges)
+      const deployed = isActiveWorkflow(selected)
+      // Deployed workflows are pushed to n8n in the same step ("Update & save").
+      const saved = await bridge.replace(merged.nodes, merged.edges, { save: deployed })
       const parts = [
         merged.added ? `${merged.added} added/changed` : '',
         merged.removed ? `${merged.removed} removed` : '',
         `${merged.kept} kept`,
       ].filter(Boolean).join(', ')
-      showToast(
-        isActiveWorkflow(selected)
-          ? `Aether updated the canvas (${parts}). Press Save to push it to n8n.`
-          : `Aether updated the canvas (${parts}).`,
-        'success',
-      )
+      if (!deployed) showToast(`Aether updated the canvas (${parts}).`, 'success')
+      else if (saved) showToast(`Aether updated the canvas (${parts}) and saved it to n8n.`, 'success')
+      else showToast(`Aether updated the canvas (${parts}), but saving to n8n failed — press Save to retry.`, 'error')
       return
     }
 
@@ -2104,6 +2116,8 @@ function WorkflowsPageInner() {
               currentSpec={selected ? selected : null}
               currentWorkflowName={selected?.title}
               getCanvasContext={getCanvasContext}
+              getChangePreview={getChangePreview}
+              isDeployed={isActiveWorkflow(selected)}
               onApplySuggestion={handleCopilotApply}
             />
             <N8nWorkflowCanvas
