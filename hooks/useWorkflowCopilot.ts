@@ -11,7 +11,8 @@
  * - reset() only called by explicit "Clear" button, NOT on open/close
  */
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import type { CanvasEditContext } from '@/lib/workflows/canvasCopilot'
 import {
   sendCopilotMessage,
   type CopilotApiResponse,
@@ -46,6 +47,10 @@ export interface UseWorkflowCopilotReturn {
   /** Remove a single message from the thread. */
   deleteMessage: (index: number) => void
   reset: () => void
+  /** Mark the proposed workflow as applied (conversation rests in COMPLETED). */
+  markApplied: () => void
+  /** Non-null when the proposal edits the workflow open on the canvas. */
+  canvasTarget: { workflowId: string; title: string } | null
 }
 
 // The copilot's backend reply arrives as one blocking JSON response (it also
@@ -126,7 +131,15 @@ function clearPersistedState() {
 
 // ── Hook ──────────────────────────────────────────────────
 
-export function useWorkflowCopilot(): UseWorkflowCopilotReturn {
+export interface UseWorkflowCopilotOptions {
+  /** Returns the workflow open on the canvas (or null) — read at send time. */
+  getCanvasContext?: () => CanvasEditContext | null
+}
+
+export function useWorkflowCopilot(options: UseWorkflowCopilotOptions = {}): UseWorkflowCopilotReturn {
+  const getCanvasRef = useRef(options.getCanvasContext)
+  useEffect(() => { getCanvasRef.current = options.getCanvasContext }, [options.getCanvasContext])
+
   // Load initial state from localStorage. Each useState below uses the
   // lazy-initializer function form (`() => ...`) rather than a shared
   // useRef — that form is guaranteed to run exactly once, on mount, so
@@ -194,6 +207,9 @@ export function useWorkflowCopilot(): UseWorkflowCopilotReturn {
         prompt: trimmed,
         sessionId,
         currentState: serverState,
+        canvas: (() => {
+          try { return getCanvasRef.current?.() ?? null } catch { return null }
+        })(),
       })
 
       // Persist state for next round
@@ -242,6 +258,15 @@ export function useWorkflowCopilot(): UseWorkflowCopilotReturn {
     setMessages(prev => prev.filter((_, i) => i !== index))
   }, [])
 
+  // Called once the proposed workflow has been applied to the canvas. The
+  // conversation rests in COMPLETED, so the next message re-reads the canvas
+  // and edits it, instead of asking to apply the same workflow again.
+  const markApplied = useCallback(() => {
+    setServerState(prev => (prev ? { ...prev, stage: 'COMPLETED' } : prev))
+    setCanApply(false)
+    setIsCompleted(true)
+  }, [])
+
   const reset = useCallback(() => {
     setMessages([])
     setLoading(false)
@@ -274,5 +299,7 @@ export function useWorkflowCopilot(): UseWorkflowCopilotReturn {
     editMessage,
     deleteMessage,
     reset,
+    markApplied,
+    canvasTarget: serverState?.canvasTarget ?? null,
   }
 }

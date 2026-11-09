@@ -12,6 +12,7 @@
  * Lihat: /app/api/copilot/[...path]/route.ts
  */
 
+import { countSteps, type CanvasEditContext } from './canvasCopilot'
 import { callCopilotOperation } from './bridgeCopilot'
 import { analyzeRequest, matchTemplate, sanitizeWorkflow } from './deterministicPlanner'
 
@@ -201,6 +202,12 @@ export interface CopilotConversationState {
   pendingAutoAction?: 'run_tests' | null
   /** Tenant/org attribution propagated to the bridge for audit trails. */
   organizationId?: string
+  /**
+   * Set while the copilot is editing a workflow that is already on the
+   * canvas (instead of generating a new one). The client uses it to replace
+   * that canvas on apply rather than forking a new draft.
+   */
+  canvasTarget?: { workflowId: string; title: string } | null
 }
 
 // ============================================================
@@ -530,9 +537,16 @@ export class CopilotStateMachine {
 
   // ---- MAIN ENTRY POINT ----
 
-  async processMessage(userMessage: string): Promise<CopilotConversationState> {
+  async processMessage(
+    userMessage: string,
+    canvas?: CanvasEditContext | null,
+  ): Promise<CopilotConversationState> {
     this.discardIfStale()
     this.addMessage('user', userMessage)
+
+    if (canvas && this.shouldEditCanvas(userMessage, canvas)) {
+      return this.enterCanvasEdit(userMessage, canvas)
+    }
 
     switch (this.state.stage) {
       case 'IDLE':
@@ -587,6 +601,58 @@ export class CopilotStateMachine {
     this.state.pendingAutoAction = null
     this.updateTimestamp()
     return this.runTests((this.state.testAttempts ?? 0) + 1)
+  }
+
+  // ---- CANVAS EDIT MODE ----
+
+  /**
+   * A workflow is open on the canvas. Edit it (rather than generating a new
+   * one) when the conversation is at rest — IDLE, COMPLETED, ERROR — or when
+   * the user switched to a different workflow mid-conversation. An explicit
+   * "new workflow" request and small talk keep the normal path.
+   */
+  private shouldEditCanvas(userMessage: string, canvas: CanvasEditContext): boolean {
+    if (!canvas.workflowId || !Array.isArray(canvas.workflow?.steps)) return false
+    if (countSteps(canvas.workflow.steps) < 1) return false
+    if (isNewWorkflowRequest(userMessage)) return false
+    if (matchSmallTalk(userMessage)) return false
+    const atRest = this.state.stage === 'IDLE' || this.state.stage === 'COMPLETED' || this.state.stage === 'ERROR'
+    const switched = !!this.state.canvasTarget && this.state.canvasTarget.workflowId !== canvas.workflowId
+    const busy = this.state.stage === 'SANDBOX_TESTING' || this.state.stage === 'FIXING' || this.state.stage === 'GENERATING'
+    return atRest || (switched && !busy)
+  }
+
+  private async enterCanvasEdit(
+    userMessage: string,
+    canvas: CanvasEditContext,
+  ): Promise<CopilotConversationState> {
+    const title = (canvas.title || canvas.workflow.workflowName || 'Current workflow').trim()
+    console.log('[CopilotStateMachine] canvas edit mode', {
+      session_id: this.state.sessionId,
+      workflowId: canvas.workflowId,
+      steps: countSteps(canvas.workflow.steps),
+    })
+    this.state.generatedWorkflow = {
+      ...JSON.parse(JSON.stringify(canvas.workflow)),
+      workflowName: title,
+    }
+    this.state.canvasTarget = { workflowId: canvas.workflowId, title }
+    this.state.userRequest = `Edit the existing workflow "${title}"`
+    this.state.testResults = null
+    this.state.testAttempts = 0
+    this.state.clarifyRounds = 0
+    this.state.pendingAutoAction = null
+    this.state.userApprovals = { confirmedWorkflow: false, approvedTest: false, appliedToCanvas: false }
+
+    if (detectUserIntent(userMessage) === 'question') {
+      // Answer about the open workflow, then rest in IDLE so the next
+      // message re-reads the (possibly hand-edited) canvas.
+      this.state.stage = 'IDLE'
+      return this.handleQuestion(userMessage)
+    }
+
+    this.state.stage = 'EDITING'
+    return this.handleEditing(userMessage)
   }
 
   // ---- STAGE HANDLERS ----
@@ -894,11 +960,15 @@ export class CopilotStateMachine {
   }
 
   private async handleQuestion(userMessage: string): Promise<CopilotConversationState> {
+    const wf = this.state.generatedWorkflow
+    const withContext = wf?.steps?.length
+      ? `${userMessage}\n\n[Context — the workflow "${wf.workflowName}" currently has these steps:\n${formatStepList(wf.steps).join('\n')}]`
+      : userMessage
     try {
       const result = await this.bridge.clarify({
         session_id: this.state.sessionId,
         organization_id: this.state.organizationId || 'copilot',
-        user_request: userMessage,
+        user_request: withContext,
         conversation_history: this.state.conversationHistory,
       })
       const answer =
@@ -1173,7 +1243,9 @@ export class CopilotStateMachine {
       this.state.userApprovals.approvedTest = true
       this.state.stage = 'AWAITING_APPLY_APPROVAL'
       return this.setAssistantMessage(
-        `The workflow has passed the sandbox test. Click the **Apply to canvas** button to place the workflow "${this.state.generatedWorkflow?.workflowName}" onto the canvas.`,
+        this.state.canvasTarget
+          ? `The workflow has passed the sandbox test. Click **Update canvas** to apply the changes to "${this.state.canvasTarget.title}".`
+          : `The workflow has passed the sandbox test. Click the **Apply to canvas** button to place the workflow "${this.state.generatedWorkflow?.workflowName}" onto the canvas.`,
       )
     }
 
@@ -1205,6 +1277,14 @@ export class CopilotStateMachine {
     const summary = this.state.generatedWorkflow?.summary
       ? `\n\n📝 *${this.state.generatedWorkflow.summary}*`
       : ''
+
+    if (isEdit && this.state.canvasTarget) {
+      return (
+        `✏️ Here are the changes to **"${this.state.canvasTarget.title}"**:\n\n${stepList}${summary}\n\n` +
+        `Steps you didn't ask to change keep their settings and credentials. ` +
+        `Reply **yes** to test it, or tell me what else to change.`
+      )
+    }
 
     if (isEdit) {
       return (
@@ -1437,4 +1517,15 @@ export function detectUserIntent(
     return 'question'
 
   return 'unknown'
+}
+/**
+ * The user explicitly wants a brand-new workflow even though one is open on
+ * the canvas ("buatin workflow baru", "create a new workflow for…").
+ */
+export function isNewWorkflowRequest(message: string): boolean {
+  const lower = message.toLowerCase().trim()
+  if (/\b(new|another|separate)\s+(workflow|automation|flow)\b|\b(workflow|alur|otomasi)\s+(baru|lain)\b|\bfrom scratch\b|\bdari (awal|nol)\b/i.test(lower)) return true
+  // "buatin workflow yang…", "create a workflow that…" — a build verb aimed
+  // at a workflow (not at a step) opens a new one.
+  return /^(tolong\s+|please\s+|can you\s+|bisa\s+)?(buat|bikin|create|build|make|generate)\w*\s+(me\s+|a\s+|an\s+|sebuah\s+|satu\s+)?(workflow|automation|otomasi)\b/i.test(lower)
 }

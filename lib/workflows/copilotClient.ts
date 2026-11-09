@@ -17,6 +17,7 @@ import type {
   Message,
 } from '@/lib/workflows/copilotStateMachine'
 import { asset } from '@/lib/asset'
+import type { CanvasEditContext } from '@/lib/workflows/canvasCopilot'
 
 // Re-export types so consumers don't need to import from the server file
 export type { CopilotConversationState, CopilotStage, GeneratedWorkflow, TestResult, Message }
@@ -34,6 +35,8 @@ export interface CopilotApiResponse {
   isCompleted: boolean
   isTesting: boolean
   isError: boolean
+  /** Set when the proposed workflow edits the workflow open on the canvas. */
+  canvasTarget: { workflowId: string; title: string } | null
   // Full state — must be stored and sent back on the next request
   currentState: CopilotConversationState
 }
@@ -42,6 +45,7 @@ export async function sendCopilotMessage(params: {
   prompt: string
   sessionId?: string | null
   currentState?: CopilotConversationState | null
+  canvas?: CanvasEditContext | null
 }): Promise<CopilotApiResponse> {
   const res = await fetch(asset('/api/workflows/copilot'), {
     method: 'POST',
@@ -50,6 +54,7 @@ export async function sendCopilotMessage(params: {
       prompt: params.prompt,
       sessionId: params.sessionId ?? undefined,
       currentState: params.currentState ?? undefined,
+      canvas: params.canvas ?? undefined,
     }),
   })
 

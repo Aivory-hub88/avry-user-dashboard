@@ -11,6 +11,21 @@ import {
   type CopilotConversationState,
 } from '@/lib/workflows/copilotStateMachine'
 import { requireModule } from '@/lib/teamAccess'
+import type { CanvasEditContext } from '@/lib/workflows/canvasCopilot'
+
+/** Accept the open canvas only in the expected shape and within a sane size. */
+function parseCanvas(raw: unknown): CanvasEditContext | null {
+  if (!raw || typeof raw !== 'object') return null
+  const c = raw as Record<string, any>
+  if (typeof c.workflowId !== 'string' || !c.workflowId || c.workflowId.length > 128) return null
+  if (!c.workflow || !Array.isArray(c.workflow.steps)) return null
+  if (JSON.stringify(c.workflow).length > 200_000) return null
+  return {
+    workflowId: c.workflowId,
+    title: typeof c.title === 'string' ? c.title.slice(0, 200) : '',
+    workflow: c.workflow,
+  }
+}
 
 export const maxDuration = 120
 
@@ -82,7 +97,11 @@ export async function POST(request: NextRequest) {
     // The route just hands the message to the state machine and returns
     // whatever state comes out. No manual intent switching needed here.
     // ------------------------------------------------------------------
-    let updatedState = await stateMachine.processMessage(userInput)
+    // The workflow currently open on the canvas (if any) — lets the copilot
+    // edit it in place instead of only generating new workflows.
+    const canvas = parseCanvas((body as Record<string, unknown>).canvas)
+
+    let updatedState = await stateMachine.processMessage(userInput, canvas)
 
     // ------------------------------------------------------------------
     // ENTERPRISE FIX: the old runTests() recursed repair->test up to 3x
@@ -117,6 +136,8 @@ export async function POST(request: NextRequest) {
       isCompleted: updatedState.stage === 'COMPLETED',
       isTesting: updatedState.stage === 'SANDBOX_TESTING' || updatedState.stage === 'FIXING',
       isError: updatedState.stage === 'ERROR',
+      // Non-null when the workflow being proposed edits the open canvas.
+      canvasTarget: updatedState.canvasTarget ?? null,
 
       // Full state — client MUST store this and send it back as `currentState`
       // on the next request. This is what keeps the conversation alive.

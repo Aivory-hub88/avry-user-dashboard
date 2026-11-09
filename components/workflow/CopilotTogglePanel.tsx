@@ -21,6 +21,7 @@ import { useCopilotPanel } from '@/hooks/useCopilotPanel'
 import { useWorkflowCopilot } from '@/hooks/useWorkflowCopilot'
 import type { CopilotMessage } from '@/hooks/useWorkflowCopilot'
 import type { GeneratedWorkflow } from '@/lib/workflows/copilotClient'
+import type { CanvasEditContext } from '@/lib/workflows/canvasCopilot'
 import { ThinkingDots } from '@/components/ui/ThinkingDots'
 
 // File icon helpers
@@ -45,14 +46,19 @@ function AetherLogo({ className = 'h-[15px] w-auto' }: { className?: string }) {
   )
 }
 
+/** Where an applied proposal lands: the open canvas (edit) or a new draft. */
+export type CopilotApplyTarget = { workflowId: string; title: string } | null
+
 interface CopilotTogglePanelProps {
   currentSpec?: unknown
   currentWorkflowName?: string
-  onApplyWorkflow?: (workflow: GeneratedWorkflow) => void
-  onApplySuggestion?: (workflow: GeneratedWorkflow) => void
+  /** Live snapshot of the workflow open on the canvas — enables edit mode. */
+  getCanvasContext?: () => CanvasEditContext | null
+  onApplyWorkflow?: (workflow: GeneratedWorkflow, target: CopilotApplyTarget) => void
+  onApplySuggestion?: (workflow: GeneratedWorkflow, target: CopilotApplyTarget) => void
 }
 
-export function CopilotTogglePanel({ onApplyWorkflow, onApplySuggestion }: CopilotTogglePanelProps) {
+export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, onApplyWorkflow, onApplySuggestion }: CopilotTogglePanelProps) {
   const { isOpen, open, close } = useCopilotPanel()
   const {
     messages,
@@ -69,10 +75,15 @@ export function CopilotTogglePanel({ onApplyWorkflow, onApplySuggestion }: Copil
     editMessage,
     deleteMessage,
     reset,
-  } = useWorkflowCopilot()
+    markApplied,
+    canvasTarget,
+  } = useWorkflowCopilot({ getCanvasContext })
 
   // Support both prop names for backward compatibility
-  const applyHandler = onApplyWorkflow || onApplySuggestion
+  const rawApply = onApplyWorkflow || onApplySuggestion
+  const applyHandler = rawApply
+    ? (wf: GeneratedWorkflow) => { rawApply(wf, canvasTarget); markApplied() }
+    : undefined
 
   // Don't reset on open/close — messages persist via localStorage.
   // Only the explicit "Clear" button (onClear={reset}) wipes the conversation.
@@ -99,6 +110,8 @@ export function CopilotTogglePanel({ onApplyWorkflow, onApplySuggestion }: Copil
           onDeleteMessage={deleteMessage}
           onApplyWorkflow={applyHandler}
           onClear={reset}
+          canvasTarget={canvasTarget}
+          canvasName={getCanvasContext ? currentWorkflowName : undefined}
         />
       ) : (
         <CopilotBarCollapsed onClick={handleOpen} />
@@ -144,16 +157,19 @@ interface CopilotPanelExpandedProps {
   onDeleteMessage: (index: number) => void
   onApplyWorkflow?: (workflow: GeneratedWorkflow) => void
   onClear?: () => void
+  canvasTarget?: CopilotApplyTarget
+  /** Name of the workflow open on the canvas, when Aether can edit it. */
+  canvasName?: string
 }
 
 function CopilotPanelExpanded({
   onClose, messages, loading, loadingHint, isStreamingReply, error,
   stage, isTesting, workflow, canApply, isCompleted,
   onSendMessage, onEditMessage, onDeleteMessage, onApplyWorkflow, onClear,
+  canvasTarget, canvasName,
 }: CopilotPanelExpandedProps) {
   const [input, setInput] = useState('')
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
-  const [appliedToCanvas, setAppliedToCanvas] = useState(false)
   const [panelHeight, setPanelHeight] = useState(360)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -187,15 +203,6 @@ function CopilotPanelExpanded({
   useEffect(() => {
     setTimeout(() => textareaRef.current?.focus(), 80)
   }, [])
-
-  useEffect(() => {
-    // Standard fetch-on-mount / sync-from-prop / hydrate-after-mount pattern
-    // (functionally correct in this pre-Suspense/pre-React-Query codebase) —
-    // not restructuring this component's data flow to satisfy the newer
-    // React Compiler style rule; see other documented instances of this.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setAppliedToCanvas(false)
-  }, [workflow?.workflowName, workflow?.steps.length])
 
   const hasMessages = messages.length > 0 || loading
   const hasContent = input.trim().length > 0 || attachedFiles.length > 0
@@ -342,11 +349,13 @@ function CopilotPanelExpanded({
       )}
 
       {/* ── Apply banner — shown only when server says canApply (workflow ready) ── */}
-      {canApply && workflow && onApplyWorkflow && !appliedToCanvas && (
+      {canApply && workflow && onApplyWorkflow && (
         <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-[var(--bg-main)]/60 border-t border-zinc-600/40 shrink-0 rounded-xl mx-3 mb-2">
           <div className="flex flex-col text-left">
             <span className="text-[13px] text-[#f7f7f7] font-medium">
-              Workflow ready — {workflow.steps.length} steps
+              {canvasTarget
+                ? `Changes ready for “${canvasTarget.title}”`
+                : `Workflow ready — ${workflow.steps.length} steps`}
             </span>
             <span className="text-[11px] text-[#a1a1aa]">
               Validated. Setup items: {workflow.setupReport?.nodeRequirements?.length ?? 0}
@@ -354,21 +363,18 @@ function CopilotPanelExpanded({
           </div>
           <button
             className="text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-[#6c5ce7] text-white cursor-pointer hover:bg-[#5b4bd6] transition-colors duration-150"
-            onClick={() => {
-              onApplyWorkflow(workflow)
-              setAppliedToCanvas(true)
-            }}
+            onClick={() => onApplyWorkflow(workflow)}
           >
-            Apply to canvas
+            {canvasTarget ? 'Update canvas' : 'Apply to canvas'}
           </button>
         </div>
       )}
 
       {/* ── Completed banner ── */}
-      {(isCompleted || appliedToCanvas) && (
+      {isCompleted && !loading && (
         <div className="flex items-center px-4 py-2 bg-emerald-900/20 border-t border-emerald-700/30 shrink-0">
           <span className="text-[13px] text-emerald-400 font-medium text-left">
-            Workflow successfully applied to canvas
+            {canvasTarget ? 'Canvas updated — ask for the next change anytime' : 'Workflow successfully applied to canvas'}
           </span>
         </div>
       )}
@@ -413,7 +419,7 @@ function CopilotPanelExpanded({
           value={input}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder="Enter an idea or app name to get started"
+          placeholder={canvasName ? `Ask Aether to change “${canvasName}”, or describe a new workflow` : 'Enter an idea or app name to get started'}
           disabled={busy}
           aria-label="Message Aivory"
         />
