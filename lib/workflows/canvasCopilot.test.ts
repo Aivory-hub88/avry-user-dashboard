@@ -18,7 +18,7 @@ vi.mock('./bridgeCopilot', () => ({
   }),
 }))
 
-import { canvasToGeneratedWorkflow, mergeEditedNodes, normalizeStepTitle, countSteps } from './canvasCopilot'
+import { canvasToGeneratedWorkflow, mergeEditedNodes, normalizeStepTitle, countSteps, stepIdAliases } from './canvasCopilot'
 import { CopilotStateMachine, isNewWorkflowRequest } from './copilotStateMachine'
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
 import { n8nToReactFlow } from '@/lib/n8nMapper'
@@ -192,5 +192,57 @@ describe('CopilotStateMachine — canvas edit mode', () => {
     expect(bridgeCalls).toHaveLength(0)
     expect(st.canvasTarget ?? null).toBeNull()
     expect(isNewWorkflowRequest('buatin workflow baru buat invoice')).toBe(true)
+  })
+})
+
+describe('mergeEditedNodes — identity survives retitling', () => {
+  it('keeps the original node when the edit engine renamed an untouched step', () => {
+    const original = n8nToReactFlow(driveBackup)
+    const edited = canvasToGeneratedWorkflow(driveBackup)
+    // The engine rewrites the title but keeps the id.
+    edited.steps[1] = { ...edited.steps[1], title: 'List invoice files in Google Drive' }
+    const rebuilt = n8nToReactFlow(
+      convertToN8nWorkflow({
+        workflow_id: 'x',
+        title: 'Drive backup',
+        trigger: edited.steps[0].title,
+        steps: edited.steps.slice(1).map((s) => ({ step: 0, action: s.title, tool: s.app || '', output: '' })),
+        keepLastStepIntent: true,
+      }) as any,
+    )
+    const merged = mergeEditedNodes(original, rebuilt, {
+      keepTrigger: true,
+      idAliases: stepIdAliases(edited.steps, original.nodes),
+    })
+    expect(merged.kept).toBe(3)
+    const list = merged.nodes.find((n) => /list invoice files/i.test(n.data.title))!
+    expect(list.data.rawN8n.credentials.googleDriveOAuth2Api.id).toBe('42')
+  })
+})
+
+describe('CopilotStateMachine — leftover proposal vs open canvas', () => {
+  const canvas = () => ({ workflowId: 'wf-1', title: 'Drive backup', workflow: canvasToGeneratedWorkflow(driveBackup) })
+  const pending = (minutesAgo: number) => ({
+    sessionId: 's', stage: 'AWAITING_APPLY_APPROVAL' as const, userRequest: 'slack', conversationHistory: [],
+    generatedWorkflow: { workflowName: 'Webhook to Slack', steps: [{ id: 'x', type: 'trigger' as const, title: 'Webhook', testable: false }], estimate_hours: 0, automation_score: 0, summary: '', nodeConfigs: [] },
+    testResults: null, testAttempts: 0, userApprovals: { confirmedWorkflow: true, approvedTest: true, appliedToCanvas: false },
+    lastMessage: '', createdAt: new Date().toISOString(), updatedAt: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
+  })
+  beforeEach(() => { bridgeCalls.length = 0 })
+
+  it('a fresh unapplied proposal keeps the conversation', async () => {
+    const st = await new CopilotStateMachine('s', pending(2)).processMessage('tambah step email', canvas())
+    expect(st.canvasTarget ?? null).toBeNull()
+    expect(bridgeCalls[0]?.body.current_workflow.workflowName).toBe('Webhook to Slack')
+  })
+
+  it('an old unapplied proposal yields to the open canvas', async () => {
+    const st = await new CopilotStateMachine('s', pending(45)).processMessage('tambah step email', canvas())
+    expect(st.canvasTarget?.workflowId).toBe('wf-1')
+  })
+
+  it('pointing at the open workflow wins even when the proposal is fresh', async () => {
+    const st = await new CopilotStateMachine('s', pending(2)).processMessage('tambah step email di workflow ini', canvas())
+    expect(st.canvasTarget?.workflowId).toBe('wf-1')
   })
 })

@@ -11,7 +11,7 @@ import {
   deactivateWorkflow,
 } from '@/hooks/useWorkflows'
 import { WorkflowCanvas as N8nWorkflowCanvas, type CanvasCopilotBridge } from '@/components/workflow/WorkflowCanvas'
-import { canvasToGeneratedWorkflow, mergeEditedNodes, normalizeStepTitle, type CanvasEditContext } from '@/lib/workflows/canvasCopilot'
+import { canvasToGeneratedWorkflow, mergeEditedNodes, normalizeStepTitle, stepIdAliases, type CanvasEditContext } from '@/lib/workflows/canvasCopilot'
 import type { CopilotApplyTarget } from '@/components/workflow/CopilotTogglePanel'
 import { CopilotTogglePanel } from '@/components/workflow/CopilotTogglePanel'
 import { WorkflowGenerationModal } from '@/components/workflow/WorkflowGenerationModal'
@@ -1429,12 +1429,13 @@ function WorkflowsPageInner() {
       const before = canvasToGeneratedWorkflow(snap.n8n)
       const keepTrigger =
         before.steps[0]?.type === 'trigger' &&
-        normalizeStepTitle(before.steps[0].title) === normalizeStepTitle(workflow.steps[0]?.title || '')
+        (workflow.steps[0]?.id === before.steps[0].id ||
+          normalizeStepTitle(before.steps[0].title) === normalizeStepTitle(workflow.steps[0]?.title || ''))
       snapshotBeforeChange('ai_apply')
       const merged = mergeEditedNodes(
         { nodes: snap.nodes, edges: snap.edges },
         { nodes: rfNodes as any, edges: rfEdges },
-        { keepTrigger },
+        { keepTrigger, idAliases: stepIdAliases(workflow.steps, snap.nodes) },
       )
       bridge.replace(merged.nodes, merged.edges)
       const parts = [
