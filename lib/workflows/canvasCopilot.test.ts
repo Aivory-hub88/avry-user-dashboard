@@ -208,7 +208,7 @@ describe('mergeEditedNodes — identity survives retitling', () => {
         trigger: edited.steps[0].title,
         steps: edited.steps.slice(1).map((s) => ({ step: 0, action: s.title, tool: s.app || '', output: '' })),
         keepLastStepIntent: true,
-      }),
+      }) as any,
     )
     const merged = mergeEditedNodes(original, rebuilt, {
       keepTrigger: true,
