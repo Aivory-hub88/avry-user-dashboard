@@ -17,7 +17,7 @@ import "@/styles/workflow-nodes.css"
 
 const nunito = Nunito({
   subsets: ["latin"],
-  weight: ["500", "600"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
   variable: "--font-nunito",
 })

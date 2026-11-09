@@ -3,33 +3,11 @@ import { asset } from "@/lib/asset";
 import Image from 'next/image';
 
 import React, { memo, useState } from 'react';
-import { Handle, Position, useReactFlow, useNodeId } from '@xyflow/react';
+import { Handle, Position, useReactFlow, useNodeId, useUpdateNodeInternals } from '@xyflow/react';
 import {
   Zap, GitFork, Waypoints, Share2, Send, Play, Workflow, BotMessageSquare, Database,
 } from 'lucide-react';
 import styles from './WorkflowNode.module.css';
-
-// ── Category → bottom panel pastel color mapping ──
-const BODY_BG_COLORS: Record<string, string> = {
-  // AI / analysis / prediction
-  ai: '#b8f5e0', agent: '#b8f5e0', 'ai & llm': '#b8f5e0',
-  // Logic / conditions / branching
-  logic: '#e3d7fb', system: '#e3d7fb',
-  // Trigger / condition
-  trigger: '#fcefb0', condition: '#fcefb0',
-  // Transform / data movement / channels
-  transform: '#d1e4ff', channel: '#d1e4ff',
-  // App / action / utility
-  app: '#fcefb0', action: '#fcefb0', utility: '#fcefb0',
-  // Email / notification / communication
-  email: '#fcefb0', notification: '#fcefb0',
-  // HTTP / API
-  http: '#d1e4ff', api: '#d1e4ff',
-  // Database
-  database: '#b8f5e0', db: '#b8f5e0',
-};
-
-function getBodyBgColor(c?: string) { return BODY_BG_COLORS[c?.toLowerCase() ?? ''] ?? '#e1ded7'; }
 
 const DESIGN = {
   nodeBg: '#a4a4a4',
@@ -40,7 +18,7 @@ const DESIGN = {
   upperBorderRadius: 11,
   iconBoxDefaultColor: '#f5a623',
   iconBoxBorderRadius: 10,
-  iconSize: 22,
+  iconSize: 26,
   titleFont: { size: 15, weight: 700, color: '#ffffff' },
   chevronBtnBg: '#555958',
   chevronBtnBorderRadius: 7,
@@ -52,14 +30,25 @@ const DESIGN = {
 };
 
 const ICON_COLOR: Record<string, string> = {
-  ai: '#7c3aed', agent: '#7c3aed', 'ai & llm': '#7c3aed',
-  logic: '#dc2626', system: '#dc2626',
-  trigger: '#f5a623', condition: '#f5a623',
-  transform: '#2563eb', channel: '#2563eb',
-  app: '#f5a623', action: '#f5a623', utility: '#f5a623',
-  email: '#f5a623', notification: '#f5a623',
-  http: '#2563eb', api: '#2563eb',
-  database: '#059669', db: '#059669',
+  ai: '#a78bfa', agent: '#a78bfa', 'ai & llm': '#a78bfa',
+  logic: '#fb7185', system: '#fb7185',
+  trigger: '#fbbf24', condition: '#fbbf24',
+  transform: '#60a5fa', channel: '#60a5fa',
+  app: '#fb923c', action: '#fb923c', utility: '#fb923c',
+  email: '#fb923c', notification: '#fb923c',
+  http: '#60a5fa', api: '#60a5fa',
+  database: '#34d399', db: '#34d399',
+};
+
+const EYEBROW: Record<string, string> = {
+  ai: 'AI', agent: 'Agent', 'ai & llm': 'AI',
+  logic: 'Logic', system: 'System',
+  trigger: 'Trigger', condition: 'Condition',
+  transform: 'Transform', channel: 'Channel',
+  app: 'App', action: 'Action', utility: 'Utility',
+  email: 'Email', notification: 'Notify',
+  http: 'HTTP', api: 'API',
+  database: 'Database', db: 'Database',
 };
 
 function getIconColor(c?: string) { return ICON_COLOR[c?.toLowerCase() ?? ''] ?? DESIGN.iconBoxDefaultColor; }
@@ -125,7 +114,7 @@ function getAppSvgIcon(label: string): string | null {
 
 function DefaultIcon({ category }: { category?: string }) {
   const cat = category?.toLowerCase() ?? '';
-  const p = { size: DESIGN.iconSize, color: 'white', strokeWidth: 2 };
+  const p = { size: DESIGN.iconSize, strokeWidth: 1.9, color: 'currentColor' };
   if (cat === 'ai' || cat === 'agent' || cat === 'ai & llm') return <BotMessageSquare {...p} />;
   if (cat === 'trigger') return <Zap {...p} />;
   if (cat === 'condition') return <GitFork {...p} />;
@@ -182,6 +171,42 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
   const { description, category, icon, hideTarget = false, onAddStep, appIcon, iconPath, app, outputs } = data;
   const { setNodes, setEdges } = useReactFlow();
   const nodeId = useNodeId();
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  const isMulti = !!(outputs && outputs.length > 1);
+  // Only Switch-style outputs (out-0, out-1, …) can grow; If/Loop are fixed pairs.
+  const canAddBranch = isMulti && outputs!.every((o) => /^out-\d+$/.test(o.id));
+
+  const handleAddBranch = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!nodeId || !outputs) return;
+    const hasFallback = outputs[outputs.length - 1]?.label === 'Fallback';
+    const ruleCount = hasFallback ? outputs.length - 1 : outputs.length;
+    const label = `Output ${ruleCount}`;
+    const next = hasFallback
+      ? [...outputs.slice(0, -1), { id: `out-${ruleCount}`, label }, { id: `out-${ruleCount + 1}`, label: 'Fallback' }]
+      : [...outputs, { id: `out-${ruleCount}`, label }];
+    setNodes((nds) => nds.map((n) => {
+      if (n.id !== nodeId) return n;
+      const raw = (n.data as any).rawN8n;
+      const params = raw?.parameters ?? {};
+      const values = [...(params.rules?.values ?? []), { outputKey: label }];
+      return {
+        ...n,
+        data: {
+          ...n.data,
+          outputs: next,
+          ...(raw ? { rawN8n: { ...raw, parameters: { ...params, rules: { ...params.rules, values } } } } : {}),
+        },
+      };
+    }));
+    // The fallback slides one index to the right — keep its connection attached.
+    if (hasFallback) {
+      setEdges((eds) => eds.map((ed) =>
+        ed.source === nodeId && ed.sourceHandle === `out-${ruleCount}` ? { ...ed, sourceHandle: `out-${ruleCount + 1}` } : ed));
+    }
+    requestAnimationFrame(() => updateNodeInternals(nodeId));
+  };
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -198,7 +223,6 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
 
   const { short, rest } = splitLabel(label);
   const hasExpandedContent = rest || description;
-  const bodyBgColor = getBodyBgColor(category);
   const accentColor = getIconColor(category);
   // Brand-icon nodes (Slack/Gmail/etc.) already carry their own recognizable
   // color — only tint the icon box for the generic DefaultIcon fallback so a
@@ -214,16 +238,16 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
   const renderIcon = () => {
     if (iconPath) {
       return (
-        <Image src={asset(iconPath)} alt={label} width={36} height={36}
-          style={{ width: 36, height: 36, objectFit: 'contain' }}
+        <Image src={asset(iconPath)} alt={label} width={28} height={28}
+          style={{ width: 28, height: 28, objectFit: 'contain' }}
           onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.removeAttribute('style'); }}
         />
       );
     }
     if (appIcon && (appIcon.startsWith('/') || appIcon.startsWith('http'))) {
       return (
-        <Image src={appIcon.startsWith('http') ? appIcon : asset(appIcon)} alt={label} width={36} height={36}
-          style={{ width: 36, height: 36, objectFit: 'contain' }}
+        <Image src={appIcon.startsWith('http') ? appIcon : asset(appIcon)} alt={label} width={28} height={28}
+          style={{ width: 28, height: 28, objectFit: 'contain' }}
           onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.removeAttribute('style'); }}
         />
       );
@@ -233,8 +257,8 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
     const svgPath = getAppSvgIcon(app || '') ?? getAppSvgIcon(typeof appIcon === 'string' ? appIcon : '') ?? (appIcon ? getAppSvgIcon(label) : null);
     if (svgPath) {
       return (
-        <Image src={asset(svgPath)} alt={label} width={36} height={36}
-          style={{ width: 36, height: 36, objectFit: 'contain' }}
+        <Image src={asset(svgPath)} alt={label} width={28} height={28}
+          style={{ width: 28, height: 28, objectFit: 'contain' }}
           onError={(e) => { e.currentTarget.style.display = 'none'; }}
         />
       );
@@ -260,15 +284,18 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
     >
 
       {/* ── Connector dot LEFT ── */}
-      <div className={styles.connectorDotLeft} />
+      <div className={styles.connectorDotLeft} style={isMulti ? { top: 31 } : undefined} />
 
       {/* ── Upper bar (always visible) ── */}
       <div className={styles.upperBar}>
-        <div className={styles.iconBox} style={hasBrandIcon ? undefined : { background: accentColor }}>
+        <div className={`${styles.iconBox} ${hasBrandIcon ? styles.iconBrand : styles.iconTint}`}>
           {renderIcon()}
         </div>
 
-        <span className={styles.title}>{short}</span>
+        <div className={styles.titleWrap}>
+          <span className={styles.eyebrow}>{EYEBROW[category?.toLowerCase() ?? ''] ?? 'Step'}</span>
+          <span className={styles.title}>{short}</span>
+        </div>
 
         {hasExpandedContent && (
           <button
@@ -276,7 +303,7 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
             onClick={(e) => { e.stopPropagation(); setExpanded(v => !v); }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-              stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               {expanded
                 ? <polyline points="18 15 12 9 6 15" />
                 : <polyline points="6 9 12 15 18 9" />
@@ -286,22 +313,41 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
         )}
       </div>
 
+      {/* ── Branch rows: one port per output (Switch / If / Loop) ── */}
+      {isMulti && (
+        <div className={styles.branches}>
+          {outputs!.map((output, i) => {
+            const isFallback = output.label === 'Fallback';
+            return (
+              <div key={output.id} className={`${styles.branchRow} ${isFallback ? styles.branchFallback : ''}`}>
+                <span className={styles.branchIdx}>{isFallback ? '∅' : i + 1}</span>
+                <span className={styles.branchLabel}>{isFallback ? 'No condition matched' : output.label}</span>
+                <div className={styles.branchDot} />
+                <Handle type="source" id={output.id} position={Position.Right} className={styles.branchHandle} />
+              </div>
+            );
+          })}
+          {canAddBranch && (
+            <button type="button" className={styles.branchAdd} onClick={handleAddBranch} title="Add branch" aria-label="Add branch">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Body (expanded only) ── */}
       {expanded && hasExpandedContent && (
         <div
           className={styles.nodeBody}
           data-category={category}
-          style={{
-            '--body-bg': bodyBgColor,
-          } as React.CSSProperties}
         >
           {rest && (
-            <span className={styles.restTitle} style={{ display: 'block', color: DESIGN.bodyText.color }}>
+            <span className={styles.restTitle}>
               {rest}
             </span>
           )}
           {description && (
-            <span className={styles.descriptionText} style={{ display: 'block', color: DESIGN.bodyText.color }}>
+            <span className={styles.descriptionText}>
               {description}
             </span>
           )}
@@ -330,30 +376,13 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
       </div>
 
       {/* ── ReactFlow handles ── */}
-      {!hideTarget && <Handle type="target" position={Position.Left} className={styles.handle} />}
+      {!hideTarget && <Handle type="target" position={Position.Left} className={styles.handle} style={isMulti ? { top: 31 } : undefined} />}
 
       {/* Multi-output nodes (If/Switch/SplitInBatches) need one NAMED handle
           per branch — edges carry a matching sourceHandle id (out-yes/out-0/…)
           and @xyflow/react can't resolve an edge whose handle id doesn't
           exist on the node, so it silently drops the connecting line. */}
-      {outputs && outputs.length > 1 ? (
-        outputs.map((output, i) => {
-          const topPct = ((i + 1) / (outputs.length + 1)) * 100;
-          return (
-            <React.Fragment key={output.id}>
-              <div className={styles.connectorDotRight} style={{ top: `${topPct}%` }} />
-              <span className={styles.outputLabel} style={{ top: `${topPct}%` }}>{output.label}</span>
-              <Handle
-                type="source"
-                id={output.id}
-                position={Position.Right}
-                className={styles.handle}
-                style={{ top: `${topPct}%` }}
-              />
-            </React.Fragment>
-          );
-        })
-      ) : (
+      {!isMulti && (
         <>
           <div className={styles.connectorDotRight} />
           <Handle type="source" position={Position.Right} className={styles.handle} />

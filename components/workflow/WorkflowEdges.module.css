@@ -2,26 +2,24 @@
 
 /* Default edge: dashed, animated marching ants */
 .n8nEdge {
-  stroke: #9ca3af;
-  stroke-width: 2px;
-  stroke-dasharray: 5 5;
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 1.75px;
   stroke-linecap: round;
   fill: none;
-  animation: n8nDash 1.5s linear infinite;
   transition: stroke 0.15s ease, stroke-width 0.15s ease;
 }
 
 .n8nEdge:hover {
-  stroke: #d1d5db;
-  stroke-width: 2.5px;
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 2px;
 }
 
 /* Selected edge: solid, thicker, primary blue */
 .n8nEdgeSelected {
-  stroke: #3b82f6;
-  stroke-width: 2.5px;
-  stroke-dasharray: none;
-  animation: none;
+  stroke: #60a5fa;
+  stroke-width: 2px;
+  stroke-dasharray: 6 6;
+  animation: n8nDash 1.2s linear infinite;
 }
 
 .n8nEdgeSelected:hover {
