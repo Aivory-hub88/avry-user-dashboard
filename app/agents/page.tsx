@@ -57,7 +57,8 @@ const AGENT_HEADER_IMAGES = {
   finance: '/agent-card-headers/green.svg',
   office: '/agent-card-headers/orange.svg',
   analyst: '/agent-card-headers/blue.svg',
-  operations: '/agent-card-headers/purple.svg',
+  operations: '/agent-card-headers/amber.svg',
+  marketing: '/agent-card-headers/orchid.svg',
 };
 
 const AGENTS = [
@@ -150,6 +151,19 @@ const AGENTS = [
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
         <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+      </svg>
+    )
+  },
+  {
+    agentType: 'marketing_content' as TelegramAgentType,
+    name: AGENT_NAMES.marketing_content,
+    titleKey: 'marketingTitle',
+    descKey: 'marketingDesc',
+    toolsKey: 'marketingTools',
+    headerImage: AGENT_HEADER_IMAGES.marketing,
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
       </svg>
     )
   },

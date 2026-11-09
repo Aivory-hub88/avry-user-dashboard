@@ -811,6 +811,14 @@
       "Draft purchase orders",
       "Late deliveries"
     ],
+    "marketingTitle": "Marketing & Content Agent",
+    "marketingDesc": "Content calendars and channel drafts from a short brief, with tracked campaign links. It only drafts: nothing is posted, broadcast or emailed without your approval.",
+    "marketingTools": [
+      "Content calendar",
+      "Channel drafts",
+      "Campaign links",
+      "Competitor research"
+    ],
     "chiefOfStaffTitle": "Chief of Staff Agent",
     "chiefOfStaffDesc": "Coordinate your AI team, route work to the right specialist, and receive one coherent outcome with approvals kept in the loop.",
     "chiefOfStaffTools": [
