@@ -811,6 +811,14 @@
       "Draf purchase order",
       "Pengiriman terlambat"
     ],
+    "marketingTitle": "Marketing & Content Agent",
+    "marketingDesc": "Kalender konten dan draf per kanal dari brief singkat, lengkap dengan tautan kampanye yang terlacak. Hanya membuat draf: tidak ada yang diposting, disiarkan, atau diemail tanpa persetujuan Anda.",
+    "marketingTools": [
+      "Kalender konten",
+      "Draf per kanal",
+      "Tautan kampanye",
+      "Riset kompetitor"
+    ],
     "chiefOfStaffTitle": "Chief of Staff Agent",
     "chiefOfStaffDesc": "Mengatur tim AI, meneruskan pekerjaan ke spesialis yang tepat, dan memberi satu hasil terpadu dengan approval tetap terjaga.",
     "chiefOfStaffTools": [

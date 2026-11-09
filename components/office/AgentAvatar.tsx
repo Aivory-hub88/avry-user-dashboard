@@ -45,6 +45,7 @@ export const AGENT_VISUALS: Record<AgentType | "null", AgentVisual> = {
   office_assistant: { portraitSrc: "/agents/office_assistant.svg" },
   data_analyst: { portraitSrc: "/agents/data_analyst.svg" }, // Data & Reporting Analyst (placeholder portrait)
   operations_inventory: { portraitSrc: "/agents/operations_inventory.svg" }, // Operations & Inventory Agent (placeholder portrait)
+  marketing_content: { portraitSrc: "/agents/marketing_content.svg" }, // Marketing & Content Agent (placeholder portrait)
   chief_of_staff: { portraitSrc: "/agents/chief_of_staff.svg" },
 }
 

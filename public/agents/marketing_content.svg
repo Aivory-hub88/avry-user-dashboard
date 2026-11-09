@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PLACEHOLDER portrait for Mira (marketing_content). Replace with the illustrated bust
+     in the same style as the other public/agents/*.svg (circle clip, 354.6 box). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 354.6 354.6">
+  <defs>
+    <clipPath id="clip"><circle cx="177.3" cy="177.3" r="177.3"/></clipPath>
+  </defs>
+  <circle cx="177.3" cy="177.3" r="177.3" fill="#d9628f"/>
+  <g clip-path="url(#clip)">
+    <path d="M60 354.6c6-62 52-100 117.300-100s111.300 38 117.300 100z" fill="#a8416a"/>
+    <rect x="152" y="196" width="50.600" height="46" rx="22" fill="#e3ae92"/>
+    <circle cx="177.300" cy="148" r="58" fill="#efc0a5"/>
+    <path d="M114 150c-4-44 24-72 63.300-72s67.300 28 63.300 72c-6-26-12-40-24-48-12 8-30 12-39.300 12s-27.300-4-39.300-12c-12 8-18 22-24 48z" fill="#2b1a1a"/>
+    <path d="M150 296l27.300-22 27.300 22-27.300 22z" fill="#fefeff" opacity=".92"/>
+  </g>
+</svg>
