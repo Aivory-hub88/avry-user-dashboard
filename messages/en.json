@@ -803,6 +803,14 @@
       "Sales forecast",
       "Anomaly flags"
     ],
+    "operationsTitle": "Operations & Inventory Agent",
+    "operationsDesc": "Daily stock checks, reorder suggestions with the maths shown, and draft purchase orders. Nothing is confirmed or sent without your approval.",
+    "operationsTools": [
+      "Low-stock list",
+      "Reorder suggestions",
+      "Draft purchase orders",
+      "Late deliveries"
+    ],
     "chiefOfStaffTitle": "Chief of Staff Agent",
     "chiefOfStaffDesc": "Coordinate your AI team, route work to the right specialist, and receive one coherent outcome with approvals kept in the loop.",
     "chiefOfStaffTools": [

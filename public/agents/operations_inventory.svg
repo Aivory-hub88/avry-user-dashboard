@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PLACEHOLDER portrait for Juno (operations_inventory). Replace with the illustrated bust
+     in the same style as the other public/agents/*.svg (circle clip, 354.6 box). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 354.6 354.6">
+  <defs>
+    <clipPath id="clip"><circle cx="177.3" cy="177.3" r="177.3"/></clipPath>
+  </defs>
+  <circle cx="177.3" cy="177.3" r="177.3" fill="#6962a5"/>
+  <g clip-path="url(#clip)">
+    <path d="M60 354.6c6-62 52-100 117.300-100s111.300 38 117.300 100z" fill="#4a468c"/>
+    <rect x="152" y="196" width="50.600" height="46" rx="22" fill="#d9a68a"/>
+    <circle cx="177.300" cy="148" r="58" fill="#e8b99d"/>
+    <path d="M118 140c0-38 25-62 59.300-62s59.300 24 59.300 62c-14-22-34-30-59.300-30s-45.300 8-59.300 30z" fill="#3a2a1d"/>
+    <g fill="#fefeff" opacity=".92">
+      <rect x="126" y="284" width="34" height="34" rx="5"/>
+      <rect x="168" y="284" width="34" height="34" rx="5"/>
+      <rect x="147" y="248" width="34" height="34" rx="5"/>
+    </g>
+  </g>
+</svg>
