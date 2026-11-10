@@ -402,7 +402,31 @@ function sanitizeStepArray(rawSteps: unknown, fixes: string[]): GeneratedWorkflo
     seen.add(steps[i].id)
   }
 
-  return steps
+  // A "merge branches" step right after a condition/switch is redundant: the
+  // converter already joins every branch. Keeping it stacked a second Merge node
+  // on the canvas (and another one on every later edit).
+  const out: GeneratedWorkflowStep[] = []
+  for (const step of steps) {
+    const prev = out[out.length - 1]
+    if (prev && BRANCHING_TYPES.has(prev.type) && isRedundantJoinStep(step)) {
+      fixes.push(`step "${step.id}": dropped redundant "${step.title}" (branches are joined automatically)`)
+      continue
+    }
+    out.push(step)
+  }
+  return out
+}
+
+const JOIN_VERB = /\b(merge|join|combine|converge|rejoin|reunite|gabung(?:kan)?|satukan)\b/i
+const JOIN_OBJECT = /\b(branch(?:es)?|paths?|flows?|lanes?|routes?|cabang|jalur|alur)\b/i
+const BARE_JOIN_TITLE = /^(?:step\s+\d+\s*:\s*)?(?:merge|join)(?:\s+\d+)?$/i
+
+/** A step whose whole job is to bring the branches of the previous condition/switch back together. */
+function isRedundantJoinStep(step: GeneratedWorkflowStep): boolean {
+  if (step.type === 'trigger' || step.type === 'condition' || step.type === 'switch' || step.type === 'loop') return false
+  if (step.branches?.length) return false
+  const label = `${step.title} ${step.action ?? ''}`
+  return BARE_JOIN_TITLE.test(step.title.trim()) || (JOIN_VERB.test(label) && JOIN_OBJECT.test(label))
 }
 
 /**

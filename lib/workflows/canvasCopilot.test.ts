@@ -361,3 +361,34 @@ describe('mergeEditedNodes — layout', () => {
     expect(new Set(spots).size).toBe(spots.length)
   })
 })
+
+describe('canvas round trip does not add Merge nodes', () => {
+  const plan: any[] = [
+    { step: 1, action: 'Read leads', tool: 'googlesheets action', app: 'googlesheets', appAction: 'read', output: '', type: 'action' },
+    { step: 2, action: 'Hot lead?', tool: 'ai condition', app: 'ai', output: '', type: 'condition', branches: [
+      { key: 'true', steps: [{ step: 3, action: 'Notify sales', tool: 'slack channel', app: 'slack', appAction: 'send', output: '', type: 'channel' }] },
+      { key: 'false', steps: [{ step: 4, action: 'Add to list', tool: 'mailchimp action', app: 'mailchimp', appAction: 'add', output: '', type: 'action' }] } ] },
+    { step: 5, action: 'Send follow-up', tool: 'gmail action', app: 'gmail', appAction: 'send', output: '', type: 'action' },
+  ]
+  const build = (steps: any[]) => convertToN8nWorkflow({ workflow_id: 'x', title: 't', trigger: 'Every day', trigger_app: 'schedule', steps, keepLastStepIntent: true } as any)
+  const joins = (wf: any) => wf.nodes.filter((n: any) => n.type === 'n8n-nodes-base.noOp').length
+
+  it('does not turn the converter\'s join node into a step', () => {
+    const wf = build(plan)
+    expect(joins(wf)).toBe(1)
+    const steps = canvasToGeneratedWorkflow(wf as any).steps
+    const flat = JSON.stringify(steps)
+    expect(flat).not.toMatch(/Merge \d/)
+    expect(steps.map((s) => s.title).slice(-1)).toEqual(['Send follow-up'])
+  })
+
+  it('stays at one join after repeated edits', () => {
+    let wf = build(plan)
+    for (let i = 0; i < 3; i++) {
+      const gen = canvasToGeneratedWorkflow(wf as any)
+      const toConv = (ss: any[]): any[] => ss.map((s) => ({ step: 0, action: s.title, tool: `${s.app || ''} ${s.type}`, app: s.app, output: '', type: s.type, branches: s.branches?.map((b: any) => ({ key: b.key, steps: toConv(b.steps) })) }))
+      wf = convertToN8nWorkflow({ workflow_id: 'x', title: 't', trigger: 'Schedule Trigger', trigger_app: 'schedule', steps: toConv(gen.steps.slice(1)), keepLastStepIntent: true } as any)
+    }
+    expect(joins(wf)).toBe(1)
+  })
+})
