@@ -530,7 +530,7 @@ function CopilotPanelExpanded({
         </div>
       )}
 
-      {/* ── Input area — same composer as the AI Console (two-row card) ── */}
+      {/* ── Input area — Console's one-row composer: + | message | send ── */}
       <div className="px-3 pb-2 pt-2 shrink-0">
         <div className="console-input-card w-full overflow-hidden">
           <input
@@ -541,22 +541,9 @@ function CopilotPanelExpanded({
             accept=".json,.txt,.csv,.pdf,.png,.jpg,.jpeg,.yaml,.yml,.env,.log"
             onChange={handleFileChange}
           />
-          <div className="px-5 pt-[14px] pb-1">
-            <textarea
-              ref={textareaRef}
-              className="console-textarea w-full"
-              rows={2}
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              placeholder={canvasName ? `Ask Aether to change “${canvasName}”, or describe a new workflow` : 'Enter an idea or app name to get started'}
-              disabled={busy}
-              aria-label="Message Aivory"
-            />
-          </div>
-          <div className="flex items-center justify-between px-4 pt-1 pb-3">
+          <div className="flex items-end gap-2 px-3 py-[10px]">
             <button
-              className="console-icon-btn"
+              className="console-icon-btn mb-[2px]"
               onClick={() => fileInputRef.current?.click()}
               title="Attach file"
               aria-label="Attach file"
@@ -566,6 +553,17 @@ function CopilotPanelExpanded({
                 <path d="M12 5v14M5 12h14"/>
               </svg>
             </button>
+            <textarea
+              ref={textareaRef}
+              className="console-textarea console-textarea--inline flex-1 min-w-0 text-[14px]"
+              rows={1}
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder={canvasName ? `Ask Aether to change “${canvasName}”…` : 'Enter an idea or app name to get started'}
+              disabled={busy}
+              aria-label="Message Aivory"
+            />
             <button
               className="console-send-btn"
               onClick={handleSend}
