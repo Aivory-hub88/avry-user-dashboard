@@ -315,7 +315,7 @@ function useFloatingPosition(wrapRef: React.RefObject<HTMLDivElement | null>, st
 /* ── Window dots: close (red) + minimize (yellow) ─────── */
 
 function WindowDots({ onClose, onMinimize }: { onClose: () => void; onMinimize?: () => void }) {
-  const base = 'group/dot relative w-3 h-3 rounded-full flex items-center justify-center transition-colors duration-150 bg-white/[0.16]'
+  const base = 'group/dot relative w-3 h-3 rounded-full flex items-center justify-center transition-[filter] duration-150 hover:brightness-110'
   return (
     <div className="flex items-center gap-1.5 group/dots" onDoubleClick={e => e.stopPropagation()}>
       <button
@@ -323,7 +323,7 @@ function WindowDots({ onClose, onMinimize }: { onClose: () => void; onMinimize?:
         onClick={onClose}
         title="Close"
         aria-label="Close Aether"
-        className={`${base} group-hover/dots:bg-[#ff5f57]`}
+        className={`${base} bg-[#ff5f57]`}
       >
         <svg width="7" height="7" viewBox="0 0 8 8" fill="none" stroke="rgba(0,0,0,0.6)" strokeWidth="1.4" strokeLinecap="round" className="opacity-0 group-hover/dots:opacity-100 transition-opacity">
           <path d="M1.5 1.5l5 5M6.5 1.5l-5 5"/>
@@ -335,7 +335,7 @@ function WindowDots({ onClose, onMinimize }: { onClose: () => void; onMinimize?:
           onClick={onMinimize}
           title="Minimize"
           aria-label="Minimize Aether"
-          className={`${base} group-hover/dots:bg-[#febc2e]`}
+          className={`${base} bg-[#febc2e]`}
         >
           <svg width="7" height="7" viewBox="0 0 8 8" fill="none" stroke="rgba(0,0,0,0.6)" strokeWidth="1.4" strokeLinecap="round" className="opacity-0 group-hover/dots:opacity-100 transition-opacity">
             <path d="M1.5 4h5"/>
