@@ -23,6 +23,7 @@ import type { CopilotMessage } from '@/hooks/useWorkflowCopilot'
 import type { GeneratedWorkflow } from '@/lib/workflows/copilotClient'
 import type { CanvasEditContext, ChangePreview } from '@/lib/workflows/canvasCopilot'
 import { ThinkingDots } from '@/components/ui/ThinkingDots'
+import { SendArrowIcon } from '@/components/ChatInput'
 
 // File icon helpers
 const FILE_ICONS = {
@@ -379,7 +380,7 @@ function CopilotPanelExpanded({
   return (
     <div
       className={`w-[520px] max-w-[90vw] rounded-2xl overflow-hidden flex flex-col border border-white/[0.08] ${dragging ? 'shadow-[0_28px_70px_rgba(0,0,0,0.55)]' : 'shadow-2xl'} transition-shadow duration-150`}
-      style={{ background: '#3a3a38', maxHeight: 'calc(100vh - 160px)' }}
+      style={{ background: '#2a2a2e', maxHeight: 'calc(100vh - 160px)' }}
       role="dialog"
       aria-label="Aivory Aether"
     >
@@ -489,7 +490,7 @@ function CopilotPanelExpanded({
             </span>
           </div>
           <button
-            className="text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-[#6c5ce7] text-white cursor-pointer hover:bg-[#5b4bd6] transition-colors duration-150"
+            className="text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-[#f2f2f3] text-[#1a1a1d] cursor-pointer hover:bg-white transition-colors duration-150"
             onClick={() => onApplyWorkflow(workflow)}
           >
             {canvasTarget ? (isDeployed ? 'Update & save' : 'Update canvas') : 'Apply to canvas'}
@@ -513,7 +514,7 @@ function CopilotPanelExpanded({
           {attachedFiles.map((file, i) => {
             const icon = getFileIcon(file.name)
             return (
-              <div key={i} className="flex items-center gap-2 bg-[#4a4a48] border border-white/10 rounded-lg px-3 py-1.5 text-[13px] text-white/75 max-w-[180px]">
+              <div key={i} className="flex items-center gap-2 bg-[#35353a] border border-white/10 rounded-lg px-3 py-1.5 text-[13px] text-white/75 max-w-[180px]">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={icon.color} strokeWidth="1.8" className="shrink-0">
                   <path d={icon.path}/>
                 </svg>
@@ -529,50 +530,52 @@ function CopilotPanelExpanded({
         </div>
       )}
 
-      {/* ── Input area ── */}
+      {/* ── Input area — same composer as the AI Console (two-row card) ── */}
       <div className="px-3 pb-2 pt-2 shrink-0">
-        <div className="bg-[#2e2e2c] border border-white/[0.07] rounded-[14px] pl-4 pr-3 py-2.5 flex items-end gap-3 shadow-md">
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          multiple
-          accept=".json,.txt,.csv,.pdf,.png,.jpg,.jpeg,.yaml,.yml,.env,.log"
-          onChange={handleFileChange}
-        />
-        <textarea
-          ref={textareaRef}
-          className="flex-1 bg-transparent border-none outline-none resize-none text-[#f7f7f7] text-[13px] leading-relaxed placeholder:text-white/30 min-h-[22px] max-h-[180px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden caret-accent disabled:opacity-50 text-left"
-          rows={1}
-          value={input}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder={canvasName ? `Ask Aether to change “${canvasName}”, or describe a new workflow` : 'Enter an idea or app name to get started'}
-          disabled={busy}
-          aria-label="Message Aivory"
-        />
-        <button
-          className="text-white/40 hover:text-white/70 flex items-center justify-center p-1 rounded-md transition-colors shrink-0 pb-0.5"
-          onClick={() => fileInputRef.current?.click()}
-          title="Attach file"
-          aria-label="Attach file"
-          type="button"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-          </svg>
-        </button>
-        <button
-          className={`w-9 h-9 rounded-[20px] flex items-center justify-center transition-colors shrink-0 ${hasContent ? 'bg-[var(--bg-main)] border border-zinc-600 hover:bg-white/10' : 'bg-zinc-600'}`}
-          onClick={handleSend}
-          disabled={!hasContent || busy}
-          aria-label="Send"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="19" x2="12" y2="5"/>
-            <polyline points="5 12 12 5 19 12"/>
-          </svg>
-        </button>
+        <div className="console-input-card w-full overflow-hidden">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            multiple
+            accept=".json,.txt,.csv,.pdf,.png,.jpg,.jpeg,.yaml,.yml,.env,.log"
+            onChange={handleFileChange}
+          />
+          <div className="px-5 pt-[14px] pb-1">
+            <textarea
+              ref={textareaRef}
+              className="console-textarea w-full"
+              rows={2}
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder={canvasName ? `Ask Aether to change “${canvasName}”, or describe a new workflow` : 'Enter an idea or app name to get started'}
+              disabled={busy}
+              aria-label="Message Aivory"
+            />
+          </div>
+          <div className="flex items-center justify-between px-4 pt-1 pb-3">
+            <button
+              className="console-icon-btn"
+              onClick={() => fileInputRef.current?.click()}
+              title="Attach file"
+              aria-label="Attach file"
+              type="button"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+            </button>
+            <button
+              className="console-send-btn"
+              onClick={handleSend}
+              disabled={!hasContent || busy}
+              aria-label="Send"
+              type="button"
+            >
+              <SendArrowIcon size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -707,7 +710,7 @@ function MessageRow({
             </button>
             <button
               type="button"
-              className="text-[11px] font-semibold px-3 py-1 rounded-lg bg-[#dddac5] text-[#23231f] hover:bg-[#eae7d4] transition-colors disabled:opacity-45"
+              className="text-[11px] font-semibold px-3 py-1 rounded-lg bg-[#f2f2f3] text-[#1a1a1d] hover:bg-white transition-colors disabled:opacity-45"
               onClick={submitEdit}
               disabled={!draft.trim() || busy}
             >
@@ -749,7 +752,7 @@ function MessageRow({
   // ── User message: right-aligned bubble, actions on hover ──
   return (
     <div className="group flex flex-col items-end">
-      <div className="max-w-[85%] bg-[#282825] border border-white/[0.06] rounded-2xl rounded-br-md px-3.5 py-2">
+      <div className="max-w-[85%] bg-[#1f1f22] border border-white/[0.06] rounded-2xl rounded-br-md px-3.5 py-2">
         <p className="m-0 text-[13px] leading-[1.6] text-[#f7f7f7] whitespace-pre-wrap break-words text-left">
           {msg.content}
         </p>
