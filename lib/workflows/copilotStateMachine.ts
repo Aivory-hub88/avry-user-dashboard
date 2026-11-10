@@ -14,7 +14,7 @@
 
 import { countSteps, type CanvasEditContext } from './canvasCopilot'
 import { callCopilotOperation } from './bridgeCopilot'
-import { analyzeRequest, matchTemplate, sanitizeWorkflow } from './deterministicPlanner'
+import { analyzeRequest, matchTemplate, findMissingApps, sanitizeWorkflow } from './deterministicPlanner'
 
 // ============================================================
 // TYPES
@@ -898,9 +898,14 @@ export class CopilotStateMachine {
         })
       }
 
+      // Coverage: if the user named apps that no step mentions, the generator
+      // dropped part of the request. Ask once for the missing parts and keep the
+      // correction only when it really covers more.
+      const completed = await this.completeMissingApps(workflow.workflowName, sanitized.steps)
+
       this.state.generatedWorkflow = {
         workflowName: workflow.workflowName,
-        steps: sanitized.steps,
+        steps: completed,
         estimate_hours: workflow.estimate_hours ?? 2,
         automation_score: workflow.automation_score ?? 0.8,
         summary: workflow.summary ?? '',
@@ -923,6 +928,43 @@ export class CopilotStateMachine {
       return this.handleError(
         `Failed to create workflow: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
+    }
+  }
+
+  /**
+   * One corrective edit when the generated steps omit apps the user named.
+   * Never throws and never makes the result worse: on any failure, or if the
+   * edit does not reduce the missing apps, the original steps are returned.
+   */
+  private async completeMissingApps(
+    workflowName: string,
+    steps: GeneratedWorkflowStep[],
+  ): Promise<GeneratedWorkflowStep[]> {
+    const missing = findMissingApps(this.state.userRequest, steps)
+    if (missing.length === 0) return steps
+    const names = missing.map((a) => a.label).join(', ')
+    try {
+      console.log('[CopilotStateMachine] coverage gap, requesting correction', {
+        session_id: this.state.sessionId,
+        missing: missing.map((a) => a.id),
+      })
+      const result = await this.bridge.edit({
+        session_id: this.state.sessionId,
+        organization_id: this.state.organizationId || 'copilot',
+        user_request: this.state.userRequest,
+        current_workflow: { workflowName, steps } as unknown as GeneratedWorkflow,
+        edit_request:
+          `The workflow is missing what the user asked for involving: ${names}. ` +
+          `Add the missing step(s) in the right place (use a condition with branches if the request is conditional), ` +
+          `keep every existing step and the original request: "${this.state.userRequest}"`,
+      })
+      const edited = result?.workflow
+      if (!edited || !Array.isArray(edited.steps) || edited.steps.length === 0) return steps
+      const fixed = sanitizeWorkflow(edited.steps).steps
+      return findMissingApps(this.state.userRequest, fixed).length < missing.length ? fixed : steps
+    } catch (error) {
+      console.warn('[CopilotStateMachine] coverage correction failed, keeping original', error)
+      return steps
     }
   }
 
