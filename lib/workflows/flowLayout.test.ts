@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { layoutLeftToRight, COLUMN_WIDTH, ROW_HEIGHT } from './flowLayout'
+import { layoutLeftToRight, placeEditedNodes, COLUMN_WIDTH, ROW_HEIGHT } from './flowLayout'
 
 const e = (source: string, target: string) => ({ source, target })
 
@@ -49,5 +49,45 @@ describe('lanes', () => {
     expect(p.get('join')!.y).toBe((p.get('notify')!.y + p.get('add')!.y) / 2)
     // the add -> join edge runs below the notify node's row
     expect(p.get('add')!.y).toBeGreaterThanOrEqual(p.get('notify')!.y + ROW_HEIGHT)
+  })
+})
+
+describe('placeEditedNodes', () => {
+  const P = (x: number, y: number) => ({ x, y })
+
+  it('keeps existing nodes where they are and appends a new step after its parent', () => {
+    const kept = new Map([['a', P(10, 20)], ['b', P(500, 90)]])
+    const fresh = layoutLeftToRight(['a', 'b', 'c'], [e('a', 'b'), e('b', 'c')])
+    const out = placeEditedNodes({ ids: ['a', 'b', 'c'], edges: [e('a', 'b'), e('b', 'c')], kept, fresh })
+    expect(out.get('a')).toEqual(P(10, 20))
+    expect(out.get('b')).toEqual(P(500, 90))
+    expect(out.get('c')).toEqual(P(500 + COLUMN_WIDTH, 90))
+  })
+
+  it('makes room when a step is inserted in the middle', () => {
+    // a -> b -> c existed; the edit makes it a -> new -> b -> c
+    const kept = new Map([['a', P(0, 0)], ['b', P(COLUMN_WIDTH, 0)], ['c', P(2 * COLUMN_WIDTH, 0)]])
+    const edges = [e('a', 'new'), e('new', 'b'), e('b', 'c')]
+    const fresh = layoutLeftToRight(['a', 'new', 'b', 'c'], edges)
+    const out = placeEditedNodes({ ids: ['a', 'new', 'b', 'c'], edges, kept, fresh })
+    expect(out.get('new')).toEqual(P(COLUMN_WIDTH, 0))
+    expect(out.get('b')).toEqual(P(2 * COLUMN_WIDTH, 0))
+    expect(out.get('c')).toEqual(P(3 * COLUMN_WIDTH, 0))
+    expect(out.get('a')).toEqual(P(0, 0))
+  })
+
+  it('does not put a new branch node on top of an existing one', () => {
+    const kept = new Map([['if', P(0, 0)], ['yes', P(COLUMN_WIDTH, 0)]])
+    const edges = [e('if', 'yes'), e('if', 'extra')]
+    const fresh = layoutLeftToRight(['if', 'yes', 'extra'], edges)
+    const out = placeEditedNodes({ ids: ['if', 'yes', 'extra'], edges, kept, fresh })
+    const a = out.get('yes')!, b = out.get('extra')!
+    expect(Math.abs(a.x - b.x) < COLUMN_WIDTH * 0.8 && Math.abs(a.y - b.y) < ROW_HEIGHT * 0.6).toBe(false)
+  })
+
+  it('places a new root from the fresh layout, aligned to the canvas', () => {
+    const kept = new Map([['a', P(1000, 500)]])
+    const out = placeEditedNodes({ ids: ['t', 'a'], edges: [e('t', 'a')], kept, fresh: new Map([['t', P(0, 0)], ['a', P(COLUMN_WIDTH, 0)]]) })
+    expect(out.get('t')).toEqual(P(1000 - COLUMN_WIDTH, 500))
   })
 })

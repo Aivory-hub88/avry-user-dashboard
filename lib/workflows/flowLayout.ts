@@ -126,3 +126,84 @@ function layoutMain(
   }
   return out
 }
+
+type Pos = { x: number; y: number }
+
+/**
+ * Positions after an edit that added steps. Nodes that were already on the canvas
+ * keep exactly where they are; each new node goes one column to the right of its
+ * parents (fanning out the way the fresh layout does when it has siblings), and
+ * everything downstream of it that would now collide is shifted right as a block
+ * so the flow keeps its shape. Finally any new node that still lands on top of
+ * another node is nudged down a row.
+ */
+export function placeEditedNodes(args: {
+  ids: string[]
+  edges: LayoutEdge[]
+  /** Positions of the nodes that already exist (keyed by their id in the new graph). */
+  kept: Map<string, Pos>
+  /** Positions the fresh layout gave every node of the new graph. */
+  fresh: Map<string, Pos>
+}): Map<string, Pos> {
+  const { ids, edges, kept, fresh } = args
+  const known = new Set(ids)
+  const links = edges.filter((e) => known.has(e.source) && known.has(e.target) && e.source !== e.target)
+  const pos = new Map<string, Pos>(kept)
+  const added = ids
+    .filter((id) => !kept.has(id))
+    .sort((a, b) => (fresh.get(a)?.x ?? 0) - (fresh.get(b)?.x ?? 0) || (fresh.get(a)?.y ?? 0) - (fresh.get(b)?.y ?? 0))
+
+  // Where the fresh layout and the canvas disagree on average: used for new nodes with no parent.
+  const both = [...kept.keys()].filter((id) => fresh.has(id))
+  const offset = both.length
+    ? {
+        x: both.reduce((s, id) => s + kept.get(id)!.x - fresh.get(id)!.x, 0) / both.length,
+        y: both.reduce((s, id) => s + kept.get(id)!.y - fresh.get(id)!.y, 0) / both.length,
+      }
+    : { x: 0, y: 0 }
+
+  const downstream = (start: string): string[] => {
+    const seen = new Set<string>([start])
+    const queue = [start]
+    while (queue.length) {
+      const id = queue.shift()!
+      for (const e of links) if (e.source === id && !seen.has(e.target)) { seen.add(e.target); queue.push(e.target) }
+    }
+    seen.delete(start)
+    return [...seen]
+  }
+
+  for (const id of added) {
+    const f = fresh.get(id) ?? { x: 0, y: 0 }
+    const parents = links.filter((e) => e.target === id && pos.has(e.source)).map((e) => e.source)
+    let p: Pos
+    if (parents.length) {
+      const px = parents.map((q) => pos.get(q)!)
+      const py = px.reduce((s, q) => s + q.y, 0) / px.length
+      const fy = parents.reduce((s, q) => s + (fresh.get(q)?.y ?? f.y), 0) / parents.length
+      p = { x: Math.max(...px.map((q) => q.x)) + COLUMN_WIDTH, y: py + (f.y - fy) }
+    } else {
+      p = { x: f.x + offset.x, y: f.y + offset.y }
+    }
+    pos.set(id, p)
+
+    // Make room: slide everything already placed downstream of this node to the right.
+    const after = downstream(id).filter((d) => kept.has(d))
+    if (after.length) {
+      const need = p.x + COLUMN_WIDTH - Math.min(...after.map((d) => pos.get(d)!.x))
+      if (need > 0) for (const d of after) pos.set(d, { x: pos.get(d)!.x + need, y: pos.get(d)!.y })
+    }
+  }
+
+  // Keep new nodes off other nodes.
+  for (const id of added) {
+    let p = pos.get(id)!
+    for (let i = 0; i < 20; i++) {
+      const hit = [...pos.entries()].some(([other, q]) => other !== id && Math.abs(q.x - p.x) < COLUMN_WIDTH * 0.8 && Math.abs(q.y - p.y) < ROW_HEIGHT * 0.6)
+      if (!hit) break
+      p = { x: p.x, y: p.y + ROW_HEIGHT }
+    }
+    pos.set(id, p)
+  }
+  return pos
+}

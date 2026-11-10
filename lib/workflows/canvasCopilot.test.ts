@@ -320,3 +320,44 @@ describe('diffSteps', () => {
     expect([d.added, d.removed, d.renamed]).toEqual([0, 0, 0])
   })
 })
+
+describe('mergeEditedNodes — layout', () => {
+  const rebuild = (extra: boolean) => {
+    const steps: any[] = [
+      { step: 0, action: 'List Google Drive Files', tool: 'google drive', output: '' },
+      { step: 0, action: 'Upload Backup to Backup Folder', tool: 'google drive', output: '' },
+      ...(extra ? [{ step: 0, action: 'Notify team on Slack', tool: 'slack', output: '' }] : []),
+    ]
+    return n8nToReactFlow(convertToN8nWorkflow({ workflow_id: 'x', title: 'Drive backup', trigger: 'Schedule Trigger', steps, keepLastStepIntent: true }) as any)
+  }
+
+  it('keeps the user\'s own positions when the edit adds or removes nothing', () => {
+    const original = n8nToReactFlow(driveBackup)
+    original.nodes[1].position = { x: 777, y: 333 } // the user dragged this node
+    const merged = mergeEditedNodes(original, rebuild(false), { keepTrigger: true })
+    expect(merged.added).toBe(0)
+    expect(merged.removed).toBe(0)
+    const moved = merged.nodes.find((n) => normalizeStepTitle(n.data.title) === 'list google drive files')!
+    expect(moved.position).toEqual({ x: 777, y: 333 })
+  })
+
+  it('keeps existing nodes in place when a step is added at the end, and puts the new one after its parent', () => {
+    const original = n8nToReactFlow(driveBackup)
+    original.nodes[1].position = { x: 777, y: 333 }
+    const merged = mergeEditedNodes(original, rebuild(true), { keepTrigger: true })
+    expect(merged.added).toBe(1)
+    const moved = merged.nodes.find((n) => normalizeStepTitle(n.data.title) === 'list google drive files')!
+    expect(moved.position).toEqual({ x: 777, y: 333 })
+    const upload = merged.nodes.find((n) => normalizeStepTitle(n.data.title) === 'upload backup to backup folder')!
+    const slack = merged.nodes.find((n) => n.data.rawN8n?.type === 'n8n-nodes-base.slack')!
+    expect(slack.position.x).toBeGreaterThan(upload.position.x)
+    expect(slack.position.y).toBe(upload.position.y)
+  })
+
+  it('never stacks two nodes on the same spot after an edit', () => {
+    const original = n8nToReactFlow(driveBackup)
+    const merged = mergeEditedNodes(original, rebuild(true), { keepTrigger: true })
+    const spots = merged.nodes.map((n) => `${Math.round(n.position.x)},${Math.round(n.position.y)}`)
+    expect(new Set(spots).size).toBe(spots.length)
+  })
+})

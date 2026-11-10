@@ -19,6 +19,7 @@ import type { Node, Edge } from '@xyflow/react'
 import type { N8nWorkflow, N8nNode } from '@/lib/n8n'
 import type { WorkflowNodeData } from '@/types/workflow-node'
 import type { GeneratedWorkflow, GeneratedWorkflowStep } from './copilotStateMachine'
+import { placeEditedNodes } from './flowLayout'
 
 /** What the client sends with each copilot message while a canvas is open. */
 export interface CanvasEditContext {
@@ -252,16 +253,41 @@ export function mergeEditedNodes(
     next.edges.filter((e) => isSubEdge(e) && matched.has(e.target)).map((e) => e.source),
   )
 
+  // Existing steps stay exactly where the user has them; new steps are placed
+  // after their parents with the downstream part of the flow shifted to make
+  // room (see placeEditedNodes). Nothing is re-laid out wholesale.
+  const mainNext = next.nodes.filter((n) => !nextSubIds.has(n.id)).length
+  const mainOrig = original.nodes.filter((n) => !origSubIds.has(n.id)).length
+  const mainNextNodes = next.nodes.filter((n) => !nextSubIds.has(n.id))
+  const finalPos = placeEditedNodes({
+    ids: mainNextNodes.map((n) => n.id),
+    edges: next.edges.filter((e) => !isSubEdge(e)).map((e) => ({ source: e.source, target: e.target })),
+    kept: new Map([...matched].filter(([id]) => !nextSubIds.has(id)).map(([id, orig]) => [id, orig.position])),
+    fresh: new Map(mainNextNodes.map((n) => [n.id, n.position])),
+  })
+  const subParent = new Map(next.edges.filter(isSubEdge).map((e) => [e.source, e.target]))
+
   const nodes: RFNode[] = []
   for (const n of next.nodes) {
     if (droppedNextSubs.has(n.id)) continue
     const orig = matched.get(n.id)
-    if (!orig) { nodes.push(n); continue }
+    if (!orig) {
+      // New node. A new AI sub-node stays under its parent; a new step uses its placed position.
+      const parentId = subParent.get(n.id)
+      const parentFresh = parentId ? next.nodes.find((x) => x.id === parentId)?.position : undefined
+      const parentFinal = parentId ? finalPos.get(parentId) : undefined
+      const position = nextSubIds.has(n.id) && parentFresh && parentFinal
+        ? { x: parentFinal.x + (n.position.x - parentFresh.x), y: parentFinal.y + (n.position.y - parentFresh.y) }
+        : (finalPos.get(n.id) ?? n.position)
+      nodes.push({ ...n, position })
+      continue
+    }
     // A kept trigger keeps its own name (the converter titles every trigger
     // generically); other kept steps take the renumbered "Step N:" title.
     const keepName = options.keepTrigger && isTriggerNode(orig)
     nodes.push({
       ...n,
+      position: finalPos.get(n.id) ?? n.position,
       data: keepName
         ? { ...orig.data }
         : { ...orig.data, title: n.data.title, label: n.data.label ?? orig.data.label },
@@ -278,15 +304,16 @@ export function mergeEditedNodes(
         const parent = nodes.find((x) => x.id === nextId)
         nodes.push({
           ...sub,
-          position: parent ? { x: parent.position.x, y: parent.position.y + 200 } : sub.position,
+          // Same offset from its parent as before, wherever the parent ended up.
+          position: parent
+            ? { x: sub.position.x + (parent.position.x - orig.position.x), y: sub.position.y + (parent.position.y - orig.position.y) }
+            : sub.position,
         })
       }
       edges.push({ ...e, id: `${e.id}-kept`, target: nextId })
     }
   }
 
-  const mainNext = next.nodes.filter((n) => !nextSubIds.has(n.id)).length
-  const mainOrig = original.nodes.filter((n) => !origSubIds.has(n.id)).length
   return {
     nodes,
     edges,
