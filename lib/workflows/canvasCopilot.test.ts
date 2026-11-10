@@ -19,7 +19,7 @@ vi.mock('./bridgeCopilot', () => ({
 }))
 
 import { canvasToGeneratedWorkflow, mergeEditedNodes, normalizeStepTitle, countSteps, stepIdAliases, diffSteps } from './canvasCopilot'
-import { CopilotStateMachine, isNewWorkflowRequest } from './copilotStateMachine'
+import { CopilotStateMachine, isNewWorkflowRequest, matchEditCapabilityQuestion } from './copilotStateMachine'
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
 import { n8nToReactFlow } from '@/lib/n8nMapper'
 
@@ -135,6 +135,29 @@ describe('mergeEditedNodes', () => {
     expect(merged.removed).toBe(1)
     expect(merged.nodes.some((n) => /upload backup/i.test(n.data.title))).toBe(false)
   })
+})
+
+describe('matchEditCapabilityQuestion', () => {
+  const steps = [
+    { id: 'a', type: 'trigger', title: 'Schedule Trigger', testable: false },
+    { id: 'b', type: 'action', title: 'List Google Drive Files', testable: true },
+    { id: 'c', type: 'action', title: 'Download Files to Temporary Storage', testable: true },
+    { id: 'd', type: 'action', title: 'Upload Backup to Backup Folder', testable: true },
+  ] as Parameters<typeof matchEditCapabilityQuestion>[1]
+
+  it('asks what to change instead of editing blindly', () => {
+    const r = matchEditCapabilityQuestion('Bisa lo rubah gak step 4?', steps)
+    expect(r).toContain('Step 4')
+    expect(r).toContain('Upload Backup to Backup Folder')
+    expect(matchEditCapabilityQuestion('can you change step 2?', steps)).toContain('List Google Drive Files')
+  })
+
+  it.each([
+    'bisa tambah step approval?',
+    'ubah step 4 jadi kirim ke Slack',
+    'can you change step 2 to use Dropbox?',
+    'hapus step download',
+  ])('leaves real edit requests alone: %s', (m) => expect(matchEditCapabilityQuestion(m, steps)).toBeNull())
 })
 
 describe('isNewWorkflowRequest', () => {
