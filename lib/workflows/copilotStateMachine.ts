@@ -890,7 +890,7 @@ export class CopilotStateMachine {
       // Deterministic sanitation — normalize structural defects locally
       // (missing ids, wrong first-step type, unknown types) so they never
       // reach the sandbox, where each would cost a full repair round.
-      const sanitized = sanitizeWorkflow(workflow.steps)
+      const sanitized = sanitizeWorkflow(workflow.steps, this.state.userRequest)
       if (sanitized.fixes.length > 0) {
         console.log('[CopilotStateMachine] sanitized LLM output', {
           session_id: this.state.sessionId,

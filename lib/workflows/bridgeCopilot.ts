@@ -22,6 +22,8 @@ const VPS_BRIDGE_URL = (
   ''
 ).replace(/\/$/, '')
 
+import { buildGroundingBlock } from '@/lib/workflows/grounding'
+
 export type CopilotOperation =
   | 'clarify'
   | 'generate'
@@ -212,6 +214,12 @@ const WORKFLOW_JSON_HINT =
   'The first step must be type "trigger". ' +
   'Only "condition" (if/else, exactly 2 branches keyed "true"/"false"), "switch" (multi-way routing, one branch per case, key = the matched value), and "loop" (iterate over items, exactly 1 branch keyed "body", with optional loopConfig.batchSize) steps use "branches" — every other step type omits both "branches" and "loopConfig" entirely. Each branch\'s "steps" is itself a step list and may be empty.]'
 
+/** Grounding is on by default; WORKFLOW_GROUNDING=off is the kill switch / eval baseline. */
+function groundingFor(userRequest: unknown): string {
+  if (process.env.WORKFLOW_GROUNDING === 'off') return ''
+  return buildGroundingBlock(typeof userRequest === 'string' ? userRequest : '')
+}
+
 function buildOutbound(op: CopilotOperation, bodyRecord: Record<string, unknown>): { targetPath: string; outbound: unknown } {
   const history = Array.isArray(bodyRecord.conversation_history)
     ? bodyRecord.conversation_history
@@ -240,7 +248,7 @@ function buildOutbound(op: CopilotOperation, bodyRecord: Record<string, unknown>
       return {
         targetPath: '/console/stream',
         outbound: {
-          message: (bodyRecord.user_request ?? '') + WORKFLOW_JSON_HINT,
+          message: (bodyRecord.user_request ?? '') + groundingFor(bodyRecord.user_request) + WORKFLOW_JSON_HINT,
           history,
           mode: 'console',
           channel: 'console_ui',

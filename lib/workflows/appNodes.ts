@@ -42,7 +42,7 @@ const ALIASES: Record<string, string[]> = {
   googledrive: ['googledrive', 'gdrive', 'drive'],
   googlecalendar: ['googlecalendar', 'gcal', 'calendar', 'googlecal'],
   gmail: ['gmail', 'googlemail'],
-  email: ['email', 'mail', 'smtp', 'emailsend', 'sendemail', 'outlook', 'microsoftoutlook', 'imap'],
+  email: ['email', 'mail', 'smtp', 'emailsend', 'sendemail', 'outlook', 'microsoftoutlook', 'imap', 'zoho', 'zohomail', 'aivorymail', 'aivorymailbox'],
   telegram: ['telegram', 'telegrambot'],
   notion: ['notion'],
   postgres: ['postgres', 'postgresql', 'pg', 'supabase'],
@@ -70,6 +70,9 @@ const ALIASES: Record<string, string[]> = {
   manual: ['manual', 'manualtrigger', 'manualrun'],
   cleanup: ['cleanup', 'noop'],
 }
+
+/** Every canonical app key the mapper understands (used to ground the generator prompt). */
+export const KNOWN_APP_KEYS: string[] = Object.keys(ALIASES)
 
 const ALIAS_LOOKUP: Map<string, string> = (() => {
   const m = new Map<string, string>()
@@ -462,6 +465,12 @@ const TRIGGER_BUILDERS: Record<string, (t: string) => TriggerBuild> = {
     credentials: cred('airtableTokenApi', 'Airtable account'),
     parameters: {},
   }),
+  // Aivory Mail POSTs every inbound message to {WORKFLOW_URL}/webhook/email-received
+  // (services/avry-mail inbound.rs): { event, message_id, from, to, subject, snippet, intelligence }.
+  aivorymail: () => ({
+    type: 'n8n-nodes-base.webhook', typeVersion: 2.1,
+    parameters: { httpMethod: 'POST', path: 'email-received', responseMode: 'onReceived', options: {} },
+  }),
   notion: () => ({
     type: 'n8n-nodes-base.notionTrigger', typeVersion: 1,
     credentials: cred('notionApi', 'Notion account'),
@@ -478,6 +487,8 @@ export type TriggerKind = 'schedule' | 'webhook' | 'manual' | 'app'
 
 export interface ResolvedTrigger {
   kind: TriggerKind
+  /** Conditions a Filter node placed right after the trigger must pass (Aivory Mail's shared webhook). */
+  filter?: Array<{ left: string; op: 'equals' | 'contains'; right: string }>
   /** Present for kind === 'app'. */
   build?: TriggerBuild
 }
@@ -490,8 +501,22 @@ const MANUAL_WORDS = /\b(manual|manually|click to run|on demand|run manually|kli
  * its title as a fallback.
  */
 export function resolveTrigger(opts: { app?: string; title?: string; description?: string }): ResolvedTrigger {
-  const key = normalizeApp(opts.app)
   const t = `${opts.title || ''} ${opts.description || ''}`
+  // Aivory Mail normalizes to "email" (SMTP/IMAP) for actions, but as a trigger it
+  // arrives through its own webhook, so it is checked before the IMAP mapping.
+  const flatApp = (opts.app || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  if (/^aivorymail(box)?$/.test(flatApp) || (['', 'email', 'mail'].includes(flatApp) && /aivory\s*mail/i.test(t))) {
+    const address = t.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/)?.[0]
+    return {
+      kind: 'app',
+      build: TRIGGER_BUILDERS.aivorymail(t),
+      filter: [
+        { left: '={{ $json.body.event }}', op: 'equals', right: 'email.received' },
+        ...(address ? [{ left: '={{ $json.body.to }}', op: 'contains' as const, right: address }] : []),
+      ],
+    }
+  }
+  const key = normalizeApp(opts.app)
   if (key === 'schedule' || key === 'wait') return { kind: 'schedule' }
   if (key === 'manual') return { kind: 'manual' }
   if (key === 'webhook') return { kind: 'webhook' }

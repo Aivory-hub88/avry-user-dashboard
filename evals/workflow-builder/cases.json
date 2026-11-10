@@ -1804,6 +1804,44 @@
      "n8n-nodes-base.notion"
     ]
    }
+  },
+  {
+   "id": "aivory-mail-slack",
+   "lang": "en",
+   "tags": [
+    "app-trigger",
+    "email",
+    "aivory-mail"
+   ],
+   "prompt": "When Aivory Mail receives an email at support@acme.id, post the subject to Slack",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "aivorymail",
+     "action": "new_aivory_mail",
+     "title": "New Aivory Mail to support@acme.id",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "slack",
+     "action": "post_message",
+     "title": "Post email subject to Slack",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.webhook",
+     "n8n-nodes-base.filter",
+     "n8n-nodes-base.slack"
+    ]
+   }
   }
  ]
 }

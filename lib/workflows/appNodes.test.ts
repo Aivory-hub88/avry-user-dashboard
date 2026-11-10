@@ -41,7 +41,7 @@ describe('appNodes — every emitted node is valid in the n8n catalog', () => {
       for (const t of ['', 'new pull request', 'refund issued', 'new deal']) {
         const b = buildTriggerForTest(key, t)
         const wf = { nodes: [{ name: 'T', type: b.type, typeVersion: b.typeVersion, parameters: b.parameters }], connections: {} }
-        const bad = scoreWorkflow(wf, { trigger: 'app' }, catalog).checks.filter((c) => !c.pass && c.critical)
+        const bad = scoreWorkflow(wf, { trigger: key === 'aivorymail' ? 'webhook' : 'app' }, catalog).checks.filter((c) => !c.pass && c.critical)
         expect(bad, `${key} / ${t}`).toEqual([])
       }
     })
@@ -95,5 +95,19 @@ describe('parseDuration / inferVerb', () => {
     expect(inferVerb('Append row to Google Sheets')).toBe('write')
     expect(inferVerb('Ambil data penjualan dari Postgres')).toBe('read')
     expect(inferVerb('Store order in Postgres')).toBe('write')
+  })
+})
+
+describe('Aivory Mail trigger', () => {
+  it('resolves to the shared email-received webhook with a filter', () => {
+    const r = resolveTrigger({ app: 'aivorymail', title: 'New email to support@acme.id' })
+    expect(r.kind).toBe('app')
+    expect(r.build?.type).toBe('n8n-nodes-base.webhook')
+    expect(r.build?.parameters.path).toBe('email-received')
+    expect(r.filter?.map((f) => f.right)).toEqual(['email.received', 'support@acme.id'])
+  })
+  it('is picked from the title when the planner said "email"', () => {
+    expect(resolveTrigger({ app: 'email', title: 'When Aivory Mail receives a message' }).build?.parameters.path).toBe('email-received')
+    expect(resolveTrigger({ app: 'email', title: 'New message in inbox' }).build?.type).toBe('n8n-nodes-base.emailReadImap')
   })
 })
