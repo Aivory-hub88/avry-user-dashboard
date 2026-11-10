@@ -455,6 +455,8 @@ class BridgeClient {
     organization_id: string
     workflowId?: string
     description: string
+    /** What the user actually asked for (recent chat turns) — lets the bridge configure each node for THIS goal. */
+    user_context?: string
     steps: BridgeStep[]
   }): Promise<BridgeDraftTestResponse> {
     const result = await this.call<BridgeDraftTestResponse>(
@@ -1010,6 +1012,7 @@ export class CopilotStateMachine {
         workflowId: this.state.generatedWorkflow.workflowId,
         description:
           this.state.generatedWorkflow.workflowName || this.state.userRequest,
+        user_context: buildUserContext(this.state.conversationHistory),
         steps: this.state.generatedWorkflow.steps.map(workflowStepToBridgeStep),
       })
 
@@ -1484,6 +1487,27 @@ export function matchSmallTalk(message: string): string | null {
       : 'I help you build automation workflows: describe your business process (trigger → apps → data), I draft the workflow, test it in the sandbox, and apply it to the canvas once you approve.'
   }
   return null
+}
+
+/**
+ * The user's own words from the conversation, newest last, for the bridge's
+ * node configurator. Short confirmations ("yes", "ok") carry no information
+ * and are dropped; the result is capped so it stays a small prompt.
+ */
+export function buildUserContext(history: Message[], maxChars = 1500): string {
+  const turns = (history || [])
+    .filter((m) => m.role === 'user' && typeof m.content === 'string')
+    .map((m) => m.content.trim())
+    .filter((t) => t.length > 12 && detectUserIntent(t) !== 'confirm')
+  const picked: string[] = []
+  let used = 0
+  for (let i = turns.length - 1; i >= 0 && picked.length < 6; i--) {
+    const t = turns[i].slice(0, 600)
+    if (used + t.length > maxChars) break
+    picked.unshift(t)
+    used += t.length
+  }
+  return picked.map((t) => `- ${t}`).join('\n')
 }
 
 export function detectUserIntent(
