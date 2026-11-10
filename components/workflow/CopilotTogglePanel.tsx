@@ -17,7 +17,7 @@ import Image from 'next/image'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { useCopilotPanel } from '@/hooks/useCopilotPanel'
+import { useCopilotPanel, type CopilotPanelMode } from '@/hooks/useCopilotPanel'
 import { useWorkflowCopilot } from '@/hooks/useWorkflowCopilot'
 import type { CopilotMessage } from '@/hooks/useWorkflowCopilot'
 import type { GeneratedWorkflow } from '@/lib/workflows/copilotClient'
@@ -48,7 +48,6 @@ function AetherLogo({ className = 'h-[15px] w-auto' }: { className?: string }) {
 }
 
 const POS_KEY = 'aivory.aether.panelOffset.v1'
-const CHIP_POS_KEY = 'aivory.aether.chipOffset.v1'
 
 /** Where an applied proposal lands: the open canvas (edit) or a new draft. */
 export type CopilotApplyTarget = { workflowId: string; title: string } | null
@@ -100,11 +99,11 @@ export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, getC
   const handleMinimize = useCallback(() => { minimize() }, [minimize])
   const handleRestore = useCallback(() => { restore() }, [restore])
 
-  // The panel and the minimized chip each remember their own spot.
+  // One spot for the panel and its minimized chip: minimizing leaves the chip
+  // exactly where the panel was (on the canvas), and restoring reopens it there.
+  // Only closing sends it back to the pill in the top bar.
   const wrapRef = useRef<HTMLDivElement>(null)
-  const panelPos = useFloatingPosition(wrapRef, POS_KEY, mode === 'open')
-  const chipPos = useFloatingPosition(wrapRef, CHIP_POS_KEY, mode === 'minimized')
-  const pos = mode === 'minimized' ? chipPos : panelPos
+  const pos = useFloatingPosition(wrapRef, POS_KEY, mode)
 
   const status = getAetherStatus({ stage, loading, isStreamingReply, isTesting, canApply: canApply && !!workflow, isCompleted, canvasTarget })
 
@@ -123,9 +122,9 @@ export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, getC
     >
       {mode === 'open' ? (
         <CopilotPanelExpanded
-          onDragStart={panelPos.startDrag}
-          onResetPosition={panelPos.reset}
-          dragging={panelPos.dragging}
+          onDragStart={pos.startDrag}
+          onResetPosition={pos.reset}
+          dragging={pos.dragging}
           onClose={handleClose}
           onMinimize={handleMinimize}
           messages={messages}
@@ -151,12 +150,12 @@ export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, getC
       ) : mode === 'minimized' ? (
         <CopilotChip
           status={status}
-          dragging={chipPos.dragging}
-          onDragStart={chipPos.startDrag}
-          wasDragged={chipPos.wasDragged}
+          dragging={pos.dragging}
+          onDragStart={pos.startDrag}
+          wasDragged={pos.wasDragged}
           onRestore={handleRestore}
           onClose={handleClose}
-          onResetPosition={chipPos.reset}
+          onResetPosition={pos.reset}
         />
       ) : (
         <CopilotBarCollapsed onClick={handleOpen} status={status} />
@@ -212,7 +211,8 @@ function StatusDot({ status }: { status: AetherStatus }) {
  * the canvas area, remembered in localStorage. `active` gates the re-fit so a
  * hidden mode never fights the visible one over the shared wrapper element.
  */
-function useFloatingPosition(wrapRef: React.RefObject<HTMLDivElement | null>, storageKey: string, active: boolean) {
+function useFloatingPosition(wrapRef: React.RefObject<HTMLDivElement | null>, storageKey: string, mode: CopilotPanelMode) {
+  const active = mode !== 'closed'
   const [offset, setOffset] = useState<{ x: number; y: number }>(() => {
     try {
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(storageKey) : null
@@ -228,7 +228,7 @@ function useFloatingPosition(wrapRef: React.RefObject<HTMLDivElement | null>, st
   const movedRef = useRef(false)
   const [dragging, setDragging] = useState(false)
 
-  const clampDelta = useCallback((ddx: number, ddy: number) => {
+  const clampDelta = useCallback((ddx: number, ddy: number, strict = false) => {
     const el = wrapRef.current
     const parent = el?.offsetParent as HTMLElement | null
     if (!el || !parent) return { ddx, ddy }
@@ -238,8 +238,9 @@ function useFloatingPosition(wrapRef: React.RefObject<HTMLDivElement | null>, st
     const minX = b.left + margin - r.left
     const maxX = b.right - margin - r.right
     const minY = b.top + margin - r.top
-    // keep the header reachable at the bottom edge instead of the whole panel
-    const maxY = b.bottom - 56 - r.top
+    // While dragging, only keep the header reachable at the bottom edge. When
+    // the shape changes (minimize ⇄ open), keep the whole thing inside.
+    const maxY = strict ? b.bottom - margin - r.bottom : b.bottom - 56 - r.top
     return {
       ddx: Math.min(Math.max(ddx, Math.min(minX, 0)), Math.max(maxX, 0)),
       ddy: Math.min(Math.max(ddy, minY), Math.max(maxY, minY)),
@@ -300,13 +301,13 @@ function useFloatingPosition(wrapRef: React.RefObject<HTMLDivElement | null>, st
   useEffect(() => {
     if (!active) return
     const fit = () => {
-      const { ddx, ddy } = clampDelta(0, 0)
+      const { ddx, ddy } = clampDelta(0, 0, true)
       if (ddx || ddy) setOffset(o => ({ x: o.x + ddx, y: o.y + ddy }))
     }
     const t = setTimeout(fit, 0)
     window.addEventListener('resize', fit)
     return () => { clearTimeout(t); window.removeEventListener('resize', fit) }
-  }, [active, clampDelta])
+  }, [active, mode, clampDelta])
 
   return { offset, dragging, startDrag, reset, wasDragged }
 }
