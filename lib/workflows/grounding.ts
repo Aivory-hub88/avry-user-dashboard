@@ -28,7 +28,8 @@ const GENERIC_WORDS = new Set([
 /** What each app trigger means, so "email" is not read as "any flow that sends an email". Keys must match TRIGGER_APP_KEYS (grounding.test.ts). */
 export const TRIGGER_EVENTS: Record<string, string> = {
   gmail: 'a new Gmail message arrives',
-  email: 'a new email arrives in an IMAP inbox — only when the user names Zoho Mail, Aivory Mail, Outlook or IMAP',
+  aivorymail: 'a new Aivory Mail message arrives; urgency, intent and entities from Aivory Mail\'s own analysis are available in the trigger data, so do not add an AI step just to classify urgency',
+  email: 'a new email arrives in an IMAP inbox — only when the user names Zoho Mail, Outlook or IMAP',
   stripe: 'a Stripe payment/refund/invoice event',
   github: 'a GitHub issue/PR/push event',
   slack: 'a new Slack message',

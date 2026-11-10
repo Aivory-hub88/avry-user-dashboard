@@ -247,6 +247,35 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
   }
   nodes.push(triggerNode)
 
+  // Aivory Mail sends every inbound message to one shared webhook, so keep only
+  // the events (and mailbox) this workflow is about before the first step.
+  let entryName = triggerNode.name
+  if (resolved.filter?.length) {
+    const filterNode: N8nNode = {
+      id: generateNodeId(),
+      name: 'Only matching emails',
+      type: 'n8n-nodes-base.filter',
+      typeVersion: 2.2,
+      position: [470, 300],
+      parameters: {
+        conditions: {
+          options: { caseSensitive: false, leftValue: '', typeValidation: 'loose', version: 2 },
+          conditions: resolved.filter.map((f) => ({
+            id: generateNodeId(),
+            leftValue: f.left,
+            rightValue: f.right,
+            operator: { type: 'string', operation: f.op },
+          })),
+          combinator: 'and',
+        },
+        options: {},
+      },
+    }
+    nodes.push(filterNode)
+    connections[triggerNode.name] = { main: [[{ node: filterNode.name, type: 'main', index: 0 }]] }
+    entryName = filterNode.name
+  }
+
   // Merge a connection into `connections` without clobbering other
   // connection types (or branches) already registered for the same source.
   // `branchIndex` selects which of the source's n8n outputs this connection
@@ -462,7 +491,7 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
     return prevNodeName
   }
 
-  const tailName = convertSteps(workflow.steps, triggerNode.name, 0, true)
+  const tailName = convertSteps(workflow.steps, entryName, 0, true)
 
   // A webhook set to "respond using Respond to Webhook" needs that node or the
   // caller gets an error. It goes AFTER the last real step — it used to
