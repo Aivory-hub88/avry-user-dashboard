@@ -4,7 +4,7 @@
  * before `npm run dev` / `npm run build`).
  * Source: GET https://backend.aivory.id/api/v1/agent-roster
  * (backend/avry-backend/app/routes/agent_roster.py)
- * Last generated: 2026-09-17T06:42:36.084Z
+ * Last generated: 2026-11-10T03:17:33.209Z
  */
 
 export const AGENT_ROSTER_RAW = [
