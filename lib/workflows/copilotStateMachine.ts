@@ -353,7 +353,8 @@ function formatStepList(steps: GeneratedWorkflowStep[], depth = 0): string[] {
   const indent = '   '.repeat(depth)
   const lines: string[] = []
   steps.forEach((s, i) => {
-    lines.push(`${indent}${i + 1}. **${s.title}** (${s.type}) — ${s.description}`)
+    const desc = s.description?.trim()
+    lines.push(`${indent}${i + 1}. **${s.title}** (${s.type})${desc ? ` — ${desc}` : ''}`)
     if (s.branches?.length) {
       s.branches.forEach((b) => {
         lines.push(`${indent}   - ↳ *${b.label || b.key}*:`)
@@ -1193,6 +1194,12 @@ export class CopilotStateMachine {
       return this.generateWorkflow()
     }
 
+    // "Can you change step 4?" asks whether, not what. Ask what instead of
+    // sending a content-free edit through the LLM, which echoes the whole
+    // workflow back. Stage stays EDITING so the next message is the change.
+    const ask = matchEditCapabilityQuestion(userMessage, this.state.generatedWorkflow.steps)
+    if (ask) return this.setAssistantMessage(ask)
+
     try {
       const result = await this.bridge.edit({
         session_id: this.state.sessionId,
@@ -1529,6 +1536,52 @@ export function detectUserIntent(
 
   return 'unknown'
 }
+const CAPABILITY_FILLER = new Set([
+  'bisa', 'boleh', 'dapat', 'mungkin', 'bisakah', 'apakah', 'apa', 'lo', 'lu', 'loe', 'kamu', 'anda', 'kau', 'elu',
+  'gak', 'nggak', 'ga', 'ngga', 'engga', 'tidak', 'kah', 'dong', 'ya', 'yah', 'sih', 'deh', 'tolong', 'please',
+  'rubah', 'ubah', 'ganti', 'edit', 'revisi', 'change', 'modify', 'update', 'tambah', 'hapus', 'add', 'remove',
+  'step', 'steps', 'langkah', 'node', 'nomor', 'no', 'number', 'ke', 'the', 'this', 'that', 'it', 'is', 'possible',
+  'to', 'can', 'could', 'you', 'i', 'we', 'a', 'an', 'yang', 'ini', 'itu',
+])
+
+/**
+ * A yes/no question about whether a step can be changed, with no description
+ * of the change itself ("bisa lo rubah gak step 4?", "can you change step 2?").
+ * Returns a short deterministic reply asking what to change, or null when the
+ * message already says what it wants ("bisa tambah step approval?").
+ */
+export function matchEditCapabilityQuestion(
+  message: string,
+  steps: GeneratedWorkflowStep[],
+): string | null {
+  const lower = message.toLowerCase().trim()
+  const asksIfPossible =
+    /^(bisa|boleh|dapat|mungkin|can|could|is it possible)\b/.test(lower) ||
+    /\b(bisa|boleh)\b.*\b(gak|nggak|ga|ngga|engga|tidak|kah)\b/.test(lower) ||
+    /\?\s*$/.test(lower)
+  if (!asksIfPossible) return null
+  if (!/\b(rubah|ubah|ganti|edit|revisi|change|modify|update)\b/.test(lower)) return null
+
+  const titles = steps.map((s) => (s.title || '').toLowerCase())
+  const rest = lower
+    .replace(/[?!.,"“”']/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((t) => !CAPABILITY_FILLER.has(t) && !/^\d+$/.test(t))
+    .filter((t) => !titles.some((title) => title.includes(t)))
+  if (rest.length > 0) return null
+
+  const n = Number(/(?:step|langkah|node|nomor|no)\s*\.?\s*(\d+)/.exec(lower)?.[1] ?? /\b(\d+)\b/.exec(lower)?.[1])
+  const target = Number.isInteger(n) && n >= 1 ? steps[n - 1] : undefined
+  const id = /\b(bisa|boleh|lo|lu|kamu|gak|nggak|ga|ngga|rubah|ubah|ganti|dong|apakah|tidak)\b/.test(lower)
+  if (target) {
+    return id
+      ? `Bisa. Step ${n} sekarang “${target.title}”. Mau diubah jadi apa?`
+      : `Yes. Step ${n} is currently “${target.title}”. What would you like to change?`
+  }
+  return id ? 'Bisa. Bagian mana yang mau diubah, dan jadi apa?' : 'Yes. Which step would you like to change, and to what?'
+}
+
 /**
  * The user explicitly wants a brand-new workflow even though one is open on
  * the canvas ("buatin workflow baru", "create a new workflow for…").
