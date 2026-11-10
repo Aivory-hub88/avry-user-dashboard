@@ -49,6 +49,12 @@ describe('groundTrigger', () => {
     expect(groundTrigger(wf('email'), 'Kalau ada email masuk, klasifikasikan dengan AI').fixes).toEqual([])
     expect(groundTrigger(wf('gmail'), 'When a new email arrives, log it').fixes).toEqual([])
   })
+  it('treats Zoho Mail and Aivory Mail as the SMTP/IMAP email app', () => {
+    expect(detectApps('kirim lewat Zoho Mail')).toEqual(['email'])
+    expect(detectApps('send from Aivory Mail')).toEqual(['email'])
+    expect(groundTrigger(wf('email'), 'when Aivory Mail gets a message, log it').fixes).toEqual([])
+    expect(buildGroundingBlock('x')).toContain('Zoho Mail, Aivory Mail')
+  })
   it('leaves webhook/schedule/manual alone', () => {
     expect(groundTrigger(wf('schedule'), 'anything').fixes).toEqual([])
   })

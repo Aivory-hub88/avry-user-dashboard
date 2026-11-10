@@ -28,7 +28,7 @@ const GENERIC_WORDS = new Set([
 /** What each app trigger means, so "email" is not read as "any flow that sends an email". Keys must match TRIGGER_APP_KEYS (grounding.test.ts). */
 export const TRIGGER_EVENTS: Record<string, string> = {
   gmail: 'a new Gmail message arrives',
-  email: 'a new email arrives in an IMAP inbox — only when the user names IMAP/Outlook',
+  email: 'a new email arrives in an IMAP inbox — only when the user names Zoho Mail, Aivory Mail, Outlook or IMAP',
   stripe: 'a Stripe payment/refund/invoice event',
   github: 'a GitHub issue/PR/push event',
   slack: 'a new Slack message',
@@ -67,7 +67,7 @@ export function buildGroundingBlock(prompt: string): string {
     '\n\n[BUILDING BLOCKS — pick "app" from these exact lowercase values:',
     `- Triggers (first step): "webhook" = an HTTP call, a form submission, or an event like "when a lead signs up / a deal is won / a ticket comes in" where the user did NOT name the app that emits it. "schedule" = recurring or time-based. "manual" = the user clicks a button or runs it by hand. An app trigger is allowed ONLY when the user named that app as the thing that starts the flow — an app used later in the flow (e.g. "wait 2 days, then email them") never makes it the trigger. App triggers: ${triggerApps}.`,
     '- Utility steps: "set" = rename, reformat, map or compute fields (prefer it for simple data reshaping); "code" = custom JavaScript, only when "set" cannot do it; "wait" = pause before continuing (a delay, or waiting for an approval/reply; put the duration in "action", e.g. "2 days"); "http" = call any REST API; "ai" = summarize, classify or draft text; "respond" = reply to the webhook caller; "compression" = zip/unzip files.',
-    `- Apps with a native node: ${NATIVE_APPS.join(', ')}. For any other service use "http". For email, use "gmail" unless the user names SMTP, IMAP or Outlook (then "email").`,
+    `- Apps with a native node: ${NATIVE_APPS.join(', ')}. For any other service use "http". For email, use "gmail" unless the user names Zoho Mail, Aivory Mail, Outlook, SMTP or IMAP (then "email", which sends over SMTP and reads over IMAP).`,
     'Rules: use only apps the user named plus utility steps — never add a CRM, chat or email app the user did not mention. Give every app and action the user asked for its own step.',
   ]
   if (mentioned.length) {
@@ -83,7 +83,7 @@ export function buildGroundingBlock(prompt: string): string {
   return lines.join('\n')
 }
 
-const MAIL_EVENT = /\b(incoming|inbox|receiv(?:e|es|ed|ing)|arriv(?:e|es|ed|ing)|new (?:e-?mail|mail|message)s?|e-?mail (?:masuk|baru)|ada e-?mail|(?:dapat|menerima|terima) e-?mail|masuk)\b/i
+const MAIL_EVENT = /\b(?:zoho|aivory) ?mail\b|\b(incoming|inbox|receiv(?:e|es|ed|ing)|arriv(?:e|es|ed|ing)|new (?:e-?mail|mail|message)s?|e-?mail (?:masuk|baru)|ada e-?mail|(?:dapat|menerima|terima) e-?mail|masuk)\b/i
 
 /**
  * Post-generation check that the trigger is something the user asked for.

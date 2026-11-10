@@ -42,7 +42,7 @@ const ALIASES: Record<string, string[]> = {
   googledrive: ['googledrive', 'gdrive', 'drive'],
   googlecalendar: ['googlecalendar', 'gcal', 'calendar', 'googlecal'],
   gmail: ['gmail', 'googlemail'],
-  email: ['email', 'mail', 'smtp', 'emailsend', 'sendemail', 'outlook', 'microsoftoutlook', 'imap'],
+  email: ['email', 'mail', 'smtp', 'emailsend', 'sendemail', 'outlook', 'microsoftoutlook', 'imap', 'zoho', 'zohomail', 'aivorymail', 'aivorymailbox'],
   telegram: ['telegram', 'telegrambot'],
   notion: ['notion'],
   postgres: ['postgres', 'postgresql', 'pg', 'supabase'],
