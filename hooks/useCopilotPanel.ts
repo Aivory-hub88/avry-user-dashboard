@@ -2,26 +2,31 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
-export function useCopilotPanel() {
-  const [isOpen, setIsOpen] = useState(false)
+/** closed = pill in the top bar · open = full panel · minimized = draggable chip */
+export type CopilotPanelMode = 'closed' | 'open' | 'minimized'
 
-  const open = useCallback(() => setIsOpen(true), [])
-  const close = useCallback(() => setIsOpen(false), [])
-  const toggle = useCallback(() => setIsOpen(prev => !prev), [])
+export function useCopilotPanel() {
+  const [mode, setMode] = useState<CopilotPanelMode>('closed')
+
+  const open = useCallback(() => setMode('open'), [])
+  const close = useCallback(() => setMode('closed'), [])
+  const minimize = useCallback(() => setMode('minimized'), [])
+  const restore = useCallback(() => setMode('open'), [])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // ⌘K: pill → panel, panel → pill, chip → panel
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        setIsOpen(prev => !prev)
+        setMode(prev => (prev === 'open' ? 'closed' : 'open'))
       }
-      if (e.key === 'Escape' && isOpen) {
-        setIsOpen(false)
+      if (e.key === 'Escape') {
+        setMode(prev => (prev === 'open' ? 'closed' : prev))
       }
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [isOpen])
+  }, [])
 
-  return { isOpen, open, close, toggle }
+  return { mode, isOpen: mode !== 'closed', open, close, minimize, restore }
 }
