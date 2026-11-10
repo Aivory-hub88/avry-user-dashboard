@@ -26,7 +26,7 @@ import type { GeneratedWorkflowStep } from './copilotStateMachine'
 // whether the app typically appears as an event source, an action target, or
 // both — used to decide whether a request names "enough" of a pipeline.
 
-interface CatalogApp {
+export interface CatalogApp {
   id: string
   label: string
   aliases: string[]
@@ -89,6 +89,21 @@ export interface RequestAnalysis {
   isSpecific: boolean
 }
 
+function escapeRegExp(v: string): string {
+  return v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * An alias only counts as a whole word. Substring matching made the short
+ * alias "wa" (WhatsApp) fire inside "le-wa-t", "da-ta-wa..." and similar, and
+ * "db " inside other words, so unrelated apps were detected.
+ */
+function aliasIndex(lower: string, alias: string): number {
+  const re = new RegExp(`(?<![a-z0-9])${escapeRegExp(alias.trim())}(?![a-z0-9])`)
+  const m = re.exec(lower)
+  return m ? m.index : -1
+}
+
 /** Find catalog apps mentioned in the text, in order of appearance. */
 function detectApps(text: string): CatalogApp[] {
   const lower = ` ${text.toLowerCase()} `
@@ -96,13 +111,26 @@ function detectApps(text: string): CatalogApp[] {
   for (const app of APP_CATALOG) {
     let best = -1
     for (const alias of app.aliases) {
-      const idx = lower.indexOf(alias)
+      const idx = aliasIndex(lower, alias)
       if (idx >= 0 && (best < 0 || idx < best)) best = idx
     }
     if (best >= 0) found.push({ app, index: best })
   }
   found.sort((a, b) => a.index - b.index)
   return found.map((f) => f.app)
+}
+
+/**
+ * Number of distinct apps a request names. "Gmail" and the generic "email"
+ * are one app. Templates only model a single source → single target pipeline,
+ * so a request naming more than two apps (e.g. webhook → Gmail → Sheets →
+ * Slack) must go to the LLM instead of being squeezed into a template that
+ * silently drops the rest.
+ */
+export function distinctAppCount(apps: CatalogApp[]): number {
+  const ids = new Set(apps.map((a) => a.id))
+  if (ids.has('gmail')) ids.delete('email')
+  return ids.size
 }
 
 /**
@@ -170,6 +198,10 @@ function step(
  */
 export function matchTemplate(text: string, analysis?: RequestAnalysis): TemplateWorkflow | null {
   const a = analysis ?? analyzeRequest(text)
+
+  // A template can only represent one source and one target. More apps than
+  // that means the user described a longer flow: never shrink it.
+  if (distinctAppCount(a.detectedApps) > 2) return null
 
   // ── Pattern 1: event → notification ("when X happens, tell Y") ────────────
   if (a.sourceApp && a.targetApp && a.hasNotifyIntent && (a.hasTrigger || a.hasSchedule) && !a.hasSchedule) {
