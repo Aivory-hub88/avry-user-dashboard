@@ -190,8 +190,10 @@ export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, getC
   return (
     <div
       ref={wrapRef}
-      className="absolute top-3 left-1/2 z-30"
+      className="absolute top-3 left-1/2 z-30 flex flex-col"
       style={{
+        // Never taller than the canvas area it floats in; the chat body shrinks.
+        maxHeight: 'calc(100% - 24px)',
         transform: isOpen
           ? `translate3d(calc(-50% + ${offset.x}px), ${offset.y}px, 0)`
           : 'translateX(-50%)',
@@ -379,7 +381,7 @@ function CopilotPanelExpanded({
 
   return (
     <div
-      className={`w-[520px] max-w-[90vw] rounded-2xl overflow-hidden flex flex-col border border-white/[0.08] ${dragging ? 'shadow-[0_28px_70px_rgba(0,0,0,0.55)]' : 'shadow-2xl'} transition-shadow duration-150`}
+      className={`w-[520px] max-w-[90vw] min-h-0 rounded-2xl overflow-hidden flex flex-col border border-white/[0.08] ${dragging ? 'shadow-[0_28px_70px_rgba(0,0,0,0.55)]' : 'shadow-2xl'} transition-shadow duration-150`}
       style={{ background: '#2a2a2e', maxHeight: 'calc(100vh - 160px)' }}
       role="dialog"
       aria-label="Aivory Aether"
@@ -435,13 +437,13 @@ function CopilotPanelExpanded({
 
       {/* ── Body ── */}
       {!hasMessages ? (
-        <div className="flex items-center justify-center px-6 py-8 shrink-0" style={{ height: `${panelHeight}px` }}>
+        <div className="flex items-center justify-center px-6 py-8 min-h-[96px]" style={{ height: `${panelHeight}px` }}>
           <p className="text-[22px] font-normal text-[#f7f7f7] text-center tracking-tight">
             What do you want to automate?
           </p>
         </div>
       ) : (
-        <div className="copilot-chat overflow-y-auto px-4 py-3 flex flex-col gap-3 shrink-0" style={{ height: `${panelHeight}px` }}>
+        <div className="copilot-chat overflow-y-auto px-4 py-3 flex flex-col gap-3 min-h-[96px]" style={{ height: `${panelHeight}px` }}>
           {messages.map((msg, i) => (
             <MessageRow
               key={i}
