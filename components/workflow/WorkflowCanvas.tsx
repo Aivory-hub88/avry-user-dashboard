@@ -42,6 +42,7 @@ import type { WorkflowNodeData } from '@/types/workflow-node';
 import type { SavedWorkflow, SavedWorkflowStep } from '@/hooks/useWorkflows';
 import type { WorkflowStep, AivoryWorkflowSpec } from '@/types/workflows';
 import { asset } from '@/lib/asset'
+import { layoutLeftToRight, COLUMN_WIDTH } from '@/lib/workflows/flowLayout'
 import { authedFetch } from '@/lib/deployAuth'
 
 type Props = {
@@ -358,10 +359,16 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
     onInjectNodes((newNodes: Node[], newEdges: Edge[]) => {
       pushHistory(nodes, edges);
       setNodes((nds) => {
-        const offsetY = nds.length > 0 ? (nds.length * 160) : 0;
-        const positioned = newNodes.map((n, i) => ({
+        // Left-to-right like n8n: a column per step, branches fanned out
+        // vertically. An existing flow keeps its place; the new one goes
+        // below it, starting at the same left edge.
+        const bottom = nds.reduce((m, n) => Math.max(m, n.position.y), -Infinity);
+        const left = nds.reduce((m, n) => Math.min(m, n.position.x), Infinity);
+        const origin = nds.length > 0 ? { x: left, y: bottom + 320 } : { x: 0, y: 0 };
+        const placed = layoutLeftToRight(newNodes.map((n) => n.id), newEdges.map((e) => ({ source: e.source, target: e.target })), origin);
+        const positioned = newNodes.map((n) => ({
           ...n,
-          position: { x: 0, y: offsetY + i * 160 },
+          position: placed.get(n.id) ?? n.position,
         })) as Node<WorkflowNodeData>[];
         return [...nds, ...rehydrate(positioned)];
       });
@@ -1157,6 +1164,10 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
                   proOptions={{ hideAttribution: true }}
                   fitView
                   fitViewOptions={{ maxZoom: 1, padding: 0.2 }}
+                  // xyflow's default minZoom (0.5) cuts off a 10+ step flow; allow a long
+                  // zoom-out like n8n so the whole workflow can be seen at once.
+                  minZoom={0.05}
+                  maxZoom={2}
                 >
                   <Background color="rgba(255,255,255,0.08)" gap={24} size={1} />
                   <Controls />
@@ -1314,10 +1325,11 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
               }}
               onApply={(result) => {
                 // Add new steps and edges to canvas
+                const sourcePos = nodes.find((n) => n.id === copilotSourceStepId)!.position;
                 const newSteps = result.newSteps.map((step, i) => ({
                   id: `${copilotSourceStepId}-ext-${i}`,
                   type: 'appNode' as const,
-                  position: { x: 0, y: (i + 1) * 180 },
+                  position: { x: sourcePos.x + (i + 1) * COLUMN_WIDTH, y: sourcePos.y },
                   data: {
                     title: step.actionId,
                     category: 'app' as const,
