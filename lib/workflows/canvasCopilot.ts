@@ -252,6 +252,13 @@ export function mergeEditedNodes(
     next.edges.filter((e) => isSubEdge(e) && matched.has(e.target)).map((e) => e.source),
   )
 
+  // When the edit only renamed/reconfigured steps (nothing added or removed),
+  // the user's own arrangement stays; once the graph's shape changes the fresh
+  // layout is used for the whole flow so new nodes do not overlap old ones.
+  const mainNext = next.nodes.filter((n) => !nextSubIds.has(n.id)).length
+  const mainOrig = original.nodes.filter((n) => !origSubIds.has(n.id)).length
+  const sameShape = mainNext === matched.size && mainOrig === matched.size
+
   const nodes: RFNode[] = []
   for (const n of next.nodes) {
     if (droppedNextSubs.has(n.id)) continue
@@ -262,6 +269,7 @@ export function mergeEditedNodes(
     const keepName = options.keepTrigger && isTriggerNode(orig)
     nodes.push({
       ...n,
+      ...(sameShape ? { position: orig.position } : {}),
       data: keepName
         ? { ...orig.data }
         : { ...orig.data, title: n.data.title, label: n.data.label ?? orig.data.label },
@@ -278,15 +286,13 @@ export function mergeEditedNodes(
         const parent = nodes.find((x) => x.id === nextId)
         nodes.push({
           ...sub,
-          position: parent ? { x: parent.position.x, y: parent.position.y + 200 } : sub.position,
+          position: sameShape ? sub.position : parent ? { x: parent.position.x, y: parent.position.y + 200 } : sub.position,
         })
       }
       edges.push({ ...e, id: `${e.id}-kept`, target: nextId })
     }
   }
 
-  const mainNext = next.nodes.filter((n) => !nextSubIds.has(n.id)).length
-  const mainOrig = original.nodes.filter((n) => !origSubIds.has(n.id)).length
   return {
     nodes,
     edges,
