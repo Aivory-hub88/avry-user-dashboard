@@ -31,17 +31,21 @@ produces. It isolates **prompt/LLM** quality. See the header of
 `lib/workflows/eval/workflowEval.live.test.ts` for the command. Outputs go to
 `results/` (gitignored); keep one file per change to compare.
 
-## knownIssue labels (root causes, first failing check)
+## knownIssue labels
 
-- `invalid-op-or-params:<node>` — the mapper emits an operation/parameter that
-  does not exist in n8n (e.g. Slack `send`/`channel`, HubSpot `create`).
-- `no-native-node:<node>` — no native mapping, falls back to a generic HTTP
-  node with a placeholder URL.
-- `trigger-not-native` — an app/manual trigger is built as a generic Webhook.
-- `last-step-replaced-by-respond` — on webhook workflows the last real step is
-  swapped for Respond to Webhook, dropping the actual action.
-- `ai-step-misclassified` — an AI step is classified by words in its title
-  ("email") instead of its `app`.
+All reference cases pass today, so none carries a `knownIssue`. Use a label
+when you add a case that exposes a real gap: `<what>:<node>`, e.g.
+`invalid-op-or-params:slack`, `no-native-node:<node>`, `trigger-not-native`.
+
+## How the mapper decides (what the eval protects)
+
+- Node choice: `forceIntent` > the step's `app` (normalised, see
+  `lib/workflows/appNodes.ts`) > title text (`detectNodeIntent`).
+- Trigger kind: the trigger step's `app` (schedule / webhook / manual / a
+  service with a trigger node) > its title.
+- `appNodes.test.ts` checks every node the app table can emit against
+  `node-catalog.json` (type, newest typeVersion, resource, operation, params).
+- A webhook workflow gets Respond to Webhook appended after the last step.
 
 Add a case whenever a real user prompt fails; never delete a case to make a
 number go up.

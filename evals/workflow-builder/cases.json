@@ -35,8 +35,7 @@
      "n8n-nodes-base.slack"
     ],
     "maxNodes": 4
-   },
-   "knownIssue": "invalid-op-or-params:slack"
+   }
   },
   {
    "id": "schedule-sheets-slack",
@@ -81,8 +80,7 @@
      "n8n-nodes-base.googleSheets",
      "n8n-nodes-base.slack"
     ]
-   },
-   "knownIssue": "invalid-op-or-params:slack + no-native-node:googleSheets"
+   }
   },
   {
    "id": "gmail-trigger-sheets",
@@ -117,8 +115,7 @@
      "n8n-nodes-base.gmailTrigger",
      "n8n-nodes-base.googleSheets"
     ]
-   },
-   "knownIssue": "trigger-not-native + no-native-node:googleSheets"
+   }
   },
   {
    "id": "form-hubspot-slack",
@@ -162,8 +159,7 @@
      "n8n-nodes-base.hubspot",
      "n8n-nodes-base.slack"
     ]
-   },
-   "knownIssue": "invalid-op-or-params:hubspot,slack"
+   }
   },
   {
    "id": "drive-backup",
@@ -308,8 +304,7 @@
      ]
     ],
     "branches": true
-   },
-   "knownIssue": "trigger-not-native + ai-step-misclassified"
+   }
   },
   {
    "id": "telegram-alert",
@@ -343,8 +338,7 @@
     "nodeTypes": [
      "n8n-nodes-base.telegram"
     ]
-   },
-   "knownIssue": "no-native-node:telegram"
+   }
   },
   {
    "id": "form-notion",
@@ -378,8 +372,7 @@
     "nodeTypes": [
      "n8n-nodes-base.notion"
     ]
-   },
-   "knownIssue": "last-step-replaced-by-respond"
+   }
   },
   {
    "id": "rss-slack",
@@ -423,8 +416,7 @@
      "n8n-nodes-base.rssFeedRead",
      "n8n-nodes-base.slack"
     ]
-   },
-   "knownIssue": "invalid-op-or-params:slack"
+   }
   },
   {
    "id": "stripe-sheets",
@@ -459,8 +451,7 @@
      "n8n-nodes-base.stripeTrigger",
      "n8n-nodes-base.googleSheets"
     ]
-   },
-   "knownIssue": "trigger-not-native + no-native-node:googleSheets"
+   }
   },
   {
    "id": "approval-email",
@@ -561,8 +552,7 @@
       "n8n-nodes-base.microsoftOutlook"
      ]
     ]
-   },
-   "knownIssue": "no-native-node:postgres"
+   }
   },
   {
    "id": "calendar-confirm",
@@ -656,8 +646,7 @@
      "n8n-nodes-base.httpRequest",
      "n8n-nodes-base.airtable"
     ]
-   },
-   "knownIssue": "no-native-node:airtable"
+   }
   },
   {
    "id": "discord-notify",
@@ -691,8 +680,7 @@
     "nodeTypes": [
      "n8n-nodes-base.discord"
     ]
-   },
-   "knownIssue": "no-native-node:discord"
+   }
   },
   {
    "id": "whatsapp-order-id",
@@ -727,8 +715,7 @@
     "nodeTypes": [
      "n8n-nodes-base.whatsApp"
     ]
-   },
-   "knownIssue": "no-native-node:whatsApp"
+   }
   },
   {
    "id": "zendesk-slack",
@@ -772,8 +759,7 @@
      "n8n-nodes-base.zendesk",
      "n8n-nodes-base.slack"
     ]
-   },
-   "knownIssue": "invalid-op-or-params:slack,zendesk"
+   }
   },
   {
    "id": "asana-task",
@@ -807,8 +793,7 @@
     "nodeTypes": [
      "n8n-nodes-base.asana"
     ]
-   },
-   "knownIssue": "last-step-replaced-by-respond"
+   }
   },
   {
    "id": "weekly-reminders",
@@ -858,8 +843,7 @@
       "n8n-nodes-base.microsoftOutlook"
      ]
     ]
-   },
-   "knownIssue": "no-native-node:googleSheets"
+   }
   },
   {
    "id": "webhook-transform-postgres",
@@ -904,8 +888,7 @@
      "n8n-nodes-base.set",
      "n8n-nodes-base.postgres"
     ]
-   },
-   "knownIssue": "last-step-replaced-by-respond"
+   }
   },
   {
    "id": "api-endpoint-hubspot",
@@ -949,8 +932,7 @@
      "n8n-nodes-base.hubspot",
      "n8n-nodes-base.respondToWebhook"
     ]
-   },
-   "knownIssue": "invalid-op-or-params:hubspot"
+   }
   },
   {
    "id": "code-totals-sheets",
@@ -994,8 +976,7 @@
      "n8n-nodes-base.code",
      "n8n-nodes-base.googleSheets"
     ]
-   },
-   "knownIssue": "last-step-replaced-by-respond"
+   }
   },
   {
    "id": "zip-drive",
@@ -1087,8 +1068,7 @@
      "n8n-nodes-base.slackTrigger",
      "n8n-nodes-base.notion"
     ]
-   },
-   "knownIssue": "trigger-not-native + no-native-node:notion"
+   }
   },
   {
    "id": "github-issue-slack",
@@ -1123,8 +1103,7 @@
      "n8n-nodes-base.githubTrigger",
      "n8n-nodes-base.slack"
     ]
-   },
-   "knownIssue": "invalid-op-or-params:slack + trigger-not-native"
+   }
   },
   {
    "id": "shopify-sheets",
@@ -1159,8 +1138,7 @@
      "n8n-nodes-base.shopifyTrigger",
      "n8n-nodes-base.googleSheets"
     ]
-   },
-   "knownIssue": "trigger-not-native + no-native-node:googleSheets"
+   }
   },
   {
    "id": "mysql-slack-id",
@@ -1205,8 +1183,7 @@
      "n8n-nodes-base.mySql",
      "n8n-nodes-base.slack"
     ]
-   },
-   "knownIssue": "invalid-op-or-params:slack"
+   }
   },
   {
    "id": "sms-twilio",
@@ -1240,8 +1217,7 @@
     "nodeTypes": [
      "n8n-nodes-base.twilio"
     ]
-   },
-   "knownIssue": "no-native-node:twilio"
+   }
   },
   {
    "id": "rss-ai-digest",
@@ -1342,8 +1318,7 @@
     "nodeTypes": [
      "n8n-nodes-base.slack"
     ]
-   },
-   "knownIssue": "invalid-op-or-params:slack + trigger-not-native"
+   }
   },
   {
    "id": "lead-followup-wait",
@@ -1393,8 +1368,7 @@
       "n8n-nodes-base.microsoftOutlook"
      ]
     ]
-   },
-   "knownIssue": "no-native-node:wait"
+   }
   },
   {
    "id": "ticket-priority-switch-id",
@@ -1485,8 +1459,7 @@
      ]
     ],
     "branches": true
-   },
-   "knownIssue": "invalid-op-or-params:slack + no-native-node:googleSheets"
+   }
   },
   {
    "id": "telegram-bot-ai",
@@ -1541,8 +1514,7 @@
       "@n8n/n8n-nodes-langchain.chainSummarization"
      ]
     ]
-   },
-   "knownIssue": "trigger-not-native + no-native-node:telegram"
+   }
   },
   {
    "id": "hubspot-mailchimp",
@@ -1578,8 +1550,260 @@
      "n8n-nodes-base.hubspotTrigger",
      "n8n-nodes-base.mailchimp"
     ]
-   },
-   "knownIssue": "trigger-not-native + no-native-node:mailchimp"
+   }
+  },
+  {
+   "id": "nightly-sheets-spelling",
+   "lang": "en",
+   "tags": [
+    "trigger",
+    "spelling"
+   ],
+   "prompt": "Every night, read rows from our Google Sheet and post a summary to Slack",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "schedule",
+     "action": "nightly_trigger",
+     "title": "Nightly Trigger",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "google sheets",
+     "action": "read_rows",
+     "title": "Read rows from the sheet",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "Slack",
+     "action": "post_summary",
+     "title": "Post summary to Slack",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "schedule",
+    "nodeTypes": [
+     "n8n-nodes-base.googleSheets",
+     "n8n-nodes-base.slack"
+    ],
+    "forbidNodeTypes": [
+     "n8n-nodes-base.httpRequest",
+     "n8n-nodes-base.webhook"
+    ]
+   }
+  },
+  {
+   "id": "daily-9am-drive-underscore",
+   "lang": "en",
+   "tags": [
+    "trigger",
+    "spelling"
+   ],
+   "prompt": "Daily at 9 AM, copy new files from Google Drive into a backup folder",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "schedule",
+     "action": "daily_9_am_trigger",
+     "title": "Daily 9 AM Trigger",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "google_drive",
+     "action": "list_files",
+     "title": "List new files",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "google_drive",
+     "action": "upload_backup",
+     "title": "Upload copies to the backup folder",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "schedule",
+    "nodeTypes": [
+     "n8n-nodes-base.googleDrive"
+    ],
+    "forbidNodeTypes": [
+     "n8n-nodes-base.httpRequest",
+     "n8n-nodes-base.ftp"
+    ]
+   }
+  },
+  {
+   "id": "wait-mid-flow-schedule-app",
+   "lang": "en",
+   "tags": [
+    "wait",
+    "spelling"
+   ],
+   "prompt": "When a lead signs up, wait 2 days and then email them",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "lead_signup",
+     "title": "Lead signup",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "schedule",
+     "action": "wait_2_days",
+     "title": "Wait 2 Days",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "gmail",
+     "action": "send_followup",
+     "title": "Send follow-up email",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.wait",
+     "n8n-nodes-base.gmail"
+    ],
+    "forbidNodeTypes": [
+     "n8n-nodes-base.scheduleTrigger"
+    ]
+   }
+  },
+  {
+   "id": "webhook-keeps-last-action",
+   "lang": "en",
+   "tags": [
+    "respond"
+   ],
+   "prompt": "When an order arrives via webhook, add a row to the sheet",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "order_webhook",
+     "title": "Order webhook",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "googlesheets",
+     "action": "append_row",
+     "title": "Add order row",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.googleSheets",
+     "n8n-nodes-base.respondToWebhook"
+    ],
+    "maxNodes": 3
+   }
+  },
+  {
+   "id": "jadwal-malam-telegram-id",
+   "lang": "id",
+   "tags": [
+    "trigger",
+    "spelling"
+   ],
+   "prompt": "Setiap malam jam 8, kirim laporan harian ke Telegram",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "schedule",
+     "action": "setiap_malam",
+     "title": "Setiap malam jam 8",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "telegram",
+     "action": "kirim_laporan",
+     "title": "Kirim laporan harian ke Telegram",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "schedule",
+    "nodeTypes": [
+     "n8n-nodes-base.telegram"
+    ],
+    "forbidNodeTypes": [
+     "n8n-nodes-base.httpRequest"
+    ]
+   }
+  },
+  {
+   "id": "unknown-app-default-text-fallback",
+   "lang": "en",
+   "tags": [
+    "fallback"
+   ],
+   "prompt": "When a webhook arrives, save the payload to Notion",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "default",
+     "action": "webhook_trigger",
+     "title": "Incoming webhook",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "default",
+     "action": "save",
+     "title": "Save the payload to Notion",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.notion"
+    ]
+   }
   }
  ]
 }
