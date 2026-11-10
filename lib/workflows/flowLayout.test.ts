@@ -39,3 +39,15 @@ describe('AI sub-nodes', () => {
     expect(p.get('agent')!.x).toBe(COLUMN_WIDTH)
   })
 })
+
+describe('lanes', () => {
+  it('keeps a branch on its own straight lane so no edge passes behind another branch', () => {
+    // if -> (create -> notify) | add -> join
+    const p = layoutLeftToRight(['if', 'create', 'notify', 'add', 'join'], [e('if', 'create'), e('create', 'notify'), e('if', 'add'), e('notify', 'join'), e('add', 'join')])
+    expect(p.get('notify')!.y).toBe(p.get('create')!.y)
+    expect(p.get('add')!.y).toBeGreaterThan(p.get('create')!.y)
+    expect(p.get('join')!.y).toBe((p.get('notify')!.y + p.get('add')!.y) / 2)
+    // the add -> join edge runs below the notify node's row
+    expect(p.get('add')!.y).toBeGreaterThanOrEqual(p.get('notify')!.y + ROW_HEIGHT)
+  })
+})

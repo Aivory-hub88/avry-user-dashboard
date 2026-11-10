@@ -5,6 +5,7 @@
  * Preserves all node properties and handles edge cases gracefully.
  */
 
+import { layoutLeftToRight } from '@/lib/workflows/flowLayout'
 import { type Node, type Edge } from '@xyflow/react'
 import { N8nWorkflow, N8nNode, N8nConnections } from './n8n'
 import type { WorkflowNodeData, WorkflowNodeCategory, NodeConfig } from '@/types/workflow-node'
@@ -152,6 +153,13 @@ export function n8nToReactFlow(
     })
   }
 
+  // Column = level; rows follow the parents so each branch keeps its own lane
+  // (see flowLayout.ts) — stacking by index made edges cross behind other nodes.
+  const laidOut = layoutLeftToRight(
+    mainFlowIds,
+    mainFlowIds.flatMap((id) => (adjacency.get(id) ?? []).map((target) => ({ source: id, target }))),
+  )
+
   // Count nodes per level for vertical stacking within a column
   const indexPerLevel = new Map<number, number>()
   const positionById = new Map<string, { x: number; y: number }>()
@@ -166,7 +174,7 @@ export function n8nToReactFlow(
     const linkedModelId = modelForAgent.get(n8nNode.id)
     const linkedModelNode = linkedModelId ? workflow.nodes.find((n) => n.id === linkedModelId) : undefined
     const workflowData = mapN8nNodeToWorkflowData(n8nNode, workflow.id, linkedModelNode)
-    const position = { x: level * 320, y: indexInLevel * 180 }
+    const position = laidOut.get(n8nNode.id) ?? { x: level * 320, y: indexInLevel * 180 }
     positionById.set(n8nNode.id, position)
 
     nodes.push({

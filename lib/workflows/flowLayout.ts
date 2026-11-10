@@ -111,8 +111,15 @@ function layoutMain(
       return ps.length ? ps.reduce((s, p) => s + row.get(p)!, 0) / ps.length : 0
     }
     const ordered = col.map((id, i) => ({ id, i, k: key(id) })).sort((a, b) => a.k - b.k || a.i - b.i)
+    // Each node aims for the average row of its parents, so a single-child chain
+    // stays on a straight line and a branch keeps its own lane instead of being
+    // re-centred behind another branch's nodes. Then push overlapping rows apart
+    // and re-centre the column on where the nodes wanted to be.
+    const placed: number[] = []
+    ordered.forEach(({ k }, idx) => placed.push(idx === 0 ? k : Math.max(k, placed[idx - 1] + ROW_HEIGHT)))
+    const shift = ordered.reduce((s, { k }, idx) => s + k - placed[idx], 0) / ordered.length
     ordered.forEach(({ id }, idx) => {
-      const y = (idx - (ordered.length - 1) / 2) * ROW_HEIGHT
+      const y = placed[idx] + shift
       row.set(id, y)
       out.set(id, { x: origin.x + l * COLUMN_WIDTH, y: origin.y + y })
     })
