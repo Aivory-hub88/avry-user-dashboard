@@ -1,0 +1,1585 @@
+{
+ "version": 1,
+ "n8nVersion": "2.26.4",
+ "cases": [
+  {
+   "id": "webhook-slack",
+   "lang": "en",
+   "tags": [
+    "basic"
+   ],
+   "prompt": "When a webhook is received, send a Slack message",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "webhook_trigger",
+     "title": "Webhook Trigger",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "slack",
+     "action": "send_slack_message",
+     "title": "Send Slack message",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.slack"
+    ],
+    "maxNodes": 4
+   },
+   "knownIssue": "invalid-op-or-params:slack"
+  },
+  {
+   "id": "schedule-sheets-slack",
+   "lang": "id",
+   "tags": [
+    "basic",
+    "id"
+   ],
+   "prompt": "Setiap hari jam 9 pagi, ambil data dari Google Sheets dan kirim ringkasannya ke Slack",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "schedule",
+     "action": "setiap_hari_jam_9_pagi",
+     "title": "Setiap hari jam 9 pagi",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "googlesheets",
+     "action": "baca_data_dari_google_sheets",
+     "title": "Baca data dari Google Sheets",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "slack",
+     "action": "kirim_ringkasan_ke_slack",
+     "title": "Kirim ringkasan ke Slack",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "schedule",
+    "nodeTypes": [
+     "n8n-nodes-base.googleSheets",
+     "n8n-nodes-base.slack"
+    ]
+   },
+   "knownIssue": "invalid-op-or-params:slack + no-native-node:googleSheets"
+  },
+  {
+   "id": "gmail-trigger-sheets",
+   "lang": "en",
+   "tags": [
+    "app-trigger"
+   ],
+   "prompt": "When I get a new email in Gmail, add a row to Google Sheets",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "gmail",
+     "action": "new_email_received_in_gmail",
+     "title": "New email received in Gmail",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "googlesheets",
+     "action": "append_row_to_google_sheets",
+     "title": "Append row to Google Sheets",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "app",
+    "nodeTypes": [
+     "n8n-nodes-base.gmailTrigger",
+     "n8n-nodes-base.googleSheets"
+    ]
+   },
+   "knownIssue": "trigger-not-native + no-native-node:googleSheets"
+  },
+  {
+   "id": "form-hubspot-slack",
+   "lang": "en",
+   "tags": [
+    "crm"
+   ],
+   "prompt": "When someone submits our website contact form, create a contact in HubSpot and notify sales on Slack",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "contact_form_submission",
+     "title": "Contact form submission",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "hubspot",
+     "action": "create_hubspot_contact",
+     "title": "Create HubSpot contact",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "slack",
+     "action": "notify_sales_on_slack",
+     "title": "Notify sales on Slack",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.hubspot",
+     "n8n-nodes-base.slack"
+    ]
+   },
+   "knownIssue": "invalid-op-or-params:hubspot,slack"
+  },
+  {
+   "id": "drive-backup",
+   "lang": "en",
+   "tags": [
+    "drive",
+    "regression"
+   ],
+   "prompt": "Every night, back up my Google Drive files into a backup folder",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "schedule",
+     "action": "every_night_at_2am",
+     "title": "Every night at 2am",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "googledrive",
+     "action": "list_google_drive_files",
+     "title": "List Google Drive files",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "googledrive",
+     "action": "download_files_to_temporary_storage",
+     "title": "Download files to temporary storage",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s4",
+     "type": "action",
+     "app": "googledrive",
+     "action": "upload_backup_to_backup_folder",
+     "title": "Upload backup to backup folder",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s5",
+     "type": "action",
+     "app": "cleanup",
+     "action": "clean_up_temporary_storage",
+     "title": "Clean up temporary storage",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "schedule",
+    "nodeTypes": [
+     "n8n-nodes-base.googleDrive"
+    ],
+    "forbidNodeTypes": [
+     "n8n-nodes-base.ftp",
+     "n8n-nodes-base.executeCommand",
+     "n8n-nodes-base.httpRequest"
+    ]
+   }
+  },
+  {
+   "id": "email-ai-classify-id",
+   "lang": "id",
+   "tags": [
+    "ai",
+    "branch",
+    "id"
+   ],
+   "prompt": "Kalau ada email masuk, klasifikasikan dengan AI, lalu balas otomatis jika itu pertanyaan harga",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "gmail",
+     "action": "email_masuk_di_gmail",
+     "title": "Email masuk di Gmail",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "openai",
+     "action": "klasifikasikan_email_dengan_ai",
+     "title": "Klasifikasikan email dengan AI",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s4",
+     "type": "condition",
+     "app": "",
+     "action": "apakah_ini_pertanyaan_harga?",
+     "title": "Apakah ini pertanyaan harga?",
+     "description": "",
+     "testable": true,
+     "branches": [
+      {
+       "key": "true",
+       "label": "Ya",
+       "steps": [
+        {
+         "id": "s3",
+         "type": "action",
+         "app": "gmail",
+         "action": "kirim_balasan_harga",
+         "title": "Kirim balasan harga",
+         "description": "",
+         "testable": true
+        }
+       ]
+      },
+      {
+       "key": "false",
+       "label": "Tidak",
+       "steps": []
+      }
+     ]
+    }
+   ],
+   "expect": {
+    "trigger": "app",
+    "anyOf": [
+     [
+      "@n8n/n8n-nodes-langchain.agent",
+      "@n8n/n8n-nodes-langchain.openAi",
+      "@n8n/n8n-nodes-langchain.chainLlm",
+      "@n8n/n8n-nodes-langchain.textClassifier",
+      "@n8n/n8n-nodes-langchain.informationExtractor",
+      "@n8n/n8n-nodes-langchain.chainSummarization"
+     ],
+     [
+      "n8n-nodes-base.gmail"
+     ]
+    ],
+    "branches": true
+   },
+   "knownIssue": "trigger-not-native + ai-step-misclassified"
+  },
+  {
+   "id": "telegram-alert",
+   "lang": "en",
+   "tags": [
+    "messaging"
+   ],
+   "prompt": "Send a Telegram message whenever a webhook comes in",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "incoming_webhook",
+     "title": "Incoming webhook",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "telegram",
+     "action": "send_telegram_message",
+     "title": "Send Telegram message",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.telegram"
+    ]
+   },
+   "knownIssue": "no-native-node:telegram"
+  },
+  {
+   "id": "form-notion",
+   "lang": "en",
+   "tags": [
+    "basic"
+   ],
+   "prompt": "Create a Notion page when someone submits the signup form",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "signup_form_submitted",
+     "title": "Signup form submitted",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "notion",
+     "action": "create_notion_page",
+     "title": "Create Notion page",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.notion"
+    ]
+   },
+   "knownIssue": "last-step-replaced-by-respond"
+  },
+  {
+   "id": "rss-slack",
+   "lang": "en",
+   "tags": [
+    "basic"
+   ],
+   "prompt": "Check this RSS feed every hour and post new items to Slack",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "schedule",
+     "action": "every_hour",
+     "title": "Every hour",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "rss",
+     "action": "read_rss_feed",
+     "title": "Read RSS feed",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "slack",
+     "action": "post_items_to_slack",
+     "title": "Post items to Slack",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "schedule",
+    "nodeTypes": [
+     "n8n-nodes-base.rssFeedRead",
+     "n8n-nodes-base.slack"
+    ]
+   },
+   "knownIssue": "invalid-op-or-params:slack"
+  },
+  {
+   "id": "stripe-sheets",
+   "lang": "en",
+   "tags": [
+    "app-trigger"
+   ],
+   "prompt": "When a Stripe payment succeeds, log it in Google Sheets",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "stripe",
+     "action": "stripe_payment_succeeded",
+     "title": "Stripe payment succeeded",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "googlesheets",
+     "action": "log_payment_in_google_sheets",
+     "title": "Log payment in Google Sheets",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "app",
+    "nodeTypes": [
+     "n8n-nodes-base.stripeTrigger",
+     "n8n-nodes-base.googleSheets"
+    ]
+   },
+   "knownIssue": "trigger-not-native + no-native-node:googleSheets"
+  },
+  {
+   "id": "approval-email",
+   "lang": "en",
+   "tags": [
+    "human-review"
+   ],
+   "prompt": "When an expense request comes in, wait for a manager to approve it, then email finance",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "expense_request_received",
+     "title": "Expense request received",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "wait",
+     "action": "wait_for_manager_approval",
+     "title": "Wait for manager approval",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "email",
+     "action": "email_finance",
+     "title": "Email finance",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.wait"
+    ],
+    "anyOf": [
+     [
+      "n8n-nodes-base.emailSend",
+      "n8n-nodes-base.gmail",
+      "n8n-nodes-base.microsoftOutlook"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "daily-report-postgres-id",
+   "lang": "id",
+   "tags": [
+    "database",
+    "id"
+   ],
+   "prompt": "Kirim laporan penjualan harian lewat email, datanya dari database Postgres",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "schedule",
+     "action": "setiap_hari_jam_8_pagi",
+     "title": "Setiap hari jam 8 pagi",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "postgres",
+     "action": "ambil_data_penjualan_dari_postgres",
+     "title": "Ambil data penjualan dari Postgres",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "email",
+     "action": "kirim_laporan_lewat_email",
+     "title": "Kirim laporan lewat email",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "schedule",
+    "nodeTypes": [
+     "n8n-nodes-base.postgres"
+    ],
+    "anyOf": [
+     [
+      "n8n-nodes-base.emailSend",
+      "n8n-nodes-base.gmail",
+      "n8n-nodes-base.microsoftOutlook"
+     ]
+    ]
+   },
+   "knownIssue": "no-native-node:postgres"
+  },
+  {
+   "id": "calendar-confirm",
+   "lang": "en",
+   "tags": [
+    "calendar"
+   ],
+   "prompt": "When someone books a meeting through our form, create a Google Calendar event and email them a confirmation",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "meeting_booking_form",
+     "title": "Meeting booking form",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "googlecalendar",
+     "action": "create_google_calendar_event",
+     "title": "Create Google Calendar event",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "email",
+     "action": "email_confirmation",
+     "title": "Email confirmation",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.googleCalendar"
+    ],
+    "anyOf": [
+     [
+      "n8n-nodes-base.emailSend",
+      "n8n-nodes-base.gmail",
+      "n8n-nodes-base.microsoftOutlook"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "api-poll-airtable",
+   "lang": "en",
+   "tags": [
+    "http"
+   ],
+   "prompt": "Every 15 minutes call our REST API and save the result in Airtable",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "schedule",
+     "action": "every_15_minutes",
+     "title": "Every 15 minutes",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "http",
+     "action": "call_rest_api",
+     "title": "Call REST API",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "airtable",
+     "action": "save_result_to_airtable",
+     "title": "Save result to Airtable",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "schedule",
+    "nodeTypes": [
+     "n8n-nodes-base.httpRequest",
+     "n8n-nodes-base.airtable"
+    ]
+   },
+   "knownIssue": "no-native-node:airtable"
+  },
+  {
+   "id": "discord-notify",
+   "lang": "en",
+   "tags": [
+    "messaging"
+   ],
+   "prompt": "Post a message in Discord when a new order arrives",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "new_order_received",
+     "title": "New order received",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "discord",
+     "action": "post_message_in_discord",
+     "title": "Post message in Discord",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.discord"
+    ]
+   },
+   "knownIssue": "no-native-node:discord"
+  },
+  {
+   "id": "whatsapp-order-id",
+   "lang": "id",
+   "tags": [
+    "messaging",
+    "id"
+   ],
+   "prompt": "Kirim pesan WhatsApp ke pelanggan saat ada pesanan baru",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "pesanan_baru_masuk",
+     "title": "Pesanan baru masuk",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "whatsapp",
+     "action": "kirim_pesan_whatsapp_ke_pelanggan",
+     "title": "Kirim pesan WhatsApp ke pelanggan",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.whatsApp"
+    ]
+   },
+   "knownIssue": "no-native-node:whatsApp"
+  },
+  {
+   "id": "zendesk-slack",
+   "lang": "en",
+   "tags": [
+    "crm"
+   ],
+   "prompt": "Create a Zendesk ticket from an incoming webhook and post it to Slack",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "incoming_webhook",
+     "title": "Incoming webhook",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "zendesk",
+     "action": "create_zendesk_ticket",
+     "title": "Create Zendesk ticket",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "slack",
+     "action": "post_ticket_to_slack",
+     "title": "Post ticket to Slack",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.zendesk",
+     "n8n-nodes-base.slack"
+    ]
+   },
+   "knownIssue": "invalid-op-or-params:slack,zendesk"
+  },
+  {
+   "id": "asana-task",
+   "lang": "en",
+   "tags": [
+    "crm"
+   ],
+   "prompt": "When a deal is won, create an Asana task for onboarding",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "deal_won_webhook",
+     "title": "Deal won webhook",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "asana",
+     "action": "create_asana_onboarding_task",
+     "title": "Create Asana onboarding task",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.asana"
+    ]
+   },
+   "knownIssue": "last-step-replaced-by-respond"
+  },
+  {
+   "id": "weekly-reminders",
+   "lang": "en",
+   "tags": [
+    "loop"
+   ],
+   "prompt": "Every Monday, read all customers from Google Sheets and email each one a reminder",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "schedule",
+     "action": "every_monday_at_9am",
+     "title": "Every Monday at 9am",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "googlesheets",
+     "action": "read_customers_from_google_sheets",
+     "title": "Read customers from Google Sheets",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "email",
+     "action": "email_each_customer_a_reminder",
+     "title": "Email each customer a reminder",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "schedule",
+    "nodeTypes": [
+     "n8n-nodes-base.googleSheets"
+    ],
+    "anyOf": [
+     [
+      "n8n-nodes-base.emailSend",
+      "n8n-nodes-base.gmail",
+      "n8n-nodes-base.microsoftOutlook"
+     ]
+    ]
+   },
+   "knownIssue": "no-native-node:googleSheets"
+  },
+  {
+   "id": "webhook-transform-postgres",
+   "lang": "en",
+   "tags": [
+    "transform",
+    "database"
+   ],
+   "prompt": "Receive order JSON on a webhook, reformat the fields, and store it in Postgres",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "order_webhook",
+     "title": "Order webhook",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "set",
+     "action": "reformat_order_fields",
+     "title": "Reformat order fields",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "postgres",
+     "action": "store_order_in_postgres",
+     "title": "Store order in Postgres",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.set",
+     "n8n-nodes-base.postgres"
+    ]
+   },
+   "knownIssue": "last-step-replaced-by-respond"
+  },
+  {
+   "id": "api-endpoint-hubspot",
+   "lang": "en",
+   "tags": [
+    "api"
+   ],
+   "prompt": "Build an API endpoint that takes a customer email, looks them up in HubSpot, and returns the result",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "api_request",
+     "title": "API request",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "hubspot",
+     "action": "look_up_customer_in_hubspot",
+     "title": "Look up customer in HubSpot",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "respond",
+     "action": "return_result_to_caller",
+     "title": "Return result to caller",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.hubspot",
+     "n8n-nodes-base.respondToWebhook"
+    ]
+   },
+   "knownIssue": "invalid-op-or-params:hubspot"
+  },
+  {
+   "id": "code-totals-sheets",
+   "lang": "en",
+   "tags": [
+    "code"
+   ],
+   "prompt": "On a webhook, run custom JavaScript to calculate order totals and save them in Google Sheets",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "order_webhook",
+     "title": "Order webhook",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "code",
+     "action": "calculate_totals_with_javascript",
+     "title": "Calculate totals with JavaScript",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "googlesheets",
+     "action": "save_totals_in_google_sheets",
+     "title": "Save totals in Google Sheets",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.code",
+     "n8n-nodes-base.googleSheets"
+    ]
+   },
+   "knownIssue": "last-step-replaced-by-respond"
+  },
+  {
+   "id": "zip-drive",
+   "lang": "en",
+   "tags": [
+    "drive",
+    "regression"
+   ],
+   "prompt": "Every Sunday, zip the files in a Google Drive folder and upload the archive back to Drive",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "schedule",
+     "action": "every_sunday",
+     "title": "Every Sunday",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "googledrive",
+     "action": "download_files_from_drive_folder",
+     "title": "Download files from Drive folder",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "compression",
+     "action": "zip_the_files",
+     "title": "Zip the files",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s4",
+     "type": "action",
+     "app": "googledrive",
+     "action": "upload_archive_to_drive",
+     "title": "Upload archive to Drive",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "schedule",
+    "nodeTypes": [
+     "n8n-nodes-base.googleDrive",
+     "n8n-nodes-base.compression"
+    ],
+    "forbidNodeTypes": [
+     "n8n-nodes-base.executeCommand"
+    ]
+   }
+  },
+  {
+   "id": "slack-trigger-notion",
+   "lang": "en",
+   "tags": [
+    "app-trigger"
+   ],
+   "prompt": "When a message is posted in a Slack channel, save it to Notion",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "slack",
+     "action": "new_slack_message_in_channel",
+     "title": "New Slack message in channel",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "notion",
+     "action": "save_message_to_notion",
+     "title": "Save message to Notion",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "app",
+    "nodeTypes": [
+     "n8n-nodes-base.slackTrigger",
+     "n8n-nodes-base.notion"
+    ]
+   },
+   "knownIssue": "trigger-not-native + no-native-node:notion"
+  },
+  {
+   "id": "github-issue-slack",
+   "lang": "en",
+   "tags": [
+    "app-trigger"
+   ],
+   "prompt": "When a new GitHub issue is opened, post it to Slack",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "github",
+     "action": "new_github_issue_opened",
+     "title": "New GitHub issue opened",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "slack",
+     "action": "post_issue_to_slack",
+     "title": "Post issue to Slack",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "app",
+    "nodeTypes": [
+     "n8n-nodes-base.githubTrigger",
+     "n8n-nodes-base.slack"
+    ]
+   },
+   "knownIssue": "invalid-op-or-params:slack + trigger-not-native"
+  },
+  {
+   "id": "shopify-sheets",
+   "lang": "en",
+   "tags": [
+    "app-trigger"
+   ],
+   "prompt": "When a Shopify order is created, add it to a Google Sheet",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "shopify",
+     "action": "new_shopify_order",
+     "title": "New Shopify order",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "googlesheets",
+     "action": "add_order_to_google_sheet",
+     "title": "Add order to Google Sheet",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "app",
+    "nodeTypes": [
+     "n8n-nodes-base.shopifyTrigger",
+     "n8n-nodes-base.googleSheets"
+    ]
+   },
+   "knownIssue": "trigger-not-native + no-native-node:googleSheets"
+  },
+  {
+   "id": "mysql-slack-id",
+   "lang": "id",
+   "tags": [
+    "database",
+    "id"
+   ],
+   "prompt": "Setiap jam, ambil pesanan baru dari MySQL dan kirim ke Slack",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "schedule",
+     "action": "setiap_jam",
+     "title": "Setiap jam",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "mysql",
+     "action": "ambil_pesanan_baru_dari_mysql",
+     "title": "Ambil pesanan baru dari MySQL",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "slack",
+     "action": "kirim_pesanan_ke_slack",
+     "title": "Kirim pesanan ke Slack",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "schedule",
+    "nodeTypes": [
+     "n8n-nodes-base.mySql",
+     "n8n-nodes-base.slack"
+    ]
+   },
+   "knownIssue": "invalid-op-or-params:slack"
+  },
+  {
+   "id": "sms-twilio",
+   "lang": "en",
+   "tags": [
+    "messaging"
+   ],
+   "prompt": "Send an SMS with Twilio when a webhook arrives",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "incoming_webhook",
+     "title": "Incoming webhook",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "twilio",
+     "action": "send_sms_with_twilio",
+     "title": "Send SMS with Twilio",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.twilio"
+    ]
+   },
+   "knownIssue": "no-native-node:twilio"
+  },
+  {
+   "id": "rss-ai-digest",
+   "lang": "en",
+   "tags": [
+    "ai"
+   ],
+   "prompt": "Every morning fetch the RSS feed, summarize it with AI, and email me the digest",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "schedule",
+     "action": "every_morning_at_7am",
+     "title": "Every morning at 7am",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "rss",
+     "action": "fetch_rss_feed",
+     "title": "Fetch RSS feed",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "openai",
+     "action": "summarize_items_with_ai",
+     "title": "Summarize items with AI",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s4",
+     "type": "action",
+     "app": "email",
+     "action": "email_the_digest",
+     "title": "Email the digest",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "schedule",
+    "nodeTypes": [
+     "n8n-nodes-base.rssFeedRead"
+    ],
+    "anyOf": [
+     [
+      "@n8n/n8n-nodes-langchain.agent",
+      "@n8n/n8n-nodes-langchain.openAi",
+      "@n8n/n8n-nodes-langchain.chainLlm",
+      "@n8n/n8n-nodes-langchain.textClassifier",
+      "@n8n/n8n-nodes-langchain.informationExtractor",
+      "@n8n/n8n-nodes-langchain.chainSummarization"
+     ],
+     [
+      "n8n-nodes-base.emailSend",
+      "n8n-nodes-base.gmail",
+      "n8n-nodes-base.microsoftOutlook"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "manual-slack",
+   "lang": "en",
+   "tags": [
+    "basic"
+   ],
+   "prompt": "I want to click a button to send a Slack message",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "manual",
+     "action": "click_to_run",
+     "title": "Click to run",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "slack",
+     "action": "send_slack_message",
+     "title": "Send Slack message",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "manual",
+    "nodeTypes": [
+     "n8n-nodes-base.slack"
+    ]
+   },
+   "knownIssue": "invalid-op-or-params:slack + trigger-not-native"
+  },
+  {
+   "id": "lead-followup-wait",
+   "lang": "en",
+   "tags": [
+    "wait"
+   ],
+   "prompt": "When a lead signs up, wait 2 days and then send a follow-up email",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "lead_signup",
+     "title": "Lead signup",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "wait",
+     "action": "wait_2_days",
+     "title": "Wait 2 days",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "email",
+     "action": "send_follow-up_email",
+     "title": "Send follow-up email",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.wait"
+    ],
+    "anyOf": [
+     [
+      "n8n-nodes-base.emailSend",
+      "n8n-nodes-base.gmail",
+      "n8n-nodes-base.microsoftOutlook"
+     ]
+    ]
+   },
+   "knownIssue": "no-native-node:wait"
+  },
+  {
+   "id": "ticket-priority-switch-id",
+   "lang": "id",
+   "tags": [
+    "branch",
+    "id"
+   ],
+   "prompt": "Tiket masuk lewat webhook: prioritas tinggi kirim ke Slack, sedang kirim email, rendah simpan ke Google Sheets",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "webhook",
+     "action": "tiket_masuk",
+     "title": "Tiket masuk",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s5",
+     "type": "switch",
+     "app": "",
+     "action": "cek_prioritas_tiket",
+     "title": "Cek prioritas tiket",
+     "description": "",
+     "testable": true,
+     "branches": [
+      {
+       "key": "high",
+       "label": "Tinggi",
+       "steps": [
+        {
+         "id": "s2",
+         "type": "action",
+         "app": "slack",
+         "action": "kirim_ke_slack",
+         "title": "Kirim ke Slack",
+         "description": "",
+         "testable": true
+        }
+       ]
+      },
+      {
+       "key": "medium",
+       "label": "Sedang",
+       "steps": [
+        {
+         "id": "s3",
+         "type": "action",
+         "app": "email",
+         "action": "kirim_email",
+         "title": "Kirim email",
+         "description": "",
+         "testable": true
+        }
+       ]
+      },
+      {
+       "key": "low",
+       "label": "Rendah",
+       "steps": [
+        {
+         "id": "s4",
+         "type": "action",
+         "app": "googlesheets",
+         "action": "simpan_ke_google_sheets",
+         "title": "Simpan ke Google Sheets",
+         "description": "",
+         "testable": true
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "expect": {
+    "trigger": "webhook",
+    "nodeTypes": [
+     "n8n-nodes-base.slack",
+     "n8n-nodes-base.googleSheets"
+    ],
+    "anyOf": [
+     [
+      "n8n-nodes-base.emailSend",
+      "n8n-nodes-base.gmail",
+      "n8n-nodes-base.microsoftOutlook"
+     ]
+    ],
+    "branches": true
+   },
+   "knownIssue": "invalid-op-or-params:slack + no-native-node:googleSheets"
+  },
+  {
+   "id": "telegram-bot-ai",
+   "lang": "en",
+   "tags": [
+    "ai",
+    "app-trigger"
+   ],
+   "prompt": "Reply to Telegram messages with an AI answer",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "telegram",
+     "action": "new_telegram_message",
+     "title": "New Telegram message",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "openai",
+     "action": "generate_ai_answer",
+     "title": "Generate AI answer",
+     "description": "",
+     "testable": true
+    },
+    {
+     "id": "s3",
+     "type": "action",
+     "app": "telegram",
+     "action": "send_reply_on_telegram",
+     "title": "Send reply on Telegram",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "app",
+    "nodeTypes": [
+     "n8n-nodes-base.telegramTrigger",
+     "n8n-nodes-base.telegram"
+    ],
+    "anyOf": [
+     [
+      "@n8n/n8n-nodes-langchain.agent",
+      "@n8n/n8n-nodes-langchain.openAi",
+      "@n8n/n8n-nodes-langchain.chainLlm",
+      "@n8n/n8n-nodes-langchain.textClassifier",
+      "@n8n/n8n-nodes-langchain.informationExtractor",
+      "@n8n/n8n-nodes-langchain.chainSummarization"
+     ]
+    ]
+   },
+   "knownIssue": "trigger-not-native + no-native-node:telegram"
+  },
+  {
+   "id": "hubspot-mailchimp",
+   "lang": "en",
+   "tags": [
+    "app-trigger",
+    "crm"
+   ],
+   "prompt": "When a new HubSpot contact is created, add them to a Mailchimp list",
+   "plan": [
+    {
+     "id": "s1",
+     "type": "trigger",
+     "app": "hubspot",
+     "action": "new_hubspot_contact",
+     "title": "New HubSpot contact",
+     "description": "",
+     "testable": false
+    },
+    {
+     "id": "s2",
+     "type": "action",
+     "app": "mailchimp",
+     "action": "add_contact_to_mailchimp_list",
+     "title": "Add contact to Mailchimp list",
+     "description": "",
+     "testable": true
+    }
+   ],
+   "expect": {
+    "trigger": "app",
+    "nodeTypes": [
+     "n8n-nodes-base.hubspotTrigger",
+     "n8n-nodes-base.mailchimp"
+    ]
+   },
+   "knownIssue": "trigger-not-native + no-native-node:mailchimp"
+  }
+ ]
+}

@@ -17,3 +17,6 @@ next-env.d.ts
 
 # Runtime data (workflows/canvas stores) — lives on a volume in prod, never in git or the image
 /.data/
+
+# Workflow-builder eval: live run outputs (compare before/after, not committed)
+/evals/workflow-builder/results/
