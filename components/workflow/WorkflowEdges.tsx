@@ -39,32 +39,20 @@ const N8NAdaptiveEdge = memo((props: EdgeProps) => {
   const { setEdges } = useReactFlow();
 
   const [edgePath, labelX, labelY] = useMemo(() => {
-    const dx = targetX - sourceX;
-    const dy = Math.abs(targetY - sourceY);
-
-    // Sharp angle: target is behind source, or very steep vertical drop
-    const isSharpAngle = dx < 50 || (dy > 100 && dx < 150);
-
-    if (isSharpAngle) {
-      return getSmoothStepPath({
-        sourceX,
-        sourceY,
-        sourcePosition,
-        targetX,
-        targetY,
-        targetPosition,
-        borderRadius: 16,
-      });
+    // Right → Left is the normal step-to-step case: one smooth cubic whose
+    // handles scale with the gap, so forward links are gentle and links that
+    // go back/around (stacked or looped layouts) swing out in a wide S instead
+    // of snapping to right angles.
+    if (sourcePosition === Position.Right && targetPosition === Position.Left) {
+      const dx = targetX - sourceX;
+      const dy = targetY - sourceY;
+      const off = dx >= 0
+        ? Math.min(Math.max(dx * 0.5, 48), 220)
+        : Math.min(70 + Math.abs(dy) * 0.18, 150);
+      const path = `M${sourceX},${sourceY} C${sourceX + off},${sourceY} ${targetX - off},${targetY} ${targetX},${targetY}`;
+      return [path, (sourceX + targetX) / 2, (sourceY + targetY) / 2] as const;
     }
-
-    return getBezierPath({
-      sourceX,
-      sourceY,
-      sourcePosition,
-      targetX,
-      targetY,
-      targetPosition,
-    });
+    return getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
   }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition]);
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -75,6 +63,8 @@ const N8NAdaptiveEdge = memo((props: EdgeProps) => {
 
   return (
     <>
+      {/* soft underlay gives the moving dashes a track to run on */}
+      <path d={edgePath} className={styles.n8nEdgeTrack} />
       <BaseEdge
         path={edgePath}
         markerEnd={markerEnd}

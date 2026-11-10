@@ -6,7 +6,9 @@ import React, { memo, useState } from 'react';
 import { Handle, Position, useReactFlow, useNodeId, useUpdateNodeInternals } from '@xyflow/react';
 import {
   Zap, GitFork, Waypoints, Share2, Send, Play, Workflow, BotMessageSquare, Database,
+  Clock, Webhook, Braces, Pencil, Timer, Merge, Filter, Mail, Reply, Repeat, MousePointerClick, Globe,
 } from 'lucide-react';
+import { resolveNodeVisual, type NodeGlyph } from '@/lib/workflows/nodeVisual';
 import styles from './WorkflowNode.module.css';
 
 const DESIGN = {
@@ -53,64 +55,11 @@ const EYEBROW: Record<string, string> = {
 
 function getIconColor(c?: string) { return ICON_COLOR[c?.toLowerCase() ?? ''] ?? DESIGN.iconBoxDefaultColor; }
 
-const APP_ICON_MAP: Record<string, string> = {
-  hubspot: '/icons/integrations/hubspot.svg',
-  airtable: '/icons/integrations/airtable.svg',
-  'amazon s3': '/icons/integrations/amazon-s3.svg',
-  asana: '/icons/integrations/asana.svg',
-  dropbox: '/icons/integrations/dropbox.svg',
-  gmail: '/icons/integrations/gmail.svg',
-  'google sheets': '/icons/integrations/google-sheets.svg',
-  'google calendar': '/icons/integrations/google-calendar.svg',
-  'google drive': '/icons/integrations/google-drive.svg',
-  http: '/icons/integrations/http.svg',
-  intercom: '/icons/integrations/intercom.svg',
-  linear: '/icons/integrations/linear.svg',
-  mailchimp: '/icons/integrations/mailchimp.svg',
-  'microsoft teams': '/icons/integrations/microsoft-teams.svg',
-  outlook: '/icons/integrations/outlook.svg',
-  notion: '/icons/integrations/notion.svg',
-  openai: '/icons/integrations/openai.svg',
-  salesforce: '/icons/integrations/salesforce.svg',
-  sendgrid: '/icons/integrations/sendgrid.svg',
-  shopify: '/icons/integrations/shopify.svg',
-  slack: '/icons/integrations/slack.svg',
-  stripe: '/icons/integrations/stripe.svg',
-  twilio: '/icons/integrations/twilio.svg',
-  zendesk: '/icons/integrations/zendesk.svg',
-  telegram: '/icons/integrations/telegram.svg',
-  whatsapp: '/icons/integrations/whatsapp.svg',
-  discord: '/icons/integrations/discord.svg',
-  postgres: '/icons/integrations/postgresql.svg',
-  postgresql: '/icons/integrations/postgresql.svg',
-  mysql: '/icons/integrations/mysql.svg',
-  mongodb: '/icons/integrations/mongodb.svg',
-  redis: '/icons/integrations/redis.svg',
-  graphql: '/icons/integrations/graphql.svg',
-  anthropic: '/icons/integrations/claude.svg',
-  claude: '/icons/integrations/claude.svg',
-  ollama: '/icons/integrations/ollama.svg',
-  odoo: '/icons/integrations/odoo.svg',
-  erpnext: '/icons/integrations/erpnext.svg',
-  // Common aliases the workflow generator emits
-  'google-sheets': '/icons/integrations/google-sheets.svg',
-  googlesheets: '/icons/integrations/google-sheets.svg',
-  sheets: '/icons/integrations/google-sheets.svg',
-  'microsoft-teams': '/icons/integrations/microsoft-teams.svg',
-  teams: '/icons/integrations/microsoft-teams.svg',
-  email: '/icons/integrations/gmail.svg',
-  s3: '/icons/integrations/amazon-s3.svg',
+const GLYPHS: Record<NodeGlyph, React.ComponentType<{ size?: number; strokeWidth?: number; color?: string }>> = {
+  clock: Clock, webhook: Webhook, code: Braces, pencil: Pencil, timer: Timer, merge: Merge,
+  filter: Filter, mail: Mail, reply: Reply, repeat: Repeat, click: MousePointerClick,
+  branch: GitFork, bot: BotMessageSquare, globe: Globe, database: Database,
 };
-
-function getAppSvgIcon(label: string): string | null {
-  const key = label.toLowerCase().trim();
-  if (!key) return null; // '' would fuzzy-match every entry below
-  if (APP_ICON_MAP[key]) return APP_ICON_MAP[key];
-  for (const [k, v] of Object.entries(APP_ICON_MAP)) {
-    if (key.includes(k) || k.includes(key)) return v;
-  }
-  return null;
-}
 
 function DefaultIcon({ category }: { category?: string }) {
   const cat = category?.toLowerCase() ?? '';
@@ -224,44 +173,35 @@ export const WorkflowNode = memo(({ data, selected }: WorkflowNodeProps) => {
   const { short, rest } = splitLabel(label);
   const hasExpandedContent = rest || description;
   const accentColor = getIconColor(category);
-  // Brand-icon nodes (Slack/Gmail/etc.) already carry their own recognizable
-  // color — only tint the icon box for the generic DefaultIcon fallback so a
-  // category accent never clashes with a real logo.
-  const hasBrandIcon = !!(
-    iconPath ||
-    (appIcon && (appIcon.startsWith('/') || appIcon.startsWith('http'))) ||
-    getAppSvgIcon(app || '') ||
-    getAppSvgIcon(typeof appIcon === 'string' ? appIcon : '') ||
-    (appIcon && getAppSvgIcon(label))
-  );
+  // n8n-style: the icon follows the app the step talks to (Google Drive → Drive logo),
+  // built-in nodes get a glyph for what they do (Schedule → clock).
+  const rawType = (data.rawN8n as { type?: string } | undefined)?.type;
+  const visual = resolveNodeVisual({
+    app,
+    appIcon: typeof appIcon === 'string' ? appIcon : undefined,
+    label,
+    description: typeof description === 'string' ? description : undefined,
+    rawType,
+  });
+  const appIconUrl = appIcon && (appIcon.startsWith('/') || appIcon.startsWith('http')) ? appIcon : null;
+  const hasBrandIcon = !!(iconPath || appIconUrl || visual.svg);
 
   const renderIcon = () => {
-    if (iconPath) {
+    const src = iconPath ? asset(iconPath)
+      : appIconUrl ? (appIconUrl.startsWith('http') ? appIconUrl : asset(appIconUrl))
+      : visual.svg ? asset(visual.svg)
+      : null;
+    if (src) {
       return (
-        <Image src={asset(iconPath)} alt={label} width={28} height={28}
-          style={{ width: 28, height: 28, objectFit: 'contain' }}
-          onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.removeAttribute('style'); }}
-        />
-      );
-    }
-    if (appIcon && (appIcon.startsWith('/') || appIcon.startsWith('http'))) {
-      return (
-        <Image src={appIcon.startsWith('http') ? appIcon : asset(appIcon)} alt={label} width={28} height={28}
-          style={{ width: 28, height: 28, objectFit: 'contain' }}
-          onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.removeAttribute('style'); }}
-        />
-      );
-    }
-    // Brand icon: the step's `app` id is the definitive signal; the node
-    // label is a last resort (titles rarely contain the app name).
-    const svgPath = getAppSvgIcon(app || '') ?? getAppSvgIcon(typeof appIcon === 'string' ? appIcon : '') ?? (appIcon ? getAppSvgIcon(label) : null);
-    if (svgPath) {
-      return (
-        <Image src={asset(svgPath)} alt={label} width={28} height={28}
+        <Image src={src} alt={label} width={28} height={28}
           style={{ width: 28, height: 28, objectFit: 'contain' }}
           onError={(e) => { e.currentTarget.style.display = 'none'; }}
         />
       );
+    }
+    if (visual.glyph) {
+      const G = GLYPHS[visual.glyph];
+      return <G size={DESIGN.iconSize} strokeWidth={1.9} color="currentColor" />;
     }
     if (icon && typeof icon !== 'string') return icon;
     return <DefaultIcon category={category} />;
