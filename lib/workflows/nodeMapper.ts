@@ -14,6 +14,8 @@
  * human review node > AI agent (last resort).
  */
 
+import { normalizeApp, hasAppBuilder, buildAppNode, type AppNodeBuild } from '@/lib/workflows/appNodes'
+
 export type NodeIntent =
   | 'email'
   | 'messaging'
@@ -189,11 +191,81 @@ export function googleDriveOperation(text: string): 'list' | 'download' | 'uploa
   return 'list'
 }
 
+/**
+ * The planner's `app` as the primary signal for picking a node. Returns null
+ * when `app` is missing, generic ("default") or not something we map — the
+ * caller then falls back to text detection (detectNodeIntent).
+ *
+ *  - `intent`: reuse an existing intent builder (email, googleDrive, …)
+ *  - `native`: a node built from the app table (Slack, Sheets, Telegram, …)
+ */
+export interface AppResolution {
+  intent?: NodeIntent
+  native?: AppNodeBuild
+}
+
+const APP_INTENT: Record<string, NodeIntent> = {
+  gmail: 'email',
+  email: 'email',
+  googledrive: 'googleDrive',
+  googlecalendar: 'calendar',
+  rss: 'rss',
+  http: 'http',
+  respond: 'respond',
+  code: 'code',
+  set: 'transform',
+  compression: 'compress',
+  cleanup: 'cleanup',
+  openai: 'ai',
+  anthropic: 'ai',
+  ai: 'ai',
+}
+
+/**
+ * With no usable `app`, a few unambiguous product names in the title still
+ * pick the native node (Slack/HubSpot/Zendesk/Asana/messaging brands are
+ * already covered by detectNodeIntent).
+ */
+const BRAND_TEXT: Array<[string, RegExp]> = [
+  ['googlesheets', /google\s*sheets?|\bgsheets?\b|google\s*spreadsheet/i],
+  ['notion', /\bnotion\b/i],
+  ['airtable', /\bairtable\b/i],
+  ['mailchimp', /\bmailchimp\b/i],
+  ['stripe', /\bstripe\b/i],
+  ['github', /\bgithub\b/i],
+]
+function brandInText(t: string): string | null {
+  for (const [key, re] of BRAND_TEXT) if (re.test(t)) return key
+  return null
+}
+
+export function resolveStepByApp(step: Pick<WorkflowStep, 'app' | 'appAction' | 'action' | 'inputs'>): AppResolution | null {
+  const key = normalizeApp(step.app) ?? brandInText(`${step.action}`)
+  if (!key) return null
+  const info = { title: step.action, appAction: step.appAction, config: step.inputs }
+  // Mid-flow "schedule"/"timer" steps are delays (Wait), or a calendar event
+  // when the text says meeting/appointment — never a second Schedule Trigger.
+  if (key === 'schedule') {
+    if (/meeting|appointment|calendar|event|session|interview|jadwalkan|menjadwalkan/i.test(step.action)) return { intent: 'calendar' }
+    return { native: buildAppNode('wait', info)! }
+  }
+  if (hasAppBuilder(key)) {
+    const native = buildAppNode(key, info)
+    if (native) return { native }
+  }
+  if (APP_INTENT[key]) return { intent: APP_INTENT[key] }
+  return null
+}
+
 interface WorkflowStep {
   step: number
   action: string
   tool: string
   output: string
+  /** Integration the planner chose for this step (any spelling) — the primary signal for node choice. */
+  app?: string
+  /** The planner's action slug for that integration, e.g. "append_row". */
+  appAction?: string
   inputs?: { url?: string; [key: string]: any }
   conditionField?: string
   aiOutputSchema?: Record<string, any>
@@ -383,7 +455,7 @@ export function mapIntentToN8nNode(
         return {
           ...baseNode,
           type: 'n8n-nodes-base.gmail',
-          typeVersion: 2.1,
+          typeVersion: 2.2,
           parameters: {
             resource: 'message',
             operation: 'send',
@@ -410,60 +482,11 @@ export function mapIntentToN8nNode(
       }
     }
 
-    case 'hubspot': {
-      const reads = /get|fetch|pull|retrieve|read|ambil|mengambil|dapatkan/i.test(`${step.action} ${step.tool}`)
-      return {
-        ...baseNode,
-        type: 'n8n-nodes-base.hubspot',
-        typeVersion: 2,
-        credentials: { hubspotApi: { id: '', name: 'HubSpot account' } },
-        parameters: reads
-          ? {
-              resource: 'contact',
-              operation: 'get',
-              contactId: '={{ $json.customer_id || $json.contact_id || $json.id }}',
-            }
-          : {
-              resource: 'contact',
-              operation: 'create',
-              properties: {
-                email: '={{ $json.email || $json.customer_email }}',
-                firstname: '={{ $json.first_name || $json.name }}',
-                lastname: '={{ $json.last_name || "" }}',
-              },
-            },
-      }
-    }
-
-    case 'zendesk': {
-      return {
-        ...baseNode,
-        type: 'n8n-nodes-base.zendesk',
-        typeVersion: 1,
-        credentials: { zendeskApi: { id: '', name: 'Zendesk account' } },
-        parameters: {
-          resource: 'ticket',
-          operation: 'create',
-          subject: '={{ $json.subject || $json.title || "Aivory support ticket" }}',
-          comment: '={{ $json.message || $json.description || $json.body || "" }}',
-        },
-      }
-    }
-
+    case 'hubspot':
+    case 'zendesk':
     case 'asana': {
-      return {
-        ...baseNode,
-        type: 'n8n-nodes-base.asana',
-        typeVersion: 1,
-        credentials: { asanaApi: { id: '', name: 'Asana account' } },
-        parameters: {
-          resource: 'task',
-          operation: 'create',
-          name: '={{ $json.task_name || $json.name || "Onboarding task" }}',
-          notes: '={{ $json.description || $json.message || "" }}',
-          workspace: '={{ $json.workspace_id || "" }}',
-        },
-      }
+      const native = buildAppNode(intent, { title: step.action, appAction: step.appAction, config: step.inputs })!
+      return { ...baseNode, type: native.type, typeVersion: native.typeVersion, parameters: native.parameters, ...(native.credentials ? { credentials: native.credentials } : {}) }
     }
 
     case 'messaging': {
@@ -472,23 +495,16 @@ export function mapIntentToN8nNode(
       const actionLower = (step.action || '').toLowerCase()
       const isSlack = /slack/.test(toolLower) || /slack/.test(actionLower)
 
-      if (isSlack) {
-        return {
-          ...baseNode,
-          type: 'n8n-nodes-base.slack',
-          typeVersion: 2,
-          credentials: { slackApi: { id: '', name: 'Slack account' } },
-          parameters: {
-            resource: 'message',
-            operation: 'send',
-            channel: step.inputs?.channel || '#general',
-            text: step.inputs?.text || '={{ $json.response || $json.body }}',
-            otherOptions: {},
-          },
-        }
+      const msgApp = isSlack ? 'slack' : /telegram/.test(`${toolLower} ${actionLower}`) ? 'telegram'
+        : /discord/.test(`${toolLower} ${actionLower}`) ? 'discord'
+        : /whatsapp/.test(`${toolLower} ${actionLower}`) ? 'whatsapp'
+        : /\bsms\b|twilio/.test(`${toolLower} ${actionLower}`) ? 'twilio' : null
+      if (msgApp) {
+        const native = buildAppNode(msgApp, { title: step.action, appAction: step.appAction, config: step.inputs })!
+        return { ...baseNode, type: native.type, typeVersion: native.typeVersion, parameters: native.parameters, ...(native.credentials ? { credentials: native.credentials } : {}) }
       }
 
-      // Generic messaging (Discord, Telegram, WhatsApp, etc.) — use HTTP request
+      // Anything else (Teams, …) — generic HTTP request
       return {
         ...baseNode,
         type: 'n8n-nodes-base.httpRequest',
@@ -526,15 +542,12 @@ export function mapIntentToN8nNode(
         },
       }
 
-    case 'schedule':
-      return {
-        ...baseNode,
-        type: 'n8n-nodes-base.scheduleTrigger',
-        typeVersion: 1,
-        parameters: {
-          rule: { interval: [{ field: 'hours', triggerAtHour: 9 }] },
-        },
-      }
+    // A step is never a second trigger: a "schedule" step in the middle of a
+    // flow ("wait 2 days", "pause until Monday") is a delay.
+    case 'schedule': {
+      const native = buildAppNode('wait', { title: step.action, appAction: step.appAction, config: step.inputs })!
+      return { ...baseNode, type: native.type, typeVersion: native.typeVersion, parameters: native.parameters }
+    }
 
     case 'rss':
       return {
@@ -561,16 +574,10 @@ export function mapIntentToN8nNode(
         },
       }
 
-    case 'database':
-      return {
-        ...baseNode,
-        type: 'n8n-nodes-base.mySql',
-        typeVersion: 2,
-        parameters: {
-          operation: 'executeQuery',
-          query: step.inputs?.query || 'SELECT * FROM table_name LIMIT 10;',
-        },
-      }
+    case 'database': {
+      const native = buildAppNode(/postgres/i.test(`${step.tool} ${step.action}`) ? 'postgres' : 'mysql', { title: step.action, appAction: step.appAction, config: step.inputs })!
+      return { ...baseNode, type: native.type, typeVersion: native.typeVersion, parameters: native.parameters, ...(native.credentials ? { credentials: native.credentials } : {}) }
+    }
 
     case 'calendar':
       return {
@@ -739,12 +746,12 @@ export function mapIntentToN8nNode(
         return {
           ...baseNode,
           type: 'n8n-nodes-base.openAi',
-          typeVersion: 1.3,
+          typeVersion: 1.1,
           parameters: {
-            resource: 'text',
-            operation: 'message',
-            modelId: { value: 'gpt-4o', mode: 'list' },
-            messages: { values: [{ content: `${step.action}: ${inputExpr}`, role: 'user' }] },
+            resource: 'chat',
+            operation: 'complete',
+            chatModel: 'gpt-4o',
+            prompt: { messages: [{ role: 'user', content: `${step.action}: ${inputExpr}` }] },
             options: {},
           },
         }

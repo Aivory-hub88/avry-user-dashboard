@@ -9,7 +9,8 @@
  * Trigger node always uses Webhook with auto-generated path.
  */
 
-import { detectNodeIntent, mapIntentToN8nNode, mapIntentToN8nNodes, buildNodeName, refineIntentForContext, type IntentContext } from '@/lib/workflows/nodeMapper'
+import { resolveTrigger, scheduleParameters } from '@/lib/workflows/appNodes'
+import { detectNodeIntent, resolveStepByApp, mapIntentToN8nNode, mapIntentToN8nNodes, buildNodeName, refineIntentForContext, type IntentContext } from '@/lib/workflows/nodeMapper'
 import type { NodeIntent, MapContext } from '@/lib/workflows/nodeMapper'
 
 // Intents whose n8n node can return multiple items — when immediately
@@ -32,6 +33,10 @@ export interface WorkflowStep {
   tool: string
   output: string
   inputs?: { url?: string; [key: string]: any }
+  /** Integration the planner picked for this step (any spelling: "google_drive", "Google Sheets"…). Primary signal for node choice. */
+  app?: string
+  /** The planner's action slug for that integration, e.g. "append_row". */
+  appAction?: string
   /**
    * Only meaningfully populated for steps sourced from the copilot's
    * GeneratedWorkflowStep ('trigger'|'action'|'condition'|'channel'|
@@ -89,6 +94,8 @@ interface AivoryWorkflow {
   title: string
   trigger?: string
   trigger_description?: string
+  /** The planner's `app` for the trigger step (schedule, webhook, manual, gmail, stripe…). Decides the trigger node. */
+  trigger_app?: string
   steps: WorkflowStep[]
   company_name?: string
   diagnostic_score?: number
@@ -128,6 +135,7 @@ interface N8nNode {
   parameters: Record<string, any>
   id?: string
   notes?: string
+  credentials?: Record<string, { id: string; name: string }>
 }
 
 interface N8nWorkflow {
@@ -187,36 +195,55 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
   const nodes: N8nNode[] = []
   const connections: Record<string, any> = {}
 
-  // 1. Trigger node — detect schedule vs webhook based on trigger text
-  const triggerText = (workflow.trigger || '').toLowerCase()
-  const isSchedule = /jam|hari|menit|detik|hour|day|minute|second|schedule|cron|setiap|every|interval|waktu|berkala/.test(triggerText)
+  // 1. Trigger node — chosen from the trigger step's `app` first, its title second.
+  const triggerText = `${workflow.trigger || ''} ${workflow.trigger_description || ''}`
+  const resolved = resolveTrigger({ app: workflow.trigger_app, title: workflow.trigger, description: workflow.trigger_description })
+  const isSchedule = resolved.kind === 'schedule'
+  const isWebhook = resolved.kind === 'webhook'
 
-  // Parse hour interval from trigger text if schedule
-  const hourMatch = triggerText.match(/(\d+)\s*jam/)
-  const hourInterval = hourMatch ? parseInt(hourMatch[1]) : 24
-
-  const triggerNode: N8nNode = isSchedule ? {
-    id: generateNodeId(),
-    name: 'Schedule Trigger',
-    type: 'n8n-nodes-base.scheduleTrigger',
-    typeVersion: 1.2,
-    position: [250, 300],
-    parameters: {
-      rule: {
-        interval: [{ field: 'hours', hoursInterval: hourInterval }]
-      }
-    },
-  } : {
-    id: generateNodeId(),
-    name: 'Webhook Trigger',
-    type: 'n8n-nodes-base.webhook',
-    typeVersion: 1,
-    position: [250, 300],
-    parameters: {
-      httpMethod: 'POST',
-      path: workflow.workflow_id ? `aivory-${workflow.workflow_id}` : `aivory-${Date.now()}`,
-      responseMode: 'responseNode',
-    },
+  let triggerNode: N8nNode
+  if (resolved.kind === 'schedule') {
+    triggerNode = {
+      id: generateNodeId(),
+      name: 'Schedule Trigger',
+      type: 'n8n-nodes-base.scheduleTrigger',
+      typeVersion: 1.3,
+      position: [250, 300],
+      parameters: scheduleParameters(triggerText),
+    }
+  } else if (resolved.kind === 'manual') {
+    triggerNode = {
+      id: generateNodeId(),
+      name: 'Manual Trigger',
+      type: 'n8n-nodes-base.manualTrigger',
+      typeVersion: 1,
+      position: [250, 300],
+      parameters: {},
+    }
+  } else if (resolved.kind === 'app' && resolved.build) {
+    const b = resolved.build
+    triggerNode = {
+      id: generateNodeId(),
+      name: b.type.replace(/^.*\./, '').replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()),
+      type: b.type,
+      typeVersion: b.typeVersion,
+      position: [250, 300],
+      parameters: b.parameters,
+      ...(b.credentials ? { credentials: b.credentials } : {}),
+    }
+  } else {
+    triggerNode = {
+      id: generateNodeId(),
+      name: 'Webhook Trigger',
+      type: 'n8n-nodes-base.webhook',
+      typeVersion: 1,
+      position: [250, 300],
+      parameters: {
+        httpMethod: 'POST',
+        path: workflow.workflow_id ? `aivory-${workflow.workflow_id}` : `aivory-${Date.now()}`,
+        responseMode: 'responseNode',
+      },
+    }
   }
   nodes.push(triggerNode)
 
@@ -315,20 +342,36 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
         primary = mapIntentToN8nNode('filter', step, ctx)
         console.log(`[workflowConverter] Step ${ctx.stepIndex}: condition with ${step.branches!.length} branch(es)`)
       } else {
-        intent = step.forceIntent ?? refineIntentForContext(detectNodeIntent(step.action, step.tool), step.action, step.tool, intentCtx)
-        console.log(`[workflowConverter] Step ${globalStepCounter}: action="${step.action}" tool="${step.tool}" → intent="${intent}"${step.forceIntent ? ' (forced)' : ''} isLast=${isLast}`)
-        // Only override last step to respondToWebhook for webhook-triggered workflows.
-        // Scheduled workflows have no webhook to respond to — keep the detected intent.
-        if (isLast && !isSchedule && !workflow.keepLastStepIntent && intent !== 'respond' && intent !== 'filter' && intent !== 'email' && intent !== 'messaging') {
-          console.log(`[workflowConverter] Step ${globalStepCounter}: overriding intent from "${intent}" to "respond" (last step, webhook workflow)`)
-          intent = 'respond'
+        // Node choice: forced intent > the planner's `app` > title text.
+        const byApp = step.forceIntent ? null : resolveStepByApp({ app: step.app, appAction: step.appAction, action: step.action, inputs: step.inputs })
+        const ctx: MapContext = { stepIndex: globalStepCounter, aiNodeCount, isLast }
+        if (byApp?.native) {
+          const { name: nodeName, notes } = buildNodeName(ctx.stepIndex, step.action)
+          const n = byApp.native
+          primary = {
+            id: generateNodeId(),
+            name: nodeName,
+            ...(notes ? { notes } : {}),
+            type: n.type,
+            typeVersion: n.typeVersion,
+            position: [250 + ((ctx.stepIndex + 1) * 220), 300],
+            parameters: n.parameters,
+            ...(n.credentials ? { credentials: n.credentials } : {}),
+          }
+          // Multi-item producers (Sheets read, SQL select…) get the same Limit-before-AI treatment.
+          intent = n.multiItem ? 'database' : null
+          globalStepCounter++
+          console.log(`[workflowConverter] Step ${ctx.stepIndex}: app="${step.app}" → ${n.type}@${n.typeVersion}`)
+        } else {
+          intent = step.forceIntent ?? byApp?.intent ?? refineIntentForContext(detectNodeIntent(step.action, step.tool), step.action, step.tool, intentCtx)
+          console.log(`[workflowConverter] Step ${globalStepCounter}: action="${step.action}" app="${step.app ?? ''}" → intent="${intent}"${step.forceIntent ? ' (forced)' : byApp?.intent ? ' (by app)' : ''} isLast=${isLast}`)
+          globalStepCounter++
+          const mapped = mapIntentToN8nNodes(intent, step, ctx)
+          primary = mapped.primary
+          extraNodes = mapped.extraNodes
+          extraConnections = mapped.extraConnections
+          console.log(`[workflowConverter] Step ${ctx.stepIndex}: mapped to n8n type="${primary.type}" typeVersion=${primary.typeVersion}`)
         }
-        const ctx: MapContext = { stepIndex: globalStepCounter++, aiNodeCount, isLast }
-        const mapped = mapIntentToN8nNodes(intent, step, ctx)
-        primary = mapped.primary
-        extraNodes = mapped.extraNodes
-        extraConnections = mapped.extraConnections
-        console.log(`[workflowConverter] Step ${ctx.stepIndex}: mapped to n8n type="${primary.type}" typeVersion=${primary.typeVersion}`)
         if (intent === 'ai') aiNodeCount++
       }
 
@@ -419,7 +462,28 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
     return prevNodeName
   }
 
-  convertSteps(workflow.steps, triggerNode.name, 0, true)
+  const tailName = convertSteps(workflow.steps, triggerNode.name, 0, true)
+
+  // A webhook set to "respond using Respond to Webhook" needs that node or the
+  // caller gets an error. It goes AFTER the last real step — it used to
+  // replace it, silently dropping the action the user asked for.
+  if (isWebhook && !workflow.keepLastStepIntent && !nodes.some((n) => n.type === 'n8n-nodes-base.respondToWebhook')) {
+    const tail = nodes.find((n) => n.name === tailName) ?? triggerNode
+    const respond: N8nNode = {
+      id: generateNodeId(),
+      name: 'Respond to Webhook',
+      type: 'n8n-nodes-base.respondToWebhook',
+      typeVersion: 1.5,
+      position: [tail.position[0] + 220, tail.position[1]],
+      parameters: {
+        respondWith: 'json',
+        responseBody: '={{ JSON.stringify({ status: "success", result: $json.response || $json.body }) }}',
+        options: {},
+      },
+    }
+    nodes.push(respond)
+    addConnection(tailName, respond.name, 'main')
+  }
 
   // Fix 2 — a workflow with unresolved endpoints must never ship as active.
   // Placeholder URLs (api.example.com / UNRESOLVED_INTEGRATION) mark nodes

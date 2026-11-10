@@ -18,6 +18,8 @@ export function toConverterStep(step: GeneratedWorkflowStep): ConverterWorkflowS
     step: 0,
     action: step.title,
     tool: [step.app, step.type].filter(Boolean).join(' '),
+    app: step.app,
+    appAction: step.action,
     output: step.description || '',
     inputs: step.config,
     type: step.type,
@@ -44,6 +46,8 @@ export function generatedWorkflowToN8n(workflow: GeneratedWorkflow, opts: Genera
     // The first step is the trigger; the converter picks schedule vs webhook
     // from its text.
     trigger: workflow.steps[0]?.title || '',
+    trigger_app: workflow.steps[0]?.app,
+    trigger_description: workflow.steps[0]?.description,
     steps: workflow.steps.slice(1).map(toConverterStep),
     keepLastStepIntent: opts.keepLastStepIntent,
   })
