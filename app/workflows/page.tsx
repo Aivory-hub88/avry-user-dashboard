@@ -27,7 +27,7 @@ import { VersionHistoryPanel } from '@/components/workflow/VersionHistoryPanel'
 import { saveCredentials, N8nCredentials } from '@/lib/workflows/credentialStore'
 import { authedFetch } from '@/lib/deployAuth'
 import { convertToN8nWorkflow, type WorkflowStep as ConverterWorkflowStep } from '@/lib/workflowConverter'
-import type { GeneratedWorkflowStep } from '@/lib/workflows/copilotStateMachine'
+import { generatedWorkflowToN8n } from '@/lib/workflows/copilotToN8n'
 import { fetchTemplateById } from '@/lib/templates/resolveTemplate'
 import { templateToCanvas } from '@/lib/templates/templateToCanvas'
 import type { AivoryWorkflowSpec } from '@/types/workflow'
@@ -1412,27 +1412,6 @@ function WorkflowsPageInner() {
 
     const title = workflow.workflowName || allSteps[0]?.action || `Aivory Workflow ${new Date().toLocaleTimeString()}`
 
-    // convertToN8nWorkflow() needs the FULL nested step tree — condition/
-    // switch/loop steps' `branches` — not the flattened `allSteps` above
-    // (which stays flat on purpose, it's just the display/summary list for
-    // SavedWorkflow.steps). Losing branches to a flat .slice(1).map() here
-    // would silently turn every real branch/loop into a dead end, the exact
-    // bug class Stage B5 exists to fix.
-    const toConverterStep = (step: GeneratedWorkflowStep): ConverterWorkflowStep => ({
-      step: 0,
-      action: step.title,
-      tool: [step.app, step.type].filter(Boolean).join(' '),
-      output: step.description || '',
-      inputs: step.config,
-      type: step.type,
-      branches: step.branches?.map((b) => ({
-        key: b.key,
-        label: b.label,
-        steps: b.steps.map(toConverterStep),
-      })),
-      loopConfig: step.loopConfig,
-    })
-
     // Date.now() here runs inside handleCopilotApply, an async event
     // handler invoked on user action — not during render — so this isn't
     // the render-purity violation the rule is designed to catch.
@@ -1440,12 +1419,10 @@ function WorkflowsPageInner() {
     // in place (unchanged steps keep their nodes, settings and credentials).
     const editingOpenCanvas = !!target && !!selected && target.workflowId === selected.workflow_id && !!canvasBridgeRef.current
 
-    const n8nWorkflow = convertToN8nWorkflow({
+    const n8nWorkflow = generatedWorkflowToN8n(workflow, {
       // eslint-disable-next-line react-hooks/purity
-      workflow_id: `copilot-${Date.now()}`,
+      workflowId: `copilot-${Date.now()}`,
       title,
-      trigger: workflow.steps[0]?.title || '',
-      steps: workflow.steps.slice(1).map(toConverterStep),
       keepLastStepIntent: editingOpenCanvas,
     })
 
