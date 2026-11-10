@@ -31,6 +31,19 @@ produces. It isolates **prompt/LLM** quality. See the header of
 `lib/workflows/eval/workflowEval.live.test.ts` for the command. Outputs go to
 `results/` (gitignored); keep one file per change to compare.
 
+## Generate-time grounding
+
+`lib/workflows/grounding.ts` appends a short building-blocks block to the
+generate request (triggers, utility steps, native apps, which apps may trigger,
+the apps this request names) and `sanitizeWorkflow(steps, userRequest)` demotes
+an app trigger the request never names to a webhook. Both are derived from
+`appNodes.ts`. `WORKFLOW_GROUNDING=off` disables the prompt block (baseline
+runs). The live eval is noisy (temperature 0.3, ±3 cases): compare means of
+three runs, not single runs.
+
+Live, 3 runs each: baseline 35 / 29 / 35 passed (mean 33.0); with grounding
+mean 36.7 of 40.
+
 ## knownIssue labels
 
 All reference cases pass today, so none carries a `knownIssue`. Use a label

@@ -20,6 +20,7 @@
  */
 
 import type { GeneratedWorkflowStep } from './copilotStateMachine'
+import { groundTrigger } from './grounding'
 
 // ── App catalog ──────────────────────────────────────────────────────────────
 // Canonical app ids with the aliases users actually type. `roles` describes
@@ -409,9 +410,9 @@ function sanitizeStepArray(rawSteps: unknown, fixes: string[]): GeneratedWorkflo
  * old flow paid an LLM "repair" round for — structural defects are
  * deterministic to detect and deterministic to fix.
  */
-export function sanitizeWorkflow(rawSteps: unknown): SanitizeResult {
+export function sanitizeWorkflow(rawSteps: unknown, userRequest?: string): SanitizeResult {
   const fixes: string[] = []
-  const steps = sanitizeStepArray(rawSteps, fixes)
+  let steps = sanitizeStepArray(rawSteps, fixes)
 
   // First step must be the trigger (top-level only — branch bodies don't need one)
   if (steps.length > 0 && steps[0].type !== 'trigger') {
@@ -424,6 +425,13 @@ export function sanitizeWorkflow(rawSteps: unknown): SanitizeResult {
       steps[0] = { ...steps[0], type: 'trigger' }
       fixes.push(`step "${steps[0].id}": coerced to trigger (workflow had none)`)
     }
+  }
+
+  // Generate path only: drop an app trigger the user never asked for.
+  if (userRequest) {
+    const grounded = groundTrigger(steps, userRequest)
+    steps = grounded.steps
+    fixes.push(...grounded.fixes)
   }
 
   return { steps, fixes }

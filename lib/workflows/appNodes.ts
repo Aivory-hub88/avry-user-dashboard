@@ -71,6 +71,9 @@ const ALIASES: Record<string, string[]> = {
   cleanup: ['cleanup', 'noop'],
 }
 
+/** Every canonical app key the mapper understands (used to ground the generator prompt). */
+export const KNOWN_APP_KEYS: string[] = Object.keys(ALIASES)
+
 const ALIAS_LOOKUP: Map<string, string> = (() => {
   const m = new Map<string, string>()
   for (const [key, names] of Object.entries(ALIASES)) for (const n of names) m.set(n, key)

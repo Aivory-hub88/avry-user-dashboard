@@ -46,7 +46,7 @@ describe.skipIf(!live)('workflow-builder eval (live: prompt -> bridge generate -
           })
           const wf = (res as { workflow?: GeneratedWorkflow }).workflow
           if (!wf || !Array.isArray(wf.steps) || wf.steps.length === 0) throw new Error('generator returned no steps')
-          const steps = sanitizeWorkflow(wf.steps).steps
+          const steps = sanitizeWorkflow(wf.steps, c.prompt).steps
           out.push({ ...evaluatePlan(c, steps, catalog), latencyMs: Date.now() - t0, generatedPlan: steps })
         } catch (err) {
           // A failed generation is a failed case, not a crashed eval.
