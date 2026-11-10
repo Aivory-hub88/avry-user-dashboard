@@ -35,6 +35,14 @@ const PER_ITEM_WORDS = /\b(each|every|all|per\s+(?:item|row|lead|record|contact|
 const LOOP_DONE_OUTPUT = 0
 const LOOP_BODY_OUTPUT = 1
 
+/** A node output waiting for the next step to connect to it. */
+interface OpenEnd {
+  name: string
+  branch: number
+  /** An output of a condition/switch whose branch has no steps ("else: do nothing"). */
+  empty?: boolean
+}
+
 export interface WorkflowStep {
   step: number
   action: string
@@ -325,9 +333,13 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
     entryNodeName: string,
     entryBranchIndex: number,
     isTopLevel: boolean
-  ): string => {
-    let prevNodeName = entryNodeName
-    let prevBranchIndex = entryBranchIndex
+  ): OpenEnd[] => {
+    // The open ends the next step connects from. Usually one; after a
+    // condition/switch it is the tail of every branch — all of them feed the
+    // next step's single input directly, the way n8n itself rejoins branches
+    // (no extra join node; a Merge node would wait for inputs that never come
+    // when only one branch ran).
+    let prev: OpenEnd[] = [{ name: entryNodeName, branch: entryBranchIndex }]
     let prevIntent: NodeIntent | null = null
     const stepCount = steps.length
 
@@ -412,8 +424,7 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
         if (intent === 'ai') aiNodeCount++
       }
 
-      let connectFromName = prevNodeName
-      let connectFromBranch = i === 0 ? prevBranchIndex : 0
+      let incoming: OpenEnd[] = prev
 
       // A multi-item producer feeding straight into an AI step gets a Limit
       // node in between, so the agent runs once per batch instead of once
@@ -428,59 +439,41 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
           parameters: { maxItems: 1 },
         }
         nodes.push(limitNode)
-        addConnection(connectFromName, limitNode.name, 'main', connectFromBranch)
-        connectFromName = limitNode.name
-        connectFromBranch = 0
+        for (const end of incoming) addConnection(end.name, limitNode.name, 'main', end.branch)
+        incoming = [{ name: limitNode.name, branch: 0 }]
       }
 
       nodes.push(primary)
       if (extraNodes) nodes.push(...extraNodes)
 
-      addConnection(connectFromName, primary.name, 'main', connectFromBranch)
+      for (const end of incoming) addConnection(end.name, primary.name, 'main', end.branch)
       for (const conn of extraConnections ?? []) {
         addConnection(conn.from, conn.to, conn.type)
       }
 
-      prevNodeName = primary.name
-      prevBranchIndex = 0
+      prev = [{ name: primary.name, branch: 0 }]
       prevIntent = intent
 
       if (hasBranches && step.type !== 'loop') {
-        // Condition/switch — every branch's tail feeds into a shared join
-        // node (n8n-nodes-base.noOp) before the outer chain resumes, so a
-        // step following this one in `steps` doesn't have to pick which
-        // branch to attach to.
-        //
-        // Name it short and generic (not `${primary.name} · join`) — reusing
-        // the router's full descriptive title made the join node render as a
-        // near-duplicate of the router step right next to it on canvas.
-        const joinName = `Merge ${globalStepCounter}`
-        nodes.push({
-          id: generateNodeId(),
-          name: joinName,
-          type: 'n8n-nodes-base.noOp',
-          typeVersion: 1,
-          position: [primary.position[0] + 110, primary.position[1] + 260],
-          parameters: {},
-        })
+        // Condition/switch — the tail of every branch becomes an open end the
+        // next step connects from. No join node.
+        const ends: OpenEnd[] = []
         step.branches!.forEach((branch, branchIdx) => {
           if (!branch.steps.length) {
-            // No extra steps on this output — but it must still connect
-            // SOMEWHERE, or n8n dead-ends there with no way to reach the
-            // rest of the workflow. Wire it straight to the join, unless
-            // this is a `terminal` branch (e.g. an exception path with
-            // nothing in it) that's supposed to dead-end.
-            if (!branch.terminal) addConnection(primary.name, joinName, 'main', branchIdx)
+            // No extra steps on this output — it still has to connect
+            // SOMEWHERE, or n8n dead-ends there. It goes straight to the next
+            // step, unless this is a `terminal` branch (e.g. an exception path
+            // with nothing in it) that is supposed to dead-end.
+            if (!branch.terminal) ends.push({ name: primary.name, branch: branchIdx, empty: true })
             return
           }
-          const branchTail = convertSteps(branch.steps, primary.name, branchIdx, false)
-          // `terminal` branches (e.g. exception/human-review paths) must
-          // NOT rejoin the shared join node — otherwise the outer chain
-          // silently resumes into the success path after them (e.g.
-          // incomplete data flowing straight into account creation).
-          if (!branch.terminal) addConnection(branchTail, joinName, 'main')
+          const branchEnds = convertSteps(branch.steps, primary.name, branchIdx, false)
+          // `terminal` branches (e.g. exception/human-review paths) must NOT
+          // rejoin the outer chain — otherwise it silently resumes into the
+          // success path after them.
+          if (!branch.terminal) ends.push(...branchEnds)
         })
-        prevNodeName = joinName
+        prev = ends
       } else if (hasBranches && step.type === 'loop') {
         // Loop body recursively converted off the "loop" output; its tail
         // wires back into the loop node itself (the cyclic back-edge n8n's
@@ -489,17 +482,37 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
         // default `prevBranchIndex` value already set above.
         const body = step.branches![0]
         if (body?.steps.length) {
-          const bodyTail = convertSteps(body.steps, primary.name, LOOP_BODY_OUTPUT, false)
-          addConnection(bodyTail, primary.name, 'main')
+          for (const end of convertSteps(body.steps, primary.name, LOOP_BODY_OUTPUT, false)) {
+            addConnection(end.name, primary.name, 'main', end.branch)
+          }
         }
-        prevBranchIndex = LOOP_DONE_OUTPUT
+        prev = [{ name: primary.name, branch: LOOP_DONE_OUTPUT }]
       }
     })
 
-    return prevNodeName
+    return prev
   }
 
-  const tailName = convertSteps(workflow.steps, entryName, 0, true)
+  let tails = convertSteps(workflow.steps, entryName, 0, true)
+  // An empty branch output at the very end of the workflow has nothing to
+  // connect to. Give it an explicit "Nothing to do" end so the else path is
+  // visible on the canvas (and, for webhooks, still reaches the response).
+  const dangling = tails.filter((t) => t.empty)
+  if (dangling.length) {
+    const base = nodes.find((n) => n.name === dangling[0].name)
+    const nothing: N8nNode = {
+      id: generateNodeId(),
+      name: 'Nothing to do',
+      type: 'n8n-nodes-base.noOp',
+      typeVersion: 1,
+      position: [(base?.position[0] ?? 250) + 220, (base?.position[1] ?? 300) + 130],
+      parameters: {},
+    }
+    nodes.push(nothing)
+    for (const end of dangling) addConnection(end.name, nothing.name, 'main', end.branch)
+    tails = [...tails.filter((t) => !t.empty), { name: nothing.name, branch: 0 }]
+  }
+  const tailName = tails[0]?.name ?? entryName
 
   // A webhook set to "respond using Respond to Webhook" needs that node or the
   // caller gets an error. It goes AFTER the last real step — it used to
@@ -519,7 +532,7 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
       },
     }
     nodes.push(respond)
-    addConnection(tailName, respond.name, 'main')
+    for (const end of tails.length ? tails : [{ name: tailName, branch: 0 }]) addConnection(end.name, respond.name, 'main', end.branch)
   }
 
   // Fix 2 — a workflow with unresolved endpoints must never ship as active.

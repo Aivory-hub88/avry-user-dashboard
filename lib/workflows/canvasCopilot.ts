@@ -106,6 +106,8 @@ export function canvasToGeneratedWorkflow(wf: N8nWorkflow): GeneratedWorkflow {
       first = false
       visited.add(cur)
       const node = byName.get(cur)!
+      // The converter's explicit "else: do nothing" end is plumbing, not a step.
+      if (node.type === 'n8n-nodes-base.noOp' && node.name === 'Nothing to do') break
       const outs = mainOutputs(cur)
       const step = toStep(node, outs.length)
 

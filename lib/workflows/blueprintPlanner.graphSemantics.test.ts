@@ -47,17 +47,22 @@ function findConnections(n8n: ReturnType<typeof convertToN8nWorkflow>, from: str
   return byType?.main ?? []
 }
 
-/**
- * Resolve the synthetic branch-merge join node a router's given output feeds
- * into. The converter names these joins `Merge N` (short + generic, commit
- * e78b36d — the old `${router.name} · join` title rendered as a near-
- * duplicate of the router step on canvas), so the join is found structurally
- * by node type, not by name pattern.
- */
-function joinTargetOf(n8n: ReturnType<typeof convertToN8nWorkflow>, from: string, output = 0): string | null {
-  const targets = findConnections(n8n, from)[output]?.map((t) => t.node) ?? []
-  const join = targets.find((t) => n8n.nodes.some((n) => n.name === t && n.type === 'n8n-nodes-base.noOp' && /^Merge \d+$/.test(n.name)))
-  return join ?? null
+/** Names of the nodes the given output of `from` connects to. */
+function targetsOf(n8n: ReturnType<typeof convertToN8nWorkflow>, from: string, output = 0): string[] {
+  return findConnections(n8n, from)[output]?.map((t) => t.node) ?? []
+}
+
+/** Every node reachable from `start` (exclusive) through main connections. */
+function reachableFrom(n8n: ReturnType<typeof convertToN8nWorkflow>, start: string): Set<string> {
+  const seen = new Set<string>()
+  const queue = [start]
+  while (queue.length) {
+    const cur = queue.shift()!
+    for (const outputs of findConnections(n8n, cur)) {
+      for (const t of outputs) if (!seen.has(t.node)) { seen.add(t.node); queue.push(t.node) }
+    }
+  }
+  return seen
 }
 
 function buildRegressionGraph() {
@@ -92,10 +97,9 @@ describe('regression: Otomasi Onboarding Pelanggan — exact bug-report blueprin
     const trueTargets = findConnections(n8n, gateNode.name)[0]?.map((t) => t.node) ?? []
     // TRUE (output 0) must NOT go to the human-review/exception node.
     expect(trueTargets.some((t) => /Meninjau|Wait for human resolution/i.test(t))).toBe(false)
-    // It goes to the branch-merge join node, which is what "continue toward
-    // routing" looks like structurally (see the next assertion for the full
-    // chain).
-    expect(joinTargetOf(n8n, gateNode.name, 0)).not.toBeNull()
+    // Branches rejoin by connecting straight into the next step (no join
+    // node), so "continue toward routing" means TRUE feeds the routing step.
+    expect(trueTargets.some((t) => /Menentukan jalur onboarding/.test(t))).toBe(true)
   })
 
   it('FALSE output of "Data complete?" goes to exception handling', () => {
@@ -105,24 +109,19 @@ describe('regression: Otomasi Onboarding Pelanggan — exact bug-report blueprin
     expect(falseTargets.some((t) => /Meninjau/.test(t))).toBe(true)
   })
 
-  it('the join reached from TRUE eventually leads to Determine Onboarding Route, then account creation', () => {
+  it('TRUE leads to Determine Onboarding Route, then the routing switch, then account creation', () => {
     const { n8n } = buildRegressionGraph()
     const gateNode = n8n.nodes.find((n) => /Data complete\?/.test(n.name))!
-    const joinName = joinTargetOf(n8n, gateNode.name, 0)!
-    expect(joinName).not.toBeNull()
-    const afterJoin = findConnections(n8n, joinName)[0]?.map((t) => t.node) ?? []
-    expect(afterJoin.some((t) => /Menentukan jalur onboarding/.test(t))).toBe(true)
+    expect(targetsOf(n8n, gateNode.name, 0).some((t) => /Menentukan jalur onboarding/.test(t))).toBe(true)
 
-    // Walk forward from there to confirm account creation is reachable.
     const routeAgent = n8n.nodes.find((n) => /Menentukan jalur onboarding/.test(n.name))!
-    const toSwitch = findConnections(n8n, routeAgent.name)[0]?.map((t) => t.node) ?? []
+    const toSwitch = targetsOf(n8n, routeAgent.name)
     const switchNode = n8n.nodes.find((n) => toSwitch.includes(n.name))!
     expect(switchNode.type).toBe('n8n-nodes-base.switch')
 
-    const switchJoin = joinTargetOf(n8n, switchNode.name, 0)!
-    expect(switchJoin).not.toBeNull()
-    const afterSwitchJoin = findConnections(n8n, switchJoin)[0]?.map((t) => t.node) ?? []
-    expect(afterSwitchJoin.some((t) => /Membuat akun/.test(t))).toBe(true)
+    // Account creation is reachable from the switch, and no join node is involved.
+    expect([...reachableFrom(n8n, switchNode.name)].some((t) => /Membuat akun/.test(t))).toBe(true)
+    expect(n8n.nodes.some((n) => n.type === 'n8n-nodes-base.noOp' && /^Merge \d+$/.test(n.name))).toBe(false)
   })
 
   it('the exception branch ends on a terminal manual-status node with no outgoing connection (does not auto-continue)', () => {
@@ -138,22 +137,20 @@ describe('regression: Otomasi Onboarding Pelanggan — exact bug-report blueprin
     expect(n8n.connections[statusNode!.name]).toBeUndefined()
   })
 
-  it('exception-branch steps never connect back into the join node', () => {
+  it('exception-branch steps never connect back into the normal flow', () => {
     const { n8n } = buildRegressionGraph()
     const gateNode = n8n.nodes.find((n) => /Data complete\?/.test(n.name))!
-    const joinName = joinTargetOf(n8n, gateNode.name, 0)!
-    expect(joinName).not.toBeNull()
-    // Nothing in the connections table should target the join except the
-    // gate's own TRUE output.
-    const targetsOfJoin: string[] = []
+    const routeAgent = n8n.nodes.find((n) => /Menentukan jalur onboarding/.test(n.name))!
+    // The continuation (routing) is fed only by the gate's own TRUE output —
+    // nothing on the exception path may target it.
+    const sources: string[] = []
     for (const [from, byType] of Object.entries(n8n.connections)) {
-      for (const branches of Object.values(byType as Record<string, any[]>)) {
-        for (const arr of branches as any[]) {
-          for (const t of arr) if (t.node === joinName) targetsOfJoin.push(from)
-        }
+      // main connections only: the agent's Chat Model feeds it over ai_languageModel.
+      for (const arr of ((byType as Record<string, any[]>).main ?? []) as any[]) {
+        for (const t of arr) if (t.node === routeAgent.name) sources.push(from)
       }
     }
-    expect(targetsOfJoin).toEqual([gateNode.name])
+    expect(sources).toEqual([gateNode.name])
   })
 
   it('does not contain a duplicate "Data complete?" condition node', () => {
