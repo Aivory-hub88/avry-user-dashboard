@@ -31,3 +31,11 @@ describe('layoutLeftToRight', () => {
     expect(layoutLeftToRight(['a'], [e('a', 'zzz')]).get('a')).toEqual({ x: 0, y: 0 })
   })
 })
+
+describe('AI sub-nodes', () => {
+  it('sit under the node they feed, not in the first column', () => {
+    const p = layoutLeftToRight(['read', 'agent', 'model'], [e('read', 'agent'), e('model', 'agent')], { x: 0, y: 0 }, [{ id: 'model', parent: 'agent' }])
+    expect(p.get('model')).toEqual({ x: p.get('agent')!.x, y: p.get('agent')!.y + 200 })
+    expect(p.get('agent')!.x).toBe(COLUMN_WIDTH)
+  })
+})

@@ -11,6 +11,9 @@ export const ROW_HEIGHT = 180
 
 export interface LayoutEdge { source: string; target: string }
 
+/** A Chat Model / Memory / Tool node that feeds `parent` through an ai_* connection; it sits under its parent. */
+export interface SubNode { id: string; parent: string }
+
 /** Loop-back edges (Split In Batches ... -> loop) would push a loop to the far right; layout ignores them. */
 function dropBackEdges(ids: string[], edges: LayoutEdge[]): LayoutEdge[] {
   const out = new Map<string, LayoutEdge[]>(ids.map((id) => [id, []]))
@@ -43,6 +46,26 @@ export function layoutLeftToRight(
   ids: string[],
   edges: LayoutEdge[],
   origin: { x: number; y: number } = { x: 0, y: 0 },
+  subNodes: SubNode[] = [],
+): Map<string, { x: number; y: number }> {
+  const subIds = new Set(subNodes.filter((s) => ids.includes(s.parent)).map((s) => s.id))
+  const mainIds = ids.filter((id) => !subIds.has(id))
+  const placed = layoutMain(mainIds, edges, origin)
+  const perParent = new Map<string, number>()
+  for (const s of subNodes) {
+    const p = placed.get(s.parent)
+    if (!p || !subIds.has(s.id)) continue
+    const k = perParent.get(s.parent) ?? 0
+    perParent.set(s.parent, k + 1)
+    placed.set(s.id, { x: p.x + k * 180, y: p.y + 200 })
+  }
+  return placed
+}
+
+function layoutMain(
+  ids: string[],
+  edges: LayoutEdge[],
+  origin: { x: number; y: number },
 ): Map<string, { x: number; y: number }> {
   const known = new Set(ids)
   const all = edges.filter((e) => known.has(e.source) && known.has(e.target) && e.source !== e.target)
