@@ -7,6 +7,7 @@ import {
   getBezierPath,
   getSmoothStepPath,
   useReactFlow,
+  useStore,
   type EdgeProps,
   Position,
 } from '@xyflow/react';
@@ -47,6 +48,38 @@ function roundedPath(pts: number[][], radius: number): string {
   return `${d} L${last[0]},${last[1]}`;
 }
 
+type Rect = { l: number; t: number; r: number; b: number };
+const LANE_MARGIN = 12;
+
+const hitsH = (y: number, xa: number, xb: number, k: Rect) =>
+  y > k.t - LANE_MARGIN && y < k.b + LANE_MARGIN && Math.max(xa, xb) > k.l - LANE_MARGIN && Math.min(xa, xb) < k.r + LANE_MARGIN;
+const hitsV = (x: number, ya: number, yb: number, k: Rect) =>
+  x > k.l - LANE_MARGIN && x < k.r + LANE_MARGIN && Math.max(ya, yb) > k.t - LANE_MARGIN && Math.min(ya, yb) < k.b + LANE_MARGIN;
+
+/**
+ * Pick the horizontal lane of a backward link: the one closest to the middle
+ * of the two handles whose route (both drops + the run) clears every node.
+ * Candidates are the midline plus the gaps just above/below each node.
+ */
+function pickLane(sy: number, ty: number, x1: number, x2: number, rects: Rect[]): number {
+  const mid = (sy + ty) / 2;
+  const cands = new Set<number>([mid]);
+  let top = Infinity;
+  let bottom = -Infinity;
+  for (const k of rects) {
+    cands.add(k.t - 28);
+    cands.add(k.b + 28);
+    top = Math.min(top, k.t);
+    bottom = Math.max(bottom, k.b);
+  }
+  cands.add(Math.max(sy, ty) + 110);
+  if (bottom > -Infinity) { cands.add(bottom + 40); cands.add(top - 40); }
+  const ok = (y: number) =>
+    !rects.some((k) => hitsH(y, x1, x2, k) || hitsV(x1, sy, y, k) || hitsV(x2, y, ty, k));
+  const sorted = [...cands].sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid));
+  return sorted.find(ok) ?? (bottom > -Infinity ? bottom + 40 : Math.max(sy, ty) + 110);
+}
+
 const N8NAdaptiveEdge = memo((props: EdgeProps) => {
   const {
     id,
@@ -61,6 +94,19 @@ const N8NAdaptiveEdge = memo((props: EdgeProps) => {
   } = props;
 
   const { setEdges } = useReactFlow();
+  // Only backward links need obstacle info, so only they pay for the subscription.
+  const isBackward = sourcePosition === Position.Right && targetPosition === Position.Left && targetX < sourceX;
+  const rectsKey = useStore((st) => {
+    if (!isBackward) return '';
+    let out = '';
+    st.nodeLookup.forEach((n) => {
+      const p = n.internals.positionAbsolute;
+      const w = n.measured?.width ?? n.width ?? 260;
+      const h = n.measured?.height ?? n.height ?? 80;
+      out += `${Math.round(p.x)},${Math.round(p.y)},${Math.round(w)},${Math.round(h)};`;
+    });
+    return out;
+  });
 
   const { edgePath, labelX, labelY, backArrow } = useMemo(() => {
     if (sourcePosition === Position.Right && targetPosition === Position.Left) {
@@ -73,10 +119,16 @@ const N8NAdaptiveEdge = memo((props: EdgeProps) => {
       // Backward link: leave right, drop into the gap between the two rows,
       // run left, then come down and enter from the left. Right-angled with
       // rounded corners; on one row it runs underneath the nodes + labels.
-      const dy = Math.abs(targetY - sourceY);
-      const midY = dy > 110 ? (sourceY + targetY) / 2 : Math.max(sourceY, targetY) + 110;
       const x1 = sourceX + BACK_PAD;
       const x2 = targetX - BACK_PAD;
+      const rects: Rect[] = rectsKey
+        .split(';')
+        .filter(Boolean)
+        .map((seg) => {
+          const [x, y, w, h] = seg.split(',').map(Number);
+          return { l: x, t: y, r: x + w, b: y + h };
+        });
+      const midY = pickLane(sourceY, targetY, x1, x2, rects);
       const path = roundedPath(
         [[sourceX, sourceY], [x1, sourceY], [x1, midY], [x2, midY], [x2, targetY], [targetX, targetY]],
         BACK_RADIUS,
@@ -86,7 +138,7 @@ const N8NAdaptiveEdge = memo((props: EdgeProps) => {
     }
     const [path, lx, ly] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
     return { edgePath: path, labelX: lx, labelY: ly, backArrow: null };
-  }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition]);
+  }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, rectsKey]);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.preventDefault();
