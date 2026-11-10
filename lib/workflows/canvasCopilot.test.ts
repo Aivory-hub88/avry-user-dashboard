@@ -341,14 +341,23 @@ describe('mergeEditedNodes — layout', () => {
     expect(moved.position).toEqual({ x: 777, y: 333 })
   })
 
-  it('uses the fresh layout for the whole flow once a step is added', () => {
+  it('keeps existing nodes in place when a step is added at the end, and puts the new one after its parent', () => {
     const original = n8nToReactFlow(driveBackup)
     original.nodes[1].position = { x: 777, y: 333 }
-    const next = rebuild(true)
-    const merged = mergeEditedNodes(original, next, { keepTrigger: true })
+    const merged = mergeEditedNodes(original, rebuild(true), { keepTrigger: true })
     expect(merged.added).toBe(1)
     const moved = merged.nodes.find((n) => normalizeStepTitle(n.data.title) === 'list google drive files')!
-    const fresh = next.nodes.find((n) => normalizeStepTitle(n.data.title) === 'list google drive files')!
-    expect(moved.position).toEqual(fresh.position)
+    expect(moved.position).toEqual({ x: 777, y: 333 })
+    const upload = merged.nodes.find((n) => normalizeStepTitle(n.data.title) === 'upload backup to backup folder')!
+    const slack = merged.nodes.find((n) => n.data.rawN8n?.type === 'n8n-nodes-base.slack')!
+    expect(slack.position.x).toBeGreaterThan(upload.position.x)
+    expect(slack.position.y).toBe(upload.position.y)
+  })
+
+  it('never stacks two nodes on the same spot after an edit', () => {
+    const original = n8nToReactFlow(driveBackup)
+    const merged = mergeEditedNodes(original, rebuild(true), { keepTrigger: true })
+    const spots = merged.nodes.map((n) => `${Math.round(n.position.x)},${Math.round(n.position.y)}`)
+    expect(new Set(spots).size).toBe(spots.length)
   })
 })
