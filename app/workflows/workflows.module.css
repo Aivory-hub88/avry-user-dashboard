@@ -827,12 +827,21 @@
 .canvasStatIcon { color: #a1a1aa; }
 
 /* ── Secondary canvas undo button ───────────────────────── */
-.canvasUndoBtn {
+.canvasBottomActions {
   position: absolute;
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  pointer-events: none;
+  z-index: 10;
+}
+.canvasUndoBtn {
+  display: flex;
+  white-space: nowrap;
   align-items: center;
   gap: 8px;
   padding: 11px 24px;
@@ -846,7 +855,6 @@
   transition: all 0.15s;
   font-family: inherit;
   pointer-events: auto;
-  z-index: 10;
 }
 .canvasUndoBtn:hover:not([aria-disabled='true']) {
   background: rgba(255,255,255,0.07);

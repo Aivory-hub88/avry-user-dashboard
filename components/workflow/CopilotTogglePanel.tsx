@@ -46,6 +46,8 @@ function AetherLogo({ className = 'h-[15px] w-auto' }: { className?: string }) {
   )
 }
 
+const POS_KEY = 'aivory.aether.panelOffset.v1'
+
 /** Where an applied proposal lands: the open canvas (edit) or a new draft. */
 export type CopilotApplyTarget = { workflowId: string; title: string } | null
 
@@ -94,10 +96,112 @@ export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, getC
   const handleOpen = useCallback(() => { open() }, [open])
   const handleClose = useCallback(() => { close() }, [close])
 
+  // ── Draggable position (expanded only) ──
+  // The panel sits top-centre by default; `offset` is the user's drag delta from
+  // there, clamped to the canvas area and remembered across sessions.
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [offset, setOffset] = useState<{ x: number; y: number }>(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(POS_KEY) : null
+      if (raw) {
+        const v = JSON.parse(raw)
+        if (Number.isFinite(v?.x) && Number.isFinite(v?.y)) return { x: v.x, y: v.y }
+      }
+    } catch { /* ignore */ }
+    return { x: 0, y: 0 }
+  })
+  const offsetRef = useRef(offset)
+  useEffect(() => { offsetRef.current = offset }, [offset])
+  const [dragging, setDragging] = useState(false)
+
+  /** Shift `want` so the panel (at its current rect) stays inside the canvas area. */
+  const clampDelta = useCallback((ddx: number, ddy: number) => {
+    const el = wrapRef.current
+    const parent = el?.offsetParent as HTMLElement | null
+    if (!el || !parent) return { ddx, ddy }
+    const r = el.getBoundingClientRect()
+    const b = parent.getBoundingClientRect()
+    const margin = 8
+    const minX = b.left + margin - r.left
+    const maxX = b.right - margin - r.right
+    const minY = b.top + margin - r.top
+    // keep the header reachable at the bottom edge instead of the whole panel
+    const maxY = b.bottom - 56 - r.top
+    return {
+      ddx: Math.min(Math.max(ddx, Math.min(minX, 0)), Math.max(maxX, 0)),
+      ddy: Math.min(Math.max(ddy, minY), Math.max(maxY, minY)),
+    }
+  }, [])
+
+  const persist = useCallback((o: { x: number; y: number }) => {
+    try { window.localStorage.setItem(POS_KEY, JSON.stringify(o)) } catch { /* ignore */ }
+  }, [])
+
+  const startDrag = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return
+    if ((e.target as HTMLElement).closest('button, a, input, textarea')) return
+    e.preventDefault()
+    const startX = e.clientX
+    const startY = e.clientY
+    const base = offsetRef.current
+    const target = e.currentTarget as HTMLElement
+    try { target.setPointerCapture(e.pointerId) } catch { /* ignore */ }
+    setDragging(true)
+    let last = base
+
+    const onMove = (m: PointerEvent) => {
+      const want = { x: base.x + (m.clientX - startX), y: base.y + (m.clientY - startY) }
+      const { ddx, ddy } = clampDelta(want.x - offsetRef.current.x, want.y - offsetRef.current.y)
+      last = { x: offsetRef.current.x + ddx, y: offsetRef.current.y + ddy }
+      setOffset(last)
+    }
+    const onUp = () => {
+      target.removeEventListener('pointermove', onMove)
+      target.removeEventListener('pointerup', onUp)
+      target.removeEventListener('pointercancel', onUp)
+      setDragging(false)
+      persist(last)
+    }
+    target.addEventListener('pointermove', onMove)
+    target.addEventListener('pointerup', onUp)
+    target.addEventListener('pointercancel', onUp)
+  }, [clampDelta, persist])
+
+  const resetPosition = useCallback(() => {
+    const z = { x: 0, y: 0 }
+    setOffset(z)
+    persist(z)
+  }, [persist])
+
+  // Re-clamp when opened and when the window resizes, so a saved position from a
+  // larger screen can never strand the panel off-canvas.
+  useEffect(() => {
+    if (!isOpen) return
+    const fit = () => {
+      const { ddx, ddy } = clampDelta(0, 0)
+      if (ddx || ddy) setOffset(o => ({ x: o.x + ddx, y: o.y + ddy }))
+    }
+    const t = setTimeout(fit, 0)
+    window.addEventListener('resize', fit)
+    return () => { clearTimeout(t); window.removeEventListener('resize', fit) }
+  }, [isOpen, clampDelta])
+
   return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30">
+    <div
+      ref={wrapRef}
+      className="absolute top-3 left-1/2 z-30"
+      style={{
+        transform: isOpen
+          ? `translate3d(calc(-50% + ${offset.x}px), ${offset.y}px, 0)`
+          : 'translateX(-50%)',
+        willChange: dragging ? 'transform' : undefined,
+      }}
+    >
       {isOpen ? (
         <CopilotPanelExpanded
+          onDragStart={startDrag}
+          onResetPosition={resetPosition}
+          dragging={dragging}
           onClose={handleClose}
           messages={messages}
           loading={loading}
@@ -147,6 +251,9 @@ function CopilotBarCollapsed({ onClick }: { onClick: () => void }) {
 /* ── Expanded floating panel ──────────────────────────── */
 
 interface CopilotPanelExpandedProps {
+  onDragStart: (e: React.PointerEvent) => void
+  onResetPosition: () => void
+  dragging: boolean
   onClose: () => void
   messages: CopilotMessage[]
   loading: boolean
@@ -171,6 +278,7 @@ interface CopilotPanelExpandedProps {
 }
 
 function CopilotPanelExpanded({
+  onDragStart, onResetPosition, dragging,
   onClose, messages, loading, loadingHint, isStreamingReply, error,
   stage, isTesting, workflow, canApply, isCompleted,
   onSendMessage, onEditMessage, onDeleteMessage, onApplyWorkflow, onClear,
@@ -270,13 +378,18 @@ function CopilotPanelExpanded({
 
   return (
     <div
-      className="w-[520px] max-w-[90vw] rounded-2xl overflow-hidden flex flex-col border border-white/[0.08] shadow-2xl"
+      className={`w-[520px] max-w-[90vw] rounded-2xl overflow-hidden flex flex-col border border-white/[0.08] ${dragging ? 'shadow-[0_28px_70px_rgba(0,0,0,0.55)]' : 'shadow-2xl'} transition-shadow duration-150`}
       style={{ background: '#3a3a38', maxHeight: 'calc(100vh - 160px)' }}
       role="dialog"
       aria-label="Aivory Aether"
     >
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.08] shrink-0">
+      <div
+        className={`flex items-center justify-between px-5 py-3.5 border-b border-white/[0.08] shrink-0 select-none touch-none ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+        onPointerDown={onDragStart}
+        onDoubleClick={e => { if (!(e.target as HTMLElement).closest('button')) onResetPosition() }}
+        title="Drag to move · double-click to reset"
+      >
         <div className="flex items-center gap-3">
           <AetherLogo />
           {/* Active stage badge */}

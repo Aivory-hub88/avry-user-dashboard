@@ -2173,7 +2173,8 @@ function WorkflowsPageInner() {
               </div>
             </div>
 
-            {/* Secondary undo — absolutely positioned overlay */}
+            {/* Secondary undo + version history — one bottom-centre overlay row */}
+            <div className={styles.canvasBottomActions}>
             <button
               className={styles.canvasUndoBtn}
               onClick={handleUndo}
@@ -2190,6 +2191,7 @@ function WorkflowsPageInner() {
             >
               Version history
             </button>
+            </div>
           </div>
 
 
