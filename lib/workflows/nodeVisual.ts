@@ -15,7 +15,6 @@ export const APP_ICON_MAP: Record<string, string> = {
   'google sheets': '/icons/integrations/google-sheets.svg',
   'google calendar': '/icons/integrations/google-calendar.svg',
   'google drive': '/icons/integrations/google-drive.svg',
-  http: '/icons/integrations/http.svg',
   intercom: '/icons/integrations/intercom.svg',
   linear: '/icons/integrations/linear.svg',
   mailchimp: '/icons/integrations/mailchimp.svg',
