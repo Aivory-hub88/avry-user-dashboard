@@ -373,9 +373,16 @@ describe('canvas round trip does not add Merge nodes', () => {
   const build = (steps: any[]) => convertToN8nWorkflow({ workflow_id: 'x', title: 't', trigger: 'Every day', trigger_app: 'schedule', steps, keepLastStepIntent: true } as any)
   const joins = (wf: any) => wf.nodes.filter((n: any) => n.type === 'n8n-nodes-base.noOp').length
 
-  it('does not turn the converter\'s join node into a step', () => {
+  it('branches rejoin by connecting straight into the next step (no join node)', () => {
+    const wf: any = build(plan)
+    expect(joins(wf)).toBe(0)
+    const follow = wf.nodes.find((n: any) => /Send follow-up/.test(n.name)).name
+    const sources = Object.entries(wf.connections).filter(([, v]: any) => v.main?.some((o: any[]) => o.some((c) => c.node === follow))).map(([k]) => k)
+    expect(sources.length).toBe(2) // the tail of each branch
+  })
+
+  it('does not add a join step when the canvas is read back', () => {
     const wf = build(plan)
-    expect(joins(wf)).toBe(1)
     const steps = canvasToGeneratedWorkflow(wf as any).steps
     const flat = JSON.stringify(steps)
     expect(flat).not.toMatch(/Merge \d/)
@@ -389,6 +396,23 @@ describe('canvas round trip does not add Merge nodes', () => {
       const toConv = (ss: any[]): any[] => ss.map((s) => ({ step: 0, action: s.title, tool: `${s.app || ''} ${s.type}`, app: s.app, output: '', type: s.type, branches: s.branches?.map((b: any) => ({ key: b.key, steps: toConv(b.steps) })) }))
       wf = convertToN8nWorkflow({ workflow_id: 'x', title: 't', trigger: 'Schedule Trigger', trigger_app: 'schedule', steps: toConv(gen.steps.slice(1)), keepLastStepIntent: true } as any)
     }
-    expect(joins(wf)).toBe(1)
+    expect(joins(wf)).toBe(0)
+    expect(wf.nodes.length).toBe(build(plan).nodes.length)
+  })
+})
+
+describe('canvas round trip — empty branch at the end', () => {
+  const plan: any[] = [
+    { step: 1, action: 'Read leads', tool: 'googlesheets action', app: 'googlesheets', appAction: 'read', output: '', type: 'action' },
+    { step: 2, action: 'Hot lead?', tool: 'ai condition', app: 'ai', output: '', type: 'condition', branches: [
+      { key: 'true', steps: [{ step: 3, action: 'Notify sales', tool: 'slack channel', app: 'slack', appAction: 'send', output: '', type: 'channel' }] },
+      { key: 'false', steps: [] } ] },
+  ]
+  it('shows the else path as "Nothing to do" but does not hand it to the model as a step', () => {
+    const wf: any = convertToN8nWorkflow({ workflow_id: 'x', title: 't', trigger: 'Every day', trigger_app: 'schedule', steps: plan, keepLastStepIntent: true } as any)
+    expect(wf.nodes.some((n: any) => n.name === 'Nothing to do')).toBe(true)
+    const steps = canvasToGeneratedWorkflow(wf).steps
+    expect(JSON.stringify(steps)).not.toMatch(/Nothing to do/)
+    expect(steps.some((s) => s.type === 'condition')).toBe(true)
   })
 })
