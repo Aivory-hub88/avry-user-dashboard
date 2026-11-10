@@ -23,6 +23,30 @@ import styles from './WorkflowEdges.module.css';
 //     use getSmoothStepPath with borderRadius 16 for clean 90° turns.
 // ─────────────────────────────────────────────────────────────────────────────
 
+const BACK_PAD = 63;     // how far a backward link sticks out of each handle
+const BACK_RADIUS = 20; // corner rounding
+
+/** Polyline with rounded corners (quadratic fillet, radius clamped to half of each segment). */
+function roundedPath(pts: number[][], radius: number): string {
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [px, py] = pts[i - 1];
+    const [cx, cy] = pts[i];
+    const [nx, ny] = pts[i + 1];
+    const inLen = Math.hypot(cx - px, cy - py);
+    const outLen = Math.hypot(nx - cx, ny - cy);
+    const r = Math.min(radius, inLen / 2, outLen / 2);
+    if (r < 1) { d += ` L${cx},${cy}`; continue; }
+    const ax = cx - ((cx - px) / inLen) * r;
+    const ay = cy - ((cy - py) / inLen) * r;
+    const bx = cx + ((nx - cx) / outLen) * r;
+    const by = cy + ((ny - cy) / outLen) * r;
+    d += ` L${ax},${ay} Q${cx},${cy} ${bx},${by}`;
+  }
+  const last = pts[pts.length - 1];
+  return `${d} L${last[0]},${last[1]}`;
+}
+
 const N8NAdaptiveEdge = memo((props: EdgeProps) => {
   const {
     id,
@@ -38,21 +62,30 @@ const N8NAdaptiveEdge = memo((props: EdgeProps) => {
 
   const { setEdges } = useReactFlow();
 
-  const [edgePath, labelX, labelY] = useMemo(() => {
-    // Right → Left is the normal step-to-step case: one smooth cubic whose
-    // handles scale with the gap, so forward links are gentle and links that
-    // go back/around (stacked or looped layouts) swing out in a wide S instead
-    // of snapping to right angles.
+  const { edgePath, labelX, labelY, backArrow } = useMemo(() => {
     if (sourcePosition === Position.Right && targetPosition === Position.Left) {
-      const dx = targetX - sourceX;
-      const dy = targetY - sourceY;
-      const off = dx >= 0
-        ? Math.min(Math.max(dx * 0.5, 48), 220)
-        : Math.min(70 + Math.abs(dy) * 0.18, 150);
-      const path = `M${sourceX},${sourceY} C${sourceX + off},${sourceY} ${targetX - off},${targetY} ${targetX},${targetY}`;
-      return [path, (sourceX + targetX) / 2, (sourceY + targetY) / 2] as const;
+      // n8n routing. Forward link: xyflow's own bezier — dead straight on the
+      // same row, a clean S with horizontal tangents otherwise.
+      if (targetX >= sourceX) {
+        const [path, lx, ly] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+        return { edgePath: path, labelX: lx, labelY: ly, backArrow: null };
+      }
+      // Backward link: leave right, drop into the gap between the two rows,
+      // run left, then come down and enter from the left. Right-angled with
+      // rounded corners; on one row it runs underneath the nodes + labels.
+      const dy = Math.abs(targetY - sourceY);
+      const midY = dy > 110 ? (sourceY + targetY) / 2 : Math.max(sourceY, targetY) + 110;
+      const x1 = sourceX + BACK_PAD;
+      const x2 = targetX - BACK_PAD;
+      const path = roundedPath(
+        [[sourceX, sourceY], [x1, sourceY], [x1, midY], [x2, midY], [x2, targetY], [targetX, targetY]],
+        BACK_RADIUS,
+      );
+      const mx = (x1 + x2) / 2;
+      return { edgePath: path, labelX: mx, labelY: midY, backArrow: { x: mx, y: midY } };
     }
-    return getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+    const [path, lx, ly] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+    return { edgePath: path, labelX: lx, labelY: ly, backArrow: null };
   }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition]);
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -71,6 +104,12 @@ const N8NAdaptiveEdge = memo((props: EdgeProps) => {
         className={`${styles.n8nEdge} ${selected ? styles.n8nEdgeSelected : ''}`}
         interactionWidth={20}
       />
+      {backArrow && (
+        <polygon
+          points={`${backArrow.x + 5},${backArrow.y - 5} ${backArrow.x - 5},${backArrow.y} ${backArrow.x + 5},${backArrow.y + 5}`}
+          className={styles.n8nBackArrow}
+        />
+      )}
       <EdgeLabelRenderer>
         <div
           style={{

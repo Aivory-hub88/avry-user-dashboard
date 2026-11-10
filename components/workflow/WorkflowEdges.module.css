@@ -9,6 +9,12 @@
   pointer-events: none;
 }
 
+/* Mid-line arrow on backward links, pointing the way the data flows (left) */
+.n8nBackArrow {
+  fill: rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
+
 /* Default edge: thin, always flowing */
 .n8nEdge {
   stroke: rgba(255, 255, 255, 0.5);
