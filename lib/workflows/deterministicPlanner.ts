@@ -159,6 +159,33 @@ export function analyzeRequest(text: string): RequestAnalysis {
   return { detectedApps: apps, sourceApp, targetApp, hasTrigger, hasSchedule, hasNotifyIntent, isSpecific }
 }
 
+// ── Coverage check ────────────────────────────────────────────────
+
+/** Concrete named products a generated workflow must contain when the user names them. */
+const COVERAGE_APP_IDS = new Set([
+  'slack', 'gmail', 'whatsapp', 'telegram', 'zendesk', 'freshdesk', 'jira', 'hubspot',
+  'salesforce', 'notion', 'sheets', 'shopify', 'stripe',
+])
+
+function stepText(step: GeneratedWorkflowStep): string {
+  const own = `${step.title} ${step.description ?? ''} ${step.app ?? ''} ${JSON.stringify(step.config ?? {})}`
+  const nested = (step.branches ?? []).flatMap((b) => b.steps ?? []).map(stepText).join(' ')
+  return `${own} ${nested}`.toLowerCase()
+}
+
+/**
+ * Apps the user named that no generated step mentions. An LLM generator
+ * sometimes drops part of a long request (e.g. the Slack alert of "…and if an
+ * invoice is over 30 days old, tell #finance-alert on Slack"); the caller uses
+ * this to ask for one correction instead of showing the user an incomplete flow.
+ */
+export function findMissingApps(request: string, steps: GeneratedWorkflowStep[]): CatalogApp[] {
+  const haystack = ` ${(steps ?? []).map(stepText).join(' ')} `
+  return detectApps(request).filter(
+    (app) => COVERAGE_APP_IDS.has(app.id) && !app.aliases.some((alias) => aliasIndex(haystack, alias) >= 0),
+  )
+}
+
 // ── Template planner ─────────────────────────────────────────────────────────
 
 export interface TemplateWorkflow {
