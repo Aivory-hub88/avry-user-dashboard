@@ -19,6 +19,14 @@ import type { NodeIntent, MapContext } from '@/lib/workflows/nodeMapper'
 // RSS Read -> Limit -> AI Agent).
 const MULTI_ITEM_INTENTS: NodeIntent[] = ['rss', 'http', 'database']
 
+/**
+ * An AI step that is meant to run for every item ("score each lead", "setiap
+ * baris") must not get the cost-saving Limit(1): that silently drops every item
+ * after the first. The step's own wording decides — the planner is told to say
+ * "each"/"every" when it means per item (see grounding.ts).
+ */
+const PER_ITEM_WORDS = /\b(each|every|all|per\s+(?:item|row|lead|record|contact|email|order)|one by one|setiap|tiap|semua|seluruh|masing-masing|satu per satu)\b/i
+
 // n8n-nodes-base.splitInBatches output convention: output 0 fires once
 // after all batches are done, output 1 fires once per batch and is where
 // the loop body connects. Confirmed against a real n8n instance during
@@ -410,7 +418,7 @@ export function convertToN8nWorkflow(workflow: AivoryWorkflow): N8nWorkflow {
       // A multi-item producer feeding straight into an AI step gets a Limit
       // node in between, so the agent runs once per batch instead of once
       // per item (matches n8n's own recommended RSS -> Limit -> AI Agent shape).
-      if (!workflow.skipAutoLimit && intent === 'ai' && prevIntent && MULTI_ITEM_INTENTS.includes(prevIntent)) {
+      if (!workflow.skipAutoLimit && intent === 'ai' && prevIntent && MULTI_ITEM_INTENTS.includes(prevIntent) && !PER_ITEM_WORDS.test(`${step.action} ${step.output || ''}`)) {
         const limitNode: N8nNode = {
           id: generateNodeId(),
           name: `Limit ${globalStepCounter}`,
