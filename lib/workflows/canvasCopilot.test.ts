@@ -153,10 +153,19 @@ describe('matchEditCapabilityQuestion', () => {
   })
 
   it.each([
+    'step 4 bisa dirubah?',
+    'step 4 bisa diganti gak?',
+    'step 4 boleh diubah?',
+    'apakah step 4 bisa diedit?',
+    'step 4 bisa diubah ga',
+  ])('handles Indonesian affixes: %s', (m) => expect(matchEditCapabilityQuestion(m, steps)).toContain('Step 4'))
+
+  it.each([
     'bisa tambah step approval?',
     'ubah step 4 jadi kirim ke Slack',
     'can you change step 2 to use Dropbox?',
     'hapus step download',
+    'step 4 bisa diganti jadi slack?',
   ])('leaves real edit requests alone: %s', (m) => expect(matchEditCapabilityQuestion(m, steps)).toBeNull())
 })
 

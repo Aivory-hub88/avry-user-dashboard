@@ -1550,6 +1550,13 @@ const CAPABILITY_FILLER = new Set([
  * Returns a short deterministic reply asking what to change, or null when the
  * message already says what it wants ("bisa tambah step approval?").
  */
+/** "dirubah" → ["dirubah","rubah"], "diubahlah" → [..., "ubah"]: forms to try against a word list. */
+function idVariants(token: string): string[] {
+  const noPrefix = token.replace(/^(di|ter|me|mem|men|meng|meny)(?=\w{3,})/, '')
+  const noSuffix = noPrefix.replace(/(kan|lah|kah|nya|an)$/, '')
+  return [token, noPrefix, noSuffix]
+}
+
 export function matchEditCapabilityQuestion(
   message: string,
   steps: GeneratedWorkflowStep[],
@@ -1560,20 +1567,19 @@ export function matchEditCapabilityQuestion(
     /\b(bisa|boleh)\b.*\b(gak|nggak|ga|ngga|engga|tidak|kah)\b/.test(lower) ||
     /\?\s*$/.test(lower)
   if (!asksIfPossible) return null
-  if (!/\b(rubah|ubah|ganti|edit|revisi|change|modify|update)\b/.test(lower)) return null
+  const tokens = lower.replace(/[?!.,"“”']/g, ' ').split(/\s+/).filter(Boolean)
+  const EDIT_VERBS = new Set(['rubah', 'ubah', 'ganti', 'edit', 'revisi', 'change', 'modify', 'update'])
+  if (!tokens.some((t) => idVariants(t).some((v) => EDIT_VERBS.has(v)))) return null
 
   const titles = steps.map((s) => (s.title || '').toLowerCase())
-  const rest = lower
-    .replace(/[?!.,"“”']/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean)
-    .filter((t) => !CAPABILITY_FILLER.has(t) && !/^\d+$/.test(t))
+  const rest = tokens
+    .filter((t) => !idVariants(t).some((v) => CAPABILITY_FILLER.has(v)) && !/^\d+$/.test(t))
     .filter((t) => !titles.some((title) => title.includes(t)))
   if (rest.length > 0) return null
 
   const n = Number(/(?:step|langkah|node|nomor|no)\s*\.?\s*(\d+)/.exec(lower)?.[1] ?? /\b(\d+)\b/.exec(lower)?.[1])
   const target = Number.isInteger(n) && n >= 1 ? steps[n - 1] : undefined
-  const id = /\b(bisa|boleh|lo|lu|kamu|gak|nggak|ga|ngga|rubah|ubah|ganti|dong|apakah|tidak)\b/.test(lower)
+  const id = tokens.some((t) => /^(bisa|boleh|lo|lu|kamu|gak|nggak|ga|ngga|dong|apakah|tidak|di\w+)$/.test(t) || idVariants(t).some((v) => /^(rubah|ubah|ganti)$/.test(v)))
   if (target) {
     return id
       ? `Bisa. Step ${n} sekarang “${target.title}”. Mau diubah jadi apa?`
