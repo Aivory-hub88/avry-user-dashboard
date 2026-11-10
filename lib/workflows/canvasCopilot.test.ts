@@ -19,7 +19,7 @@ vi.mock('./bridgeCopilot', () => ({
 }))
 
 import { canvasToGeneratedWorkflow, mergeEditedNodes, normalizeStepTitle, countSteps, stepIdAliases, diffSteps } from './canvasCopilot'
-import { CopilotStateMachine, isNewWorkflowRequest, matchEditCapabilityQuestion } from './copilotStateMachine'
+import { CopilotStateMachine, isNewWorkflowRequest, matchEditCapabilityQuestion, buildUserContext } from './copilotStateMachine'
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
 import { n8nToReactFlow } from '@/lib/n8nMapper'
 
@@ -134,6 +134,24 @@ describe('mergeEditedNodes', () => {
     const merged = mergeEditedNodes(original, rebuilt, { keepTrigger: true })
     expect(merged.removed).toBe(1)
     expect(merged.nodes.some((n) => /upload backup/i.test(n.data.title))).toBe(false)
+  })
+})
+
+describe('buildUserContext', () => {
+  const m = (role: 'user' | 'assistant', content: string) => ({ role, content }) as Parameters<typeof buildUserContext>[0][number]
+  it('keeps the user\'s own requests, newest last, and drops confirmations and assistant turns', () => {
+    const out = buildUserContext([
+      m('user', 'buat workflow: lead masuk lewat webhook, email ke sales'),
+      m('assistant', 'Here are the changes ...'),
+      m('user', 'yes'),
+      m('user', 'tambah step kirim notifikasi ke Slack #sales-leads'),
+    ])
+    expect(out).toBe('- buat workflow: lead masuk lewat webhook, email ke sales\n- tambah step kirim notifikasi ke Slack #sales-leads')
+  })
+  it('is empty for no usable history and respects the size cap', () => {
+    expect(buildUserContext([])).toBe('')
+    const long = 'x'.repeat(590)
+    expect(buildUserContext([m('user', long), m('user', long), m('user', long)], 1500).split('\n').length).toBe(2)
   })
 })
 
