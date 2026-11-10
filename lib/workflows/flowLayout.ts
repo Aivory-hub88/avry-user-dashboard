@@ -11,6 +11,9 @@ export const ROW_HEIGHT = 180
 
 export interface LayoutEdge { source: string; target: string }
 
+/** A Chat Model / Memory / Tool node that feeds `parent` through an ai_* connection; it sits under its parent. */
+export interface SubNode { id: string; parent: string }
+
 /** Loop-back edges (Split In Batches ... -> loop) would push a loop to the far right; layout ignores them. */
 function dropBackEdges(ids: string[], edges: LayoutEdge[]): LayoutEdge[] {
   const out = new Map<string, LayoutEdge[]>(ids.map((id) => [id, []]))
@@ -43,6 +46,26 @@ export function layoutLeftToRight(
   ids: string[],
   edges: LayoutEdge[],
   origin: { x: number; y: number } = { x: 0, y: 0 },
+  subNodes: SubNode[] = [],
+): Map<string, { x: number; y: number }> {
+  const subIds = new Set(subNodes.filter((s) => ids.includes(s.parent)).map((s) => s.id))
+  const mainIds = ids.filter((id) => !subIds.has(id))
+  const placed = layoutMain(mainIds, edges, origin)
+  const perParent = new Map<string, number>()
+  for (const s of subNodes) {
+    const p = placed.get(s.parent)
+    if (!p || !subIds.has(s.id)) continue
+    const k = perParent.get(s.parent) ?? 0
+    perParent.set(s.parent, k + 1)
+    placed.set(s.id, { x: p.x + k * 180, y: p.y + 200 })
+  }
+  return placed
+}
+
+function layoutMain(
+  ids: string[],
+  edges: LayoutEdge[],
+  origin: { x: number; y: number },
 ): Map<string, { x: number; y: number }> {
   const known = new Set(ids)
   const all = edges.filter((e) => known.has(e.source) && known.has(e.target) && e.source !== e.target)
@@ -88,8 +111,15 @@ export function layoutLeftToRight(
       return ps.length ? ps.reduce((s, p) => s + row.get(p)!, 0) / ps.length : 0
     }
     const ordered = col.map((id, i) => ({ id, i, k: key(id) })).sort((a, b) => a.k - b.k || a.i - b.i)
+    // Each node aims for the average row of its parents, so a single-child chain
+    // stays on a straight line and a branch keeps its own lane instead of being
+    // re-centred behind another branch's nodes. Then push overlapping rows apart
+    // and re-centre the column on where the nodes wanted to be.
+    const placed: number[] = []
+    ordered.forEach(({ k }, idx) => placed.push(idx === 0 ? k : Math.max(k, placed[idx - 1] + ROW_HEIGHT)))
+    const shift = ordered.reduce((s, { k }, idx) => s + k - placed[idx], 0) / ordered.length
     ordered.forEach(({ id }, idx) => {
-      const y = (idx - (ordered.length - 1) / 2) * ROW_HEIGHT
+      const y = placed[idx] + shift
       row.set(id, y)
       out.set(id, { x: origin.x + l * COLUMN_WIDTH, y: origin.y + y })
     })

@@ -365,7 +365,10 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
         const bottom = nds.reduce((m, n) => Math.max(m, n.position.y), -Infinity);
         const left = nds.reduce((m, n) => Math.min(m, n.position.x), Infinity);
         const origin = nds.length > 0 ? { x: left, y: bottom + 320 } : { x: 0, y: 0 };
-        const placed = layoutLeftToRight(newNodes.map((n) => n.id), newEdges.map((e) => ({ source: e.source, target: e.target })), origin);
+        const subNodes = newEdges
+          .filter((e) => e.type === 'aiSubConnection')
+          .map((e) => ({ id: e.source, parent: e.target }));
+        const placed = layoutLeftToRight(newNodes.map((n) => n.id), newEdges.map((e) => ({ source: e.source, target: e.target })), origin, subNodes);
         const positioned = newNodes.map((n) => ({
           ...n,
           position: placed.get(n.id) ?? n.position,
