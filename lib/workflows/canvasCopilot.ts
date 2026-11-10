@@ -122,6 +122,13 @@ export function canvasToGeneratedWorkflow(wf: N8nWorkflow): GeneratedWorkflow {
         })
         steps.push(step)
         cur = join
+        // The converter's own join node (a no-op) is plumbing, not a step the user
+        // asked for. Handing it to the model as a step made every edit add another
+        // Merge node, so continue past it.
+        if (cur && byName.get(cur)?.type === 'n8n-nodes-base.noOp' && !visited.has(cur)) {
+          visited.add(cur)
+          cur = mainOutputs(cur)[0]?.[0]
+        }
         first = true
         allowJoinAtStart = true
         continue

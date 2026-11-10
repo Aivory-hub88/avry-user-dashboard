@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { analyzeRequest, matchTemplate, distinctAppCount, findMissingApps } from './deterministicPlanner'
+import { analyzeRequest, matchTemplate, distinctAppCount, findMissingApps, sanitizeWorkflow } from './deterministicPlanner'
 import type { GeneratedWorkflowStep } from './copilotStateMachine'
 
 const MULTI_APP =
@@ -63,5 +63,28 @@ describe('coverage check', () => {
     expect(findMissingApps('kirim notifikasi ke Slack', [step('Notify', '', { app: 'slack' })])).toEqual([])
     expect(findMissingApps('kirim email ke tim', [step('Kirim ke tim')])).toEqual([])
     expect(findMissingApps('', [])).toEqual([])
+  })
+})
+
+describe('sanitizeWorkflow drops a redundant "merge branches" step', () => {
+  const st = (id: string, type: string, title: string, extra: Record<string, unknown> = {}) => ({ id, type, title, app: 'x', action: 'y', description: '', config: {}, ...extra })
+  const cond = st('c', 'condition', 'Hot?', { branches: [{ key: 'true', steps: [st('a', 'action', 'A')] }, { key: 'false', steps: [st('b', 'action', 'B')] }] })
+
+  it.each(['Merge Branches', 'Merge 3', 'Join the hot and cold paths', 'Gabungkan cabang'])('drops "%s" right after a condition', (title) => {
+    const r = sanitizeWorkflow([st('t', 'trigger', 'Start'), cond, st('m', 'action', title), st('e', 'action', 'Send email')])
+    expect(r.steps.map((s) => s.title)).toEqual(['Start', 'Hot?', 'Send email'])
+    expect(r.fixes.some((f) => f.includes('dropped redundant'))).toBe(true)
+  })
+
+  it('keeps a real merge elsewhere (not right after a condition) and ordinary steps', () => {
+    const r = sanitizeWorkflow([st('t', 'trigger', 'Start'), st('a', 'action', 'Fetch orders'), st('m', 'action', 'Merge customer data with orders'), cond, st('e', 'action', 'Send email')])
+    expect(r.steps.map((s) => s.title)).toEqual(['Start', 'Fetch orders', 'Merge customer data with orders', 'Hot?', 'Send email'])
+  })
+
+  it('also cleans a branch body', () => {
+    const inner = st('c2', 'condition', 'Big?', { branches: [{ key: 'true', steps: [st('x', 'action', 'X')] }, { key: 'false', steps: [] }] })
+    const outer = st('c1', 'condition', 'Hot?', { branches: [{ key: 'true', steps: [inner, st('m', 'action', 'Merge branches')] }, { key: 'false', steps: [] }] })
+    const r = sanitizeWorkflow([st('t', 'trigger', 'Start'), outer])
+    expect(r.steps[1].branches![0].steps.map((s) => s.title)).toEqual(['Big?'])
   })
 })
