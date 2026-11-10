@@ -24,6 +24,7 @@ describe('buildGroundingBlock', () => {
     expect(b).toMatch(/"manual"/)
     expect(b).toMatch(/"set"/)
     expect(b).toMatch(/"wait"/)
+    expect(b).toMatch(/say "each" or "every"/)
     expect(b).toContain('slack (native node, can trigger)')
   })
   it('never echoes user text', () => {
