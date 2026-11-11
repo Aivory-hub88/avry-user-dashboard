@@ -1,4 +1,5 @@
 import type { WorkflowNodeData, NodeConfig } from '@/types/workflow-node';
+import { evaluateNodeReadiness } from '@/lib/workflows/nodeReadiness';
 
 /** Extract a typed NodeConfig from node data, mapping rawN8n params or using defaults */
 export function extractConfigFromNode(data: WorkflowNodeData): NodeConfig {
@@ -257,11 +258,9 @@ export function getDeployChecklist(config: NodeConfig, data: WorkflowNodeData): 
       break;
     case 'slack':
       items.push({ label: 'Channel is set', ok: Boolean(config.channel), severity: 'error', hint: 'e.g. #general or a channel ID' });
-      items.push({ label: 'Bot token provided', ok: Boolean(config.botToken), severity: 'warn', hint: 'Or attach a Slack credential in n8n after deploy' });
       break;
     case 'gmail':
       items.push({ label: 'Recipient is set', ok: Boolean(config.to), severity: 'error' });
-      items.push({ label: 'Gmail account connected', ok: false, severity: 'warn', hint: 'Attach the Gmail OAuth2 credential in n8n after deploy — Aivory cannot complete Google OAuth for you' });
       break;
     case 'switch': {
       const hasRule = config.rules.length > 0 && config.rules.every(r => Boolean(r.condition.field));
@@ -281,8 +280,33 @@ export function getDeployChecklist(config: NodeConfig, data: WorkflowNodeData): 
       }
     }
   }
+
+  // Shared readiness engine: credentials, required parameters, placeholders.
+  // Types with their own field checks above only take the credential and
+  // placeholder items from the engine, so a field is never listed twice.
+  const engineOwnsFields = config.type === 'generic' || !HAS_OWN_FIELD_CHECKS.has(config.type);
+  const readiness = evaluateNodeReadiness(data);
+  const relevant = readiness.filter(i => engineOwnsFields || i.kind !== 'required');
+  for (const r of relevant) {
+    items.push({
+      label: r.message,
+      ok: false,
+      severity: r.severity,
+      hint: r.kind === 'credential'
+        ? 'Set up this connection in n8n — Aivory cannot complete OAuth or store secrets for you'
+        : r.kind === 'placeholder' ? 'The generator left a sample value here' : 'n8n will fail without it',
+    });
+  }
+  if (data.rawN8n?.type && relevant.length === 0 && engineOwnsFields) {
+    items.push({ label: 'Connection and required settings are filled', ok: true, severity: 'error' });
+  }
   return items;
 }
+
+const HAS_OWN_FIELD_CHECKS = new Set<string>([
+  'httpRequest', 'webhook', 'schedule', 'aiStep', 'ifCondition', 'editFields', 'httpResponse',
+  'manualTrigger', 'agent', 'rssFeed', 'slack', 'gmail', 'switch', 'code',
+]);
 
 /** True when no error-severity checklist item is failing. */
 export function isDeployReady(config: NodeConfig, data: WorkflowNodeData): boolean {
