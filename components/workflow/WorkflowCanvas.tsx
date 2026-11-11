@@ -1282,6 +1282,8 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       {inspectorOpen && (
         <NodeInspectorPanel
           selectedNode={selectedNode}
+          nodes={nodes}
+          onSelectNode={(id) => setSelectedNodeId(id)}
           onChange={handleInspectorChange}
           onDelete={handleInspectorDelete}
           onClose={() => { setSelectedNodeId(null); setInspectorOpen(false); }}

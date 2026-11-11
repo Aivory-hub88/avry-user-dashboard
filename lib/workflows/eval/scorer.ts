@@ -12,6 +12,8 @@
  * but do not fail the case.
  */
 
+import { PLACEHOLDER_PATTERN as PLACEHOLDER } from '../nodeReadiness'
+
 export interface CatalogNodeInfo {
   creds: string[] // 'name*' = required
   resources: string[]
@@ -78,8 +80,6 @@ export interface CaseScore {
 
 /** n8n 2.x disables these by default (NODES_EXCLUDE) — they render as unknown "?" nodes. */
 export const DISABLED_BY_DEFAULT = ['n8n-nodes-base.executeCommand', 'n8n-nodes-base.localFileTrigger']
-
-const PLACEHOLDER = /api\.example\.com|UNRESOLVED_INTEGRATION|YOUR_[A-Z_]+|hooks\.slack\.com\/services\/YOUR/i
 
 function isTrigger(type: string, group: string[] | undefined): boolean {
   if (group?.includes('trigger')) return true

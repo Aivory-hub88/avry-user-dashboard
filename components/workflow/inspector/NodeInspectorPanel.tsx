@@ -21,6 +21,7 @@ import SwitchForm from './forms/SwitchForm';
 import CodeForm from './forms/CodeForm';
 import ErrorHandlingSection from './ErrorHandlingSection';
 import { asset } from '@/lib/asset'
+import { summarizeWorkflowReadiness } from '@/lib/workflows/nodeReadiness'
 
 type Tab = 'configure' | 'advanced' | 'output';
 interface Props {
@@ -28,9 +29,13 @@ interface Props {
   onChange: (nodeId: string, data: Partial<WorkflowNodeData>) => void;
   onDelete: (nodeId: string) => void;
   onClose: () => void;
+  /** All canvas nodes — drives the "Workflow health" summary when nothing is selected. */
+  nodes?: Node<WorkflowNodeData>[];
+  /** Select a node on the canvas and show its configuration. */
+  onSelectNode?: (nodeId: string) => void;
 }
 
-export default function NodeInspectorPanel({ selectedNode, onChange, onDelete, onClose }: Props) {
+export default function NodeInspectorPanel({ selectedNode, onChange, onDelete, onClose, nodes = [], onSelectNode }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('configure');
   const [testing, setTesting] = useState(false);
   const [editName, setEditName] = useState('');
@@ -41,6 +46,7 @@ export default function NodeInspectorPanel({ selectedNode, onChange, onDelete, o
   if (data && nodeId !== nameInit) { setEditName(data.title || data.label || ''); setNameInit(nodeId); }
   const errors = useMemo(() => config ? validateConfig(config) : {}, [config]);
   const typeLabel = useMemo(() => data ? getNodeTypeLabel(data) : '', [data]);
+  const health = useMemo(() => summarizeWorkflowReadiness(nodes), [nodes]);
   const handleConfigChange = useCallback((c: NodeConfig) => onChange(nodeId, { config: c }), [nodeId, onChange]);
   const handleErrorHandlingChange = useCallback(
     (eh: import('@/types/workflow-node').NodeErrorHandling) => onChange(nodeId, { errorHandling: eh }),
@@ -75,18 +81,14 @@ export default function NodeInspectorPanel({ selectedNode, onChange, onDelete, o
           <div className={styles.headerLeft}>
             <div className={styles.headerIcon}>□</div>
             <div className={styles.headerInfo}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary, #a8a6a2)' }}>Inspector</span>
-              <span className={styles.typeBadge}>No selection</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary, #a8a6a2)' }}>Workflow health</span>
+              <span className={styles.typeBadge}>No node selected</span>
             </div>
           </div>
           <button className={styles.closeBtn} onClick={onClose} aria-label="Close inspector">×</button>
         </div>
-        <div className={styles.body} style={{ alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-          <div style={{ color: 'var(--text-tertiary, #5a5a58)', fontSize: 12, lineHeight: 1.6 }}>
-            <p style={{ fontSize: 20, marginBottom: 8, opacity: 0.4 }}></p>
-            <p>Select a node to inspect</p>
-            <p style={{ fontSize: 11, marginTop: 4, opacity: 0.7 }}>Double-click a node or use the edit button</p>
-          </div>
+        <div className={styles.body}>
+          <WorkflowHealth health={health} onSelectNode={onSelectNode} />
         </div>
       </div>
     );
@@ -198,6 +200,65 @@ function OutputTab({ testResult }: { testResult: import('@/types/workflow-node')
         <pre style={{ fontSize: 10, color: '#a1a1aa', background: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 6, overflow: 'auto', maxHeight: 300, marginTop: 8, border: '1px solid rgba(255,255,255,0.04)' }}>
           {typeof testResult.output === 'string' ? testResult.output : JSON.stringify(testResult.output, null, 2)}
         </pre>
+      )}
+    </div>
+  );
+}
+
+type Health = ReturnType<typeof summarizeWorkflowReadiness>;
+
+const sectionTitle: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#5a5a58', margin: '14px 0 6px' };
+
+function WorkflowHealth({ health, onSelectNode }: { health: Health; onSelectNode?: (id: string) => void }) {
+  if (health.total === 0) {
+    return <p style={{ color: '#5a5a58', fontSize: 12 }}>This workflow has no nodes yet.</p>;
+  }
+  const allReady = health.ready === health.total;
+  return (
+    <div style={{ fontSize: 12, color: 'var(--text-secondary, #a8a6a2)' }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: allReady ? 'var(--color-accent, #4ade80)' : '#fbbf24' }}>
+        {health.ready} of {health.total} nodes ready
+      </div>
+      <p style={{ margin: '4px 0 0', fontSize: 11, color: '#5a5a58' }}>
+        {allReady ? 'Every node has its connection and required settings.' : 'Click a node below to finish its setup.'}
+      </p>
+
+      {health.trigger && (
+        <>
+          <div style={sectionTitle}>Trigger</div>
+          <div>{health.trigger}</div>
+        </>
+      )}
+
+      {health.pending.length > 0 && (
+        <>
+          <div style={sectionTitle}>Needs setup</div>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {health.pending.map((p) => (
+              <li key={p.id}>
+                <button type="button" onClick={() => onSelectNode?.(p.id)}
+                  style={{ width: '100%', textAlign: 'left', cursor: 'pointer', color: 'inherit', font: 'inherit',
+                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 10px' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary, #e8e6e3)' }}>{p.title}</div>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 16, fontSize: 11, color: '#f87171' }}>
+                    {p.items.map((i) => <li key={i.id}>{i.message}</li>)}
+                  </ul>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {health.connections.length > 0 && (
+        <>
+          <div style={sectionTitle}>Connections to set up</div>
+          <ul style={{ margin: 0, paddingLeft: 16 }}>
+            {health.connections.map((c) => (
+              <li key={c.app}><strong>{c.app}</strong> <span style={{ color: '#5a5a58' }}>— used by {c.nodeTitles.join(', ')}</span></li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );
