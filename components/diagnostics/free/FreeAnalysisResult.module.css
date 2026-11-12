@@ -1,0 +1,130 @@
+/* Free analysis result: same surfaces and type scale as the paid report
+   (app/diagnostics/deep/final-result), monochrome, no gradient text. */
+
+.page {
+  min-height: 100%;
+  background: var(--bg-main);
+  color: #e5e5e3;
+  font-family: var(--font-manrope), sans-serif;
+}
+
+.content {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.topRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.back { font-size: 0.85rem; color: #a3a39c; text-decoration: none; }
+.back:hover { color: #f4f4f2; }
+.topActions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lang {
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px;
+  color: #e5e5e3; font: inherit; font-size: 0.8125rem; padding: 6px 10px; cursor: pointer;
+}
+
+.card {
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  padding: 28px 32px;
+  border: 1px solid #4a4a46;
+}
+@media (max-width: 640px) { .card { padding: 20px 18px; } }
+
+.eyebrow {
+  display: block;
+  font-size: 11px; font-weight: 600; color: #a3a39c;
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+
+.title { font-size: 26px; font-weight: 300; letter-spacing: -0.3px; line-height: 1.3; color: #f4f4f2; margin: 6px 0 14px; }
+
+.meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 640px) { .meta { grid-template-columns: 1fr; } }
+.metaValue { margin-top: 4px; font-size: 16px; font-weight: 600; color: #f4f4f2; overflow-wrap: anywhere; }
+
+.sectionLabel {
+  font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: #f4f4f2;
+  margin: 0 0 20px; padding-bottom: 12px; border-bottom: 1px solid #4a4a46;
+}
+
+.scoreRow { display: grid; grid-template-columns: 220px 1fr; gap: 32px; align-items: center; }
+@media (max-width: 767px) { .scoreRow { grid-template-columns: 1fr; } }
+.ringCol { display: flex; justify-content: center; }
+
+.band { font-size: 16px; font-weight: 600; color: #f4f4f2; margin: 0 0 6px; }
+.body { font-size: 14.5px; line-height: 1.7; color: #d4d4cf; margin: 0; }
+.caption { margin: 10px 0 0; font-size: 12px; color: #a3a39c; line-height: 1.5; }
+
+.ladder { margin-top: 20px; }
+.ladderTrack { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.ladderStep { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); }
+.ladderStepOn { background: #f4f4f2; }
+.ladderLabels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: 8px; }
+.ladderLabel { font-size: 11px; color: #7a7a72; text-align: center; }
+.ladderLabelOn { color: #f4f4f2; font-weight: 700; }
+
+.dims { display: flex; flex-direction: column; gap: 18px; }
+.dimTop { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.dimName { font-size: 15px; font-weight: 600; color: #f4f4f2; }
+.dimScore { font-size: 15px; font-weight: 700; color: #f4f4f2; font-variant-numeric: tabular-nums; }
+.dimBar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); margin: 8px 0 6px; overflow: hidden; }
+.dimFill { height: 100%; border-radius: 3px; background: #f4f4f2; transition: width 0.6s ease; }
+.dimDriver { font-size: 12px; color: #a3a39c; }
+
+.twoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 767px) { .twoCol { grid-template-columns: 1fr; } }
+.list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.listItem { display: flex; justify-content: space-between; gap: 12px; font-size: 14.5px; color: #e5e5e3; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; }
+.listScore { color: #a3a39c; font-variant-numeric: tabular-nums; }
+.empty { font-size: 13px; color: #7a7a72; margin: 10px 0 0; }
+
+.insights { display: flex; flex-direction: column; gap: 14px; }
+.insight { padding: 14px 16px; border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3px solid rgba(255, 255, 255, 0.55); border-radius: 8px; }
+.insightBlocker { border-left-color: rgba(255, 255, 255, 0.22); }
+.insightHead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.insightTitle { font-size: 16px; font-weight: 600; color: #f4f4f2; }
+.tag {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.2); color: #d4d4cf;
+}
+.insightDriver { font-size: 12px; color: #a3a39c; margin-bottom: 6px; }
+
+.note { padding: 14px 16px; border-radius: 8px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 16px; }
+.noteTitle { font-size: 15px; font-weight: 700; color: #f4f4f2; margin: 0 0 6px; }
+
+.hook { display: flex; flex-direction: column; gap: 10px; }
+.hookLead { font-size: 18px; font-weight: 600; line-height: 1.5; color: #f4f4f2; margin: 0; }
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; align-items: center; }
+.primary {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 10px 18px; border-radius: 10px; border: none;
+  background: #f4f4f2; color: #0b0b10; font: inherit; font-size: 0.875rem; font-weight: 700;
+  cursor: pointer; text-decoration: none;
+}
+.primary:hover { filter: brightness(0.94); }
+.primary:disabled { opacity: 0.6; cursor: default; }
+.ghost {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 9px 16px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent; color: #e5e5e3; font: inherit; font-size: 0.875rem; font-weight: 600;
+  cursor: pointer; text-decoration: none;
+}
+.ghost:hover { border-color: rgba(255, 255, 255, 0.35); color: #fff; }
+.ghost:disabled { opacity: 0.6; cursor: default; }
+.runsNote { font-size: 12px; color: #a3a39c; }
+
+.footer { display: flex; justify-content: center; padding-top: 8px; }
+.aether { height: 16px; opacity: 0.6; }
+
+.loading { min-height: 60vh; display: flex; align-items: center; justify-content: center; }
+.spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.08); border-top-color: #f4f4f2;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
