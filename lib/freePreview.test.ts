@@ -9,10 +9,14 @@ describe('free preview locks', () => {
     expect(lockedPrefixFor('/agents/teams')).toBe('/agents')
     expect(lockedPrefixFor('/blueprint')).toBe('/blueprint')
     expect(lockedPrefixFor('/integrations')).toBe('/integrations')
+    // LLM work and n8n deploys are paid-only (2026-11-12).
+    expect(lockedPrefixFor('/workflows')).toBe('/workflows')
+    expect(lockedPrefixFor('/diagnostics/deep')).toBe('/diagnostics/deep')
+    expect(lockedPrefixFor('/diagnostics/deep/summary')).toBe('/diagnostics/deep')
   })
 
   it('leaves the free parts open', () => {
-    for (const p of ['/', '/overview', '/console', '/diagnostics', '/diagnostics/deep', '/workflows', '/dashboard/subscriptions']) {
+    for (const p of ['/', '/overview', '/console', '/diagnostics', '/dashboard/subscriptions']) {
       expect(lockedPrefixFor(p)).toBeNull()
     }
     expect(lockedPrefixFor('/agentsx')).toBeNull()

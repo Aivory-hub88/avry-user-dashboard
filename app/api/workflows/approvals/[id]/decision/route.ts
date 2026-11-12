@@ -1,3 +1,4 @@
+import { requirePaidPlan } from '@/lib/planGate'
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { getAuthUser } from '@/lib/serverAuth'
@@ -10,6 +11,10 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(request, 'console')
   if (denied) return denied
 

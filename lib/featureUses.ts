@@ -34,9 +34,9 @@ const NOT_BOUGHT: Record<Feature, string> = {
 }
 
 /**
- * Runs can come from a purchase (3 each) or, for an account that never bought
- * anything, from the one-time free allowance (2 diagnostics, 1 copilot
- * session; avry-backend FREE_GRANTS), so the text doesn't name a count.
+ * Runs come from a purchase (3 each). The one-time free allowance
+ * (avry-backend FREE_GRANTS) is empty since 2026-11-12, so the text doesn't
+ * name a count.
  */
 const USED_UP: Record<Feature, string> = {
   snapshot:
@@ -44,7 +44,7 @@ const USED_UP: Record<Feature, string> = {
   blueprint:
     'You have used all the blueprint runs on your account. Buy the Blueprint + Roadmap again for 3 more.',
   copilot:
-    'You have used your free Workflow Copilot session. Upgrade to the Operational plan to keep building.',
+    'Workflow Copilot is part of the Operational plan. Upgrade to keep building.',
 }
 
 type Gate =

@@ -1,3 +1,4 @@
+import { requirePaidPlan } from '@/lib/planGate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireModule } from '@/lib/teamAccess'
 
@@ -54,6 +55,10 @@ function schemaGuard(patch: Record<string, any>, current: Record<string, any>): 
 }
 
 export async function POST(req: NextRequest) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(req, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(req, 'workflows')
   if (denied) return denied
 

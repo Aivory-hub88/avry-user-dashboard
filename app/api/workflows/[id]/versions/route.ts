@@ -1,3 +1,4 @@
+import { requirePaidPlan } from '@/lib/planGate'
 import { NextRequest, NextResponse } from 'next/server'
 import { listVersions, snapshotVersion, type VersionTriggerReason } from '@/lib/workflows/versionRepository'
 import { getAuthUser } from '@/lib/serverAuth'
@@ -32,6 +33,10 @@ export async function GET(
   _request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(_request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(_request, 'workflows')
   if (denied) return denied
 
@@ -53,6 +58,10 @@ export async function POST(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(request, 'workflows')
   if (denied) return denied
 

@@ -1,3 +1,4 @@
+import { requirePaidPlan } from '@/lib/planGate'
 import { NextRequest, NextResponse } from 'next/server'
 import { canvasRepository } from '@/lib/workflows/canvasRepository'
 import { requireModule } from '@/lib/teamAccess'
@@ -14,6 +15,10 @@ export async function GET(
   _request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(_request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(_request, 'workflows')
   if (denied) return denied
 
@@ -35,6 +40,10 @@ export async function PUT(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(request, 'workflows')
   if (denied) return denied
 
@@ -66,6 +75,10 @@ export async function DELETE(
   _request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(_request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(_request, 'workflows')
   if (denied) return denied
 

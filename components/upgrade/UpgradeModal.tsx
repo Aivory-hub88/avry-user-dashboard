@@ -44,7 +44,7 @@ export default function UpgradeModal() {
   const title = request.feature ? `Unlock ${request.feature}` : 'Upgrade to keep going'
   const body =
     request.message ||
-    'Your free account includes 2 diagnostics and 1 Workflow Copilot session. Upgrade to the Operational plan to unlock everything else.'
+    'Your free account includes the free AI readiness analysis. Upgrade to the Operational plan to unlock the Deep Diagnostic, workflows, AI agents and everything else.'
 
   return (
     <div

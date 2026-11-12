@@ -1,3 +1,4 @@
+import { requirePaidPlan } from '@/lib/planGate'
 /**
  * POST /api/workflows/clarify
  *
@@ -47,6 +48,10 @@ interface ClarifyRequestBody {
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(request, 'workflows')
   if (denied) return denied
 

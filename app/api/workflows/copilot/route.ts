@@ -11,7 +11,6 @@ import {
   type CopilotConversationState,
 } from '@/lib/workflows/copilotStateMachine'
 import { requirePaidPlan } from '@/lib/planGate'
-import { trialTurn } from '@/lib/featureUses'
 import type { CanvasEditContext } from '@/lib/workflows/canvasCopilot'
 
 /** Accept the open canvas only in the expected shape and within a sane size. */
@@ -31,26 +30,13 @@ function parseCanvas(raw: unknown): CanvasEditContext | null {
 export const maxDuration = 120
 
 export async function POST(request: NextRequest) {
+  // Paid plans only (since 2026-11-12 free accounts get no Copilot session:
+  // building and deploying workflows is the paid product).
   const gate = await requirePaidPlan(request, 'workflows')
-  if (!gate.ok && gate.code !== 'UPGRADE_REQUIRED') return gate.response
+  if (!gate.ok) return gate.response
 
   try {
     const body = await request.json()
-
-    // No paid plan: the free allowance covers ONE copilot session of up to
-    // avry-backend TRIAL_MAX_TURNS turns, keyed to the session id. Check
-    // before the turn (charges nothing), record after it worked (charges the
-    // session on its first good turn and counts the turn, in Postgres), so a
-    // failed turn costs nothing and a restart can't reset the count.
-    const trialRef = gate.ok ? null : (() => {
-      const sid = typeof body?.sessionId === 'string' && /^[\w:.-]{1,128}$/.test(body.sessionId) ? body.sessionId : null
-      body.sessionId = sid ?? `session_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
-      return `copilot:${body.sessionId}`
-    })()
-    if (trialRef) {
-      const denied = await trialTurn(request, 'check', 'copilot', trialRef)
-      if (denied) return denied
-    }
 
     // ------------------------------------------------------------------
     // BUG WAS HERE #1: old code read `prompt || description` and ignored
@@ -134,12 +120,6 @@ export async function POST(request: NextRequest) {
       Date.now() - autoDriveT0 < AUTO_DRIVE_DEADLINE_MS
     ) {
       updatedState = await stateMachine.continuePending()
-    }
-
-    // A free turn is charged only when it worked; an errored turn is free.
-    if (trialRef && updatedState.stage !== 'ERROR') {
-      const denied = await trialTurn(request, 'record', 'copilot', trialRef)
-      if (denied) return denied
     }
 
     return Response.json({

@@ -1,3 +1,4 @@
+import { requirePaidPlan } from '@/lib/planGate'
 import { NextRequest, NextResponse } from 'next/server'
 import { workflowRepository } from '@/lib/workflows/repository'
 import type { AivoryWorkflowSpec } from '@/types/workflow'
@@ -21,6 +22,10 @@ export async function POST(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(request, 'workflows')
   if (denied) return denied
 
