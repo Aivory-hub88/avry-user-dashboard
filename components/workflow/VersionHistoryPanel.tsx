@@ -1,5 +1,6 @@
 'use client';
 
+import { authedFetch } from '@/lib/deployAuth'
 import React, { useEffect, useState, useCallback } from 'react';
 import { asset } from '@/lib/asset';
 import styles from './VersionHistoryPanel.module.css';
@@ -38,7 +39,7 @@ export function VersionHistoryPanel({ open, workflowId, onClose, onRestored }: V
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(asset(`/api/workflows/${workflowId}/versions`));
+      const res = await authedFetch(asset(`/api/workflows/${workflowId}/versions`));
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setVersions(await res.json());
     } catch (err: any) {
@@ -60,7 +61,7 @@ export function VersionHistoryPanel({ open, workflowId, onClose, onRestored }: V
   const handleRestore = async (version: number) => {
     setRestoringVersion(version);
     try {
-      const res = await fetch(asset(`/api/workflows/${workflowId}/versions/${version}/restore`), { method: 'POST' });
+      const res = await authedFetch(asset(`/api/workflows/${workflowId}/versions/${version}/restore`), { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       onRestored();
       onClose();

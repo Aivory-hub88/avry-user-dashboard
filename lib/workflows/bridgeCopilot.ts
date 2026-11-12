@@ -12,8 +12,10 @@
  *     round trip previously went container → Cloudflare → Traefik → same
  *     container, adding seconds of latency and an external dependency to
  *     what is logically an internal function call)
- *   - app/api/copilot/[...path]/route.ts    (thin HTTP wrapper so browser
- *     code can reach the same operations)
+ *
+ * The old public /api/copilot/* wrapper had no auth or plan check and no
+ * browser caller left, so it was removed: the only way in is a gated route
+ * (/api/workflows/*, behind requireModule('workflows')).
  */
 
 const VPS_BRIDGE_URL = (

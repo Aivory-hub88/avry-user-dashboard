@@ -4,6 +4,7 @@
  * Provides workflow-level and step-level AI assistance
  */
 
+import { authedFetch } from '@/lib/deployAuth'
 import { SavedWorkflow } from '@/hooks/useWorkflows'
 import { asset } from '@/lib/asset'
 
@@ -36,7 +37,7 @@ export async function requestWorkflowEdit(
   userInstruction: string
 ): Promise<AIEditResponse> {
   try {
-    const res = await fetch(asset('/api/workflows/aivory-edit'), {
+    const res = await authedFetch(asset('/api/workflows/aivory-edit'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -86,7 +87,7 @@ export async function requestStepEdit(
       integrations: [],
     }
 
-    const res = await fetch(asset('/api/workflows/aivory-edit'), {
+    const res = await authedFetch(asset('/api/workflows/aivory-edit'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

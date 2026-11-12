@@ -264,9 +264,8 @@ async function fetchFreshTier(accessToken: string): Promise<string | null> {
 /**
  * Resolve + gate the caller from the incoming `NextRequest` cookies.
  *
- * This is the thin I/O wrapper around the pure core: it reads the shared
- * cross-subdomain session cookies (`aivory_session_token`, `aivory_user`) off
- * `req.cookies`, parses the user via `parseAivoryUser`, fetches a fresh tier
+ * This is the thin I/O wrapper around the pure core: it verifies the caller's
+ * JWT (`lib/serverAuth.ts`: Bearer header or the token cookies), fetches a fresh tier
  * (the cookie never carries one — see `fetchFreshTier`), and delegates the
  * authentication/paid-tier decision to `decideIntegrationAccess`.
  *
@@ -278,33 +277,28 @@ async function fetchFreshTier(accessToken: string): Promise<string | null> {
  * Requirements: 1.1, 1.5, 2.1, 2.2, 2.3, 2.4, 2.5
  */
 export async function resolveIntegrationUser(req: NextRequest): Promise<IntegrationAuthResult> {
-  let sessionToken = req.cookies.get(SESSION_TOKEN_COOKIE)?.value ?? null
-  let user = parseAivoryUser(req.cookies.get(USER_COOKIE)?.value)
-  let accessToken = req.cookies.get(ACCESS_TOKEN_COOKIE)?.value ?? null
-
-  // The shared cookies are host-only with a 7-day max-age, while the
-  // localStorage session (and its JWT) outlives them. A user who still looks
-  // signed in used to get a silent 401 on every Connect click. Fall back to
-  // the verified JWT (Authorization: Bearer, or any of the token cookies) the
-  // same way the dashboard's other API routes authenticate.
-  if (!sessionToken || !user) {
-    let verified: ReturnType<typeof getAuthUserWithToken> = null
-    try {
-      verified = getAuthUserWithToken(req)
-    } catch {
-      verified = null
-    }
-    if (verified) {
-      sessionToken = verified.token
-      accessToken = verified.token
-      user = {
+  // Identity and account_type come ONLY from a verified JWT (Bearer header or
+  // the token cookies). The `aivory_user` cookie is plain JSON the browser can
+  // rewrite, so trusting it let anyone holding any `aivory_session_token`
+  // value claim another user's id or `account_type: "superadmin"` and skip the
+  // paid gate. `parseAivoryUser` is kept for its tests and old callers, but no
+  // longer decides who the caller is.
+  let verified: ReturnType<typeof getAuthUserWithToken> = null
+  try {
+    verified = getAuthUserWithToken(req)
+  } catch {
+    verified = null
+  }
+  const sessionToken = verified?.token ?? null
+  const accessToken = verified?.token ?? null
+  const user: User | null = verified
+    ? ({
         user_id: verified.user.user_id,
         email: verified.user.email,
         account_type: verified.user.account_type,
         role: verified.user.account_type,
-      } as User
-    }
-  }
+      } as User)
+    : null
 
   let tier = 'free'
   if (user) {

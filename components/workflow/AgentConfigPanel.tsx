@@ -1,5 +1,6 @@
 'use client';
 
+import { authedFetch } from '@/lib/deployAuth'
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Agent } from '@/types/agents';
@@ -31,7 +32,7 @@ export function AgentConfigPanel({
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(asset('/api/agents?status=active'));
+        const res = await authedFetch(asset('/api/agents?status=active'));
         if (!res.ok) throw new Error('Failed to fetch agents');
         const data = await res.json();
         setAgents(data.agents || []);

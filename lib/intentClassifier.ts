@@ -1,3 +1,4 @@
+import { authedFetch } from '@/lib/deployAuth'
 import { IntentRoute, INTENT_BOUNDARIES } from './intentBoundaries'
 import { asset } from '@/lib/asset'
 
@@ -55,11 +56,8 @@ export async function classifyIntent(userMessage: string, aiReply: string): Prom
     const prompt = buildClassifierPrompt(userMessage, aiReply)
     console.log('[IntentClassifier] LOG #1 — prompt built, length:', prompt.length)
     
-    const response = await fetch(asset(`/api/intent`), {
+    const response = await authedFetch(asset(`/api/intent`), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({
         message: prompt,
         context: { endpoint: 'intent-classifier' },

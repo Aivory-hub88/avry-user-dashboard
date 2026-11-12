@@ -3,13 +3,10 @@
  * Full agentic loop: Clarify → Generate → Test → Fix → Apply
  *
  * Architecture:
- *   Browser (this file) → /api/copilot/* (Next.js proxy) → VPS Bridge → ZeroClaw / n8n
+ *   Browser → /api/workflows/copilot (gated Next.js route, this file runs
+ *   there) → lib/workflows/bridgeCopilot.ts → VPS Bridge → ZeroClaw / n8n
  *
- * PENTING: BridgeClient menggunakan URL relatif (/api/copilot/*)
- * sehingga TIDAK ada CORS — semua panggilan ke VPS Bridge terjadi
- * di sisi server (Next.js API route), bukan dari browser.
- *
- * Lihat: /app/api/copilot/[...path]/route.ts
+ * Every VPS Bridge call happens server-side, never from the browser.
  */
 
 import { countSteps, type CanvasEditContext } from './canvasCopilot'

@@ -1,5 +1,6 @@
 'use client';
 
+import { authedFetch } from '@/lib/deployAuth'
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -52,7 +53,7 @@ export default function NewAgentPage() {
     setLoading(true);
 
     try {
-      const res = await fetch(asset('/api/agents'), {
+      const res = await authedFetch(asset('/api/agents'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

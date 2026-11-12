@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getConfig } from '@/lib/config'
+import { requirePaidPlan, ANY_MODULE } from '@/lib/planGate'
 
 const FALLBACK = NextResponse.json(
   { rawagentresponse: '{"route":"console","confidence":0,"reason":"Staying in Console","tabLabel":"Console"}' },
@@ -7,6 +8,9 @@ const FALLBACK = NextResponse.json(
 )
 
 export async function POST(req: NextRequest) {
+  // Paid LLM feature: verified identity + live plan, decided on the server.
+  const gate = await requirePaidPlan(req, ANY_MODULE)
+  if (!gate.ok) return gate.response
   const body = await req.json().catch(() => ({}))
   console.log('[/api/intent] POST received, body:', JSON.stringify(body).slice(0, 300))
   const config = getConfig()

@@ -44,32 +44,4 @@ describe('team nav and routes', () => {
   })
 })
 
-describe('requireModule', () => {
-  it('403s a restricted member without the module, passes otherwise, fails open on DB errors', async () => {
-    const { query } = await import('@/lib/db')
-    const { getAuthUser } = await import('@/lib/serverAuth')
-    const { requireModule } = await import('./teamAccess')
-    const req = {} as never
-    const q = vi.mocked(query)
-    vi.mocked(getAuthUser).mockReturnValue({ user_id: 'u1', account_type: 'user' } as never)
-
-    // no plan, editor grant = [console] only
-    q.mockImplementation((async (sql: string) =>
-      sql.includes('user_tiers') ? { rowCount: 0, rows: [] } : { rowCount: 1, rows: [{ role: 'editor', modules: ['console'] }] }) as never)
-    expect(await requireModule(req, 'console')).toBeNull()
-    const denied = await requireModule(req, 'workflows')
-    expect(denied?.status).toBe(403)
-    expect((await denied!.json()).code).toBe('MODULE_DISABLED')
-
-    // own plan = never restricted
-    q.mockImplementation((async (sql: string) =>
-      sql.includes('user_tiers') ? { rowCount: 1, rows: [{}] } : { rowCount: 1, rows: [{ role: 'editor', modules: [] }] }) as never)
-    expect(await requireModule(req, 'workflows')).toBeNull()
-
-    q.mockRejectedValue(new Error('db down'))
-    expect(await requireModule(req, 'workflows')).toBeNull()
-
-    vi.mocked(getAuthUser).mockReturnValue(null)
-    expect(await requireModule(req, 'workflows')).toBeNull()
-  })
-})
+// requireModule now delegates to the server plan gate: see planGate.test.ts.

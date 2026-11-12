@@ -1,5 +1,6 @@
 'use client';
 
+import { authedFetch } from '@/lib/deployAuth'
 import React, { useRef, useState, useCallback } from 'react';
 import styles from './FileDropzone.module.css';
 import { asset } from '@/lib/asset'
@@ -78,7 +79,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
       formData.append('fileName', file.name);
 
       console.log('[FileDropzone] calling fetch to /api/console/upload');
-      const response = await fetch(asset('/api/console/upload'), {
+      const response = await authedFetch(asset('/api/console/upload'), {
         method: 'POST',
         body: formData,
       });
