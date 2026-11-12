@@ -1,3 +1,4 @@
+import { requirePaidPlan } from '@/lib/planGate'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateSetupGuideMarkdown, type GuideStep } from '@/lib/workflows/nodeSetupGuide'
 import { mdToText, mdToPdf } from '@/lib/workflows/guideFormats'
@@ -12,6 +13,10 @@ export const maxDuration = 30
  * Deterministic — no LLM call; curated knowledge base per app/node type.
  */
 export async function POST(request: NextRequest) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(request, 'workflows')
   if (denied) return denied
 

@@ -3,9 +3,11 @@
  *
  * Free accounts (avry-backend free_accounts_enabled, 2026-11-12) get the full
  * dashboard chrome so it looks like the paid product, but only these work:
- *   - Diagnostics: 2 free runs (backend ledger FREE_GRANTS.snapshot)
- *   - Workflow Copilot: 1 free session (FREE_GRANTS.copilot)
+ *   - Diagnostics page (the free analysis; the LLM Deep Diagnostic is paid)
  *   - Overview and Settings / Subscriptions (to upgrade)
+ * Since 2026-11-12 (later the same day) free accounts get no Deep Diagnostic
+ * run and no Workflow Copilot session: both are LLM work that belongs to the
+ * paid product, and workflows can be deployed to n8n.
  * The AI Console opens an upgrade prompt on send, and every other module is
  * shown locked behind a "paid plans only" overlay.
  *
@@ -27,6 +29,8 @@ export const LOCKED_PATH_PREFIXES: readonly string[] = [
   '/integrations',
   '/templates',
   '/approvals',
+  '/workflows',
+  '/diagnostics/deep',
 ]
 
 /** Sidebar nav keys that get a lock badge for a free account. */
@@ -39,6 +43,7 @@ export const LOCKED_NAV_KEYS: readonly string[] = [
   'executionLogs',
   'integrations',
   'templates',
+  'workflows',
 ]
 
 /** Copy for the lock overlay, per locked route. */
@@ -52,6 +57,8 @@ export const LOCKED_FEATURE_NAMES: Readonly<Record<string, string>> = Object.fre
   '/integrations': 'Integrations',
   '/templates': 'Automation Templates',
   '/approvals': 'Approvals',
+  '/workflows': 'Workflows',
+  '/diagnostics/deep': 'the Deep Diagnostic',
 })
 
 function matches(pathname: string, prefix: string): boolean {

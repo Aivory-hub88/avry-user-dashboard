@@ -1,3 +1,4 @@
+import { requirePaidPlan } from '@/lib/planGate'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireModule } from '@/lib/teamAccess'
 
@@ -19,6 +20,10 @@ const BRIDGE = (
 ).replace(/\/$/, '')
 
 export async function POST(req: NextRequest) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(req, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(req, 'workflows')
   if (denied) return denied
 

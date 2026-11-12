@@ -1,3 +1,4 @@
+import { requirePaidPlan } from '@/lib/planGate'
 import { NextRequest, NextResponse } from 'next/server'
 import { workflowRepository } from '@/lib/workflows/repository'
 import { canvasRepository } from '@/lib/workflows/canvasRepository'
@@ -18,6 +19,10 @@ export async function POST(
   _request: NextRequest,
   ctx: { params: Promise<{ id: string; version: string }> }
 ) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(_request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(_request, 'workflows')
   if (denied) return denied
 

@@ -1,3 +1,4 @@
+import { requirePaidPlan } from '@/lib/planGate'
 /**
  * GET  /api/n8n/workflow/[id] — fetch a workflow's live n8n JSON.
  * PUT  /api/n8n/workflow/[id] — overwrite a workflow's n8n JSON.
@@ -39,6 +40,10 @@ export async function GET(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(request, 'workflows')
   if (denied) return denied
 
@@ -70,6 +75,10 @@ export async function PUT(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(request, 'workflows')
   if (denied) return denied
 

@@ -1,3 +1,4 @@
+import { requirePaidPlan } from '@/lib/planGate'
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
 import { getAuthUser } from '@/lib/serverAuth'
@@ -15,6 +16,10 @@ function auth(request: NextRequest) {
 
 /** List pending exception cases for the signed-in reviewer. */
 export async function GET(request: NextRequest) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(request, 'console')
   if (denied) return denied
 
@@ -33,6 +38,10 @@ export async function GET(request: NextRequest) {
 
 /** Register a Wait execution once its execution-specific resume URL is known. */
 export async function POST(request: NextRequest) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(request, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(request, 'console')
   if (denied) return denied
 

@@ -1,3 +1,4 @@
+import { requirePaidPlan } from '@/lib/planGate'
 import { NextRequest, NextResponse } from 'next/server'
 import type {
   WorkflowGenerationResult,
@@ -32,6 +33,10 @@ const VPS_BRIDGE_URL = (
 const TIMEOUT_MS = 120_000
 
 export async function POST(req: NextRequest) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(req, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(req, 'workflows')
   if (denied) return denied
 

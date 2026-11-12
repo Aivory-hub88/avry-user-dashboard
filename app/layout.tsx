@@ -10,6 +10,7 @@ import DemoRouteGuard from "@/components/routing/demo-route-guard"
 import PaidRouteLock from "@/components/upgrade/PaidRouteLock"
 import UpgradeModal from "@/components/upgrade/UpgradeModal"
 import { TokenInitializer } from "@/components/TokenInitializer"
+import { STORAGE_OWNER_GUARD_JS } from "@/lib/storageOwnerGuard"
 import { ModeProvider } from "@/contexts/ModeContext"
 import { RouterProvider } from "@/contexts/RouterContext"
 import { SettingsModalProvider } from "@/contexts/SettingsModalContext"
@@ -43,6 +44,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${manrope.variable} ${nunito.variable}`}>
+      <head>
+        {/* Before hydration: drop another account's browser caches (lib/storageOwnerGuard). */}
+        <script dangerouslySetInnerHTML={{ __html: STORAGE_OWNER_GUARD_JS }} />
+      </head>
       <body className={`flex h-screen bg-[var(--bg-main)] overflow-hidden ${manrope.className}`}>
         <TokenInitializer />
         <SessionKeepAlive />

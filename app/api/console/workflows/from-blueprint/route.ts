@@ -1,3 +1,4 @@
+import { requirePaidPlan } from '@/lib/planGate'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   planWorkflowFromBlueprintModule,
@@ -91,6 +92,10 @@ async function sandboxValidate(n8nWorkflow: Record<string, unknown>): Promise<Re
 }
 
 export async function POST(req: NextRequest) {
+  // Paid plans only: free accounts cannot build, run or deploy workflows.
+  const planGate = await requirePaidPlan(req, 'workflows')
+  if (!planGate.ok) return planGate.response
+
   const denied = await requireModule(req, 'console')
   if (denied) return denied
 
