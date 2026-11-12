@@ -103,6 +103,14 @@ export default function CreditUsageMeter({
         )}
       </div>
 
+      {allowance === 0 ? (
+        // No live plan (free, lapsed or one-time buyer): no monthly credits,
+        // so no "100% used" bar that reads like an outage.
+        <div className="mt-5">
+          <span className="text-[15px]">{t('monthlyLimit')}</span>
+          <p className="mt-2 text-xs text-white/40">{t('noPlanMonthly')}</p>
+        </div>
+      ) : (
       <div className="mt-5">
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-[15px]">{t('monthlyLimit')}</span>
@@ -131,6 +139,7 @@ export default function CreditUsageMeter({
           ) : null}
         </p>
       </div>
+      )}
 
       <div className="mt-6">
         <div className="flex items-baseline justify-between gap-3">
