@@ -368,7 +368,7 @@ export function useChat({
           console.log('[useChat] triggerClassification called with text:', text.slice(0, 100), '| parsed.reply:', parsed.reply.slice(0, 100))
           triggerClassification(text, parsed.reply)
         } else if (chunk.type === "error") {
-          addToast("error", chunk.error || "Something went wrong.")
+          if (!chunk.upgradeRequired) addToast("error", chunk.error || "Something went wrong.")
           if (currentSessionIdRef.current === sentSessionId) {
             setMessages(p => p.filter(m => m.id !== assistantId))
           }

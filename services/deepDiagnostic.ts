@@ -1,3 +1,4 @@
+import { handleUpgradeRequired } from '@/lib/planAccess'
 import {
   PhaseId,
   PhaseConfig,
@@ -138,6 +139,10 @@ export class DeepDiagnosticService {
     }
     if (!submitRes.ok) {
       const error = await submitRes.json().catch(() => ({ message: 'Failed to submit diagnostic' }))
+      // Free diagnostics used up: the server answers NO_RUNS_LEFT (402).
+      if (submitRes.status === 402) {
+        handleUpgradeRequired(402, { ...error, code: 'UPGRADE_REQUIRED' }, 'Diagnostics')
+      }
       throw new Error(error.message || 'Failed to submit diagnostic')
     }
     const queued = await submitRes.json().catch(() => ({} as any))

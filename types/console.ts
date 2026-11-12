@@ -40,6 +40,8 @@ export interface StreamChunk {
   receivedContent?: boolean
   /** Structured workflow spec payload — present when type === 'workflow_spec' */
   workflow?: WorkflowSpec
+  /** Error was a 402 UPGRADE_REQUIRED; the upgrade prompt is already open. */
+  upgradeRequired?: boolean
 }
 
 /**

@@ -10,7 +10,8 @@ import {
   CopilotStateMachine,
   type CopilotConversationState,
 } from '@/lib/workflows/copilotStateMachine'
-import { requireModule } from '@/lib/teamAccess'
+import { requirePaidPlan } from '@/lib/planGate'
+import { chargeTrial } from '@/lib/featureUses'
 import type { CanvasEditContext } from '@/lib/workflows/canvasCopilot'
 
 /** Accept the open canvas only in the expected shape and within a sane size. */
@@ -29,12 +30,42 @@ function parseCanvas(raw: unknown): CanvasEditContext | null {
 
 export const maxDuration = 120
 
+/** Turns allowed in the one free copilot session (per process; enough to clarify, generate, test and fix once). */
+const FREE_SESSION_MAX_TURNS = 12
+const FREE_SESSION_TURNS = new Map<string, number>()
+
 export async function POST(request: NextRequest) {
-  const denied = await requireModule(request, 'workflows')
-  if (denied) return denied
+  const gate = await requirePaidPlan(request, 'workflows')
+  if (!gate.ok && gate.code !== 'UPGRADE_REQUIRED') return gate.response
 
   try {
     const body = await request.json()
+
+    // No paid plan: the free allowance covers ONE copilot session, charged
+    // up front and keyed to the session id (the server owns the id it hands
+    // out, so a reset client state can't start a second free session).
+    if (!gate.ok) {
+      const sid = typeof body?.sessionId === 'string' && /^[\w:.-]{1,128}$/.test(body.sessionId) ? body.sessionId : null
+      body.sessionId = sid ?? `session_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+      const denied = await chargeTrial(request, 'copilot', `copilot:${body.sessionId}`)
+      if (denied) return denied
+      // One session, not unlimited turns inside it: the client owns the
+      // conversation state and could keep resetting it under the same id.
+      const turns = (FREE_SESSION_TURNS.get(body.sessionId) ?? 0) + 1
+      if (turns > FREE_SESSION_MAX_TURNS) {
+        return Response.json(
+          {
+            message: 'Your free Workflow Copilot session has ended. Upgrade to the Operational plan to keep building.',
+            code: 'UPGRADE_REQUIRED',
+            requiredTier: 'operational',
+            trialUsed: true,
+          },
+          { status: 402 },
+        )
+      }
+      if (FREE_SESSION_TURNS.size > 5000) FREE_SESSION_TURNS.clear()
+      FREE_SESSION_TURNS.set(body.sessionId, turns)
+    }
 
     // ------------------------------------------------------------------
     // BUG WAS HERE #1: old code read `prompt || description` and ignored

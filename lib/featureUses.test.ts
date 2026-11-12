@@ -39,7 +39,7 @@ describe('featureUses gate', () => {
     expect(gate.ok).toBe(false)
     if (!gate.ok) {
       expect(gate.response.status).toBe(402)
-      expect((await gate.response.json()).message).toMatch(/used all 3/)
+      expect((await gate.response.json()).message).toMatch(/used all the analysis runs/)
     }
     vi.stubGlobal('fetch', uses({ remaining: 0, granted: 0, used: 0, unlimited: false }))
     gate = await requireRunLeft(req, 'snapshot')
