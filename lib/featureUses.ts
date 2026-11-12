@@ -16,7 +16,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { getAuthUserWithToken } from '@/lib/serverAuth'
 
-export type Feature = 'snapshot' | 'blueprint'
+export type Feature = 'snapshot' | 'blueprint' | 'copilot'
 
 export interface FeatureUse {
   remaining: number
@@ -30,13 +30,21 @@ const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.i
 const NOT_BOUGHT: Record<Feature, string> = {
   snapshot: 'Purchase the Business Operations Analysis to run a diagnostic.',
   blueprint: 'Purchase the Transformation Blueprint + Roadmap to generate a blueprint.',
+  copilot: 'Workflow Copilot is part of the Operational plan. Upgrade to keep building.',
 }
 
+/**
+ * Runs can come from a purchase (3 each) or, for an account that never bought
+ * anything, from the one-time free allowance (2 diagnostics, 1 copilot
+ * session; avry-backend FREE_GRANTS), so the text doesn't name a count.
+ */
 const USED_UP: Record<Feature, string> = {
   snapshot:
-    'You have used all 3 analysis runs included with your purchase. Buy the Analysis again for 3 more.',
+    'You have used all the analysis runs on your account. Upgrade to the Operational plan or buy the Analysis for 3 more.',
   blueprint:
-    'You have used all 3 blueprint runs included with your purchase. Buy the Blueprint + Roadmap again for 3 more.',
+    'You have used all the blueprint runs on your account. Buy the Blueprint + Roadmap again for 3 more.',
+  copilot:
+    'You have used your free Workflow Copilot session. Upgrade to the Operational plan to keep building.',
 }
 
 type Gate =
@@ -156,5 +164,58 @@ export async function chargeRun(
     // answer keeps it polling, and the charge is idempotent on the job id, so
     // the retry neither loses the result nor charges twice.
     return NextResponse.json(pendingBody)
+  }
+}
+
+
+/**
+ * Free-trial turns of a session feature with no single result to charge on
+ * (a copilot session). Before each turn `trialTurn(.., 'check')` asks if it
+ * may run (charges nothing); after a turn that worked, `'record'` charges the
+ * session's one use on its first turn (idempotent on `ref`) and counts the
+ * turn against avry-backend TRIAL_MAX_TURNS, both in Postgres. A failed turn
+ * is never recorded, so it costs nothing. Returns null when allowed, or the
+ * response to send instead (402 UPGRADE_REQUIRED, 401, 503: fail closed).
+ */
+export async function trialTurn(
+  request: NextRequest,
+  step: 'check' | 'record',
+  feature: Feature,
+  ref: string,
+): Promise<NextResponse | null> {
+  let auth: ReturnType<typeof getAuthUserWithToken>
+  try {
+    auth = getAuthUserWithToken(request)
+  } catch {
+    auth = null
+  }
+  if (!auth) {
+    return NextResponse.json({ message: 'Please sign in again to continue.', code: 'UNAUTHENTICATED' }, { status: 401 })
+  }
+  try {
+    const res = await fetch(`${BACKEND}/api/v1/entitlements/uses/trial/${step}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature, ref }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(5000),
+    })
+    if (res.ok) return null
+    if (res.status === 402) {
+      return NextResponse.json(
+        { message: USED_UP[feature], error: USED_UP[feature], code: 'UPGRADE_REQUIRED', requiredTier: 'operational', trialUsed: true },
+        { status: 402 },
+      )
+    }
+    if (res.status === 401) {
+      return NextResponse.json({ message: 'Please sign in again to continue.', code: 'UNAUTHENTICATED' }, { status: 401 })
+    }
+    throw new Error(`trial ${step} ${res.status}`)
+  } catch (e) {
+    console.error(`[featureUses] trial ${step} failed:`, e)
+    return NextResponse.json(
+      { message: 'We could not check your plan right now. Please try again in a moment.', code: 'PLAN_CHECK_UNAVAILABLE' },
+      { status: 503 },
+    )
   }
 }

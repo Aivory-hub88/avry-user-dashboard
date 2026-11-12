@@ -865,6 +865,7 @@
     "monthlyLimit": "Monthly limit",
     "resetsOn": "Resets {date}",
     "monthlyDetail": "{used} of {allowance} credits used",
+    "noPlanMonthly": "Monthly credits come with a paid plan. Upgrade to the Operational plan to get them.",
     "tokensUsed": "{tokens} tokens this month",
     "extraCredits": "Extra credits",
     "extraHelp": "Credits you topped up. They are used only after your monthly limit runs out, and they never expire.",

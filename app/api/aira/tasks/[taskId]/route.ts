@@ -1,6 +1,7 @@
+import { ANY_MODULE } from '@/lib/planGate'
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
-import { workspaceCredential, unauthorized } from '@/lib/workspaceAuth'
+import { workspaceCredential, unauthorized, workspacePlanDenied } from '@/lib/workspaceAuth'
 
 /**
  * PATCH /api/aira/tasks/[taskId] — operator intervention on the task ledger.
@@ -32,6 +33,8 @@ export async function PATCH(
 ) {
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred, ANY_MODULE)
+  if (planDenied) return planDenied
   if (cred.kind !== 'user') {
     return NextResponse.json({ error: 'user session required' }, { status: 403 })
   }

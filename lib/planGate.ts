@@ -155,7 +155,9 @@ const UNAVAILABLE = () =>
 
 export type PlanGate =
   | { ok: true; user: AuthUser; token: string }
-  | { ok: false; response: NextResponse }
+  | { ok: false; response: NextResponse; code: PlanDenyCode }
+
+export type PlanDenyCode = 'UNAUTHENTICATED' | 'UPGRADE_REQUIRED' | 'MODULE_DISABLED' | 'PLAN_CHECK_UNAVAILABLE'
 
 /**
  * Gate a paid module. Returns the verified caller, or the response to send:
@@ -170,18 +172,18 @@ export async function requirePaidPlan(req: NextRequest, module: string): Promise
     auth = getAuthUserWithToken(req)
   } catch (e) {
     console.error('[planGate] token verification unavailable:', e)
-    return { ok: false, response: UNAVAILABLE() }
+    return { ok: false, response: UNAVAILABLE(), code: 'PLAN_CHECK_UNAVAILABLE' }
   }
-  if (!auth) return { ok: false, response: UNAUTHENTICATED() }
+  if (!auth) return { ok: false, response: UNAUTHENTICATED(), code: 'UNAUTHENTICATED' }
   const { user, token } = auth
 
   if (isPlanExempt(user.account_type)) return { ok: true, user, token }
 
   const tier = await lookupTier(user.user_id, token)
-  if (tier.kind === 'unauthorized') return { ok: false, response: UNAUTHENTICATED() }
+  if (tier.kind === 'unauthorized') return { ok: false, response: UNAUTHENTICATED(), code: 'UNAUTHENTICATED' }
   if (tier.kind === 'unavailable') {
     console.error('[planGate] tier lookup unavailable for', user.user_id)
-    return { ok: false, response: UNAVAILABLE() }
+    return { ok: false, response: UNAVAILABLE(), code: 'PLAN_CHECK_UNAVAILABLE' }
   }
 
   let grants: TeamGrant[] = []
@@ -190,7 +192,7 @@ export async function requirePaidPlan(req: NextRequest, module: string): Promise
       grants = await teamGrants(user.user_id)
     } catch (e) {
       console.error('[planGate] team lookup failed:', e)
-      return { ok: false, response: UNAVAILABLE() }
+      return { ok: false, response: UNAVAILABLE(), code: 'PLAN_CHECK_UNAVAILABLE' }
     }
   }
 
@@ -200,6 +202,7 @@ export async function requirePaidPlan(req: NextRequest, module: string): Promise
     return {
       ok: false,
       response: json(403, { error: 'feature not enabled for your team role', code: 'MODULE_DISABLED', module }),
+      code: 'MODULE_DISABLED',
     }
   }
   return {
@@ -210,5 +213,6 @@ export async function requirePaidPlan(req: NextRequest, module: string): Promise
       requiredTier: UPGRADE_TIER,
       module,
     }),
+    code: 'UPGRADE_REQUIRED',
   }
 }

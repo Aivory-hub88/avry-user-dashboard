@@ -6,7 +6,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { loadRequest, requestAccess } from "@/lib/projectRequestStore"
 import { cleanRequestInput, requestFromRow, EDITABLE, WITHDRAWABLE } from "@/lib/projectRequests"
 
@@ -20,6 +20,8 @@ export async function GET(req: NextRequest, { params }: Ctx) {
   const { rid } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   try {
     const r = await loadRequest(rid)
     if (!r) return notFound()
@@ -56,6 +58,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   const { rid } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   try {
     const r = await loadRequest(rid)
     if (!r) return notFound()

@@ -1,6 +1,7 @@
+import { ANY_MODULE } from '@/lib/planGate'
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
-import { workspaceCredential, unauthorized } from '@/lib/workspaceAuth'
+import { workspaceCredential, unauthorized, workspacePlanDenied } from '@/lib/workspaceAuth'
 import {
   groupIntoOrchestrations,
   CHILD_SLA_MINUTES,
@@ -108,6 +109,8 @@ async function fetchFinishedTasks(opts: {
 export async function GET(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred, ANY_MODULE)
+  if (planDenied) return planDenied
 
   const params = req.nextUrl.searchParams
   const agentType = (params.get('agent_type') || '').trim() || null

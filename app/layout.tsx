@@ -7,6 +7,8 @@ import SessionExpiredNotice from "@/components/SessionExpiredNotice"
 import LocaleWrapper from "@/components/LocaleWrapper"
 import DashboardEntryGate from "@/components/routing/dashboard-entry-gate"
 import DemoRouteGuard from "@/components/routing/demo-route-guard"
+import PaidRouteLock from "@/components/upgrade/PaidRouteLock"
+import UpgradeModal from "@/components/upgrade/UpgradeModal"
 import { TokenInitializer } from "@/components/TokenInitializer"
 import { ModeProvider } from "@/contexts/ModeContext"
 import { RouterProvider } from "@/contexts/RouterContext"
@@ -53,9 +55,10 @@ export default function RootLayout({
                     <DemoRouteGuard />
                     <Sidebar />
                     <main className="flex-1 flex flex-col h-full min-w-0 overflow-y-auto">
-                      {children}
+                      <PaidRouteLock>{children}</PaidRouteLock>
                     </main>
                     <ClientShell />
+                    <UpgradeModal />
                     <SessionExpiredNotice />
                   </DashboardEntryGate>
                 </WorkspaceProvider>

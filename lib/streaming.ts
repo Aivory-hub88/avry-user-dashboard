@@ -3,6 +3,7 @@
  */
 
 import { keepSessionFresh } from '@/lib/deployAuth'
+import { handleUpgradeRequired } from '@/lib/planAccess'
 import { StreamChunk } from '@/types/console'
 
 const MAX_FILE_MB = 10
@@ -95,6 +96,12 @@ export async function* streamConsoleResponse(
       try {
         const errorJson = await response.json()
         errorMessage = errorJson.message || errorJson.error || `Server error ${response.status}`
+        // 402 UPGRADE_REQUIRED: the upgrade prompt says it better than a toast.
+        if (handleUpgradeRequired(response.status, errorJson)) {
+          if (idleTimer) clearTimeout(idleTimer)
+          yield { type: 'error', error: '', upgradeRequired: true }
+          return
+        }
         if (process.env.NODE_ENV === 'development') {
           console.error('[streaming] non-2xx response:', { status: response.status, body: errorJson })
         }

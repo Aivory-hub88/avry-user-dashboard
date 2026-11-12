@@ -9,7 +9,7 @@
  */
 import { NextResponse, type NextRequest } from "next/server"
 import { getDocRole, canRead, canWrite, checkAgentAccess } from "@/lib/workspaceAccess"
-import { workspaceCredential, unauthorized, forbidden, type WorkspaceCredential } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, type WorkspaceCredential, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { fileRoom } from "@/lib/workspaceFileRoom"
 import { requesterFrom, requesterKey } from "@/lib/spaceWrite"
 import { query } from "@/lib/db"
@@ -119,6 +119,8 @@ export async function noteGate(
 ): Promise<{ cred: WorkspaceCredential; who: string } | Response> {
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   if (await checkAgentAccess(id, cred, req.headers.get("x-agent-type"), need)) return forbidden()
   const role = await getDocRole(cred, id)
   if (need === "write" ? !canWrite(role) : !canRead(role)) return forbidden()

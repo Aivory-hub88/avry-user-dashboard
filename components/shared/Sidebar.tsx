@@ -10,6 +10,9 @@ import { getWorkflowCount } from "@/hooks/useWorkflows"
 import { useAgentApprovals } from "@/hooks/useAgentApprovals"
 import { AuthManager } from "@/lib/authManager"
 import { canAccessNavKey, isNavKeyAllowedForTeam } from "@/lib/moduleAccess"
+import { LOCKED_NAV_KEYS } from "@/lib/freePreview"
+import { useIsFreeAccount } from "@/hooks/usePlanAccess"
+import { LockIcon } from "@/components/upgrade/UpgradeModal"
 import { useTeamAccess } from "@/hooks/useTeamAccess"
 import LanguagePill from "./LanguagePill"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
@@ -243,6 +246,8 @@ export default function Sidebar() {
     }
   }, [])
 
+  const isFree = useIsFreeAccount()
+
   const navItems = [
     // Approvals now live inside Console itself (agent column badges + the
     // rail's "Waiting on you"), not a separate page — this badge is the one
@@ -327,6 +332,11 @@ export default function Sidebar() {
                   {"badge" in item && item.badge !== null && (
                     <span className="bg-white/10 text-zinc-300 text-xs px-2 py-0.5 rounded-full">
                       {item.badge}
+                    </span>
+                  )}
+                  {isFree && LOCKED_NAV_KEYS.includes(item.key) && (
+                    <span className="text-zinc-500" title="Available on paid plans">
+                      <LockIcon />
                     </span>
                   )}
                 </div>

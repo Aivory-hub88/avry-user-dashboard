@@ -9,6 +9,7 @@
  * gets back the updated state. No mode switching, no split paths.
  */
 
+import { handleUpgradeRequired } from '@/lib/planAccess'
 import { authedFetch } from '@/lib/deployAuth'
 import type {
   CopilotConversationState,
@@ -64,6 +65,8 @@ export async function sendCopilotMessage(params: {
     try {
       const err = await res.json()
       msg = err.message || msg
+      // Free session used up (or no plan): open the upgrade prompt too.
+      handleUpgradeRequired(res.status, err, 'Workflow Copilot')
     } catch { /* ignore */ }
     throw new Error(msg)
   }

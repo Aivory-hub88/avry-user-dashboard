@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { getDocRole, canWrite, canRead, checkAgentAccess } from "@/lib/workspaceAccess"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 
 export const runtime = "nodejs"
@@ -10,6 +10,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   // Agent gate (read) for asserted service agents; users via getDocRole.
   if (await checkAgentAccess(id, credential, req.headers.get("x-agent-type"), 'read')) return forbidden()
   if (!canRead(await getDocRole(credential, id))) return forbidden()
@@ -46,6 +48,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   if (!canWrite(await getDocRole(credential, id))) return forbidden()
   const body = await req.json().catch(() => ({})) as Record<string, unknown>
   const action = typeof body.action === "string" ? body.action.slice(0, 80) : "workspace.updated"

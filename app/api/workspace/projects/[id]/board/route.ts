@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { canReadDocId, isKnownAgentType } from "@/lib/workspaceAccess"
 import { projectMemberDocs, legacyDocId } from "@/lib/workspaceDoc"
 import { loadDbDoc, rowsFromDbDoc, getWipLimits, getFieldDefs, withResolvedRollups, WorkspaceDenied, type DbRow } from "@/lib/workspaceDb"
@@ -27,6 +27,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const agent = req.headers.get("x-agent-type") ?? undefined
   const assertedAgent = cred.kind === "service" && isKnownAgentType(agent) ? agent : undefined
 

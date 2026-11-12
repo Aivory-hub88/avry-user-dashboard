@@ -25,6 +25,14 @@ import { GET as LIST, POST as CREATE } from "./route"
 import { GET as DOWNLOAD, DELETE as REMOVE } from "./[fileId]/route"
 import { POST as COMPLETE } from "./[fileId]/complete/route"
 
+// The paid-plan gate is covered in lib/planGate.test.ts and
+// lib/workspaceAuth.plan.test.ts; these tests run as a paying caller.
+vi.mock("@/lib/planGate", async (orig) => ({
+  ...(await orig<typeof import("@/lib/planGate")>()),
+  requirePaidPlan: async () => ({ ok: true }),
+}))
+
+
 const USER = { user: { user_id: "u1", email: "rina@x.id", account_type: "member" }, token: "jwt-1" }
 
 const fileRow = (over: Record<string, unknown> = {}) => ({

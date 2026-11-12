@@ -16,7 +16,7 @@ import { query } from "@/lib/db"
 import { getDocRole, canRead, canWrite, checkAgentAccess } from "@/lib/workspaceAccess"
 import { fireDueReminders } from "@/lib/teamReminders"
 import { startIdleQueuedTurns } from "@/lib/spaceAgentRun"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { clampLimit, spaceMessageFromRow } from "@/lib/spaceThreads"
 import { spaceAgentTaskFromRow } from "@/lib/spaceAgent"
 
@@ -28,6 +28,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   if (await checkAgentAccess(id, credential, req.headers.get("x-agent-type"), "read")) return forbidden()
   const role = await getDocRole(credential, id)
   if (!canRead(role)) return forbidden()

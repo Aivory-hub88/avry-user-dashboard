@@ -865,6 +865,7 @@
     "monthlyLimit": "Limit bulanan",
     "resetsOn": "Reset {date}",
     "monthlyDetail": "{used} dari {allowance} credit terpakai",
+    "noPlanMonthly": "Credit bulanan tersedia di paket berbayar. Upgrade ke paket Operational untuk mendapatkannya.",
     "tokensUsed": "{tokens} token bulan ini",
     "extraCredits": "Extra credit",
     "extraHelp": "Credit hasil top up. Baru dipakai setelah limit bulanan habis, dan tidak pernah kedaluwarsa.",

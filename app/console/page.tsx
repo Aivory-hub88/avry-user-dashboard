@@ -44,6 +44,8 @@ import AgentDeployNotice from "@/components/office/AgentDeployNotice"
 import MissionControl from "@/components/office/MissionControl"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { useWorkspaceContext } from "@/contexts/WorkspaceContext"
+import { useIsFreeAccount } from "@/hooks/usePlanAccess"
+import { requestUpgrade } from "@/lib/planAccess"
 
 // LobeHub-style route-split: UploadMenu + WorkflowContainer ditarik dinamis
 // agar chunk Console awal tidak ikut membawa pemroses file berat.
@@ -393,8 +395,16 @@ export default function ConsolePage() {
     return false
   }, [activeAgentName, addToast])
 
+  // Free preview: the Console is visible but sending opens the upgrade
+  // prompt (the message stays in the composer). The server refuses it anyway.
+  const isFree = useIsFreeAccount()
+
   const handleSendWithWorkspace = useCallback(
     async (text: string, atts: Attachment[]) => {
+      if (isFree) {
+        requestUpgrade({ feature: "AI Console" })
+        return
+      }
       const clearComposer = () => {
         setInputValue("")
         if (textareaRef.current) textareaRef.current.style.height = "auto"
@@ -479,7 +489,7 @@ export default function ConsolePage() {
       }
       handleSend(text, atts)
     },
-    [tryWorkspaceCreate, inRoom, emptyMention, mentionCandidates, handleSendRoom, handleSend, setAttachments, messages, sessions, currentSessionId],
+    [isFree, tryWorkspaceCreate, inRoom, emptyMention, mentionCandidates, handleSendRoom, handleSend, setAttachments, messages, sessions, currentSessionId],
   )
 
   // Fetch connected integrations from store

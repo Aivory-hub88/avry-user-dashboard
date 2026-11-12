@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUserWithToken, type AuthUser } from '@/lib/serverAuth'
 import { query } from '@/lib/db'
+import { requirePaidPlan } from '@/lib/planGate'
 
 export type WorkspaceCredential =
   | { kind: 'user'; user: AuthUser; token: string }
@@ -31,6 +32,23 @@ export function workspaceCredential(request: NextRequest): WorkspaceCredential |
   const authed = getAuthUserWithToken(request)
   if (authed) return { kind: 'user', user: authed.user, token: authed.token }
   return null
+}
+
+/**
+ * Paid-plan check for a workspace caller: null = allowed, otherwise the
+ * response to send (402 UPGRADE_REQUIRED for a free account, 403 when a team
+ * didn't grant `module`, 401/503 per lib/planGate). Service-token calls are
+ * server-to-server (Cerveau agents, which avry-backend already gates by
+ * plan) and carry no user, so they pass.
+ */
+export async function workspacePlanDenied(
+  request: NextRequest,
+  cred: WorkspaceCredential,
+  module: string = 'workspace',
+): Promise<NextResponse | null> {
+  if (cred.kind === 'service') return null
+  const gate = await requirePaidPlan(request, module)
+  return gate.ok ? null : gate.response
 }
 
 /** Headers to forward to aivory-collab so it enforces its own per-doc RBAC. */

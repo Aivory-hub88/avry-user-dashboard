@@ -12,6 +12,14 @@ vi.mock("@/lib/serverAuth", () => ({ getAuthUserWithToken: () => authMock() }))
 
 import { GET } from "./route"
 
+// The paid-plan gate is covered in lib/planGate.test.ts and
+// lib/workspaceAuth.plan.test.ts; these tests run as a paying caller.
+vi.mock("@/lib/planGate", async (orig) => ({
+  ...(await orig<typeof import("@/lib/planGate")>()),
+  requirePaidPlan: async () => ({ ok: true }),
+}))
+
+
 const USER = { user: { user_id: "u1", email: "rina@x.id", account_type: "member" }, token: "t" }
 
 const row = (over: Record<string, unknown>) => ({

@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requirePaidPlan } from '@/lib/planGate'
 import { listConnections, createConnection } from '@/lib/integrations/store'
 import type { CreateConnectionPayload } from '@/types/integrations'
 
-function getTenantId(req: NextRequest): string {
-  return req.headers.get('x-tenant-id') ?? 'default'
+/**
+ * The caller's own tenant, from the verified session (never a client header:
+ * an `x-tenant-id` header used to pick anyone's connections, and an absent
+ * one shared a single 'default' tenant). Paid plan required.
+ */
+async function getTenantId(req: NextRequest): Promise<string | Response> {
+  const gate = await requirePaidPlan(req, 'integrations')
+  return gate.ok ? gate.user.user_id : gate.response
 }
 
 export async function GET(req: NextRequest) {
-  const tenantId = getTenantId(req)
+  const tenantId = await getTenantId(req)
+  if (typeof tenantId !== 'string') return tenantId
   const appId = req.nextUrl.searchParams.get('appId') ?? undefined
   // Never include storageRef in the response
   const connections = listConnections(tenantId, appId).map(({ storageRef: _ref, ...safe }) => safe)
@@ -15,7 +23,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const tenantId = getTenantId(req)
+  const tenantId = await getTenantId(req)
+  if (typeof tenantId !== 'string') return tenantId
 
   let body: CreateConnectionPayload
   try {

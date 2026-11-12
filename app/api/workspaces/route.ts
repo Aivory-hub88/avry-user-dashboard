@@ -1,3 +1,4 @@
+import { ANY_MODULE } from "@/lib/planGate"
 /**
  * /api/workspaces — team workspaces (ADR-019 P1).
  *
@@ -7,7 +8,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { withTransaction } from "@/lib/db"
-import { workspaceCredential, unauthorized } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { myTeams, cleanTeamName, MAX_OWNED_TEAMS } from "@/lib/teams"
 import { newId } from "@/lib/spaceWrite"
 
@@ -16,6 +17,8 @@ export const runtime = "nodejs"
 export async function GET(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred || cred.kind !== "user") return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred, ANY_MODULE)
+  if (planDenied) return planDenied
   try {
     return NextResponse.json({ teams: await myTeams(cred.user.user_id) })
   } catch (e) {
@@ -27,6 +30,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred || cred.kind !== "user") return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred, ANY_MODULE)
+  if (planDenied) return planDenied
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
   const name = cleanTeamName(body.name)
   if (!name) return NextResponse.json({ error: "team name must be 2 to 80 characters" }, { status: 400 })

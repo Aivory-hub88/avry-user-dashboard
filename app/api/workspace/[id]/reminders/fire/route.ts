@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDocRole, canWrite } from "@/lib/workspaceAccess"
 import { fireDueReminders } from "@/lib/teamReminders"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 
 export const runtime = "nodejs"
 
@@ -19,6 +19,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   // An agent turn needs a member's own credential; the service token has none.
   if (credential.kind !== "user") return forbidden()
   if (!canWrite(await getDocRole(credential, id))) return forbidden()

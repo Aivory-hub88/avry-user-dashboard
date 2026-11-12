@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { getDocRolesBatch, canRead, isKnownAgentType } from "@/lib/workspaceAccess"
 import { loadDbDoc, rowsFromDbDoc, WorkspaceDenied } from "@/lib/workspaceDb"
 import { embed, embeddingsConfigured } from "@/lib/embeddings"
@@ -41,6 +41,8 @@ function snippetOf(hay: string, needle: string, radius = 48): string {
 export async function GET(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim().slice(0, 100)
   if (q.length < 2) return NextResponse.json({ q, hits: [] })
   const agent = req.headers.get("x-agent-type") ?? undefined

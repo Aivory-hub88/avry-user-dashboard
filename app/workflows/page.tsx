@@ -270,7 +270,7 @@ function RightPanel({
   const [connections, setConnections] = useState<Array<{ id: string; displayName: string; appId: string; appName: string; status: string }>>([])
   const [selectedConnectionId, setSelectedConnectionId] = useState(step?.connectionId ?? '')
   useEffect(() => {
-    fetch(asset('/api/integrations/connections'))
+    authedFetch(asset('/api/integrations/connections'))
       .then(r => r.ok ? r.json() : [])
       .then((all: Array<{ id: string; displayName: string; appId: string; appName: string; status: string }>) =>
         setConnections(all.filter(c => c.status === 'connected'))

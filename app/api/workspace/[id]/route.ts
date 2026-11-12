@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
-import { workspaceCredential, unauthorized, forbidden } from '@/lib/workspaceAuth'
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from '@/lib/workspaceAuth'
 import { getDocRole, canWrite } from '@/lib/workspaceAccess'
 import { parseFieldDefs } from '@/lib/workspaceDb'
 import { parseAutomationRules } from '@/lib/workspaceDbModel'
@@ -14,6 +14,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const role = await getDocRole(cred, id)
   if (!canWrite(role)) return forbidden()
   let body: { title?: unknown; mode?: unknown; favorite?: unknown; tags?: unknown; props?: unknown; icon?: unknown } = {}
@@ -242,6 +244,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const role = await getDocRole(cred, id)
   const isOwner = role === 'owner'
   if (!isOwner) return forbidden()
@@ -270,6 +274,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const role = await getDocRole(cred, id)
   // Even if soft-deleted, owner's ACL still resolvable via workspace_doc_acl, so check owner via direct query
   const isOwner = role === 'owner'
