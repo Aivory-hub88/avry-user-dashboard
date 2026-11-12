@@ -118,6 +118,32 @@ describe('requirePaidPlan', () => {
     else throw new Error('expected 503')
   })
 
+  it('reads /entitlements/access and trusts its paid verdict', async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ tier: 'free', paid: true }), { status: 200 }))
+    expect((await requirePaidPlan(req, 'console')).ok).toBe(true)
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/v1/entitlements/access')
+    expect(query).not.toHaveBeenCalled()
+  })
+
+  it('falls back to /auth/me when the backend has no /access yet', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('{}', { status: 404 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ tier: 'business' }), { status: 200 }))
+    expect((await requirePaidPlan(req, 'console')).ok).toBe(true)
+    expect(String(fetchMock.mock.calls[1][0])).toContain('/api/v1/auth/me')
+  })
+
+  it('treats a 503 or a body without a tier as unavailable, never as free', async () => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 503 }))
+    let g = await requirePaidPlan(req, 'console')
+    if (!g.ok) expect(g.response.status).toBe(503)
+    else throw new Error('expected 503')
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }))
+    g = await requirePaidPlan(req, 'console')
+    if (!g.ok) expect(g.response.status).toBe(503)
+    else throw new Error('expected 503')
+  })
+
   it('401s when the backend rejects the token', async () => {
     fetchMock.mockResolvedValue(new Response('{}', { status: 401 }))
     const g = await requirePaidPlan(req, 'console')

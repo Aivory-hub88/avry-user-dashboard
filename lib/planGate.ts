@@ -6,8 +6,9 @@
  * server, from facts the browser cannot edit:
  *   - identity from the verified HS256 JWT (`lib/serverAuth.ts`), never from
  *     the `aivory_user` cookie or localStorage;
- *   - the tier from avry-backend `GET /api/v1/auth/me`, the same tier every
- *     other paid gate reads (legacy payments + `identity.user_tiers` overlay);
+ *   - the tier from avry-backend `GET /api/v1/entitlements/access`, read
+ *     fresh from `identity.user_tiers` and answering 503 (not "free") when it
+ *     can't (falls back to `/auth/me` while that endpoint isn't deployed);
  *   - team grants from `dashboard.workspace_members`, honoured only when the
  *     team's owner holds a live subscription (or is staff), so an account with
  *     no plan cannot unlock itself by creating its own team.
@@ -64,11 +65,13 @@ export function ownerCoversSeat(g: TeamGrant): boolean {
 export function decidePlanAccess(input: {
   accountType: string | null | undefined
   tier: string | null | undefined
+  /** The backend's own verdict (staff/demo per the database, or any plan). */
+  paid?: boolean
   grants: TeamGrant[]
   module: string
 }): PlanDecision {
   if (isPlanExempt(input.accountType)) return { ok: true, via: 'staff' }
-  if (isPaidTier(input.tier)) return { ok: true, via: 'plan' }
+  if (input.paid || isPaidTier(input.tier)) return { ok: true, via: 'plan' }
   const covered = input.grants.filter(ownerCoversSeat)
   if (covered.length === 0) return { ok: false, status: 402, code: 'UPGRADE_REQUIRED' }
   if (input.module === ANY_MODULE) return { ok: true, via: 'team' }
@@ -84,9 +87,9 @@ const TIER_TIMEOUT_MS = 5000
 const TIER_CACHE_MS = 20_000
 const TIER_CACHE_MAX = 2000
 
-type TierLookup = { kind: 'ok'; tier: string } | { kind: 'unauthorized' } | { kind: 'unavailable' }
+type TierLookup = { kind: 'ok'; tier: string; paid: boolean } | { kind: 'unauthorized' } | { kind: 'unavailable' }
 
-const tierCache = new Map<string, { tier: string; at: number }>()
+const tierCache = new Map<string, { tier: string; paid: boolean; at: number }>()
 
 /** Test hook. */
 export function clearPlanCache(): void {
@@ -95,21 +98,27 @@ export function clearPlanCache(): void {
 
 async function lookupTier(userId: string, token: string): Promise<TierLookup> {
   const hit = tierCache.get(userId)
-  if (hit && Date.now() - hit.at < TIER_CACHE_MS) return { kind: 'ok', tier: hit.tier }
+  if (hit && Date.now() - hit.at < TIER_CACHE_MS) return { kind: 'ok', tier: hit.tier, paid: hit.paid }
 
-  try {
-    const res = await fetch(`${BACKEND}/api/v1/auth/me`, {
+  const get = (path: string) =>
+    fetch(`${BACKEND}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: 'no-store',
       signal: AbortSignal.timeout(TIER_TIMEOUT_MS),
     })
+  try {
+    let res = await get('/api/v1/entitlements/access')
+    // Older backend without the strict endpoint: /auth/me (best-effort tier).
+    if (res.status === 404) res = await get('/api/v1/auth/me')
     if (res.status === 401 || res.status === 403) return { kind: 'unauthorized' }
     if (!res.ok) return { kind: 'unavailable' }
-    const data = (await res.json().catch(() => null)) as { tier?: unknown } | null
-    const tier = typeof data?.tier === 'string' ? data.tier.toLowerCase() : 'free'
+    const data = (await res.json().catch(() => null)) as { tier?: unknown; paid?: unknown } | null
+    if (!data || typeof data.tier !== 'string') return { kind: 'unavailable' }
+    const tier = data.tier.toLowerCase()
+    const paid = data.paid === true
     if (tierCache.size >= TIER_CACHE_MAX) tierCache.clear()
-    tierCache.set(userId, { tier, at: Date.now() })
-    return { kind: 'ok', tier }
+    tierCache.set(userId, { tier, paid, at: Date.now() })
+    return { kind: 'ok', tier, paid }
   } catch {
     return { kind: 'unavailable' }
   }
@@ -176,7 +185,7 @@ export async function requirePaidPlan(req: NextRequest, module: string): Promise
   }
 
   let grants: TeamGrant[] = []
-  if (!isPaidTier(tier.tier)) {
+  if (!tier.paid && !isPaidTier(tier.tier)) {
     try {
       grants = await teamGrants(user.user_id)
     } catch (e) {
@@ -185,7 +194,7 @@ export async function requirePaidPlan(req: NextRequest, module: string): Promise
     }
   }
 
-  const d = decidePlanAccess({ accountType: user.account_type, tier: tier.tier, grants, module })
+  const d = decidePlanAccess({ accountType: user.account_type, tier: tier.tier, paid: tier.paid, grants, module })
   if (d.ok) return { ok: true, user, token }
   if (d.code === 'MODULE_DISABLED') {
     return {
