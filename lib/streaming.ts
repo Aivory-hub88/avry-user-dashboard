@@ -2,6 +2,7 @@
  * SSE (Server-Sent Events) streaming utilities for console responses
  */
 
+import { keepSessionFresh } from '@/lib/deployAuth'
 import { StreamChunk } from '@/types/console'
 
 const MAX_FILE_MB = 10
@@ -72,6 +73,9 @@ export async function* streamConsoleResponse(
     resetIdleTimer()
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    // The route verifies the token server-side now (no more anonymous pass);
+    // refresh a nearly-expired one first so a long idle tab doesn't 401.
+    try { await keepSessionFresh(60_000) } catch {}
     try {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('aivory_auth') : null
       const token = raw ? JSON.parse(raw)?.access_token : null

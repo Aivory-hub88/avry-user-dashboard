@@ -1,4 +1,5 @@
 'use client';
+import { authedFetch } from '@/lib/deployAuth'
 import { asset } from "@/lib/asset";
 import GrainHeader from '@/components/ui/GrainHeader';
 
@@ -677,7 +678,7 @@ export default function AgentsPage() {
     }
   }, [refreshDeployments]);
   useEffect(() => {
-    fetch('/dashboard/api/agent-catalog')
+    authedFetch('/dashboard/api/agent-catalog')
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         if (!Array.isArray(data)) return;

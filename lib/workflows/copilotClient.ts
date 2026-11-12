@@ -9,6 +9,7 @@
  * gets back the updated state. No mode switching, no split paths.
  */
 
+import { authedFetch } from '@/lib/deployAuth'
 import type {
   CopilotConversationState,
   CopilotStage,
@@ -47,7 +48,7 @@ export async function sendCopilotMessage(params: {
   currentState?: CopilotConversationState | null
   canvas?: CanvasEditContext | null
 }): Promise<CopilotApiResponse> {
-  const res = await fetch(asset('/api/workflows/copilot'), {
+  const res = await authedFetch(asset('/api/workflows/copilot'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

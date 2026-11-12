@@ -1,5 +1,6 @@
 'use client';
 
+import { authedFetch } from '@/lib/deployAuth'
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -43,7 +44,7 @@ export default function AgentDetailPage() {
     const fetchAgent = async () => {
       try {
         setLoading(true);
-        const res = await fetch(asset(`/api/agents/${id}`));
+        const res = await authedFetch(asset(`/api/agents/${id}`));
         if (!res.ok) throw new Error('Failed to fetch agent');
         const data = await res.json();
         setAgent(data);
@@ -71,7 +72,7 @@ export default function AgentDetailPage() {
     setError(null);
 
     try {
-      const res = await fetch(asset(`/api/agents/${id}`), {
+      const res = await authedFetch(asset(`/api/agents/${id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -101,7 +102,7 @@ export default function AgentDetailPage() {
     setError(null);
 
     try {
-      const res = await fetch(asset(`/api/agents/${id}`), {
+      const res = await authedFetch(asset(`/api/agents/${id}`), {
         method: 'DELETE',
       });
 

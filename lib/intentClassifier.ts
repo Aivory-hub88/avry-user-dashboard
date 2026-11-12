@@ -1,3 +1,4 @@
+import { authedFetch } from '@/lib/deployAuth'
 import { IntentRoute, INTENT_BOUNDARIES } from './intentBoundaries'
 import { asset } from '@/lib/asset'
 
@@ -55,15 +56,8 @@ export async function classifyIntent(userMessage: string, aiReply: string): Prom
     const prompt = buildClassifierPrompt(userMessage, aiReply)
     console.log('[IntentClassifier] LOG #1 — prompt built, length:', prompt.length)
     
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    try {
-      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('aivory_auth') : null
-      const token = raw ? JSON.parse(raw)?.access_token : null
-      if (token) headers['Authorization'] = `Bearer ${token}`
-    } catch {}
-    const response = await fetch(asset(`/api/intent`), {
+    const response = await authedFetch(asset(`/api/intent`), {
       method: 'POST',
-      headers,
       body: JSON.stringify({
         message: prompt,
         context: { endpoint: 'intent-classifier' },

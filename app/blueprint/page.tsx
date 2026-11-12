@@ -1,5 +1,6 @@
 'use client'
 
+import { authedFetch } from '@/lib/deployAuth'
 import React, { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -1352,7 +1353,7 @@ export default function BlueprintPage() {
         try { return JSON.parse(localStorage.getItem('aivory_deep_result') || '{}') } catch { return {} }
       })()
 
-      const res = await fetch(asset('/api/console/workflows/from-blueprint'), {
+      const res = await authedFetch(asset('/api/console/workflows/from-blueprint'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

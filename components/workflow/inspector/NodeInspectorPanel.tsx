@@ -1,4 +1,5 @@
 'use client';
+import { authedFetch } from '@/lib/deployAuth'
 import React, { useState, useMemo, useCallback } from 'react';
 import type { Node } from '@xyflow/react';
 import type { WorkflowNodeData, NodeConfig } from '@/types/workflow-node';
@@ -61,7 +62,7 @@ export default function NodeInspectorPanel({ selectedNode, onChange, onDelete, o
     if (!config) return;
     setTesting(true);
     try {
-      const res = await fetch(asset('/api/workflows/test-step'), {
+      const res = await authedFetch(asset('/api/workflows/test-step'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodeId, config }),
       });

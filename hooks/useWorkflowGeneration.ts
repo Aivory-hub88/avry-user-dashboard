@@ -5,6 +5,7 @@
  * Handles loading, error states, and canvas updates.
  */
 
+import { authedFetch } from '@/lib/deployAuth'
 import { useCallback, useState } from 'react'
 import { AivoryWorkflowSpec, AivoryWorkflowEdge, WorkflowGenerationResult } from '@/types/workflows'
 import { asset } from '@/lib/asset'
@@ -52,7 +53,7 @@ export function useWorkflowGeneration(): UseWorkflowGenerationState & UseWorkflo
       setNotes(null)
 
       try {
-        const response = await fetch(asset('/api/workflows/ai-suggest'), {
+        const response = await authedFetch(asset('/api/workflows/ai-suggest'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

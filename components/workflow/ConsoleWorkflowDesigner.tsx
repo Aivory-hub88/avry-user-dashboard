@@ -5,6 +5,7 @@
  * Allows users to describe workflows and see explanations before creating them.
  */
 
+import { authedFetch } from '@/lib/deployAuth'
 import React, { useState, useCallback } from 'react'
 import styles from './ConsoleWorkflowDesigner.module.css'
 import { AivoryWorkflowSpec, AivoryWorkflowEdge } from '@/types/workflows'
@@ -53,7 +54,7 @@ export const ConsoleWorkflowDesigner: React.FC<ConsoleWorkflowDesignerProps> = (
 
     try {
       // Call ai-suggest endpoint
-      const response = await fetch(asset('/api/workflows/ai-suggest'), {
+      const response = await authedFetch(asset('/api/workflows/ai-suggest'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -72,7 +73,7 @@ export const ConsoleWorkflowDesigner: React.FC<ConsoleWorkflowDesignerProps> = (
       setGeneratedEdges(result.edges)
 
       // Now call copilot to get explanation
-      const explainResponse = await fetch(asset('/api/workflows/copilot'), {
+      const explainResponse = await authedFetch(asset('/api/workflows/copilot'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

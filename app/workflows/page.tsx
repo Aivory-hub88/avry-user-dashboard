@@ -747,7 +747,7 @@ function WorkflowsPageInner() {
   const snapshotBeforeChange = (reason: 'ai_apply' | 'manual_edit' | 'status_change' | 'title_change') => {
     if (!selected) return
     const canvas = loadCanvasState(selected.workflow_id)
-    fetch(asset(`/api/workflows/${selected.workflow_id}/versions`), {
+    authedFetch(asset(`/api/workflows/${selected.workflow_id}/versions`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ spec: savedToSpec(selected), canvas, reason }),
@@ -1077,7 +1077,7 @@ function WorkflowsPageInner() {
         alert('Workflow belum memiliki steps untuk dibuatkan guide.')
         return
       }
-      const res = await fetch('/api/workflows/guide', {
+      const res = await authedFetch('/api/workflows/guide', {
         method: 'POST',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1525,7 +1525,7 @@ function WorkflowsPageInner() {
     // Store pending nodes for injection once the NEW canvas mounts
     pendingHandoffRef.current = { nodes: rfNodes, edges: rfEdges }
     // Persist to backend canvas for the new workflow
-    fetch(asset(`/api/workflows/${workflowId}/canvas`), {
+    authedFetch(asset(`/api/workflows/${workflowId}/canvas`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nodes: rfNodes, edges: rfEdges }),
@@ -1614,7 +1614,7 @@ function WorkflowsPageInner() {
     // Store pending nodes for injection once the NEW canvas mounts
     pendingHandoffRef.current = { nodes, edges }
     // Persist to backend canvas for the new workflow
-    fetch(asset(`/api/workflows/${workflowId}/canvas`), {
+    authedFetch(asset(`/api/workflows/${workflowId}/canvas`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nodes, edges }),
