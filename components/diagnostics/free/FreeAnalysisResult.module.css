@@ -128,3 +128,33 @@
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Header card on the grainy gradient (GrainHeader, world "harbour").
+   White type and frosted controls on the surface, primary solid white. */
+.hero { border-radius: 22px; padding: 32px 36px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35); }
+@media (max-width: 640px) { .hero { padding: 24px 20px; } }
+.heroInner { position: relative; z-index: 10; }
+.heroEyebrow {
+  display: block;
+  font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.75);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.heroTitle { font-size: 30px; font-weight: 300; letter-spacing: -0.4px; line-height: 1.2; color: #fff; margin: 8px 0 18px; }
+.heroMetaValue { margin-top: 4px; font-size: 16px; font-weight: 600; color: #fff; overflow-wrap: anywhere; }
+.heroPrimary {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 44px; padding: 0 22px; border-radius: 999px; border: 1px solid #fff;
+  background: #fff; color: #0b1a3a; font: inherit; font-size: 13.5px; font-weight: 600;
+  cursor: pointer; text-decoration: none; white-space: nowrap;
+}
+.heroPrimary:hover { filter: brightness(0.95); }
+.heroPrimary:disabled { opacity: 0.7; cursor: default; }
+.heroGhost {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 44px; padding: 0 22px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  color: #fff; font: inherit; font-size: 13.5px; font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.heroGhost:hover { background: rgba(255, 255, 255, 0.22); border-color: rgba(255, 255, 255, 0.5); }
+.heroNote { font-size: 12px; color: rgba(255, 255, 255, 0.8); }
