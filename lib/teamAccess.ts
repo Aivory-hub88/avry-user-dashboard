@@ -11,7 +11,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
-import { getAuthUser } from '@/lib/serverAuth'
+import { requirePaidPlan } from '@/lib/planGate'
 import { effectiveModules } from '@/lib/workspaceModules'
 import { LEGACY_WORKSPACE } from '@/lib/teams'
 
@@ -54,20 +54,14 @@ export async function teamAccessFor(userId: string, accountType?: string | null)
 }
 
 /**
- * API-route guard: null = allowed, otherwise the 403 to return. Fails open on
- * DB errors so a hiccup can't lock paying users out (the downstream plan gates
- * still apply).
+ * API-route guard for a paid module: null = allowed, otherwise the response to
+ * return (401 not signed in, 402 no paid plan, 403 module not granted by the
+ * team, 503 plan check unavailable). This used to pass unauthenticated and
+ * planless callers through, trusting a browser-side redirect to keep them
+ * out; the decision now lives on the server and fails closed. See
+ * `lib/planGate.ts`.
  */
 export async function requireModule(req: NextRequest, key: string): Promise<NextResponse | null> {
-  try {
-    const user = getAuthUser(req)
-    if (!user) return null // unauthenticated requests are rejected by the route itself
-    const access = await teamAccessFor(user.user_id, user.account_type)
-    if (access.restricted && !access.modules.includes(key)) {
-      return NextResponse.json({ error: 'feature not enabled for your team role', code: 'MODULE_DISABLED', module: key }, { status: 403 })
-    }
-  } catch (e) {
-    console.error('[teamAccess]', e)
-  }
-  return null
+  const gate = await requirePaidPlan(req, key)
+  return gate.ok ? null : gate.response
 }

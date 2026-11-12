@@ -12,6 +12,8 @@ const { callCopilotOperationMock } = vi.hoisted(() => ({
   callCopilotOperationMock: vi.fn(),
 }))
 vi.mock('@/lib/workflows/bridgeCopilot', () => ({ callCopilotOperation: callCopilotOperationMock }))
+// The paid-plan gate has its own tests (lib/planGate.test.ts); here the caller is a paying user.
+vi.mock('@/lib/teamAccess', () => ({ requireModule: async () => null }))
 
 import { POST } from './route'
 

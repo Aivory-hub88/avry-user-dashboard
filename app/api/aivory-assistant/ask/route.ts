@@ -1,10 +1,14 @@
 import { NextRequest } from 'next/server'
 import { getConfig } from '@/lib/config'
+import { requirePaidPlan, ANY_MODULE } from '@/lib/planGate'
 
 // FIXED: TIMEOUT INCREASE — 120s to match bridge + Zeroclaw timeout
 export const maxDuration = 120
 
 export async function POST(request: NextRequest) {
+  // Paid LLM feature: verified identity + live plan, decided on the server.
+  const gate = await requirePaidPlan(request, ANY_MODULE)
+  if (!gate.ok) return gate.response
   try {
     const body = await request.json()
     const { session_id, messages, context } = body
