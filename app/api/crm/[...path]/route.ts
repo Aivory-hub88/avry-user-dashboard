@@ -5,7 +5,7 @@
  * verified JWT — any x-tenant-id the client sends is ignored.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { getAuthUser } from "@/lib/serverAuth"
+import { requirePaidPlan, ANY_MODULE } from "@/lib/planGate"
 import { isAllowedCrmPath } from "@/lib/crmPaths"
 
 export const runtime = "nodejs"
@@ -13,8 +13,10 @@ export const runtime = "nodejs"
 type Ctx = { params: Promise<{ path: string[] }> }
 
 async function proxy(req: NextRequest, ctx: Ctx): Promise<NextResponse> {
-  const user = getAuthUser(req)
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  // Paid plan (or a paying team's seat) required; 401/402/503 per lib/planGate.
+  const gate = await requirePaidPlan(req, ANY_MODULE)
+  if (!gate.ok) return gate.response
+  const user = gate.user
 
   const { path } = await ctx.params
   if (!isAllowedCrmPath(path, req.method)) {

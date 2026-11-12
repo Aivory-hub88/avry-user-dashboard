@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, workspacePlanDenied, forbidden } from "@/lib/workspaceAuth"
 import { teamRole, LEGACY_WORKSPACE } from "@/lib/teams"
 import { cleanRequestInput, requestFromRow } from "@/lib/projectRequests"
 import { newId } from "@/lib/spaceWrite"
@@ -17,6 +17,8 @@ export const runtime = "nodejs"
 export async function GET(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred || cred.kind !== "user") return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const userId = cred.user.user_id
   const scope = req.nextUrl.searchParams.get("scope") === "inbox" ? "inbox" : "mine"
   try {
@@ -52,6 +54,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred || cred.kind !== "user") return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
   const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : ""
   if (!workspaceId || workspaceId === LEGACY_WORKSPACE)

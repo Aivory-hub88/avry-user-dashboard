@@ -169,13 +169,17 @@ export async function chargeRun(
 
 
 /**
- * Spend a free-allowance use up front, for features with no "delivered
- * result" to charge on (a copilot session). Idempotent on `ref`: the same
- * session keeps working, a new one needs a use left. Returns null when
- * allowed, otherwise the response to send (402 UPGRADE_REQUIRED, 401, 503).
+ * Free-trial turns of a session feature with no single result to charge on
+ * (a copilot session). Before each turn `trialTurn(.., 'check')` asks if it
+ * may run (charges nothing); after a turn that worked, `'record'` charges the
+ * session's one use on its first turn (idempotent on `ref`) and counts the
+ * turn against avry-backend TRIAL_MAX_TURNS, both in Postgres. A failed turn
+ * is never recorded, so it costs nothing. Returns null when allowed, or the
+ * response to send instead (402 UPGRADE_REQUIRED, 401, 503: fail closed).
  */
-export async function chargeTrial(
+export async function trialTurn(
   request: NextRequest,
+  step: 'check' | 'record',
   feature: Feature,
   ref: string,
 ): Promise<NextResponse | null> {
@@ -189,7 +193,7 @@ export async function chargeTrial(
     return NextResponse.json({ message: 'Please sign in again to continue.', code: 'UNAUTHENTICATED' }, { status: 401 })
   }
   try {
-    const res = await fetch(`${BACKEND}/api/v1/entitlements/uses/consume`, {
+    const res = await fetch(`${BACKEND}/api/v1/entitlements/uses/trial/${step}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ feature, ref }),
@@ -206,9 +210,9 @@ export async function chargeTrial(
     if (res.status === 401) {
       return NextResponse.json({ message: 'Please sign in again to continue.', code: 'UNAUTHENTICATED' }, { status: 401 })
     }
-    throw new Error(`consume ${res.status}`)
+    throw new Error(`trial ${step} ${res.status}`)
   } catch (e) {
-    console.error('[featureUses] trial charge failed:', e)
+    console.error(`[featureUses] trial ${step} failed:`, e)
     return NextResponse.json(
       { message: 'We could not check your plan right now. Please try again in a moment.', code: 'PLAN_CHECK_UNAVAILABLE' },
       { status: 503 },

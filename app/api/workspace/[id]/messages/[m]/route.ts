@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { getDocRole, canRead, checkAgentAccess } from "@/lib/workspaceAccess"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { parseSpaceMentions } from "@/lib/spaceProtocol"
 import { spaceMessageFromRow } from "@/lib/spaceThreads"
 import { requesterFrom, requesterKey, authorKeyOf, cleanBody } from "@/lib/spaceWrite"
@@ -33,6 +33,8 @@ export async function PATCH(
   const { id, m } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   if (await checkAgentAccess(id, credential, req.headers.get("x-agent-type"), "write"))
     return forbidden()
   if (!canRead(await getDocRole(credential, id))) return forbidden()
@@ -70,6 +72,8 @@ export async function DELETE(
   const { id, m } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   if (await checkAgentAccess(id, credential, req.headers.get("x-agent-type"), "write"))
     return forbidden()
   if (!canRead(await getDocRole(credential, id))) return forbidden()

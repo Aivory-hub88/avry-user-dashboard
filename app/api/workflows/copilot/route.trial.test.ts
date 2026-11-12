@@ -5,7 +5,7 @@ const trial = vi.fn()
 const processMessage = vi.fn()
 
 vi.mock('@/lib/planGate', () => ({ requirePaidPlan: (...a: unknown[]) => gate(...a) }))
-vi.mock('@/lib/featureUses', () => ({ chargeTrial: (...a: unknown[]) => trial(...a) }))
+vi.mock('@/lib/featureUses', () => ({ trialTurn: (...a: unknown[]) => trial(...a) }))
 vi.mock('@/lib/workflows/copilotStateMachine', () => ({
   CopilotStateMachine: class {
     processMessage = processMessage
@@ -23,6 +23,8 @@ const denied = (code: string, status: number) => ({
   code,
   response: new Response(JSON.stringify({ code }), { status }),
 })
+const upgrade = () => new Response(JSON.stringify({ code: 'UPGRADE_REQUIRED' }), { status: 402 })
+const steps = () => trial.mock.calls.map((c) => c[1])
 
 beforeEach(() => {
   gate.mockReset()
@@ -39,28 +41,48 @@ describe('copilot free session', () => {
     expect(trial).not.toHaveBeenCalled()
   })
 
-  it('a free account spends its one session, keyed to the session id', async () => {
+  it('a free turn is checked first and recorded after it worked, keyed to the session', async () => {
     gate.mockResolvedValue(denied('UPGRADE_REQUIRED', 402))
     trial.mockResolvedValue(null)
     const res = await POST(req({ prompt: 'hi', sessionId: 'session_abc' }))
     expect(res.status).toBe(200)
-    expect(trial).toHaveBeenCalledWith(expect.anything(), 'copilot', 'copilot:session_abc')
+    expect(trial.mock.calls).toEqual([
+      [expect.anything(), 'check', 'copilot', 'copilot:session_abc'],
+      [expect.anything(), 'record', 'copilot', 'copilot:session_abc'],
+    ])
   })
 
-  it('a used-up free session gets the 402 and no LLM call', async () => {
+  it('a used-up allowance (or used-up turns) gets the 402 and no LLM call', async () => {
     gate.mockResolvedValue(denied('UPGRADE_REQUIRED', 402))
-    trial.mockResolvedValue(new Response(JSON.stringify({ code: 'UPGRADE_REQUIRED' }), { status: 402 }))
+    trial.mockResolvedValue(upgrade())
     const res = await POST(req({ prompt: 'hi', sessionId: 'session_new' }))
     expect(res.status).toBe(402)
     expect(processMessage).not.toHaveBeenCalled()
+    expect(steps()).toEqual(['check'])
   })
 
-  it('caps the turns inside the one free session', async () => {
+  it('an errored turn is not recorded, so it costs nothing', async () => {
     gate.mockResolvedValue(denied('UPGRADE_REQUIRED', 402))
     trial.mockResolvedValue(null)
-    let last = 200
-    for (let i = 0; i < 13; i++) last = (await POST(req({ prompt: 'again', sessionId: 'session_cap' }))).status
-    expect(last).toBe(402)
+    processMessage.mockResolvedValue({ stage: 'ERROR', lastMessage: 'LLM failed', conversationHistory: [] })
+    expect((await POST(req({ prompt: 'hi', sessionId: 's_err' }))).status).toBe(200)
+    expect(steps()).toEqual(['check'])
+  })
+
+  it('a thrown turn is not recorded either', async () => {
+    gate.mockResolvedValue(denied('UPGRADE_REQUIRED', 402))
+    trial.mockResolvedValue(null)
+    processMessage.mockRejectedValue(new Error('upstream down'))
+    expect((await POST(req({ prompt: 'hi', sessionId: 's_throw' }))).status).toBe(500)
+    expect(steps()).toEqual(['check'])
+  })
+
+  it('withholds the result when recording is refused (two sessions raced for the last use)', async () => {
+    gate.mockResolvedValue(denied('UPGRADE_REQUIRED', 402))
+    trial.mockResolvedValueOnce(null).mockResolvedValueOnce(upgrade())
+    const res = await POST(req({ prompt: 'hi', sessionId: 's_race' }))
+    expect(res.status).toBe(402)
+    expect(await res.text()).not.toContain('"currentState"')
   })
 
   it('other denials pass straight through', async () => {

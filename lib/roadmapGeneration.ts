@@ -278,7 +278,7 @@ export async function generateRoadmapAsync(opts: GenerateRoadmapOptions): Promis
     opts.onProgress?.(Date.now() - startedAt)
     let pollRes: Response
     try {
-      pollRes = await fetch(asset(`/api/roadmap/result/${jobId}`))
+      pollRes = await authedFetch(asset(`/api/roadmap/result/${jobId}`))
     } catch {
       continue // transient network blip — keep polling
     }

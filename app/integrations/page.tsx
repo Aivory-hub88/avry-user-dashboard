@@ -124,7 +124,7 @@ function ConnectModal({ app, existingId, onClose, onSaved }: ConnectModalProps) 
     try {
       let res: Response
       if (isReconnect) {
-        res = await fetch(asset(`/api/integrations/connections/${existingId}`), {
+        res = await authedFetch(asset(`/api/integrations/connections/${existingId}`), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ credentials: fieldValues }),
@@ -135,7 +135,7 @@ function ConnectModal({ app, existingId, onClose, onSaved }: ConnectModalProps) 
           displayName: displayName.trim(),
           credentials: fieldValues,
         }
-        res = await fetch(asset('/api/integrations/connections'), {
+        res = await authedFetch(asset('/api/integrations/connections'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -309,7 +309,7 @@ function IntegrationsContent() {
       const oauthConns = oauthRes.ok ? await oauthRes.json() : []
 
       // Fetch manual (API key/basic) connections from Next.js API
-      const manualRes = await fetch(asset('/api/integrations/connections'))
+      const manualRes = await authedFetch(asset('/api/integrations/connections'))
       const manualConns = manualRes.ok ? await manualRes.json() : []
 
       // Merge: manual connections + OAuth connections
@@ -381,7 +381,7 @@ function IntegrationsContent() {
         })
         if (!res.ok) throw new Error('Failed to revoke OAuth connection')
       } else {
-        const res = await fetch(asset(`/api/integrations/connections/${conn.id}`), { method: 'DELETE' })
+        const res = await authedFetch(asset(`/api/integrations/connections/${conn.id}`), { method: 'DELETE' })
         if (!res.ok) throw new Error('Failed to delete connection')
       }
       setFeedback({ type: 'success', message: `Successfully revoked ${conn.displayName}` })

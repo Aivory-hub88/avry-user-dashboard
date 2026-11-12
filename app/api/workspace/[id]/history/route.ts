@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
-import { workspaceCredential, unauthorized, forbidden } from '@/lib/workspaceAuth'
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from '@/lib/workspaceAuth'
 import { getDocRole } from '@/lib/workspaceAccess'
 
 export const runtime = 'nodejs'
@@ -10,6 +10,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const role = await getDocRole(cred, id)
   if (!role) return forbidden()
   try {
@@ -27,6 +29,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const role = await getDocRole(cred, id)
   if (!role) return forbidden()
   // Only writer can snapshot; but allow any reader to trigger snapshot of current state (idempotent)

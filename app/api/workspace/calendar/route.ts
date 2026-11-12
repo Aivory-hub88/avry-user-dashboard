@@ -4,7 +4,7 @@
  * plus their project requests still waiting for approval. Window ≤ 120 days.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { workspaceCredential, unauthorized } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { cleanWindow } from "@/lib/timeline"
 import { cleanTimeZone, loadTimeline } from "@/lib/timelineStore"
 
@@ -13,6 +13,8 @@ export const runtime = "nodejs"
 export async function GET(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred || cred.kind !== "user") return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const sp = req.nextUrl.searchParams
   const { from, to } = cleanWindow(sp.get("from"), sp.get("to"), new Date().toISOString().slice(0, 10))
   try {

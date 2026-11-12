@@ -4,7 +4,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { loadRequest, requestAccess, approveRequest } from "@/lib/projectRequestStore"
 import { requestFromRow, reviewTransition, LIMITS, type ReviewDecision } from "@/lib/projectRequests"
 
@@ -16,6 +16,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ rid
   const { rid } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
   const decision = body.decision as ReviewDecision
   if (!DECISIONS.has(decision)) return NextResponse.json({ error: "decision must be approve, changes or reject" }, { status: 400 })

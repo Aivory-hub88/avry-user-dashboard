@@ -9,7 +9,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { workspaceCredential, unauthorized } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { ROOMS_VISIBLE_TO_USER } from "@/lib/teams"
 
 export const runtime = "nodejs"
@@ -17,6 +17,8 @@ export const runtime = "nodejs"
 export async function GET(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred || cred.kind !== "user") return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const userId = cred.user.user_id
   try {
     const r = await query(

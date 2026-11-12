@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { getDocRole, canRead, checkAgentAccess } from "@/lib/workspaceAccess"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { spaceAgentTaskFromRow } from "@/lib/spaceAgent"
 
 export const runtime = "nodejs"
@@ -16,6 +16,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   if (await checkAgentAccess(id, credential, req.headers.get("x-agent-type"), "read"))
     return forbidden()
   if (!canRead(await getDocRole(credential, id))) return forbidden()

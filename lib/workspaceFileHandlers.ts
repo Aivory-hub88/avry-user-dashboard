@@ -9,7 +9,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { unauthorized, workspaceCredential, type WorkspaceCredential } from "@/lib/workspaceAuth"
+import { unauthorized, workspaceCredential, type WorkspaceCredential, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { requesterFrom, requesterKey, newId } from "@/lib/spaceWrite"
 import { validateUploadIntent, objectKey, fileFromRow, type FileOwnerKind } from "@/lib/workspaceFiles"
 import { presignPut, presignGet, headObject, deleteObject, r2Configured, R2_TTL } from "@/lib/r2"
@@ -48,6 +48,8 @@ async function scopeFor(
 ): Promise<{ cred: WorkspaceCredential; scope: FileScope } | Response> {
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const scope = await resolve(req, cred, ownerId, need)
   if (scope instanceof Response) return scope
   if (need === "write" && !scope.canWrite) return forbidden()

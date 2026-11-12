@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { canManageDoc, isKnownAgentType, AGENT_DISPLAY_NAMES } from "@/lib/workspaceAccess"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 
@@ -14,6 +14,8 @@ export async function DELETE(
   const { id, agentType } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const actor = cred.kind === "service" ? undefined : cred.user.user_id
   const accountType = cred.kind === "service" ? "superadmin" : cred.user.account_type
   if (!(await canManageDoc(id, accountType, actor))) return forbidden()

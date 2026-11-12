@@ -15,13 +15,19 @@
 import { NextRequest } from 'next/server'
 import { SERVICES } from '@/config/services'
 import { parseRoadmapContent, buildFallbackRoadmap } from '@/lib/roadmapGeneration'
+import { requireFeatureBought } from '@/lib/featureUses'
 
 export const maxDuration = 30
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
 ) {
+  // Same gate as POST /api/roadmap/generate: signed in and bought the
+  // Blueprint + Roadmap (or a plan). Used to need only a job id.
+  const gate = await requireFeatureBought(request, 'blueprint')
+  if (!gate.ok) return gate.response
+
   const { jobId } = await params
   if (!jobId) {
     return Response.json({ success: false, error: 'jobId is required' }, { status: 400 })

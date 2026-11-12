@@ -2,7 +2,18 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { NextRequest } from "next/server"
 
 const { authMock } = vi.hoisted(() => ({ authMock: vi.fn<(...args: unknown[]) => unknown>(() => null) }))
-vi.mock("@/lib/serverAuth", () => ({ getAuthUser: () => authMock() }))
+const { planMock } = vi.hoisted(() => ({ planMock: vi.fn<() => "paid" | "free">(() => "paid") }))
+// The real gate is tested in lib/planGate.test.ts: here no session → 401,
+// a free account → 402, otherwise the signed-in user.
+vi.mock("@/lib/planGate", () => ({
+  ANY_MODULE: "*",
+  requirePaidPlan: async () => {
+    const user = authMock()
+    if (!user) return { ok: false, code: "UNAUTHENTICATED", response: Response.json({}, { status: 401 }) }
+    if (planMock() === "free") return { ok: false, code: "UPGRADE_REQUIRED", response: Response.json({ code: "UPGRADE_REQUIRED" }, { status: 402 }) }
+    return { ok: true, user, token: "t" }
+  },
+}))
 
 import { GET, POST, PATCH } from "./route"
 import { isAllowedCrmPath } from "@/lib/crmPaths"
@@ -19,6 +30,7 @@ function call(handler: typeof GET, method: string, path: string[], init: { body?
 beforeEach(() => {
   fetchMock.mockReset()
   authMock.mockReturnValue({ user_id: "user-1" })
+  planMock.mockReturnValue("paid")
   process.env.CRM_SERVICE_TOKEN = "svc-token-1234567890"
   process.env.CRM_URL = "http://crm.test:8091"
 })
@@ -43,6 +55,13 @@ describe("isAllowedCrmPath", () => {
 })
 
 describe("/api/crm proxy", () => {
+  it("402s a free account and never calls the CRM", async () => {
+    planMock.mockReturnValue("free")
+    const res = await call(GET, "GET", ["companies"])
+    expect(res.status).toBe(402)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it("401s without a session and never calls the CRM", async () => {
     authMock.mockReturnValue(null)
     const res = await call(GET, "GET", ["companies"])

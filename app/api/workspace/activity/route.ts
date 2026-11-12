@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { getDocRolesBatch, canRead } from "@/lib/workspaceAccess"
-import { workspaceCredential, unauthorized } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { isAgentType } from "@/lib/agentRoster"
 import {
   ACTIVITY_DEFAULT_LIMIT,
@@ -29,6 +29,8 @@ export const runtime = "nodejs"
 export async function GET(req: NextRequest) {
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   const agentType = req.headers.get("x-agent-type")
   if (credential.kind === "service" && !isAgentType(agentType ?? "")) {
     return NextResponse.json({ error: "agent required (X-Agent-Type)" }, { status: 400 })
@@ -143,6 +145,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   const agentType = req.headers.get("x-agent-type")
   if (credential.kind === "service" && !isAgentType(agentType ?? "")) {
     return NextResponse.json({ error: "agent required (X-Agent-Type)" }, { status: 400 })

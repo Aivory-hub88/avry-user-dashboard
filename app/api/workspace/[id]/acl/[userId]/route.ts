@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { canManageDoc } from "@/lib/workspaceAccess"
 
 export const runtime = "nodejs"
@@ -11,6 +11,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id, userId } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const actor = cred.kind === "service" ? undefined : cred.user.user_id
   const accountType = cred.kind === "service" ? "superadmin" : cred.user.account_type
   if (!(await canManageDoc(id, accountType, actor))) return forbidden()
@@ -40,6 +42,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { id, userId } = await params
   const cred = workspaceCredential(_req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(_req, cred)
+  if (planDenied) return planDenied
   const actor = cred.kind === "service" ? undefined : cred.user.user_id
   const accountType = cred.kind === "service" ? "superadmin" : cred.user.account_type
   if (!(await canManageDoc(id, accountType, actor))) return forbidden()

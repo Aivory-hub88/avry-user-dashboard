@@ -3,7 +3,7 @@
  * (ADR-019 P6): its dated tasks, deadline, dated notes and agent turns.
  */
 import { NextRequest, NextResponse } from "next/server"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, workspacePlanDenied, forbidden } from "@/lib/workspaceAuth"
 import { canRead, getDocRole } from "@/lib/workspaceAccess"
 import { fileRoom } from "@/lib/workspaceFileRoom"
 import { cleanWindow } from "@/lib/timeline"
@@ -15,6 +15,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred || cred.kind !== "user") return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   if (!canRead(await getDocRole(cred, id))) return forbidden()
   if (!(await fileRoom(id))) return NextResponse.json({ error: "room not found" }, { status: 404 })
   const sp = req.nextUrl.searchParams

@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { getDocRole, canRead, canWrite, checkAgentAccess } from "@/lib/workspaceAccess"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { spaceMessageFromRow, spaceTopicFromRow, THREAD_MAX_REPLIES } from "@/lib/spaceThreads"
 import { requesterFrom, requesterKey, authorKeyOf } from "@/lib/spaceWrite"
@@ -22,6 +22,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   if (await checkAgentAccess(id, credential, req.headers.get("x-agent-type"), "read"))
     return forbidden()
   if (!canRead(await getDocRole(credential, id))) return forbidden()
@@ -78,6 +80,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   if (await checkAgentAccess(id, credential, req.headers.get("x-agent-type"), "write"))
     return forbidden()
   const role = await getDocRole(credential, id)

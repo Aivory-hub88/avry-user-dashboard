@@ -14,6 +14,7 @@ const { queryMock, credMock } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ query: queryMock }))
 vi.mock("@/lib/workspaceAuth", () => ({
+  workspacePlanDenied: async () => null,
   workspaceCredential: (...args: unknown[]) => credMock(...args),
   unauthorized: () => Response.json({ error: "unauthorized" }, { status: 401 }),
 }))

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { workspaceCredential, unauthorized } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { isKnownAgentType, canReadDocId } from "@/lib/workspaceAccess"
 
 export const runtime = "nodejs"
@@ -36,6 +36,8 @@ async function watermark(reader: Reader): Promise<string> {
 export async function GET(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const reader = readerOf(req, cred)
   if (!reader) return NextResponse.json({ error: "agent required (X-Agent-Type)" }, { status: 400 })
   try {
@@ -67,6 +69,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const reader = readerOf(req, cred)
   if (!reader) return NextResponse.json({ error: "agent required (X-Agent-Type)" }, { status: 400 })
   let body: { markRead?: unknown } = {}

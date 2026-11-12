@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDocRole, canWrite } from "@/lib/workspaceAccess"
 import { fireDueReminders } from "@/lib/teamReminders"
 import { requestWake } from "@/lib/teamWaits"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 
 export const runtime = "nodejs"
 
@@ -24,6 +24,8 @@ export async function POST(
   const { id, waitId } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   if (credential.kind === "user" && !canWrite(await getDocRole(credential, id))) return forbidden()
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(waitId)) return NextResponse.json({ error: "not found" }, { status: 404 })
 

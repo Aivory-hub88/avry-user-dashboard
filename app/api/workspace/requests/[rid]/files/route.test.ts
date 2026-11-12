@@ -20,6 +20,14 @@ vi.mock("@/lib/r2", () => ({ ...r2, R2_TTL: { put: 300, get: 60 } }))
 
 import { GET as LIST, POST as CREATE } from "./route"
 
+// The paid-plan gate is covered in lib/planGate.test.ts and
+// lib/workspaceAuth.plan.test.ts; these tests run as a paying caller.
+vi.mock("@/lib/planGate", async (orig) => ({
+  ...(await orig<typeof import("@/lib/planGate")>()),
+  requirePaidPlan: async () => ({ ok: true }),
+}))
+
+
 const as = (id: string) => ({ user: { user_id: id, email: `${id}@x.id`, account_type: "member" }, token: "t" })
 let status = "draft"
 

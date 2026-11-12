@@ -20,6 +20,14 @@ vi.mock("@/lib/serverAuth", () => ({ getAuthUserWithToken: () => authMock() }))
 import { GET } from "./route"
 import { POST, PATCH } from "./[task]/route"
 
+// The paid-plan gate is covered in lib/planGate.test.ts and
+// lib/workspaceAuth.plan.test.ts; these tests run as a paying caller.
+vi.mock("@/lib/planGate", async (orig) => ({
+  ...(await orig<typeof import("@/lib/planGate")>()),
+  requirePaidPlan: async () => ({ ok: true }),
+}))
+
+
 process.env.COLLAB_SERVICE_TOKEN = "test-service-token"
 process.env.NEXT_PUBLIC_BACKEND_URL = "https://backend.test"
 

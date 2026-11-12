@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { getDocRole, canWrite, checkAgentAccess } from "@/lib/workspaceAccess"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { spaceTopicFromRow } from "@/lib/spaceThreads"
 
 export const runtime = "nodejs"
@@ -22,6 +22,8 @@ export async function PATCH(
   const { id, t } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   if (await checkAgentAccess(id, credential, req.headers.get("x-agent-type"), "write"))
     return forbidden()
   if (!canWrite(await getDocRole(credential, id))) return forbidden()

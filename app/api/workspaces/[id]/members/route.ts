@@ -1,6 +1,7 @@
+import { ANY_MODULE } from '@/lib/planGate'
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { LEGACY_WORKSPACE } from "@/lib/teams"
 import { normalizeModules } from "@/lib/workspaceModules"
 import { canTakeSeat, holdsSeat, ownerSeatUsage, type SeatUsage } from "@/lib/seats"
@@ -28,6 +29,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred, ANY_MODULE)
+  if (planDenied) return planDenied
   const userId = cred.kind === "service" ? undefined : cred.user.user_id
   const accountType = cred.kind === "service" ? "superadmin" : cred.user.account_type
   if (!(await isManager(id, accountType, userId))) return forbidden()
@@ -66,6 +69,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred, ANY_MODULE)
+  if (planDenied) return planDenied
   const userId = cred.kind === "service" ? undefined : cred.user.user_id
   const accountType = cred.kind === "service" ? "superadmin" : cred.user.account_type
   if (!(await isManager(id, accountType, userId))) return forbidden()

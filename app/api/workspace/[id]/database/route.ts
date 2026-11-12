@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import * as Y from "yjs"
-import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { checkAgentAccess } from "@/lib/workspaceAccess"
 import {
   WorkspaceDenied,
@@ -45,6 +45,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const agent = req.headers.get("x-agent-type")
   // Agent gate: invited agents read per their grant; revoked/unknown agents 403
   // (also covers the pg-fallback path when collab is down).
@@ -65,6 +67,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const assertedAgent = req.headers.get("x-agent-type") || req.headers.get("X-Agent-Type")
   // Agent gate: only invited editor+ agents may write (also covers pg fallback).
   if (await checkAgentAccess(id, cred, assertedAgent, 'write')) return forbidden()

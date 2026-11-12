@@ -11,7 +11,7 @@ import {
   type CopilotConversationState,
 } from '@/lib/workflows/copilotStateMachine'
 import { requirePaidPlan } from '@/lib/planGate'
-import { chargeTrial } from '@/lib/featureUses'
+import { trialTurn } from '@/lib/featureUses'
 import type { CanvasEditContext } from '@/lib/workflows/canvasCopilot'
 
 /** Accept the open canvas only in the expected shape and within a sane size. */
@@ -30,10 +30,6 @@ function parseCanvas(raw: unknown): CanvasEditContext | null {
 
 export const maxDuration = 120
 
-/** Turns allowed in the one free copilot session (per process; enough to clarify, generate, test and fix once). */
-const FREE_SESSION_MAX_TURNS = 12
-const FREE_SESSION_TURNS = new Map<string, number>()
-
 export async function POST(request: NextRequest) {
   const gate = await requirePaidPlan(request, 'workflows')
   if (!gate.ok && gate.code !== 'UPGRADE_REQUIRED') return gate.response
@@ -41,30 +37,19 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // No paid plan: the free allowance covers ONE copilot session, charged
-    // up front and keyed to the session id (the server owns the id it hands
-    // out, so a reset client state can't start a second free session).
-    if (!gate.ok) {
+    // No paid plan: the free allowance covers ONE copilot session of up to
+    // avry-backend TRIAL_MAX_TURNS turns, keyed to the session id. Check
+    // before the turn (charges nothing), record after it worked (charges the
+    // session on its first good turn and counts the turn, in Postgres), so a
+    // failed turn costs nothing and a restart can't reset the count.
+    const trialRef = gate.ok ? null : (() => {
       const sid = typeof body?.sessionId === 'string' && /^[\w:.-]{1,128}$/.test(body.sessionId) ? body.sessionId : null
       body.sessionId = sid ?? `session_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
-      const denied = await chargeTrial(request, 'copilot', `copilot:${body.sessionId}`)
+      return `copilot:${body.sessionId}`
+    })()
+    if (trialRef) {
+      const denied = await trialTurn(request, 'check', 'copilot', trialRef)
       if (denied) return denied
-      // One session, not unlimited turns inside it: the client owns the
-      // conversation state and could keep resetting it under the same id.
-      const turns = (FREE_SESSION_TURNS.get(body.sessionId) ?? 0) + 1
-      if (turns > FREE_SESSION_MAX_TURNS) {
-        return Response.json(
-          {
-            message: 'Your free Workflow Copilot session has ended. Upgrade to the Operational plan to keep building.',
-            code: 'UPGRADE_REQUIRED',
-            requiredTier: 'operational',
-            trialUsed: true,
-          },
-          { status: 402 },
-        )
-      }
-      if (FREE_SESSION_TURNS.size > 5000) FREE_SESSION_TURNS.clear()
-      FREE_SESSION_TURNS.set(body.sessionId, turns)
     }
 
     // ------------------------------------------------------------------
@@ -149,6 +134,12 @@ export async function POST(request: NextRequest) {
       Date.now() - autoDriveT0 < AUTO_DRIVE_DEADLINE_MS
     ) {
       updatedState = await stateMachine.continuePending()
+    }
+
+    // A free turn is charged only when it worked; an errored turn is free.
+    if (trialRef && updatedState.stage !== 'ERROR') {
+      const denied = await trialTurn(request, 'record', 'copilot', trialRef)
+      if (denied) return denied
     }
 
     return Response.json({

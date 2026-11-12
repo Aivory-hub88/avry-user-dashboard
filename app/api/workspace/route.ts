@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
-import { workspaceCredential, unauthorized } from '@/lib/workspaceAuth'
+import { workspaceCredential, unauthorized, workspacePlanDenied } from '@/lib/workspaceAuth'
 import { getDocRolesBatch } from '@/lib/workspaceAccess'
 import { recordWorkspaceActivity } from '@/lib/workspaceActivity'
 
@@ -28,6 +28,8 @@ function encodeCursor(c: ListCursor): string {
 export async function GET(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const showTrash = req.nextUrl.searchParams.get('trash') === '1'
   // Page size the caller sees after ACL filtering + dedup. Default 100 keeps
   // the old single-page behavior for workspaces under the old hard cap.
@@ -107,6 +109,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   if (cred.kind !== 'user' && cred.kind !== 'service') return unauthorized()
   const userId = cred.kind === 'service' ? 'service' : cred.user.user_id
   let body: { title?: string; id?: string; workspace_id?: string } = {}

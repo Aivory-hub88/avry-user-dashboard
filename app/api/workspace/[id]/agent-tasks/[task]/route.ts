@@ -13,7 +13,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { getDocRole, canWrite } from "@/lib/workspaceAccess"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { agentDisplayName } from "@/lib/spaceAgent"
 import { loadAgentTask, setAgentTask, runAgentTask } from "@/lib/spaceAgentRun"
@@ -28,6 +28,8 @@ export async function POST(
   const { id, task: taskId } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   if (credential.kind !== "user") return forbidden()
   const role = await getDocRole(credential, id)
   if (!canWrite(role)) return forbidden()
@@ -71,6 +73,8 @@ export async function PATCH(
   const { id, task: taskId } = await params
   const credential = workspaceCredential(req)
   if (!credential) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, credential)
+  if (planDenied) return planDenied
   const role = await getDocRole(credential, id)
   if (!canWrite(role)) return forbidden()
 

@@ -1,7 +1,7 @@
 /** POST /api/workspace/requests/[rid]/submit — requester sends it for review (ADR-019 P1). */
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { workspaceCredential, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { loadRequest, requestAccess } from "@/lib/projectRequestStore"
 import { requestFromRow, submitProblems, EDITABLE } from "@/lib/projectRequests"
 
@@ -11,6 +11,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ rid
   const { rid } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   try {
     const r = await loadRequest(rid)
     const access = r ? await requestAccess(cred, r) : null

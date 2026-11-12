@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import * as Y from "yjs"
-import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden } from "@/lib/workspaceAuth"
+import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { checkAgentAccess } from "@/lib/workspaceAccess"
 import {
   WorkspaceDenied,
@@ -45,6 +45,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id, rowId } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const assertedAgent = req.headers.get("x-agent-type") || req.headers.get("X-Agent-Type")
   if (await checkAgentAccess(id, cred, assertedAgent, 'write')) return forbidden()
   const agentType = assertedAgent || "user"
@@ -145,6 +147,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id, rowId } = await params
   const cred = workspaceCredential(req)
   if (!cred) return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
   const assertedAgent = req.headers.get("x-agent-type") || req.headers.get("X-Agent-Type")
   if (await checkAgentAccess(id, cred, assertedAgent, 'write')) return forbidden()
   const agentType = assertedAgent || "user"
