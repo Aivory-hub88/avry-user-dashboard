@@ -16,7 +16,7 @@ describe('free preview locks', () => {
   })
 
   it('leaves the free parts open', () => {
-    for (const p of ['/', '/overview', '/console', '/diagnostics', '/dashboard/subscriptions']) {
+    for (const p of ['/', '/overview', '/console', '/diagnostics', '/diagnostics/free', '/diagnostics/free/result', '/dashboard/subscriptions']) {
       expect(lockedPrefixFor(p)).toBeNull()
     }
     expect(lockedPrefixFor('/agentsx')).toBeNull()

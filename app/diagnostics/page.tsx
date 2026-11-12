@@ -9,9 +9,22 @@ import { useRouterContext } from '@/contexts/RouterContext'
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole'
 import GrainHeader from '@/components/ui/GrainHeader'
 import PoweredByAether from '@/components/ui/PoweredByAether'
+import FreeDiagnosticsOverview from '@/components/diagnostics/free/FreeDiagnosticsOverview'
+import { useIsFreeAccount } from '@/hooks/usePlanAccess'
 import styles from './diagnostics.module.css'
 
+/**
+ * Free accounts get the free analysis as the primary action and the Deep
+ * Diagnostic shown locked. Everyone else (and the plan still loading) keeps
+ * the Deep Diagnostic page below.
+ */
 export default function DiagnosticsPage() {
+  const isFree = useIsFreeAccount()
+  if (isFree) return <FreeDiagnosticsOverview />
+  return <DeepDiagnosticsPage />
+}
+
+function DeepDiagnosticsPage() {
   const [deepDiagnosticCompleted, setDeepDiagnosticCompleted] = useState(false)
   const [deepDiagnosticInProgress, setDeepDiagnosticInProgress] = useState(false)
   const [routingNotice, setRoutingNotice] = useState<string | null>(null)

@@ -13,8 +13,10 @@ import ErrorState from "@/components/dashboard/ErrorState"
 import styles from "./overview.module.css"
 import { useRouterContext } from '@/contexts/RouterContext'
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole'
+import { useIsFreeAccount } from '@/hooks/usePlanAccess'
 
 export default function DashboardPage() {
+  const isFree = useIsFreeAccount()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [deepDiagnosticCompleted, setDeepDiagnosticCompleted] = useState(false)
@@ -71,7 +73,10 @@ export default function DashboardPage() {
 
   // Diagnostics card state — deep diagnostic only (free diagnostic moved to landing page)
   const diagnosticsStatus = deepDiagnosticCompleted ? 'completed' : data.diagnostic.status
-  const diagnosticsHref = deepDiagnosticCompleted
+  // Free accounts land on /diagnostics, where the free analysis is (the Deep Diagnostic is paid).
+  const diagnosticsHref = isFree
+    ? '/diagnostics'
+    : deepDiagnosticCompleted
     ? '/diagnostics/deep/final-result'
     : '/diagnostics/deep'
   const diagnosticsCta = deepDiagnosticCompleted
