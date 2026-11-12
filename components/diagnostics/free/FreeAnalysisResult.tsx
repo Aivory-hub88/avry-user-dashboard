@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import ScoreRing from '@/components/result/ScoreRing'
+import GrainHeader from '@/components/ui/GrainHeader'
 import { asset } from '@/lib/asset'
 import { useLocaleContext } from '@/hooks/useLocale'
 import { requestUpgrade } from '@/lib/planAccess'
@@ -206,25 +207,28 @@ export default function FreeAnalysisResult() {
         {header}
 
         {/* Header: what this report is about */}
-        <section className={styles.card}>
-          <span className={styles.eyebrow}>{c.eyebrow} · {c.completed(completed)}</span>
-          <h1 className={styles.title}>{a.ui.resultsTitle}</h1>
-          <div className={styles.meta}>
-            <div><span className={styles.eyebrow}>{c.company}</span><div className={styles.metaValue}>{result.companyName}</div></div>
-            <div><span className={styles.eyebrow}>{c.industry}</span><div className={styles.metaValue}>{view.industryLabel}</div></div>
-            <div><span className={styles.eyebrow}>{c.size}</span><div className={styles.metaValue}>{view.sizeLabel}</div></div>
+        {/* Same grainy-gradient world as the /diagnostics hero card */}
+        <GrainHeader world="harbour" className={styles.hero}>
+          <div className={styles.heroInner}>
+            <span className={styles.heroEyebrow}>{c.eyebrow} · {c.completed(completed)}</span>
+            <h1 className={styles.heroTitle}>{a.ui.resultsTitle}</h1>
+            <div className={styles.meta}>
+              <div><span className={styles.heroEyebrow}>{c.company}</span><div className={styles.heroMetaValue}>{result.companyName}</div></div>
+              <div><span className={styles.heroEyebrow}>{c.industry}</span><div className={styles.heroMetaValue}>{view.industryLabel}</div></div>
+              <div><span className={styles.heroEyebrow}>{c.size}</span><div className={styles.heroMetaValue}>{view.sizeLabel}</div></div>
+            </div>
+            <div className={styles.actions}>
+              <button type="button" className={styles.heroPrimary} onClick={downloadPdf} disabled={pdfBusy}>{pdfBusy ? c.pdfBusy : c.pdf}</button>
+              {remaining !== null && remaining > 0 && (
+                <>
+                  <Link href="/diagnostics/free" className={styles.heroGhost}>{c.again}</Link>
+                  <span className={styles.heroNote}>{c.runsLeft(remaining)}</span>
+                </>
+              )}
+              {remaining === 0 && <span className={styles.heroNote}>{c.noRuns}</span>}
+            </div>
           </div>
-          <div className={styles.actions}>
-            <button type="button" className={styles.primary} onClick={downloadPdf} disabled={pdfBusy}>{pdfBusy ? c.pdfBusy : c.pdf}</button>
-            {remaining !== null && remaining > 0 && (
-              <>
-                <Link href="/diagnostics/free" className={styles.ghost}>{c.again}</Link>
-                <span className={styles.runsNote}>{c.runsLeft(remaining)}</span>
-              </>
-            )}
-            {remaining === 0 && <span className={styles.runsNote}>{c.noRuns}</span>}
-          </div>
-        </section>
+        </GrainHeader>
 
         {/* Score and maturity band */}
         <section className={styles.card}>
