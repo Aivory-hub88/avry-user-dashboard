@@ -4,7 +4,9 @@ import { asset } from "@/lib/asset";
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
+import { X } from "lucide-react"
+import { useMobileNav } from "./MobileNav"
 import { useTranslations } from "next-intl"
 import { getWorkflowCount } from "@/hooks/useWorkflows"
 import { useAgentApprovals } from "@/hooks/useAgentApprovals"
@@ -207,6 +209,14 @@ const NAV_ICONS: Record<string, React.FC> = {
   templates: ExploreIcon,
 }
 
+const PHONE_QUERY = "(max-width: 767px)"
+const subscribePhone = (cb: () => void) => {
+  const mq = window.matchMedia(PHONE_QUERY)
+  mq.addEventListener("change", cb)
+  return () => mq.removeEventListener("change", cb)
+}
+const isPhone = () => window.matchMedia(PHONE_QUERY).matches
+
 export default function Sidebar() {
   const pathname = usePathname() || ""
   const [workflowCount, setWorkflowCount] = useState(0)
@@ -218,7 +228,11 @@ export default function Sidebar() {
   const [allowedModules, setAllowedModules] = useState<string[] | null | undefined>(null)
   const team = useTeamAccess()
   const t = useTranslations("nav")
-  const { collapsed, toggle } = useSidebarCollapse()
+  const { collapsed: storedCollapsed, toggle } = useSidebarCollapse()
+  // Phones get an off-canvas drawer (always full width when open), not the icon rail.
+  const phone = useSyncExternalStore(subscribePhone, isPhone, () => false)
+  const { open, setOpen } = useMobileNav()
+  const collapsed = storedCollapsed && !phone
 
   useEffect(() => {
     const update = () => setWorkflowCount(getWorkflowCount())
@@ -268,7 +282,16 @@ export default function Sidebar() {
     .filter((item) => !team.restricted || isNavKeyAllowedForTeam(item.key, team.modules))
 
   return (
-    <aside className={`flex flex-col h-full bg-[var(--bg-elevated)] border-r border-white/5 transition-all duration-300 ${collapsed ? "w-12" : "w-[220px]"}`}>
+    <>
+    {open && <div aria-hidden onClick={() => setOpen(false)} className="fixed inset-0 z-40 bg-black/55 md:hidden" />}
+    <aside
+      id="app-sidebar"
+      inert={phone && !open}
+      className={`flex flex-col h-full bg-[var(--bg-elevated)] border-r border-white/5 transition-all duration-300
+        max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[min(280px,85vw)] max-md:overflow-y-auto max-md:shadow-2xl
+        ${open ? "max-md:translate-x-0" : "max-md:-translate-x-full max-md:invisible"}
+        ${collapsed ? "md:w-12" : "md:w-[220px]"}`}
+    >
       {/* Logo / Header */}
       <div className="flex items-center gap-2 px-4 pt-8 pb-4">
         {!collapsed ? (
@@ -294,7 +317,17 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Collapsible Toggle Button */}
+      {/* Collapsible Toggle Button (phones: close the drawer instead) */}
+      {phone ? (
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-label="Close menu"
+          className="absolute right-2 top-5 flex h-10 w-10 items-center justify-center rounded-lg text-zinc-400 hover:bg-white/5 hover:text-zinc-100"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      ) : (
       <button
         onClick={toggle}
         className="flex items-center justify-center w-full py-2 text-zinc-400 hover:text-zinc-100 transition-colors"
@@ -302,6 +335,7 @@ export default function Sidebar() {
       >
         {collapsed ? <ChevronRight /> : <ChevronLeft />}
       </button>
+      )}
 
       {/* Navigation */}
       <nav className="flex flex-col gap-0.5 px-2 shrink-0">
@@ -314,6 +348,7 @@ export default function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => setOpen(false)}
               className={`flex items-center rounded-lg text-sm transition-colors cursor-pointer group
                 ${collapsed
                   ? "justify-center w-9 h-9 mx-auto"
@@ -370,5 +405,6 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   )
 }
