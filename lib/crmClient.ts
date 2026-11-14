@@ -17,6 +17,7 @@ export type Company = Owned & {
   industry: string | null
   size: string | null
   custom_fields: Record<string, unknown>
+  created_at?: string
 }
 export type Contact = Owned & {
   id: string
@@ -26,6 +27,7 @@ export type Contact = Owned & {
   title: string | null
   company_id: string | null
   custom_fields: Record<string, unknown>
+  created_at?: string
 }
 export type Deal = Owned & {
   id: string
@@ -104,7 +106,7 @@ const clean = <T extends Record<string, unknown>>(o: T) =>
 export const crmApi = {
   companies: {
     list: () => api<Company[]>("companies"),
-    create: (b: { name: string; domain?: string; industry?: string }) =>
+    create: (b: { name: string; domain?: string | null; industry?: string | null; size?: string; custom_fields?: Record<string, unknown> }) =>
       api<Company>("companies", { method: "POST", json: clean(b) }),
     get: (id: string) => api<Company>(`companies/${id}`),
     /** PATCH replaces the whole record; `companyBody` keeps every field not in `ch`. */
@@ -113,7 +115,7 @@ export const crmApi = {
   },
   contacts: {
     list: () => api<Contact[]>("contacts"),
-    create: (b: { name: string; email?: string; phone?: string; title?: string; company_id?: string }) =>
+    create: (b: { name: string; email?: string | null; phone?: string | null; title?: string | null; company_id?: string; custom_fields?: Record<string, unknown> }) =>
       api<Contact>("contacts", { method: "POST", json: clean(b) }),
     get: (id: string) => api<Contact>(`contacts/${id}`),
     update: (c: Contact, ch: ContactChanges) => api<Contact>(`contacts/${c.id}`, { method: "PATCH", json: contactBody(c, ch) }),
@@ -121,7 +123,16 @@ export const crmApi = {
   },
   deals: {
     list: () => api<Deal[]>("deals"),
-    create: (b: { title: string; value?: number; currency?: string; company_id?: string; contact_ids?: string[]; expected_close_date?: string }) =>
+    create: (b: {
+      title: string
+      value?: number
+      currency?: string
+      stage?: DealStage
+      company_id?: string
+      contact_ids?: string[]
+      expected_close_date?: string
+      custom_fields?: Record<string, unknown>
+    }) =>
       api<Deal>("deals", { method: "POST", json: clean(b) }),
     get: (id: string) => api<Deal>(`deals/${id}`),
     update: (d: Deal, ch: DealChanges) => api<Deal>(`deals/${d.id}`, { method: "PATCH", json: dealBody(d, ch) }),
