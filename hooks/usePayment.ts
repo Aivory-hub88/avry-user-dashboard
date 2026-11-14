@@ -110,6 +110,11 @@ export function usePayment() {
 
       const data = await response.json()
       if (!data.success) throw new Error(data.error || 'Failed to create payment transaction')
+      // A 100% promo: the service granted the order on the spot, with no Snap token.
+      if (data.free) {
+        await finalizePurchase(data.order_id, userId, product, amount, productName, false)
+        return
+      }
       if (!data.token) throw new Error('Payment gateway returned no token')
 
       if (data.token.startsWith('mock_token_')) {
