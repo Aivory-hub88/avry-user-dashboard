@@ -4,6 +4,7 @@
 import { BASE_PATH } from "@/lib/asset"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import type { ActivityKind, SubjectType } from "@/lib/crmActivity"
+import { companyBody, contactBody, dealBody, type CompanyChanges, type ContactChanges, type DealChanges } from "@/lib/crmPipeline"
 
 export const DEAL_STAGES = ["lead", "qualified", "proposal", "won", "lost"] as const
 export type DealStage = (typeof DEAL_STAGES)[number]
@@ -36,6 +37,8 @@ export type Deal = Owned & {
   contact_ids: string[]
   expected_close_date: string | null
   custom_fields: Record<string, unknown>
+  created_at?: string
+  updated_at?: string
 }
 
 export type Activity = Owned & {
@@ -103,18 +106,25 @@ export const crmApi = {
     list: () => api<Company[]>("companies"),
     create: (b: { name: string; domain?: string; industry?: string }) =>
       api<Company>("companies", { method: "POST", json: clean(b) }),
+    get: (id: string) => api<Company>(`companies/${id}`),
+    /** PATCH replaces the whole record; `companyBody` keeps every field not in `ch`. */
+    update: (c: Company, ch: CompanyChanges) => api<Company>(`companies/${c.id}`, { method: "PATCH", json: companyBody(c, ch) }),
     remove: (id: string) => api(`companies/${id}`, { method: "DELETE" }),
   },
   contacts: {
     list: () => api<Contact[]>("contacts"),
-    create: (b: { name: string; email?: string; title?: string; company_id?: string }) =>
+    create: (b: { name: string; email?: string; phone?: string; title?: string; company_id?: string }) =>
       api<Contact>("contacts", { method: "POST", json: clean(b) }),
+    get: (id: string) => api<Contact>(`contacts/${id}`),
+    update: (c: Contact, ch: ContactChanges) => api<Contact>(`contacts/${c.id}`, { method: "PATCH", json: contactBody(c, ch) }),
     remove: (id: string) => api(`contacts/${id}`, { method: "DELETE" }),
   },
   deals: {
     list: () => api<Deal[]>("deals"),
-    create: (b: { title: string; value?: number; currency?: string; company_id?: string; contact_ids?: string[] }) =>
+    create: (b: { title: string; value?: number; currency?: string; company_id?: string; contact_ids?: string[]; expected_close_date?: string }) =>
       api<Deal>("deals", { method: "POST", json: clean(b) }),
+    get: (id: string) => api<Deal>(`deals/${id}`),
+    update: (d: Deal, ch: DealChanges) => api<Deal>(`deals/${d.id}`, { method: "PATCH", json: dealBody(d, ch) }),
     setStage: (id: string, stage: DealStage) => api<Deal>(`deals/${id}/stage`, { method: "PATCH", json: { stage } }),
     remove: (id: string) => api(`deals/${id}`, { method: "DELETE" }),
   },
