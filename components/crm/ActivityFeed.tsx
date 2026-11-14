@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import ActivityItem from "@/components/crm/ActivityItem"
 import { crmApi, type Activity } from "@/lib/crmClient"
 import { sortFollowUps, type SubjectType } from "@/lib/crmActivity"
-import type { Subject } from "@/components/crm/ActivityPanel"
+export type Subject = { type: SubjectType; id: string; name: string }
 
 const RECENT_SHOWN = 50
 
