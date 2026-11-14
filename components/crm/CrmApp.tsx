@@ -10,19 +10,47 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowRightLeft, Clock, Plus, Search, SlidersHorizontal, X } from "lucide-react"
+import { ArrowRightLeft, Clock, Plus, Search, SlidersHorizontal, Sparkles, Upload, X } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import AgentAccess from "@/components/crm/AgentAccess"
 import ActivityFeed from "@/components/crm/ActivityFeed"
+import CrmWelcome, { SetupChecklist } from "@/components/crm/CrmWelcome"
+import ImportDialog from "@/components/crm/ImportDialog"
+import { loadSampleData, removeSampleData } from "@/components/crm/onboardingActions"
 import { CRM_TABS, STAGE_DOT, STAGE_LABEL, crmHref, type CrmTab } from "@/components/crm/crmUi"
 import { activityState, agentLabel, formatWhen } from "@/lib/crmActivity"
-import { crmApi, DEAL_STAGES, type Activity, type Company, type Contact, type Deal, type DealStage } from "@/lib/crmClient"
+import { crmApi, DEAL_STAGES, type Activity, type Company, type Contact, type Deal, type DealStage, type Grant } from "@/lib/crmClient"
+import { agentRecent, isSample, setupChecklist, type ChecklistItem } from "@/lib/crmOnboarding"
 import { daysUntil, formatMoney, isPastClose, OPEN_STAGES, pipelineSummary, sharedCurrency, stageTotals } from "@/lib/crmPipeline"
 
 function ownerInitial(o: { owner_agent: string | null }): { label: string; title: string; agent: boolean } {
   if (!o.owner_agent) return { label: "You", title: "Owner: you", agent: false }
   const name = agentLabel(o.owner_agent).replace(/ \(agent\)$/, "")
   return { label: name.charAt(0).toUpperCase(), title: `Owner: ${name}`, agent: true }
+}
+
+const WELCOME_SKIPPED_KEY = "aivory.crm.welcomeSkipped"
+const CHECKLIST_HIDDEN_KEY = "aivory.crm.checklistHidden"
+
+/** Per-viewer UI preference; storage can be unavailable (private mode), so never throw. */
+function readFlag(key: string): boolean {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(key) === "1"
+  } catch {
+    return false
+  }
+}
+
+function writeFlag(key: string) {
+  try {
+    window.localStorage.setItem(key, "1")
+  } catch {
+    // Not persisted; the in-memory state still applies for this visit.
+  }
+}
+
+function SamplePill() {
+  return <span className="shrink-0 rounded-full bg-white/[0.08] px-1.5 py-px text-[10px] font-medium text-white/60">Sample</span>
 }
 
 function shortDate(iso: string): string {
@@ -42,22 +70,33 @@ export default function CrmApp() {
   const [contacts, setContacts] = useState<Contact[] | null>(null)
   const [deals, setDeals] = useState<Deal[] | null>(null)
   const [followUps, setFollowUps] = useState<Activity[]>([])
+  const [activities, setActivities] = useState<Activity[]>([])
+  const [grants, setGrants] = useState<Grant[] | null>(null)
+  const [welcomeSkipped, setWelcomeSkipped] = useState(() => readFlag(WELCOME_SKIPPED_KEY))
+  const [checklistHidden, setChecklistHidden] = useState(() => readFlag(CHECKLIST_HIDDEN_KEY))
+  const [checklistOpen, setChecklistOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [sampleBusy, setSampleBusy] = useState<"load" | "remove" | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [q, setQ] = useState("")
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   const load = useCallback(async () => {
     try {
-      const [c, p, d, f] = await Promise.all([
+      const [c, p, d, f, a, g] = await Promise.all([
         crmApi.companies.list(),
         crmApi.contacts.list(),
         crmApi.deals.list(),
         crmApi.activities.list({ has_due: true, completed: false }).catch(() => [] as Activity[]),
+        crmApi.activities.list().catch(() => [] as Activity[]),
+        crmApi.grants.list().catch(() => null),
       ])
       setCompanies(c)
       setContacts(p)
       setDeals(d)
       setFollowUps(f)
+      setActivities(a)
+      setGrants(g)
       setError(null)
     } catch (e) {
       setError((e as Error).message)
@@ -125,20 +164,120 @@ export default function CrmApp() {
     { key: "activity", label: "Activity" },
   ]
   const ready = companies !== null && contacts !== null && deals !== null
+  const data = { companies: companies ?? [], contacts: contacts ?? [], deals: deals ?? [], activities }
+  const checklist = setupChecklist({ ...data, grants })
+  const setupDone = checklist.filter((i) => i.done).length
+  const recent = agentRecent(data)
+  const sampleCount = [...data.companies, ...data.contacts, ...data.deals].filter(isSample).length
+  const empty = ready && data.companies.length + data.contacts.length + data.deals.length === 0
+  const showWelcome = empty && !welcomeSkipped
+
+  const skipWelcome = () => {
+    setWelcomeSkipped(true)
+    writeFlag(WELCOME_SKIPPED_KEY)
+  }
+  const hideChecklist = () => {
+    setChecklistHidden(true)
+    setChecklistOpen(false)
+    writeFlag(CHECKLIST_HIDDEN_KEY)
+  }
+  const onChecklistItem = (key: ChecklistItem["key"]) => {
+    setChecklistOpen(false)
+    if (key === "agent") return setSettingsOpen(true)
+    skipWelcome()
+    if (key === "company") setTab("companies")
+    else if (key === "contact") setTab("contacts")
+    else if (key === "activity" && data.deals[0]) router.push(crmHref("deal", data.deals[0].id))
+    else if (key === "activity" && data.companies[0]) router.push(crmHref("company", data.companies[0].id))
+    else setTab("deals")
+  }
+  const addSample = async () => {
+    setSampleBusy("load")
+    setError(null)
+    try {
+      await loadSampleData()
+    } catch (e) {
+      setError(`Sample data could not be fully loaded: ${(e as Error).message}`)
+    }
+    await load()
+    setSampleBusy(null)
+  }
+  const dropSample = async () => {
+    setSampleBusy("remove")
+    setError(null)
+    const failed = await removeSampleData(data)
+    if (failed) setError(`${failed} sample items could not be removed. Try again.`)
+    await load()
+    setSampleBusy(null)
+  }
 
   return (
     <div className="flex h-full w-full flex-col bg-surface-1">
       <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-line bg-black/10 px-6 text-[13px]">
         <span className="font-medium text-white/85">CRM</span>
-        <button
+        <span className="flex items-center gap-1">
+          {ready && !showWelcome && !checklistHidden && setupDone < checklist.length && (
+            <span className="relative">
+              <button
+                type="button"
+                onClick={() => setChecklistOpen((o) => !o)}
+                aria-expanded={checklistOpen}
+                className="flex items-center gap-2 whitespace-nowrap rounded-full border border-line bg-white/[0.04] py-1 pl-1.5 pr-3 text-[12px] text-white/75 hover:text-white"
+              >
+                <span
+                  className="flex h-5 w-5 items-center justify-center rounded-full"
+                  style={{ background: `conic-gradient(#fff ${(setupDone / checklist.length) * 360}deg, rgba(255,255,255,.14) 0deg)` }}
+                >
+                  <span className="h-3.5 w-3.5 rounded-full bg-surface-1" />
+                </span>
+                Setup {setupDone} of {checklist.length}
+              </button>
+              {checklistOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setChecklistOpen(false)} aria-hidden />
+                  <div className="absolute right-0 top-9 z-40 w-[300px] rounded-2xl border border-line bg-surface-1 p-4 shadow-2xl">
+                    <SetupChecklist items={checklist} onItem={onChecklistItem} onHide={hideChecklist} />
+                  </div>
+                </>
+              )}
+            </span>
+          )}
+          {ready && !showWelcome && (
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] text-white/55 hover:bg-white/[0.06] hover:text-white/85"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Import
+            </button>
+          )}
+          <button
           type="button"
           onClick={() => setSettingsOpen(true)}
           className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] text-white/55 hover:bg-white/[0.06] hover:text-white/85"
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
           Agent access
-        </button>
+          </button>
+        </span>
       </div>
+
+      {showWelcome ? (
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
+          {error && <div className="mx-auto mb-4 max-w-[1040px] rounded-xl bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>}
+          <CrmWelcome
+            checklist={checklist}
+            sampleBusy={sampleBusy === "load"}
+            onConnect={() => setSettingsOpen(true)}
+            onImport={() => setImportOpen(true)}
+            onSample={() => void addSample()}
+            onSkip={skipWelcome}
+            onItem={onChecklistItem}
+          />
+        </div>
+      ) : (
+        <>
 
       <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-line px-6 py-3">
         <div className="flex flex-wrap gap-1" role="tablist">
@@ -164,6 +303,33 @@ export default function CrmApp() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         {error && <div className="mb-4 rounded-xl bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>}
+        {ready && sampleCount > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white/[0.03] px-4 py-2.5">
+            <SamplePill />
+            <span className="min-w-[200px] flex-1 text-[13px] text-white/75">You&apos;re looking at sample data. Records you add yourself stay when you remove it.</span>
+            <Button onClick={() => void dropSample()} disabled={sampleBusy !== null}>
+              {sampleBusy === "remove" ? "Removing…" : "Remove sample data"}
+            </Button>
+          </div>
+        )}
+        {ready && recent.records + recent.activities > 0 && tab !== "activity" && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-sky-400/15 bg-sky-400/[0.06] px-4 py-2.5">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-400/20 text-sky-100">
+              <Sparkles size={12} />
+            </span>
+            <span className="min-w-[200px] flex-1 text-[13px] text-white/80">
+              {recent.agents.map((a) => agentLabel(a).replace(/ \(agent\)$/, "")).join(" and ")}{" "}
+              {[
+                recent.records ? `added ${recent.records} ${recent.records === 1 ? "record" : "records"}` : "",
+                recent.activities ? `logged ${recent.activities} ${recent.activities === 1 ? "activity" : "activities"}` : "",
+              ]
+                .filter(Boolean)
+                .join(" and ")}{" "}
+              in the last 24 hours.
+            </span>
+            <Button onClick={() => setTab("activity")}>Review</Button>
+          </div>
+        )}
 
         {!ready ? (
           !error && <div className="h-40 animate-pulse rounded-2xl bg-white/[0.03]" />
@@ -198,7 +364,18 @@ export default function CrmApp() {
         )}
       </div>
 
-      {settingsOpen && <AgentDrawer onClose={() => setSettingsOpen(false)} />}
+        </>
+      )}
+
+      {settingsOpen && (
+        <AgentDrawer
+          onClose={() => {
+            setSettingsOpen(false)
+            void load()
+          }}
+        />
+      )}
+      {importOpen && companies && <ImportDialog companies={companies} onClose={() => setImportOpen(false)} onImported={() => void load()} />}
     </div>
   )
 }
@@ -431,7 +608,12 @@ function DealCard({
           {owner.label}
         </span>
       </div>
-      {company && <div className="mt-0.5 truncate text-[11px] text-white/55">{company}</div>}
+      {(company || isSample(d)) && (
+        <div className="mt-0.5 flex items-center gap-1.5">
+          {company && <span className="truncate text-[11px] text-white/55">{company}</span>}
+          {isSample(d) && <SamplePill />}
+        </div>
+      )}
       <div className="mt-2 flex items-center justify-between gap-2 text-[12px]">
         <span className="text-white/85">{d.value !== null ? formatMoney(d.value, d.currency) : <span className="text-white/35">No value</span>}</span>
         {d.expected_close_date && (
@@ -531,7 +713,10 @@ function CompaniesTab({
                 return (
                   <tr key={c.id} className="hover:bg-white/[0.025]">
                     <td className="px-4 py-3">
-                      <Link href={crmHref("company", c.id)} className="block text-white/90 hover:underline hover:decoration-white/25 hover:underline-offset-2">{c.name}</Link>
+                      <span className="flex items-center gap-2">
+                        <Link href={crmHref("company", c.id)} className="text-white/90 hover:underline hover:decoration-white/25 hover:underline-offset-2">{c.name}</Link>
+                        {isSample(c) && <SamplePill />}
+                      </span>
                       {c.domain && <span className="block text-[11px] text-white/45">{c.domain}</span>}
                     </td>
                     <td className="px-4 py-3 text-white/65">{c.industry ?? <span className="text-white/25">—</span>}</td>
@@ -611,7 +796,10 @@ function ContactsTab({
               {contacts.map((c) => (
                 <tr key={c.id} className="hover:bg-white/[0.025]">
                   <td className="px-4 py-3">
-                    <Link href={crmHref("contact", c.id)} className="block text-white/90 hover:underline hover:decoration-white/25 hover:underline-offset-2">{c.name}</Link>
+                    <span className="flex items-center gap-2">
+                      <Link href={crmHref("contact", c.id)} className="text-white/90 hover:underline hover:decoration-white/25 hover:underline-offset-2">{c.name}</Link>
+                      {isSample(c) && <SamplePill />}
+                    </span>
                     {c.title && <span className="block text-[11px] text-white/45">{c.title}</span>}
                   </td>
                   <td className="px-4 py-3 text-white/65">
