@@ -8,9 +8,10 @@
  * admin approves it and the room opens. This page replaces the old list of
  * Notion-style pages and the "jump to the latest project" redirect.
  */
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { CalendarRange, ChevronRight, Plus, Users } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { CalendarRange, ChevronRight, CircleHelp, Plus, Users } from "lucide-react"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { agentDisplayName } from "@/lib/spaceAgent"
@@ -18,6 +19,9 @@ import { displayBody, personName } from "@/lib/roomChat"
 import { useSettingsModal } from "@/contexts/SettingsModalContext"
 import { requestsApi, teamsApi, type RequestWithTeam, type TeamSummary } from "@/lib/requestsClient"
 import { StatusPill, formatDate } from "@/components/requests/requestUi"
+import { WorkspaceGuide, WorkspaceWelcome } from "@/components/workspace/WorkspaceWelcome"
+import WorkspaceTour, { tourDone } from "@/components/workspace/WorkspaceTour"
+import { onboardingSteps, type StepAction } from "@/lib/workspaceOnboarding"
 
 interface RoomSummary {
   id: string
@@ -49,12 +53,15 @@ function lastLine(r: RoomSummary): string {
 }
 
 export default function WorkspaceHome() {
-  const { openSettingsModal } = useSettingsModal()
+  const { openSettingsModal, isOpen: settingsOpen } = useSettingsModal()
+  const router = useRouter()
   const [rooms, setRooms] = useState<RoomSummary[] | null>(null)
   const [teams, setTeams] = useState<TeamSummary[] | null>(null)
   const [mine, setMine] = useState<RequestWithTeam[]>([])
   const [inbox, setInbox] = useState<RequestWithTeam[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const [tourOpen, setTourOpen] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -83,6 +90,29 @@ export default function WorkspaceHome() {
   const toReview = useMemo(() => inbox.filter((r) => r.status === "submitted"), [inbox])
   const inProgress = useMemo(() => mine.filter((r) => r.status === "draft" || r.status === "changes_requested" || r.status === "submitted").slice(0, 5), [mine])
   const canRequest = (teams ?? []).some((t) => t.role === "owner" || t.role === "editor")
+  const steps = useMemo(() => onboardingSteps({ teams: teams ?? [], mine, inbox, rooms: rooms ?? [] }), [teams, mine, inbox, rooms])
+  const hasRooms = (rooms?.length ?? 0) > 0
+
+  // First visit after the first room exists: walk through the page once.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (hasRooms && !tourDone()) setTourOpen(true)
+  }, [hasRooms])
+
+  // Teams live in the settings modal; reload when it closes so a new team ticks step 1.
+  const settingsWasOpen = useRef(settingsOpen)
+  useEffect(() => {
+    if (settingsWasOpen.current && !settingsOpen) void load()
+    settingsWasOpen.current = settingsOpen
+  }, [settingsOpen, load])
+
+  const onAction = (a: StepAction) => {
+    if (a.kind === "createTeam") openSettingsModal("team")
+    else if (a.kind === "newRequest") router.push("/workspace/requests?new=1")
+    else if (a.kind === "openRequest") router.push(`/workspace/requests/${a.id}`)
+    else if (a.kind === "reviewInbox") router.push("/workspace/requests?tab=inbox")
+    else router.push(`/workspace/${a.id}`)
+  }
 
   return (
     <div className="flex h-full w-full flex-col bg-surface-1">
@@ -93,11 +123,20 @@ export default function WorkspaceHome() {
             <CalendarRange className="h-3.5 w-3.5" />
             <span>Timeline</span>
           </Link>
-          <button type="button" onClick={() => openSettingsModal("team")} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
+          <button
+            type="button"
+            onClick={() => setGuideOpen(true)}
+            aria-label="How Workspace works"
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80"
+          >
+            <CircleHelp className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">How it works</span>
+          </button>
+          <button data-tour="teams" type="button" onClick={() => openSettingsModal("team")} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
             <Users className="h-3.5 w-3.5" />
             <span>Teams</span>
           </button>
-          <Link href="/workspace/requests" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
+          <Link data-tour="requests" href="/workspace/requests" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
             <span>Requests</span>
             {toReview.length > 0 && <span className="rounded-full bg-amber-500/20 px-1.5 text-[10px] tabular-nums text-amber-200">{toReview.length}</span>}
           </Link>
@@ -113,7 +152,7 @@ export default function WorkspaceHome() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[920px] px-8 py-8">
+        <div className="mx-auto w-full max-w-[920px] px-4 py-8 sm:px-8">
           {error && <div className="mb-4 rounded-xl bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>}
 
           {toReview.length > 0 && (
@@ -128,39 +167,21 @@ export default function WorkspaceHome() {
             </Link>
           )}
 
-          <div className="mb-3 flex items-end justify-between">
-            <span className="text-[13px] font-medium text-white/80">Rooms</span>
-            {rooms && rooms.length > 0 && <span className="text-[11px] text-white/30">{rooms.length === 1 ? "1 room" : `${rooms.length} rooms`}</span>}
-          </div>
-
-          {rooms === null ? (
+          {rooms === null || teams === null ? (
             <div className="space-y-2">
               {[0, 1, 2].map((i) => (
                 <div key={i} className="h-[72px] animate-pulse rounded-xl bg-white/[0.03]" />
               ))}
             </div>
           ) : rooms.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-line px-6 py-12 text-center">
-              <div className="text-[15px] font-medium text-white/80">No rooms yet</div>
-              <div className="mx-auto mt-2 max-w-[460px] text-[13px] leading-relaxed text-white/40">
-                A room is where your team and its agents work on one project. Start with a request: describe the project, add its data and files, and a team admin approves it.
-              </div>
-              <div className="mt-6 flex justify-center gap-2">
-                {teams !== null && teams.length === 0 ? (
-                  <button type="button" onClick={() => openSettingsModal("team")} className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black">
-                    Create a team
-                  </button>
-                ) : (
-                  canRequest && (
-                    <Link href="/workspace/requests?new=1" className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black">
-                      Request a project
-                    </Link>
-                  )
-                )}
-              </div>
-            </div>
+            <WorkspaceWelcome steps={steps} onAction={onAction} />
           ) : (
-            <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+            <>
+            <div className="mb-3 flex items-end justify-between">
+              <span className="text-[13px] font-medium text-white/80">Rooms</span>
+              <span className="text-[11px] text-white/30">{rooms.length === 1 ? "1 room" : `${rooms.length} rooms`}</span>
+            </div>
+            <div data-tour="rooms" className="divide-y divide-line overflow-hidden rounded-xl border border-line">
               {rooms.map((r) => (
                 <Link key={r.id} href={`/workspace/${r.id}`} className="group flex items-center gap-4 px-4 py-3.5 transition-colors duration-150 hover:bg-white/[0.03]">
                   <div className="min-w-0 flex-1">
@@ -190,6 +211,7 @@ export default function WorkspaceHome() {
                 </Link>
               ))}
             </div>
+            </>
           )}
 
           {inProgress.length > 0 && (
@@ -215,6 +237,18 @@ export default function WorkspaceHome() {
           )}
         </div>
       </div>
+
+      {guideOpen && (
+        <WorkspaceGuide
+          steps={steps}
+          onClose={() => setGuideOpen(false)}
+          onTour={() => {
+            setGuideOpen(false)
+            if (hasRooms) setTourOpen(true)
+          }}
+        />
+      )}
+      {tourOpen && <WorkspaceTour onClose={() => setTourOpen(false)} />}
     </div>
   )
 }
