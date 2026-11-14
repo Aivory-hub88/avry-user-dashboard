@@ -2,6 +2,7 @@ import SessionKeepAlive from "@/components/auth/SessionKeepAlive"
 import type { Metadata } from "next"
 import { Inter_Tight, Nunito, Manrope } from "next/font/google"
 import Sidebar from "@/components/shared/Sidebar"
+import { MobileNavProvider, MobileTopBar } from "@/components/shared/MobileNav"
 import ClientShell from "@/components/ClientShell"
 import SessionExpiredNotice from "@/components/SessionExpiredNotice"
 import LocaleWrapper from "@/components/LocaleWrapper"
@@ -58,10 +59,15 @@ export default function RootLayout({
                 <WorkspaceProvider>
                   <DashboardEntryGate>
                     <DemoRouteGuard />
-                    <Sidebar />
-                    <main className="flex-1 flex flex-col h-full min-w-0 overflow-y-auto">
-                      <PaidRouteLock>{children}</PaidRouteLock>
-                    </main>
+                    <MobileNavProvider>
+                      <Sidebar />
+                      <div className="flex h-full min-w-0 flex-1 flex-col">
+                        <MobileTopBar />
+                        <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-y-auto">
+                          <PaidRouteLock>{children}</PaidRouteLock>
+                        </main>
+                      </div>
+                    </MobileNavProvider>
                     <ClientShell />
                     <UpgradeModal />
                     <SessionExpiredNotice />
