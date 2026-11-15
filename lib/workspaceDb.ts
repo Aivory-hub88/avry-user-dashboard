@@ -3,7 +3,7 @@ import { query } from "@/lib/db"
 import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDoc"
 import { collabAuthHeaders, type WorkspaceCredential } from "@/lib/workspaceAuth"
 import { canReadDocId } from "@/lib/workspaceAccess"
-import { computeRollups, parseFieldDefs, type FieldDef, type CellValue } from "@/lib/workspaceDbModel"
+import { computeRollups, parseFieldDefs, rowAssignees, cleanOwner, cleanPersonRef, type FieldDef, type CellValue, type PersonRef } from "@/lib/workspaceDbModel"
 
 // Re-exported so existing importers keep working; the pure model lives in
 // workspaceDbModel.ts (client-safe: no pg/node imports, see its header).
@@ -35,7 +35,15 @@ export type DbRow = {
   title: string
   status: string
   priority: "Low" | "Med" | "High"
+  /** Derived display mirror of `assignees` (legacy rows: the free text). */
   assignee: string
+  /** Who does it — people and/or agents (max 5). */
+  assignees: PersonRef[]
+  /** Who is accountable — always a person. */
+  owner: PersonRef | null
+  /** Set once on create; never changed by edits. */
+  createdBy: PersonRef | null
+  createdAt: string
   start: string
   due: string
   description: string
@@ -94,6 +102,10 @@ export function parseDbRow(m: Y.Map<unknown>): DbRow {
     status: str(m.get("status"), "Todo"),
     priority: (VALID_PRIORITIES.has(priority) ? priority : "Med") as DbRow["priority"],
     assignee: str(m.get("assignee")),
+    assignees: rowAssignees(m.get("assignees"), m.get("assignee")),
+    owner: cleanOwner(m.get("owner")),
+    createdBy: cleanPersonRef(m.get("createdBy")),
+    createdAt: str(m.get("createdAt")),
     start: str(m.get("start")),
     due: str(m.get("due")),
     description: str(m.get("description")).slice(0, MAX_DESCRIPTION_LEN),
@@ -110,6 +122,15 @@ export function newDbRowId(): string {
   return Math.random().toString(36).slice(2, 8)
 }
 
+/** The caller as a person ref (agents by type; users by id + email name). */
+export function actorRef(cred: WorkspaceCredential, agentType: string): PersonRef | null {
+  if (cred.kind === "user") {
+    const name = cred.user.email ? cred.user.email.split("@")[0] : ""
+    return cleanPersonRef({ kind: "user", id: cred.user.user_id, name })
+  }
+  return cleanPersonRef({ kind: "agent", type: agentType })
+}
+
 export function dbRowToYMap(r: DbRow): Y.Map<unknown> {
   const m = new Y.Map<unknown>()
   m.set("id", r.id)
@@ -117,6 +138,12 @@ export function dbRowToYMap(r: DbRow): Y.Map<unknown> {
   m.set("status", r.status)
   m.set("priority", r.priority)
   m.set("assignee", r.assignee)
+  // No typed assignees but legacy text: leave `assignees` unset so the text
+  // still reads as an unlinked assignee (see rowAssignees).
+  if (r.assignees.length > 0 || !r.assignee) m.set("assignees", r.assignees)
+  m.set("owner", r.owner)
+  m.set("createdBy", r.createdBy)
+  m.set("createdAt", r.createdAt)
   m.set("start", r.start)
   m.set("due", r.due)
   m.set("description", r.description)

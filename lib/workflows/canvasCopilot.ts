@@ -268,8 +268,24 @@ export function mergeEditedNodes(
     keepTrigger?: boolean
     /** normalized edited title -> original node id (see stepIdAliases). */
     idAliases?: Map<string, string>
+    /** Original node ids that must not be kept (applyEditToCanvas excludes
+     *  nodes the connection check implicated). Their steps get fresh nodes. */
+    exclude?: ReadonlySet<string>
+    /** Test hook: false disables the output-shape guard, to prove the
+     *  connection check repairs what the guard would have prevented. */
+    checkOutputShape?: boolean
   } = {},
-): { nodes: RFNode[]; edges: Edge[]; kept: number; added: number; removed: number } {
+): {
+  nodes: RFNode[]
+  edges: Edge[]
+  kept: number
+  added: number
+  removed: number
+  /** next node id -> the original node id whose data it kept. */
+  keptIds: Map<string, string>
+} {
+  const excluded = options.exclude ?? new Set<string>()
+  const shapeGuard = options.checkOutputShape !== false
   const origSubIds = new Set(original.edges.filter(isSubEdge).map((e) => e.source))
   const nextSubIds = new Set(next.edges.filter(isSubEdge).map((e) => e.source))
 
@@ -288,7 +304,7 @@ export function mergeEditedNodes(
     const aliasId = key ? options.idAliases?.get(key) : undefined
     const byId = aliasId ? original.nodes.find((o) => o.id === aliasId && !origSubIds.has(o.id)) : undefined
     const orig = byId ?? (key ? origByTitle.get(key) : undefined)
-    if (orig && !usedOrig.has(orig.id) && outputShape(orig) === outputShape(n)) {
+    if (orig && !usedOrig.has(orig.id) && !excluded.has(orig.id) && (!shapeGuard || outputShape(orig) === outputShape(n))) {
       matched.set(n.id, orig)
       usedOrig.add(orig.id)
     }
@@ -296,7 +312,7 @@ export function mergeEditedNodes(
 
   if (options.keepTrigger) {
     const nextTrigger = next.nodes.find((n) => isTriggerNode(n) && !matched.has(n.id))
-    const origTrigger = original.nodes.find((n) => isTriggerNode(n) && !usedOrig.has(n.id))
+    const origTrigger = original.nodes.find((n) => isTriggerNode(n) && !usedOrig.has(n.id) && !excluded.has(n.id))
     if (nextTrigger && origTrigger) matched.set(nextTrigger.id, origTrigger)
     if (nextTrigger && origTrigger) usedOrig.add(origTrigger.id)
   }
@@ -373,7 +389,161 @@ export function mergeEditedNodes(
     kept: matched.size,
     added: mainNext - matched.size,
     removed: mainOrig - matched.size,
+    keptIds: new Map([...matched].map(([id, orig]) => [id, orig.id])),
   }
+}
+
+// ── Connection check ──────────────────────────────────────────────────────
+
+export type CanvasIssueKind = 'missing-node' | 'missing-handle' | 'unreachable'
+
+export interface CanvasIssue {
+  kind: CanvasIssueKind
+  /** The node the issue is about (an edge's source for edge issues). */
+  nodeId: string
+  /** Human-readable step title, for messages. */
+  title: string
+  edgeId?: string
+  message: string
+}
+
+function nodeTitle(n: RFNode | undefined, fallback: string): string {
+  return displayTitle(String(n?.data?.title || n?.data?.label || fallback))
+}
+
+/**
+ * The source handle ids a node renders (see WorkflowNode): a node with more
+ * than one `data.outputs` entry exposes exactly those ids; every other node
+ * has a single source handle with no id. `null` stands for that unnamed one.
+ */
+function sourceHandles(n: RFNode): Set<string | null> {
+  const outs = (n.data as { outputs?: { id: string }[] } | undefined)?.outputs
+  return outs && outs.length > 1 ? new Set(outs.map((o) => o.id)) : new Set([null])
+}
+
+/**
+ * Everything on a canvas that React Flow would silently not draw or that
+ * would never run: edges whose source/target node is missing, edges leaving
+ * a handle the source node does not expose, and main nodes no trigger
+ * reaches (skipped when the canvas has no trigger). AI sub-node links
+ * (`aiSubConnection`) are not main flow and are only checked for dangling ends.
+ */
+export function checkCanvasIntegrity(nodes: RFNode[], edges: Edge[]): CanvasIssue[] {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const issues: CanvasIssue[] = []
+  const subIds = new Set(edges.filter(isSubEdge).map((e) => e.source))
+  const live: Edge[] = []
+
+  for (const e of edges) {
+    const src = byId.get(e.source)
+    const tgt = byId.get(e.target)
+    if (!src || !tgt) {
+      const missing = !src ? e.source : e.target
+      issues.push({
+        kind: 'missing-node',
+        nodeId: src ? e.source : tgt ? e.target : e.source,
+        title: nodeTitle(src ?? tgt, missing),
+        edgeId: e.id,
+        message: `A connection points to a step that no longer exists (${missing}).`,
+      })
+      continue
+    }
+    if (isSubEdge(e)) continue
+    const handle = e.sourceHandle ?? null
+    if (handle !== null && !sourceHandles(src).has(handle)) {
+      issues.push({
+        kind: 'missing-handle',
+        nodeId: src.id,
+        title: nodeTitle(src, src.id),
+        edgeId: e.id,
+        message: `"${nodeTitle(src, src.id)}" has no "${handle}" output, so its link to "${nodeTitle(tgt, tgt.id)}" would not be drawn.`,
+      })
+      continue
+    }
+    live.push(e)
+  }
+
+  const main = nodes.filter((n) => !subIds.has(n.id))
+  const triggers = main.filter(isTriggerNode)
+  if (triggers.length) {
+    const out = new Map<string, string[]>()
+    for (const e of live) out.set(e.source, [...(out.get(e.source) || []), e.target])
+    const seen = new Set(triggers.map((t) => t.id))
+    const queue = triggers.map((t) => t.id)
+    while (queue.length) {
+      for (const t of out.get(queue.shift()!) || []) {
+        if (!seen.has(t)) {
+          seen.add(t)
+          queue.push(t)
+        }
+      }
+    }
+    for (const n of main) {
+      if (seen.has(n.id)) continue
+      issues.push({
+        kind: 'unreachable',
+        nodeId: n.id,
+        title: nodeTitle(n, n.id),
+        message: `"${nodeTitle(n, n.id)}" is not connected to the trigger, so it would never run.`,
+      })
+    }
+  }
+  return issues
+}
+
+/**
+ * mergeEditedNodes + checkCanvasIntegrity with auto-repair: when the merged
+ * canvas has issues, every kept original node implicated in one (the source
+ * of a broken edge; with no broken edges, an unreachable node and its direct
+ * predecessors) is excluded and the merge re-run, so that step gets a freshly mapped
+ * node with the right handles. At most 3 repair rounds. `reset` names the
+ * steps whose old settings the repair dropped; `issues` is what is still
+ * broken — the caller must not apply a canvas with issues left.
+ */
+export function applyEditToCanvas(
+  original: { nodes: RFNode[]; edges: Edge[] },
+  next: { nodes: RFNode[]; edges: Edge[] },
+  opts: Parameters<typeof mergeEditedNodes>[2] = {},
+): ReturnType<typeof mergeEditedNodes> & { issues: CanvasIssue[]; reset: string[] } {
+  const exclude = new Set(opts.exclude ?? [])
+  const reset: string[] = []
+  let merged = mergeEditedNodes(original, next, { ...opts, exclude })
+  let issues = checkCanvasIntegrity(merged.nodes, merged.edges)
+
+  for (let round = 0; round < 3 && issues.length; round++) {
+    // Broken edges explain most unreachable nodes (an IF slot that kept a
+    // single-output node drops both branch edges), so blame only the nodes
+    // owning a broken edge first; downstream steps keep their settings.
+    // Only when every edge is fine are unreachable nodes and their direct
+    // predecessors blamed.
+    const implicated = new Set<string>()
+    const edgeIssues = issues.filter((i) => i.kind !== 'unreachable')
+    for (const i of edgeIssues) implicated.add(i.nodeId)
+    if (!edgeIssues.length) {
+      const mainEdges = merged.edges.filter((e) => !isSubEdge(e))
+      for (const i of issues) {
+        implicated.add(i.nodeId)
+        for (const e of mainEdges) if (e.target === i.nodeId) implicated.add(e.source)
+      }
+    }
+    const newlyExcluded: string[] = []
+    for (const nextId of implicated) {
+      const origId = merged.keptIds.get(nextId)
+      if (!origId || exclude.has(origId)) continue
+      exclude.add(origId)
+      newlyExcluded.push(nextId)
+    }
+    if (!newlyExcluded.length) break // nothing kept to blame: a real structural problem
+    for (const nextId of newlyExcluded) {
+      const n = merged.nodes.find((x) => x.id === nextId)
+      const title = nodeTitle(n, nextId)
+      if (!reset.includes(title)) reset.push(title)
+    }
+    merged = mergeEditedNodes(original, next, { ...opts, exclude })
+    issues = checkCanvasIntegrity(merged.nodes, merged.edges)
+  }
+
+  return { ...merged, issues, reset }
 }
 
 // ── Change preview ────────────────────────────────────────────────────────
@@ -437,4 +607,42 @@ export function diffSteps(original: GeneratedWorkflowStep[], edited: GeneratedWo
 
   const count = (k: StepChangeKind) => changes.filter((c) => c.kind === k).length
   return { changes, added: count('added'), removed: count('removed'), kept: count('kept'), renamed: count('renamed') }
+}
+
+// ── Server-owned step ids ─────────────────────────────────────────────────
+
+/**
+ * The edit/repair model must not decide step identity. Keep an id only when
+ * it belonged to the workflow before the edit, is used once, and still names
+ * the same kind of step (isSameStepKind). Every other id — reused for a
+ * replaced step, duplicated, or invented — gets a fresh server-minted id, so
+ * the canvas merge never carries an old node into a slot it no longer fits.
+ */
+export function reconcileEditedIds(
+  before: GeneratedWorkflowStep[],
+  edited: GeneratedWorkflowStep[],
+  mintId: () => string = () => `step_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+): { steps: GeneratedWorkflowStep[]; kept: number; reminted: number } {
+  const origById = new Map(flattenStepTree(before).map((s) => [s.id, s]))
+  const seen = new Set<string>()
+  let kept = 0
+  let reminted = 0
+  const visit = (steps: GeneratedWorkflowStep[]): GeneratedWorkflowStep[] =>
+    steps.map((s) => {
+      const orig = s.id ? origById.get(s.id) : undefined
+      const keep = !!orig && !seen.has(s.id) && isSameStepKind(orig, s)
+      let id = s.id
+      if (keep) kept++
+      else {
+        id = mintId()
+        reminted++
+      }
+      seen.add(id)
+      const out: GeneratedWorkflowStep = { ...s, id }
+      // A replaced step must not inherit the old node's resolved n8n type.
+      if (!keep && orig && out.nodeType === orig.nodeType) delete out.nodeType
+      if (s.branches) out.branches = s.branches.map((b) => ({ ...b, steps: visit(b.steps) }))
+      return out
+    })
+  return { steps: visit(edited), kept, reminted }
 }

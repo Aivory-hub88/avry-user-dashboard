@@ -350,3 +350,153 @@ export function matchRules(rules: AutomationRule[], prevStatus: string | null, n
   if (prevStatus === nextStatus) return []
   return rules.filter((r) => r.whenStatus === nextStatus)
 }
+
+// ---------------------------------------------------------------------------
+// People on a task (P0 "assign to"): typed references instead of free text.
+//
+// A task has many `assignees` (who does it — people and/or agents), one
+// human `owner` (who is accountable) and an immutable `createdBy`. The old
+// single free-text `assignee` string stays on the row as a derived display
+// mirror (search, room context, timeline keep reading it). When a row has no
+// `assignees` key yet (written before this change), `rowAssignees` reads the
+// legacy string: an agent type becomes an agent ref; anything else is
+// resolved against the room's people on the client, or shown as unlinked.
+// ---------------------------------------------------------------------------
+
+export type PersonRef =
+  | { kind: "user"; id: string; name?: string }
+  | { kind: "agent"; type: string }
+
+export const MAX_ASSIGNEES = 5
+const MAX_PERSON_ID = 64
+const MAX_PERSON_NAME = 60
+
+const KNOWN_AGENT_TYPES: ReadonlySet<string> = new Set(AGENT_ROSTER.map((a) => a.type))
+
+/** Stable string key for a person ref: `user:<id>` / `agent:<type>`. */
+export function personKey(p: PersonRef): string {
+  return p.kind === "user" ? `user:${p.id}` : `agent:${p.type}`
+}
+
+/** Validate one raw person ref (unknown agent types and empty ids drop). */
+export function cleanPersonRef(v: unknown): PersonRef | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null
+  const r = v as Record<string, unknown>
+  if (r.kind === "agent") {
+    const type = typeof r.type === "string" ? r.type.trim() : ""
+    return KNOWN_AGENT_TYPES.has(type) ? { kind: "agent", type } : null
+  }
+  if (r.kind === "user") {
+    const id = typeof r.id === "string" ? r.id.trim().slice(0, MAX_PERSON_ID) : ""
+    if (!id) return null
+    const name = typeof r.name === "string" ? r.name.trim().slice(0, MAX_PERSON_NAME) : ""
+    return name ? { kind: "user", id, name } : { kind: "user", id }
+  }
+  return null
+}
+
+/** Validate a raw assignee list: deduped by key, capped at MAX_ASSIGNEES. */
+export function cleanAssignees(v: unknown): PersonRef[] {
+  if (!Array.isArray(v)) return []
+  const out: PersonRef[] = []
+  const seen = new Set<string>()
+  for (const raw of v) {
+    const p = cleanPersonRef(raw)
+    if (!p) continue
+    const k = personKey(p)
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(p)
+    if (out.length >= MAX_ASSIGNEES) break
+  }
+  return out
+}
+
+/** Owner must be a person, never an agent (an agent is a delegate). */
+export function cleanOwner(v: unknown): PersonRef | null {
+  const p = cleanPersonRef(v)
+  return p && p.kind === "user" ? p : null
+}
+
+/**
+ * Assignees of a stored row. `raw` is the row's `assignees` value (undefined
+ * for rows written before typed assignees); `legacy` is its `assignee` string.
+ */
+export function rowAssignees(raw: unknown, legacy: unknown): PersonRef[] {
+  if (Array.isArray(raw)) return cleanAssignees(raw)
+  const s = typeof legacy === "string" ? legacy.trim() : ""
+  if (!s) return []
+  const agent = MENTIONABLE_AGENTS.find((a) => a.type === s || a.names.includes(s.toLowerCase()))
+  return agent ? [{ kind: "agent", type: agent.type }] : []
+}
+
+/**
+ * The legacy free-text assignee a row still carries without a typed match —
+ * shown as an "unlinked" chip until someone picks a real person.
+ */
+export function unlinkedAssignee(raw: unknown, legacy: unknown): string {
+  if (Array.isArray(raw)) return ""
+  const s = typeof legacy === "string" ? legacy.trim() : ""
+  return s && rowAssignees(raw, legacy).length === 0 ? s.slice(0, 100) : ""
+}
+
+/** Display name for a ref (agents by roster first name). */
+export function personLabel(p: PersonRef): string {
+  if (p.kind === "agent") return AGENT_ROSTER.find((a) => a.type === p.type)?.name ?? p.type
+  return p.name || "Member"
+}
+
+/** Derived `assignee` mirror string written next to `assignees`. */
+export function assigneeMirror(list: PersonRef[]): string {
+  return list.map(personLabel).join(", ").slice(0, 100)
+}
+
+/** Refs in `next` that weren't in `prev` (who to notify on assign). */
+export function addedAssignees(prev: PersonRef[], next: PersonRef[]): PersonRef[] {
+  const had = new Set(prev.map(personKey))
+  return next.filter((p) => !had.has(personKey(p)))
+}
+
+/**
+ * Person filter for the task views: "All" | "me" | "unassigned" | a person key.
+ * "me" matches tasks where the viewer is an assignee OR the owner.
+ */
+export function matchesPeopleFilter(
+  row: { assignees: PersonRef[]; owner: PersonRef | null; unlinked?: string },
+  filter: string,
+  selfKey: string | null,
+): boolean {
+  if (!filter || filter === "All") return true
+  const keys = row.assignees.map(personKey)
+  if (filter === "unassigned") return keys.length === 0 && !row.unlinked
+  if (filter === "me") {
+    if (!selfKey) return false
+    return keys.includes(selfKey) || (row.owner ? personKey(row.owner) === selfKey : false)
+  }
+  return keys.includes(filter)
+}
+
+/** Saved-view people filter value check ("All" | "me" | "unassigned" | key). */
+export function cleanPeopleFilter(v: unknown): string {
+  if (typeof v !== "string") return "All"
+  if (v === "All" || v === "me" || v === "unassigned") return v
+  if (/^user:[^\s]{1,64}$/.test(v)) return v
+  if (/^agent:[a-z0-9_-]{1,40}$/.test(v) && KNOWN_AGENT_TYPES.has(v.slice(6))) return v
+  return "All"
+}
+
+/**
+ * Typed assignees for an automation's `setAssignee` value: an agent type or
+ * name → that agent; `user:<id>` → that person; "" → nobody. Anything else (old free-text rules) → null,
+ * meaning "write the legacy string" so the rule keeps doing what it did.
+ */
+export function assigneesFromRuleValue(v: string): PersonRef[] | null {
+  const s = v.trim()
+  if (!s) return []
+  if (s.startsWith("user:")) {
+    const p = cleanPersonRef({ kind: "user", id: s.slice(5) })
+    return p ? [p] : null
+  }
+  const agent = MENTIONABLE_AGENTS.find((a) => a.type === s || a.names.includes(s.toLowerCase()))
+  return agent ? [{ kind: "agent", type: agent.type }] : null
+}

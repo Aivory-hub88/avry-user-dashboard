@@ -5,22 +5,61 @@ import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
 import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload, LayoutTemplate, Zap } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
-import { readCells, computeRollups, DUE_FILTERS, matchesDueFilter, parseAutomationRules, type FieldDef, type CellValue, type AutomationRule } from "@/lib/workspaceDbModel"
+import {
+  readCells,
+  computeRollups,
+  DUE_FILTERS,
+  matchesDueFilter,
+  parseAutomationRules,
+  rowAssignees,
+  unlinkedAssignee,
+  cleanOwner,
+  cleanPersonRef,
+  assigneeMirror,
+  addedAssignees,
+  matchesPeopleFilter,
+  cleanPeopleFilter,
+  personKey,
+  type FieldDef,
+  type CellValue,
+  type AutomationRule,
+  type PersonRef,
+} from "@/lib/workspaceDbModel"
 import { AGENT_ROSTER } from "@/lib/agentRoster"
+import { AvatarStack, PeoplePicker, PersonAvatar, nameOf, namesOf, type TaskAgent, type TaskPerson } from "@/components/workspace/TaskPeople"
 
 type RowComment = { id: string; text: string; author: string; at: string }
-type Row = { id: string; title: string; status: string; priority: "Low" | "Med" | "High"; assignee: string; start: string; due: string; description: string; comments: RowComment[]; cells: Record<string, CellValue> }
+type Row = {
+  id: string
+  title: string
+  status: string
+  priority: "Low" | "Med" | "High"
+  /** Display mirror of `assignees` (legacy rows: the old free text). */
+  assignee: string
+  assignees: PersonRef[]
+  owner: PersonRef | null
+  createdBy: PersonRef | null
+  createdAt: string
+  start: string
+  due: string
+  description: string
+  comments: RowComment[]
+  cells: Record<string, CellValue>
+  /** Read-only: legacy assignee text not linked to anyone (never written). */
+  unlinked: string
+}
 
 const STATUSES = ["Todo", "Doing", "Done"] as const
 const PRIORITIES = ["Low", "Med", "High"] as const
 
-// Invitable Cerveau agents (must match KNOWN_AGENT_TYPES server-side).
-// Stored as the agent_type string so ACL, skills, and filters agree.
-const AGENT_ASSIGNEES = AGENT_ROSTER.map((a) => ({ value: a.type, label: a.name }))
-
-function assigneeLabel(v: string): string {
-  const hit = AGENT_ASSIGNEES.find((a) => a.value === v)
-  return hit ? `${hit.label} (agent)` : v
+/** Person ref for a board column / lane / filter key (`user:<id>` / `agent:<type>`). */
+function refFromKey(key: string, people: TaskPerson[]): PersonRef | null {
+  if (key.startsWith("agent:")) return cleanPersonRef({ kind: "agent", type: key.slice(6) })
+  if (key.startsWith("user:")) {
+    const id = key.slice(5)
+    return cleanPersonRef({ kind: "user", id, name: people.find((p) => p.id === id)?.name ?? "" })
+  }
+  return null
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -35,7 +74,13 @@ function uid() {
 
 function yMapFromRow(r: Row): Y.Map<unknown> {
   const m = new Y.Map<unknown>()
-  for (const [k, v] of Object.entries(r)) m.set(k, v)
+  for (const [k, v] of Object.entries(r)) {
+    if (k === "unlinked") continue
+    // No typed assignees but legacy text (e.g. a template): leave `assignees`
+    // unset so the text still reads as an unlinked assignee.
+    if (k === "assignees" && r.assignees.length === 0 && r.assignee) continue
+    m.set(k, v)
+  }
   if (!m.has("cells")) m.set("cells", {})
   return m
 }
@@ -53,6 +98,11 @@ function toRows(arr: Y.Array<Y.Map<unknown>>): Row[] {
       status: (m.get("status") as string) ?? "Todo",
       priority: (m.get("priority") as Row["priority"]) ?? "Med",
       assignee: (m.get("assignee") as string) ?? "",
+      assignees: rowAssignees(m.get("assignees"), m.get("assignee")),
+      owner: cleanOwner(m.get("owner")),
+      createdBy: cleanPersonRef(m.get("createdBy")),
+      createdAt: (m.get("createdAt") as string) ?? "",
+      unlinked: unlinkedAssignee(m.get("assignees"), m.get("assignee")),
       start: (m.get("start") as string) ?? "",
       due: (m.get("due") as string) ?? "",
       description: (m.get("description") as string) ?? "",
@@ -400,6 +450,7 @@ type SavedView = {
   sortField: string
   sortDir: "asc" | "desc"
   dueFilter?: string
+  peopleFilter?: string
 }
 
 type DbTemplate = {
@@ -422,7 +473,25 @@ const BUILT_IN_TEMPLATES: DbTemplate[] = [
   { id: "builtin-spike", name: "Research spike", title: "", status: "Todo", priority: "Low", assignee: "", start: "", due: "", description: "Question:\n\nTimebox:\n\nFindings:\n" },
 ]
 
-export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: string; readOnly?: boolean }) {
+export default function WorkspaceDatabase({
+  docId,
+  readOnly = false,
+  people = [],
+  agents = [],
+  selfId = null,
+  initialTaskId = null,
+}: {
+  docId: string
+  readOnly?: boolean
+  /** Room members (owner first) — assignee/owner pickers and name lookup. */
+  people?: TaskPerson[]
+  /** Agents invited to the room — assignable next to people. */
+  agents?: TaskAgent[]
+  /** The viewer's user id — "Me" filter and created-by/owner on new tasks. */
+  selfId?: string | null
+  /** Open this task's drawer on load (inbox links: ?tab=tasks&task=<id>). */
+  initialTaskId?: string | null
+}) {
   const docRef = useRef<Y.Doc | null>(null)
   const yRowsRef = useRef<Y.Array<Y.Map<unknown>> | null>(null)
   const [rows, setRows] = useState<Row[]>([])
@@ -450,9 +519,8 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   // Board grouping: status (default kanban) | assignee (workload) | priority.
   // Session-only; saved views keep controlling filters/sort.
   const [groupBy, setGroupBy] = useState<"status" | "assignee" | "priority">("status")
-  // Table assignee cell is display-first ("Geno (agent)"); click to edit.
-  const [editingAssigneeId, setEditingAssigneeId] = useState<string | null>(null)
-  const [assigneeDraft, setAssigneeDraft] = useState("")
+  // People filter: "All" | "me" | "unassigned" | person key (saved in views).
+  const [peopleFilter, setPeopleFilter] = useState<string>("All")
   // Swimlanes (status board only): second dimension splitting columns into lanes.
   const [laneBy, setLaneBy] = useState<"none" | "assignee" | "priority">("none")
   const [quickLane, setQuickLane] = useState<string | null>(null)
@@ -520,12 +588,24 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
   // Display rows: stored rows + locally computed rollups (same pure function
   // the server uses, over readable target caches). Ids stable, writes still
   // go through updateRow on stored state.
-  const displayRows: Row[] = useMemo(() => {
-    if (fields.every((f) => f.type !== "rollup")) return rows
-    const computed = computeRollups(rows, fields, (id) => targetRows[id] ?? null)
-    if (Object.keys(computed).length === 0) return rows
-    // Nulls (unreadable links) are omitted — the cell renders as empty.
+  // Legacy free-text assignees that name a room member read as that member
+  // (display only — nothing is written until someone edits the assignees).
+  const peopleRows: Row[] = useMemo(() => {
+    if (!rows.some((r) => r.unlinked)) return rows
     return rows.map((r) => {
+      if (!r.unlinked) return r
+      const t = r.unlinked.toLowerCase()
+      const hit = people.find((p) => p.name.toLowerCase() === t || p.id === r.unlinked)
+      return hit ? { ...r, assignees: [{ kind: "user", id: hit.id, name: hit.name }], unlinked: "" } : r
+    })
+  }, [rows, people])
+
+  const displayRows: Row[] = useMemo(() => {
+    if (fields.every((f) => f.type !== "rollup")) return peopleRows
+    const computed = computeRollups(peopleRows, fields, (id) => targetRows[id] ?? null)
+    if (Object.keys(computed).length === 0) return peopleRows
+    // Nulls (unreadable links) are omitted — the cell renders as empty.
+    return peopleRows.map((r) => {
       const c = computed[r.id]
       if (!c) return r
       const cells: Row["cells"] = { ...r.cells }
@@ -535,11 +615,15 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
       }
       return { ...r, cells }
     })
-  }, [rows, fields, targetRows])
+  }, [peopleRows, fields, targetRows])
 
   // Drawer row resolves against display rows (local rollups included); all
   // edits address stored state by stable id via updateRow/updateCell.
   const selectedRow = selectedId ? displayRows.find((r) => r.id === selectedId) ?? null : null
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (initialTaskId) setSelectedId(initialTaskId)
+  }, [initialTaskId])
   useEffect(() => {
     let alive = true
     fetch(`/api/workspace/${docId}/meta`, { headers: collabAuthHeaders() })
@@ -632,6 +716,11 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     setNewRuleMoveTo("")
   }
 
+  const ruleAssigneeLabel = (v: string): string => {
+    const ref = v.startsWith("user:") ? refFromKey(v, people) : cleanPersonRef({ kind: "agent", type: v })
+    return ref ? nameOf(ref, people) : v
+  }
+
   const removeAutomation = (ruleId: string) => {
     if (readOnlyRef.current) return
     void persistAutomations(automations.filter((r) => r.id !== ruleId))
@@ -701,8 +790,20 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
-    const r: Row = { id: uid(), title: tpl.title, status: tpl.status, priority: tpl.priority, assignee: tpl.assignee, start: tpl.start ?? "", due: tpl.due, description: tpl.description, comments: [], cells: {} }
+    // Template assignee is text: an agent name becomes typed, other text stays unlinked.
+    const typed = rowAssignees(undefined, tpl.assignee)
+    const r = blankRow({
+      title: tpl.title,
+      status: tpl.status,
+      priority: tpl.priority,
+      assignees: typed,
+      assignee: typed.length > 0 ? assigneeMirror(typed) : tpl.assignee,
+      start: tpl.start ?? "",
+      due: tpl.due,
+      description: tpl.description,
+    })
     doc.transact(() => yRows.push([yMapFromRow(r)]), "user")
+    notifyAssigned(r.id, typed)
   }
 
   const persistViews = async (next: SavedView[]) => {
@@ -752,6 +853,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     setSortField(v.sortField)
     setSortDir(v.sortDir)
     setDueFilter(typeof v.dueFilter === "string" && (DUE_FILTERS as string[]).includes(v.dueFilter) ? v.dueFilter : "All")
+    setPeopleFilter(cleanPeopleFilter(v.peopleFilter))
   }
 
   const saveCurrentAsView = async () => {
@@ -769,6 +871,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
       sortField,
       sortDir,
       dueFilter,
+      peopleFilter,
     }
     await persistViews([...savedViews, next])
     setActiveViewId(next.id)
@@ -900,13 +1003,59 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
 
   const guard = () => !readOnlyRef.current
 
+  // The viewer as a person: owns and is recorded as creator of new tasks.
+  const selfKey = selfId ? `user:${selfId}` : null
+  const selfRef: PersonRef | null = selfId
+    ? cleanPersonRef({ kind: "user", id: selfId, name: people.find((p) => p.id === selfId)?.name ?? "" })
+    : null
+
+  /** A new task row: created by + owned by the viewer, nobody assigned yet. */
+  const blankRow = (over: Partial<Row> = {}): Row => ({
+    id: uid(),
+    title: "",
+    status: "Todo",
+    priority: "Med",
+    assignee: "",
+    assignees: [],
+    owner: selfRef,
+    createdBy: selfRef,
+    createdAt: new Date().toISOString(),
+    start: "",
+    due: "",
+    description: "",
+    comments: [],
+    cells: {},
+    unlinked: "",
+    ...over,
+  })
+
+  /** Tell newly assigned people/agents (inbox). The Yjs write is the source of truth. */
+  const notifyAssigned = (rowId: string, added: PersonRef[]) => {
+    if (added.length === 0) return
+    fetch(`/api/workspace/${docId}/database/${encodeURIComponent(rowId)}/assigned`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+      body: JSON.stringify({ added }),
+    }).catch(() => {})
+  }
+
+  const setAssignees = (row: Row, next: PersonRef[]) => {
+    if (!guard()) return
+    updateRow(row.id, { assignees: next, assignee: assigneeMirror(next) })
+    notifyAssigned(row.id, addedAssignees(row.assignees, next))
+  }
+
+  const setOwner = (row: Row, next: PersonRef | null) => {
+    if (!guard()) return
+    updateRow(row.id, { owner: next })
+  }
+
   const addRow = () => {
     if (!guard()) return
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
-    const r: Row = { id: uid(), title: "", status: "Todo", priority: "Med", assignee: "", start: "", due: "", description: "", comments: [], cells: {} }
-    doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
+    doc.transact(() => yRows.push([yMapFromRow(blankRow())]), agentOrigin())
   }
 
   const quickAddRow = () => {
@@ -916,59 +1065,83 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
+    const assignTo = (key: string | null): Partial<Row> => {
+      const ref = key ? refFromKey(key, people) : null
+      return ref ? { assignees: [ref], assignee: assigneeMirror([ref]) } : {}
+    }
     const extra: Partial<Row> =
       groupBy === "status"
         ? {
             status: quickStatus,
             // Swimlane carry-over: new cards inherit the lane they were added in.
-            ...(laneBy === "assignee" && quickLane !== null ? { assignee: quickLane } : {}),
+            ...(laneBy === "assignee" ? assignTo(quickLane) : {}),
             ...(laneBy === "priority" && quickLane !== null ? { priority: quickLane as Row["priority"] } : {}),
           }
         : groupBy === "assignee"
-          ? { status: "Todo", assignee: quickStatus }
+          ? { status: "Todo", ...assignTo(quickStatus) }
           : { status: "Todo", priority: quickStatus as Row["priority"] }
-    const r: Row = { id: uid(), title, status: "Todo", priority: "Med", assignee: "", start: "", due: "", description: "", comments: [], cells: {}, ...extra }
+    const r = blankRow({ title, ...extra })
     doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
+    notifyAssigned(r.id, r.assignees)
     setQuickTitle("")
     setQuickStatus(null)
     setQuickLane(null)
   }
 
+  // Person groups (board columns / swimlanes): one per assignee in `list`,
+  // people first then agents, plus "Unassigned". A task with several
+  // assignees shows up in each of their groups (workload view).
+  const personGroups = (list: Row[]): Array<{ key: string; label: string }> => {
+    const seen = new Map<string, PersonRef>()
+    for (const r of list) for (const p of r.assignees) if (!seen.has(personKey(p))) seen.set(personKey(p), p)
+    const refs = [...seen.values()]
+      .sort((a, b) => (a.kind === b.kind ? nameOf(a, people).localeCompare(nameOf(b, people)) : a.kind === "user" ? -1 : 1))
+      .slice(0, 8)
+    return [
+      ...refs.map((p) => ({ key: personKey(p), label: p.kind === "agent" ? `${nameOf(p, people)} (agent)` : nameOf(p, people) })),
+      { key: "", label: "Unassigned" },
+    ]
+  }
+
+  const inPersonGroup = (r: Row, key: string): boolean =>
+    key === "" ? r.assignees.length === 0 : r.assignees.some((p) => personKey(p) === key)
+
   // Swimlane partition for the status board (assignee lanes incl. Unassigned).
   const swimlanes = (): Array<{ key: string; label: string }> => {
-    if (laneBy === "assignee") {
-      const names = Array.from(new Set(filtered.map((r) => r.assignee.trim()).filter(Boolean))).sort().slice(0, 8)
-      return [...names.map((n) => ({ key: n, label: assigneeLabel(n) })), { key: "", label: "Unassigned" }]
-    }
+    if (laneBy === "assignee") return personGroups(filtered)
     if (laneBy === "priority") return [...PRIORITIES].reverse().map((p) => ({ key: p, label: `${p} priority` }))
     return [{ key: "", label: "" }]
   }
 
-  const laneOf = (r: Row): string => {
-    if (laneBy === "assignee") return r.assignee.trim()
-    if (laneBy === "priority") return r.priority
-    return ""
+  const inLane = (r: Row, key: string): boolean => {
+    if (laneBy === "assignee") return inPersonGroup(r, key)
+    if (laneBy === "priority") return r.priority === key
+    return true
   }
 
-  const groupKeyOf = (r: Row): string => {
-    if (groupBy === "assignee") return r.assignee.trim()
-    if (groupBy === "priority") return r.priority
-    return r.status
+  const inColumn = (r: Row, key: string): boolean => {
+    if (groupBy === "assignee") return inPersonGroup(r, key)
+    if (groupBy === "priority") return r.priority === key
+    return r.status === key
   }
 
   const boardColumns = (): Array<{ key: string; label: string }> => {
-    if (groupBy === "assignee") {
-      const names = Array.from(new Set(rows.map((r) => r.assignee.trim()).filter(Boolean))).sort().slice(0, 8)
-      return [...names.map((n) => ({ key: n, label: assigneeLabel(n) })), { key: "", label: "Unassigned" }]
-    }
+    if (groupBy === "assignee") return personGroups(displayRows)
     if (groupBy === "priority") return [...PRIORITIES].reverse().map((p) => ({ key: p, label: `${p} priority` }))
     return STATUSES.map((s) => ({ key: s, label: s }))
   }
 
-  const dropPatch = (key: string): Partial<Row> => {
-    if (groupBy === "assignee") return { assignee: key }
-    if (groupBy === "priority") return { priority: key as Row["priority"] }
-    return { status: key }
+  /** Move a card between person columns: swap the source person for the target. */
+  const reassignByDrop = (row: Row, fromKey: string, toKey: string) => {
+    if (fromKey === toKey) return
+    if (toKey === "") {
+      setAssignees(row, [])
+      return
+    }
+    const to = refFromKey(toKey, people)
+    if (!to) return
+    const kept = row.assignees.filter((p) => personKey(p) !== fromKey && personKey(p) !== toKey)
+    setAssignees(row, [...kept, to].slice(-5))
   }
 
   const deleteRow = (id: string) => {
@@ -1009,7 +1182,12 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
         }
       }
     }
-    updateRow(id, dropPatch(key))
+    if (groupBy === "assignee") {
+      const row = displayRows.find((r) => r.id === id)
+      if (row) reassignByDrop(row, e.dataTransfer.getData("application/x-aivory-from"), key)
+      return
+    }
+    updateRow(id, groupBy === "priority" ? { priority: key as Row["priority"] } : { status: key })
   }
 
   // Days (ISO) a row occupies on the calendar: the full start→due span when
@@ -1100,6 +1278,23 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     return rows
   }
 
+  /** CSV assignee cell → typed refs when names match people/agents, else legacy text. */
+  const csvAssignee = (text: string): { assignees: PersonRef[] } | { assignee: string } => {
+    const parts = text.split(/[;,]/).map((t) => t.trim()).filter(Boolean)
+    const refs: PersonRef[] = []
+    for (const part of parts) {
+      const t = part.toLowerCase()
+      const person = people.find((p) => p.name.toLowerCase() === t || p.id === part)
+      if (person) {
+        refs.push({ kind: "user", id: person.id, name: person.name })
+        continue
+      }
+      const agent = rowAssignees(undefined, part)[0]
+      if (agent) refs.push(agent)
+    }
+    return refs.length > 0 && refs.length === parts.length ? { assignees: refs } : { assignee: text.slice(0, 100) }
+  }
+
   const importCsv = async (file: File) => {
     if (importing || readOnlyRef.current) return
     setImporting(true)
@@ -1143,7 +1338,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
               title: title.slice(0, 200) || "Untitled",
               status: at("status") || "Todo",
               priority: ["Low", "Med", "High"].includes(at("priority")) ? at("priority") : "Med",
-              assignee: at("assignee").slice(0, 100),
+              ...csvAssignee(at("assignee")),
               start: at("start").slice(0, 20),
               due: at("due").slice(0, 20),
               description: at("description").slice(0, 4000),
@@ -1168,7 +1363,8 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
     const needle = q.trim().toLowerCase()
     const searchOk = !needle || r.title.toLowerCase().includes(needle) || r.assignee.toLowerCase().includes(needle) || r.id.toLowerCase().includes(needle)
     const dueOk = dueFilter === "All" || matchesDueFilter(r.due, r.status, dueFilter, new Date().toISOString().slice(0, 10))
-    return statusOk && prioOk && searchOk && dueOk
+    const peopleOk = matchesPeopleFilter(r, peopleFilter, selfKey)
+    return statusOk && prioOk && searchOk && dueOk && peopleOk
   })
 
   const priorityRank: Record<string, number> = { High: 3, Med: 2, Low: 1 }
@@ -1195,17 +1391,11 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
 
   return (
     <div className="mx-auto w-full max-w-[900px]">
-      {/* Assignee picker suggestions: invited Cerveau agents + free text */}
-      <datalist id={`aivory-assignees-${docId}`}>
-        {AGENT_ASSIGNEES.map((a) => (
-          <option key={a.value} value={a.value}>{`${a.label} (agent)`}</option>
-        ))}
-      </datalist>
       {/* Saved views tabs — AppFlowy-style: “All” + user saved views (persisted in pg props.dbViews) */}
       {viewsLoaded && (
         <div className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1">
           <button
-            onClick={() => { setActiveViewId(null); setView("table"); setStatusFilter("All"); setPriorityFilter("All"); setDueFilter("All"); setQ(""); setSortField("title"); setSortDir("asc") }}
+            onClick={() => { setActiveViewId(null); setView("table"); setStatusFilter("All"); setPriorityFilter("All"); setDueFilter("All"); setPeopleFilter("All"); setQ(""); setSortField("title"); setSortDir("asc") }}
             className={`shrink-0 rounded-full border px-3 py-1 text-[12px] ${activeViewId === null ? "border-white bg-white text-black" : "border-line bg-white/[0.04] text-white/50 hover:text-white/80"}`}
           >
             All
@@ -1326,6 +1516,32 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                 {DUE_FILTERS.map((d) => (
                   <option key={d} value={d}>{d === "All" ? "All dates" : d}</option>
                 ))}
+              </select>
+              <span className="text-white/10">|</span>
+              <select
+                value={peopleFilter}
+                onChange={(e) => setPeopleFilter(e.target.value)}
+                title="Filter by assignee — Me also matches tasks you own"
+                aria-label="Filter by person"
+                className="max-w-[130px] bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none"
+              >
+                <option value="All">All people</option>
+                {selfId && <option value="me">Me</option>}
+                <option value="unassigned">Unassigned</option>
+                {people.length > 0 && (
+                  <optgroup label="People">
+                    {people.map((p) => (
+                      <option key={p.id} value={`user:${p.id}`}>{p.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {agents.length > 0 && (
+                  <optgroup label="Agents">
+                    {agents.map((a) => (
+                      <option key={a.type} value={`agent:${a.type}`}>{a.name}</option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
               <span className="text-white/10">|</span>
               <select value={sortField} onChange={(e) => setSortField(e.target.value)} className="bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none">
@@ -1538,7 +1754,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                     {r.name}{" "}
                     <span className="text-white/25">
                       · on {r.whenStatus}
-                      {r.setAssignee ? ` → ${r.setAssignee}` : ""}
+                      {r.setAssignee ? ` → ${ruleAssigneeLabel(r.setAssignee)}` : ""}
                       {r.addComment ? " + comment" : ""}
                       {r.moveTo ? ` → ${r.moveTo}` : ""}
                     </span>
@@ -1564,14 +1780,28 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
-            <input
+            <select
               value={newRuleAssignee}
               onChange={(e) => setNewRuleAssignee(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") addAutomation() }}
-              placeholder="Assign to (optional)"
-              list={`workspace-assignees-${docId}`}
-              className="w-[160px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none"
-            />
+              title="Assign to (optional)"
+              className="max-w-[170px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70 outline-none"
+            >
+              <option value="">No assign</option>
+              {people.length > 0 && (
+                <optgroup label="People">
+                  {people.map((p) => (
+                    <option key={p.id} value={`user:${p.id}`}>Assign {p.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              {agents.length > 0 && (
+                <optgroup label="Agents">
+                  {agents.map((a) => (
+                    <option key={a.type} value={a.type}>Assign {a.name}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
             <input
               value={newRuleComment}
               onChange={(e) => setNewRuleComment(e.target.value)}
@@ -1622,7 +1852,8 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                   <th className="min-w-[240px] px-4 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Title</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Status</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Priority</th>
-                  <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Assignee</th>
+                  <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Assignees</th>
+                  <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Owner</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Start</th>
                   <th className="px-3 py-2.5 text-[11px] font-medium uppercase tracking-widest text-white/30">Due</th>
                   {fields.map((f) => (
@@ -1673,44 +1904,48 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                       <PriorityPill p={r.priority} />
                     </td>
                     <td className="px-3 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <User className="h-3 w-3 shrink-0 text-white/25" />
-                        {editingAssigneeId === r.id ? (
-                          <input
-                            autoFocus
-                            value={assigneeDraft}
-                            list={`workspace-assignees-${docId}`}
-                            disabled={readOnly}
-                            onChange={(e) => setAssigneeDraft(e.target.value)}
-                            onBlur={() => {
-                              updateRow(r.id, { assignee: assigneeDraft.trim().slice(0, 100) })
-                              setEditingAssigneeId(null)
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                updateRow(r.id, { assignee: assigneeDraft.trim().slice(0, 100) })
-                                setEditingAssigneeId(null)
-                              }
-                              if (e.key === "Escape") setEditingAssigneeId(null)
-                            }}
-                            placeholder="—"
-                            className="w-full bg-transparent text-[13px] text-white/80 placeholder:text-white/25 outline-none disabled:opacity-80"
-                          />
+                      <PeoplePicker
+                        value={r.assignees}
+                        onChange={(next) => setAssignees(r, next)}
+                        people={people}
+                        agents={agents}
+                        unlinked={r.unlinked}
+                        readOnly={readOnly}
+                        title={readOnly ? namesOf(r.assignees, people) || undefined : "Assign people or agents"}
+                        className={`flex min-h-[26px] min-w-[72px] items-center gap-1.5 rounded-full px-1 text-left text-[13px] ${readOnly ? "" : "hover:bg-white/[0.05]"}`}
+                      >
+                        {r.assignees.length > 0 ? (
+                          <>
+                            <AvatarStack list={r.assignees} people={people} />
+                            {r.assignees.length === 1 && <span className="max-w-[110px] truncate text-white/60">{nameOf(r.assignees[0], people)}</span>}
+                          </>
+                        ) : r.unlinked ? (
+                          <span className="max-w-[120px] truncate text-white/40 italic" title="Not linked to a room member — click to pick someone">{r.unlinked}</span>
                         ) : (
-                          <button
-                            disabled={readOnly}
-                            onClick={() => {
-                              if (readOnly) return
-                              setAssigneeDraft(r.assignee)
-                              setEditingAssigneeId(r.id)
-                            }}
-                            title={readOnly ? undefined : "Click to change assignee"}
-                            className={`min-w-0 flex-1 truncate text-left text-[13px] ${r.assignee ? "text-white/60" : "text-white/25"} ${readOnly ? "" : "hover:text-white/85"}`}
-                          >
-                            {r.assignee ? assigneeLabel(r.assignee) : "—"}
-                          </button>
+                          <span className="flex items-center gap-1 text-white/25"><User className="h-3 w-3" />—</span>
                         )}
-                      </div>
+                      </PeoplePicker>
+                    </td>
+                    <td className="px-3 py-3">
+                      <PeoplePicker
+                        single
+                        value={r.owner ? [r.owner] : []}
+                        onChange={(next) => setOwner(r, next[0] ?? null)}
+                        people={people}
+                        agents={[]}
+                        readOnly={readOnly}
+                        title={readOnly ? undefined : "Who is accountable for this task"}
+                        className={`flex min-h-[26px] items-center gap-1.5 rounded-full px-1 text-left text-[13px] ${readOnly ? "" : "hover:bg-white/[0.05]"}`}
+                      >
+                        {r.owner ? (
+                          <>
+                            <PersonAvatar person={r.owner} people={people} />
+                            <span className="max-w-[100px] truncate text-white/60">{nameOf(r.owner, people)}</span>
+                          </>
+                        ) : (
+                          <span className="text-white/25">—</span>
+                        )}
+                      </PeoplePicker>
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-1.5">
@@ -1807,7 +2042,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
             </button>
           </div>
           {swimlanes().map((lane) => {
-            const laneRows = laneBy === "none" || groupBy !== "status" ? filtered : filtered.filter((r) => laneOf(r) === lane.key)
+            const laneRows = laneBy === "none" || groupBy !== "status" ? filtered : filtered.filter((r) => inLane(r, lane.key))
             return (
             <div key={lane.key || "__all__"} className={laneBy !== "none" && groupBy === "status" ? "mb-5 last:mb-0" : ""}>
               {laneBy !== "none" && groupBy === "status" && (
@@ -1819,7 +2054,7 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
               )}
           <div className="grid auto-cols-[minmax(220px,1fr)] grid-flow-col gap-4 overflow-x-auto pb-2">
           {boardColumns().map(({ key: s, label }) => {
-            const inCol = laneRows.filter((r) => groupKeyOf(r) === s)
+            const inCol = laneRows.filter((r) => inColumn(r, s))
             const limit = groupBy === "status" ? wip[s] : undefined
             const over = limit !== undefined && inCol.length > limit
             // Hide-empty: collapse zero-card columns to a slim drop zone so
@@ -1899,7 +2134,11 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                     <div
                       key={r.id}
                       draggable={!readOnly}
-                      onDragStart={(e) => e.dataTransfer.setData("text/plain", r.id)}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", r.id)
+                        // Person columns: the drop swaps THIS column's person for the target.
+                        e.dataTransfer.setData("application/x-aivory-from", s)
+                      }}
                       className="group cursor-grab rounded-[12px] border border-line bg-surface-1 p-4 shadow-sm transition hover:border-white/10 active:cursor-grabbing"
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -1922,10 +2161,15 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <PriorityPill p={r.priority} />
                         {groupBy !== "status" && <StatusPill s={r.status} />}
-                        {r.assignee && groupBy !== "assignee" && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] text-white/50">
+                        {(groupBy !== "assignee" || r.assignees.length > 1) && r.assignees.length > 0 && (
+                          <span className="ml-auto" title={namesOf(r.assignees, people)}>
+                            <AvatarStack list={r.assignees} people={people} size={20} />
+                          </span>
+                        )}
+                        {r.assignees.length === 0 && r.unlinked && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] italic text-white/40" title="Not linked to a room member">
                             <User className="h-3 w-3" />
-                            {assigneeLabel(r.assignee)}
+                            {r.unlinked}
                           </span>
                         )}
                       </div>
@@ -2094,10 +2338,76 @@ export default function WorkspaceDatabase({ docId, readOnly = false }: { docId: 
                     {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </label>
-                <label className="block">
-                  <span className="text-[11px] uppercase tracking-wider text-white/30">Assignee</span>
-                  <input value={selectedRow.assignee} disabled={readOnly} list={`aivory-assignees-${docId}`} onChange={(e) => updateRow(selectedRow.id, { assignee: e.target.value })} placeholder="—" className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-3 py-2 text-[12px] text-white/60 outline-none placeholder:text-white/25 disabled:opacity-60" />
-                </label>
+                <div className="col-span-2">
+                  <span className="text-[11px] uppercase tracking-wider text-white/30">Assignees</span>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {selectedRow.assignees.map((p) => (
+                      <span key={personKey(p)} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] py-0.5 pl-0.5 pr-2 text-[12px] text-white/70">
+                        <PersonAvatar person={p} people={people} size={20} />
+                        {nameOf(p, people)}
+                        {p.kind === "agent" && <span className="text-[10px] uppercase tracking-wider text-white/30">agent</span>}
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            onClick={() => setAssignees(selectedRow, selectedRow.assignees.filter((x) => personKey(x) !== personKey(p)))}
+                            title={`Unassign ${nameOf(p, people)}`}
+                            className="ml-0.5 text-white/30 hover:text-white/70"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                    {selectedRow.assignees.length === 0 && selectedRow.unlinked && (
+                      <span className="rounded-full border border-dashed border-white/10 px-2 py-0.5 text-[12px] italic text-white/40" title="Not linked to a room member">
+                        {selectedRow.unlinked}
+                      </span>
+                    )}
+                    {!readOnly && (
+                      <PeoplePicker
+                        value={selectedRow.assignees}
+                        onChange={(next) => setAssignees(selectedRow, next)}
+                        people={people}
+                        agents={agents}
+                        unlinked={selectedRow.unlinked}
+                        className="inline-flex items-center gap-1 rounded-full border border-dashed border-white/15 px-2.5 py-1 text-[12px] text-white/45 hover:text-white/75"
+                      >
+                        <Plus className="h-3 w-3" /> {selectedRow.assignees.length === 0 ? "Assign" : "Add"}
+                      </PeoplePicker>
+                    )}
+                    {readOnly && selectedRow.assignees.length === 0 && !selectedRow.unlinked && <span className="text-[12px] text-white/25">—</span>}
+                  </div>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-[11px] uppercase tracking-wider text-white/30">Owner</span>
+                  <div className="mt-1 flex items-center gap-2">
+                    <PeoplePicker
+                      single
+                      value={selectedRow.owner ? [selectedRow.owner] : []}
+                      onChange={(next) => setOwner(selectedRow, next[0] ?? null)}
+                      people={people}
+                      agents={[]}
+                      readOnly={readOnly}
+                      title={readOnly ? undefined : "Who is accountable for this task"}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] py-0.5 pl-0.5 pr-2.5 text-[12px] text-white/70 hover:bg-white/[0.07] disabled:hover:bg-white/[0.04]"
+                    >
+                      {selectedRow.owner ? (
+                        <>
+                          <PersonAvatar person={selectedRow.owner} people={people} size={20} />
+                          {nameOf(selectedRow.owner, people)}
+                        </>
+                      ) : (
+                        <span className="px-2 py-0.5 text-white/35">No owner</span>
+                      )}
+                    </PeoplePicker>
+                    {selectedRow.createdBy && (
+                      <span className="text-[11px] text-white/30">
+                        Created by {nameOf(selectedRow.createdBy, people)}
+                        {selectedRow.createdAt ? ` · ${new Date(selectedRow.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+                      </span>
+                    )}
+                  </div>
+                </div>
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-wider text-white/30">Start</span>
                   <input

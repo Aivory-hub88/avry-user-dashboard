@@ -101,3 +101,53 @@ describe('POST /api/workspace/[id]/database WIP gate', () => {
     expect(res.status).toBe(201)
   })
 })
+
+describe('POST /api/workspace/[id]/database people', () => {
+  it('keeps the caller as actor when the task is assigned to an agent', async () => {
+    const res = await POST(postReq({ title: 'For Geno', status: 'Doing', assignee: 'autonomous' }), {
+      params: Promise.resolve({ id: 'doc-1' }),
+    })
+    expect(res.status).toBe(201)
+    const j = await res.json()
+    // Before: the actor became the assignee ("autonomous").
+    expect(j.agentType).toBe('user')
+    expect(j.row.assignees).toEqual([{ kind: 'agent', type: 'autonomous' }])
+    expect(j.row.assignee).toBe('Geno')
+  })
+
+  it('stores typed assignees and notifies them', async () => {
+    const res = await POST(
+      postReq({
+        title: 'Shared',
+        status: 'Doing',
+        assignees: [
+          { kind: 'user', id: 'u-2', name: 'Rina' },
+          { kind: 'agent', type: 'leads_qualifier' },
+          { kind: 'agent', type: 'not-an-agent' },
+        ],
+      }),
+      { params: Promise.resolve({ id: 'doc-1' }) },
+    )
+    expect(res.status).toBe(201)
+    const j = await res.json()
+    expect(j.row.assignees).toEqual([
+      { kind: 'user', id: 'u-2', name: 'Rina' },
+      { kind: 'agent', type: 'leads_qualifier' },
+    ])
+    expect(j.row.createdAt).toMatch(/^\d{4}-/)
+    const inbox = queryMock.mock.calls.find(([sql]) => typeof sql === 'string' && sql.includes("'assigned'"))
+    expect(inbox).toBeTruthy()
+    const params = inbox![1] as unknown[]
+    expect(params[params.length - 2]).toEqual(['user', 'agent'])
+    expect(params[params.length - 1]).toEqual(['u-2', 'leads_qualifier'])
+  })
+
+  it('keeps unknown free-text assignees as legacy text', async () => {
+    const res = await POST(postReq({ title: 'Old style', status: 'Doing', assignee: 'Budi' }), {
+      params: Promise.resolve({ id: 'doc-1' }),
+    })
+    const j = await res.json()
+    expect(j.row.assignees).toEqual([])
+    expect(j.row.assignee).toBe('Budi')
+  })
+})

@@ -475,3 +475,146 @@ describe('mergeEditedNodes — an id reused for a different step', () => {
     expect(d.kept + d.renamed).toBe(1) // only the trigger
   })
 })
+
+describe('reconcileEditedIds', () => {
+  it('keeps ids of same-kind steps and remints reused, duplicate and invented ids', async () => {
+    const { reconcileEditedIds } = await import('./canvasCopilot')
+    const before = canvasToGeneratedWorkflow(driveBackup).steps
+    let n = 0
+    const edited = [
+      before[0],
+      { ...before[1], title: 'List invoices' }, // same kind -> kept
+      { id: before[2].id, type: 'condition' as const, title: 'Check', testable: true }, // replaced -> new id
+      { id: before[1].id, type: 'action' as const, title: 'Dup', app: 'google drive', testable: true }, // duplicate
+      { id: 'llm-made', type: 'action' as const, title: 'New', app: 'slack', testable: true },
+    ]
+    const r = reconcileEditedIds(before, edited, () => `m${++n}`)
+    expect(r.steps.map((s) => s.id)).toEqual([before[0].id, before[1].id, 'm1', 'm2', 'm3'])
+    expect([r.kept, r.reminted]).toEqual([2, 3])
+  })
+})
+
+describe('checkCanvasIntegrity / applyEditToCanvas', () => {
+  const drive = (id: string, name: string, x: number) =>
+    ({ id, name, type: 'n8n-nodes-base.googleDrive', typeVersion: 3, position: [x, 0], parameters: {} })
+  const backup = {
+    name: 'Blank Workflow',
+    nodes: [
+      { id: 't', name: 'Schedule Trigger', type: 'n8n-nodes-base.scheduleTrigger', typeVersion: 1.2, position: [0, 0], parameters: {} },
+      drive('r', 'Step 1: Read', 200), drive('c', 'Step 2: Check', 400), drive('p', 'Step 3: Process', 600), drive('l', 'Step 4: Log', 800),
+    ],
+    connections: {
+      'Schedule Trigger': { main: [[{ node: 'Step 1: Read', type: 'main', index: 0 }]] },
+      'Step 1: Read': { main: [[{ node: 'Step 2: Check', type: 'main', index: 0 }]] },
+      'Step 2: Check': { main: [[{ node: 'Step 3: Process', type: 'main', index: 0 }]] },
+      'Step 3: Process': { main: [[{ node: 'Step 4: Log', type: 'main', index: 0 }]] },
+    },
+  } as any
+
+  const driveToIf = async () => {
+    const { generatedWorkflowToN8n } = await import('./copilotToN8n')
+    const original = n8nToReactFlow(backup)
+    const before = canvasToGeneratedWorkflow(backup)
+    const edited = {
+      ...before,
+      steps: [
+        { ...before.steps[0] },
+        { id: 'r', type: 'action' as const, title: 'Read Google Drive Files', app: 'google drive', testable: true },
+        {
+          id: 'c', type: 'condition' as const, title: 'Check if Data Exists', testable: true,
+          branches: [
+            { key: 'true', label: 'Data Found', steps: [{ id: 'p', type: 'action' as const, title: 'Process Each Row', app: 'google drive', testable: true }] },
+            { key: 'false', label: 'No Data', steps: [{ id: 'l', type: 'action' as const, title: 'Log Completion', app: 'google drive', testable: true }] },
+          ],
+        },
+      ],
+    }
+    const rebuilt = n8nToReactFlow(generatedWorkflowToN8n(edited, { workflowId: 'x', title: 'Blank Workflow', keepLastStepIntent: true }) as any)
+    // No `before.steps`: the alias map trusts the reused ids, like the model did before PR #215.
+    return { original, rebuilt, idAliases: stepIdAliases(edited.steps, original.nodes) }
+  }
+
+  it('the Drive-backup-to-IF edit ends connected even with the shape guard bypassed', async () => {
+    const { applyEditToCanvas } = await import('./canvasCopilot')
+    const { original, rebuilt, idAliases } = await driveToIf()
+
+    // Without the guard and the repair, the old Drive node sits in the IF slot.
+    const raw = mergeEditedNodes(original, rebuilt, { keepTrigger: true, idAliases, checkOutputShape: false })
+    const { checkCanvasIntegrity } = await import('./canvasCopilot')
+    const rawIssues = checkCanvasIntegrity(raw.nodes, raw.edges)
+    expect(rawIssues.some((i) => i.kind === 'missing-handle' && /check if data exists/i.test(i.title))).toBe(true)
+
+    const r = applyEditToCanvas(original, rebuilt, { keepTrigger: true, idAliases, checkOutputShape: false })
+    expect(r.issues).toEqual([])
+    expect(r.reset).toEqual(['Check if Data Exists'])
+    const check = r.nodes.find((n) => /check if data exists/i.test(n.data.title))!
+    expect(check.data.rawN8n.type).toBe('n8n-nodes-base.if')
+    expect(r.edges.filter((e) => e.source === check.id).length).toBe(2)
+    // Downstream Drive steps keep their original nodes — only the culprit is reset.
+    const process = r.nodes.find((n) => /process each row/i.test(n.data.title))!
+    expect(r.keptIds.get(process.id)).toBe('p')
+  })
+
+  it('repairs a kept node that lacks the handle an edge uses', async () => {
+    const { applyEditToCanvas } = await import('./canvasCopilot')
+    const node = (id: string, title: string, extra: Record<string, unknown> = {}) =>
+      ({ id, type: 'workflowStep', position: { x: 0, y: 0 }, data: { title, label: title, ...extra } }) as any
+    const original = {
+      nodes: [
+        node('o-t', 'Trigger', { rawN8n: { type: 'n8n-nodes-base.manualTrigger' } }),
+        node('o-x', 'Route', { rawN8n: { type: 'n8n-nodes-base.slack', parameters: { channel: 'old' } } }),
+      ],
+      edges: [{ id: 'oe', source: 'o-t', target: 'o-x' }],
+    }
+    const next = {
+      nodes: [
+        node('n-t', 'Trigger', { rawN8n: { type: 'n8n-nodes-base.manualTrigger' } }),
+        node('n-x', 'Route', {
+          rawN8n: { type: 'n8n-nodes-base.slack' }, // same shape as the original, so the guard keeps it
+          outputs: [{ id: 'out-yes', label: 'Yes' }, { id: 'out-no', label: 'No' }],
+        }),
+        node('n-a', 'A'),
+        node('n-b', 'B'),
+      ],
+      edges: [
+        { id: 'e1', source: 'n-t', target: 'n-x' },
+        { id: 'e2', source: 'n-x', target: 'n-a', sourceHandle: 'out-yes' },
+        { id: 'e3', source: 'n-x', target: 'n-b', sourceHandle: 'out-no' },
+      ],
+    }
+    const r = applyEditToCanvas(original, next, { keepTrigger: true })
+    expect(r.issues).toEqual([])
+    expect(r.reset).toEqual(['Route'])
+    const route = r.nodes.find((n) => n.id === 'n-x')!
+    expect(route.data.outputs).toHaveLength(2)
+    expect(r.keptIds.has('n-x')).toBe(false)
+    expect(r.keptIds.get('n-t')).toBe('o-t')
+  })
+
+  it('reports dangling edges, missing handles and unreachable steps', async () => {
+    const { checkCanvasIntegrity } = await import('./canvasCopilot')
+    const node = (id: string, title: string, extra: Record<string, unknown> = {}) =>
+      ({ id, type: 'workflowStep', position: { x: 0, y: 0 }, data: { title, label: title, ...extra } }) as any
+    const nodes = [
+      node('t', 'Trigger', { rawN8n: { type: 'n8n-nodes-base.scheduleTrigger' } }),
+      node('a', 'Step 1: Send'),
+      node('b', 'Step 2: Log'),
+      node('m', 'Chat Model'),
+    ]
+    const edges = [
+      { id: 'e1', source: 't', target: 'a' },
+      { id: 'e2', source: 'a', target: 'ghost' },
+      { id: 'e3', source: 'a', target: 'b', sourceHandle: 'out-yes' },
+      { id: 'e4', source: 'm', target: 'a', type: 'aiSubConnection', targetHandle: 'ai_languageModel' },
+    ]
+    const issues = checkCanvasIntegrity(nodes, edges)
+    expect(issues.map((i) => [i.kind, i.edgeId ?? i.nodeId])).toEqual([
+      ['missing-node', 'e2'],
+      ['missing-handle', 'e3'],
+      ['unreachable', 'b'],
+    ])
+    expect(issues[2].title).toBe('Log')
+    // No trigger -> reachability is not checked.
+    expect(checkCanvasIntegrity(nodes.slice(1, 3), [])).toEqual([])
+  })
+})
