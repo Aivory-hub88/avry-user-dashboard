@@ -618,3 +618,120 @@ describe('checkCanvasIntegrity / applyEditToCanvas', () => {
     expect(checkCanvasIntegrity(nodes.slice(1, 3), [])).toEqual([])
   })
 })
+
+describe('planCanvasEdit — preview and apply share one merge', () => {
+  const drive = (id: string, name: string, x: number) =>
+    ({ id, name, type: 'n8n-nodes-base.googleDrive', typeVersion: 3, position: [x, 0], parameters: {} })
+  const backup = {
+    name: 'Blank Workflow',
+    nodes: [
+      { id: 't', name: 'Schedule Trigger', type: 'n8n-nodes-base.scheduleTrigger', typeVersion: 1.2, position: [0, 0], parameters: {} },
+      drive('r', 'Step 1: Read', 200), drive('c', 'Step 2: Check', 400), drive('p', 'Step 3: Process', 600),
+    ],
+    connections: {
+      'Schedule Trigger': { main: [[{ node: 'Step 1: Read', type: 'main', index: 0 }]] },
+      'Step 1: Read': { main: [[{ node: 'Step 2: Check', type: 'main', index: 0 }]] },
+      'Step 2: Check': { main: [[{ node: 'Step 3: Process', type: 'main', index: 0 }]] },
+    },
+  } as any
+
+  it('runs the connection check on the canvas that would be applied', async () => {
+    const { planCanvasEdit } = await import('./canvasEditPlan')
+    const snap = { ...n8nToReactFlow(backup), n8n: backup } as any
+    const before = canvasToGeneratedWorkflow(backup)
+    const edited = {
+      ...before,
+      steps: [
+        { ...before.steps[0] },
+        { id: 'r', type: 'action' as const, title: 'Read', app: 'google drive', testable: true },
+        {
+          id: 'c', type: 'condition' as const, title: 'Check if Data Exists', testable: true,
+          branches: [
+            { key: 'true', label: 'Yes', steps: [{ id: 'p', type: 'action' as const, title: 'Process', app: 'google drive', testable: true }] },
+            { key: 'false', label: 'No', steps: [{ id: 'n', type: 'action' as const, title: 'Log Nothing Found', app: 'google drive', testable: true }] },
+          ],
+        },
+      ],
+    }
+    const { merged, preview } = planCanvasEdit(snap, edited, { workflowId: 'x', title: 'Blank Workflow' })
+    expect(preview.issues).toBe(merged.issues)
+    expect(preview.reset).toBe(merged.reset)
+    expect(merged.issues).toEqual([])
+    expect(preview.steps).toBe(5)
+    const check = merged.nodes.find((n) => /check if data exists/i.test(n.data.title))!
+    expect(check.data.rawN8n.type).toBe('n8n-nodes-base.if')
+    expect(merged.edges.filter((e) => e.source === check.id)).toHaveLength(2)
+    // The canvas is not touched.
+    expect(snap.nodes).toHaveLength(4)
+  })
+})
+
+describe('connectionCheckSummary', () => {
+  const issue = (kind: 'missing-handle' | 'unreachable', nodeId: string, message: string) =>
+    ({ kind, nodeId, title: nodeId, message })
+
+  it('says every step is connected when nothing is wrong', async () => {
+    const { connectionCheckSummary } = await import('./canvasEditPlan')
+    expect(connectionCheckSummary({ issues: [], reset: [], steps: 5 })).toEqual({ ok: true, headline: 'All 5 steps connected', lines: [] })
+    expect(connectionCheckSummary({ issues: [], reset: [], steps: 1 }).headline).toBe('All 1 step connected')
+  })
+
+  it('names steps whose settings auto-repair resets, and still allows applying', async () => {
+    const { connectionCheckSummary } = await import('./canvasEditPlan')
+    const r = connectionCheckSummary({ issues: [], reset: ['Check if Data Exists'], steps: 5 })
+    expect(r.ok).toBe(true)
+    expect(r.headline).toBe('All 5 steps connected, with settings reset')
+    expect(r.lines).toEqual(['Settings will be reset for "Check if Data Exists" so it stays connected.'])
+  })
+
+  it('lists each remaining problem once and blocks applying', async () => {
+    const { connectionCheckSummary } = await import('./canvasEditPlan')
+    const r = connectionCheckSummary({
+      issues: [
+        issue('missing-handle', 'c', '"Check" has no "out-yes" output.'),
+        issue('missing-handle', 'c', '"Check" has no "out-yes" output.'),
+        issue('unreachable', 'p', '"Process" is not connected to the trigger, so it would never run.'),
+      ],
+      reset: ['Read'],
+      steps: 4,
+    })
+    expect(r.ok).toBe(false)
+    expect(r.headline).toBe('2 connection problems — Update canvas is disabled. Ask Aether to fix it.')
+    expect(r.lines).toEqual([
+      '"Check" has no "out-yes" output.',
+      '"Process" is not connected to the trigger, so it would never run.',
+      'Settings will be reset for "Read" so it stays connected.',
+    ])
+  })
+})
+
+describe('CopilotStateMachine — approval message', () => {
+  const tested = (canvasTarget: { workflowId: string; title: string } | null) => ({
+    sessionId: 's', stage: 'TESTING' as const, userRequest: 'x', conversationHistory: [],
+    generatedWorkflow: {
+      workflowName: 'Drive backup', steps: [{ id: 't', type: 'trigger' as const, title: 'Schedule', testable: false }],
+      estimate_hours: 0, automation_score: 0, summary: 'Backs up Drive.', nodeConfigs: [],
+    },
+    testResults: [
+      { stepId: 'a', status: 'success', message: 'ok' },
+      { stepId: 'b', status: 'skipped', message: 'no creds' },
+    ],
+    testAttempts: 1, userApprovals: { confirmedWorkflow: true, approvedTest: false, appliedToCanvas: false },
+    lastMessage: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    canvasTarget,
+  }) as any
+
+  it('a canvas edit says only the new steps were sandbox-tested and points to the connection check', () => {
+    const msg: string = (new CopilotStateMachine('s', tested({ workflowId: 'wf-1', title: 'Drive backup' })) as any).buildApprovalMessage(1)
+    expect(msg).toContain('Sandbox tested the new steps: 1 succeeded, 1 skipped, out of 2.')
+    expect(msg).toContain('not the merged canvas')
+    expect(msg).toContain('connection check for "Drive backup" is shown in the panel')
+    expect(msg).not.toContain('Sandbox testing complete')
+  })
+
+  it('a new workflow keeps the full sandbox wording', () => {
+    const msg: string = (new CopilotStateMachine('s', tested(null)) as any).buildApprovalMessage(1)
+    expect(msg).toContain('Sandbox testing complete! 1 succeeded, 1 skipped, out of 2 total steps.')
+    expect(msg).not.toContain('connection check')
+  })
+})

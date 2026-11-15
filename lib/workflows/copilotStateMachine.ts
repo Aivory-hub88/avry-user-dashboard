@@ -1309,7 +1309,7 @@ export class CopilotStateMachine {
       this.state.stage = 'AWAITING_APPLY_APPROVAL'
       return this.setAssistantMessage(
         this.state.canvasTarget
-          ? `The workflow has passed the sandbox test. Click **Update canvas** to apply the changes to "${this.state.canvasTarget.title}".`
+          ? `The new steps passed the sandbox test. Check the connection check in the panel, then click **Update canvas** to apply the changes to "${this.state.canvasTarget.title}".`
           : `The workflow has passed the sandbox test. Click the **Apply to canvas** button to place the workflow "${this.state.generatedWorkflow?.workflowName}" onto the canvas.`,
       )
     }
@@ -1402,14 +1402,22 @@ export class CopilotStateMachine {
           .join('\n\n')
     }
 
+    // Canvas edit: the sandbox ran the edited step list, not the merged canvas
+    // (kept nodes keep their own settings). Don't imply the canvas result was
+    // tested — the connection check of the real merge is shown in the panel.
+    const headline = this.state.canvasTarget
+      ? `✅ **Sandbox tested the new steps: ${passed} succeeded, ${skipped} skipped, out of ${total}.**\n` +
+        `_The sandbox tests the steps on their own, not the merged canvas. The connection check for "${this.state.canvasTarget.title}" is shown in the panel below._\n\n`
+      : `✅ **Sandbox testing complete! ${passed} succeeded, ${skipped} skipped, out of ${total} total steps.**\n_Validation: ${wf.dummyTest?.validationMode || 'sandbox'}_\n\n`
+
     return (
-      `✅ **Sandbox testing complete! ${passed} succeeded, ${skipped} skipped, out of ${total} total steps.**\n_Validation: ${wf.dummyTest?.validationMode || 'sandbox'}_\n\n` +
+      headline +
       attemptNote +
       `${testSummary}\n\n` +
       `---\n📌 **Workflow Summary:**\n${wf.summary}` +
       nodeDetails +
       (this.state.canvasTarget
-        ? `\n\n---\n🚀 **The changes to "${this.state.canvasTarget.title}" are ready. Review them below, then click Update canvas.**`
+        ? `\n\n---\n🚀 **The changes to "${this.state.canvasTarget.title}" are ready. Review them and the connection check below, then click Update canvas.**`
         : `\n\n---\n🚀 **The workflow "${wf.workflowName}" is ready to be applied. Click the Apply to canvas button to place it onto the canvas.**`) +
       `\n\n_Note: once deployed to n8n, you can open any node there and adjust its exact configuration — credentials, field mappings, the precise data source — yourself; I set up the workflow's structure, but node-level details are easiest to finish directly in n8n._`
     )

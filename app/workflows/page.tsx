@@ -11,7 +11,8 @@ import {
   deactivateWorkflow,
 } from '@/hooks/useWorkflows'
 import { WorkflowCanvas as N8nWorkflowCanvas, type CanvasCopilotBridge } from '@/components/workflow/WorkflowCanvas'
-import { applyEditToCanvas, canvasToGeneratedWorkflow, diffSteps, normalizeStepTitle, stepIdAliases, type CanvasEditContext } from '@/lib/workflows/canvasCopilot'
+import { canvasToGeneratedWorkflow, type CanvasEditContext } from '@/lib/workflows/canvasCopilot'
+import { planCanvasEdit, workflowToCanvasGraph, type CanvasEditPreview } from '@/lib/workflows/canvasEditPlan'
 import type { CopilotApplyTarget } from '@/components/workflow/CopilotTogglePanel'
 import { CopilotTogglePanel } from '@/components/workflow/CopilotTogglePanel'
 import { WorkflowGenerationModal } from '@/components/workflow/WorkflowGenerationModal'
@@ -27,7 +28,6 @@ import { VersionHistoryPanel } from '@/components/workflow/VersionHistoryPanel'
 import { saveCredentials, N8nCredentials } from '@/lib/workflows/credentialStore'
 import { authedFetch } from '@/lib/deployAuth'
 import { convertToN8nWorkflow, type WorkflowStep as ConverterWorkflowStep } from '@/lib/workflowConverter'
-import { generatedWorkflowToN8n } from '@/lib/workflows/copilotToN8n'
 import { fetchTemplateById } from '@/lib/templates/resolveTemplate'
 import { templateToCanvas } from '@/lib/templates/templateToCanvas'
 import type { AivoryWorkflowSpec } from '@/types/workflow'
@@ -1370,14 +1370,16 @@ function WorkflowsPageInner() {
   }, [selected])
 
   // What "Update canvas" would do to the workflow that is open right now —
-  // shown in the Aether panel before the user applies anything.
+  // shown in the Aether panel before the user applies anything. Runs the same
+  // planCanvasEdit as handleCopilotApply, so the connection check shown is
+  // the one the apply will hit.
   const getChangePreview = useCallback(
-    (workflow: import('@/lib/workflows/copilotClient').GeneratedWorkflow) => {
+    (workflow: import('@/lib/workflows/copilotClient').GeneratedWorkflow): CanvasEditPreview | null => {
       const bridge = canvasBridgeRef.current
       if (!bridge) return null
       const snap = bridge.snapshot()
       if (!snap.nodes.length) return null
-      return diffSteps(canvasToGeneratedWorkflow(snap.n8n).steps, workflow.steps)
+      return planCanvasEdit(snap, workflow, { workflowId: 'copilot-preview', title: workflow.workflowName || 'Preview' }).preview
     },
     [],
   )
@@ -1419,32 +1421,10 @@ function WorkflowsPageInner() {
     // in place (unchanged steps keep their nodes, settings and credentials).
     const editingOpenCanvas = !!target && !!selected && target.workflowId === selected.workflow_id && !!canvasBridgeRef.current
 
-    const n8nWorkflow = generatedWorkflowToN8n(workflow, {
-      // eslint-disable-next-line react-hooks/purity
-      workflowId: `copilot-${Date.now()}`,
-      title,
-      keepLastStepIntent: editingOpenCanvas,
-    })
-
-    // convertToN8nWorkflow()/n8nToReactFlow() declare their own local
-    // N8nWorkflow/N8nNode interfaces (pre-existing duplication across
-    // lib/workflowConverter.ts, lib/workflows/nodeMapper.ts and lib/n8n.ts)
-    // that are structurally identical but not nominally the same type.
-    const { nodes: rfNodes, edges: rfEdges } = n8nToReactFlow(n8nWorkflow as unknown as N8nWorkflow)
-
     if (editingOpenCanvas && canvasBridgeRef.current && selected) {
       const bridge = canvasBridgeRef.current
-      const snap = bridge.snapshot()
-      const before = canvasToGeneratedWorkflow(snap.n8n)
-      const keepTrigger =
-        before.steps[0]?.type === 'trigger' &&
-        (workflow.steps[0]?.id === before.steps[0].id ||
-          normalizeStepTitle(before.steps[0].title) === normalizeStepTitle(workflow.steps[0]?.title || ''))
-      const merged = applyEditToCanvas(
-        { nodes: snap.nodes, edges: snap.edges },
-        { nodes: rfNodes as any, edges: rfEdges },
-        { keepTrigger, idAliases: stepIdAliases(workflow.steps, snap.nodes, before.steps) },
-      )
+      // eslint-disable-next-line react-hooks/purity
+      const { merged } = planCanvasEdit(bridge.snapshot(), workflow, { workflowId: `copilot-${Date.now()}`, title })
       // Never put a canvas with broken connections on screen: React Flow would
       // silently drop those edges and leave steps floating unconnected.
       if (merged.issues.length) {
@@ -1470,6 +1450,12 @@ function WorkflowsPageInner() {
       else showToast(`Aether updated the canvas (${parts}), but saving to n8n failed — press Save to retry.${resetNote}`, 'error')
       return
     }
+
+    const { nodes: rfNodes, edges: rfEdges } = workflowToCanvasGraph(workflow, {
+      // eslint-disable-next-line react-hooks/purity
+      workflowId: `copilot-${Date.now()}`,
+      title,
+    })
 
     // A workflow is already open — ask whether to merge into it or fork a
     // new draft, instead of always silently forking (which orphaned the
