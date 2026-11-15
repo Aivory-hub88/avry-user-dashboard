@@ -14,16 +14,32 @@ import {
   cleanCells,
   wipExceeded,
   withResolvedRollups,
+  actorRef,
   MAX_DESCRIPTION_LEN,
   type DbRow,
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { indexRow, rowText, workspaceOf } from "@/lib/workspaceIndex"
 import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
+import { recordAssignments } from "@/lib/workspaceMentions"
+import { assigneeMirror, cleanAssignees, cleanOwner, rowAssignees, type PersonRef } from "@/lib/workspaceDbModel"
 
 export const runtime = "nodejs"
 
-function cleanRowInput(body: Partial<DbRow>): Omit<DbRow, "id" | "comments" | "cells"> {
+type RowInput = Omit<DbRow, "id" | "comments" | "cells" | "createdBy" | "createdAt">
+
+/** Typed assignees win; else the legacy `assignee` text (agent → typed). */
+function assigneesInput(body: Partial<DbRow>): { assignees: PersonRef[]; assignee: string } {
+  if (Array.isArray(body.assignees)) {
+    const assignees = cleanAssignees(body.assignees)
+    return { assignees, assignee: assigneeMirror(assignees) }
+  }
+  const legacy = (body.assignee ?? "").toString().slice(0, 100)
+  const assignees = rowAssignees(undefined, legacy)
+  return { assignees, assignee: assignees.length > 0 ? assigneeMirror(assignees) : legacy }
+}
+
+function cleanRowInput(body: Partial<DbRow>): RowInput {
   const status = (body.status ?? "Todo").toString().slice(0, 16)
   const priority = body.priority === "Low" || body.priority === "High" ? body.priority : "Med"
   const due = (body.due ?? "").toString().slice(0, 20)
@@ -34,7 +50,8 @@ function cleanRowInput(body: Partial<DbRow>): Omit<DbRow, "id" | "comments" | "c
     title: (body.title ?? "Untitled").toString().slice(0, 200),
     status,
     priority,
-    assignee: (body.assignee ?? "").toString().slice(0, 100),
+    ...assigneesInput(body),
+    owner: cleanOwner(body.owner),
     start,
     due,
     description: (body.description ?? "").toString().slice(0, MAX_DESCRIPTION_LEN),
@@ -78,7 +95,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   } catch {
     return NextResponse.json({ error: "invalid json" }, { status: 400 })
   }
-  const agentType = assertedAgent || (body.assignee ?? "").toString().slice(0, 100) || "user"
+  // The actor is the caller, never the task's assignee (assigning Geno while
+  // creating a task must not make the write — or its activity — Geno's).
+  const agentType = assertedAgent || "user"
 
   try {
     const allowPg = cred.kind === "service" ? true : await authorizeDocFallback(cred, id)
@@ -94,9 +113,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (limited !== null) {
       return NextResponse.json({ error: "wip-exceeded", limit: limited }, { status: 409 })
     }
+    const input = cleanRowInput(body)
+    const creator = actorRef(cred, agentType)
     const newRow: DbRow = {
       id: newDbRowId(),
-      ...cleanRowInput(body),
+      ...input,
+      // A person creating a task owns it unless they named another owner.
+      owner: input.owner ?? (creator?.kind === "user" ? creator : null),
+      createdBy: creator,
+      createdAt: new Date().toISOString(),
       comments: [],
       cells: cleanCells(body.cells, fieldDefs),
     }
@@ -134,6 +159,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         metadata: { applied: automated },
       })
     }
+    await recordAssignments({ docId: id, rowId: newRow.id, credential: cred, agentType, added: newRow.assignees, title: newRow.title })
     const [resolved] = await withResolvedRollups([newRow], fieldDefs, cred, agentType, allowPg)
     // Semantic index (best-effort, never blocks the response).
     void indexRow(id, newRow.id, await workspaceOf(id), rowText(newRow)).catch(() => {})

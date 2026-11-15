@@ -16,7 +16,8 @@ import {
   MAX_DESCRIPTION_LEN,
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
-import { syncDescriptionMentions } from "@/lib/workspaceMentions"
+import { syncDescriptionMentions, recordAssignments } from "@/lib/workspaceMentions"
+import { addedAssignees, assigneeMirror, cleanAssignees, cleanOwner, rowAssignees, type PersonRef } from "@/lib/workspaceDbModel"
 import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
 import { indexRow, removeRowIndex, rowText, workspaceOf } from "@/lib/workspaceIndex"
 
@@ -33,6 +34,36 @@ function cleanPatch(patch: Record<string, unknown>): Record<string, string> {
   }
   if (out.priority !== undefined && out.priority !== "Low" && out.priority !== "Med" && out.priority !== "High") {
     out.priority = "Med"
+  }
+  return out
+}
+
+/**
+ * People part of a patch: `assignees` (typed list) wins over the legacy
+ * `assignee` string; a legacy string naming an agent becomes typed, any
+ * other text stays legacy (unlinked). `owner` accepts a person or null.
+ */
+function peoplePatch(patch: Record<string, unknown>): {
+  assignees?: PersonRef[] | "legacy"
+  legacyText?: string
+  owner?: PersonRef | null
+} {
+  const out: ReturnType<typeof peoplePatch> = {}
+  if (Array.isArray(patch.assignees)) {
+    out.assignees = cleanAssignees(patch.assignees)
+  } else if (typeof patch.assignee === "string") {
+    const text = patch.assignee.trim().slice(0, 100)
+    const typed = rowAssignees(undefined, text)
+    if (typed.length > 0 || !text) out.assignees = typed
+    else {
+      out.assignees = "legacy"
+      out.legacyText = text
+    }
+  }
+  if (patch.owner === null) out.owner = null
+  else if (patch.owner !== undefined) {
+    const o = cleanOwner(patch.owner)
+    if (o) out.owner = o
   }
   return out
 }
@@ -57,8 +88,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "invalid json" }, { status: 400 })
   }
   const clean = cleanPatch(patch)
+  // Assignee is handled by peoplePatch (typed + mirror), not as a raw scalar.
+  delete clean.assignee
+  const people = peoplePatch(patch)
+  const hasPeople = people.assignees !== undefined || people.owner !== undefined
   const hasCells = patch.cells !== undefined
-  if (Object.keys(clean).length === 0 && !hasCells) return NextResponse.json({ error: "nothing to update" }, { status: 400 })
+  if (Object.keys(clean).length === 0 && !hasCells && !hasPeople) return NextResponse.json({ error: "nothing to update" }, { status: 400 })
 
   try {
     const doc = await loadDbDoc(id, cred, agentType, await allowPg(cred, id))
@@ -88,9 +123,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (patch.cells !== undefined) {
       mergedCells = { ...parseDbRow(m).cells, ...cleanCells(patch.cells, await getFieldDefs(id)) }
     }
+    const prevAssignees = parseDbRow(m).assignees
     doc.transact(() => {
       for (const [k, v] of Object.entries(clean)) m.set(k, v)
       if (mergedCells) m.set("cells", mergedCells)
+      if (people.assignees === "legacy") {
+        m.delete("assignees")
+        m.set("assignee", people.legacyText ?? "")
+      } else if (people.assignees !== undefined) {
+        m.set("assignees", people.assignees)
+        m.set("assignee", assigneeMirror(people.assignees))
+      }
+      if (people.owner !== undefined) m.set("owner", people.owner)
     }, agentType)
     const actorName = cred.kind === "service" ? agentType.replace(/_/g, " ") : (cred.user.email ?? cred.user.user_id)
     const automated = await runStatusAutomations({
@@ -103,6 +147,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       getRules: () => getAutomationRules(id),
     })
     await saveDbDoc(id, doc, cred, agentType)
+    // Diff after automations too (a rule may assign an agent on entry).
+    const afterRow = parseDbRow(m)
+    const added = addedAssignees(prevAssignees, afterRow.assignees)
+    if (added.length > 0) {
+      await recordAssignments({ docId: id, rowId, credential: cred, agentType, added, title: afterRow.title })
+    }
     await recordWorkspaceActivity({
       docId: id,
       credential: cred,
@@ -111,7 +161,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       summary: `Updated task ${rowId}`,
       targetType: "database-row",
       targetId: rowId,
-      metadata: clean,
+      metadata: {
+        ...clean,
+        ...(people.assignees !== undefined ? { assignee: afterRow.assignee } : {}),
+        ...(people.owner !== undefined ? { owner: afterRow.owner?.kind === "user" ? afterRow.owner.id : null } : {}),
+      },
     })
     if (automated.length > 0) {
       await recordWorkspaceActivity({
@@ -131,11 +185,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       await syncDescriptionMentions({ docId: id, rowId, credential: cred, agentType, source: "description", text: clean.description })
     }
     // Semantic reindex on text-affecting edits (best-effort, non-blocking).
-    if (clean.title !== undefined || clean.description !== undefined || clean.assignee !== undefined) {
+    if (clean.title !== undefined || clean.description !== undefined || people.assignees !== undefined) {
       const fresh = parseDbRow(arr.get(idx) as Y.Map<unknown>)
       void indexRow(id, rowId, await workspaceOf(id), rowText(fresh)).catch(() => {})
     }
-    return NextResponse.json({ id: rowId, patched: clean, ...(mergedCells ? { cells: mergedCells } : {}), rollups: resolved?.cells ?? {} })
+    return NextResponse.json({ id: rowId, patched: {
+      ...clean,
+      ...(people.assignees !== undefined ? { assignee: afterRow.assignee, assignees: afterRow.assignees } : {}),
+      ...(people.owner !== undefined ? { owner: afterRow.owner } : {}),
+    }, ...(mergedCells ? { cells: mergedCells } : {}), rollups: resolved?.cells ?? {} })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
     console.error("[workspace/database PATCH]", e)

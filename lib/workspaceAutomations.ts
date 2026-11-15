@@ -1,7 +1,7 @@
 import * as Y from "yjs"
 import { query } from "@/lib/db"
 import { rowsFromDbDoc, wipExceeded } from "@/lib/workspaceDb"
-import { parseAutomationRules, matchRules, type AutomationRule } from "@/lib/workspaceDbModel"
+import { parseAutomationRules, matchRules, assigneesFromRuleValue, assigneeMirror, type AutomationRule } from "@/lib/workspaceDbModel"
 
 /**
  * Status-change automations (Fase 4e): when a row moves INTO a status, run
@@ -24,7 +24,17 @@ export function applyRuleToRow(
   actorName: string,
 ): AppliedAutomation {
   const applied: AppliedAutomation = { ruleId: rule.id, ruleName: rule.name }
-  if (rule.setAssignee !== undefined) m.set("assignee", rule.setAssignee)
+  if (rule.setAssignee !== undefined) {
+    const typed = assigneesFromRuleValue(rule.setAssignee)
+    if (typed) {
+      m.set("assignees", typed)
+      m.set("assignee", assigneeMirror(typed))
+    } else {
+      // Old free-text rule: legacy string only (read as an unlinked assignee).
+      m.delete("assignees")
+      m.set("assignee", rule.setAssignee)
+    }
+  }
   if (rule.moveTo !== undefined) {
     if (allowMove) {
       m.set("status", rule.moveTo)

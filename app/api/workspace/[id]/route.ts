@@ -3,7 +3,7 @@ import { query } from '@/lib/db'
 import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from '@/lib/workspaceAuth'
 import { getDocRole, canWrite } from '@/lib/workspaceAccess'
 import { parseFieldDefs } from '@/lib/workspaceDb'
-import { parseAutomationRules } from '@/lib/workspaceDbModel'
+import { parseAutomationRules, cleanPeopleFilter } from '@/lib/workspaceDbModel'
 import { recordWorkspaceActivity } from '@/lib/workspaceActivity'
 
 export const runtime = 'nodejs'
@@ -136,7 +136,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const sortField = sortFields.has(vv.sortField as string) ? (vv.sortField as string) : "title"
         const sortDir = sortDirs.has(vv.sortDir as string) ? (vv.sortDir as string) : "asc"
         const dueFilter = dueFilters.has(vv.dueFilter as string) ? (vv.dueFilter as string) : "All"
-        cleanedViews.push({ id, name, kind, statusFilter, priorityFilter, q, sortField, sortDir, dueFilter })
+        const peopleFilter = cleanPeopleFilter(vv.peopleFilter)
+        cleanedViews.push({ id, name, kind, statusFilter, priorityFilter, q, sortField, sortDir, dueFilter, peopleFilter })
       }
       propsPatch.dbViews = cleanedViews
     } else if (src.dbViews === undefined) {

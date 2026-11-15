@@ -27,6 +27,7 @@ import RoomPanel, { type Autonomy, type RoomBrief, type RoomPerson } from "@/com
 import RoomNotes from "@/components/room/RoomNotes"
 import ProjectTimeline from "@/components/timeline/ProjectTimeline"
 import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
+import WorkspaceInbox from "@/components/workspace/WorkspaceInbox"
 import { useDiscussionResource } from "@/hooks/useDiscussionResource"
 import { useSelfId } from "@/hooks/useSelfId"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
@@ -364,6 +365,7 @@ export default function RoomView({
               ))}
             </span>
           )}
+          <WorkspaceInbox />
           <Link href="/workspace/requests" className="rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
             Requests
           </Link>
@@ -382,7 +384,7 @@ export default function RoomView({
       <div className="flex min-h-0 flex-1">
         {tab === "tasks" ? (
           <div className="min-w-0 flex-1 overflow-y-auto px-6 py-6">
-            <WorkspaceDatabase docId={roomId} readOnly={!canWrite} />
+            <WorkspaceDatabase docId={roomId} readOnly={!canWrite} people={people} agents={agents} selfId={selfId} initialTaskId={search.get("task")} />
           </div>
         ) : tab === "timeline" ? (
           <ProjectTimeline roomId={roomId} />

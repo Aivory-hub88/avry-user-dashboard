@@ -30,6 +30,7 @@ vi.mock('@/lib/serverAuth', () => ({ getAuthUserWithToken: () => null }))
 import { PATCH } from './route'
 import { POST as movePOST } from './move/route'
 import { GET as commentsGET, POST as commentsPOST } from './comments/route'
+import { POST as assignedPOST } from './assigned/route'
 
 process.env.COLLAB_SERVICE_TOKEN = 'test-service-token'
 
@@ -213,5 +214,61 @@ describe('comment mention fan-out', () => {
     // type lands in the `ids` array param, not as its own flat param.
     const params = insert?.[1] as unknown[]
     expect(params.some((p) => Array.isArray(p) && p.includes('leads_qualifier'))).toBe(true)
+  })
+})
+
+describe('task people via PATCH', () => {
+  const inboxCalls = () => queryMock.mock.calls.filter(([sql]) => typeof sql === 'string' && sql.includes("'assigned'"))
+
+  it('sets typed assignees + owner and notifies only the newly added', async () => {
+    const res = await PATCH(
+      patchReq('r0', {
+        assignees: [{ kind: 'agent', type: 'autonomous' }, { kind: 'user', id: 'u-9', name: 'Rina' }],
+        owner: { kind: 'user', id: 'u-1', name: 'Irfan' },
+      }),
+      patchParams('r0'),
+    )
+    expect(res.status).toBe(200)
+    const j = await res.json()
+    expect(j.patched.assignee).toBe('Geno, Rina')
+    expect(j.patched.owner).toEqual({ kind: 'user', id: 'u-1', name: 'Irfan' })
+    expect(inboxCalls()).toHaveLength(1)
+    const params = inboxCalls()[0][1] as unknown[]
+    expect(params[params.length - 1]).toEqual(['autonomous', 'u-9'])
+  })
+
+  it('rejects an agent as owner (ignored) and accepts null', async () => {
+    const res = await PATCH(patchReq('r0', { owner: { kind: 'agent', type: 'autonomous' } }), patchParams('r0'))
+    expect(res.status).toBe(400)
+    const res2 = await PATCH(patchReq('r0', { owner: null }), patchParams('r0'))
+    expect(res2.status).toBe(200)
+  })
+
+  it('legacy assignee text naming an agent becomes typed', async () => {
+    const res = await PATCH(patchReq('r0', { assignee: 'Lex' }), patchParams('r0'))
+    const j = await res.json()
+    expect(j.patched.assignees).toEqual([{ kind: 'agent', type: 'leads_qualifier' }])
+    expect(inboxCalls()).toHaveLength(1)
+  })
+})
+
+describe('POST /assigned (UI notify)', () => {
+  const req = (body: unknown) =>
+    new NextRequest('http://localhost/api/workspace/doc-1/database/r0/assigned', {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json', ...svc },
+    })
+  const params = (rowId: string) => ({ params: Promise.resolve({ id: 'doc-1', rowId }) })
+
+  it('notifies valid refs on an existing row', async () => {
+    const res = await assignedPOST(req({ added: [{ kind: 'user', id: 'u-3' }, { kind: 'agent', type: 'ghost' }] }), params('r0'))
+    expect(res.status).toBe(200)
+    expect((await res.json()).notified).toBe(1)
+  })
+
+  it('400 without refs, 404 for unknown rows', async () => {
+    expect((await assignedPOST(req({ added: [] }), params('r0'))).status).toBe(400)
+    expect((await assignedPOST(req({ added: [{ kind: 'user', id: 'u-3' }] }), params('nope'))).status).toBe(404)
   })
 })

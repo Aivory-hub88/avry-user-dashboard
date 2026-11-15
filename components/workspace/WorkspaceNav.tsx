@@ -9,6 +9,7 @@
  * Page-specific actions go through window events, so a page that is already
  * open reacts in place (no reload); from another tab they navigate.
  */
+import WorkspaceInbox from "@/components/workspace/WorkspaceInbox"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -79,6 +80,7 @@ export default function WorkspaceNav() {
       <div className="flex h-12 items-center justify-between gap-3 px-4 sm:px-6">
         <span className="text-[13px] font-medium text-white/85">Workspace</span>
         <div className="flex items-center gap-1">
+          <WorkspaceInbox />
           <button
             type="button"
             onClick={openGuide}

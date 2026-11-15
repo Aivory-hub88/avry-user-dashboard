@@ -1,5 +1,5 @@
 import { query } from "@/lib/db"
-import { parseMentions } from "@/lib/workspaceDbModel"
+import { parseMentions, personKey, personLabel, type PersonRef } from "@/lib/workspaceDbModel"
 import type { WorkspaceCredential } from "@/lib/workspaceAuth"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { workspaceOf } from "@/lib/workspaceIndex"
@@ -82,4 +82,53 @@ export async function syncDescriptionMentions(input: MentionInput): Promise<void
     return
   }
   await recordCommentMentions({ ...input, source: "description" })
+}
+
+type AssignInput = {
+  docId: string
+  rowId: string
+  credential: WorkspaceCredential
+  agentType?: string
+  /** Newly added assignees (already diffed by the caller). */
+  added: PersonRef[]
+  title: string
+}
+
+/**
+ * Assignment fan-out: each newly assigned person/agent gets an inbox row
+ * (source 'assigned', excerpt = task title). The actor never notifies
+ * themself. Fire-and-forget: a failure is logged, never thrown.
+ */
+export async function recordAssignments(input: AssignInput): Promise<void> {
+  const { docId, rowId, credential } = input
+  const agentType = input.agentType ?? "user"
+  const actor = actorOf(credential, agentType)
+  const selfKey = actor.actorType === "user" ? `user:${actor.actorId}` : `agent:${actor.actorId}`
+  const targets = input.added.filter((p) => personKey(p) !== selfKey)
+  if (targets.length === 0) return
+  try {
+    const workspaceId = await workspaceOf(docId)
+    const kinds = targets.map((p) => p.kind)
+    const ids = targets.map((p) => (p.kind === "user" ? p.id : p.type))
+    const excerpt = (input.title.trim() || "Untitled").slice(0, 200)
+    await query(
+      `INSERT INTO dashboard.workspace_mentions
+        (workspace_id, doc_id, row_id, actor_type, actor_id, actor_name, mentioned_kind, mentioned_id, source, excerpt)
+       SELECT $1, $2, $3, $4, $5, $6, m.kind, m.id, 'assigned', $7
+       FROM unnest($8::text[], $9::text[]) AS m(kind, id)`,
+      [workspaceId, docId, rowId, actor.actorType, actor.actorId, actor.actorName, excerpt, kinds, ids],
+    )
+    await recordWorkspaceActivity({
+      docId,
+      credential,
+      agentType,
+      action: "database.assigned",
+      summary: `${actor.actorName} assigned ${targets.map(personLabel).join(", ")} to “${excerpt}”`,
+      targetType: "database-row",
+      targetId: rowId,
+      metadata: { assigned: targets.map(personKey) },
+    })
+  } catch (e) {
+    console.error("[workspace assignments]", e)
+  }
 }

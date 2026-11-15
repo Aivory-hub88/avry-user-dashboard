@@ -128,3 +128,87 @@ describe("parseAutomationRules", () => {
     expect(matchRules(rules, "Todo", "Doing")).toHaveLength(0)
   })
 })
+
+import {
+  cleanAssignees,
+  cleanOwner,
+  rowAssignees,
+  unlinkedAssignee,
+  addedAssignees,
+  matchesPeopleFilter,
+  cleanPeopleFilter,
+  assigneesFromRuleValue,
+  assigneeMirror,
+} from "./workspaceDbModel"
+
+describe("task people", () => {
+  it("cleanAssignees drops junk, dedupes and caps at 5", () => {
+    const raw = [
+      { kind: "agent", type: "autonomous" },
+      { kind: "agent", type: "autonomous" },
+      { kind: "agent", type: "nope" },
+      { kind: "user", id: "" },
+      { kind: "user", id: "a", name: "A" },
+      { kind: "user", id: "b" },
+      { kind: "user", id: "c" },
+      { kind: "user", id: "d" },
+      { kind: "user", id: "e" },
+    ]
+    const out = cleanAssignees(raw)
+    expect(out).toHaveLength(5)
+    expect(out[0]).toEqual({ kind: "agent", type: "autonomous" })
+    expect(out[1]).toEqual({ kind: "user", id: "a", name: "A" })
+  })
+
+  it("owner must be a person", () => {
+    expect(cleanOwner({ kind: "agent", type: "autonomous" })).toBeNull()
+    expect(cleanOwner({ kind: "user", id: "u1" })).toEqual({ kind: "user", id: "u1" })
+  })
+
+  it("reads legacy assignee text: agents typed, other text unlinked", () => {
+    expect(rowAssignees(undefined, "autonomous")).toEqual([{ kind: "agent", type: "autonomous" }])
+    expect(rowAssignees(undefined, "Geno")).toEqual([{ kind: "agent", type: "autonomous" }])
+    expect(rowAssignees(undefined, "Budi")).toEqual([])
+    expect(unlinkedAssignee(undefined, "Budi")).toBe("Budi")
+    expect(unlinkedAssignee(undefined, "Geno")).toBe("")
+    // Once typed, the legacy text is only a mirror.
+    expect(rowAssignees([], "Budi")).toEqual([])
+    expect(unlinkedAssignee([], "Budi")).toBe("")
+  })
+
+  it("addedAssignees diffs by key", () => {
+    const a = { kind: "user", id: "a" } as const
+    const g = { kind: "agent", type: "autonomous" } as const
+    expect(addedAssignees([a], [a, g])).toEqual([g])
+    expect(addedAssignees([a, g], [g])).toEqual([])
+  })
+
+  it("people filter: me matches assignee or owner", () => {
+    const row = { assignees: [{ kind: "agent", type: "autonomous" } as const], owner: { kind: "user", id: "me" } as const }
+    expect(matchesPeopleFilter(row, "me", "user:me")).toBe(true)
+    expect(matchesPeopleFilter(row, "me", "user:other")).toBe(false)
+    expect(matchesPeopleFilter(row, "agent:autonomous", null)).toBe(true)
+    expect(matchesPeopleFilter(row, "unassigned", null)).toBe(false)
+    expect(matchesPeopleFilter({ assignees: [], owner: null }, "unassigned", null)).toBe(true)
+    expect(matchesPeopleFilter({ assignees: [], owner: null, unlinked: "Budi" }, "unassigned", null)).toBe(false)
+  })
+
+  it("cleanPeopleFilter accepts only known shapes", () => {
+    expect(cleanPeopleFilter("me")).toBe("me")
+    expect(cleanPeopleFilter("user:abc-1")).toBe("user:abc-1")
+    expect(cleanPeopleFilter("agent:autonomous")).toBe("agent:autonomous")
+    expect(cleanPeopleFilter("agent:ghost")).toBe("All")
+    expect(cleanPeopleFilter(42)).toBe("All")
+  })
+
+  it("automation assign values", () => {
+    expect(assigneesFromRuleValue("Geno")).toEqual([{ kind: "agent", type: "autonomous" }])
+    expect(assigneesFromRuleValue("user:u1")).toEqual([{ kind: "user", id: "u1" }])
+    expect(assigneesFromRuleValue("")).toEqual([])
+    expect(assigneesFromRuleValue("Budi")).toBeNull()
+  })
+
+  it("mirror uses names", () => {
+    expect(assigneeMirror([{ kind: "agent", type: "autonomous" }, { kind: "user", id: "u", name: "Rina" }])).toBe("Geno, Rina")
+  })
+})
