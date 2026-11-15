@@ -4,6 +4,7 @@ import { query, withTransaction } from "@/lib/db"
 import { workspaceCredential, collabAuthHeaders, authorizeDocFallback, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { checkAgentAccess } from "@/lib/workspaceAccess"
 import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDoc"
+import { scheduleTaskIndexSync } from "@/lib/workspaceTaskIndexSync"
 
 export const runtime = "nodejs"
 
@@ -159,6 +160,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }
     return NextResponse.json({ error: "db" }, { status: 500 })
   }
+
+  // Tasks edited in the UI land here (Yjs), so keep the "My tasks" index in step.
+  scheduleTaskIndexSync(id)
 
   if (collabRes?.ok) {
     return NextResponse.json({ id, updated_at: new Date().toISOString(), bytes: buf.byteLength, source: "collab+pg", agentType })
