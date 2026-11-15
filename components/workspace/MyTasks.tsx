@@ -5,8 +5,15 @@ import Link from "next/link"
 import { useMyTasks } from "@/hooks/useMyTasks"
 import { MY_TASK_TABS, groupMyTasks, localDayISO, myTaskHref, type MyTask, type MyTaskGroup, type MyTaskRole } from "@/lib/myTasks"
 
-const STATUS_DOT: Record<string, string> = { Todo: "bg-white/40", Doing: "bg-amber-400", Done: "bg-emerald-400" }
-const STATUS_LABEL: Record<string, string> = { Todo: "To do", Doing: "In progress", Done: "Done" }
+import { statusGroup, STATUS_GROUP_LABEL, type StatusGroup } from "@/lib/workspaceDbModel"
+
+/** Rooms name their own statuses; the dot follows the status's group. */
+const GROUP_DOT: Record<StatusGroup, string> = {
+  todo: "bg-white/40",
+  in_progress: "bg-amber-400",
+  done: "bg-emerald-400",
+  canceled: "bg-red-400/60",
+}
 const GROUP_TONE: Record<MyTaskGroup, string> = {
   Overdue: "text-red-300",
   Today: "text-amber-200",
@@ -23,12 +30,13 @@ function fmtDue(due: string, today: string): string {
 
 function TaskLine({ t, today }: { t: MyTask; today: string }) {
   const overdue = !!t.due && t.due < today
+  const group = t.statusGroup ?? statusGroup([], t.status)
   return (
     <Link
       href={myTaskHref(t)}
       className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/[0.04]"
     >
-      <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[t.status] ?? "bg-white/40"}`} title={STATUS_LABEL[t.status] ?? t.status} />
+      <span className={`h-2 w-2 shrink-0 rounded-full ${GROUP_DOT[group]}`} title={`${t.status} · ${STATUS_GROUP_LABEL[group]}`} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13px] text-white/85">{t.title}</span>
         <span className="block truncate text-[11.5px] text-white/35">{t.roomTitle}</span>

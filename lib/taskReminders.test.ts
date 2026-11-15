@@ -42,7 +42,7 @@ describe("task due reminders", () => {
     expect(params).toEqual(["2026-11-18", "2026-11-19"])
     expect(sql).toContain("INSERT INTO dashboard.workspace_task_reminders")
     expect(sql).toContain("ON CONFLICT DO NOTHING")
-    expect(sql).toContain("t.status <> 'Done'")
+    expect(sql).toContain("t.status_group NOT IN ('done', 'canceled')")
     // Old dedupe rows are pruned in the same pass.
     expect(String(queryMock.mock.calls[1][0])).toContain("DELETE FROM dashboard.workspace_task_reminders")
   })

@@ -1,5 +1,5 @@
 import { query } from "@/lib/db"
-import { personKey } from "@/lib/workspaceDbModel"
+import { parseStatusDefs, personKey, statusGroup, type StatusDef, type StatusGroup } from "@/lib/workspaceDbModel"
 import type { DbRow } from "@/lib/workspaceDb"
 import type { MyTask, MyTaskRole } from "@/lib/myTasks"
 
@@ -19,6 +19,7 @@ export type TaskIndexRecord = {
   row_id: string
   title: string
   status: string
+  status_group: StatusGroup
   priority: string
   due: string | null
   owner_key: string | null
@@ -28,7 +29,7 @@ export type TaskIndexRecord = {
 }
 
 /** Index lines for a doc's rows (pure; rows without an id are skipped). */
-export function taskIndexRecords(rows: DbRow[]): TaskIndexRecord[] {
+export function taskIndexRecords(rows: DbRow[], statuses: readonly StatusDef[] = parseStatusDefs(undefined)): TaskIndexRecord[] {
   const seen = new Set<string>()
   const out: TaskIndexRecord[] = []
   for (const r of rows) {
@@ -38,6 +39,7 @@ export function taskIndexRecords(rows: DbRow[]): TaskIndexRecord[] {
       row_id: r.id.slice(0, 64),
       title: r.title.slice(0, 200),
       status: (r.status || "Todo").slice(0, 16),
+      status_group: statusGroup(statuses, r.status || "Todo"),
       priority: r.priority,
       due: /^\d{4}-\d{2}-\d{2}$/.test(r.due) ? r.due : null,
       owner_key: r.owner ? personKey(r.owner) : null,
@@ -53,12 +55,12 @@ export function taskIndexRecords(rows: DbRow[]): TaskIndexRecord[] {
 export async function syncTaskIndex(docId: string, rows: DbRow[], workspaceId?: string): Promise<void> {
   const id = bareDocId(docId)
   if (!id) return
-  const records = taskIndexRecords(rows)
   try {
+    const records = taskIndexRecords(rows, await roomStatuses(id))
     await query(
       `WITH data AS (
          SELECT * FROM jsonb_to_recordset($3::jsonb) AS x(
-           row_id text, title text, status text, priority text, due text,
+           row_id text, title text, status text, status_group text, priority text, due text,
            owner_key text, creator_key text, assignee_keys text[], follower_keys text[])
        ),
        gone AS (
@@ -66,19 +68,50 @@ export async function syncTaskIndex(docId: string, rows: DbRow[], workspaceId?: 
          WHERE g.doc_id = $1 AND NOT EXISTS (SELECT 1 FROM data d WHERE d.row_id = g.row_id)
        )
        INSERT INTO dashboard.workspace_task_index AS t
-         (doc_id, row_id, workspace_id, title, status, priority, due, owner_key, creator_key, assignee_keys, follower_keys, updated_at)
+         (doc_id, row_id, workspace_id, title, status, status_group, priority, due, owner_key, creator_key, assignee_keys, follower_keys, updated_at)
        SELECT $1, d.row_id, COALESCE($2, (SELECT workspace_id FROM dashboard.workspace_docs WHERE id IN ($1, 'workspace:' || $1) LIMIT 1), 'default'),
-              d.title, d.status, d.priority, d.due::date, d.owner_key, d.creator_key,
+              d.title, d.status, d.status_group, d.priority, d.due::date, d.owner_key, d.creator_key,
               COALESCE(d.assignee_keys, '{}'), COALESCE(d.follower_keys, '{}'), now()
        FROM data d
        ON CONFLICT (doc_id, row_id) DO UPDATE SET
-         title = EXCLUDED.title, status = EXCLUDED.status, priority = EXCLUDED.priority, due = EXCLUDED.due,
+         title = EXCLUDED.title, status = EXCLUDED.status, status_group = EXCLUDED.status_group, priority = EXCLUDED.priority, due = EXCLUDED.due,
          owner_key = EXCLUDED.owner_key, creator_key = EXCLUDED.creator_key,
          assignee_keys = EXCLUDED.assignee_keys, follower_keys = EXCLUDED.follower_keys, updated_at = now()
-       WHERE (t.title, t.status, t.priority, t.due, t.owner_key, t.creator_key, t.assignee_keys, t.follower_keys)
-         IS DISTINCT FROM (EXCLUDED.title, EXCLUDED.status, EXCLUDED.priority, EXCLUDED.due,
+       WHERE (t.title, t.status, t.status_group, t.priority, t.due, t.owner_key, t.creator_key, t.assignee_keys, t.follower_keys)
+         IS DISTINCT FROM (EXCLUDED.title, EXCLUDED.status, EXCLUDED.status_group, EXCLUDED.priority, EXCLUDED.due,
                            EXCLUDED.owner_key, EXCLUDED.creator_key, EXCLUDED.assignee_keys, EXCLUDED.follower_keys)`,
       [id, workspaceId ?? null, JSON.stringify(records)],
+    )
+  } catch (e) {
+    console.error("[workspace task index]", e)
+  }
+}
+
+/** The room's statuses, read from its props (default Todo/Doing/Done). */
+async function roomStatuses(id: string): Promise<StatusDef[]> {
+  const r = await query(`SELECT props FROM dashboard.workspace_docs WHERE id IN ($1, 'workspace:' || $1) LIMIT 1`, [id])
+  const props = r.rows[0]?.props as Record<string, unknown> | undefined
+  return parseStatusDefs(props?.dbStatuses)
+}
+
+/**
+ * Re-derive every index line's group after the room's statuses changed (a
+ * status moved to another group, or was renamed while rows still carry the
+ * old name). Names the room no longer lists keep their legacy meaning.
+ */
+export async function restampTaskIndexGroups(docId: string, statuses: readonly StatusDef[]): Promise<void> {
+  try {
+    await query(
+      `WITH s AS (SELECT * FROM jsonb_to_recordset($2::jsonb) AS x(name text, "group" text))
+       UPDATE dashboard.workspace_task_index t
+          SET status_group = g.grp, updated_at = now()
+         FROM (
+           SELECT i.row_id, COALESCE((SELECT s."group" FROM s WHERE s.name = i.status),
+                    CASE i.status WHEN 'Done' THEN 'done' WHEN 'Doing' THEN 'in_progress' ELSE 'todo' END) AS grp
+             FROM dashboard.workspace_task_index i WHERE i.doc_id = $1
+         ) g
+        WHERE t.doc_id = $1 AND t.row_id = g.row_id AND t.status_group IS DISTINCT FROM g.grp`,
+      [bareDocId(docId), JSON.stringify(statuses)],
     )
   } catch (e) {
     console.error("[workspace task index]", e)
@@ -102,12 +135,12 @@ const MAX_MY_TASKS = 500
  */
 export async function tasksInvolving(key: string): Promise<MyTask[]> {
   const r = await query(
-    `SELECT t.doc_id, t.row_id, t.title, t.status, t.priority, to_char(t.due, 'YYYY-MM-DD') AS due,
+    `SELECT t.doc_id, t.row_id, t.title, t.status, t.status_group, t.priority, to_char(t.due, 'YYYY-MM-DD') AS due,
             t.owner_key, t.creator_key, t.assignee_keys, t.follower_keys,
             (SELECT d.title FROM dashboard.workspace_docs d
               WHERE d.id IN (t.doc_id, 'workspace:' || t.doc_id) AND d.title IS NOT NULL LIMIT 1) AS room_title
      FROM dashboard.workspace_task_index t
-     WHERE t.status <> 'Done'
+     WHERE t.status_group NOT IN ('done', 'canceled')
        AND (t.owner_key = $1 OR t.creator_key = $1 OR $1 = ANY(t.assignee_keys) OR $1 = ANY(t.follower_keys))
        AND NOT EXISTS (
          SELECT 1 FROM dashboard.workspace_docs d
@@ -130,6 +163,7 @@ export async function tasksInvolving(key: string): Promise<MyTask[]> {
       roomTitle: ((row.room_title as string | null) ?? "").trim() || "Untitled room",
       title: ((row.title as string) || "").trim() || "Untitled",
       status: row.status as string,
+      statusGroup: row.status_group as StatusGroup,
       priority: row.priority as string,
       due: (row.due as string | null) ?? "",
       roles,

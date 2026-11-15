@@ -10,6 +10,7 @@ import {
   parseDbRow,
   getWipLimits,
   getFieldDefs,
+  getStatusDefs,
   cleanCells,
   wipExceeded,
   withResolvedRollups,
@@ -27,7 +28,9 @@ import {
   cleanOwner,
   cleanParentId,
   descendantIds,
+  entersInProgress,
   openBlockers,
+  resolveStatus,
   parentProblem,
   rowAssignees,
   rowChanges,
@@ -119,6 +122,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (hasParent && patch.parentId !== null && typeof patch.parentId !== "string") {
     return NextResponse.json({ error: "invalid parentId", reason: "shape" }, { status: 400 })
   }
+  // Status must be one of the room's (legacy Todo/Doing/Done map onto their group).
+  const statuses = await getStatusDefs(id)
+  if (clean.status !== undefined) {
+    const resolved = resolveStatus(statuses, clean.status)
+    if (!resolved) {
+      return NextResponse.json({ error: "invalid status", statuses: statuses.map((s) => s.name) }, { status: 400 })
+    }
+    clean.status = resolved
+  }
   if (Object.keys(clean).length === 0 && !hasCells && !hasPeople && !hasParent && !hasBlockedBy) return NextResponse.json({ error: "nothing to update" }, { status: 400 })
 
   try {
@@ -206,7 +218,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // notices); the generic "updated" entry covers the remaining fields.
     const changes = rowChanges(prevRow, afterRow)
     await recordRowChanges(
-      { docId: id, rowId, credential: cred, agentType, title: afterRow.title, followers: afterRow.followers, rows: rowsFromDbDoc(doc) },
+      { docId: id, rowId, credential: cred, agentType, title: afterRow.title, followers: afterRow.followers, rows: rowsFromDbDoc(doc), statuses },
       changes,
     )
     const tracked = new Set(["status", "due"])
@@ -258,10 +270,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const fresh = parseDbRow(arr.get(idx) as Y.Map<unknown>)
       void indexRow(id, rowId, await workspaceOf(id), rowText(fresh)).catch(() => {})
     }
-    // Moving a blocked task into Doing is allowed, but the caller is told.
+    // Moving a blocked task into an in-progress status is allowed, but the caller is told.
     const waitingOn =
-      changes.some((c) => c.kind === "status" && c.to === "Doing")
-        ? openBlockers(rowsFromDbDoc(doc), afterRow).map((b) => ({ id: b.id, title: b.title, status: b.status }))
+      changes.some((c) => c.kind === "status" && entersInProgress(statuses, c.from, c.to))
+        ? openBlockers(rowsFromDbDoc(doc), afterRow, statuses).map((b) => ({ id: b.id, title: b.title, status: b.status }))
         : []
     return NextResponse.json({ id: rowId, patched: {
       ...clean,

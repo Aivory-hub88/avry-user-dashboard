@@ -11,6 +11,7 @@ import {
   dbRowToYMap,
   getWipLimits,
   getFieldDefs,
+  getStatusDefs,
   cleanCells,
   wipExceeded,
   withResolvedRollups,
@@ -30,7 +31,9 @@ import {
   cleanBlockedBy,
   cleanOwner,
   cleanParentId,
+  defaultStatus,
   parentProblem,
+  resolveStatus,
   rowAssignees,
   MAX_BLOCKED_BY,
   type PersonRef,
@@ -51,8 +54,8 @@ function assigneesInput(body: Partial<DbRow>): { assignees: PersonRef[]; assigne
   return { assignees, assignee: assignees.length > 0 ? assigneeMirror(assignees) : legacy }
 }
 
-function cleanRowInput(body: Partial<DbRow>): RowInput {
-  const status = (body.status ?? "Todo").toString().slice(0, 16)
+/** `status` is already resolved against the room's statuses. */
+function cleanRowInput(body: Partial<DbRow>, status: string): RowInput {
   const priority = body.priority === "Low" || body.priority === "High" ? body.priority : "Med"
   const due = (body.due ?? "").toString().slice(0, 20)
   let start = (body.start ?? "").toString().slice(0, 20)
@@ -84,7 +87,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const allowPg = cred.kind === "service" ? true : await authorizeDocFallback(cred, id)
     const doc = await loadDbDoc(id, cred, agent ?? undefined, allowPg)
     const rows = await withResolvedRollups(rowsFromDbDoc(doc), await getFieldDefs(id), cred, agent ?? undefined, allowPg)
-    return NextResponse.json({ id, rows })
+    return NextResponse.json({ id, rows, statuses: await getStatusDefs(id) })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
     console.error("[workspace/database GET]", e)
@@ -110,6 +113,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // The actor is the caller, never the task's assignee (assigning Geno while
   // creating a task must not make the write — or its activity — Geno's).
   const agentType = assertedAgent || "user"
+  // Status: one of the room's statuses (legacy Todo/Doing/Done map onto
+  // their group); none given → the room's first to-do status.
+  const statuses = await getStatusDefs(id)
+  const status = body.status === undefined || body.status === null || body.status === ""
+    ? defaultStatus(statuses)
+    : resolveStatus(statuses, body.status)
+  if (!status) {
+    return NextResponse.json({ error: "invalid status", statuses: statuses.map((s) => s.name) }, { status: 400 })
+  }
 
   try {
     const allowPg = cred.kind === "service" ? true : await authorizeDocFallback(cred, id)
@@ -121,11 +133,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const wipLimits = await getWipLimits(id)
     const fieldDefs = await getFieldDefs(id)
     // WIP gate (F2-4): creating into a full column is rejected, not queued.
-    const limited = wipExceeded(rows, (body.status ?? "Todo").toString().slice(0, 16), wipLimits)
+    const limited = wipExceeded(rows, status, wipLimits)
     if (limited !== null) {
       return NextResponse.json({ error: "wip-exceeded", limit: limited }, { status: 409 })
     }
-    const input = cleanRowInput(body)
+    const input = cleanRowInput(body, status)
     const newId = newDbRowId()
     // Sub-task / dependencies: same-doc rows only, validated before writing.
     const parentId = cleanParentId(body.parentId)

@@ -62,7 +62,7 @@ export async function runDueReminders(now: Date = new Date(), opts: { force?: bo
               CASE WHEN t.due = $2::date THEN 'due_soon' ELSE 'overdue' END AS kind,
               array_append(t.assignee_keys, t.owner_key) AS keys
        FROM dashboard.workspace_task_index t
-       WHERE t.status <> 'Done' AND t.due IS NOT NULL AND (t.due = $2::date OR t.due < $1::date)
+       WHERE t.status_group NOT IN ('done', 'canceled') AND t.due IS NOT NULL AND (t.due = $2::date OR t.due < $1::date)
          AND NOT EXISTS (
            SELECT 1 FROM dashboard.workspace_docs d
            WHERE d.id IN (t.doc_id, 'workspace:' || t.doc_id) AND d.deleted_at IS NOT NULL)

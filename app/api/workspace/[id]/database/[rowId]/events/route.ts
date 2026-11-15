@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden, workspacePlanDenied, type WorkspaceCredential } from "@/lib/workspaceAuth"
 import { checkAgentAccess } from "@/lib/workspaceAccess"
-import { WorkspaceDenied, loadDbDoc, rowsFromDbDoc, type DbRow } from "@/lib/workspaceDb"
+import { WorkspaceDenied, getStatusDefs, loadDbDoc, rowsFromDbDoc, type DbRow } from "@/lib/workspaceDb"
 import { cleanOwner, personKey, type RowChange } from "@/lib/workspaceDbModel"
 import { recordComment, recordRowChanges, recordRowCreated } from "@/lib/workspaceTaskEvents"
 
@@ -28,7 +28,7 @@ const RECHECK_MS = 1500
 
 type Body = { kind?: unknown; from?: unknown; commentId?: unknown }
 
-/** The row and all of the doc's rows (a move to Done may unblock others). */
+/** The row and all of the doc's rows (closing it may unblock others). */
 async function loadRow(
   id: string,
   rowId: string,
@@ -111,7 +111,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
     if (!row) return NextResponse.json({ error: "not found" }, { status: 404 })
     if (!claim) return NextResponse.json({ error: "no such change" }, { status: 409 })
-    const ctx = { docId: id, rowId, credential: cred, agentType, title: row.title, followers: row.followers, rows }
+    // Status notices key off the room's status groups.
+    const statuses = body.kind === "status" ? await getStatusDefs(id) : undefined
+    const ctx = { docId: id, rowId, credential: cred, agentType, title: row.title, followers: row.followers, rows, statuses }
     if (claim === "created") await recordRowCreated(ctx)
     else if ("comment" in claim) {
       const c = row.comments.find((x) => x.id === claim.comment)

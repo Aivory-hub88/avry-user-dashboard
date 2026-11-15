@@ -1,3 +1,5 @@
+import { statusGroup, type StatusGroup } from "@/lib/workspaceDbModel"
+
 /**
  * "My tasks" model (client-safe, no server imports): the shape the index
  * endpoint returns, the role tabs and the due-date grouping.
@@ -11,6 +13,8 @@ export type MyTask = {
   roomTitle: string
   title: string
   status: string
+  /** Group of `status` in its room (absent from old responses → legacy meaning). */
+  statusGroup?: StatusGroup
   priority: string
   /** YYYY-MM-DD or "" */
   due: string
@@ -59,6 +63,12 @@ export function groupMyTasks(tasks: MyTask[], role: MyTaskRole, todayISO: string
   })).filter((g) => g.tasks.length > 0)
 }
 
+/** Done or canceled in its room. */
+export function myTaskClosed(t: Pick<MyTask, "status" | "statusGroup">): boolean {
+  const g = t.statusGroup ?? statusGroup([], t.status)
+  return g === "done" || g === "canceled"
+}
+
 /** Assigned to me or owned by me (the tasks that are on me). */
 function onMe(t: MyTask): boolean {
   return t.roles.includes("assignee") || t.roles.includes("owner")
@@ -69,13 +79,13 @@ function onMe(t: MyTask): boolean {
  * me"). Done tasks never reach the list (the endpoint returns open ones).
  */
 export function myTasksBadge(tasks: MyTask[], todayISO: string): number {
-  return tasks.filter((t) => onMe(t) && t.status !== "Done" && !!t.due && t.due <= todayISO).length
+  return tasks.filter((t) => onMe(t) && !myTaskClosed(t) && !!t.due && t.due <= todayISO).length
 }
 
 /** The Console "Today" card: overdue first, then due today (max `max`). */
 export function todayTasks(tasks: MyTask[], todayISO: string, max = 5): MyTask[] {
   return tasks
-    .filter((t) => onMe(t) && t.status !== "Done" && !!t.due && t.due <= todayISO)
+    .filter((t) => onMe(t) && !myTaskClosed(t) && !!t.due && t.due <= todayISO)
     .sort((a, b) => (a.due === b.due ? a.title.localeCompare(b.title) : a.due < b.due ? -1 : 1))
     .slice(0, max)
 }

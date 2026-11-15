@@ -1,7 +1,7 @@
 import * as Y from "yjs"
 import { query } from "@/lib/db"
 import { rowsFromDbDoc, wipExceeded } from "@/lib/workspaceDb"
-import { parseAutomationRules, matchRules, assigneesFromRuleValue, assigneeMirror, type AutomationRule } from "@/lib/workspaceDbModel"
+import { parseAutomationRules, parseStatusDefs, matchRules, assigneesFromRuleValue, assigneeMirror, type AutomationRule } from "@/lib/workspaceDbModel"
 
 /**
  * Status-change automations (Fase 4e): when a row moves INTO a status, run
@@ -65,7 +65,7 @@ export async function getAutomationRules(docId: string): Promise<AutomationRule[
       docId,
     ])
     const props = r.rows[0]?.props as Record<string, unknown> | undefined
-    return parseAutomationRules(props?.dbAutomations)
+    return parseAutomationRules(props?.dbAutomations, parseStatusDefs(props?.dbStatuses))
   } catch {
     return []
   }

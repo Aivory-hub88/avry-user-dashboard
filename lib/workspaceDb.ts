@@ -4,7 +4,7 @@ import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDo
 import { collabAuthHeaders, type WorkspaceCredential } from "@/lib/workspaceAuth"
 import { canReadDocId } from "@/lib/workspaceAccess"
 import { syncTaskIndex } from "@/lib/workspaceTaskIndex"
-import { computeRollups, parseFieldDefs, rowAssignees, rowFollowers, cleanComment, cleanOwner, cleanPersonRef, cleanParentId, cleanBlockedBy, type FieldDef, type CellValue, type PersonRef, type TaskComment } from "@/lib/workspaceDbModel"
+import { computeRollups, parseFieldDefs, parseStatusDefs, type StatusDef, rowAssignees, rowFollowers, cleanComment, cleanOwner, cleanPersonRef, cleanParentId, cleanBlockedBy, type FieldDef, type CellValue, type PersonRef, type TaskComment } from "@/lib/workspaceDbModel"
 
 // Re-exported so existing importers keep working; the pure model lives in
 // workspaceDbModel.ts (client-safe: no pg/node imports, see its header).
@@ -74,6 +74,20 @@ export async function getFieldDefs(docId: string): Promise<FieldDef[]> {
     return parseFieldDefs(props?.dbFields)
   } catch {
     return []
+  }
+}
+
+/** The room's statuses (props.dbStatuses; default Todo/Doing/Done). */
+export async function getStatusDefs(docId: string): Promise<StatusDef[]> {
+  try {
+    const r = await query(`SELECT props FROM dashboard.workspace_docs WHERE id = $1 OR id = $2 LIMIT 1`, [
+      `workspace:${docId}`,
+      docId,
+    ])
+    const props = r.rows[0]?.props as Record<string, unknown> | undefined
+    return parseStatusDefs(props?.dbStatuses)
+  } catch {
+    return parseStatusDefs(undefined)
   }
 }
 
@@ -316,18 +330,24 @@ export async function withResolvedRollups(
   // loadDbDoc can itself take up to 2s on a collab timeout, so N rollup
   // targets used to multiply straight into this request's latency.
   const entries = await Promise.all(
-    Array.from(needTargets).map(async (t): Promise<[string, DbRow[] | null]> => {
-      if (!(await canReadDocId(cred, t, agentType))) return [t, null]
+    Array.from(needTargets).map(async (t): Promise<[string, DbRow[] | null, StatusDef[]]> => {
+      if (!(await canReadDocId(cred, t, agentType))) return [t, null, []]
       try {
-        const doc = await loadDbDoc(t, cred, agentType, allowPgFallback)
-        return [t, rowsFromDbDoc(doc)]
+        const [doc, statuses] = await Promise.all([loadDbDoc(t, cred, agentType, allowPgFallback), getStatusDefs(t)])
+        return [t, rowsFromDbDoc(doc), statuses]
       } catch {
-        return [t, null]
+        return [t, null, []]
       }
     }),
   )
-  const cache = new Map<string, DbRow[] | null>(entries)
-  const computed = computeRollups(rows, defs, (docId) => cache.get(docId) ?? null)
+  const cache = new Map<string, DbRow[] | null>(entries.map(([t, r]) => [t, r]))
+  const statusCache = new Map<string, StatusDef[]>(entries.map(([t, , s]) => [t, s]))
+  const computed = computeRollups(
+    rows,
+    defs,
+    (docId) => cache.get(docId) ?? null,
+    (docId) => statusCache.get(docId) ?? parseStatusDefs(undefined),
+  )
   if (Object.keys(computed).length === 0) return rows
   // Nulls (unreadable links) are omitted from cells — renderers show empty.
   return rows.map((r) => {
