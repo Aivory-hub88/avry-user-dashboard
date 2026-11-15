@@ -20,10 +20,10 @@ export function WorkspaceWelcome({ steps, onAction, onContinue }: { steps: Onboa
   const at = currentStepIndex(steps)
   return (
     <div className="space-y-8">
-      <div className="max-w-[600px] space-y-3">
+      <div className="max-w-[720px] space-y-3">
         <div className="text-[12px] font-medium uppercase tracking-wide text-white/55">Welcome to Workspace</div>
-        <div className="text-[28px] font-light leading-tight text-white">One room per project, for your team and its agents</div>
-        <div className="text-[14px] leading-relaxed text-white/60">
+        <div className="text-[28px] font-light leading-tight text-white [text-wrap:pretty]">One room per project, for your team and its agents</div>
+        <div className="max-w-[600px] text-[14px] leading-relaxed text-white/60">
           Every project starts as a request. Once a team owner approves it, a room opens where people and agents chat, split the work into tasks and keep notes.
         </div>
         <div className="flex flex-wrap gap-x-5 gap-y-1.5 pt-1 text-[12px] text-white/45">
