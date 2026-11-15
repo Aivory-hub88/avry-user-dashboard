@@ -11,7 +11,7 @@ import {
   deactivateWorkflow,
 } from '@/hooks/useWorkflows'
 import { WorkflowCanvas as N8nWorkflowCanvas, type CanvasCopilotBridge } from '@/components/workflow/WorkflowCanvas'
-import { canvasToGeneratedWorkflow, diffSteps, mergeEditedNodes, normalizeStepTitle, stepIdAliases, type CanvasEditContext } from '@/lib/workflows/canvasCopilot'
+import { applyEditToCanvas, canvasToGeneratedWorkflow, diffSteps, normalizeStepTitle, stepIdAliases, type CanvasEditContext } from '@/lib/workflows/canvasCopilot'
 import type { CopilotApplyTarget } from '@/components/workflow/CopilotTogglePanel'
 import { CopilotTogglePanel } from '@/components/workflow/CopilotTogglePanel'
 import { WorkflowGenerationModal } from '@/components/workflow/WorkflowGenerationModal'
@@ -1440,12 +1440,20 @@ function WorkflowsPageInner() {
         before.steps[0]?.type === 'trigger' &&
         (workflow.steps[0]?.id === before.steps[0].id ||
           normalizeStepTitle(before.steps[0].title) === normalizeStepTitle(workflow.steps[0]?.title || ''))
-      snapshotBeforeChange('ai_apply')
-      const merged = mergeEditedNodes(
+      const merged = applyEditToCanvas(
         { nodes: snap.nodes, edges: snap.edges },
         { nodes: rfNodes as any, edges: rfEdges },
         { keepTrigger, idAliases: stepIdAliases(workflow.steps, snap.nodes, before.steps) },
       )
+      // Never put a canvas with broken connections on screen: React Flow would
+      // silently drop those edges and leave steps floating unconnected.
+      if (merged.issues.length) {
+        const names = [...new Set(merged.issues.map((i) => i.title))].join(', ')
+        showToast(`Aether's edit was not applied: some steps would be left unconnected (${names}). Ask Aether to try again.`, 'error')
+        console.warn('[copilot apply] connection check failed', merged.issues)
+        return
+      }
+      snapshotBeforeChange('ai_apply')
       const deployed = isActiveWorkflow(selected)
       // Deployed workflows are pushed to n8n in the same step ("Update & save").
       const saved = await bridge.replace(merged.nodes, merged.edges, { save: deployed })
@@ -1454,9 +1462,12 @@ function WorkflowsPageInner() {
         merged.removed ? `${merged.removed} removed` : '',
         `${merged.kept} kept`,
       ].filter(Boolean).join(', ')
-      if (!deployed) showToast(`Aether updated the canvas (${parts}).`, 'success')
-      else if (saved) showToast(`Aether updated the canvas (${parts}) and saved it to n8n.`, 'success')
-      else showToast(`Aether updated the canvas (${parts}), but saving to n8n failed — press Save to retry.`, 'error')
+      const resetNote = merged.reset.length
+        ? ` Settings were reset for ${merged.reset.join(', ')} so ${merged.reset.length === 1 ? 'it stays' : 'they stay'} connected.`
+        : ''
+      if (!deployed) showToast(`Aether updated the canvas (${parts}).${resetNote}`, 'success')
+      else if (saved) showToast(`Aether updated the canvas (${parts}) and saved it to n8n.${resetNote}`, 'success')
+      else showToast(`Aether updated the canvas (${parts}), but saving to n8n failed — press Save to retry.${resetNote}`, 'error')
       return
     }
 
