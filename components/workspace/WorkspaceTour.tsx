@@ -45,7 +45,7 @@ export default function WorkspaceTour({ onClose }: { onClose: () => void }) {
     const el = document.querySelector<HTMLElement>(`[data-tour="${step.key}"]`)
     if (!el) return setBox(null)
     const r = el.getBoundingClientRect()
-    setBox({ top: r.top, left: r.left, width: r.width, height: r.height })
+    setBox((b) => (b && b.top === r.top && b.left === r.left && b.width === r.width && b.height === r.height ? b : { top: r.top, left: r.left, width: r.width, height: r.height }))
   }, [step.key])
 
   useLayoutEffect(() => {
@@ -58,11 +58,29 @@ export default function WorkspaceTour({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     window.addEventListener("resize", measure)
     window.addEventListener("scroll", measure, true)
+    // The tour opens while the page is still settling (sidebar width, rooms
+    // rendering, banners above the list), which moves the target without a
+    // window resize. Follow size changes of the target and the page, and poll
+    // each frame for the first moments to catch pure position shifts.
+    // The target and a few ancestors: content added above the target, or the
+    // sidebar changing width, resizes one of them even when the target keeps its size.
+    const ro = new ResizeObserver(() => measure())
+    let node: Element | null = document.querySelector<HTMLElement>(`[data-tour="${step.key}"]`)
+    for (let i = 0; node && node !== document.body && i < 4; i++, node = node.parentElement) ro.observe(node)
+    let frame = 0
+    const until = performance.now() + 1500
+    const tick = () => {
+      measure()
+      if (performance.now() < until) frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
     return () => {
       window.removeEventListener("resize", measure)
       window.removeEventListener("scroll", measure, true)
+      ro.disconnect()
+      cancelAnimationFrame(frame)
     }
-  }, [measure])
+  }, [measure, step.key])
 
   const finish = useCallback(() => {
     markTourDone()
