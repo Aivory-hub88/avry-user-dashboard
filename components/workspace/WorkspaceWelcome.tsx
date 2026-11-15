@@ -12,7 +12,11 @@ import { AgentAvatar } from "@/components/office/AgentAvatar"
 import type { OnboardingStep, StepAction } from "@/lib/workspaceOnboarding"
 import { currentStepIndex } from "@/lib/workspaceOnboarding"
 
-export function WorkspaceWelcome({ steps, onAction }: { steps: OnboardingStep[]; onAction: (a: StepAction) => void }) {
+/**
+ * `onContinue` is passed once rooms exist (a returning user seeing the welcome
+ * for the first time, or reopening it): it adds the way through to the rooms.
+ */
+export function WorkspaceWelcome({ steps, onAction, onContinue }: { steps: OnboardingStep[]; onAction: (a: StepAction) => void; onContinue?: () => void }) {
   const at = currentStepIndex(steps)
   return (
     <div className="space-y-8">
@@ -22,6 +26,23 @@ export function WorkspaceWelcome({ steps, onAction }: { steps: OnboardingStep[];
         <div className="text-[14px] leading-relaxed text-white/60">
           Every project starts as a request. Once a team owner approves it, a room opens where people and agents chat, split the work into tasks and keep notes.
         </div>
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5 pt-1 text-[12px] text-white/45">
+          <span><span className="text-white/75">Rooms</span> your projects</span>
+          <span><span className="text-white/75">Requests</span> start or approve work</span>
+          <span><span className="text-white/75">Timeline</span> every deadline in one place</span>
+          <span><span className="text-white/75">Teams</span> who can request and approve</span>
+        </div>
+        {onContinue && (
+          <div className="pt-3">
+            <button
+              type="button"
+              onClick={onContinue}
+              className="min-h-[38px] rounded-full bg-white px-5 text-[13px] font-medium text-black transition-transform duration-150 hover:bg-white/90 active:scale-[0.97]"
+            >
+              Go to your rooms
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-2xl border border-line p-5 sm:p-6">
