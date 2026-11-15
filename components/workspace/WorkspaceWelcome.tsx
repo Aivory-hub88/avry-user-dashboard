@@ -16,7 +16,18 @@ import { currentStepIndex } from "@/lib/workspaceOnboarding"
  * `onContinue` is passed once rooms exist (a returning user seeing the welcome
  * for the first time, or reopening it): it adds the way through to the rooms.
  */
-export function WorkspaceWelcome({ steps, onAction, onContinue }: { steps: OnboardingStep[]; onAction: (a: StepAction) => void; onContinue?: () => void }) {
+export function WorkspaceWelcome({
+  steps,
+  onAction,
+  onContinue,
+  onNewRoom,
+}: {
+  steps: OnboardingStep[]
+  onAction: (a: StepAction) => void
+  onContinue?: () => void
+  /** Team owners can skip the request and open a room themselves. */
+  onNewRoom?: () => void
+}) {
   const at = currentStepIndex(steps)
   return (
     <div className="space-y-8">
@@ -32,15 +43,28 @@ export function WorkspaceWelcome({ steps, onAction, onContinue }: { steps: Onboa
           <span><span className="text-white/75">Timeline</span> every deadline in one place</span>
           <span><span className="text-white/75">Teams</span> who can request and approve</span>
         </div>
-        {onContinue && (
-          <div className="pt-3">
-            <button
-              type="button"
-              onClick={onContinue}
-              className="min-h-[38px] rounded-full bg-white px-5 text-[13px] font-medium text-black transition-transform duration-150 hover:bg-white/90 active:scale-[0.97]"
-            >
-              Go to your rooms
-            </button>
+        {(onContinue || onNewRoom) && (
+          <div className="flex flex-wrap items-center gap-2 pt-3">
+            {onContinue && (
+              <button
+                type="button"
+                onClick={onContinue}
+                className="min-h-[38px] rounded-full bg-white px-5 text-[13px] font-medium text-black transition-transform duration-150 hover:bg-white/90 active:scale-[0.97]"
+              >
+                Go to your rooms
+              </button>
+            )}
+            {onNewRoom && (
+              <button
+                type="button"
+                onClick={onNewRoom}
+                className={`min-h-[38px] rounded-full px-5 text-[13px] font-medium transition-transform duration-150 active:scale-[0.97] ${
+                  onContinue ? "border border-line text-white/80 hover:bg-white/[0.05]" : "bg-white text-black hover:bg-white/90"
+                }`}
+              >
+                Open a room now
+              </button>
+            )}
           </div>
         )}
       </div>

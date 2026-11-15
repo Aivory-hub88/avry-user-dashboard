@@ -6,11 +6,22 @@
  * agents and how many agent turns wait for approval. Platform admins can
  * open any room by URL but only see their own here — the home is a list of
  * your work, not every customer's.
+ *
+ * POST /api/workspace/rooms { workspaceId, title, goal?, deadline?, agents? }
+ * — a team owner opens a room straight away. Owners are the ones who approve
+ * requests, so this files the request and approves it in one step: the room
+ * still has its request record (approved, with a note saying so) and gets the
+ * same setup as any approved request (agents, kickoff, activity log).
  */
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { workspaceCredential, unauthorized, workspacePlanDenied } from "@/lib/workspaceAuth"
-import { ROOMS_VISIBLE_TO_USER } from "@/lib/teams"
+import { workspaceCredential, unauthorized, workspacePlanDenied, forbidden } from "@/lib/workspaceAuth"
+import { ROOMS_VISIBLE_TO_USER, teamRole, LEGACY_WORKSPACE } from "@/lib/teams"
+import { cleanRequestInput, requestFromRow } from "@/lib/projectRequests"
+import { approveRequest } from "@/lib/projectRequestStore"
+import { newId } from "@/lib/spaceWrite"
+
+const DIRECT_NOTE = "Opened directly by a team owner"
 
 export const runtime = "nodejs"
 
@@ -56,6 +67,51 @@ export async function GET(req: NextRequest) {
     })
   } catch (e) {
     console.error("[workspace/rooms GET]", e)
+    return NextResponse.json({ error: "db" }, { status: 500 })
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const cred = workspaceCredential(req)
+  if (!cred || cred.kind !== "user") return unauthorized()
+  const planDenied = await workspacePlanDenied(req, cred)
+  if (planDenied) return planDenied
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
+  const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : ""
+  if (!workspaceId || workspaceId === LEGACY_WORKSPACE) return NextResponse.json({ error: "choose a team" }, { status: 400 })
+  const role = await teamRole(cred, workspaceId)
+  if (role === "editor") return NextResponse.json({ error: "Only team owners can open a room directly. Send a request instead." }, { status: 403 })
+  if (role !== "owner") return forbidden()
+
+  const v = cleanRequestInput({ title: body.title, goal: body.goal, deadline: body.deadline ?? null, agents: body.agents ?? [] })
+  if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 })
+  const x = v.value
+  if (!x.title || x.title.length < 2) return NextResponse.json({ error: "give the room a name" }, { status: 400 })
+
+  const id = newId()
+  const userId = cred.user.user_id
+  try {
+    const ins = await query(
+      `INSERT INTO dashboard.project_requests
+         (id, workspace_id, title, goal, deadline, priority, requested_by, requested_by_name,
+          fields, data_table, members, agents, status, submitted_at)
+       VALUES ($1, $2, $3, $4, $5, 'Med', $6, $7, '[]'::jsonb, $8::jsonb, '[]'::jsonb, $9, 'submitted', now())
+       RETURNING *`,
+      [id, workspaceId, x.title, x.goal ?? "", x.deadline ?? null, userId, cred.user.email ?? "", JSON.stringify({ columns: [], rows: [] }), x.agents ?? []],
+    )
+    const request = requestFromRow(ins.rows[0] as Record<string, unknown>)
+    let result
+    try {
+      result = await approveRequest(request, cred, userId, DIRECT_NOTE)
+    } catch (e) {
+      // Don't leave a submitted request behind for a room that never opened.
+      await query(`DELETE FROM dashboard.project_requests WHERE id = $1 AND status = 'submitted'`, [id]).catch(() => {})
+      throw e
+    }
+    if (!result) return NextResponse.json({ error: "could not open the room" }, { status: 409 })
+    return NextResponse.json({ roomId: result.roomId, requestId: id }, { status: 201 })
+  } catch (e) {
+    console.error("[rooms POST]", e)
     return NextResponse.json({ error: "db" }, { status: 500 })
   }
 }

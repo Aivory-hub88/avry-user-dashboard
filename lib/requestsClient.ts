@@ -125,3 +125,9 @@ export async function uploadFile(base: FileBase, file: File, onProgress?: (fract
   const done = await api<{ file: WorkspaceFile }>(`${base}/${pending.id}/complete`, { method: "POST", json: {} })
   return done.file
 }
+
+/** Team owners open a room directly (files and approves the request in one step). */
+export const roomsApi = {
+  create: (b: { workspaceId: string; title: string; goal?: string; deadline?: string | null; agents?: string[] }) =>
+    api<{ roomId: string; requestId: string }>("/api/workspace/rooms", { method: "POST", json: b }),
+}
