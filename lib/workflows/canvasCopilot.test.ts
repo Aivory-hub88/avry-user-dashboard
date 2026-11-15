@@ -416,3 +416,62 @@ describe('canvas round trip — empty branch at the end', () => {
     expect(steps.some((s) => s.type === 'condition')).toBe(true)
   })
 })
+
+describe('mergeEditedNodes — an id reused for a different step', () => {
+  // The edit engine kept the ids of a Drive backup canvas but replaced every
+  // step: "Step 2: Check" (a Drive action) became a condition. Keeping the old
+  // Drive node left no true/false handles, so the branch edges vanished and
+  // "Process"/"Log" floated unconnected on the canvas.
+  const drive = (id: string, name: string, x: number) =>
+    ({ id, name, type: 'n8n-nodes-base.googleDrive', typeVersion: 3, position: [x, 0], parameters: {} })
+  const backup = {
+    name: 'Blank Workflow',
+    nodes: [
+      { id: 't', name: 'Schedule Trigger', type: 'n8n-nodes-base.scheduleTrigger', typeVersion: 1.2, position: [0, 0], parameters: {} },
+      drive('r', 'Step 1: Read', 200), drive('c', 'Step 2: Check', 400), drive('p', 'Step 3: Process', 600), drive('l', 'Step 4: Log', 800),
+    ],
+    connections: {
+      'Schedule Trigger': { main: [[{ node: 'Step 1: Read', type: 'main', index: 0 }]] },
+      'Step 1: Read': { main: [[{ node: 'Step 2: Check', type: 'main', index: 0 }]] },
+      'Step 2: Check': { main: [[{ node: 'Step 3: Process', type: 'main', index: 0 }]] },
+      'Step 3: Process': { main: [[{ node: 'Step 4: Log', type: 'main', index: 0 }]] },
+    },
+  } as any
+
+  it('rebuilds the replaced steps so every edge has its handle', async () => {
+    const { generatedWorkflowToN8n } = await import('./copilotToN8n')
+    const original = n8nToReactFlow(backup)
+    const before = canvasToGeneratedWorkflow(backup)
+    const edited = {
+      ...before,
+      steps: [
+        { ...before.steps[0] },
+        { id: 'r', type: 'action' as const, title: 'Read Google Sheets Data', app: 'google sheets', testable: true },
+        {
+          id: 'c', type: 'condition' as const, title: 'Check if Data Exists', testable: true,
+          branches: [
+            { key: 'true', label: 'Data Found', steps: [{ id: 'p', type: 'action' as const, title: 'Process Each Row', app: 'code', testable: true }] },
+            { key: 'false', label: 'No Data', steps: [{ id: 'l', type: 'action' as const, title: 'Log Completion', app: 'code', testable: true }] },
+          ],
+        },
+      ],
+    }
+    const rebuilt = n8nToReactFlow(generatedWorkflowToN8n(edited, { workflowId: 'x', title: 'Blank Workflow', keepLastStepIntent: true }) as any)
+    const merged = mergeEditedNodes(original, rebuilt, {
+      keepTrigger: true,
+      idAliases: stepIdAliases(edited.steps, original.nodes, before.steps),
+    })
+
+    // No Drive node survives in a slot that is now Sheets / IF / Code.
+    expect(merged.nodes.some((n) => n.data.rawN8n?.type === 'n8n-nodes-base.googleDrive')).toBe(false)
+    const check = merged.nodes.find((n) => /check if data exists/i.test(n.data.title))!
+    expect(check.data.rawN8n.type).toBe('n8n-nodes-base.if')
+    // Both branches still leave the IF node.
+    expect(merged.edges.filter((e) => e.source === check.id).length).toBe(2)
+    const ids = new Set(merged.nodes.map((n) => n.id))
+    expect(merged.edges.every((e) => ids.has(e.source) && ids.has(e.target))).toBe(true)
+
+    const d = diffSteps(before.steps, edited.steps)
+    expect(d.kept + d.renamed).toBe(1) // only the trigger
+  })
+})

@@ -1444,7 +1444,7 @@ function WorkflowsPageInner() {
       const merged = mergeEditedNodes(
         { nodes: snap.nodes, edges: snap.edges },
         { nodes: rfNodes as any, edges: rfEdges },
-        { keepTrigger, idAliases: stepIdAliases(workflow.steps, snap.nodes) },
+        { keepTrigger, idAliases: stepIdAliases(workflow.steps, snap.nodes, before.steps) },
       )
       const deployed = isActiveWorkflow(selected)
       // Deployed workflows are pushed to n8n in the same step ("Update & save").

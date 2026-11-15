@@ -193,16 +193,50 @@ function isSubEdge(e: Edge): boolean {
  * touch ("Send" -> "Send Slack Message"). Map every edited step title back to
  * the original node id it came from, so the merge matches on identity first.
  */
+const STRUCTURAL_STEP_TYPES = new Set<GeneratedWorkflowStep['type']>(['trigger', 'condition', 'switch', 'loop'])
+
+function appKey(app: string | undefined): string {
+  return (app || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+/**
+ * Is `edited` still the same step as `original`, or did the edit engine reuse
+ * the id for a different step? The engine keeps ids even when it replaces a
+ * step outright ("Step 2: Check" a Google Drive action -> "Check if Data
+ * Exists" a condition). Keeping the old node then leaves a Drive node where an
+ * IF belongs — no true/false outputs, so its branch edges vanish and the rest
+ * of the flow floats unconnected on the canvas.
+ */
+export function isSameStepKind(original: GeneratedWorkflowStep, edited: GeneratedWorkflowStep): boolean {
+  if (
+    (STRUCTURAL_STEP_TYPES.has(original.type) || STRUCTURAL_STEP_TYPES.has(edited.type)) &&
+    original.type !== edited.type
+  ) return false
+  if (original.nodeType && edited.nodeType && original.nodeType === edited.nodeType) return true
+  const a = appKey(original.app)
+  const b = appKey(edited.app)
+  return !a || !b || a === b
+}
+
+function flattenStepTree(steps: GeneratedWorkflowStep[]): GeneratedWorkflowStep[] {
+  return steps.flatMap((s) => [s, ...flattenStepTree((s.branches || []).flatMap((b) => b.steps))])
+}
+
 export function stepIdAliases(
   editedSteps: GeneratedWorkflowStep[],
   originalNodes: RFNode[],
+  /** The canvas steps before the edit — when given, an id reused for a different kind of step is not an alias. */
+  originalSteps?: GeneratedWorkflowStep[],
 ): Map<string, string> {
   const ids = new Set(originalNodes.map((n) => n.id))
+  const origById = new Map(flattenStepTree(originalSteps || []).map((s) => [s.id, s]))
   const out = new Map<string, string>()
   const visit = (steps: GeneratedWorkflowStep[]) => {
     for (const s of steps) {
       const key = normalizeStepTitle(s.title)
-      if (s.id && ids.has(s.id) && key && !out.has(key)) out.set(key, s.id)
+      const before = s.id ? origById.get(s.id) : undefined
+      const sameKind = !before || isSameStepKind(before, s)
+      if (s.id && ids.has(s.id) && key && sameKind && !out.has(key)) out.set(key, s.id)
       for (const b of s.branches || []) visit(b.steps)
     }
   }
@@ -213,6 +247,16 @@ export function stepIdAliases(
 function isTriggerNode(n: RFNode): boolean {
   const type = n.data?.rawN8n?.type
   return typeof type === 'string' ? isTriggerType(type) : n.data?.category === 'trigger'
+}
+
+/** The node's output shape — a kept node must expose the handles the new edges use. */
+function outputShape(n: RFNode): string {
+  const type = String(n.data?.rawN8n?.type || '')
+  if (isTriggerNode(n)) return 'trigger'
+  if (/\.(if|filter)$/i.test(type)) return 'if'
+  if (/\.switch$/i.test(type)) return 'switch'
+  if (/\.splitInBatches$/i.test(type)) return 'loop'
+  return 'single'
 }
 
 export function mergeEditedNodes(
@@ -244,7 +288,7 @@ export function mergeEditedNodes(
     const aliasId = key ? options.idAliases?.get(key) : undefined
     const byId = aliasId ? original.nodes.find((o) => o.id === aliasId && !origSubIds.has(o.id)) : undefined
     const orig = byId ?? (key ? origByTitle.get(key) : undefined)
-    if (orig && !usedOrig.has(orig.id)) {
+    if (orig && !usedOrig.has(orig.id) && outputShape(orig) === outputShape(n)) {
       matched.set(n.id, orig)
       usedOrig.add(orig.id)
     }
@@ -373,10 +417,10 @@ export function diffSteps(original: GeneratedWorkflowStep[], edited: GeneratedWo
   const changes: StepChange[] = []
 
   for (const { step, depth } of flattenSteps(edited)) {
-    let idx = step.id ? orig.findIndex((o, i) => !used.has(i) && o.step.id === step.id) : -1
+    let idx = step.id ? orig.findIndex((o, i) => !used.has(i) && o.step.id === step.id && isSameStepKind(o.step, step)) : -1
     if (idx < 0) {
       const key = normalizeStepTitle(step.title)
-      idx = orig.findIndex((o, i) => !used.has(i) && normalizeStepTitle(o.step.title) === key)
+      idx = orig.findIndex((o, i) => !used.has(i) && normalizeStepTitle(o.step.title) === key && isSameStepKind(o.step, step))
     }
     if (idx < 0) {
       changes.push({ kind: 'added', title: step.title, depth })
