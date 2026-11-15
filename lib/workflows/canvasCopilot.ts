@@ -438,3 +438,41 @@ export function diffSteps(original: GeneratedWorkflowStep[], edited: GeneratedWo
   const count = (k: StepChangeKind) => changes.filter((c) => c.kind === k).length
   return { changes, added: count('added'), removed: count('removed'), kept: count('kept'), renamed: count('renamed') }
 }
+
+// ── Server-owned step ids ─────────────────────────────────────────────────
+
+/**
+ * The edit/repair model must not decide step identity. Keep an id only when
+ * it belonged to the workflow before the edit, is used once, and still names
+ * the same kind of step (isSameStepKind). Every other id — reused for a
+ * replaced step, duplicated, or invented — gets a fresh server-minted id, so
+ * the canvas merge never carries an old node into a slot it no longer fits.
+ */
+export function reconcileEditedIds(
+  before: GeneratedWorkflowStep[],
+  edited: GeneratedWorkflowStep[],
+  mintId: () => string = () => `step_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+): { steps: GeneratedWorkflowStep[]; kept: number; reminted: number } {
+  const origById = new Map(flattenStepTree(before).map((s) => [s.id, s]))
+  const seen = new Set<string>()
+  let kept = 0
+  let reminted = 0
+  const visit = (steps: GeneratedWorkflowStep[]): GeneratedWorkflowStep[] =>
+    steps.map((s) => {
+      const orig = s.id ? origById.get(s.id) : undefined
+      const keep = !!orig && !seen.has(s.id) && isSameStepKind(orig, s)
+      let id = s.id
+      if (keep) kept++
+      else {
+        id = mintId()
+        reminted++
+      }
+      seen.add(id)
+      const out: GeneratedWorkflowStep = { ...s, id }
+      // A replaced step must not inherit the old node's resolved n8n type.
+      if (!keep && orig && out.nodeType === orig.nodeType) delete out.nodeType
+      if (s.branches) out.branches = s.branches.map((b) => ({ ...b, steps: visit(b.steps) }))
+      return out
+    })
+  return { steps: visit(edited), kept, reminted }
+}

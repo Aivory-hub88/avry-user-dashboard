@@ -9,7 +9,7 @@
  * Every VPS Bridge call happens server-side, never from the browser.
  */
 
-import { countSteps, type CanvasEditContext } from './canvasCopilot'
+import { countSteps, reconcileEditedIds, type CanvasEditContext } from './canvasCopilot'
 import { callCopilotOperation } from './bridgeCopilot'
 import { analyzeRequest, matchTemplate, findMissingApps, sanitizeWorkflow } from './deterministicPlanner'
 
@@ -1214,7 +1214,10 @@ export class CopilotStateMachine {
         return
       }
 
-      this.state.generatedWorkflow.steps = sanitizeWorkflow(repairedWorkflow.steps).steps.map((step) => {
+      this.state.generatedWorkflow.steps = reconcileEditedIds(
+        this.state.generatedWorkflow.steps,
+        sanitizeWorkflow(repairedWorkflow.steps).steps,
+      ).steps.map((step) => {
         const known = existingNodeTypes.get(step.id)
         return known && !step.nodeType ? { ...step, nodeType: known } : step
       })
@@ -1264,7 +1267,11 @@ export class CopilotStateMachine {
         return this.setAssistantMessage(message)
       }
 
-      this.state.generatedWorkflow.steps = sanitizeWorkflow(editedWorkflow.steps).steps
+      // The server, not the model, owns step identity (see reconcileEditedIds).
+      this.state.generatedWorkflow.steps = reconcileEditedIds(
+        this.state.generatedWorkflow.steps,
+        sanitizeWorkflow(editedWorkflow.steps).steps,
+      ).steps
       if (typeof editedWorkflow.workflowName === 'string' && editedWorkflow.workflowName.trim()) {
         this.state.generatedWorkflow.workflowName = editedWorkflow.workflowName
       }

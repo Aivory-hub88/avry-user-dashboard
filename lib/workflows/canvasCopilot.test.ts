@@ -475,3 +475,21 @@ describe('mergeEditedNodes — an id reused for a different step', () => {
     expect(d.kept + d.renamed).toBe(1) // only the trigger
   })
 })
+
+describe('reconcileEditedIds', () => {
+  it('keeps ids of same-kind steps and remints reused, duplicate and invented ids', async () => {
+    const { reconcileEditedIds } = await import('./canvasCopilot')
+    const before = canvasToGeneratedWorkflow(driveBackup).steps
+    let n = 0
+    const edited = [
+      before[0],
+      { ...before[1], title: 'List invoices' }, // same kind -> kept
+      { id: before[2].id, type: 'condition' as const, title: 'Check', testable: true }, // replaced -> new id
+      { id: before[1].id, type: 'action' as const, title: 'Dup', app: 'google drive', testable: true }, // duplicate
+      { id: 'llm-made', type: 'action' as const, title: 'New', app: 'slack', testable: true },
+    ]
+    const r = reconcileEditedIds(before, edited, () => `m${++n}`)
+    expect(r.steps.map((s) => s.id)).toEqual([before[0].id, before[1].id, 'm1', 'm2', 'm3'])
+    expect([r.kept, r.reminted]).toEqual([2, 3])
+  })
+})
