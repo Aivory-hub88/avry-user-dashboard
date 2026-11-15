@@ -3,6 +3,7 @@ import { query } from "@/lib/db"
 import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDoc"
 import { collabAuthHeaders, type WorkspaceCredential } from "@/lib/workspaceAuth"
 import { canReadDocId } from "@/lib/workspaceAccess"
+import { syncTaskIndex } from "@/lib/workspaceTaskIndex"
 import { computeRollups, parseFieldDefs, rowAssignees, rowFollowers, cleanComment, cleanOwner, cleanPersonRef, type FieldDef, type CellValue, type PersonRef, type TaskComment } from "@/lib/workspaceDbModel"
 
 // Re-exported so existing importers keep working; the pure model lives in
@@ -246,6 +247,8 @@ export async function saveDbDoc(id: string, doc: Y.Doc, cred: WorkspaceCredentia
      ON CONFLICT (id) DO UPDATE SET yjs_update = EXCLUDED.yjs_update, updated_at = now()`,
     [id, upd],
   )
+  // "My tasks" index: `doc` now holds the merged state, so its rows are current.
+  await syncTaskIndex(id, rowsFromDbDoc(doc))
 }
 
 /** WIP limits from the doc's pg props (`props.dbWip`, same shape the client persists). */

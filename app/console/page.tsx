@@ -25,6 +25,7 @@ import { useActiveRuns } from "@/hooks/useActiveRuns"
 import { useRoomTeam } from "@/hooks/useRoomTeam"
 import { filterCandidatesByTeam } from "@/lib/agentTeams"
 import RoomGroupModal from "@/components/console/RoomGroupModal"
+import TodayTasksCard from "@/components/workspace/TodayTasksCard"
 import { useStuckTasks } from "@/hooks/useStuckTasks"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
 import { getMentionCandidates, parseAgentMentions, resolveNamedAgents, detectRoundIntent, expandToRoom, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
@@ -922,6 +923,8 @@ export default function ConsolePage() {
                   </div>
                 )}
               </div>
+              {/* Today: overdue / due-today tasks on me, linking to Workspace › My tasks. */}
+              <TodayTasksCard />
             </div>
           </div>
           </div>

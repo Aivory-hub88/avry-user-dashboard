@@ -1,8 +1,8 @@
 "use client"
 
 /**
- * One header for the Workspace section: title, the four sections as tabs
- * (Rooms, Requests, Timeline, Teams), "How it works" and "New request".
+ * One header for the Workspace section: title, the five sections as tabs
+ * (My tasks, Rooms, Requests, Timeline, Teams), "How it works" and "New request".
  * Rendered by app/workspace/layout.tsx, so it stays mounted while you switch
  * tabs instead of each page drawing its own bar.
  *
@@ -15,12 +15,15 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { CircleHelp, Plus } from "lucide-react"
 import { requestsApi, teamsApi } from "@/lib/requestsClient"
+import { useMyTasks } from "@/hooks/useMyTasks"
+import { localDayISO, myTasksBadge } from "@/lib/myTasks"
 
 export const WORKSPACE_GUIDE_EVENT = "aivory:workspace-guide"
 export const WORKSPACE_NEW_REQUEST_EVENT = "aivory:workspace-new-request"
 export const WORKSPACE_NEW_ROOM_EVENT = "aivory:workspace-new-room"
 
 export const WORKSPACE_TABS = [
+  { href: "/workspace/my-tasks", label: "My tasks", tour: "my-tasks" },
   { href: "/workspace", label: "Rooms", tour: "rooms-tab" },
   { href: "/workspace/requests", label: "Requests", tour: "requests" },
   { href: "/workspace/timeline", label: "Timeline", tour: "timeline" },
@@ -38,6 +41,9 @@ export default function WorkspaceNav() {
   const [canRequest, setCanRequest] = useState(false)
   const [owns, setOwns] = useState(false)
   const [waiting, setWaiting] = useState(0)
+  // My tasks badge: open tasks on me (assigned or owned) that are overdue or due today.
+  const { tasks: myTasks } = useMyTasks(pathname)
+  const onMe = myTasks ? myTasksBadge(myTasks, localDayISO()) : 0
 
   // Refresh on every tab switch: a team created on Teams or a request
   // reviewed on Requests should show up in the badge and button right away.
@@ -138,6 +144,11 @@ export default function WorkspaceNav() {
               }`}
             >
               {t.label}
+              {t.href === "/workspace/my-tasks" && onMe > 0 && (
+                <span className="rounded-full bg-red-500/20 px-1.5 text-[10px] tabular-nums text-red-200" title={`${onMe} overdue or due today`}>
+                  {onMe}
+                </span>
+              )}
               {t.href === "/workspace/requests" && waiting > 0 && (
                 <span className="rounded-full bg-amber-500/20 px-1.5 text-[10px] tabular-nums text-amber-200" title={`${waiting} waiting for your review`}>
                   {waiting}
