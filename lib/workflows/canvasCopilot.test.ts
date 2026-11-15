@@ -9,6 +9,16 @@ const bridgeCalls: { op: string; body: any }[] = []
 vi.mock('./bridgeCopilot', () => ({
   callCopilotOperation: vi.fn(async (op: string, body: any) => {
     bridgeCalls.push({ op, body: JSON.parse(JSON.stringify(body)) })
+    if (op === 'edit' && /ubah total/i.test(body.edit_request)) {
+      // A full rewrite: every step is new (the trigger keeps its id).
+      const [trigger] = body.current_workflow.steps
+      const steps = [
+        trigger,
+        { id: 'x1', type: 'action', title: 'Read invoice emails', app: 'gmail', testable: true },
+        { id: 'x2', type: 'action', title: 'Add row to Google Sheets', app: 'googleSheets', testable: true },
+      ]
+      return { workflow: { ...body.current_workflow, steps } }
+    }
     if (op === 'edit') {
       const steps = [...body.current_workflow.steps, { id: 'new', type: 'action', title: 'Notify team on Slack', app: 'slack', testable: true }]
       return { workflow: { ...body.current_workflow, steps } }
@@ -19,7 +29,7 @@ vi.mock('./bridgeCopilot', () => ({
 }))
 
 import { canvasToGeneratedWorkflow, mergeEditedNodes, normalizeStepTitle, countSteps, stepIdAliases, diffSteps } from './canvasCopilot'
-import { CopilotStateMachine, isNewWorkflowRequest, matchEditCapabilityQuestion, buildUserContext } from './copilotStateMachine'
+import { CopilotStateMachine, isNewWorkflowRequest, matchEditCapabilityQuestion, buildUserContext, isNearTotalRewrite, matchRewriteChoice } from './copilotStateMachine'
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
 import { n8nToReactFlow } from '@/lib/n8nMapper'
 
@@ -733,5 +743,74 @@ describe('CopilotStateMachine — approval message', () => {
     const msg: string = (new CopilotStateMachine('s', tested(null)) as any).buildApprovalMessage(1)
     expect(msg).toContain('Sandbox testing complete! 1 succeeded, 1 skipped, out of 2 total steps.')
     expect(msg).not.toContain('connection check')
+  })
+})
+
+describe('CopilotStateMachine — a near-total rewrite asks first', () => {
+  const canvas = () => ({ workflowId: 'wf-1', title: 'Drive backup', workflow: canvasToGeneratedWorkflow(driveBackup) })
+  beforeEach(() => { bridgeCalls.length = 0 })
+
+  const rewrite = async () => {
+    const m = new CopilotStateMachine('s1')
+    const st = await m.processMessage('ubah total jadi rekap invoice dari Gmail ke Sheets', canvas())
+    // Don't hit the sandbox from these tests.
+    ;(m as any).runTests = vi.fn(async () => (m as any).state)
+    return { m, st }
+  }
+
+  it('asks new or replace instead of going straight to confirmation', async () => {
+    const { st } = await rewrite()
+    expect(st.stage).toBe('AWAITING_CONFIRMATION')
+    expect(st.pendingRewriteChoice).toBe(true)
+    expect(st.lastMessage).toContain('This replaces every step of "Drive backup"')
+    expect(st.lastMessage).toContain('Reply **new** to save it as a new workflow (recommended) or **replace** to overwrite it.')
+  })
+
+  it.each(['new', 'baru', 'yes', 'ok'])('"%s" saves it as a new workflow', async (reply) => {
+    const { m } = await rewrite()
+    const st = await m.processMessage(reply, canvas())
+    expect(st.canvasTarget).toBeNull()
+    expect(st.applyAsNew).toBe(true)
+    expect(st.pendingRewriteChoice).toBe(false)
+    expect((m as any).runTests).toHaveBeenCalledOnce()
+  })
+
+  it.each(['replace', 'ganti', 'timpa aja'])('"%s" keeps the canvas as the target', async (reply) => {
+    const { m } = await rewrite()
+    const st = await m.processMessage(reply, canvas())
+    expect(st.canvasTarget).toEqual({ workflowId: 'wf-1', title: 'Drive backup' })
+    expect(st.applyAsNew).toBe(false)
+    expect((m as any).runTests).toHaveBeenCalledOnce()
+  })
+
+  it('a partial edit does not ask', async () => {
+    const st = await new CopilotStateMachine('s1').processMessage('tambah step kirim notifikasi Slack di akhir', canvas())
+    expect(st.pendingRewriteChoice).toBe(false)
+    expect(st.lastMessage).not.toContain('replaces every step')
+  })
+
+  it('a new edit instead of a choice clears the question and re-checks', async () => {
+    const { m } = await rewrite()
+    const st = await m.processMessage('tambah step kirim notifikasi Slack di akhir', canvas())
+    expect(bridgeCalls.filter((c) => c.op === 'edit')).toHaveLength(2)
+    // The second edit kept the rewritten steps, so nothing new to ask.
+    expect(st.pendingRewriteChoice).toBe(false)
+    expect(st.canvasTarget?.workflowId).toBe('wf-1')
+  })
+})
+
+describe('isNearTotalRewrite / matchRewriteChoice', () => {
+  const s = (id: string, type: any = 'action') => ({ id, type, title: id, testable: true })
+  it('needs at least two non-trigger steps, none kept', () => {
+    expect(isNearTotalRewrite([s('t', 'trigger'), s('a'), s('b')], [s('t', 'trigger'), s('x'), s('y')])).toBe(true)
+    expect(isNearTotalRewrite([s('t', 'trigger'), s('a'), s('b')], [s('t', 'trigger'), s('a'), s('y')])).toBe(false)
+    expect(isNearTotalRewrite([s('t', 'trigger'), s('a')], [s('x')])).toBe(false)
+  })
+  it('reads short replies only', () => {
+    expect(matchRewriteChoice('New')).toBe('new')
+    expect(matchRewriteChoice('simpan baru')).toBe('new')
+    expect(matchRewriteChoice('replace')).toBe('replace')
+    expect(matchRewriteChoice('replace the gmail step with outlook please')).toBeNull()
+    expect(matchRewriteChoice('yes')).toBeNull()
   })
 })

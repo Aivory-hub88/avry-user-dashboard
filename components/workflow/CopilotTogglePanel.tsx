@@ -62,8 +62,8 @@ interface CopilotTogglePanelProps {
   getChangePreview?: (workflow: GeneratedWorkflow) => CanvasEditPreview | null
   /** The open workflow is deployed to n8n — Update also saves it there. */
   isDeployed?: boolean
-  onApplyWorkflow?: (workflow: GeneratedWorkflow, target: CopilotApplyTarget) => void
-  onApplySuggestion?: (workflow: GeneratedWorkflow, target: CopilotApplyTarget) => void
+  onApplyWorkflow?: (workflow: GeneratedWorkflow, target: CopilotApplyTarget, asNew?: boolean) => void
+  onApplySuggestion?: (workflow: GeneratedWorkflow, target: CopilotApplyTarget, asNew?: boolean) => void
 }
 
 export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, getChangePreview, isDeployed, onApplyWorkflow, onApplySuggestion }: CopilotTogglePanelProps) {
@@ -85,12 +85,13 @@ export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, getC
     reset,
     markApplied,
     canvasTarget,
+    applyAsNew,
   } = useWorkflowCopilot({ getCanvasContext })
 
   // Support both prop names for backward compatibility
   const rawApply = onApplyWorkflow || onApplySuggestion
   const applyHandler = rawApply
-    ? (wf: GeneratedWorkflow) => { rawApply(wf, canvasTarget); markApplied() }
+    ? (wf: GeneratedWorkflow) => { rawApply(wf, canvasTarget, applyAsNew); markApplied() }
     : undefined
 
   // Don't reset on open/close — messages persist via localStorage.

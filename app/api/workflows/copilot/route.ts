@@ -140,6 +140,8 @@ export async function POST(request: NextRequest) {
       isError: updatedState.stage === 'ERROR',
       // Non-null when the workflow being proposed edits the open canvas.
       canvasTarget: updatedState.canvasTarget ?? null,
+      // The user chose to save a full rewrite of the open canvas as a new workflow.
+      applyAsNew: !!updatedState.applyAsNew,
 
       // Full state — client MUST store this and send it back as `currentState`
       // on the next request. This is what keeps the conversation alive.

@@ -1387,6 +1387,7 @@ function WorkflowsPageInner() {
   const handleCopilotApply = async (
     workflow: import('@/lib/workflows/copilotClient').GeneratedWorkflow,
     target: CopilotApplyTarget = null,
+    asNew = false,
   ) => {
     // Build the canvas nodes/edges via the SAME conversion pipeline already
     // used elsewhere in this app for correct n8n typing — NOT the old ad-hoc
@@ -1460,7 +1461,9 @@ function WorkflowsPageInner() {
     // A workflow is already open — ask whether to merge into it or fork a
     // new draft, instead of always silently forking (which orphaned the
     // workflow the user was actually looking at while chatting).
-    if (selected) {
+    // asNew: the user already told Aether to save a full rewrite as a new
+    // workflow — don't ask again.
+    if (selected && !asNew) {
       setPendingApply({ rfNodes, rfEdges, workflow, allSteps, title })
       return
     }
