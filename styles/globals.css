@@ -1274,3 +1274,19 @@ body {
     transform: scale(0.97);
   }
 }
+
+/* Session-expired notice: backdrop fades, card rises and settles. */
+@keyframes sessionBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sessionCardIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.session-backdrop-in { animation: sessionBackdropIn 200ms ease-out both; }
+.session-card-in { animation: sessionCardIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .session-backdrop-in,
+  .session-card-in { animation: none; }
+}

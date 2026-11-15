@@ -65,43 +65,49 @@ export default function SessionExpiredNotice({ autoNavigate = false }: { autoNav
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+      className="session-backdrop-in fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-md"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="session-expired-title"
+      aria-describedby="session-expired-body"
     >
-      <div className="w-full max-w-[420px] rounded-2xl border border-amber-400/20 bg-surface-1 px-6 py-6 text-left shadow-2xl">
-        <div className="mb-1 inline-block rounded-full bg-amber-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-amber-300/90">
-          {expired ? 'Sesi berakhir' : 'Login diperlukan'}
+      <div
+        ref={(el) => el?.focus({ preventScroll: true })}
+        tabIndex={-1}
+        className="session-card-in w-full outline-none max-w-[360px] rounded-3xl border border-white/[0.08] bg-[#151517] p-7 text-center shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)]">
+        <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-white/[0.06] ring-1 ring-white/[0.08]">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-white/80" aria-hidden>
+            <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+            <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+          </svg>
         </div>
-        <h2 id="session-expired-title" className="mt-3 text-lg font-semibold text-white">
-          {expired ? 'Sesi Anda telah berakhir' : 'Silakan login kembali'}
+        <h2 id="session-expired-title" className="mt-5 text-[17px] font-semibold tracking-[-0.01em] text-white">
+          {expired ? 'Sesi Anda telah berakhir' : 'Silakan login dulu'}
         </h2>
-        <p className="mt-2 text-sm font-light leading-relaxed text-white/65">
+        <p id="session-expired-body" className="mx-auto mt-2 max-w-[280px] text-[13.5px] leading-relaxed text-white/50">
           {expired
-            ? 'Sesi login Anda sudah kedaluwarsa dan tidak bisa diperpanjang otomatis. Login kembali untuk melanjutkan — chat dan data Anda tetap tersimpan.'
-            : 'Anda belum login atau sesi tidak ditemukan. Login untuk mengakses dashboard.'}
+            ? 'Login lagi untuk melanjutkan. Chat dan data Anda tetap tersimpan.'
+            : 'Login untuk membuka dashboard Anda.'}
         </p>
-        <div className="mt-5 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={goLogin}
+          className="mt-6 w-full rounded-full bg-white py-2.5 text-[14px] font-semibold text-black transition-[background-color,transform] duration-150 hover:bg-white/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151517]"
+        >
+          {expired ? 'Login kembali' : 'Login'}
+        </button>
+        {autoNavigate ? (
+          <div className="mt-4 text-[12px] text-white/35" aria-live="polite">
+            Mengalihkan dalam {countdown} detik
+          </div>
+        ) : (
           <button
-            onClick={goLogin}
-            className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-on-accent transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            type="button"
+            onClick={() => setVisible(false)}
+            className="mt-2 w-full rounded-full py-2.5 text-[13px] font-medium text-white/45 transition-colors hover:bg-white/[0.04] hover:text-white/75"
           >
-            Login kembali
+            Nanti saja
           </button>
-          {!autoNavigate && (
-            <button
-              onClick={() => setVisible(false)}
-              className="text-sm font-medium text-white/45 underline underline-offset-2 transition-colors hover:text-white/75"
-            >
-              Nanti saja
-            </button>
-          )}
-        </div>
-        {autoNavigate && (
-          <p className="mt-4 text-xs font-light text-white/40">
-            Mengalihkan ke halaman login dalam {countdown} detik…
-          </p>
         )}
       </div>
     </div>
