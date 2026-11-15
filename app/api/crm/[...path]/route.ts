@@ -42,10 +42,11 @@ async function proxy(req: NextRequest, ctx: Ctx): Promise<NextResponse> {
     // The CRM rejecting our own service token is a deployment fault, not the user's.
     if (upstream.status === 401) return NextResponse.json({ error: "crm_unavailable" }, { status: 502 })
     const text = await upstream.text()
-    return new NextResponse(text, {
-      status: upstream.status,
-      headers: { "content-type": upstream.headers.get("content-type") ?? "application/json" },
-    })
+    const headers: Record<string, string> = { "content-type": upstream.headers.get("content-type") ?? "application/json" }
+    // List pagination (avry-crm `X-Next-Cursor`, see lib/crmPaging).
+    const next = upstream.headers.get("x-next-cursor")
+    if (next) headers["x-next-cursor"] = next
+    return new NextResponse(text, { status: upstream.status, headers })
   } catch {
     return NextResponse.json({ error: "crm_unavailable" }, { status: 502 })
   }
