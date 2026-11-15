@@ -17,7 +17,23 @@ import {
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { syncDescriptionMentions, recordAssignments } from "@/lib/workspaceMentions"
-import { addFollowers, addedAssignees, assigneeMirror, cleanAssignees, cleanOwner, rowAssignees, rowChanges, type PersonRef } from "@/lib/workspaceDbModel"
+import {
+  addFollowers,
+  addedAssignees,
+  assigneeMirror,
+  blockedByProblem,
+  cleanAssignees,
+  cleanBlockedBy,
+  cleanOwner,
+  cleanParentId,
+  descendantIds,
+  openBlockers,
+  parentProblem,
+  rowAssignees,
+  rowChanges,
+  MAX_BLOCKED_BY,
+  type PersonRef,
+} from "@/lib/workspaceDbModel"
 import { recordRowChanges } from "@/lib/workspaceTaskEvents"
 import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
 import { indexRow, removeRowIndex, rowText, workspaceOf } from "@/lib/workspaceIndex"
@@ -94,7 +110,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const people = peoplePatch(patch)
   const hasPeople = people.assignees !== undefined || people.owner !== undefined
   const hasCells = patch.cells !== undefined
-  if (Object.keys(clean).length === 0 && !hasCells && !hasPeople) return NextResponse.json({ error: "nothing to update" }, { status: 400 })
+  // Structure: `parentId` (string | null) and `blockedBy` (row ids), checked against the doc below.
+  const hasParent = patch.parentId !== undefined
+  const hasBlockedBy = patch.blockedBy !== undefined
+  if (hasBlockedBy && (!Array.isArray(patch.blockedBy) || patch.blockedBy.length > MAX_BLOCKED_BY)) {
+    return NextResponse.json({ error: "invalid blockedBy", reason: Array.isArray(patch.blockedBy) ? "too_many" : "shape" }, { status: 400 })
+  }
+  if (hasParent && patch.parentId !== null && typeof patch.parentId !== "string") {
+    return NextResponse.json({ error: "invalid parentId", reason: "shape" }, { status: 400 })
+  }
+  if (Object.keys(clean).length === 0 && !hasCells && !hasPeople && !hasParent && !hasBlockedBy) return NextResponse.json({ error: "nothing to update" }, { status: 400 })
 
   try {
     const doc = await loadDbDoc(id, cred, agentType, await allowPg(cred, id))
@@ -109,6 +134,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
     const m = arr.get(idx) as Y.Map<unknown>
+    const allRows = rowsFromDbDoc(doc)
+    const parentId = hasParent ? cleanParentId(patch.parentId) : undefined
+    if (parentId !== undefined) {
+      const why = parentProblem(allRows, rowId, parentId)
+      if (why) return NextResponse.json({ error: "invalid parentId", reason: why }, { status: 400 })
+    }
+    let blockedBy: string[] | undefined
+    if (hasBlockedBy) {
+      if ((patch.blockedBy as unknown[]).some((b) => b === rowId)) {
+        return NextResponse.json({ error: "invalid blockedBy", reason: "self" }, { status: 400 })
+      }
+      blockedBy = cleanBlockedBy(patch.blockedBy, rowId)
+      const why = blockedByProblem(allRows, rowId, blockedBy)
+      if (why) return NextResponse.json({ error: "invalid blockedBy", reason: why }, { status: 400 })
+    }
     // Invariant start <= due (mirrors client clamp): prefer the just-patched side.
     const mergedStart = clean.start ?? ((m.get("start") as string) ?? "")
     const mergedDue = clean.due ?? ((m.get("due") as string) ?? "")
@@ -137,6 +177,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         m.set("assignee", assigneeMirror(people.assignees))
       }
       if (people.owner !== undefined) m.set("owner", people.owner)
+      if (parentId !== undefined) m.set("parentId", parentId)
+      if (blockedBy !== undefined) m.set("blockedBy", blockedBy)
       // New owner / assignees start following the task.
       if (people.owner || (Array.isArray(people.assignees) && people.assignees.length > 0)) {
         const add = [people.owner ?? null, ...(Array.isArray(people.assignees) ? people.assignees : [])]
@@ -163,10 +205,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // Status / due / owner get their own activity entries (+ follower
     // notices); the generic "updated" entry covers the remaining fields.
     const changes = rowChanges(prevRow, afterRow)
-    await recordRowChanges({ docId: id, rowId, credential: cred, agentType, title: afterRow.title, followers: afterRow.followers }, changes)
+    await recordRowChanges(
+      { docId: id, rowId, credential: cred, agentType, title: afterRow.title, followers: afterRow.followers, rows: rowsFromDbDoc(doc) },
+      changes,
+    )
     const tracked = new Set(["status", "due"])
     const otherKeys = Object.keys(clean).filter((k) => !tracked.has(k))
-    if (otherKeys.length > 0 || mergedCells || people.assignees !== undefined || (changes.length === 0 && people.owner === undefined)) {
+    if (
+      otherKeys.length > 0 ||
+      mergedCells ||
+      people.assignees !== undefined ||
+      parentId !== undefined ||
+      blockedBy !== undefined ||
+      (changes.length === 0 && people.owner === undefined)
+    ) {
       await recordWorkspaceActivity({
         docId: id,
         credential: cred,
@@ -179,6 +231,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           ...clean,
           ...(people.assignees !== undefined ? { assignee: afterRow.assignee } : {}),
           ...(people.owner !== undefined ? { owner: afterRow.owner?.kind === "user" ? afterRow.owner.id : null } : {}),
+          ...(parentId !== undefined ? { parentId } : {}),
+          ...(blockedBy !== undefined ? { blockedBy } : {}),
         },
       })
     }
@@ -204,11 +258,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const fresh = parseDbRow(arr.get(idx) as Y.Map<unknown>)
       void indexRow(id, rowId, await workspaceOf(id), rowText(fresh)).catch(() => {})
     }
+    // Moving a blocked task into Doing is allowed, but the caller is told.
+    const waitingOn =
+      changes.some((c) => c.kind === "status" && c.to === "Doing")
+        ? openBlockers(rowsFromDbDoc(doc), afterRow).map((b) => ({ id: b.id, title: b.title, status: b.status }))
+        : []
     return NextResponse.json({ id: rowId, patched: {
       ...clean,
       ...(people.assignees !== undefined ? { assignee: afterRow.assignee, assignees: afterRow.assignees } : {}),
       ...(people.owner !== undefined ? { owner: afterRow.owner } : {}),
-    }, ...(mergedCells ? { cells: mergedCells } : {}), rollups: resolved?.cells ?? {} })
+      ...(parentId !== undefined ? { parentId: afterRow.parentId } : {}),
+      ...(blockedBy !== undefined ? { blockedBy: afterRow.blockedBy } : {}),
+    }, ...(mergedCells ? { cells: mergedCells } : {}), rollups: resolved?.cells ?? {},
+    ...(waitingOn.length > 0 ? { warning: "blocked", blockedBy: waitingOn } : {}) })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
     console.error("[workspace/database PATCH]", e)
@@ -225,24 +287,50 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const assertedAgent = req.headers.get("x-agent-type") || req.headers.get("X-Agent-Type")
   if (await checkAgentAccess(id, cred, assertedAgent, 'write')) return forbidden()
   const agentType = assertedAgent || "user"
+  const subtasks = req.nextUrl.searchParams.get("subtasks") === "delete" ? "delete" : "keep"
   try {
     const doc = await loadDbDoc(id, cred, agentType, await allowPg(cred, id))
     const arr = doc.getArray<Y.Map<unknown>>("database")
-    const idx = arr.toArray().findIndex((m) => (m.get("id") as string) === rowId)
-    if (idx < 0) return NextResponse.json({ error: "not found" }, { status: 404 })
-    doc.transact(() => arr.delete(idx, 1), agentType)
+    const rows = rowsFromDbDoc(doc)
+    if (!rows.some((r) => r.id === rowId)) return NextResponse.json({ error: "not found" }, { status: 404 })
+    // A parent's sub-tasks are deleted with it (?subtasks=delete) or kept as
+    // top-level tasks (default). Other tasks stop waiting on deleted rows.
+    const children = descendantIds(rows, rowId)
+    const removed = new Set([rowId, ...(subtasks === "delete" ? children : [])])
+    doc.transact(() => {
+      const maps = arr.toArray()
+      for (let i = maps.length - 1; i >= 0; i--) {
+        const m = maps[i]
+        const rid = m.get("id") as string
+        if (removed.has(rid)) {
+          arr.delete(i, 1)
+          continue
+        }
+        if (m.get("parentId") === rowId) m.set("parentId", null)
+        const bb = m.get("blockedBy")
+        if (Array.isArray(bb) && bb.some((b) => removed.has(b as string))) {
+          m.set("blockedBy", bb.filter((b) => !removed.has(b as string)))
+        }
+      }
+    }, agentType)
     await saveDbDoc(id, doc, cred, agentType)
-    void removeRowIndex(id, rowId).catch(() => {})
+    for (const rid of removed) void removeRowIndex(id, rid).catch(() => {})
     await recordWorkspaceActivity({
       docId: id,
       credential: cred,
       agentType,
       action: "database.row_deleted",
-      summary: `Deleted task ${rowId}`,
+      summary:
+        children.length === 0
+          ? `Deleted task ${rowId}`
+          : subtasks === "delete"
+            ? `Deleted task ${rowId} and ${children.length} sub-task${children.length === 1 ? "" : "s"}`
+            : `Deleted task ${rowId} (kept ${children.length} sub-task${children.length === 1 ? "" : "s"})`,
       targetType: "database-row",
       targetId: rowId,
+      metadata: children.length > 0 ? { subtasks, children } : undefined,
     })
-    return NextResponse.json({ ok: true, id: rowId })
+    return NextResponse.json({ ok: true, id: rowId, deleted: [...removed] })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
     console.error("[workspace/database DELETE]", e)

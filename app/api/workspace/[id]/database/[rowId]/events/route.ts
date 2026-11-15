@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import * as Y from "yjs"
 import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden, workspacePlanDenied, type WorkspaceCredential } from "@/lib/workspaceAuth"
 import { checkAgentAccess } from "@/lib/workspaceAccess"
-import { WorkspaceDenied, loadDbDoc, parseDbRow, type DbRow } from "@/lib/workspaceDb"
+import { WorkspaceDenied, loadDbDoc, rowsFromDbDoc, type DbRow } from "@/lib/workspaceDb"
 import { cleanOwner, personKey, type RowChange } from "@/lib/workspaceDbModel"
 import { recordComment, recordRowChanges, recordRowCreated } from "@/lib/workspaceTaskEvents"
 
@@ -29,13 +28,17 @@ const RECHECK_MS = 1500
 
 type Body = { kind?: unknown; from?: unknown; commentId?: unknown }
 
-async function loadRow(id: string, rowId: string, cred: WorkspaceCredential, agentType: string, allowPg: boolean): Promise<DbRow | null> {
+/** The row and all of the doc's rows (a move to Done may unblock others). */
+async function loadRow(
+  id: string,
+  rowId: string,
+  cred: WorkspaceCredential,
+  agentType: string,
+  allowPg: boolean,
+): Promise<{ row: DbRow | null; rows: DbRow[] }> {
   const doc = await loadDbDoc(id, cred, agentType, allowPg)
-  const m = doc
-    .getArray<Y.Map<unknown>>("database")
-    .toArray()
-    .find((x) => (x.get("id") as string) === rowId)
-  return m ? parseDbRow(m) : null
+  const rows = rowsFromDbDoc(doc)
+  return { row: rows.find((r) => r.id === rowId) ?? null, rows }
 }
 
 function recent(iso: string): boolean {
@@ -99,16 +102,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const allowPg = cred.kind === "service" ? true : await authorizeDocFallback(cred, id)
     const selfKey = selfKeyOf(cred, agentType)
-    let row = await loadRow(id, rowId, cred, agentType, allowPg)
+    let { row, rows } = await loadRow(id, rowId, cred, agentType, allowPg)
     let claim = row ? verify(row, body, selfKey) : null
     if (!claim) {
       await new Promise((r) => setTimeout(r, RECHECK_MS))
-      row = await loadRow(id, rowId, cred, agentType, allowPg)
+      ;({ row, rows } = await loadRow(id, rowId, cred, agentType, allowPg))
       claim = row ? verify(row, body, selfKey) : null
     }
     if (!row) return NextResponse.json({ error: "not found" }, { status: 404 })
     if (!claim) return NextResponse.json({ error: "no such change" }, { status: 409 })
-    const ctx = { docId: id, rowId, credential: cred, agentType, title: row.title, followers: row.followers }
+    const ctx = { docId: id, rowId, credential: cred, agentType, title: row.title, followers: row.followers, rows }
     if (claim === "created") await recordRowCreated(ctx)
     else if ("comment" in claim) {
       const c = row.comments.find((x) => x.id === claim.comment)

@@ -22,11 +22,23 @@ import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { indexRow, rowText, workspaceOf } from "@/lib/workspaceIndex"
 import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
 import { recordAssignments } from "@/lib/workspaceMentions"
-import { addFollowers, assigneeMirror, cleanAssignees, cleanOwner, rowAssignees, type PersonRef } from "@/lib/workspaceDbModel"
+import {
+  addFollowers,
+  assigneeMirror,
+  blockedByProblem,
+  cleanAssignees,
+  cleanBlockedBy,
+  cleanOwner,
+  cleanParentId,
+  parentProblem,
+  rowAssignees,
+  MAX_BLOCKED_BY,
+  type PersonRef,
+} from "@/lib/workspaceDbModel"
 
 export const runtime = "nodejs"
 
-type RowInput = Omit<DbRow, "id" | "comments" | "cells" | "createdBy" | "createdAt" | "followers">
+type RowInput = Omit<DbRow, "id" | "comments" | "cells" | "createdBy" | "createdAt" | "followers" | "parentId" | "blockedBy">
 
 /** Typed assignees win; else the legacy `assignee` text (agent → typed). */
 function assigneesInput(body: Partial<DbRow>): { assignees: PersonRef[]; assignee: string } {
@@ -114,12 +126,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "wip-exceeded", limit: limited }, { status: 409 })
     }
     const input = cleanRowInput(body)
+    const newId = newDbRowId()
+    // Sub-task / dependencies: same-doc rows only, validated before writing.
+    const parentId = cleanParentId(body.parentId)
+    const parentErr = parentProblem(rows, newId, parentId)
+    if (parentErr) return NextResponse.json({ error: "invalid parentId", reason: parentErr }, { status: 400 })
+    if (Array.isArray(body.blockedBy) && body.blockedBy.length > MAX_BLOCKED_BY) {
+      return NextResponse.json({ error: "invalid blockedBy", reason: "too_many" }, { status: 400 })
+    }
+    const blockedBy = cleanBlockedBy(body.blockedBy)
+    const blockedErr = blockedByProblem(rows, newId, blockedBy)
+    if (blockedErr) return NextResponse.json({ error: "invalid blockedBy", reason: blockedErr }, { status: 400 })
     const creator = actorRef(cred, agentType)
     // A person creating a task owns it unless they named another owner.
     const owner = input.owner ?? (creator?.kind === "user" ? creator : null)
     const newRow: DbRow = {
-      id: newDbRowId(),
+      id: newId,
       ...input,
+      parentId,
+      blockedBy,
       owner,
       createdBy: creator,
       createdAt: new Date().toISOString(),

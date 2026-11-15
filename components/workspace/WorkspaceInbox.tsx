@@ -45,6 +45,8 @@ export function inboxVerb(source: string): string {
       return "marked a task you follow as Done"
     case "due_changed":
       return "changed the due date of a task you follow"
+    case "unblocked":
+      return "finished the last blocker — your task can start"
     case "due_soon":
       return "Due tomorrow"
     case "overdue":
