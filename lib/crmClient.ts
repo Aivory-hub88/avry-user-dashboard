@@ -4,6 +4,7 @@
 import { BASE_PATH } from "@/lib/asset"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import type { ActivityKind, SubjectType } from "@/lib/crmActivity"
+import { collectPages, NEXT_CURSOR_HEADER, pageQuery } from "@/lib/crmPaging"
 import { companyBody, contactBody, dealBody, type CompanyChanges, type ContactChanges, type DealChanges } from "@/lib/crmPipeline"
 
 export const DEAL_STAGES = ["lead", "qualified", "proposal", "won", "lost"] as const
@@ -75,6 +76,15 @@ export class CrmError extends Error {
 }
 
 async function api<T>(path: string, init?: { method?: string; json?: unknown }): Promise<T> {
+  return (await call<T>(path, init)).data
+}
+
+/** Every row of a paged list (see lib/crmPaging). */
+function listAll<T>(path: string, filters?: URLSearchParams): Promise<T[]> {
+  return collectPages((cursor) => call<T[]>(`${path}?${pageQuery(filters, cursor)}`))
+}
+
+async function call<T>(path: string, init?: { method?: string; json?: unknown }): Promise<{ data: T; next: string | null }> {
   const r = await fetch(`${BASE_PATH}/api/crm/${path}`, {
     method: init?.method ?? "GET",
     headers: { ...collabAuthHeaders(), ...(init?.json !== undefined ? { "Content-Type": "application/json" } : {}) },
@@ -97,7 +107,7 @@ async function api<T>(path: string, init?: { method?: string; json?: unknown }):
           : (fromJson ?? "Something went wrong. Try again.")
     throw new CrmError(r.status, message)
   }
-  return j as T
+  return { data: j as T, next: r.headers.get(NEXT_CURSOR_HEADER) }
 }
 
 const clean = <T extends Record<string, unknown>>(o: T) =>
@@ -105,7 +115,7 @@ const clean = <T extends Record<string, unknown>>(o: T) =>
 
 export const crmApi = {
   companies: {
-    list: () => api<Company[]>("companies"),
+    list: () => listAll<Company>("companies"),
     create: (b: { name: string; domain?: string | null; industry?: string | null; size?: string; custom_fields?: Record<string, unknown> }) =>
       api<Company>("companies", { method: "POST", json: clean(b) }),
     get: (id: string) => api<Company>(`companies/${id}`),
@@ -114,7 +124,7 @@ export const crmApi = {
     remove: (id: string) => api(`companies/${id}`, { method: "DELETE" }),
   },
   contacts: {
-    list: () => api<Contact[]>("contacts"),
+    list: () => listAll<Contact>("contacts"),
     create: (b: { name: string; email?: string | null; phone?: string | null; title?: string | null; company_id?: string; custom_fields?: Record<string, unknown> }) =>
       api<Contact>("contacts", { method: "POST", json: clean(b) }),
     get: (id: string) => api<Contact>(`contacts/${id}`),
@@ -122,7 +132,7 @@ export const crmApi = {
     remove: (id: string) => api(`contacts/${id}`, { method: "DELETE" }),
   },
   deals: {
-    list: () => api<Deal[]>("deals"),
+    list: () => listAll<Deal>("deals"),
     create: (b: {
       title: string
       value?: number
@@ -146,8 +156,7 @@ export const crmApi = {
       if (q.subject_id) p.set("subject_id", q.subject_id)
       if (q.has_due !== undefined) p.set("has_due", String(q.has_due))
       if (q.completed !== undefined) p.set("completed", String(q.completed))
-      const qs = p.toString()
-      return api<Activity[]>(qs ? `activities?${qs}` : "activities")
+      return listAll<Activity>("activities", p)
     },
     create: (b: { kind: ActivityKind; subject_type: SubjectType; subject_id: string; body?: string; due_at?: string | null }) =>
       api<Activity>("activities", { method: "POST", json: clean(b) }),
