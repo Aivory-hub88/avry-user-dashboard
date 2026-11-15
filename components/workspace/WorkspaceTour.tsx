@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * Three-step tour of the workspace page: Rooms, Requests, Teams. Each step
+ * Four-step tour of the workspace: Rooms, Requests, Timeline, Teams. Each step
  * outlines an element marked `data-tour="<key>"` and shows a card under it.
  * Shown once after the first room opens (the empty-state stepper covers the
  * time before); "How it works" can start it again.
@@ -29,6 +29,7 @@ export function markTourDone() {
 const STEPS = [
   { key: "rooms", title: "Your rooms", body: "Each approved project gets a room. The orange badge means an agent is waiting for your approval." },
   { key: "requests", title: "Requests", body: "Start new work here. Owners also review their team's requests here; the number shows how many are waiting." },
+  { key: "timeline", title: "Timeline", body: "Every room's tasks, deadlines and agent jobs on one calendar, plus requests still waiting for approval." },
   { key: "teams", title: "Teams", body: "Invite people and set who can request projects (editors) and who approves them (owners)." },
 ] as const
 

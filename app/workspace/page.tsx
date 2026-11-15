@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { CalendarRange, ChevronRight, CircleHelp, Plus, Users } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { authedFetch } from "@/lib/deployAuth"
 import { agentDisplayName } from "@/lib/spaceAgent"
@@ -21,7 +21,28 @@ import { requestsApi, teamsApi, type RequestWithTeam, type TeamSummary } from "@
 import { StatusPill, formatDate } from "@/components/requests/requestUi"
 import { WorkspaceGuide, WorkspaceWelcome } from "@/components/workspace/WorkspaceWelcome"
 import WorkspaceTour, { tourDone } from "@/components/workspace/WorkspaceTour"
+import { WORKSPACE_GUIDE_EVENT } from "@/components/workspace/WorkspaceNav"
 import { onboardingSteps, type StepAction } from "@/lib/workspaceOnboarding"
+
+/** Set once the welcome screen has been read; rooms show from then on. */
+const WELCOME_DONE_KEY = "aivory.workspace.welcomeDone"
+
+function readWelcomeDone(): boolean {
+  try {
+    return localStorage.getItem(WELCOME_DONE_KEY) === "1"
+  } catch {
+    return true // no storage: don't block the rooms on every visit
+  }
+}
+
+function writeWelcomeDone(done: boolean) {
+  try {
+    if (done) localStorage.setItem(WELCOME_DONE_KEY, "1")
+    else localStorage.removeItem(WELCOME_DONE_KEY)
+  } catch {
+    // not persisted; this visit still follows the choice
+  }
+}
 
 interface RoomSummary {
   id: string
@@ -53,7 +74,7 @@ function lastLine(r: RoomSummary): string {
 }
 
 export default function WorkspaceHome() {
-  const { openSettingsModal, isOpen: settingsOpen } = useSettingsModal()
+  const { isOpen: settingsOpen } = useSettingsModal()
   const router = useRouter()
   const [rooms, setRooms] = useState<RoomSummary[] | null>(null)
   const [teams, setTeams] = useState<TeamSummary[] | null>(null)
@@ -62,6 +83,8 @@ export default function WorkspaceHome() {
   const [error, setError] = useState<string | null>(null)
   const [guideOpen, setGuideOpen] = useState(false)
   const [tourOpen, setTourOpen] = useState(false)
+  // Read after mount (localStorage); null until then so the rooms don't flash first.
+  const [welcomeDone, setWelcomeDone] = useState<boolean | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -89,15 +112,42 @@ export default function WorkspaceHome() {
 
   const toReview = useMemo(() => inbox.filter((r) => r.status === "submitted"), [inbox])
   const inProgress = useMemo(() => mine.filter((r) => r.status === "draft" || r.status === "changes_requested" || r.status === "submitted").slice(0, 5), [mine])
-  const canRequest = (teams ?? []).some((t) => t.role === "owner" || t.role === "editor")
   const steps = useMemo(() => onboardingSteps({ teams: teams ?? [], mine, inbox, rooms: rooms ?? [] }), [teams, mine, inbox, rooms])
   const hasRooms = (rooms?.length ?? 0) > 0
+  // New here, or no rooms yet: the welcome screen (with the setup steps) comes first.
+  const showWelcome = rooms !== null && welcomeDone !== null && (!hasRooms || !welcomeDone)
 
-  // First visit after the first room exists: walk through the page once.
+  useEffect(() => {
+    // localStorage is only readable after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setWelcomeDone(readWelcomeDone())
+  }, [])
+
+  // "How it works" in the header: an event while this page is open, `?guide=1` from another tab.
+  useEffect(() => {
+    const open = () => setGuideOpen(true)
+    window.addEventListener(WORKSPACE_GUIDE_EVENT, open)
+    if (new URLSearchParams(window.location.search).get("guide") === "1") {
+      open()
+      router.replace("/workspace")
+    }
+    return () => window.removeEventListener(WORKSPACE_GUIDE_EVENT, open)
+  }, [router])
+
+  // Once the welcome is read and rooms exist: walk through the page once.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (hasRooms && !tourDone()) setTourOpen(true)
-  }, [hasRooms])
+    if (hasRooms && welcomeDone && !tourDone()) setTourOpen(true)
+  }, [hasRooms, welcomeDone])
+
+  const finishWelcome = () => {
+    writeWelcomeDone(true)
+    setWelcomeDone(true)
+  }
+  const showWelcomeAgain = () => {
+    writeWelcomeDone(false)
+    setWelcomeDone(false)
+  }
 
   // Teams live in the settings modal; reload when it closes so a new team ticks step 1.
   const settingsWasOpen = useRef(settingsOpen)
@@ -107,7 +157,7 @@ export default function WorkspaceHome() {
   }, [settingsOpen, load])
 
   const onAction = (a: StepAction) => {
-    if (a.kind === "createTeam") openSettingsModal("team")
+    if (a.kind === "createTeam") router.push("/workspace/teams")
     else if (a.kind === "newRequest") router.push("/workspace/requests?new=1")
     else if (a.kind === "openRequest") router.push(`/workspace/requests/${a.id}`)
     else if (a.kind === "reviewInbox") router.push("/workspace/requests?tab=inbox")
@@ -115,42 +165,7 @@ export default function WorkspaceHome() {
   }
 
   return (
-    <div className="flex h-full w-full flex-col bg-surface-1">
-      <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-black/10 px-6">
-        <span className="text-[13px] font-medium text-white/85">Workspace</span>
-        <div className="flex items-center gap-1">
-          <Link href="/workspace/timeline" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
-            <CalendarRange className="h-3.5 w-3.5" />
-            <span>Timeline</span>
-          </Link>
-          <button
-            type="button"
-            onClick={() => setGuideOpen(true)}
-            aria-label="How Workspace works"
-            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80"
-          >
-            <CircleHelp className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">How it works</span>
-          </button>
-          <button data-tour="teams" type="button" onClick={() => openSettingsModal("team")} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
-            <Users className="h-3.5 w-3.5" />
-            <span>Teams</span>
-          </button>
-          <Link data-tour="requests" href="/workspace/requests" className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] text-white/50 hover:bg-white/[0.06] hover:text-white/80">
-            <span>Requests</span>
-            {toReview.length > 0 && <span className="rounded-full bg-amber-500/20 px-1.5 text-[10px] tabular-nums text-amber-200">{toReview.length}</span>}
-          </Link>
-          {canRequest && (
-            <Link
-              href="/workspace/requests?new=1"
-              className="ml-1 flex items-center gap-1 rounded-full bg-white px-3.5 py-1.5 text-[12px] font-medium text-black transition-transform duration-150 ease-out hover:bg-white/90 active:scale-[0.97]"
-            >
-              <Plus className="h-3.5 w-3.5" /> New request
-            </Link>
-          )}
-        </div>
-      </div>
-
+    <>
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[920px] px-4 py-8 sm:px-8">
           {error && <div className="mb-4 rounded-xl bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>}
@@ -167,14 +182,14 @@ export default function WorkspaceHome() {
             </Link>
           )}
 
-          {rooms === null || teams === null ? (
+          {rooms === null || teams === null || welcomeDone === null ? (
             <div className="space-y-2">
               {[0, 1, 2].map((i) => (
                 <div key={i} className="h-[72px] animate-pulse rounded-xl bg-white/[0.03]" />
               ))}
             </div>
-          ) : rooms.length === 0 ? (
-            <WorkspaceWelcome steps={steps} onAction={onAction} />
+          ) : showWelcome ? (
+            <WorkspaceWelcome steps={steps} onAction={onAction} onContinue={hasRooms ? finishWelcome : undefined} />
           ) : (
             <>
             <div className="mb-3 flex items-end justify-between">
@@ -214,6 +229,14 @@ export default function WorkspaceHome() {
             </>
           )}
 
+          {!showWelcome && hasRooms && (
+            <div className="mt-3 text-right">
+              <button type="button" onClick={showWelcomeAgain} className="text-[11px] text-white/35 underline decoration-white/15 underline-offset-4 hover:text-white/70">
+                Show the welcome screen
+              </button>
+            </div>
+          )}
+
           {inProgress.length > 0 && (
             <div className="mt-10">
               <div className="mb-3 flex items-end justify-between">
@@ -249,6 +272,6 @@ export default function WorkspaceHome() {
         />
       )}
       {tourOpen && <WorkspaceTour onClose={() => setTourOpen(false)} />}
-    </div>
+    </>
   )
 }
