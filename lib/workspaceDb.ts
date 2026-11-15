@@ -3,7 +3,8 @@ import { query } from "@/lib/db"
 import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDoc"
 import { collabAuthHeaders, type WorkspaceCredential } from "@/lib/workspaceAuth"
 import { canReadDocId } from "@/lib/workspaceAccess"
-import { computeRollups, parseFieldDefs, rowAssignees, cleanOwner, cleanPersonRef, type FieldDef, type CellValue, type PersonRef } from "@/lib/workspaceDbModel"
+import { syncTaskIndex } from "@/lib/workspaceTaskIndex"
+import { computeRollups, parseFieldDefs, rowAssignees, rowFollowers, cleanComment, cleanOwner, cleanPersonRef, type FieldDef, type CellValue, type PersonRef, type TaskComment } from "@/lib/workspaceDbModel"
 
 // Re-exported so existing importers keep working; the pure model lives in
 // workspaceDbModel.ts (client-safe: no pg/node imports, see its header).
@@ -29,7 +30,7 @@ import { cleanCells, readCells } from "@/lib/workspaceDbModel"
  * stores description + threaded comments in the same Yjs `database` array.
  */
 
-export type DbRowComment = { id: string; text: string; author: string; at: string }
+export type DbRowComment = TaskComment
 export type DbRow = {
   id: string
   title: string
@@ -44,6 +45,8 @@ export type DbRow = {
   /** Set once on create; never changed by edits. */
   createdBy: PersonRef | null
   createdAt: string
+  /** Who hears about changes (max 50); see rowFollowers for legacy rows. */
+  followers: PersonRef[]
   start: string
   due: string
   description: string
@@ -89,23 +92,25 @@ export function parseDbRow(m: Y.Map<unknown>): DbRow {
   let comments: DbRowComment[] = []
   if (Array.isArray(rawComments)) {
     comments = (rawComments as unknown[])
-      .filter(
-        (c): c is DbRowComment =>
-          !!c && typeof c === "object" && typeof (c as DbRowComment).id === "string" && typeof (c as DbRowComment).text === "string",
-      )
-      .slice(0, MAX_COMMENTS_PER_ROW) as DbRowComment[]
+      .map(cleanComment)
+      .filter((c): c is DbRowComment => !!c)
+      .slice(0, MAX_COMMENTS_PER_ROW)
   }
   const priority = str(m.get("priority"), "Med")
+  const assignees = rowAssignees(m.get("assignees"), m.get("assignee"))
+  const owner = cleanOwner(m.get("owner"))
+  const createdBy = cleanPersonRef(m.get("createdBy"))
   return {
     id: str(m.get("id")),
     title: str(m.get("title")),
     status: str(m.get("status"), "Todo"),
     priority: (VALID_PRIORITIES.has(priority) ? priority : "Med") as DbRow["priority"],
     assignee: str(m.get("assignee")),
-    assignees: rowAssignees(m.get("assignees"), m.get("assignee")),
-    owner: cleanOwner(m.get("owner")),
-    createdBy: cleanPersonRef(m.get("createdBy")),
+    assignees,
+    owner,
+    createdBy,
     createdAt: str(m.get("createdAt")),
+    followers: rowFollowers(m.get("followers"), { createdBy, owner, assignees }),
     start: str(m.get("start")),
     due: str(m.get("due")),
     description: str(m.get("description")).slice(0, MAX_DESCRIPTION_LEN),
@@ -144,6 +149,7 @@ export function dbRowToYMap(r: DbRow): Y.Map<unknown> {
   m.set("owner", r.owner)
   m.set("createdBy", r.createdBy)
   m.set("createdAt", r.createdAt)
+  m.set("followers", r.followers)
   m.set("start", r.start)
   m.set("due", r.due)
   m.set("description", r.description)
@@ -241,6 +247,8 @@ export async function saveDbDoc(id: string, doc: Y.Doc, cred: WorkspaceCredentia
      ON CONFLICT (id) DO UPDATE SET yjs_update = EXCLUDED.yjs_update, updated_at = now()`,
     [id, upd],
   )
+  // "My tasks" index: `doc` now holds the merged state, so its rows are current.
+  await syncTaskIndex(id, rowsFromDbDoc(doc))
 }
 
 /** WIP limits from the doc's pg props (`props.dbWip`, same shape the client persists). */

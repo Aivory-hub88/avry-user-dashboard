@@ -17,7 +17,8 @@ import {
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { syncDescriptionMentions, recordAssignments } from "@/lib/workspaceMentions"
-import { addedAssignees, assigneeMirror, cleanAssignees, cleanOwner, rowAssignees, type PersonRef } from "@/lib/workspaceDbModel"
+import { addFollowers, addedAssignees, assigneeMirror, cleanAssignees, cleanOwner, rowAssignees, rowChanges, type PersonRef } from "@/lib/workspaceDbModel"
+import { recordRowChanges } from "@/lib/workspaceTaskEvents"
 import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
 import { indexRow, removeRowIndex, rowText, workspaceOf } from "@/lib/workspaceIndex"
 
@@ -123,7 +124,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (patch.cells !== undefined) {
       mergedCells = { ...parseDbRow(m).cells, ...cleanCells(patch.cells, await getFieldDefs(id)) }
     }
-    const prevAssignees = parseDbRow(m).assignees
+    const prevRow = parseDbRow(m)
+    const prevAssignees = prevRow.assignees
     doc.transact(() => {
       for (const [k, v] of Object.entries(clean)) m.set(k, v)
       if (mergedCells) m.set("cells", mergedCells)
@@ -135,6 +137,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         m.set("assignee", assigneeMirror(people.assignees))
       }
       if (people.owner !== undefined) m.set("owner", people.owner)
+      // New owner / assignees start following the task.
+      if (people.owner || (Array.isArray(people.assignees) && people.assignees.length > 0)) {
+        const add = [people.owner ?? null, ...(Array.isArray(people.assignees) ? people.assignees : [])]
+        m.set("followers", addFollowers(prevRow.followers, add))
+      }
     }, agentType)
     const actorName = cred.kind === "service" ? agentType.replace(/_/g, " ") : (cred.user.email ?? cred.user.user_id)
     const automated = await runStatusAutomations({
@@ -153,20 +160,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (added.length > 0) {
       await recordAssignments({ docId: id, rowId, credential: cred, agentType, added, title: afterRow.title })
     }
-    await recordWorkspaceActivity({
-      docId: id,
-      credential: cred,
-      agentType,
-      action: "database.row_updated",
-      summary: `Updated task ${rowId}`,
-      targetType: "database-row",
-      targetId: rowId,
-      metadata: {
-        ...clean,
-        ...(people.assignees !== undefined ? { assignee: afterRow.assignee } : {}),
-        ...(people.owner !== undefined ? { owner: afterRow.owner?.kind === "user" ? afterRow.owner.id : null } : {}),
-      },
-    })
+    // Status / due / owner get their own activity entries (+ follower
+    // notices); the generic "updated" entry covers the remaining fields.
+    const changes = rowChanges(prevRow, afterRow)
+    await recordRowChanges({ docId: id, rowId, credential: cred, agentType, title: afterRow.title, followers: afterRow.followers }, changes)
+    const tracked = new Set(["status", "due"])
+    const otherKeys = Object.keys(clean).filter((k) => !tracked.has(k))
+    if (otherKeys.length > 0 || mergedCells || people.assignees !== undefined || (changes.length === 0 && people.owner === undefined)) {
+      await recordWorkspaceActivity({
+        docId: id,
+        credential: cred,
+        agentType,
+        action: "database.row_updated",
+        summary: `Updated task ${rowId}`,
+        targetType: "database-row",
+        targetId: rowId,
+        metadata: {
+          ...clean,
+          ...(people.assignees !== undefined ? { assignee: afterRow.assignee } : {}),
+          ...(people.owner !== undefined ? { owner: afterRow.owner?.kind === "user" ? afterRow.owner.id : null } : {}),
+        },
+      })
+    }
     if (automated.length > 0) {
       await recordWorkspaceActivity({
         docId: id,

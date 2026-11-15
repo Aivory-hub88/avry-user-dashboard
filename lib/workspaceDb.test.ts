@@ -37,6 +37,7 @@ function row(over: Partial<DbRow> = {}): DbRow {
     owner: null,
     createdBy: null,
     createdAt: "",
+    followers: [],
     start: "",
     due: "",
     description: "",

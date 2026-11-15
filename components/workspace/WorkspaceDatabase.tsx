@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
-import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload, LayoutTemplate, Zap } from "lucide-react"
+import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload, LayoutTemplate, Zap, Bell, BellOff } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 import {
   readCells,
@@ -20,6 +20,12 @@ import {
   matchesPeopleFilter,
   cleanPeopleFilter,
   personKey,
+  rowFollowers,
+  addFollowers,
+  removeFollower,
+  hasPerson,
+  cleanComment,
+  type TaskComment,
   type FieldDef,
   type CellValue,
   type AutomationRule,
@@ -27,8 +33,9 @@ import {
 } from "@/lib/workspaceDbModel"
 import { AGENT_ROSTER } from "@/lib/agentRoster"
 import { AvatarStack, PeoplePicker, PersonAvatar, nameOf, namesOf, type TaskAgent, type TaskPerson } from "@/components/workspace/TaskPeople"
+import { CommentComposer, CommentText, TaskActivity } from "@/components/workspace/TaskComments"
 
-type RowComment = { id: string; text: string; author: string; at: string }
+type RowComment = TaskComment
 type Row = {
   id: string
   title: string
@@ -40,6 +47,8 @@ type Row = {
   owner: PersonRef | null
   createdBy: PersonRef | null
   createdAt: string
+  /** Who hears about changes (creator, owner, assignees, commenters, @mentioned). */
+  followers: PersonRef[]
   start: string
   due: string
   description: string
@@ -90,18 +99,22 @@ function toRows(arr: Y.Array<Y.Map<unknown>>): Row[] {
     const rawComments = m.get("comments")
     let comments: RowComment[] = []
     if (Array.isArray(rawComments)) {
-      comments = (rawComments as unknown[]).filter((c): c is RowComment => !!c && typeof c === "object" && typeof (c as RowComment).id === "string" && typeof (c as RowComment).text === "string").slice(0, 100) as RowComment[]
+      comments = (rawComments as unknown[]).map(cleanComment).filter((c): c is RowComment => !!c).slice(0, 100)
     }
+    const assignees = rowAssignees(m.get("assignees"), m.get("assignee"))
+    const owner = cleanOwner(m.get("owner"))
+    const createdBy = cleanPersonRef(m.get("createdBy"))
     return {
       id: (m.get("id") as string) ?? uid(),
       title: (m.get("title") as string) ?? "",
       status: (m.get("status") as string) ?? "Todo",
       priority: (m.get("priority") as Row["priority"]) ?? "Med",
       assignee: (m.get("assignee") as string) ?? "",
-      assignees: rowAssignees(m.get("assignees"), m.get("assignee")),
-      owner: cleanOwner(m.get("owner")),
-      createdBy: cleanPersonRef(m.get("createdBy")),
+      assignees,
+      owner,
+      createdBy,
       createdAt: (m.get("createdAt") as string) ?? "",
+      followers: rowFollowers(m.get("followers"), { createdBy, owner, assignees }),
       unlinked: unlinkedAssignee(m.get("assignees"), m.get("assignee")),
       start: (m.get("start") as string) ?? "",
       due: (m.get("due") as string) ?? "",
@@ -308,60 +321,9 @@ function isOverdue(r: Row): boolean {
   return !!r.due && r.status !== "Done" && r.due < new Date().toISOString().slice(0, 10)
 }
 
-type HistoryItem = {
-  id: string
-  actor_type: string
-  actor_id: string
-  actor_name: string
-  action: string
-  summary: string
-  created_at: string
-}
-
 /** Comment ids are time-based; kept outside the component so render stays pure. */
 function newCommentId(): string {
   return `c-${Date.now().toString(36)}`
-}
-
-/** Per-row history from the workspace activity log (created/moved/commented…). */
-function RowHistory({ docId, rowId }: { docId: string; rowId: string }) {
-  const [items, setItems] = useState<HistoryItem[] | null>(null)
-  useEffect(() => {
-    let alive = true
-    // Reset to the loading state when switching rows; the fetch below fills it.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setItems(null)
-    fetch(`/api/workspace/${docId}/activity?targetType=database-row&targetId=${encodeURIComponent(rowId)}`, {
-      headers: collabAuthHeaders(),
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (alive) setItems(Array.isArray(j?.activities) ? j.activities : [])
-      })
-      .catch(() => {
-        if (alive) setItems([])
-      })
-    return () => {
-      alive = false
-    }
-  }, [docId, rowId])
-  if (items === null || items.length === 0) return null
-  return (
-    <div className="mt-6 border-t border-line pt-4">
-      <div className="text-[11px] uppercase tracking-wider text-white/30">History · {items.length}</div>
-      <div className="mt-2 flex flex-col gap-1.5">
-        {items.slice(0, 10).map((h) => (
-          <div key={h.id} className="rounded-xl bg-white/[0.02] px-3 py-2">
-            <div className="text-[12px] leading-snug text-white/60">{h.summary}</div>
-            <div className="mt-0.5 text-[10px] text-white/25">
-              {h.actor_name || h.actor_id} · {h.action} ·{" "}
-              {new Date(h.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
 }
 
 function StatusPill({ s }: { s: string }) {
@@ -508,7 +470,9 @@ export default function WorkspaceDatabase({
   const [viewsLoaded, setViewsLoaded] = useState(false)
   const [savingView, setSavingView] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [commentDraft, setCommentDraft] = useState("")
+  const [drawerTab, setDrawerTab] = useState<"comments" | "activity">("comments")
+  // Bumped after an event lands so the Activity tab refetches.
+  const [activityTick, setActivityTick] = useState(0)
   const [ready, setReady] = useState(false)
   // Kanban depth: per-column WIP limits (persisted in pg props.dbWip) +
   // inline quick-add with the column's status (the old footer button always
@@ -804,6 +768,7 @@ export default function WorkspaceDatabase({
     })
     doc.transact(() => yRows.push([yMapFromRow(r)]), "user")
     notifyAssigned(r.id, typed)
+    postEvent(r.id, { kind: "created" })
   }
 
   const persistViews = async (next: SavedView[]) => {
@@ -1008,26 +973,51 @@ export default function WorkspaceDatabase({
   const selfRef: PersonRef | null = selfId
     ? cleanPersonRef({ kind: "user", id: selfId, name: people.find((p) => p.id === selfId)?.name ?? "" })
     : null
+  // Is the viewer following the open task (drawer Follow / Unfollow)?
+  const following = selectedRow ? hasPerson(selectedRow.followers, selfKey) : false
 
   /** A new task row: created by + owned by the viewer, nobody assigned yet. */
-  const blankRow = (over: Partial<Row> = {}): Row => ({
-    id: uid(),
-    title: "",
-    status: "Todo",
-    priority: "Med",
-    assignee: "",
-    assignees: [],
-    owner: selfRef,
-    createdBy: selfRef,
-    createdAt: new Date().toISOString(),
-    start: "",
-    due: "",
-    description: "",
-    comments: [],
-    cells: {},
-    unlinked: "",
-    ...over,
-  })
+  const blankRow = (over: Partial<Row> = {}): Row => {
+    const base: Row = {
+      id: uid(),
+      title: "",
+      status: "Todo",
+      priority: "Med",
+      assignee: "",
+      assignees: [],
+      owner: selfRef,
+      createdBy: selfRef,
+      createdAt: new Date().toISOString(),
+      start: "",
+      due: "",
+      description: "",
+      comments: [],
+      cells: {},
+      unlinked: "",
+      followers: [],
+      ...over,
+    }
+    // Creator, owner and assignees follow a new task.
+    return { ...base, followers: addFollowers(base.followers, [base.createdBy, base.owner, ...base.assignees]) }
+  }
+
+  /**
+   * Report a local edit to the server (activity + follower notices). The
+   * server checks the claim against the stored row, so this waits for the
+   * Yjs write (debounced PUT, ~2s) to land first.
+   */
+  const postEvent = (rowId: string, body: Record<string, unknown>) => {
+    if (readOnlyRef.current) return
+    setTimeout(() => {
+      fetch(`/api/workspace/${docId}/database/${encodeURIComponent(rowId)}/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+        body: JSON.stringify(body),
+      })
+        .then(() => setActivityTick((t) => t + 1))
+        .catch(() => {})
+    }, 2500)
+  }
 
   /** Tell newly assigned people/agents (inbox). The Yjs write is the source of truth. */
   const notifyAssigned = (rowId: string, added: PersonRef[]) => {
@@ -1041,13 +1031,20 @@ export default function WorkspaceDatabase({
 
   const setAssignees = (row: Row, next: PersonRef[]) => {
     if (!guard()) return
-    updateRow(row.id, { assignees: next, assignee: assigneeMirror(next) })
+    const added = addedAssignees(row.assignees, next)
+    updateRow(row.id, { assignees: next, assignee: assigneeMirror(next), ...(added.length > 0 ? { followers: addFollowers(row.followers, added) } : {}) })
     notifyAssigned(row.id, addedAssignees(row.assignees, next))
   }
 
   const setOwner = (row: Row, next: PersonRef | null) => {
     if (!guard()) return
-    updateRow(row.id, { owner: next })
+    updateRow(row.id, { owner: next, ...(next ? { followers: addFollowers(row.followers, [next]) } : {}) })
+  }
+
+  const toggleFollow = (row: Row) => {
+    if (!guard() || !selfRef) return
+    const following = hasPerson(row.followers, selfKey)
+    updateRow(row.id, { followers: following ? removeFollower(row.followers, selfRef) : addFollowers(row.followers, [selfRef]) })
   }
 
   const addRow = () => {
@@ -1055,7 +1052,9 @@ export default function WorkspaceDatabase({
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
-    doc.transact(() => yRows.push([yMapFromRow(blankRow())]), agentOrigin())
+    const r = blankRow()
+    doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
+    postEvent(r.id, { kind: "created" })
   }
 
   const quickAddRow = () => {
@@ -1083,6 +1082,7 @@ export default function WorkspaceDatabase({
     const r = blankRow({ title, ...extra })
     doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
     notifyAssigned(r.id, r.assignees)
+    postEvent(r.id, { kind: "created" })
     setQuickTitle("")
     setQuickStatus(null)
     setQuickLane(null)
@@ -1161,10 +1161,17 @@ export default function WorkspaceDatabase({
     if (!yRows || !doc) return
     const idx = toRows(yRows).findIndex((x) => x.id === id)
     if (idx < 0) return
+    const prev = toRows(yRows)[idx]
     const m = yRows.get(idx) as Y.Map<unknown>
     doc.transact(() => {
       for (const [k, v] of Object.entries(patch)) m.set(k, v)
     }, agentOrigin())
+    // Tracked changes → activity + follower notices (server verifies them).
+    if (patch.status !== undefined && patch.status !== prev.status) postEvent(id, { kind: "status", from: prev.status })
+    if (patch.due !== undefined && (patch.due || "") !== (prev.due || "")) postEvent(id, { kind: "due", from: prev.due })
+    if (patch.owner !== undefined && (patch.owner ? personKey(patch.owner) : "") !== (prev.owner ? personKey(prev.owner) : "")) {
+      postEvent(id, { kind: "owner", from: prev.owner })
+    }
   }
 
   const onDropKanban = (e: React.DragEvent, key: string) => {
@@ -1231,12 +1238,23 @@ export default function WorkspaceDatabase({
     updateRow(id, { due: "" })
   }
 
-  const addComment = () => {
-    if (!selectedRow || !commentDraft.trim() || readOnlyRef.current) return
-    const author = (typeof window !== "undefined" ? localStorage.getItem("aivory:userId") || localStorage.getItem("aivory:agentType") || "You" : "You") as string
-    const next = [...selectedRow.comments, { id: newCommentId(), text: commentDraft.trim().slice(0, 500), author, at: new Date().toISOString() }]
-    updateRow(selectedRow.id, { comments: next } as unknown as Partial<Row>)
-    setCommentDraft("")
+  const addComment = (text: string, mentions: PersonRef[]) => {
+    if (!selectedRow || !text.trim() || readOnlyRef.current) return
+    const author = selfRef ? nameOf(selfRef, people) : "You"
+    const comment: RowComment = {
+      id: newCommentId(),
+      text: text.trim().slice(0, 500),
+      author,
+      at: new Date().toISOString(),
+      ...(selfRef ? { authorRef: selfRef } : {}),
+      ...(mentions.length > 0 ? { mentions } : {}),
+    }
+    // Commenting, and being @mentioned, makes you a follower.
+    updateRow(selectedRow.id, {
+      comments: [...selectedRow.comments, comment],
+      followers: addFollowers(selectedRow.followers, [selfRef, ...mentions]),
+    })
+    if (selfRef) postEvent(selectedRow.id, { kind: "comment", commentId: comment.id })
   }
 
   /** Minimal CSV parser (quotes + embedded commas/newlines). Returns rows of cells. */
@@ -2314,7 +2332,26 @@ export default function WorkspaceDatabase({
           <div onClick={(e) => e.stopPropagation()} className="flex h-full w-full max-w-[420px] flex-col border-l border-line bg-[#1a1a18] shadow-2xl">
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <span className="text-[12px] font-medium uppercase tracking-wider text-white/40">Row detail</span>
-              <button onClick={() => setSelectedId(null)} className="rounded-full bg-white/[0.06] px-3 py-1 text-[12px] text-white/60 hover:bg-white/[0.10]">Close</button>
+              <span className="flex items-center gap-1.5">
+                {!readOnly && selfRef && (
+                  <button
+                    type="button"
+                    onClick={() => toggleFollow(selectedRow)}
+                    aria-pressed={following}
+                    title={following ? "You get notified about comments, Done and due date changes" : "Get notified about comments, Done and due date changes"}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] transition-colors ${following ? "bg-white/[0.06] text-white/70 hover:bg-white/[0.10]" : "border border-line text-white/50 hover:text-white/80"}`}
+                  >
+                    {following ? <BellOff className="h-3 w-3" /> : <Bell className="h-3 w-3" />}
+                    {following ? "Unfollow" : "Follow"}
+                  </button>
+                )}
+                {selectedRow.followers.length > 0 && (
+                  <span title={`Followers: ${namesOf(selectedRow.followers, people)}`}>
+                    <AvatarStack list={selectedRow.followers} people={people} size={20} max={3} />
+                  </span>
+                )}
+                <button onClick={() => setSelectedId(null)} className="rounded-full bg-white/[0.06] px-3 py-1 text-[12px] text-white/60 hover:bg-white/[0.10]">Close</button>
+              </span>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               <label className="block text-[11px] uppercase tracking-wider text-white/30">Title</label>
@@ -2459,32 +2496,49 @@ export default function WorkspaceDatabase({
               )}
 
               <div className="mt-6 border-t border-line pt-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] uppercase tracking-wider text-white/30">Comments · {selectedRow.comments.length}</span>
-                  {!readOnly && selectedRow.comments.length > 0 && <span className="text-[11px] text-white/20">Newest last</span>}
+                <div role="tablist" aria-label="Task conversation" className="flex items-center gap-1">
+                  {(["comments", "activity"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      role="tab"
+                      aria-selected={drawerTab === t}
+                      onClick={() => setDrawerTab(t)}
+                      className={`rounded-full px-3 py-1 text-[12px] font-medium transition-colors ${drawerTab === t ? "bg-white/[0.1] text-white" : "text-white/45 hover:text-white/75"}`}
+                    >
+                      {t === "comments" ? `Comments${selectedRow.comments.length ? ` · ${selectedRow.comments.length}` : ""}` : "Activity"}
+                    </button>
+                  ))}
                 </div>
-                <div className="mt-3 flex flex-col gap-2">
-                  {selectedRow.comments.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-white/10 py-6 text-center text-[12px] text-white/30">No comments yet.</div>
-                  ) : (
-                    selectedRow.comments.map((c) => (
-                      <div key={c.id} className="rounded-xl border border-line bg-white/[0.03] px-3 py-2.5">
-                        <div className="flex items-center justify-between text-[11px] text-white/30">
-                          <span className="font-medium text-white/50">{c.author}</span>
-                          <span>{new Date(c.at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
-                        </div>
-                        <div className="mt-1 text-[12px] leading-relaxed text-white/75">{c.text}</div>
-                      </div>
-                    ))
-                  )}
-                </div>
-                {!readOnly && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <input value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addComment() } }} placeholder="Write a comment…" className="flex-1 rounded-full border border-line bg-white/[0.04] px-3 py-2 text-[12px] text-white/80 placeholder:text-white/25 outline-none" />
-                    <button onClick={addComment} disabled={!commentDraft.trim()} className="rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40">Send</button>
+                {drawerTab === "comments" ? (
+                  <>
+                    <div className="mt-3 flex flex-col gap-2">
+                      {selectedRow.comments.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-white/10 py-6 text-center text-[12px] text-white/30">No comments yet.</div>
+                      ) : (
+                        selectedRow.comments.map((c) => (
+                          <div key={c.id} className="rounded-xl border border-line bg-white/[0.03] px-3 py-2.5">
+                            <div className="flex items-center justify-between text-[11px] text-white/30">
+                              <span className="flex items-center gap-1.5 font-medium text-white/50">
+                                {c.authorRef && <PersonAvatar person={c.authorRef} people={people} size={16} />}
+                                {c.authorRef ? nameOf(c.authorRef, people) : c.author}
+                              </span>
+                              <span>{new Date(c.at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                            </div>
+                            <div className="mt-1 text-[12px] leading-relaxed text-white/75">
+                              <CommentText text={c.text} people={people} />
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    {!readOnly && <CommentComposer people={people} agents={agents} onSend={addComment} />}
+                  </>
+                ) : (
+                  <div className="mt-3">
+                    <TaskActivity docId={docId} rowId={selectedRow.id} people={people} refreshKey={activityTick} />
                   </div>
                 )}
-                <RowHistory docId={docId} rowId={selectedRow.id} />
                 {!readOnly && (
                   <button
                     onClick={async () => {
