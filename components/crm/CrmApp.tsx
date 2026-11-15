@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowRightLeft, Clock, Plus, Search, SlidersHorizontal, Sparkles, Upload, X } from "lucide-react"
+import { ArrowRightLeft, ChevronDown, Clock, LayoutGrid, Plus, Search, SlidersHorizontal, Sparkles, Upload, X } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import AgentAccess from "@/components/crm/AgentAccess"
 import ActivityFeed from "@/components/crm/ActivityFeed"
@@ -41,12 +41,31 @@ function readFlag(key: string): boolean {
   }
 }
 
-function writeFlag(key: string) {
+function writeFlag(key: string, on = true) {
   try {
-    window.localStorage.setItem(key, "1")
+    if (on) window.localStorage.setItem(key, "1")
+    else window.localStorage.removeItem(key)
   } catch {
     // Not persisted; the in-memory state still applies for this visit.
   }
+}
+
+function MenuItem({ icon, title, hint, onClick, disabled }: { icon: React.ReactNode; title: string; hint: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/[0.05] disabled:cursor-default disabled:opacity-50 disabled:hover:bg-transparent"
+    >
+      <span className="mt-0.5 text-white/60">{icon}</span>
+      <span className="min-w-0">
+        <span className="block text-[13px] text-white/90">{title}</span>
+        <span className="mt-0.5 block text-[11px] leading-snug text-white/45">{hint}</span>
+      </span>
+    </button>
+  )
 }
 
 function SamplePill() {
@@ -76,6 +95,13 @@ export default function CrmApp() {
   const [checklistHidden, setChecklistHidden] = useState(() => readFlag(CHECKLIST_HIDDEN_KEY))
   const [checklistOpen, setChecklistOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  useEffect(() => {
+    if (!addMenuOpen) return
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setAddMenuOpen(false)
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [addMenuOpen])
   const [sampleBusy, setSampleBusy] = useState<"load" | "remove" | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [q, setQ] = useState("")
@@ -176,6 +202,10 @@ export default function CrmApp() {
     setWelcomeSkipped(true)
     writeFlag(WELCOME_SKIPPED_KEY)
   }
+  const showWelcomeAgain = () => {
+    setWelcomeSkipped(false)
+    writeFlag(WELCOME_SKIPPED_KEY, false)
+  }
   const hideChecklist = () => {
     setChecklistHidden(true)
     setChecklistOpen(false)
@@ -192,6 +222,8 @@ export default function CrmApp() {
     else setTab("deals")
   }
   const addSample = async () => {
+    setAddMenuOpen(false)
+    if (sampleCount > 0) return
     setSampleBusy("load")
     setError(null)
     try {
@@ -243,14 +275,42 @@ export default function CrmApp() {
             </span>
           )}
           {ready && !showWelcome && (
-            <button
-              type="button"
-              onClick={() => setImportOpen(true)}
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] text-white/55 hover:bg-white/[0.06] hover:text-white/85"
-            >
-              <Upload className="h-3.5 w-3.5" />
-              Import
-            </button>
+            <span className="relative">
+              <button
+                type="button"
+                onClick={() => setAddMenuOpen((o) => !o)}
+                aria-expanded={addMenuOpen}
+                aria-haspopup="menu"
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] text-white/55 hover:bg-white/[0.06] hover:text-white/85"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                Import
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </button>
+              {addMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setAddMenuOpen(false)} aria-hidden />
+                  <div role="menu" className="absolute right-0 top-9 z-40 w-[280px] rounded-2xl border border-line bg-surface-1 p-1.5 shadow-2xl">
+                    <MenuItem
+                      icon={<Upload className="h-4 w-4" />}
+                      title="Import from CSV"
+                      hint="Google Contacts, HubSpot, Pipedrive or a spreadsheet"
+                      onClick={() => {
+                        setAddMenuOpen(false)
+                        setImportOpen(true)
+                      }}
+                    />
+                    <MenuItem
+                      icon={<LayoutGrid className="h-4 w-4" />}
+                      title={sampleBusy === "load" ? "Adding sample data…" : "Add sample data"}
+                      hint={sampleCount > 0 ? "Already added. Remove it from the banner first" : "A few companies, people and deals, marked Sample"}
+                      disabled={sampleCount > 0 || sampleBusy !== null}
+                      onClick={() => void addSample()}
+                    />
+                  </div>
+                </>
+              )}
+            </span>
           )}
           <button
           type="button"
@@ -303,6 +363,18 @@ export default function CrmApp() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         {error && <div className="mb-4 rounded-xl bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>}
+        {empty && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white/[0.03] px-4 py-2.5">
+            <span className="min-w-[200px] flex-1 text-[13px] text-white/75">Your CRM is empty. Bring in your contacts, or look around with sample data first.</span>
+            <Button onClick={() => setImportOpen(true)}>Import CSV</Button>
+            <Button onClick={() => void addSample()} disabled={sampleBusy !== null}>
+              {sampleBusy === "load" ? "Adding…" : "Add sample data"}
+            </Button>
+            <button type="button" onClick={showWelcomeAgain} className="text-[12px] text-white/45 underline decoration-white/15 underline-offset-4 hover:text-white/80">
+              Show the welcome screen
+            </button>
+          </div>
+        )}
         {ready && sampleCount > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white/[0.03] px-4 py-2.5">
             <SamplePill />
