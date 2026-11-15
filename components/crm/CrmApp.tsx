@@ -7,11 +7,12 @@
  * in span/div only — the dashboard's global `main h1-h4` / `main p` rules
  * would override Tailwind on UI chrome.
  */
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowRightLeft, ChevronDown, Clock, LayoutGrid, Plus, Search, SlidersHorizontal, Sparkles, Upload, X } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
+import { AddButton, AddNoteLine, useAddForm } from "@/components/crm/AddForm"
 import AgentAccess from "@/components/crm/AgentAccess"
 import ActivityFeed from "@/components/crm/ActivityFeed"
 import CrmWelcome, { SetupChecklist } from "@/components/crm/CrmWelcome"
@@ -159,14 +160,16 @@ export default function CrmApp() {
   const needle = q.trim().toLowerCase()
   const hit = (...parts: (string | null | undefined)[]) => !needle || parts.some((p) => p?.toLowerCase().includes(needle))
 
-  const run = async (fn: () => Promise<unknown>) => {
+  const run = async (fn: () => Promise<unknown>): Promise<boolean> => {
     setError(null)
     try {
       await fn()
-      await load()
     } catch (e) {
       setError((e as Error).message)
+      return false
     }
+    await load()
+    return true
   }
 
   const moveDeal = async (id: string, stage: DealStage) => {
@@ -513,7 +516,7 @@ function DealsTab({
   companyName: Map<string, string>
   nextStep: Map<string, Activity>
   overdue: number
-  onCreate: (b: { title: string; value?: number; company_id?: string; expected_close_date?: string }) => void
+  onCreate: (b: { title: string; value?: number; company_id?: string; expected_close_date?: string }) => Promise<boolean>
   onMove: (id: string, s: DealStage) => void
   onShowActivity: () => void
 }) {
@@ -524,7 +527,9 @@ function DealsTab({
   const [dragId, setDragId] = useState<string | null>(null)
   const [over, setOver] = useState<DealStage | null>(null)
   const parsed = value.trim() === "" ? undefined : Number(value)
-  const invalid = title.trim().length < 2 || (parsed !== undefined && !Number.isInteger(parsed))
+  const form = useAddForm()
+  const titleRef = useRef<HTMLInputElement>(null)
+  const valueRef = useRef<HTMLInputElement>(null)
 
   const summary = pipelineSummary(allDeals)
   const cur = sharedCurrency(allDeals)
@@ -553,17 +558,25 @@ function DealsTab({
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          if (invalid) return
-          onCreate({ title: title.trim(), value: parsed, company_id: companyId || undefined, expected_close_date: close || undefined })
-          setTitle("")
-          setValue("")
-          setCompanyId("")
-          setClose("")
+          const badTitle = title.trim().length < 2
+          const badValue = parsed !== undefined && (!Number.isInteger(parsed) || parsed < 0)
+          void form.submit({
+            problem: badTitle ? "Give the deal a title first." : badValue ? "Value must be a whole number, like 12000." : null,
+            focus: badTitle ? titleRef.current : valueRef.current,
+            create: () => onCreate({ title: title.trim(), value: parsed, company_id: companyId || undefined, expected_close_date: close || undefined }),
+            added: `Added “${title.trim()}” to Lead.`,
+            reset: () => {
+              setTitle("")
+              setValue("")
+              setCompanyId("")
+              setClose("")
+            },
+          })
         }}
         className="flex flex-wrap items-center gap-2"
       >
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="New deal title" aria-label="Deal title" className={`w-[240px] ${fieldClass}`} />
-        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder="Value" inputMode="numeric" aria-label="Deal value" className={`w-[110px] ${fieldClass}`} />
+        <input ref={titleRef} value={title} onChange={(e) => { setTitle(e.target.value); form.clearHint() }} placeholder="New deal title" aria-label="Deal title" className={`w-[240px] ${fieldClass}`} />
+        <input ref={valueRef} value={value} onChange={(e) => { setValue(e.target.value); form.clearHint() }} placeholder="Value" inputMode="numeric" aria-label="Deal value" className={`w-[110px] ${fieldClass}`} />
         <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} aria-label="Company" className={`w-[180px] ${fieldClass}`}>
           <option value="">No company</option>
           {companies.map((c) => (
@@ -573,9 +586,8 @@ function DealsTab({
           ))}
         </select>
         <input type="date" value={close} onChange={(e) => setClose(e.target.value)} aria-label="Expected close date" title="Expected close date" className={`w-[150px] ${fieldClass} [color-scheme:dark]`} />
-        <Button tone="primary" type="submit" disabled={invalid}>
-          <span className="flex items-center gap-1"><Plus size={13} /> Add deal</span>
-        </Button>
+        <AddButton saving={form.saving} label="Add deal" />
+        <AddNoteLine note={form.note} />
       </form>
 
       <div className="overflow-x-auto pb-2">
@@ -729,11 +741,13 @@ function CompaniesTab({
   companies: Company[]
   contacts: Contact[]
   deals: Deal[]
-  onCreate: (b: { name: string; domain?: string; industry?: string }) => void
+  onCreate: (b: { name: string; domain?: string; industry?: string }) => Promise<boolean>
 }) {
   const [name, setName] = useState("")
   const [domain, setDomain] = useState("")
   const [industry, setIndustry] = useState("")
+  const form = useAddForm()
+  const nameRef = useRef<HTMLInputElement>(null)
   const people = useMemo(() => {
     const m = new Map<string, number>()
     for (const c of contacts) if (c.company_id) m.set(c.company_id, (m.get(c.company_id) ?? 0) + 1)
@@ -749,20 +763,25 @@ function CompaniesTab({
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          if (name.trim().length < 2) return
-          onCreate({ name: name.trim(), domain, industry })
-          setName("")
-          setDomain("")
-          setIndustry("")
+          void form.submit({
+            problem: name.trim().length < 2 ? "Enter the company name first." : null,
+            focus: nameRef.current,
+            create: () => onCreate({ name: name.trim(), domain, industry }),
+            added: `Added ${name.trim()}.`,
+            reset: () => {
+              setName("")
+              setDomain("")
+              setIndustry("")
+            },
+          })
         }}
         className="flex flex-wrap items-center gap-2"
       >
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Company name" aria-label="Company name" className={`w-[220px] ${fieldClass}`} />
+        <input ref={nameRef} value={name} onChange={(e) => { setName(e.target.value); form.clearHint() }} placeholder="Company name" aria-label="Company name" className={`w-[220px] ${fieldClass}`} />
         <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="domain.com" aria-label="Domain" className={`w-[180px] ${fieldClass}`} />
         <input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="Industry" aria-label="Industry" className={`w-[160px] ${fieldClass}`} />
-        <Button tone="primary" type="submit" disabled={name.trim().length < 2}>
-          <span className="flex items-center gap-1"><Plus size={13} /> Add company</span>
-        </Button>
+        <AddButton saving={form.saving} label="Add company" />
+        <AddNoteLine note={form.note} />
       </form>
       {companies.length === 0 ? (
         <Empty>No companies yet. Add one above, or let an agent like Lex add them as it qualifies leads.</Empty>
@@ -815,28 +834,40 @@ function ContactsTab({
   contacts: Contact[]
   companies: Company[]
   companyName: Map<string, string>
-  onCreate: (b: { name: string; email?: string; phone?: string; title?: string; company_id?: string }) => void
+  onCreate: (b: { name: string; email?: string; phone?: string; title?: string; company_id?: string }) => Promise<boolean>
 }) {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [title, setTitle] = useState("")
   const [companyId, setCompanyId] = useState("")
+  const form = useAddForm()
+  const nameRef = useRef<HTMLInputElement>(null)
+  const emailRef = useRef<HTMLInputElement>(null)
   return (
     <div className="mx-auto max-w-[1000px] space-y-5">
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault()
-          if (name.trim().length < 2) return
-          onCreate({ name: name.trim(), email, title, company_id: companyId || undefined })
-          setName("")
-          setEmail("")
-          setTitle("")
-          setCompanyId("")
+          const badName = name.trim().length < 2
+          const badEmail = email.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+          void form.submit({
+            problem: badName ? "Enter the contact’s name first." : badEmail ? "That email doesn’t look right." : null,
+            focus: badName ? nameRef.current : emailRef.current,
+            create: () => onCreate({ name: name.trim(), email: email.trim(), title: title.trim(), company_id: companyId || undefined }),
+            added: `Added ${name.trim()}.`,
+            reset: () => {
+              setName("")
+              setEmail("")
+              setTitle("")
+              setCompanyId("")
+            },
+          })
         }}
         className="flex flex-wrap items-center gap-2"
       >
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" aria-label="Full name" className={`w-[180px] ${fieldClass}`} />
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" aria-label="Email" className={`w-[200px] ${fieldClass}`} />
+        <input ref={nameRef} value={name} onChange={(e) => { setName(e.target.value); form.clearHint() }} placeholder="Full name" aria-label="Full name" className={`w-[180px] ${fieldClass}`} />
+        <input ref={emailRef} type="email" value={email} onChange={(e) => { setEmail(e.target.value); form.clearHint() }} placeholder="Email" aria-label="Email" className={`w-[200px] ${fieldClass}`} />
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" aria-label="Title" className={`w-[140px] ${fieldClass}`} />
         <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} aria-label="Company" className={`w-[170px] ${fieldClass}`}>
           <option value="">No company</option>
@@ -846,9 +877,8 @@ function ContactsTab({
             </option>
           ))}
         </select>
-        <Button tone="primary" type="submit" disabled={name.trim().length < 2}>
-          <span className="flex items-center gap-1"><Plus size={13} /> Add contact</span>
-        </Button>
+        <AddButton saving={form.saving} label="Add contact" />
+        <AddNoteLine note={form.note} />
       </form>
       {contacts.length === 0 ? (
         <Empty>No contacts yet.</Empty>
