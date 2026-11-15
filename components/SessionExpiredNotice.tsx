@@ -15,8 +15,34 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SESSION_EXPIRED_EVENT, readSessionEndReason, clearSessionEndReason } from '@/lib/auth'
 import { signInUrlHere } from '@/lib/signIn'
+import { getInitialLocale } from '@/hooks/useLocale'
 
 const AUTO_NAV_SECONDS = 8
+
+// Read straight from the stored locale: the entry gate renders this outside
+// the dashboard shell, and the notice only shows after mount anyway.
+const COPY = {
+  en: {
+    expiredTitle: 'Your session has ended',
+    expiredBody: 'Sign in again to continue. Your chats and data are saved.',
+    expiredCta: 'Sign in again',
+    signInTitle: 'Please sign in',
+    signInBody: 'Sign in to open your dashboard.',
+    signInCta: 'Sign in',
+    later: 'Not now',
+    redirect: (n: number) => `Redirecting in ${n} ${n === 1 ? 'second' : 'seconds'}`,
+  },
+  id: {
+    expiredTitle: 'Sesi Anda telah berakhir',
+    expiredBody: 'Login lagi untuk melanjutkan. Chat dan data Anda tetap tersimpan.',
+    expiredCta: 'Login kembali',
+    signInTitle: 'Silakan login dulu',
+    signInBody: 'Login untuk membuka dashboard Anda.',
+    signInCta: 'Login',
+    later: 'Nanti saja',
+    redirect: (n: number) => `Mengalihkan dalam ${n} detik`,
+  },
+} as const
 
 /** Landing /login with `?next=` back to this page (lib/signIn). */
 function loginUrl(): string {
@@ -62,6 +88,7 @@ export default function SessionExpiredNotice({ autoNavigate = false }: { autoNav
   }, [visible, autoNavigate, goLogin])
 
   if (!visible) return null
+  const t = COPY[getInitialLocale()]
 
   return (
     <div
@@ -82,23 +109,21 @@ export default function SessionExpiredNotice({ autoNavigate = false }: { autoNav
           </svg>
         </div>
         <h2 id="session-expired-title" className="mt-5 text-[17px] font-semibold tracking-[-0.01em] text-white">
-          {expired ? 'Sesi Anda telah berakhir' : 'Silakan login dulu'}
+          {expired ? t.expiredTitle : t.signInTitle}
         </h2>
         <p id="session-expired-body" className="mx-auto mt-2 max-w-[280px] text-[13.5px] leading-relaxed text-white/50">
-          {expired
-            ? 'Login lagi untuk melanjutkan. Chat dan data Anda tetap tersimpan.'
-            : 'Login untuk membuka dashboard Anda.'}
+          {expired ? t.expiredBody : t.signInBody}
         </p>
         <button
           type="button"
           onClick={goLogin}
           className="mt-6 w-full rounded-full bg-white py-2.5 text-[14px] font-semibold text-black transition-[background-color,transform] duration-150 hover:bg-white/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#151517]"
         >
-          {expired ? 'Login kembali' : 'Login'}
+          {expired ? t.expiredCta : t.signInCta}
         </button>
         {autoNavigate ? (
           <div className="mt-4 text-[12px] text-white/35" aria-live="polite">
-            Mengalihkan dalam {countdown} detik
+            {t.redirect(countdown)}
           </div>
         ) : (
           <button
@@ -106,7 +131,7 @@ export default function SessionExpiredNotice({ autoNavigate = false }: { autoNav
             onClick={() => setVisible(false)}
             className="mt-2 w-full rounded-full py-2.5 text-[13px] font-medium text-white/45 transition-colors hover:bg-white/[0.04] hover:text-white/75"
           >
-            Nanti saja
+            {t.later}
           </button>
         )}
       </div>

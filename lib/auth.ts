@@ -98,6 +98,9 @@ function clearLocalCaches() {
     const key = localStorage.key(i);
     if (!key || !key.startsWith("aivory_")) continue;
     if (key === "aivory_chat_sessions" || key.startsWith("aivory_chat_sessions__u_")) continue;
+    // The language choice is a device preference, not account data: keeping it
+    // means the session-expired notice and the next login stay in that language.
+    if (key === "aivory_locale") continue;
     keysToRemove.push(key);
   }
   keysToRemove.forEach((key) => localStorage.removeItem(key));
