@@ -14,12 +14,13 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SESSION_EXPIRED_EVENT, readSessionEndReason, clearSessionEndReason } from '@/lib/auth'
-import { getMarketingUrl } from '@/lib/config'
+import { signInUrlHere } from '@/lib/signIn'
 
 const AUTO_NAV_SECONDS = 8
 
+/** Landing /login with `?next=` back to this page (lib/signIn). */
 function loginUrl(): string {
-  return `${getMarketingUrl()}/login`
+  return signInUrlHere()
 }
 
 export default function SessionExpiredNotice({ autoNavigate = false }: { autoNavigate?: boolean }) {

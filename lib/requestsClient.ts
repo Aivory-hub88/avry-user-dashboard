@@ -5,7 +5,7 @@
  * Uploads go browser → R2 directly: presign, PUT with the signed
  * Content-Type, then /complete so the server verifies size and type.
  */
-import { collabAuthHeaders } from "@/lib/collabClient"
+import { authedFetch } from "@/lib/deployAuth"
 import type { ProjectRequest, ReviewDecision } from "@/lib/projectRequests"
 import type { WorkspaceFile } from "@/lib/workspaceFiles"
 import { ALLOWED_MIME, MAX_FILE_BYTES } from "@/lib/workspaceFiles"
@@ -21,11 +21,9 @@ export class ApiError extends Error {
 }
 
 async function api<T>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
-  const headers: Record<string, string> = { ...collabAuthHeaders() }
-  if (init?.json !== undefined) headers["Content-Type"] = "application/json"
-  const r = await fetch(path, {
+  // authedFetch refreshes an expired token once, and opens the session-expired notice when it can't.
+  const r = await authedFetch(path, {
     ...init,
-    headers: { ...headers, ...(init?.headers as Record<string, string> | undefined) },
     body: init?.json !== undefined ? JSON.stringify(init.json) : init?.body,
   })
   const j = (await r.json().catch(() => ({}))) as Record<string, unknown>

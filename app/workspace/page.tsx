@@ -13,7 +13,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { CalendarRange, ChevronRight, CircleHelp, Plus, Users } from "lucide-react"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
-import { collabAuthHeaders } from "@/lib/collabClient"
+import { authedFetch } from "@/lib/deployAuth"
 import { agentDisplayName } from "@/lib/spaceAgent"
 import { displayBody, personName } from "@/lib/roomChat"
 import { useSettingsModal } from "@/contexts/SettingsModalContext"
@@ -66,7 +66,7 @@ export default function WorkspaceHome() {
   const load = useCallback(async () => {
     try {
       const [roomsRes, t, m] = await Promise.all([
-        fetch("/api/workspace/rooms", { headers: collabAuthHeaders(), cache: "no-store" }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))),
+        authedFetch("/api/workspace/rooms", { cache: "no-store" }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))),
         teamsApi.list(),
         requestsApi.list("mine"),
       ])

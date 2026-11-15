@@ -2,7 +2,7 @@
 
 /** Browser helpers for the CRM. Everything goes through /api/crm (see the proxy route). */
 import { BASE_PATH } from "@/lib/asset"
-import { collabAuthHeaders } from "@/lib/collabClient"
+import { authedFetch } from "@/lib/deployAuth"
 import type { ActivityKind, SubjectType } from "@/lib/crmActivity"
 import { collectPages, NEXT_CURSOR_HEADER, pageQuery } from "@/lib/crmPaging"
 import { companyBody, contactBody, dealBody, type CompanyChanges, type ContactChanges, type DealChanges } from "@/lib/crmPipeline"
@@ -85,9 +85,9 @@ function listAll<T>(path: string, filters?: URLSearchParams): Promise<T[]> {
 }
 
 async function call<T>(path: string, init?: { method?: string; json?: unknown }): Promise<{ data: T; next: string | null }> {
-  const r = await fetch(`${BASE_PATH}/api/crm/${path}`, {
+  // authedFetch refreshes an expired token once, and opens the session-expired notice when it can't.
+  const r = await authedFetch(`${BASE_PATH}/api/crm/${path}`, {
     method: init?.method ?? "GET",
-    headers: { ...collabAuthHeaders(), ...(init?.json !== undefined ? { "Content-Type": "application/json" } : {}) },
     body: init?.json !== undefined ? JSON.stringify(init.json) : undefined,
   })
   const text = await r.text()
