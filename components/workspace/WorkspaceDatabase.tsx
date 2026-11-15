@@ -34,6 +34,28 @@ import {
   descendantIds,
   blocking,
   MAX_BLOCKED_BY,
+  DEFAULT_STATUSES,
+  STATUS_GROUPS,
+  STATUS_GROUP_LABEL,
+  MAX_STATUSES,
+  MAX_STATUS_NAME,
+  parseStatusDefs,
+  statusGroup,
+  isClosedStatus,
+  isDoneStatus,
+  firstStatusOf,
+  defaultStatus,
+  entersInProgress,
+  cleanStatusName,
+  renameStatusRefs,
+  deleteStatusRefs,
+  resolveStatus,
+  sortStatusDefs,
+  statusDefsProblem,
+  type StatusDefsProblem,
+  type StatusRefProps,
+  type StatusDef,
+  type StatusGroup,
   type TaskComment,
   type FieldDef,
   type CellValue,
@@ -43,6 +65,7 @@ import {
 import { AGENT_ROSTER } from "@/lib/agentRoster"
 import { AvatarStack, PeoplePicker, PersonAvatar, nameOf, namesOf, type TaskAgent, type TaskPerson } from "@/components/workspace/TaskPeople"
 import { CommentComposer, CommentText, TaskActivity } from "@/components/workspace/TaskComments"
+import { TaskStatuses } from "@/components/workspace/TaskStatuses"
 import { TaskRowPicker } from "@/components/workspace/TaskRowPicker"
 
 type RowComment = TaskComment
@@ -72,7 +95,6 @@ type Row = {
   unlinked: string
 }
 
-const STATUSES = ["Todo", "Doing", "Done"] as const
 const PRIORITIES = ["Low", "Med", "High"] as const
 
 /** Person ref for a board column / lane / filter key (`user:<id>` / `agent:<type>`). */
@@ -85,10 +107,22 @@ function refFromKey(key: string, people: TaskPerson[]): PersonRef | null {
   return null
 }
 
-const STATUS_DOT: Record<string, string> = {
-  Todo: "bg-white/40",
-  Doing: "bg-amber-400",
-  Done: "bg-emerald-400",
+/** Statuses are colored by their group (rename keeps the color, regroup recolors). */
+const GROUP_STYLE: Record<StatusGroup, { dot: string; pill: string; hex: string }> = {
+  todo: { dot: "bg-white/40", pill: "bg-white/[0.06] text-white/50 border-white/10", hex: "#6b7280" },
+  in_progress: { dot: "bg-amber-400", pill: "bg-amber-500/10 text-amber-300 border-amber-500/20", hex: "#f59e0b" },
+  done: { dot: "bg-emerald-400", pill: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20", hex: "#10b981" },
+  canceled: { dot: "bg-red-400/60", pill: "bg-red-500/[0.06] text-red-300/70 border-red-500/15", hex: "#b45454" },
+}
+
+const STATUS_PROBLEM_TEXT: Record<StatusDefsProblem, string> = {
+  shape: "Couldn't read the status list.",
+  empty_name: "A status needs a name.",
+  duplicate: "Two statuses can't share a name.",
+  bad_group: "Pick a group for every status.",
+  too_many: `A room can have up to 12 statuses.`,
+  no_todo: "Keep at least one status in To do.",
+  no_done: "Keep at least one status in Done.",
 }
 
 function uid() {
@@ -334,8 +368,8 @@ function PriorityPill({ p }: { p: Row["priority"] }) {  const cls =
   return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>{p}</span>
 }
 
-function isOverdue(r: Row): boolean {
-  return !!r.due && r.status !== "Done" && r.due < new Date().toISOString().slice(0, 10)
+function isOverdue(r: Row, statuses: readonly StatusDef[]): boolean {
+  return !!r.due && !isClosedStatus(statuses, r.status) && r.due < new Date().toISOString().slice(0, 10)
 }
 
 /** Comment ids are time-based; kept outside the component so render stays pure. */
@@ -343,42 +377,38 @@ function newCommentId(): string {
   return `c-${Date.now().toString(36)}`
 }
 
-function StatusPill({ s }: { s: string }) {
-  const cls =
-    s === "Doing"
-      ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
-      : s === "Done"
-        ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
-        : "bg-white/[0.06] text-white/50 border-white/10"
+function StatusPill({ s, statuses }: { s: string; statuses: readonly StatusDef[] }) {
+  const style = GROUP_STYLE[statusGroup(statuses, s)]
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${cls}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[s] ?? "bg-white/40"}`} />
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${style.pill}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
       {s}
     </span>
   )
 }
 
-function DonutByStatus({ rows }: { rows: Row[] }) {
+/** One segment per status group (a room may have a dozen statuses; groups stay readable). */
+function DonutByStatus({ rows, statuses }: { rows: Row[]; statuses: readonly StatusDef[] }) {
   const total = rows.length || 1
-  const counts: Record<string, number> = { Todo: 0, Doing: 0, Done: 0 }
-  for (const r of rows) counts[r.status] = (counts[r.status] ?? 0) + 1
-  const segments = [
-    { label: "Todo", value: counts.Todo, color: "#6b7280" },
-    { label: "Doing", value: counts.Doing, color: "#f59e0b" },
-    { label: "Done", value: counts.Done, color: "#10b981" },
-  ]
-  let acc = 0
+  const counts: Record<StatusGroup, number> = { todo: 0, in_progress: 0, done: 0, canceled: 0 }
+  for (const r of rows) counts[statusGroup(statuses, r.status)]++
+  const segments = STATUS_GROUPS.filter((g) => g !== "canceled" || counts.canceled > 0).map((g) => ({
+    label: STATUS_GROUP_LABEL[g],
+    value: counts[g],
+    color: GROUP_STYLE[g].hex,
+  }))
   const r = 32
   const C = 2 * Math.PI * r
+  // Each segment starts where the previous ones end (computed before render).
+  const starts = segments.map((_, i) => segments.slice(0, i).reduce((sum, x) => sum + x.value / total, 0))
   return (
     <div className="flex items-center gap-4">
       <svg width={88} height={88} viewBox="0 0 88 88" className="shrink-0">
         <circle cx={44} cy={44} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={12} />
-        {segments.map((s) => {
+        {segments.map((s, i) => {
           const len = total ? (s.value / total) * C : 0
           const dash = `${len} ${C - len}`
-          const offset = -acc * C
-          acc += s.value / total
+          const offset = -starts[i] * C
           return <circle key={s.label} cx={44} cy={44} r={r} fill="none" stroke={s.color} strokeWidth={12} strokeDasharray={dash} strokeDashoffset={offset} strokeLinecap="round" transform="rotate(-90 44 44)" opacity={s.value ? 1 : 0.15} />
         })}
         <text x={44} y={44} textAnchor="middle" dy="0.35em" fontSize={14} fontWeight={700} fill="rgba(255,255,255,0.85)">{rows.length}</text>
@@ -543,11 +573,25 @@ export default function WorkspaceDatabase({
   const [showAutomations, setShowAutomations] = useState(false)
   const [newRuleName, setNewRuleName] = useState("")
   const [newRuleWhen, setNewRuleWhen] = useState("Done")
+  // Custom statuses (P2): the room's list in pg props.dbStatuses, each in a
+  // fixed group. Rows store the name; logic asks the group.
+  const [statuses, setStatuses] = useState<StatusDef[]>(() => DEFAULT_STATUSES.map((d) => ({ ...d })))
+  const statusNames = statuses.map((d) => d.name)
+  const groupOf = (name: string): StatusGroup => statusGroup(statuses, name)
+  const dotOf = (name: string): string => GROUP_STYLE[groupOf(name)].dot
+  /** A template's / import's status in this room (unknown → where new tasks start). */
+  const toRoomStatus = (name: string): string => resolveStatus(statuses, name) ?? defaultStatus(statuses)
+
+  const [showStatuses, setShowStatuses] = useState(false)
+  // Trigger picker: falls back to the first done status if the chosen one was renamed away.
+  const ruleWhen = statusNames.includes(newRuleWhen) ? newRuleWhen : (firstStatusOf(statuses, "done") ?? statusNames[0] ?? "")
   const [newRuleAssignee, setNewRuleAssignee] = useState("")
   const [newRuleComment, setNewRuleComment] = useState("")
   const [newRuleMoveTo, setNewRuleMoveTo] = useState("")
   // Target-doc rows for relation pickers (cached per doc; read-gated server-side).
   const [targetRows, setTargetRows] = useState<Record<string, Row[]>>({})
+  // …and their rooms' statuses (donePct counts the TARGET room's done group).
+  const [targetStatuses, setTargetStatuses] = useState<Record<string, StatusDef[]>>({})
   const targetLoading = useRef<Set<string>>(new Set())
 
   const ensureTargetRows = (targetDocId: string | undefined) => {
@@ -557,6 +601,7 @@ export default function WorkspaceDatabase({
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         if (Array.isArray(j?.rows)) setTargetRows((prev) => ({ ...prev, [targetDocId]: j.rows as Row[] }))
+        if (Array.isArray(j?.statuses)) setTargetStatuses((prev) => ({ ...prev, [targetDocId]: parseStatusDefs(j.statuses) }))
       })
       .catch(() => {})
       .finally(() => {
@@ -589,7 +634,12 @@ export default function WorkspaceDatabase({
 
   const displayRows: Row[] = useMemo(() => {
     if (fields.every((f) => f.type !== "rollup")) return peopleRows
-    const computed = computeRollups(peopleRows, fields, (id) => targetRows[id] ?? null)
+    const computed = computeRollups(
+      peopleRows,
+      fields,
+      (id) => targetRows[id] ?? null,
+      (id) => targetStatuses[id] ?? DEFAULT_STATUSES,
+    )
     if (Object.keys(computed).length === 0) return peopleRows
     // Nulls (unreadable links) are omitted — the cell renders as empty.
     return peopleRows.map((r) => {
@@ -602,7 +652,7 @@ export default function WorkspaceDatabase({
       }
       return { ...r, cells }
     })
-  }, [peopleRows, fields, targetRows])
+  }, [peopleRows, fields, targetRows, targetStatuses])
 
   // Drawer row resolves against display rows (local rollups included); all
   // edits address stored state by stable id via updateRow/updateCell.
@@ -654,7 +704,9 @@ export default function WorkspaceDatabase({
             .slice(0, 20)
           setFields(cleanedFields)
         }
-        setAutomations(parseAutomationRules(props?.dbAutomations))
+        const roomStatuses = parseStatusDefs(props?.dbStatuses)
+        setStatuses(roomStatuses)
+        setAutomations(parseAutomationRules(props?.dbAutomations, roomStatuses))
         setViewsLoaded(true)
       })
       .catch(() => { if (alive) setViewsLoaded(true) })
@@ -686,13 +738,13 @@ export default function WorkspaceDatabase({
   const addAutomation = () => {
     if (readOnlyRef.current || automations.length >= 20) return
     const name = newRuleName.trim().slice(0, 40)
-    if (!name || !["Todo", "Doing", "Done"].includes(newRuleWhen)) return
-    const rule: AutomationRule = { id: `auto-${uid()}`, name, whenStatus: newRuleWhen }
+    if (!name || !statusNames.includes(ruleWhen)) return
+    const rule: AutomationRule = { id: `auto-${uid()}`, name, whenStatus: ruleWhen }
     const assignee = newRuleAssignee.trim().slice(0, 100)
     if (assignee) rule.setAssignee = assignee
     const comment = newRuleComment.trim().slice(0, 500)
     if (comment) rule.addComment = comment
-    if (newRuleMoveTo && ["Todo", "Doing", "Done"].includes(newRuleMoveTo) && newRuleMoveTo !== newRuleWhen) {
+    if (newRuleMoveTo && statusNames.includes(newRuleMoveTo) && newRuleMoveTo !== ruleWhen) {
       rule.moveTo = newRuleMoveTo
     }
     if (rule.setAssignee === undefined && rule.addComment === undefined && rule.moveTo === undefined) return
@@ -781,7 +833,7 @@ export default function WorkspaceDatabase({
     const typed = rowAssignees(undefined, tpl.assignee)
     const r = blankRow({
       title: tpl.title,
-      status: tpl.status,
+      status: toRoomStatus(tpl.status),
       priority: tpl.priority,
       assignees: typed,
       assignee: typed.length > 0 ? assigneeMirror(typed) : tpl.assignee,
@@ -814,6 +866,111 @@ export default function WorkspaceDatabase({
         body: JSON.stringify({ props: { dbWip: next } }),
       })
     } catch {}
+  }
+
+  /** Status options for a select: the room's, plus the row's own if the room no longer lists it. */
+  const statusOptions = (current: string): string[] =>
+    current && !statusNames.includes(current) ? [...statusNames, current] : statusNames
+
+  /**
+   * Save the room's statuses plus the follow-up keys a rename / delete
+   * touched (WIP, automations, views, templates) in ONE props patch.
+   * Returns an error message, or null when it was accepted.
+   */
+  const saveStatuses = async (next: StatusDef[], extra: StatusRefProps = {}): Promise<string | null> => {
+    const why = statusDefsProblem(next)
+    if (why) return STATUS_PROBLEM_TEXT[why]
+    setStatuses(sortStatusDefs(next))
+    if (extra.dbWip) setWip(extra.dbWip)
+    if (extra.dbAutomations) setAutomations(extra.dbAutomations)
+    if (extra.dbViews) setSavedViews(extra.dbViews as SavedView[])
+    if (extra.dbTemplates) setTemplates(extra.dbTemplates as DbTemplate[])
+    try {
+      const res = await fetch(`/api/workspace/${docId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
+        body: JSON.stringify({ props: { dbStatuses: next, ...extra } }),
+      })
+      if (!res.ok) return "Couldn't save statuses — reload and try again."
+    } catch {
+      return "Couldn't save statuses — check your connection."
+    }
+    return null
+  }
+
+  /** Rows in status `from` move to `to` (Yjs, one transaction). Returns how many moved. */
+  const moveRowsStatus = (from: string, to: string): number => {
+    const yRows = yRowsRef.current
+    const doc = docRef.current
+    if (!yRows || !doc) return 0
+    let n = 0
+    doc.transact(() => {
+      for (const m of yRows.toArray()) {
+        if ((m.get("status") as string) === from) {
+          m.set("status", to)
+          n++
+        }
+      }
+    }, agentOrigin())
+    return n
+  }
+
+  const statusRefProps = (): StatusRefProps => ({ dbWip: wip, dbAutomations: automations, dbViews: savedViews, dbTemplates: templates })
+
+  const renameStatus = async (from: string, raw: string): Promise<string | null> => {
+    if (readOnlyRef.current) return null
+    const to = cleanStatusName(raw)
+    if (!to || to === from) return null
+    if (statuses.some((d) => d.name !== from && d.name.toLowerCase() === to.toLowerCase())) return `“${to}” already exists.`
+    const next = statuses.map((d) => (d.name === from ? { ...d, name: to } : d))
+    const err = await saveStatuses(next, renameStatusRefs(statusRefProps(), from, to))
+    if (err) return err
+    moveRowsStatus(from, to)
+    if (statusFilter === from) setStatusFilter(to)
+    if (newRuleWhen === from) setNewRuleWhen(to)
+    if (newRuleMoveTo === from) setNewRuleMoveTo(to)
+    return null
+  }
+
+  const regroupStatus = (name: string, group: StatusGroup): Promise<string | null> => {
+    if (readOnlyRef.current) return Promise.resolve(null)
+    // Lands at the end of its new group.
+    const rest = statuses.filter((d) => d.name !== name)
+    return saveStatuses([...rest, { name, group }])
+  }
+
+  /** Swap with the neighbour in the same group (dir -1 = up, 1 = down). */
+  const nudgeStatus = (name: string, dir: -1 | 1) => {
+    if (readOnlyRef.current) return
+    const i = statuses.findIndex((d) => d.name === name)
+    const j = i + dir
+    if (i < 0 || j < 0 || j >= statuses.length || statuses[j].group !== statuses[i].group) return
+    const next = [...statuses]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    void saveStatuses(next)
+  }
+
+  const addStatus = async (raw: string, group: StatusGroup): Promise<string | null> => {
+    if (readOnlyRef.current) return null
+    const name = cleanStatusName(raw)
+    if (!name) return null
+    if (statuses.length >= MAX_STATUSES) return `A room can have up to ${MAX_STATUSES} statuses.`
+    if (statuses.some((d) => d.name.toLowerCase() === name.toLowerCase())) return `“${name}” already exists.`
+    return saveStatuses([...statuses, { name, group }])
+  }
+
+  const deleteStatus = async (name: string, moveTo: string): Promise<string | null> => {
+    if (readOnlyRef.current) return null
+    if (!statusNames.includes(moveTo) || moveTo === name) return "Pick where its tasks go."
+    const next = statuses.filter((d) => d.name !== name)
+    const err = await saveStatuses(next, deleteStatusRefs(statusRefProps(), name, moveTo))
+    if (err) return err
+    const moved = moveRowsStatus(name, moveTo)
+    if (statusFilter === name) setStatusFilter("All")
+    if (newRuleWhen === name) setNewRuleWhen(moveTo)
+    if (newRuleMoveTo === name) setNewRuleMoveTo("")
+    if (moved > 0) setNotice(`Deleted “${name}” — moved ${moved} task${moved === 1 ? "" : "s"} to ${moveTo}.`)
+    return null
   }
 
   const editWipLimit = (status: string) => {
@@ -1004,7 +1161,7 @@ export default function WorkspaceDatabase({
     const base: Row = {
       id: uid(),
       title: "",
-      status: "Todo",
+      status: defaultStatus(statuses),
       priority: "Med",
       assignee: "",
       assignees: [],
@@ -1102,8 +1259,8 @@ export default function WorkspaceDatabase({
             ...(laneBy === "priority" && quickLane !== null ? { priority: quickLane as Row["priority"] } : {}),
           }
         : groupBy === "assignee"
-          ? { status: "Todo", ...assignTo(quickStatus) }
-          : { status: "Todo", priority: quickStatus as Row["priority"] }
+          ? { status: defaultStatus(statuses), ...assignTo(quickStatus) }
+          : { status: defaultStatus(statuses), priority: quickStatus as Row["priority"] }
     const r = blankRow({ title, ...extra })
     doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
     notifyAssigned(r.id, r.assignees)
@@ -1153,7 +1310,11 @@ export default function WorkspaceDatabase({
   const boardColumns = (): Array<{ key: string; label: string }> => {
     if (groupBy === "assignee") return personGroups(displayRows)
     if (groupBy === "priority") return [...PRIORITIES].reverse().map((p) => ({ key: p, label: `${p} priority` }))
-    return STATUSES.map((s) => ({ key: s, label: s }))
+    // Rows can carry a name the room no longer lists (renamed in another
+    // tab, or written by an old client): give them a column instead of
+    // hiding the cards.
+    const extra = [...new Set(displayRows.map((r) => r.status))].filter((n) => n && !statusNames.includes(n))
+    return [...statusNames, ...extra].map((s) => ({ key: s, label: s }))
   }
 
   /** Move a card between person columns: swap the source person for the target. */
@@ -1223,12 +1384,12 @@ export default function WorkspaceDatabase({
     doc.transact(() => {
       for (const [k, v] of Object.entries(patch)) m.set(k, v)
     }, agentOrigin())
-    // Moving a blocked task into Doing is allowed; say what it still waits on.
-    if (patch.status === "Doing" && prev.status !== "Doing") {
-      const waiting = openBlockers(toRows(yRows), prev)
+    // Moving a blocked task into an in-progress status is allowed; say what it still waits on.
+    if (patch.status !== undefined && entersInProgress(statuses, prev.status, patch.status)) {
+      const waiting = openBlockers(toRows(yRows), prev, statuses)
       if (waiting.length > 0) {
         const what = waiting.length === 1 ? `“${waiting[0].title || "Untitled"}”` : `${waiting.length} open tasks`
-        setNotice(`“${prev.title || "Untitled"}” is still blocked by ${what} — moved to Doing anyway.`)
+        setNotice(`“${prev.title || "Untitled"}” is still blocked by ${what} — moved to ${patch.status} anyway.`)
       }
     }
     // Tracked changes → activity + follower notices (server verifies them).
@@ -1460,7 +1621,7 @@ export default function WorkspaceDatabase({
             headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
             body: JSON.stringify({
               title: title.slice(0, 200) || "Untitled",
-              status: at("status") || "Todo",
+              status: toRoomStatus(at("status")),
               priority: ["Low", "Med", "High"].includes(at("priority")) ? at("priority") : "Med",
               ...csvAssignee(at("assignee")),
               start: at("start").slice(0, 20),
@@ -1486,17 +1647,18 @@ export default function WorkspaceDatabase({
     const prioOk = priorityFilter === "All" || r.priority === priorityFilter
     const needle = q.trim().toLowerCase()
     const searchOk = !needle || r.title.toLowerCase().includes(needle) || r.assignee.toLowerCase().includes(needle) || r.id.toLowerCase().includes(needle)
-    const dueOk = dueFilter === "All" || matchesDueFilter(r.due, r.status, dueFilter, new Date().toISOString().slice(0, 10))
+    const dueOk = dueFilter === "All" || matchesDueFilter(r.due, r.status, dueFilter, new Date().toISOString().slice(0, 10), statuses)
     const peopleOk = matchesPeopleFilter(r, peopleFilter, selfKey)
     return statusOk && prioOk && searchOk && dueOk && peopleOk
   })
 
   const priorityRank: Record<string, number> = { High: 3, Med: 2, Low: 1 }
-  const statusRank: Record<string, number> = { Todo: 0, Doing: 1, Done: 2 }
+  // Sort by the room's status order (grouped: to do → in progress → done → canceled).
+  const statusRank: Record<string, number> = Object.fromEntries(statusNames.map((n, i) => [n, i]))
   const filtered = [...baseFiltered].sort((a, b) => {
     const dir = sortDir === "asc" ? 1 : -1
     if (sortField === "priority") return (priorityRank[a.priority] - priorityRank[b.priority]) * dir
-    if (sortField === "status") return (statusRank[a.status] - statusRank[b.status]) * dir
+    if (sortField === "status") return ((statusRank[a.status] ?? 99) - (statusRank[b.status] ?? 99)) * dir
     if (sortField === "start") return ((a.start || "") < (b.start || "") ? -1 : (a.start || "") > (b.start || "") ? 1 : 0) * dir
     if (sortField === "due") return ((a.due || "") < (b.due || "") ? -1 : (a.due || "") > (b.due || "") ? 1 : 0) * dir
     if (sortField === "assignee") return a.assignee.localeCompare(b.assignee) * dir
@@ -1526,7 +1688,9 @@ export default function WorkspaceDatabase({
   // Drawer structure (the open task's parent, sub-tasks, and who waits on it).
   const drawerParent = selectedRow ? parentOf(selectedRow) : null
   const drawerKids = selectedRow ? childrenOf(selectedRow.id) : []
-  const drawerProgress = selectedRow ? subtaskProgress(displayRows, selectedRow.id) : { done: 0, total: 0 }
+  const statusCounts: Record<string, number> = {}
+  for (const r of rows) statusCounts[r.status] = (statusCounts[r.status] ?? 0) + 1
+  const drawerProgress = selectedRow ? subtaskProgress(displayRows, selectedRow.id, statuses) : { done: 0, total: 0 }
   const drawerBlocking = selectedRow ? blocking(displayRows, selectedRow.id) : []
   const subDraftText = selectedRow && subDraft.parentId === selectedRow.id ? subDraft.text : ""
   const pendingTarget = pendingDelete ? rowById.get(pendingDelete) ?? null : null
@@ -1594,7 +1758,7 @@ export default function WorkspaceDatabase({
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-line bg-white/[0.025] p-4">
             <div className="mb-3 text-[11px] font-medium uppercase tracking-wider text-white/30">By status</div>
-            <DonutByStatus rows={rows} />
+            <DonutByStatus rows={rows} statuses={statuses} />
           </div>
           <div className="rounded-2xl border border-line bg-white/[0.025] p-4">
             <div className="mb-3 text-[11px] font-medium uppercase tracking-wider text-white/30">By priority</div>
@@ -1646,7 +1810,7 @@ export default function WorkspaceDatabase({
                 className="bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none"
               >
                 <option value="All">All status</option>
-                {STATUSES.map((s) => (
+                {statusNames.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
@@ -1745,6 +1909,13 @@ export default function WorkspaceDatabase({
             {!readOnly && (
               <>
                 <button
+                  onClick={() => setShowStatuses((v) => !v)}
+                  title="Manage statuses: names, groups and order"
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-[12.5px] font-medium ${showStatuses ? "border-white bg-white text-black" : "border-line bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white"}`}
+                >
+                  Statuses · {statuses.length}
+                </button>
+                <button
                   onClick={() => setShowFields((v) => !v)}
                   title="Manage custom fields"
                   className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-[12.5px] font-medium ${showFields ? "border-white bg-white text-black" : "border-line bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white"}`}
@@ -1791,6 +1962,23 @@ export default function WorkspaceDatabase({
           </div>
         </div>
       </div>
+
+      {showStatuses && !readOnly && (
+        <div className="mb-4 rounded-2xl border border-line bg-white/[0.025] p-4">
+          <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/30">
+            Statuses · {statuses.length}/{MAX_STATUSES}
+          </div>
+          <TaskStatuses
+            statuses={statuses}
+            counts={statusCounts}
+            onRename={renameStatus}
+            onRegroup={regroupStatus}
+            onNudge={nudgeStatus}
+            onAdd={addStatus}
+            onDelete={deleteStatus}
+          />
+        </div>
+      )}
 
       {showFields && !readOnly && (
         <div className="mb-4 rounded-2xl border border-line bg-white/[0.025] p-4">
@@ -1934,8 +2122,8 @@ export default function WorkspaceDatabase({
               className="w-[160px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none"
             />
             <span className="text-[12px] text-white/30">when entering</span>
-            <select value={newRuleWhen} onChange={(e) => setNewRuleWhen(e.target.value)} className="rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70 outline-none">
-              {STATUSES.map((s) => (
+            <select value={ruleWhen} onChange={(e) => setNewRuleWhen(e.target.value)} className="rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70 outline-none">
+              {statusNames.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
@@ -1975,7 +2163,7 @@ export default function WorkspaceDatabase({
               className="rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70 outline-none"
             >
               <option value="">No move</option>
-              {STATUSES.filter((s) => s !== newRuleWhen).map((s) => (
+              {statusNames.filter((s) => s !== ruleWhen).map((s) => (
                 <option key={s} value={s}>Move to {s}</option>
               ))}
             </select>
@@ -2024,9 +2212,9 @@ export default function WorkspaceDatabase({
               <tbody className="divide-y divide-line">
                 {tableRows.map(({ row: r, nested }) => {
                   const kids = nested ? 0 : childrenOf(r.id).length
-                  const progress = kids > 0 ? subtaskProgress(displayRows, r.id) : null
+                  const progress = kids > 0 ? subtaskProgress(displayRows, r.id, statuses) : null
                   const parent = parentOf(r)
-                  const waiting = openBlockers(displayRows, r)
+                  const waiting = openBlockers(displayRows, r, statuses)
                   return (
                   <tr key={r.id} className={`group hover:bg-white/[0.03] ${nested ? "bg-white/[0.012]" : ""}`}>
                     <td className="min-w-[240px] px-4 py-3">
@@ -2066,7 +2254,7 @@ export default function WorkspaceDatabase({
                             {progress.done}/{progress.total}
                           </button>
                         )}
-                        {waiting.length > 0 && r.status !== "Done" && (
+                        {waiting.length > 0 && !isClosedStatus(statuses, r.status) && (
                           <span
                             title={`Waiting on ${waiting.map((b) => `“${b.title || "Untitled"}”`).join(", ")}`}
                             className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[11px] text-red-300"
@@ -2093,7 +2281,7 @@ export default function WorkspaceDatabase({
                         onChange={(e) => updateRow(r.id, { status: e.target.value })}
                         className="rounded-full border bg-surface-2 px-2.5 py-1 text-[12px] text-white/70 outline-none disabled:opacity-60"
                       >
-                        {STATUSES.map((s) => (
+                        {statusOptions(r.status).map((s) => (
                           <option key={s} value={s}>
                             {s}
                           </option>
@@ -2310,7 +2498,7 @@ export default function WorkspaceDatabase({
             >
               <div className="mb-3 flex items-center gap-2 px-1">
                 {groupBy === "status" ? (
-                  <span className={`h-2 w-2 rounded-full ${STATUS_DOT[s]}`} />
+                  <span className={`h-2 w-2 rounded-full ${dotOf(s)}`} />
                 ) : groupBy === "assignee" ? (
                   <User className="h-3 w-3 text-white/40" />
                 ) : null}
@@ -2333,9 +2521,9 @@ export default function WorkspaceDatabase({
               <div className="flex flex-col gap-2.5">
                 {inCol.map((r) => {
                     const kids = childrenOf(r.id).length
-                    const progress = kids > 0 ? subtaskProgress(displayRows, r.id) : null
+                    const progress = kids > 0 ? subtaskProgress(displayRows, r.id, statuses) : null
                     const parent = parentOf(r)
-                    const waiting = r.status === "Done" ? [] : openBlockers(displayRows, r)
+                    const waiting = isClosedStatus(statuses, r.status) ? [] : openBlockers(displayRows, r, statuses)
                     return (
                     <div
                       key={r.id}
@@ -2377,7 +2565,7 @@ export default function WorkspaceDatabase({
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <PriorityPill p={r.priority} />
-                        {groupBy !== "status" && <StatusPill s={r.status} />}
+                        {groupBy !== "status" && <StatusPill s={r.status} statuses={statuses} />}
                         {progress && (
                           <span
                             title={`${progress.done} of ${progress.total} sub-tasks done`}
@@ -2409,12 +2597,12 @@ export default function WorkspaceDatabase({
                         )}
                       </div>
                       {(r.due || r.start) && (
-                        <div className={`mt-2 flex items-center gap-1 text-[11px] ${isOverdue(r) ? "font-medium text-red-300" : "text-white/35"}`}>
+                        <div className={`mt-2 flex items-center gap-1 text-[11px] ${isOverdue(r, statuses) ? "font-medium text-red-300" : "text-white/35"}`}>
                           <Calendar className="h-3 w-3" />
                           {r.start && r.due && r.start !== r.due
                             ? `${new Date(r.start).toLocaleDateString("en-GB")} → ${new Date(r.due).toLocaleDateString("en-GB")}`
                             : new Date(r.due || r.start).toLocaleDateString("en-GB")}
-                          {isOverdue(r) && <span className="uppercase tracking-wider">· overdue</span>}
+                          {isOverdue(r, statuses) && <span className="uppercase tracking-wider">· overdue</span>}
                         </div>
                       )}
                     </div>
@@ -2507,7 +2695,7 @@ export default function WorkspaceDatabase({
                           onDragStart={(e) => e.dataTransfer.setData("text/plain", r.id)}
                           onClick={() => setSelectedId(r.id)}
                           title={`${r.title || "Untitled"} (continues)`}
-                          className={`h-1.5 rounded-full opacity-70 ${STATUS_DOT[r.status] ?? "bg-white/40"}`}
+                          className={`h-1.5 rounded-full opacity-70 ${dotOf(r.status)}`}
                         />
                       )
                     })}
@@ -2584,7 +2772,7 @@ export default function WorkspaceDatabase({
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-wider text-white/30">Status</span>
                   <select value={selectedRow.status} disabled={readOnly} onChange={(e) => updateRow(selectedRow.id, { status: e.target.value })} className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-2.5 py-2 text-[12px] text-white/70 outline-none disabled:opacity-60">
-                    {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    {statusOptions(selectedRow.status).map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </label>
                 <label className="block">
@@ -2669,7 +2857,7 @@ export default function WorkspaceDatabase({
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         {drawerParent ? (
                           <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-2 py-0.5 text-[12px] text-white/70">
-                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[drawerParent.status] ?? "bg-white/40"}`} />
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotOf(drawerParent.status)}`} />
                             <button type="button" onClick={() => setSelectedId(drawerParent.id)} className="max-w-[260px] truncate hover:underline">
                               {drawerParent.title || "Untitled"}
                             </button>
@@ -2698,13 +2886,13 @@ export default function WorkspaceDatabase({
                     {selectedRow.blockedBy.map((bid) => {
                       const b = rowById.get(bid)
                       if (!b) return null
-                      const done = b.status === "Done"
+                      const done = isClosedStatus(statuses, b.status)
                       return (
                         <span
                           key={bid}
                           className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-[12px] ${done ? "border-line bg-white/[0.03] text-white/40" : "border-red-500/20 bg-red-500/10 text-red-200"}`}
                         >
-                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[b.status] ?? "bg-white/40"}`} />
+                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotOf(b.status)}`} />
                           <button type="button" onClick={() => setSelectedId(b.id)} className={`max-w-[220px] truncate hover:underline ${done ? "line-through" : ""}`}>
                             {b.title || "Untitled"}
                           </button>
@@ -2789,21 +2977,21 @@ export default function WorkspaceDatabase({
                     </div>
                     <div className="mt-1.5 flex flex-col gap-0.5">
                       {drawerKids.map((k) => {
-                        const kWaiting = k.status === "Done" ? [] : openBlockers(displayRows, k)
+                        const kWaiting = isClosedStatus(statuses, k.status) ? [] : openBlockers(displayRows, k, statuses)
                         return (
                           <div key={k.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/[0.03]">
                             <input
                               type="checkbox"
-                              checked={k.status === "Done"}
+                              checked={isDoneStatus(statuses, k.status)}
                               disabled={readOnly}
-                              onChange={() => updateRow(k.id, { status: k.status === "Done" ? "Todo" : "Done" })}
-                              aria-label={`Mark “${k.title || "Untitled"}” ${k.status === "Done" ? "not done" : "done"}`}
+                              onChange={() => updateRow(k.id, { status: isDoneStatus(statuses, k.status) ? defaultStatus(statuses) : (firstStatusOf(statuses, "done") ?? k.status) })}
+                              aria-label={`Mark “${k.title || "Untitled"}” ${isDoneStatus(statuses, k.status) ? "not done" : "done"}`}
                               className="h-3.5 w-3.5 shrink-0 accent-emerald-400"
                             />
                             <button
                               type="button"
                               onClick={() => setSelectedId(k.id)}
-                              className={`min-w-0 flex-1 truncate text-left text-[12.5px] ${k.status === "Done" ? "text-white/35 line-through" : "text-white/75 hover:text-white"}`}
+                              className={`min-w-0 flex-1 truncate text-left text-[12.5px] ${isClosedStatus(statuses, k.status) ? "text-white/35 line-through" : "text-white/75 hover:text-white"}`}
                             >
                               {k.title || "Untitled"}
                             </button>

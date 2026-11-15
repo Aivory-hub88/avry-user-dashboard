@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { parseFieldDefs, cleanCells, computeRollups, parseMentions, matchesDueFilter, matchRules, parseAutomationRules, type RollupSubject } from "./workspaceDbModel"
+import { parseFieldDefs, cleanCells, computeRollups, parseMentions, matchesDueFilter, matchRules, parseAutomationRules, DEFAULT_STATUSES, type RollupSubject } from "./workspaceDbModel"
 
 
 describe("parseFieldDefs relation/rollup", () => {
@@ -118,8 +118,22 @@ describe("parseAutomationRules", () => {
       { id: "a3", name: "", whenStatus: "Todo", addComment: "x" },
       { id: "a4", name: "Loop", whenStatus: "Doing", moveTo: "Doing" },
       { id: "a5", name: "Bad", whenStatus: "Archived", addComment: "x" },
-    ])
+    ], DEFAULT_STATUSES)
     expect(rules.map((r) => r.id)).toEqual(["a1"])
+  })
+
+  it("checks statuses against the room's list, or only their shape without one", () => {
+    const raw = [
+      { id: "a1", name: "Ship", whenStatus: "Review", moveTo: "Shipped" },
+      { id: "a2", name: "Odd", whenStatus: "Archived", addComment: "x" },
+    ]
+    const room = [
+      { name: "Todo", group: "todo" as const },
+      { name: "Review", group: "in_progress" as const },
+      { name: "Shipped", group: "done" as const },
+    ]
+    expect(parseAutomationRules(raw, room).map((r) => r.id)).toEqual(["a1"])
+    expect(parseAutomationRules(raw).map((r) => r.id)).toEqual(["a1", "a2"])
   })
 
   it("matches entries into the trigger status only", () => {

@@ -3,7 +3,8 @@ import { query } from '@/lib/db'
 import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from '@/lib/workspaceAuth'
 import { getDocRole, canWrite } from '@/lib/workspaceAccess'
 import { parseFieldDefs } from '@/lib/workspaceDb'
-import { parseAutomationRules, cleanPeopleFilter } from '@/lib/workspaceDbModel'
+import { parseAutomationRules, cleanPeopleFilter, parseStatusDefs, statusDefsProblem, type StatusDef } from '@/lib/workspaceDbModel'
+import { restampTaskIndexGroups } from '@/lib/workspaceTaskIndex'
 import { recordWorkspaceActivity } from '@/lib/workspaceActivity'
 
 export const runtime = 'nodejs'
@@ -33,6 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   let tags: Array<{ id: string; label: string; color: string }> | undefined
   let props: Record<string, unknown> | undefined
   let icon: string | null | undefined
+  let statusDefs: StatusDef[] | undefined
   if (body.title !== undefined) {
     title = (body.title ?? '').toString().slice(0, 200).trim()
     if (!title) return NextResponse.json({ error: 'title required' }, { status: 400 })
@@ -116,6 +118,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     } else if (src.dbFields !== undefined) {
       return NextResponse.json({ error: 'props.dbFields must be array' }, { status: 400 })
     }
+    // Custom statuses (Tasks P2): [{name, group}], group in todo |
+    // in_progress | done | canceled, max 12, at least one todo + one done.
+    // Rows keep the name; the client renames/moves rows in Yjs and sends the
+    // follow-up wip/automation/view keys in this same patch.
+    if (src.dbStatuses !== undefined) {
+      const why = statusDefsProblem(src.dbStatuses)
+      if (why) return NextResponse.json({ error: 'invalid props.dbStatuses', reason: why }, { status: 400 })
+      statusDefs = parseStatusDefs(src.dbStatuses)
+      propsPatch.dbStatuses = statusDefs
+    }
     // Persisted database views (saved filters/sorts) — array of lightweight view configs.
     // Kept inside props so one JSONB column holds all per-doc UI state, no extra table.
     if (Array.isArray(src.dbViews)) {
@@ -184,7 +196,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // Automation rules (Fase 4e): validated structurally here; the runner
     // enforces WIP + writes activity at execution time.
     if (Array.isArray(src.dbAutomations)) {
-      propsPatch.dbAutomations = parseAutomationRules(src.dbAutomations)
+      propsPatch.dbAutomations = parseAutomationRules(src.dbAutomations, statusDefs)
     } else if (src.dbAutomations !== undefined) {
       return NextResponse.json({ error: 'props.dbAutomations must be array' }, { status: 400 })
     }
@@ -220,6 +232,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // Return the merged server truth so the client can reconcile instead of
     // guessing — this is what the Network tab should show for the revert bug.
     const mergedProps = (upd.rows[0]?.props as Record<string, unknown> | null) ?? props ?? undefined
+    // "My tasks" / reminders read the group stored per index line.
+    if (statusDefs) await restampTaskIndexGroups(id, statusDefs)
     if (title !== undefined) {
       await recordWorkspaceActivity({
         docId: id,

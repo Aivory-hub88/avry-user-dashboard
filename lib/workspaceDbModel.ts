@@ -179,6 +179,8 @@ export function computeRollups(
   rows: RollupSubject[],
   defs: FieldDef[],
   getTargetRows: (docId: string) => RollupSubject[] | null,
+  /** Statuses of a target doc (its own config); default Todo/Doing/Done. */
+  getTargetStatuses: (docId: string) => readonly StatusDef[] = () => DEFAULT_STATUSES,
 ): Record<string, Record<string, number | null>> {
   const out: Record<string, Record<string, number | null>> = {}
   const rollups = defs.filter((d) => d.type === "rollup" && d.relationFieldId && d.rollupOp)
@@ -213,7 +215,11 @@ export function computeRollups(
       if (def.rollupOp === "count") {
         cell[def.id] = linked.length
       } else if (def.rollupOp === "donePct") {
-        cell[def.id] = Math.round((linked.filter((r) => r.status === "Done").length / linked.length) * 100)
+        // Canceled rows don't count either way (Linear-style progress).
+        const statuses = getTargetStatuses(targetDoc)
+        const live = linked.filter((r) => statusGroup(statuses, r.status) !== "canceled")
+        const done = live.filter((r) => isDoneStatus(statuses, r.status)).length
+        cell[def.id] = live.length === 0 ? 0 : Math.round((done / live.length) * 100)
       } else if (def.rollupOp === "sum" && def.rollupFieldId) {
         let total = 0
         for (const r of linked) {
@@ -367,10 +373,16 @@ function weekStartISO(todayISO: string): string {
 }
 
 /** Relative due-date predicate (pure; todayISO = YYYY-MM-DD). */
-export function matchesDueFilter(due: string, status: string, filter: string, todayISO: string): boolean {
+export function matchesDueFilter(
+  due: string,
+  status: string,
+  filter: string,
+  todayISO: string,
+  statuses: readonly StatusDef[] = DEFAULT_STATUSES,
+): boolean {
   switch (filter) {
     case "Overdue":
-      return !!due && due < todayISO && status !== "Done";
+      return !!due && due < todayISO && !isClosedStatus(statuses, status);
     case "Today":
       return due === todayISO;
     case "This week": {
@@ -399,10 +411,15 @@ export type AutomationRule = {
 }
 
 export const MAX_AUTOMATIONS = 20
-const AUTOMATION_STATUSES: ReadonlySet<string> = new Set(["Todo", "Doing", "Done"])
 
-/** Validate raw props.dbAutomations (used by REST + PATCH). */
-export function parseAutomationRules(raw: unknown): AutomationRule[] {
+/**
+ * Validate raw props.dbAutomations (used by REST + PATCH). With `statuses`,
+ * trigger/target must be one of the room's statuses; without (the room
+ * PATCH, which never reads before writing) any status-shaped name passes and
+ * the runner re-validates against the room's statuses.
+ */
+export function parseAutomationRules(raw: unknown, statuses?: readonly StatusDef[]): AutomationRule[] {
+  const known = (s: string) => (statuses ? statuses.some((d) => d.name === s) : s.length > 0)
   if (!Array.isArray(raw)) return []
   const out: AutomationRule[] = []
   const seen = new Set<string>()
@@ -413,8 +430,8 @@ export function parseAutomationRules(raw: unknown): AutomationRule[] {
     if (!id || seen.has(id)) continue
     const name = typeof r.name === "string" ? r.name.trim().slice(0, 40) : ""
     if (!name) continue
-    const whenStatus = typeof r.whenStatus === "string" ? r.whenStatus.slice(0, 16) : ""
-    if (!AUTOMATION_STATUSES.has(whenStatus)) continue
+    const whenStatus = cleanStatusName(r.whenStatus)
+    if (!known(whenStatus)) continue
     const rule: AutomationRule = { id, name, whenStatus }
     if (typeof r.setAssignee === "string" && r.setAssignee.trim()) {
       rule.setAssignee = r.setAssignee.trim().slice(0, 100)
@@ -422,8 +439,9 @@ export function parseAutomationRules(raw: unknown): AutomationRule[] {
     if (typeof r.addComment === "string" && r.addComment.trim()) {
       rule.addComment = r.addComment.trim().slice(0, 500)
     }
-    if (typeof r.moveTo === "string" && AUTOMATION_STATUSES.has(r.moveTo) && r.moveTo !== whenStatus) {
-      rule.moveTo = r.moveTo
+    const moveTo = cleanStatusName(r.moveTo)
+    if (moveTo && known(moveTo) && moveTo !== whenStatus) {
+      rule.moveTo = moveTo
     }
     if (rule.setAssignee === undefined && rule.addComment === undefined && rule.moveTo === undefined) continue
     seen.add(id)
@@ -798,45 +816,276 @@ export function blockedByProblem(rows: DepRow[], rowId: string, blockers: string
 }
 
 /** Sub-task progress of `parentId`: done / total (0/0 = no sub-tasks). */
-export function subtaskProgress(rows: Array<TreeRow & StatusRow>, parentId: string): { done: number; total: number } {
+export function subtaskProgress(
+  rows: Array<TreeRow & StatusRow>,
+  parentId: string,
+  statuses: readonly StatusDef[] = DEFAULT_STATUSES,
+): { done: number; total: number } {
   let done = 0
   let total = 0
   for (const r of rows) {
     if (r.parentId !== parentId) continue
+    const g = statusGroup(statuses, r.status)
+    // Canceled sub-tasks drop out of the count (neither open nor done).
+    if (g === "canceled") continue
     total++
-    if (r.status === "Done") done++
+    if (g === "done") done++
   }
   return { done, total }
 }
 
-/** Blockers of `row` that exist and aren't Done yet. */
-export function openBlockers<R extends DepRow & StatusRow>(rows: R[], row: DepRow): R[] {
+/** Blockers of `row` that exist and are still open (not done / canceled). */
+export function openBlockers<R extends DepRow & StatusRow>(
+  rows: R[],
+  row: DepRow,
+  statuses: readonly StatusDef[] = DEFAULT_STATUSES,
+): R[] {
   if (row.blockedBy.length === 0) return []
   const byId = new Map(rows.map((r) => [r.id, r]))
   const out: R[] = []
   for (const id of row.blockedBy) {
     const b = byId.get(id)
-    if (b && b.status !== "Done") out.push(b)
+    if (b && !isClosedStatus(statuses, b.status)) out.push(b)
   }
   return out
 }
 
-/** Is `row` waiting on any blocker that isn't Done? */
-export function isBlocked(rows: Array<DepRow & StatusRow>, row: DepRow): boolean {
-  return openBlockers(rows, row).length > 0
+/** Is `row` waiting on any blocker that is still open? */
+export function isBlocked(
+  rows: Array<DepRow & StatusRow>,
+  row: DepRow,
+  statuses: readonly StatusDef[] = DEFAULT_STATUSES,
+): boolean {
+  return openBlockers(rows, row, statuses).length > 0
 }
 
 /**
- * Tasks that `doneId` (now Done) was the last open blocker of: they list it
- * in `blockedBy`, aren't Done themselves and wait on nothing else.
+ * Tasks that `doneId` (now closed: done or canceled) was the last open
+ * blocker of: they list it in `blockedBy`, are open themselves and wait on
+ * nothing else.
  */
-export function unblockedBy<R extends DepRow & StatusRow>(rows: R[], doneId: string): R[] {
+export function unblockedBy<R extends DepRow & StatusRow>(
+  rows: R[],
+  doneId: string,
+  statuses: readonly StatusDef[] = DEFAULT_STATUSES,
+): R[] {
   const done = rows.find((r) => r.id === doneId)
-  if (!done || done.status !== "Done") return []
-  return rows.filter((r) => r.status !== "Done" && r.blockedBy.includes(doneId) && !isBlocked(rows, r))
+  if (!done || !isClosedStatus(statuses, done.status)) return []
+  return rows.filter(
+    (r) => !isClosedStatus(statuses, r.status) && r.blockedBy.includes(doneId) && !isBlocked(rows, r, statuses),
+  )
 }
 
 /** Rows that list `id` as a blocker (the drawer's "Blocking" line). */
 export function blocking<R extends DepRow>(rows: R[], id: string): R[] {
   return rows.filter((r) => r.blockedBy.includes(id))
+}
+
+// ---------------------------------------------------------------------------
+// Custom statuses (P2): each room configures its own status names in
+// props.dbStatuses, every one in a fixed group. Rows keep storing the status
+// NAME; logic (overdue, progress, blockers, notices, My tasks) asks the
+// group. Rooms without config get Todo / Doing / Done, so old rows behave
+// exactly as before.
+// ---------------------------------------------------------------------------
+
+export type StatusGroup = "todo" | "in_progress" | "done" | "canceled"
+export type StatusDef = { name: string; group: StatusGroup }
+
+export const STATUS_GROUPS: readonly StatusGroup[] = ["todo", "in_progress", "done", "canceled"]
+export const STATUS_GROUP_LABEL: Record<StatusGroup, string> = {
+  todo: "To do",
+  in_progress: "In progress",
+  done: "Done",
+  canceled: "Canceled",
+}
+export const DEFAULT_STATUSES: readonly StatusDef[] = [
+  { name: "Todo", group: "todo" },
+  { name: "Doing", group: "in_progress" },
+  { name: "Done", group: "done" },
+]
+export const MAX_STATUSES = 12
+export const MAX_STATUS_NAME = 16
+
+const GROUP_SET: ReadonlySet<string> = new Set(STATUS_GROUPS)
+/** Names rows were written with before custom statuses (and what REST clients still send). */
+const LEGACY_GROUP: Record<string, StatusGroup> = { Todo: "todo", Doing: "in_progress", Done: "done" }
+
+export function cleanStatusName(v: unknown): string {
+  return typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, MAX_STATUS_NAME) : ""
+}
+
+export type StatusDefsProblem = "shape" | "empty_name" | "duplicate" | "bad_group" | "too_many" | "no_todo" | "no_done"
+
+/** Why `raw` isn't a valid status list (null = fine). Used by the room PATCH (400). */
+export function statusDefsProblem(raw: unknown): StatusDefsProblem | null {
+  if (!Array.isArray(raw)) return "shape"
+  if (raw.length > MAX_STATUSES) return "too_many"
+  const seen = new Set<string>()
+  const groups = new Set<string>()
+  for (const v of raw) {
+    if (!v || typeof v !== "object") return "shape"
+    const r = v as Record<string, unknown>
+    const name = cleanStatusName(r.name)
+    if (!name) return "empty_name"
+    if (typeof r.group !== "string" || !GROUP_SET.has(r.group)) return "bad_group"
+    const k = name.toLowerCase()
+    if (seen.has(k)) return "duplicate"
+    seen.add(k)
+    groups.add(r.group)
+  }
+  if (!groups.has("todo")) return "no_todo"
+  if (!groups.has("done")) return "no_done"
+  return null
+}
+
+/**
+ * The room's statuses from props.dbStatuses, ordered by group (to do → in
+ * progress → done → canceled), keeping the configured order inside a group.
+ * Missing or invalid config → the default three.
+ */
+export function parseStatusDefs(raw: unknown): StatusDef[] {
+  if (statusDefsProblem(raw) !== null) return DEFAULT_STATUSES.map((s) => ({ ...s }))
+  const defs = (raw as Array<Record<string, unknown>>).map((r) => ({ name: cleanStatusName(r.name), group: r.group as StatusGroup }))
+  return sortStatusDefs(defs)
+}
+
+/** Stable sort by group order (the board's column order). */
+export function sortStatusDefs(defs: StatusDef[]): StatusDef[] {
+  return defs
+    .map((d, i) => ({ d, i }))
+    .sort((a, b) => STATUS_GROUPS.indexOf(a.d.group) - STATUS_GROUPS.indexOf(b.d.group) || a.i - b.i)
+    .map((x) => x.d)
+}
+
+/**
+ * Group of a status name. A name the room doesn't list (a row written before
+ * a rename, or by an old client) falls back to the legacy meaning of
+ * Todo/Doing/Done, else "todo" — so it stays open rather than silently closed.
+ */
+export function statusGroup(statuses: readonly StatusDef[], status: string): StatusGroup {
+  const hit = statuses.find((s) => s.name === status)
+  if (hit) return hit.group
+  return LEGACY_GROUP[status] ?? "todo"
+}
+
+/** Done group only (follower "done" notice, progress, the sub-task checkbox). */
+export function isDoneStatus(statuses: readonly StatusDef[], status: string): boolean {
+  return statusGroup(statuses, status) === "done"
+}
+
+/** Done or canceled: no longer open (overdue, blockers, My tasks, reminders). */
+export function isClosedStatus(statuses: readonly StatusDef[], status: string): boolean {
+  const g = statusGroup(statuses, status)
+  return g === "done" || g === "canceled"
+}
+
+/** First status of `group` in the room's order (null when the group is empty). */
+export function firstStatusOf(statuses: readonly StatusDef[], group: StatusGroup): string | null {
+  return statuses.find((s) => s.group === group)?.name ?? null
+}
+
+/** The status new tasks start in: first of the todo group. */
+export function defaultStatus(statuses: readonly StatusDef[]): string {
+  return firstStatusOf(statuses, "todo") ?? statuses[0]?.name ?? "Todo"
+}
+
+/**
+ * Canonical room status for what a writer sent: exact name, then a
+ * case-insensitive match, then the legacy names (Todo/Doing/Done → first
+ * status of that group, so agents and old clients keep working after a
+ * rename). null = not a status of this room.
+ */
+export function resolveStatus(statuses: readonly StatusDef[], input: unknown): string | null {
+  const name = cleanStatusName(input)
+  if (!name) return null
+  if (statuses.some((s) => s.name === name)) return name
+  const ci = statuses.find((s) => s.name.toLowerCase() === name.toLowerCase())
+  if (ci) return ci.name
+  const legacy = LEGACY_GROUP[name]
+  return legacy ? firstStatusOf(statuses, legacy) : null
+}
+
+/** Entering the done group from outside it (follower notice, unblocked notice). */
+export function entersDone(statuses: readonly StatusDef[], from: string, to: string): boolean {
+  return isDoneStatus(statuses, to) && !isDoneStatus(statuses, from)
+}
+
+/** Entering a closed group (done or canceled) from an open one: frees blocked tasks. */
+export function entersClosed(statuses: readonly StatusDef[], from: string, to: string): boolean {
+  return isClosedStatus(statuses, to) && !isClosedStatus(statuses, from)
+}
+
+/** Entering the in-progress group (the "still blocked" warning). */
+export function entersInProgress(statuses: readonly StatusDef[], from: string, to: string): boolean {
+  return statusGroup(statuses, to) === "in_progress" && statusGroup(statuses, from) !== "in_progress"
+}
+
+/** What a rename / delete touches besides the rows themselves. */
+export type StatusRefProps = {
+  dbWip?: Record<string, number>
+  dbAutomations?: AutomationRule[]
+  dbViews?: Array<Record<string, unknown> & { statusFilter?: string }>
+  dbTemplates?: Array<Record<string, unknown> & { status?: string }>
+}
+
+/**
+ * Props patch for renaming status `from` → `to`: WIP limit keys, automation
+ * triggers/targets, saved-view status filters and template statuses follow.
+ * Only keys that changed are returned (the room PATCH merges shallowly).
+ */
+export function renameStatusRefs(props: StatusRefProps, from: string, to: string): StatusRefProps {
+  const out: StatusRefProps = {}
+  if (props.dbWip && from in props.dbWip) {
+    const wip: Record<string, number> = {}
+    for (const [k, v] of Object.entries(props.dbWip)) wip[k === from ? to : k] = v
+    out.dbWip = wip
+  }
+  if (props.dbAutomations?.some((r) => r.whenStatus === from || r.moveTo === from)) {
+    out.dbAutomations = props.dbAutomations.map((r) => ({
+      ...r,
+      whenStatus: r.whenStatus === from ? to : r.whenStatus,
+      ...(r.moveTo === from ? { moveTo: to } : {}),
+    }))
+  }
+  if (props.dbViews?.some((v) => v.statusFilter === from)) {
+    out.dbViews = props.dbViews.map((v) => (v.statusFilter === from ? { ...v, statusFilter: to } : v))
+  }
+  if (props.dbTemplates?.some((t) => t.status === from)) {
+    out.dbTemplates = props.dbTemplates.map((t) => (t.status === from ? { ...t, status: to } : t))
+  }
+  return out
+}
+
+/**
+ * Props patch for deleting status `name` (its rows move to `moveTo`): its WIP
+ * limit goes, rules triggered by it go, rules moving into it lose the move
+ * (and go if nothing else is left), views filtering on it show all, templates
+ * start in `moveTo`.
+ */
+export function deleteStatusRefs(props: StatusRefProps, name: string, moveTo: string): StatusRefProps {
+  const out: StatusRefProps = {}
+  if (props.dbWip && name in props.dbWip) {
+    const wip = { ...props.dbWip }
+    delete wip[name]
+    out.dbWip = wip
+  }
+  if (props.dbAutomations?.some((r) => r.whenStatus === name || r.moveTo === name)) {
+    out.dbAutomations = props.dbAutomations
+      .filter((r) => r.whenStatus !== name)
+      .map((r) => {
+        if (r.moveTo !== name) return r
+        const rest = { ...r }
+        delete rest.moveTo
+        return rest
+      })
+      .filter((r) => r.setAssignee !== undefined || r.addComment !== undefined || r.moveTo !== undefined)
+  }
+  if (props.dbViews?.some((v) => v.statusFilter === name)) {
+    out.dbViews = props.dbViews.map((v) => (v.statusFilter === name ? { ...v, statusFilter: "All" } : v))
+  }
+  if (props.dbTemplates?.some((t) => t.status === name)) {
+    out.dbTemplates = props.dbTemplates.map((t) => (t.status === name ? { ...t, status: moveTo } : t))
+  }
+  return out
 }

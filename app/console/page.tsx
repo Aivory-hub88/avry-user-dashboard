@@ -386,7 +386,7 @@ export default function ConsolePage() {
       const r = await fetch(`/api/workspace/demo/database`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
-        body: JSON.stringify({ title, status: "Todo", priority: "High", assignee: activeAgentName }),
+        body: JSON.stringify({ title, priority: "High", assignee: activeAgentName }),
       })
       if (r.ok) {
         addToast("success", `Added "${title}" to Leads DB`)
