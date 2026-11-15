@@ -7,11 +7,13 @@ import {
   loadDbDoc,
   saveDbDoc,
   parseDbRow,
+  actorRef,
+  type DbRowComment,
   MAX_COMMENTS_PER_ROW,
   MAX_COMMENT_LEN,
 } from "@/lib/workspaceDb"
-import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
-import { recordCommentMentions } from "@/lib/workspaceMentions"
+import { recordComment } from "@/lib/workspaceTaskEvents"
+import { addFollowers, mentionRefs } from "@/lib/workspaceDbModel"
 import { indexRow, rowText, workspaceOf } from "@/lib/workspaceIndex"
 
 export const runtime = "nodejs"
@@ -78,26 +80,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (row.comments.length >= MAX_COMMENTS_PER_ROW) {
       return NextResponse.json({ error: "comments-full" }, { status: 409 })
     }
-    const comment = {
+    const author = actorRef(cred, agentType)
+    const mentions = mentionRefs(text)
+    const comment: DbRowComment = {
       id: `c-${Date.now().toString(36)}`,
       text,
       author: authorOf(cred, agentType).slice(0, 100),
       at: new Date().toISOString(),
+      ...(author ? { authorRef: author } : {}),
+      ...(mentions.length > 0 ? { mentions } : {}),
     }
+    // Commenting (and being @mentioned) makes you a follower.
+    const followers = addFollowers(row.followers, [author, ...mentions])
     doc.transact(() => {
       m.set("comments", [...row.comments, comment])
+      m.set("followers", followers)
     }, agentType)
     await saveDbDoc(id, doc, cred, agentType)
-    await recordWorkspaceActivity({
-      docId: id,
-      credential: cred,
-      agentType,
-      action: "database.row_commented",
-      summary: `Commented on task ${rowId}`,
-      targetType: "database-row",
-      targetId: rowId,
-    })
-    await recordCommentMentions({ docId: id, rowId, credential: cred, agentType, source: "comment", text })
+    // Mentioned people are skipped by recordComment (the mention told them).
+    await recordComment({ docId: id, rowId, credential: cred, agentType, title: row.title, followers }, comment)
     void indexRow(id, rowId, await workspaceOf(id), rowText(parseDbRow(m))).catch(() => {})
     return NextResponse.json({ id: comment.id, comment }, { status: 201 })
   } catch (e) {

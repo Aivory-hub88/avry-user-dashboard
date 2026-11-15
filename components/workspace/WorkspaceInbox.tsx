@@ -1,7 +1,8 @@
 "use client"
 
 /**
- * Workspace inbox bell: unread task assignments and @mentions of the viewer
+ * Workspace inbox bell: unread task assignments, @mentions, notices about
+ * tasks the viewer follows (comments, Done, due changes) and due reminders
  * (GET /api/workspace/notifications — rows created after the read watermark).
  * Clicking an item opens the task in its room; "Mark all read" advances the
  * watermark. Polls once a minute while mounted.
@@ -31,6 +32,31 @@ const POLL_MS = 60_000
 function actorLabel(m: InboxItem): string {
   if (m.actor_type === "agent") return AGENT_ROSTER.find((a) => a.type === m.actor_id)?.name ?? "An agent"
   return personName(m.actor_name ?? "")
+}
+
+/** What the notice says after the actor's name (per inbox source). */
+export function inboxVerb(source: string): string {
+  switch (source) {
+    case "assigned":
+      return "assigned you a task"
+    case "commented":
+      return "commented on a task you follow"
+    case "status_done":
+      return "marked a task you follow as Done"
+    case "due_changed":
+      return "changed the due date of a task you follow"
+    case "due_soon":
+      return "Due tomorrow"
+    case "overdue":
+      return "Overdue"
+    default:
+      return "mentioned you"
+  }
+}
+
+/** Reminders come from the system, not a person. */
+function isReminder(source: string): boolean {
+  return source === "due_soon" || source === "overdue"
 }
 
 function hrefOf(m: InboxItem): string {
@@ -105,7 +131,7 @@ export default function WorkspaceInbox() {
           if (!open) void load()
         }}
         aria-label={unread ? `Inbox, ${unread} unread` : "Inbox"}
-        title="Assignments and mentions"
+        title="Inbox: assignments, mentions and tasks you follow"
         className="relative flex h-8 w-8 items-center justify-center rounded-full text-white/50 hover:bg-white/[0.06] hover:text-white/80"
       >
         <Bell className="h-4 w-4" />
@@ -138,8 +164,13 @@ export default function WorkspaceInbox() {
                 >
                   <div className="flex items-baseline justify-between gap-2 text-[12.5px] text-white/75">
                     <span className="min-w-0 truncate">
-                      <span className="font-medium text-white/85">{actorLabel(m)}</span>{" "}
-                      {m.source === "assigned" ? "assigned you a task" : "mentioned you"}
+                      {isReminder(m.source) ? (
+                        <span className={`font-medium ${m.source === "overdue" ? "text-red-300" : "text-amber-200"}`}>{inboxVerb(m.source)}</span>
+                      ) : (
+                        <>
+                          <span className="font-medium text-white/85">{actorLabel(m)}</span> {inboxVerb(m.source)}
+                        </>
+                      )}
                     </span>
                     <span className="shrink-0 text-[10.5px] text-white/30">{ago(m.created_at)}</span>
                   </div>

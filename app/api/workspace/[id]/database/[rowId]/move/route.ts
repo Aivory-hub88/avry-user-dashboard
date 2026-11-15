@@ -6,11 +6,13 @@ import {
   WorkspaceDenied,
   loadDbDoc,
   saveDbDoc,
+  parseDbRow,
   rowsFromDbDoc,
   getWipLimits,
   wipExceeded,
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
+import { notifyFollowers } from "@/lib/workspaceMentions"
 import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
 
 export const runtime = "nodejs"
@@ -85,6 +87,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         targetId: rowId,
         metadata: { applied: automated },
       })
+    }
+    // Followers hear when the task lands in Done (after automations, which may move it on).
+    const after = parseDbRow(m)
+    if (after.status === "Done" && from !== "Done") {
+      await notifyFollowers({ docId: id, rowId, credential: cred, agentType, followers: after.followers, kind: "status_done", excerpt: after.title })
     }
     return NextResponse.json({ id: rowId, status, moved: true, from, automated: automated.length > 0 ? automated : undefined })
   } catch (e) {

@@ -238,29 +238,116 @@ export const MENTIONABLE_AGENTS: ReadonlyArray<{ type: string; names: string[] }
   names: [...new Set([a.name.toLowerCase(), a.type, a.type.replace(/_/g, "-")])],
 }))
 
-export type ParsedMentions = { agents: string[]; emails: string[] }
+export type ParsedMentions = { agents: string[]; emails: string[]; users: string[] }
 
 /**
- * Parse @mentions from free text (pure): @Geno/@autonomous → agent type,
+ * Picker-inserted mention token — the room chat's format (lib/spaceProtocol):
+ * `[@Label](#member:<user id>)` / `[@Label](#agent:<type>)`. The label is
+ * only for display; the ref after it is what gets notified.
+ */
+const MENTION_TOKEN_RE = /\[@([^[\]\n]{1,60})\]\(#(member|agent):([A-Za-z0-9_.@:-]{1,64})\)/g
+
+/** Build the stored token for a picked person (label brackets stripped). */
+export function mentionToken(p: PersonRef, label: string): string {
+  const clean = label.replace(/[[\]\n]/g, "").trim().slice(0, 60) || "Member"
+  return p.kind === "user" ? `[@${clean}](#member:${p.id})` : `[@${clean}](#agent:${p.type})`
+}
+
+/**
+ * Parse @mentions from free text (pure): picker tokens `[@Name](#member:<id>)`
+ * → user id / agent type; legacy @Geno/@autonomous → agent type;
  * @user@example.com → user email. Case-insensitive, deduped, capped.
  */
 export function parseMentions(text: unknown): ParsedMentions {
-  if (typeof text !== "string" || text.length === 0) return { agents: [], emails: [] }
+  if (typeof text !== "string" || text.length === 0) return { agents: [], emails: [], users: [] }
   const agents = new Set<string>()
   const emails = new Set<string>()
-  const emailRe = /@([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g
+  const users = new Set<string>()
   let m: RegExpExecArray | null
-  while ((m = emailRe.exec(text)) !== null) {
+  const tokenRe = new RegExp(MENTION_TOKEN_RE.source, "g")
+  while ((m = tokenRe.exec(text)) !== null) {
+    if (m[2] === "member") {
+      if (users.size < 20) users.add(m[3])
+    } else if (KNOWN_AGENT_TYPES.has(m[3]) && agents.size < 20) {
+      agents.add(m[3])
+    }
+  }
+  const rest = text.replace(tokenRe, " ")
+  const emailRe = /@([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g
+  while ((m = emailRe.exec(rest)) !== null) {
     if (emails.size < 20) emails.add(m[1].toLowerCase())
   }
-  const stripped = text.replace(emailRe, " ")
-  const tokenRe = /@([A-Za-z][A-Za-z0-9_-]*)/g
-  while ((m = tokenRe.exec(stripped)) !== null) {
+  const stripped = rest.replace(emailRe, " ")
+  const wordRe = /@([A-Za-z][A-Za-z0-9_-]*)/g
+  while ((m = wordRe.exec(stripped)) !== null) {
     const tok = m[1].toLowerCase()
     const hit = MENTIONABLE_AGENTS.find((a) => a.names.includes(tok))
     if (hit && agents.size < 20) agents.add(hit.type)
   }
-  return { agents: [...agents], emails: [...emails] }
+  return { agents: [...agents], emails: [...emails], users: [...users] }
+}
+
+/**
+ * Turn a composer draft into stored text: each picked `@Label` (first
+ * unclaimed occurrence, longest label first so "@Ann Lee" beats "@Ann")
+ * becomes its token. Names typed by hand without the picker stay plain.
+ */
+export function tokenizeMentions(text: string, picked: Array<{ ref: PersonRef; label: string }>): { text: string; mentions: PersonRef[] } {
+  let out = text
+  const tokens: string[] = []
+  const mentions: PersonRef[] = []
+  const seen = new Set<string>()
+  for (const c of [...picked].sort((a, b) => b.label.length - a.label.length)) {
+    const needle = `@${c.label}`
+    // Whole name only: "@Ann" must not match inside "@Anna".
+    let at = out.indexOf(needle)
+    while (at >= 0 && /[\p{L}\p{N}_]/u.test(out.charAt(at + needle.length))) at = out.indexOf(needle, at + 1)
+    if (at < 0) continue
+    // Placeholder first, so a shorter label can't match inside a token.
+    out = out.slice(0, at) + `\u0000${tokens.length}\u0000` + out.slice(at + needle.length)
+    tokens.push(mentionToken(c.ref, c.label))
+    const k = personKey(c.ref)
+    if (!seen.has(k)) {
+      seen.add(k)
+      mentions.push(c.ref)
+    }
+  }
+  out = out.replace(/\u0000(\d+)\u0000/g, (_m, i: string) => tokens[Number(i)] ?? "")
+  return { text: out, mentions }
+}
+
+/** Typed refs mentioned in text (picker tokens + legacy agent names; emails have no ref). */
+export function mentionRefs(text: unknown): PersonRef[] {
+  const { agents, users } = parseMentions(text)
+  return [
+    ...users.map((id): PersonRef => ({ kind: "user", id })),
+    ...agents.map((type): PersonRef => ({ kind: "agent", type })),
+  ]
+}
+
+export type MentionSegment = { kind: "text"; text: string } | { kind: "mention"; ref: PersonRef; label: string }
+
+/** Split comment text into plain text and mention chips (picker tokens only). */
+export function mentionSegments(text: string): MentionSegment[] {
+  const out: MentionSegment[] = []
+  const re = new RegExp(MENTION_TOKEN_RE.source, "g")
+  let last = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    const ref: PersonRef | null =
+      m[2] === "member" ? { kind: "user", id: m[3] } : KNOWN_AGENT_TYPES.has(m[3]) ? { kind: "agent", type: m[3] } : null
+    if (!ref) continue
+    if (m.index > last) out.push({ kind: "text", text: text.slice(last, m.index) })
+    out.push({ kind: "mention", ref, label: m[1] })
+    last = m.index + m[0].length
+  }
+  if (last < text.length) out.push({ kind: "text", text: text.slice(last) })
+  return out
+}
+
+/** Plain-text form of a comment (tokens → @Label), for excerpts and search. */
+export function mentionPlainText(text: string): string {
+  return text.replace(new RegExp(MENTION_TOKEN_RE.source, "g"), (_all, label: string) => `@${label}`)
 }
 
 export type DueFilter = "All" | "Overdue" | "Today" | "This week" | "Next 7 days" | "No date";
@@ -499,4 +586,108 @@ export function assigneesFromRuleValue(v: string): PersonRef[] | null {
   }
   const agent = MENTIONABLE_AGENTS.find((a) => a.type === s || a.names.includes(s.toLowerCase()))
   return agent ? [{ kind: "agent", type: agent.type }] : null
+}
+
+// ---------------------------------------------------------------------------
+// Followers (P1): who hears about a task. Auto-added when someone creates,
+// owns, is assigned to, is @mentioned in, or comments on a task; anyone can
+// unfollow from the drawer. Rows written before followers existed have no
+// `followers` key — they read as creator + owner + assignees.
+// ---------------------------------------------------------------------------
+
+export const MAX_FOLLOWERS = 50
+
+/** Validate a raw follower list: deduped by key, capped at MAX_FOLLOWERS. */
+export function cleanFollowers(v: unknown): PersonRef[] {
+  if (!Array.isArray(v)) return []
+  const out: PersonRef[] = []
+  const seen = new Set<string>()
+  for (const raw of v) {
+    const p = cleanPersonRef(raw)
+    if (!p) continue
+    const k = personKey(p)
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(p)
+    if (out.length >= MAX_FOLLOWERS) break
+  }
+  return out
+}
+
+/** `list` plus every ref in `add` it doesn't have yet (order kept, capped). */
+export function addFollowers(list: PersonRef[], add: Array<PersonRef | null | undefined>): PersonRef[] {
+  return cleanFollowers([...list, ...add.filter((p): p is PersonRef => !!p)])
+}
+
+/** `list` without `who`. */
+export function removeFollower(list: PersonRef[], who: PersonRef): PersonRef[] {
+  const k = personKey(who)
+  return list.filter((p) => personKey(p) !== k)
+}
+
+/**
+ * Followers of a stored row. `raw` is the row's `followers` value (undefined
+ * for rows written before followers existed — those default to creator,
+ * owner and assignees).
+ */
+export function rowFollowers(
+  raw: unknown,
+  row: { createdBy: PersonRef | null; owner: PersonRef | null; assignees: PersonRef[] },
+): PersonRef[] {
+  if (Array.isArray(raw)) return cleanFollowers(raw)
+  return addFollowers([], [row.createdBy, row.owner, ...row.assignees])
+}
+
+/** Does `list` contain `key`? */
+export function hasPerson(list: PersonRef[], key: string | null): boolean {
+  return !!key && list.some((p) => personKey(p) === key)
+}
+
+export type RowChange =
+  | { kind: "status"; from: string; to: string }
+  | { kind: "due"; from: string; to: string }
+  | { kind: "owner"; from: PersonRef | null; to: PersonRef | null }
+
+/** Tracked field changes between two versions of a row (activity + follower notices). */
+export function rowChanges(
+  prev: { status: string; due: string; owner: PersonRef | null },
+  next: { status: string; due: string; owner: PersonRef | null },
+): RowChange[] {
+  const out: RowChange[] = []
+  if (prev.status !== next.status) out.push({ kind: "status", from: prev.status, to: next.status })
+  if ((prev.due || "") !== (next.due || "")) out.push({ kind: "due", from: prev.due || "", to: next.due || "" })
+  const pk = prev.owner ? personKey(prev.owner) : ""
+  const nk = next.owner ? personKey(next.owner) : ""
+  if (pk !== nk) out.push({ kind: "owner", from: prev.owner, to: next.owner })
+  return out
+}
+
+/** A stored task comment. `authorRef`/`mentions` are absent on old comments. */
+export type TaskComment = {
+  id: string
+  text: string
+  author: string
+  at: string
+  authorRef?: PersonRef
+  mentions?: PersonRef[]
+}
+
+/** Read one stored comment (bad shapes drop; typed fields validated). */
+export function cleanComment(v: unknown): TaskComment | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null
+  const r = v as Record<string, unknown>
+  if (typeof r.id !== "string" || typeof r.text !== "string") return null
+  const c: TaskComment = {
+    id: r.id.slice(0, 40),
+    text: r.text,
+    author: typeof r.author === "string" ? r.author : "",
+    at: typeof r.at === "string" ? r.at : "",
+  }
+  const a = cleanPersonRef(r.authorRef)
+  if (a) c.authorRef = a
+  if (Array.isArray(r.mentions)) {
+    const ms = cleanFollowers(r.mentions).slice(0, 20)
+    if (ms.length > 0) c.mentions = ms
+  }
+  return c
 }

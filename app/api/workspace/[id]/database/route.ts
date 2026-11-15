@@ -22,11 +22,11 @@ import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { indexRow, rowText, workspaceOf } from "@/lib/workspaceIndex"
 import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
 import { recordAssignments } from "@/lib/workspaceMentions"
-import { assigneeMirror, cleanAssignees, cleanOwner, rowAssignees, type PersonRef } from "@/lib/workspaceDbModel"
+import { addFollowers, assigneeMirror, cleanAssignees, cleanOwner, rowAssignees, type PersonRef } from "@/lib/workspaceDbModel"
 
 export const runtime = "nodejs"
 
-type RowInput = Omit<DbRow, "id" | "comments" | "cells" | "createdBy" | "createdAt">
+type RowInput = Omit<DbRow, "id" | "comments" | "cells" | "createdBy" | "createdAt" | "followers">
 
 /** Typed assignees win; else the legacy `assignee` text (agent → typed). */
 function assigneesInput(body: Partial<DbRow>): { assignees: PersonRef[]; assignee: string } {
@@ -115,13 +115,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
     const input = cleanRowInput(body)
     const creator = actorRef(cred, agentType)
+    // A person creating a task owns it unless they named another owner.
+    const owner = input.owner ?? (creator?.kind === "user" ? creator : null)
     const newRow: DbRow = {
       id: newDbRowId(),
       ...input,
-      // A person creating a task owns it unless they named another owner.
-      owner: input.owner ?? (creator?.kind === "user" ? creator : null),
+      owner,
       createdBy: creator,
       createdAt: new Date().toISOString(),
+      // Creator, owner and assignees follow the task from the start.
+      followers: addFollowers([], [creator, owner, ...input.assignees]),
       comments: [],
       cells: cleanCells(body.cells, fieldDefs),
     }
