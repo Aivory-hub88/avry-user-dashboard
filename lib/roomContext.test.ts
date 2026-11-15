@@ -11,8 +11,8 @@ import { dbRowToYMap } from "@/lib/workspaceDb"
 function boardUpdate(): Buffer {
   const doc = new Y.Doc()
   doc.getArray<Y.Map<unknown>>("database").push([
-    dbRowToYMap({ id: "a", title: "Acme", status: "Todo", priority: "High", assignee: "", assignees: [], owner: null, createdBy: null, createdAt: "", followers: [], start: "", due: "", description: "", comments: [], cells: { rq1: "Jakarta" } }),
-    dbRowToYMap({ id: "b", title: "Beta Corp", status: "Done", priority: "Med", assignee: "Rina", assignees: [], owner: null, createdBy: null, createdAt: "", followers: [], start: "", due: "2026-11-01", description: "", comments: [], cells: {} }),
+    dbRowToYMap({ id: "a", title: "Acme", status: "Todo", priority: "High", assignee: "", assignees: [], owner: null, createdBy: null, createdAt: "", followers: [], parentId: null, blockedBy: [], start: "", due: "", description: "", comments: [], cells: { rq1: "Jakarta" } }),
+    dbRowToYMap({ id: "b", title: "Beta Corp", status: "Done", priority: "Med", assignee: "Rina", assignees: [], owner: null, createdBy: null, createdAt: "", followers: [], parentId: null, blockedBy: [], start: "", due: "2026-11-01", description: "", comments: [], cells: {} }),
   ])
   return Buffer.from(Y.encodeStateAsUpdate(doc))
 }

@@ -4,7 +4,7 @@ import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDo
 import { collabAuthHeaders, type WorkspaceCredential } from "@/lib/workspaceAuth"
 import { canReadDocId } from "@/lib/workspaceAccess"
 import { syncTaskIndex } from "@/lib/workspaceTaskIndex"
-import { computeRollups, parseFieldDefs, rowAssignees, rowFollowers, cleanComment, cleanOwner, cleanPersonRef, type FieldDef, type CellValue, type PersonRef, type TaskComment } from "@/lib/workspaceDbModel"
+import { computeRollups, parseFieldDefs, rowAssignees, rowFollowers, cleanComment, cleanOwner, cleanPersonRef, cleanParentId, cleanBlockedBy, type FieldDef, type CellValue, type PersonRef, type TaskComment } from "@/lib/workspaceDbModel"
 
 // Re-exported so existing importers keep working; the pure model lives in
 // workspaceDbModel.ts (client-safe: no pg/node imports, see its header).
@@ -47,6 +47,10 @@ export type DbRow = {
   createdAt: string
   /** Who hears about changes (max 50); see rowFollowers for legacy rows. */
   followers: PersonRef[]
+  /** Sub-task of this same-doc row (one level deep); null = top level. */
+  parentId: string | null
+  /** Same-doc rows that must be Done first (max 20). */
+  blockedBy: string[]
   start: string
   due: string
   description: string
@@ -100,8 +104,9 @@ export function parseDbRow(m: Y.Map<unknown>): DbRow {
   const assignees = rowAssignees(m.get("assignees"), m.get("assignee"))
   const owner = cleanOwner(m.get("owner"))
   const createdBy = cleanPersonRef(m.get("createdBy"))
+  const id = str(m.get("id"))
   return {
-    id: str(m.get("id")),
+    id,
     title: str(m.get("title")),
     status: str(m.get("status"), "Todo"),
     priority: (VALID_PRIORITIES.has(priority) ? priority : "Med") as DbRow["priority"],
@@ -111,6 +116,8 @@ export function parseDbRow(m: Y.Map<unknown>): DbRow {
     createdBy,
     createdAt: str(m.get("createdAt")),
     followers: rowFollowers(m.get("followers"), { createdBy, owner, assignees }),
+    parentId: cleanParentId(m.get("parentId")),
+    blockedBy: cleanBlockedBy(m.get("blockedBy"), id),
     start: str(m.get("start")),
     due: str(m.get("due")),
     description: str(m.get("description")).slice(0, MAX_DESCRIPTION_LEN),
@@ -150,6 +157,8 @@ export function dbRowToYMap(r: DbRow): Y.Map<unknown> {
   m.set("createdBy", r.createdBy)
   m.set("createdAt", r.createdAt)
   m.set("followers", r.followers)
+  m.set("parentId", r.parentId)
+  m.set("blockedBy", r.blockedBy)
   m.set("start", r.start)
   m.set("due", r.due)
   m.set("description", r.description)

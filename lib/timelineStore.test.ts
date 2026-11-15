@@ -18,7 +18,7 @@ const cred = { kind: "user" as const, token: "t", user: { user_id: "u1" } } as n
 function board(): Buffer {
   const doc = new Y.Doc()
   const row = (id: string, start: string, due: string) =>
-    dbRowToYMap({ id, title: id, status: "Doing", priority: "Med", assignee: "", assignees: [], owner: null, createdBy: null, createdAt: "", followers: [], start, due, description: "", comments: [], cells: {} })
+    dbRowToYMap({ id, title: id, status: "Doing", priority: "Med", assignee: "", assignees: [], owner: null, createdBy: null, createdAt: "", followers: [], parentId: null, blockedBy: [], start, due, description: "", comments: [], cells: {} })
   doc.getArray<Y.Map<unknown>>("database").push([row("in", "2026-09-20", "2026-09-25"), row("undated", "", ""), row("later", "", "2027-03-01")])
   return Buffer.from(Y.encodeStateAsUpdate(doc))
 }

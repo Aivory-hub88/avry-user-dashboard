@@ -38,6 +38,8 @@ function row(over: Partial<DbRow> = {}): DbRow {
     createdBy: null,
     createdAt: "",
     followers: [],
+    parentId: null,
+    blockedBy: [],
     start: "",
     due: "",
     description: "",

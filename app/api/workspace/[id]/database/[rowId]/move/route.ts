@@ -13,6 +13,8 @@ import {
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { notifyFollowers } from "@/lib/workspaceMentions"
+import { recordUnblocked } from "@/lib/workspaceTaskEvents"
+import { openBlockers } from "@/lib/workspaceDbModel"
 import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
 
 export const runtime = "nodejs"
@@ -92,8 +94,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const after = parseDbRow(m)
     if (after.status === "Done" && from !== "Done") {
       await notifyFollowers({ docId: id, rowId, credential: cred, agentType, followers: after.followers, kind: "status_done", excerpt: after.title })
+      await recordUnblocked({ docId: id, credential: cred, agentType }, rowsFromDbDoc(doc), rowId)
     }
-    return NextResponse.json({ id: rowId, status, moved: true, from, automated: automated.length > 0 ? automated : undefined })
+    // Moving a blocked task into Doing is allowed, but the caller is told.
+    const waitingOn = after.status === "Doing" ? openBlockers(rowsFromDbDoc(doc), after).map((b) => ({ id: b.id, title: b.title, status: b.status })) : []
+    return NextResponse.json({
+      id: rowId,
+      status,
+      moved: true,
+      from,
+      automated: automated.length > 0 ? automated : undefined,
+      ...(waitingOn.length > 0 ? { warning: "blocked", blockedBy: waitingOn } : {}),
+    })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
     console.error("[workspace/move POST]", e)

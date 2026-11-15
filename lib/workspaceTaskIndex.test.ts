@@ -8,7 +8,7 @@ import type { DbRow } from "./workspaceDb"
 
 const row = (over: Partial<DbRow>): DbRow => ({
   id: "r1", title: "T", status: "Todo", priority: "Med", assignee: "", assignees: [], owner: null, createdBy: null,
-  createdAt: "", followers: [], start: "", due: "", description: "", comments: [], cells: {}, ...over,
+  createdAt: "", followers: [], parentId: null, blockedBy: [], start: "", due: "", description: "", comments: [], cells: {}, ...over,
 })
 
 beforeEach(() => {

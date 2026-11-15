@@ -203,3 +203,66 @@ export async function recordAssignments(input: AssignInput): Promise<void> {
     console.error("[workspace assignments]", e)
   }
 }
+
+type UnblockedInput = {
+  docId: string
+  /** The task that can start now. */
+  rowId: string
+  credential: WorkspaceCredential
+  agentType?: string
+  /** Its assignees + owner (people and agents). */
+  recipients: PersonRef[]
+  /** Inbox line: the unblocked task's title. */
+  excerpt: string
+}
+
+/**
+ * "Your task is unblocked": the last open blocker of a task is Done, so its
+ * assignees and owner hear about it (source 'unblocked'). The actor never
+ * notifies themself, and the same notice isn't repeated to a person within
+ * 10 minutes (a blocker toggled Done → Todo → Done). Fire-and-forget.
+ */
+export async function notifyUnblocked(input: UnblockedInput): Promise<number> {
+  const agentType = input.agentType ?? "user"
+  const actor = actorOf(input.credential, agentType)
+  const selfKey = actor.actorType === "user" ? `user:${actor.actorId}` : `agent:${actor.actorId}`
+  const seen = new Set<string>([selfKey])
+  const targets: PersonRef[] = []
+  for (const p of input.recipients) {
+    const k = personKey(p)
+    if (seen.has(k)) continue
+    seen.add(k)
+    targets.push(p)
+  }
+  if (targets.length === 0) return 0
+  try {
+    const workspaceId = await workspaceOf(input.docId)
+    await query(
+      `INSERT INTO dashboard.workspace_mentions
+        (workspace_id, doc_id, row_id, actor_type, actor_id, actor_name, mentioned_kind, mentioned_id, source, excerpt)
+       SELECT $1, $2, $3, $4, $5, $6, m.kind, m.id, 'unblocked', $7
+       FROM unnest($8::text[], $9::text[]) AS m(kind, id)
+       WHERE NOT EXISTS (
+         SELECT 1 FROM dashboard.workspace_mentions w
+         WHERE w.doc_id = $2 AND w.row_id = $3 AND w.source = 'unblocked'
+           AND w.mentioned_kind = m.kind AND w.mentioned_id = m.id
+           AND w.created_at > now() - interval '10 minutes'
+       )`,
+      [
+        workspaceId,
+        input.docId,
+        input.rowId,
+        actor.actorType,
+        actor.actorId,
+        actor.actorName,
+        (input.excerpt.trim() || "Untitled").slice(0, 200),
+        targets.map((p) => p.kind),
+        targets.map((p) => (p.kind === "user" ? p.id : p.type)),
+      ],
+    )
+    return targets.length
+  } catch (e) {
+    console.error("[workspace unblocked]", e)
+    return 0
+  }
+}

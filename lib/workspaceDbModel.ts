@@ -691,3 +691,152 @@ export function cleanComment(v: unknown): TaskComment | null {
   }
   return c
 }
+
+// ---------------------------------------------------------------------------
+// Structure (P2): sub-tasks and dependencies, both inside one doc.
+//
+// `parentId` makes a row a sub-task of another row in the same doc. One
+// level only: a parent is always a top-level row, and a row that has
+// sub-tasks can't become a sub-task itself (so a cycle can't form).
+// `blockedBy` lists same-doc row ids that must be Done first. A blocker that
+// no longer exists is ignored. Rows written before P2 have neither key:
+// no parent, no blockers.
+// ---------------------------------------------------------------------------
+
+export const MAX_BLOCKED_BY = 20
+const MAX_ROW_ID = 64
+
+/** Shape of a stored parent id (string or null; existence is checked on write). */
+export function cleanParentId(v: unknown): string | null {
+  if (typeof v !== "string") return null
+  const s = v.trim().slice(0, MAX_ROW_ID)
+  return s || null
+}
+
+/** Shape of a stored blocker list: ids deduped, never `selfId`, capped. */
+export function cleanBlockedBy(v: unknown, selfId?: string): string[] {
+  if (!Array.isArray(v)) return []
+  const out: string[] = []
+  for (const raw of v) {
+    if (typeof raw !== "string") continue
+    const id = raw.trim().slice(0, MAX_ROW_ID)
+    if (!id || id === selfId || out.includes(id)) continue
+    out.push(id)
+    if (out.length >= MAX_BLOCKED_BY) break
+  }
+  return out
+}
+
+type TreeRow = { id: string; parentId: string | null }
+type DepRow = { id: string; blockedBy: string[] }
+type StatusRow = { id: string; status: string }
+
+export type ParentProblem = "missing" | "self" | "cycle" | "nested" | "has_subtasks"
+
+/** Ids of every row under `id` (children, grandchildren, …). */
+export function descendantIds(rows: TreeRow[], id: string): string[] {
+  const out: string[] = []
+  const queue = [id]
+  const seen = new Set<string>([id])
+  while (queue.length > 0) {
+    const cur = queue.shift() as string
+    for (const r of rows) {
+      if (r.parentId === cur && !seen.has(r.id)) {
+        seen.add(r.id)
+        out.push(r.id)
+        queue.push(r.id)
+      }
+    }
+  }
+  return out
+}
+
+/**
+ * Why `rowId` can't get `parentId` as its parent (null = fine; a null
+ * parentId always is). `cycle` = the parent is one of the row's own
+ * descendants; `nested` = the parent is itself a sub-task; `has_subtasks` =
+ * the row has sub-tasks of its own (both keep it one level deep).
+ */
+export function parentProblem(rows: TreeRow[], rowId: string, parentId: string | null): ParentProblem | null {
+  if (parentId === null) return null
+  if (parentId === rowId) return "self"
+  const parent = rows.find((r) => r.id === parentId)
+  if (!parent) return "missing"
+  if (descendantIds(rows, rowId).includes(parentId)) return "cycle"
+  if (parent.parentId !== null && rows.some((r) => r.id === parent.parentId)) return "nested"
+  if (rows.some((r) => r.parentId === rowId)) return "has_subtasks"
+  return null
+}
+
+/** Would `rowId` blocked by `blockers` close a loop (a blocker already waits on `rowId`)? */
+export function blockedByCycle(rows: DepRow[], rowId: string, blockers: string[]): boolean {
+  const byId = new Map(rows.map((r) => [r.id, r]))
+  const seen = new Set<string>()
+  const stack = [...blockers]
+  while (stack.length > 0) {
+    const cur = stack.pop() as string
+    if (cur === rowId) return true
+    if (seen.has(cur)) continue
+    seen.add(cur)
+    // rowId's own current edges are being replaced, never followed.
+    const r = byId.get(cur)
+    if (r) stack.push(...r.blockedBy)
+  }
+  return false
+}
+
+export type BlockedByProblem = "self" | "missing" | "cycle" | "too_many"
+
+/** Why `rowId` can't be blocked by `blockers` (null = fine). */
+export function blockedByProblem(rows: DepRow[], rowId: string, blockers: string[]): BlockedByProblem | null {
+  if (blockers.length > MAX_BLOCKED_BY) return "too_many"
+  if (blockers.includes(rowId)) return "self"
+  const ids = new Set(rows.map((r) => r.id))
+  if (blockers.some((b) => !ids.has(b))) return "missing"
+  if (blockedByCycle(rows, rowId, blockers)) return "cycle"
+  return null
+}
+
+/** Sub-task progress of `parentId`: done / total (0/0 = no sub-tasks). */
+export function subtaskProgress(rows: Array<TreeRow & StatusRow>, parentId: string): { done: number; total: number } {
+  let done = 0
+  let total = 0
+  for (const r of rows) {
+    if (r.parentId !== parentId) continue
+    total++
+    if (r.status === "Done") done++
+  }
+  return { done, total }
+}
+
+/** Blockers of `row` that exist and aren't Done yet. */
+export function openBlockers<R extends DepRow & StatusRow>(rows: R[], row: DepRow): R[] {
+  if (row.blockedBy.length === 0) return []
+  const byId = new Map(rows.map((r) => [r.id, r]))
+  const out: R[] = []
+  for (const id of row.blockedBy) {
+    const b = byId.get(id)
+    if (b && b.status !== "Done") out.push(b)
+  }
+  return out
+}
+
+/** Is `row` waiting on any blocker that isn't Done? */
+export function isBlocked(rows: Array<DepRow & StatusRow>, row: DepRow): boolean {
+  return openBlockers(rows, row).length > 0
+}
+
+/**
+ * Tasks that `doneId` (now Done) was the last open blocker of: they list it
+ * in `blockedBy`, aren't Done themselves and wait on nothing else.
+ */
+export function unblockedBy<R extends DepRow & StatusRow>(rows: R[], doneId: string): R[] {
+  const done = rows.find((r) => r.id === doneId)
+  if (!done || done.status !== "Done") return []
+  return rows.filter((r) => r.status !== "Done" && r.blockedBy.includes(doneId) && !isBlocked(rows, r))
+}
+
+/** Rows that list `id` as a blocker (the drawer's "Blocking" line). */
+export function blocking<R extends DepRow>(rows: R[], id: string): R[] {
+  return rows.filter((r) => r.blockedBy.includes(id))
+}

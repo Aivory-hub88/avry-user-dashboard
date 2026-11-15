@@ -56,6 +56,8 @@ export function seedRows(table: ProjectRequest["dataTable"], fields: FieldDef[])
     createdBy: null,
     createdAt: "",
     followers: [],
+    parentId: null,
+    blockedBy: [],
     start: "",
     due: "",
     description: "",

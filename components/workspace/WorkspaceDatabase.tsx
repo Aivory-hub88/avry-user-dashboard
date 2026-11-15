@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
-import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload, LayoutTemplate, Zap, Bell, BellOff } from "lucide-react"
+import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload, LayoutTemplate, Zap, Bell, BellOff, ChevronRight, ListChecks, Ban, CornerDownRight } from "lucide-react"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 import {
   readCells,
@@ -25,6 +25,15 @@ import {
   removeFollower,
   hasPerson,
   cleanComment,
+  cleanParentId,
+  cleanBlockedBy,
+  subtaskProgress,
+  openBlockers,
+  parentProblem,
+  blockedByProblem,
+  descendantIds,
+  blocking,
+  MAX_BLOCKED_BY,
   type TaskComment,
   type FieldDef,
   type CellValue,
@@ -34,6 +43,7 @@ import {
 import { AGENT_ROSTER } from "@/lib/agentRoster"
 import { AvatarStack, PeoplePicker, PersonAvatar, nameOf, namesOf, type TaskAgent, type TaskPerson } from "@/components/workspace/TaskPeople"
 import { CommentComposer, CommentText, TaskActivity } from "@/components/workspace/TaskComments"
+import { TaskRowPicker } from "@/components/workspace/TaskRowPicker"
 
 type RowComment = TaskComment
 type Row = {
@@ -49,6 +59,10 @@ type Row = {
   createdAt: string
   /** Who hears about changes (creator, owner, assignees, commenters, @mentioned). */
   followers: PersonRef[]
+  /** Sub-task of this row (same doc, one level deep); null = top level. */
+  parentId: string | null
+  /** Rows that must be Done first (same doc, max 20). */
+  blockedBy: string[]
   start: string
   due: string
   description: string
@@ -104,8 +118,9 @@ function toRows(arr: Y.Array<Y.Map<unknown>>): Row[] {
     const assignees = rowAssignees(m.get("assignees"), m.get("assignee"))
     const owner = cleanOwner(m.get("owner"))
     const createdBy = cleanPersonRef(m.get("createdBy"))
+    const id = (m.get("id") as string) ?? uid()
     return {
-      id: (m.get("id") as string) ?? uid(),
+      id,
       title: (m.get("title") as string) ?? "",
       status: (m.get("status") as string) ?? "Todo",
       priority: (m.get("priority") as Row["priority"]) ?? "Med",
@@ -116,6 +131,8 @@ function toRows(arr: Y.Array<Y.Map<unknown>>): Row[] {
       createdAt: (m.get("createdAt") as string) ?? "",
       followers: rowFollowers(m.get("followers"), { createdBy, owner, assignees }),
       unlinked: unlinkedAssignee(m.get("assignees"), m.get("assignee")),
+      parentId: cleanParentId(m.get("parentId")),
+      blockedBy: cleanBlockedBy(m.get("blockedBy"), id),
       start: (m.get("start") as string) ?? "",
       due: (m.get("due") as string) ?? "",
       description: (m.get("description") as string) ?? "",
@@ -493,6 +510,12 @@ export default function WorkspaceDatabase({
   const importRef = useRef<HTMLInputElement | null>(null)
   // Transient action notice (WIP blocks, import summary). Auto-clears.
   const [notice, setNotice] = useState<string | null>(null)
+  // Sub-tasks: parents expanded in the table (collapsed by default), the
+  // parent waiting for "delete its sub-tasks or keep them", and the drawer's
+  // inline "Add sub-task" draft (tied to the row it was typed for).
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
+  const [subDraft, setSubDraft] = useState<{ parentId: string; text: string }>({ parentId: "", text: "" })
   useEffect(() => {
     if (!notice) return
     const t = setTimeout(() => setNotice(null), 5000)
@@ -995,6 +1018,8 @@ export default function WorkspaceDatabase({
       cells: {},
       unlinked: "",
       followers: [],
+      parentId: null,
+      blockedBy: [],
       ...over,
     }
     // Creator, owner and assignees follow a new task.
@@ -1144,14 +1169,46 @@ export default function WorkspaceDatabase({
     setAssignees(row, [...kept, to].slice(-5))
   }
 
+  /** Delete a task. A parent asks first: delete its sub-tasks too, or keep them. */
   const deleteRow = (id: string) => {
+    if (!guard()) return
+    const yRows = yRowsRef.current
+    if (!yRows) return
+    if (toRows(yRows).some((r) => r.parentId === id)) {
+      setPendingDelete(id)
+      return
+    }
+    removeRows(id, "keep")
+  }
+
+  /**
+   * Remove a task (and with "delete" its sub-tasks) in one transaction.
+   * Kept sub-tasks become top-level tasks; no task keeps waiting on a
+   * deleted one.
+   */
+  const removeRows = (id: string, subtasks: "keep" | "delete") => {
+    setPendingDelete(null)
     if (!guard()) return
     const yRows = yRowsRef.current
     const doc = docRef.current
     if (!yRows || !doc) return
-    const idx = toRows(yRows).findIndex((x) => x.id === id)
-    if (idx < 0) return
-    doc.transact(() => yRows.delete(idx, 1), agentOrigin())
+    const all = toRows(yRows)
+    if (!all.some((r) => r.id === id)) return
+    const removed = new Set([id, ...(subtasks === "delete" ? descendantIds(all, id) : [])])
+    doc.transact(() => {
+      const maps = yRows.toArray()
+      for (let i = maps.length - 1; i >= 0; i--) {
+        const m = maps[i]
+        if (removed.has(m.get("id") as string)) {
+          yRows.delete(i, 1)
+          continue
+        }
+        if (m.get("parentId") === id) m.set("parentId", null)
+        const bb = cleanBlockedBy(m.get("blockedBy"))
+        if (bb.some((b) => removed.has(b))) m.set("blockedBy", bb.filter((b) => !removed.has(b)))
+      }
+    }, agentOrigin())
+    if (selectedId && removed.has(selectedId)) setSelectedId(null)
   }
 
   const updateRow = (id: string, patch: Partial<Row>) => {
@@ -1166,6 +1223,14 @@ export default function WorkspaceDatabase({
     doc.transact(() => {
       for (const [k, v] of Object.entries(patch)) m.set(k, v)
     }, agentOrigin())
+    // Moving a blocked task into Doing is allowed; say what it still waits on.
+    if (patch.status === "Doing" && prev.status !== "Doing") {
+      const waiting = openBlockers(toRows(yRows), prev)
+      if (waiting.length > 0) {
+        const what = waiting.length === 1 ? `“${waiting[0].title || "Untitled"}”` : `${waiting.length} open tasks`
+        setNotice(`“${prev.title || "Untitled"}” is still blocked by ${what} — moved to Doing anyway.`)
+      }
+    }
     // Tracked changes → activity + follower notices (server verifies them).
     if (patch.status !== undefined && patch.status !== prev.status) postEvent(id, { kind: "status", from: prev.status })
     if (patch.due !== undefined && (patch.due || "") !== (prev.due || "")) postEvent(id, { kind: "due", from: prev.due })
@@ -1173,6 +1238,47 @@ export default function WorkspaceDatabase({
       postEvent(id, { kind: "owner", from: prev.owner })
     }
   }
+
+  /** Inline "Add sub-task" in the drawer: a new task under `parent` (same blankRow rules). */
+  const addSubtask = (parent: Row) => {
+    if (!guard()) return
+    const title = (subDraft.parentId === parent.id ? subDraft.text : "").trim().slice(0, 200)
+    if (!title) return
+    const yRows = yRowsRef.current
+    const doc = docRef.current
+    if (!yRows || !doc) return
+    const r = blankRow({ title, parentId: parent.id })
+    doc.transact(() => yRows.push([yMapFromRow(r)]), agentOrigin())
+    postEvent(r.id, { kind: "created" })
+    setSubDraft({ parentId: parent.id, text: "" })
+    setExpanded((prev) => new Set(prev).add(parent.id))
+  }
+
+  const setParent = (row: Row, parentId: string | null) => {
+    if (parentProblem(rows, row.id, parentId)) return
+    updateRow(row.id, { parentId })
+  }
+
+  const addBlocker = (row: Row, blockerId: string) => {
+    const next = [...row.blockedBy, blockerId]
+    const why = blockedByProblem(rows, row.id, next)
+    if (why) {
+      setNotice(why === "cycle" ? "That task already waits on this one — a loop isn't allowed." : "Can't add that blocker.")
+      return
+    }
+    updateRow(row.id, { blockedBy: next })
+  }
+
+  const removeBlocker = (row: Row, blockerId: string) => {
+    updateRow(row.id, { blockedBy: row.blockedBy.filter((b) => b !== blockerId) })
+  }
+
+  /** Rows `row` may wait on: not itself, not already listed, no loop. */
+  const blockerCandidates = (row: Row): Row[] =>
+    displayRows.filter((c) => c.id !== row.id && !row.blockedBy.includes(c.id) && !blockedByProblem(rows, row.id, [...row.blockedBy, c.id]))
+
+  /** Rows `row` may become a sub-task of (top-level, not itself; `row` has no sub-tasks). */
+  const parentCandidates = (row: Row): Row[] => displayRows.filter((c) => !parentProblem(rows, row.id, c.id))
 
   const onDropKanban = (e: React.DragEvent, key: string) => {
     const id = e.dataTransfer.getData("text/plain")
@@ -1397,6 +1503,41 @@ export default function WorkspaceDatabase({
     // title default
     return a.title.localeCompare(b.title) * dir
   })
+
+  // Structure lookups (sub-tasks, blockers) over every row, not just the filtered ones.
+  const rowById = new Map(displayRows.map((r) => [r.id, r]))
+  /** The row's parent when it exists (a deleted parent leaves a top-level task). */
+  const parentOf = (r: Row): Row | null => (r.parentId && r.parentId !== r.id ? rowById.get(r.parentId) ?? null : null)
+  const childrenOf = (id: string): Row[] => displayRows.filter((r) => r.parentId === id && r.id !== id)
+
+  // Table order: each parent, then (when expanded) its sub-tasks indented
+  // under it. A sub-task whose parent is filtered out shows on its own,
+  // marked as a sub-task.
+  const tableRows: Array<{ row: Row; nested: boolean }> = []
+  {
+    const shown = new Set(filtered.map((r) => r.id))
+    for (const r of filtered) {
+      const parent = parentOf(r)
+      if (parent && shown.has(parent.id)) continue
+      tableRows.push({ row: r, nested: false })
+      if (expanded.has(r.id)) for (const c of filtered) if (c.parentId === r.id && c.id !== r.id) tableRows.push({ row: c, nested: true })
+    }
+  }
+  // Drawer structure (the open task's parent, sub-tasks, and who waits on it).
+  const drawerParent = selectedRow ? parentOf(selectedRow) : null
+  const drawerKids = selectedRow ? childrenOf(selectedRow.id) : []
+  const drawerProgress = selectedRow ? subtaskProgress(displayRows, selectedRow.id) : { done: 0, total: 0 }
+  const drawerBlocking = selectedRow ? blocking(displayRows, selectedRow.id) : []
+  const subDraftText = selectedRow && subDraft.parentId === selectedRow.id ? subDraft.text : ""
+  const pendingTarget = pendingDelete ? rowById.get(pendingDelete) ?? null : null
+  const pendingKids = pendingDelete ? childrenOf(pendingDelete).length : 0
+  const toggleExpanded = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   // Calendar helpers (current month)
   const now = new Date()
@@ -1881,11 +2022,32 @@ export default function WorkspaceDatabase({
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {filtered.map((r) => (
-                  <tr key={r.id} className="group hover:bg-white/[0.03]">
+                {tableRows.map(({ row: r, nested }) => {
+                  const kids = nested ? 0 : childrenOf(r.id).length
+                  const progress = kids > 0 ? subtaskProgress(displayRows, r.id) : null
+                  const parent = parentOf(r)
+                  const waiting = openBlockers(displayRows, r)
+                  return (
+                  <tr key={r.id} className={`group hover:bg-white/[0.03] ${nested ? "bg-white/[0.012]" : ""}`}>
                     <td className="min-w-[240px] px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <GripVertical className="h-3.5 w-3.5 shrink-0 text-white/15 opacity-0 group-hover:opacity-100" />
+                      <div className={`flex items-center gap-2 ${nested ? "pl-5" : ""}`}>
+                        {kids > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(r.id)}
+                            aria-expanded={expanded.has(r.id)}
+                            title={expanded.has(r.id) ? "Hide sub-tasks" : "Show sub-tasks"}
+                            className="shrink-0 rounded p-0.5 text-white/40 hover:bg-white/[0.06] hover:text-white/75"
+                          >
+                            <ChevronRight className={`h-3.5 w-3.5 transition-transform ${expanded.has(r.id) ? "rotate-90" : ""}`} />
+                          </button>
+                        ) : parent ? (
+                          <span title={`Sub-task of “${parent.title || "Untitled"}”`} className="shrink-0">
+                            <CornerDownRight className="h-3.5 w-3.5 text-white/25" />
+                          </span>
+                        ) : (
+                          <GripVertical className="h-3.5 w-3.5 shrink-0 text-white/15 opacity-0 group-hover:opacity-100" />
+                        )}
                         <input
                           value={r.title}
                           disabled={readOnly}
@@ -1893,6 +2055,26 @@ export default function WorkspaceDatabase({
                           placeholder="Untitled"
                           className="w-full bg-transparent text-[13.5px] text-white/85 placeholder:text-white/25 outline-none disabled:opacity-80"
                         />
+                        {progress && (
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(r.id)}
+                            title={`${progress.done} of ${progress.total} sub-tasks done`}
+                            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] ${progress.done === progress.total ? "bg-emerald-500/10 text-emerald-300" : "bg-white/[0.06] text-white/50"}`}
+                          >
+                            <ListChecks className="h-3 w-3" />
+                            {progress.done}/{progress.total}
+                          </button>
+                        )}
+                        {waiting.length > 0 && r.status !== "Done" && (
+                          <span
+                            title={`Waiting on ${waiting.map((b) => `“${b.title || "Untitled"}”`).join(", ")}`}
+                            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[11px] text-red-300"
+                          >
+                            <Ban className="h-3 w-3" />
+                            Blocked
+                          </span>
+                        )}
                         {!readOnly && (
                           <button
                             onClick={() => deleteRow(r.id)}
@@ -2008,7 +2190,8 @@ export default function WorkspaceDatabase({
                       </button>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -2148,7 +2331,12 @@ export default function WorkspaceDatabase({
                 {over && <span className="text-[10px] font-medium uppercase tracking-wider text-amber-300/80">over wip</span>}
               </div>
               <div className="flex flex-col gap-2.5">
-                {inCol.map((r) => (
+                {inCol.map((r) => {
+                    const kids = childrenOf(r.id).length
+                    const progress = kids > 0 ? subtaskProgress(displayRows, r.id) : null
+                    const parent = parentOf(r)
+                    const waiting = r.status === "Done" ? [] : openBlockers(displayRows, r)
+                    return (
                     <div
                       key={r.id}
                       draggable={!readOnly}
@@ -2159,6 +2347,17 @@ export default function WorkspaceDatabase({
                       }}
                       className="group cursor-grab rounded-[12px] border border-line bg-surface-1 p-4 shadow-sm transition hover:border-white/10 active:cursor-grabbing"
                     >
+                      {parent && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedId(parent.id)}
+                          title="Open the parent task"
+                          className="mb-1 flex max-w-full items-center gap-1 truncate text-[11px] text-white/35 hover:text-white/60"
+                        >
+                          <CornerDownRight className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{parent.title || "Untitled"}</span>
+                        </button>
+                      )}
                       <div className="flex items-start justify-between gap-2">
                         <button onClick={() => setSelectedId(r.id)} className="min-w-0 flex-1 text-left text-[13.5px] font-medium leading-snug text-white/85 hover:text-white">
                           {r.title || "Untitled"}
@@ -2179,6 +2378,24 @@ export default function WorkspaceDatabase({
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
                         <PriorityPill p={r.priority} />
                         {groupBy !== "status" && <StatusPill s={r.status} />}
+                        {progress && (
+                          <span
+                            title={`${progress.done} of ${progress.total} sub-tasks done`}
+                            className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] ${progress.done === progress.total ? "bg-emerald-500/10 text-emerald-300" : "bg-white/[0.06] text-white/50"}`}
+                          >
+                            <ListChecks className="h-3 w-3" />
+                            {progress.done}/{progress.total}
+                          </span>
+                        )}
+                        {waiting.length > 0 && (
+                          <span
+                            title={`Waiting on ${waiting.map((b) => `“${b.title || "Untitled"}”`).join(", ")}`}
+                            className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[11px] text-red-300"
+                          >
+                            <Ban className="h-3 w-3" />
+                            Blocked
+                          </span>
+                        )}
                         {(groupBy !== "assignee" || r.assignees.length > 1) && r.assignees.length > 0 && (
                           <span className="ml-auto" title={namesOf(r.assignees, people)}>
                             <AvatarStack list={r.assignees} people={people} size={20} />
@@ -2201,7 +2418,8 @@ export default function WorkspaceDatabase({
                         </div>
                       )}
                     </div>
-                  ))}
+                    )
+                  })}
                 {!readOnly && (
                   quickStatus === s && (laneBy === "none" || groupBy !== "status" || quickLane === lane.key) ? (
                     <div className="flex items-center gap-1.5 rounded-[12px] border border-white/15 bg-white/[0.03] p-2">
@@ -2445,6 +2663,84 @@ export default function WorkspaceDatabase({
                     )}
                   </div>
                 </div>
+                {(drawerParent || (!readOnly && drawerKids.length === 0)) && (
+                    <div className="col-span-2">
+                      <span className="text-[11px] uppercase tracking-wider text-white/30">Sub-task of</span>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        {drawerParent ? (
+                          <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-2 py-0.5 text-[12px] text-white/70">
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[drawerParent.status] ?? "bg-white/40"}`} />
+                            <button type="button" onClick={() => setSelectedId(drawerParent.id)} className="max-w-[260px] truncate hover:underline">
+                              {drawerParent.title || "Untitled"}
+                            </button>
+                            {!readOnly && (
+                              <button type="button" onClick={() => setParent(selectedRow, null)} title="Make it a top-level task" className="ml-0.5 text-white/30 hover:text-white/70">
+                                ✕
+                              </button>
+                            )}
+                          </span>
+                        ) : (
+                          <TaskRowPicker
+                            candidates={parentCandidates(selectedRow)}
+                            onPick={(pid) => setParent(selectedRow, pid)}
+                            label="Find the parent task"
+                            className="inline-flex items-center gap-1 rounded-full border border-dashed border-white/15 px-2.5 py-1 text-[12px] text-white/45 hover:text-white/75"
+                          >
+                            <Plus className="h-3 w-3" /> Set parent
+                          </TaskRowPicker>
+                        )}
+                      </div>
+                    </div>
+                )}
+                <div className="col-span-2">
+                  <span className="text-[11px] uppercase tracking-wider text-white/30">Blocked by</span>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {selectedRow.blockedBy.map((bid) => {
+                      const b = rowById.get(bid)
+                      if (!b) return null
+                      const done = b.status === "Done"
+                      return (
+                        <span
+                          key={bid}
+                          className={`inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-[12px] ${done ? "border-line bg-white/[0.03] text-white/40" : "border-red-500/20 bg-red-500/10 text-red-200"}`}
+                        >
+                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[b.status] ?? "bg-white/40"}`} />
+                          <button type="button" onClick={() => setSelectedId(b.id)} className={`max-w-[220px] truncate hover:underline ${done ? "line-through" : ""}`}>
+                            {b.title || "Untitled"}
+                          </button>
+                          <span className="text-[10px] uppercase tracking-wider opacity-60">{b.status}</span>
+                          {!readOnly && (
+                            <button type="button" onClick={() => removeBlocker(selectedRow, bid)} title="Remove blocker" className="ml-0.5 opacity-50 hover:opacity-100">
+                              ✕
+                            </button>
+                          )}
+                        </span>
+                      )
+                    })}
+                    {!readOnly && selectedRow.blockedBy.length < MAX_BLOCKED_BY && (
+                      <TaskRowPicker
+                        candidates={blockerCandidates(selectedRow)}
+                        onPick={(bid) => addBlocker(selectedRow, bid)}
+                        label="Find a task this waits on"
+                        className="inline-flex items-center gap-1 rounded-full border border-dashed border-white/15 px-2.5 py-1 text-[12px] text-white/45 hover:text-white/75"
+                      >
+                        <Plus className="h-3 w-3" /> Add
+                      </TaskRowPicker>
+                    )}
+                    {readOnly && !selectedRow.blockedBy.some((b) => rowById.has(b)) && <span className="text-[12px] text-white/25">—</span>}
+                  </div>
+                  {drawerBlocking.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] text-white/35">
+                        <span>Blocking</span>
+                        {drawerBlocking.map((w, i) => (
+                          <button key={w.id} type="button" onClick={() => setSelectedId(w.id)} className="max-w-[200px] truncate text-white/50 hover:text-white/80 hover:underline">
+                            {w.title || "Untitled"}
+                            {i < drawerBlocking.length - 1 ? "," : ""}
+                          </button>
+                        ))}
+                      </div>
+                  )}
+                </div>
                 <label className="block">
                   <span className="text-[11px] uppercase tracking-wider text-white/30">Start</span>
                   <input
@@ -2480,6 +2776,69 @@ export default function WorkspaceDatabase({
                 <span className="text-[11px] uppercase tracking-wider text-white/30">Description</span>
                 <textarea value={selectedRow.description} disabled={readOnly} onChange={(e) => updateRow(selectedRow.id, { description: e.target.value })} placeholder="Add details…" rows={4} className="mt-1 w-full rounded-xl border border-line bg-white/[0.04] px-3 py-2 text-[13px] text-white/70 outline-none placeholder:text-white/25 disabled:opacity-60" />
               </label>
+
+              {!drawerParent && !(readOnly && drawerKids.length === 0) && (
+                  <div className="mt-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] uppercase tracking-wider text-white/30">Sub-tasks{drawerProgress.total > 0 ? ` ${drawerProgress.done}/${drawerProgress.total}` : ""}</span>
+                      {drawerProgress.total > 0 && (
+                        <span className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+                          <span className="block h-full rounded-full bg-emerald-400/70" style={{ width: `${Math.round((drawerProgress.done / drawerProgress.total) * 100)}%` }} />
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1.5 flex flex-col gap-0.5">
+                      {drawerKids.map((k) => {
+                        const kWaiting = k.status === "Done" ? [] : openBlockers(displayRows, k)
+                        return (
+                          <div key={k.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/[0.03]">
+                            <input
+                              type="checkbox"
+                              checked={k.status === "Done"}
+                              disabled={readOnly}
+                              onChange={() => updateRow(k.id, { status: k.status === "Done" ? "Todo" : "Done" })}
+                              aria-label={`Mark “${k.title || "Untitled"}” ${k.status === "Done" ? "not done" : "done"}`}
+                              className="h-3.5 w-3.5 shrink-0 accent-emerald-400"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setSelectedId(k.id)}
+                              className={`min-w-0 flex-1 truncate text-left text-[12.5px] ${k.status === "Done" ? "text-white/35 line-through" : "text-white/75 hover:text-white"}`}
+                            >
+                              {k.title || "Untitled"}
+                            </button>
+                            {kWaiting.length > 0 && (
+                              <span title={`Waiting on ${kWaiting.map((b) => `“${b.title || "Untitled"}”`).join(", ")}`} className="shrink-0 text-red-300">
+                                <Ban className="h-3 w-3" />
+                              </span>
+                            )}
+                            {k.assignees.length > 0 && <AvatarStack list={k.assignees} people={people} size={18} />}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {!readOnly && (
+                      <div className="mt-1 flex items-center gap-2 rounded-lg px-2 py-1">
+                        <Plus className="h-3.5 w-3.5 shrink-0 text-white/30" />
+                        <input
+                          value={subDraftText}
+                          onChange={(e) => setSubDraft({ parentId: selectedRow.id, text: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") addSubtask(selectedRow)
+                            if (e.key === "Escape") setSubDraft({ parentId: selectedRow.id, text: "" })
+                          }}
+                          placeholder="Add sub-task…"
+                          className="min-w-0 flex-1 bg-transparent text-[12.5px] text-white/80 placeholder:text-white/25 outline-none"
+                        />
+                        {subDraftText.trim() && (
+                          <button type="button" onClick={() => addSubtask(selectedRow)} className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-medium text-black hover:bg-white/90">
+                            Add
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+              )}
 
               {fields.length > 0 && (
                 <div className="mt-4">
@@ -2578,12 +2937,40 @@ export default function WorkspaceDatabase({
                   </div>
                 )}
                 {!readOnly && (
-                  <button onClick={() => { if (confirm("Delete this row?")) { deleteRow(selectedRow.id); setSelectedId(null) } }} className="mt-4 w-full rounded-full border border-red-500/20 bg-red-500/10 py-2 text-[12px] text-red-300 hover:bg-red-500/15">Delete row</button>
+                  <button onClick={() => { if (childrenOf(selectedRow.id).length > 0) deleteRow(selectedRow.id); else if (confirm("Delete this row?")) { deleteRow(selectedRow.id); setSelectedId(null) } }} className="mt-4 w-full rounded-full border border-red-500/20 bg-red-500/10 py-2 text-[12px] text-red-300 hover:bg-red-500/15">Delete row</button>
                 )}
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Deleting a parent: its sub-tasks go with it, or stay as top-level tasks. */}
+      {pendingTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" onClick={() => setPendingDelete(null)}>
+            <div
+              role="alertdialog"
+              aria-label="Delete task with sub-tasks"
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-[400px] rounded-2xl border border-line bg-[#1a1a18] p-5 shadow-2xl"
+            >
+              <div className="text-[14px] font-medium text-white/85">Delete “{pendingTarget.title || "Untitled"}”?</div>
+              <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/50">
+                It has {pendingKids} sub-task{pendingKids === 1 ? "" : "s"}. Delete {pendingKids === 1 ? "it" : "them"} too, or keep {pendingKids === 1 ? "it" : "them"} as separate tasks?
+              </p>
+              <div className="mt-4 flex flex-col gap-2">
+                <button onClick={() => removeRows(pendingTarget.id, "delete")} className="rounded-full border border-red-500/20 bg-red-500/10 py-2 text-[12px] text-red-300 hover:bg-red-500/15">
+                  Delete task and {pendingKids} sub-task{pendingKids === 1 ? "" : "s"}
+                </button>
+                <button onClick={() => removeRows(pendingTarget.id, "keep")} className="rounded-full border border-line bg-white/[0.04] py-2 text-[12px] text-white/75 hover:bg-white/[0.08]">
+                  Delete task, keep sub-tasks
+                </button>
+                <button onClick={() => setPendingDelete(null)} className="rounded-full py-2 text-[12px] text-white/45 hover:text-white/75">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
       )}
 
       {/* Template gallery — starters plus saved customs. Save customs from any row's drawer. */}
