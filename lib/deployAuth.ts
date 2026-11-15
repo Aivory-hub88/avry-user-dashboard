@@ -156,8 +156,16 @@ export async function authedFetch(
       },
     })
 
-  let res = await doFetch(currentToken())
+  const token = currentToken()
+  let res = await doFetch(token)
   if (res.status === 401) {
+    if (token && !readSession()?.refresh_token) {
+      // A rejected access token with no refresh token to trade in (e.g. a
+      // session carried over from the landing's cookie) can never recover:
+      // say so once, instead of leaving every page on a bare 401.
+      handleDeadSession()
+      return res
+    }
     const fresh = await tryRefresh()
     if (fresh) res = await doFetch(fresh)
   }

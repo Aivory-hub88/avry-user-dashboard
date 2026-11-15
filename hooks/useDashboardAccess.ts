@@ -31,6 +31,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { signInUrl } from '@/lib/signIn'
 import { isServerRender, getWindow } from '@/lib/ssr-safe'
 import { AuthManager } from '@/lib/authManager'
 import { getMarketingUrl } from '@/lib/config'
@@ -244,7 +245,7 @@ export function useDashboardAccess({ navigate = true }: { navigate?: boolean } =
     const redirect = (target: Exclude<RedirectTarget, null>) => {
       const marketing = getMarketingUrl()
       const url =
-        target === 'sign-in' ? `${marketing}/login` : `${marketing}/diagnostic?upgrade=1`
+        target === 'sign-in' ? signInUrl(marketing, win.location) : `${marketing}/diagnostic?upgrade=1`
       win.location.href = url
     }
 
