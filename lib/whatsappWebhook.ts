@@ -3,6 +3,7 @@ import { after, NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { crmFor } from '@/lib/crmServer'
 import { askAssistant } from '@/lib/aivoryAssistantServer'
+import { aivoryTenant } from '@/lib/whatsappConnection'
 import { getDraftSetting, saveDraft } from '@/lib/whatsappDrafts'
 import { draftForEntry, latestPerContact } from '@/lib/whatsappDraftRunner'
 import { logInbound, SeenIds } from '@/lib/whatsappInbound'
@@ -57,7 +58,7 @@ function scheduleDrafts(tenantId: string, crm: ReturnType<typeof crmFor>, entrie
   const work = async () => {
     for (const e of latestPerContact(entries)) {
       try {
-        await draftForEntry(tenantId, e, { enabled: getDraftSetting, notes: (id) => crm.listContactActivities(id), ask: askAssistant, save: saveDraft })
+        await draftForEntry(tenantId, e, { enabled: async (t) => t === aivoryTenant() && (await getDraftSetting(t)), notes: (id) => crm.listContactActivities(id), ask: askAssistant, save: saveDraft })
       } catch (err) {
         console.error('[whatsapp draft] failed:', (err as Error).message)
       }

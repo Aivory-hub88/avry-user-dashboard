@@ -20,11 +20,19 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
   const [setup, setSetup] = useState<string[]>([])
   const meta = providerMeta(provider) ?? PROVIDERS[0]
   const [drafts, setDrafts] = useState<boolean | null>(null)
+  const [draftsAvailable, setDraftsAvailable] = useState(false)
   const connected = !!status?.connected
   useEffect(() => {
     if (!connected) return
     let alive = true
-    waApi.settings().then((s) => alive && setDrafts(s.draft_replies), () => alive && setDrafts(false))
+    waApi.settings().then(
+      (s) => {
+        if (!alive) return
+        setDrafts(s.draft_replies)
+        setDraftsAvailable(s.available)
+      },
+      () => alive && setDrafts(false),
+    )
     return () => {
       alive = false
     }
@@ -147,7 +155,7 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
         </form>
       )}
 
-      {status.connected && (
+      {status.connected && draftsAvailable && (
         <div className="space-y-2 rounded-2xl border border-line px-4 py-4">
           <div className="flex items-center gap-3">
             <span className="text-[13px] text-white/90">Draft replies with the Aivory assistant</span>

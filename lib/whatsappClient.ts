@@ -48,10 +48,10 @@ export const waApi = {
     if (!r.ok) throw new WaError(j.error ?? "Could not send. Try again.", j.code)
     return { logged: j.logged !== false }
   },
-  settings: async (): Promise<{ draft_replies: boolean }> => {
+  settings: async (): Promise<{ draft_replies: boolean; available: boolean }> => {
     const r = await authedFetch(`${BASE_PATH}/api/whatsapp/settings`)
     if (!r.ok) throw new Error("settings")
-    return (await r.json()) as { draft_replies: boolean }
+    return (await r.json()) as { draft_replies: boolean; available: boolean }
   },
   setDraftReplies: async (on: boolean): Promise<void> => {
     const r = await authedFetch(`${BASE_PATH}/api/whatsapp/settings`, { method: "PUT", body: JSON.stringify({ draft_replies: on }) })
