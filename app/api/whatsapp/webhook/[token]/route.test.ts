@@ -13,7 +13,7 @@ vi.mock("@/lib/crmServer", () => ({
     listContactActivities: async () => [],
   }),
 }))
-vi.mock("@/lib/whatsappDrafts", () => ({ getDraftSetting: async () => false, saveDraft: async () => {} }))
+vi.mock("@/lib/whatsappDrafts", () => ({ getDraftConfig: async () => ({ draftReplies: false, agent: null, replyMode: "approval" }), saveDraft: async () => {}, deleteDraft: async () => {}, countAutoReplies: async () => ({ contactCount: 0, accountCount: 0 }), recordAutoReply: async () => {} }))
 let stored: { userId: string; conn: unknown } | null = null
 vi.mock("@/lib/whatsappConnection", () => ({ getConnectionByToken: async () => stored, aivoryTenant: () => null }))
 

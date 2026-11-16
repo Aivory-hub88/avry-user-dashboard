@@ -4,7 +4,7 @@ import { ANY_MODULE, requirePaidPlan } from '@/lib/planGate'
 import { MAX_TEXT } from '@/lib/whatsapp/types'
 import { getProvider } from '@/lib/whatsapp/providers'
 import { whatsappDigits } from '@/lib/crmLabels'
-import { WA_OUT } from '@/lib/crmWhatsapp'
+import { sentBody } from '@/lib/crmWhatsapp'
 import { crmFor } from '@/lib/crmServer'
 import { getConnection } from '@/lib/whatsappConnection'
 import { deleteDraft } from '@/lib/whatsappDrafts'
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   // The message is out; a logging failure must not look like a send failure.
   let logged = true
   try {
-    await crm.createActivity({ kind: 'note', subject_type: 'contact', subject_id: contact.id, body: `${WA_OUT}${text}` })
+    await crm.createActivity({ kind: 'note', subject_type: 'contact', subject_id: contact.id, body: sentBody(text) })
   } catch (e) {
     logged = false
     console.error('[whatsapp send] sent but not logged:', (e as Error).message)

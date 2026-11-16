@@ -5,7 +5,7 @@ import { useState } from "react"
 import { ArrowDownLeft, ArrowUpRight, Check } from "lucide-react"
 import type { Activity } from "@/lib/crmClient"
 import { activityState, agentLabel, DUE_TONE, formatWhen, isCompletable, KIND_META, SUBJECT_LABEL } from "@/lib/crmActivity"
-import { whatsappDirection, whatsappText } from "@/lib/crmWhatsapp"
+import { whatsappDirection, whatsappParts } from "@/lib/crmWhatsapp"
 
 export default function ActivityItem({
   a,
@@ -28,6 +28,7 @@ export default function ActivityItem({
   const actor = a.owner_agent ? agentLabel(a.owner_agent) : "You"
   const canTick = !!onToggleDone && isCompletable(a)
   const wa = whatsappDirection(a)
+  const waParts = wa && a.body ? whatsappParts(a.body) : null
 
   return (
     <li className="flex gap-3 px-4 py-3">
@@ -54,6 +55,8 @@ export default function ActivityItem({
               {wa === "in" ? "Received" : "Sent"}
             </span>
           )}
+          {waParts?.auto && <span className="rounded-full bg-sky-400/10 px-1.5 py-px text-[10.5px] font-medium text-sky-200/90">Auto-reply · {waParts.auto}</span>}
+          {waParts?.template && <span className="rounded-full bg-white/[0.07] px-1.5 py-px text-[10.5px] font-medium text-white/60">Template · {waParts.template}</span>}
           {(!wa || a.owner_agent) && <span>{actor}</span>}
           <span>{formatWhen(a.occurred_at)}</span>
           {done && a.completed_at ? (
@@ -73,7 +76,7 @@ export default function ActivityItem({
           </button>
         )}
         {a.body && (
-          <div className={`mt-1 whitespace-pre-wrap break-words text-[13px] leading-relaxed ${done ? "text-white/40 line-through decoration-white/25" : "text-white/80"}`}>{wa ? whatsappText(a.body) : a.body}</div>
+          <div className={`mt-1 whitespace-pre-wrap break-words text-[13px] leading-relaxed ${done ? "text-white/40 line-through decoration-white/25" : "text-white/80"}`}>{waParts ? waParts.text : a.body}</div>
         )}
         {onDelete && (
           <div className="mt-1.5 text-[11px]">

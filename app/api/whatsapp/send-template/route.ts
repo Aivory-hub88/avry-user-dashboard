@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ANY_MODULE, requirePaidPlan } from '@/lib/planGate'
 import { whatsappDigits } from '@/lib/crmLabels'
-import { WA_OUT } from '@/lib/crmWhatsapp'
+import { sentBody } from '@/lib/crmWhatsapp'
 import { crmFor } from '@/lib/crmServer'
 import { getProvider } from '@/lib/whatsapp/providers'
 import { renderTemplate } from '@/lib/whatsapp/templates'
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
   let logged = true
   try {
-    await crm.createActivity({ kind: 'note', subject_type: 'contact', subject_id: contact.id, body: `${WA_OUT}${renderTemplate(tpl.body, values)}\nTemplate: ${tpl.name}` })
+    await crm.createActivity({ kind: 'note', subject_type: 'contact', subject_id: contact.id, body: sentBody(renderTemplate(tpl.body, values), { template: tpl.name }) })
   } catch (e) {
     logged = false
     console.error('[whatsapp send-template] sent but not logged:', (e as Error).message)

@@ -13,7 +13,7 @@ import WhatsappIcon from "@/components/crm/WhatsappIcon"
 import { whatsappDigits } from "@/lib/crmLabels"
 import { renderTemplate } from "@/lib/whatsapp/templates"
 import { MAX_TEXT, type WaTemplate } from "@/lib/whatsapp/types"
-import { waApi, WaError, type TemplateListing } from "@/lib/whatsappClient"
+import { waApi, WaError, type TemplateListing, type WaDraft } from "@/lib/whatsappClient"
 
 type Note = { tone: "ok" | "bad"; text: string } | null
 
@@ -26,7 +26,7 @@ export default function WhatsappSend({ contactId, name, phone, onSent }: { conta
   const [listError, setListError] = useState<string | null>(null)
   const [picked, setPicked] = useState("")
   const [vars, setVars] = useState<string[]>([])
-  const [draft, setDraft] = useState<string | null>(null)
+  const [draft, setDraft] = useState<WaDraft | null>(null)
   const usable = whatsappDigits(phone) !== null
 
   // An AI draft shows up a few seconds after a customer message arrives (when the account turned drafts on).
@@ -37,7 +37,7 @@ export default function WhatsappSend({ contactId, name, phone, onSent }: { conta
     const look = () =>
       waApi.draft(contactId).then((d) => {
         if (!alive || !d) return
-        setDraft(d.text)
+        setDraft(d)
         // Never overwrite something the person is already typing.
         setText((cur) => (cur.trim() === "" ? d.text : cur))
       })
@@ -134,9 +134,9 @@ export default function WhatsappSend({ contactId, name, phone, onSent }: { conta
           {draft !== null && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-sky-200/80">
               <Sparkles size={12} className="shrink-0" />
-              <span>Draft from the Aivory assistant. Review it, then Send.</span>
-              {text !== draft && (
-                <button type="button" onClick={() => setText(draft)} className="underline decoration-sky-200/30 underline-offset-2 hover:text-sky-100">
+              <span>Draft from {draft.writer ?? "the Aivory assistant"}. Review it, then Send.</span>
+              {text !== draft.text && (
+                <button type="button" onClick={() => setText(draft.text)} className="underline decoration-sky-200/30 underline-offset-2 hover:text-sky-100">
                   Use draft
                 </button>
               )}
@@ -145,7 +145,7 @@ export default function WhatsappSend({ contactId, name, phone, onSent }: { conta
                 onClick={async () => {
                   // Wait for the delete: clearing first would let the next look-up bring the same draft back.
                   await waApi.discardDraft(contactId)
-                  if (text === draft) setText("")
+                  if (text === draft.text) setText("")
                   setDraft(null)
                 }}
                 className="ml-auto text-white/40 underline decoration-white/15 underline-offset-2 hover:text-white/75"
@@ -154,6 +154,7 @@ export default function WhatsappSend({ contactId, name, phone, onSent }: { conta
               </button>
             </div>
           )}
+          {draft?.note && <div className="rounded-lg bg-amber-500/10 px-3 py-2 text-[12px] leading-relaxed text-amber-200/90">{draft.note}</div>}
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}

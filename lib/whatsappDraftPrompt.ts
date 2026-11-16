@@ -2,7 +2,7 @@
  * Pure helpers for AI-drafted WhatsApp replies: when to draft, the prompt, and cleaning the answer.
  * A draft is only a suggestion; a person reviews it and presses Send.
  */
-import { WA_IN, WA_OUT, whatsappDirection, whatsappText } from "./crmWhatsapp"
+import { WA_IN, WA_OUT, whatsappDirection, whatsappParts } from "./crmWhatsapp"
 
 export type ChatTurn = { role: "user" | "assistant"; content: string }
 
@@ -24,7 +24,7 @@ export function historyFromNotes(notes: { kind: string; body: string | null; occ
     .filter((n) => whatsappDirection(n) !== null)
     .sort((a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime())
     .slice(-limit)
-    .map((n) => ({ role: whatsappDirection(n) === "in" ? ("user" as const) : ("assistant" as const), content: whatsappText(n.body as string).split("\nTemplate: ")[0] }))
+    .map((n) => ({ role: whatsappDirection(n) === "in" ? ("user" as const) : ("assistant" as const), content: whatsappParts(n.body as string).text }))
 }
 
 /** The instruction sent to the assistant. The customer's text is quoted as data, never as instructions. */
