@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest"
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }))
 vi.mock("@/lib/db", () => ({ query: queryMock }))
 
-import { bareDocId, restampTaskIndexGroups, syncTaskIndex, taskIndexRecords, tasksInvolving } from "./workspaceTaskIndex"
+import { fieldPeopleOf, bareDocId, restampTaskIndexGroups, syncTaskIndex, taskIndexRecords, tasksInvolving } from "./workspaceTaskIndex"
 import type { DbRow } from "./workspaceDb"
 
 const row = (over: Partial<DbRow>): DbRow => ({
@@ -32,8 +32,8 @@ describe("task index", () => {
       row({ id: "b", due: "soon" }),
     ])
     expect(recs).toEqual([
-      { row_id: "a", title: "T", status: "Todo", status_group: "todo", priority: "Med", due: "2026-11-20", owner_key: "user:me", creator_key: "user:me", assignee_keys: ["agent:autonomous"], follower_keys: ["user:me"] },
-      { row_id: "b", title: "T", status: "Todo", status_group: "todo", priority: "Med", due: null, owner_key: null, creator_key: null, assignee_keys: [], follower_keys: [] },
+      { row_id: "a", title: "T", status: "Todo", status_group: "todo", priority: "Med", due: "2026-11-20", owner_key: "user:me", creator_key: "user:me", assignee_keys: ["agent:autonomous"], follower_keys: ["user:me"], field_people: {} },
+      { row_id: "b", title: "T", status: "Todo", status_group: "todo", priority: "Med", due: null, owner_key: null, creator_key: null, assignee_keys: [], follower_keys: [], field_people: {} },
     ])
   })
 
@@ -64,6 +64,27 @@ describe("task index", () => {
     expect(JSON.parse(params[2])).toHaveLength(1)
     queryMock.mockRejectedValueOnce(new Error("no table"))
     await expect(syncTaskIndex("abc", [])).resolves.toBeUndefined()
+  })
+
+  it("records who is set on person fields, keyed by field name", () => {
+    const fields = [
+      { id: "rev", name: "Reviewer", type: "person" as const, options: [] },
+      { id: "txt", name: "Note", type: "text" as const, options: [] },
+    ]
+    const r = row({ id: "a", cells: { rev: [{ kind: "user", id: "u1", name: "Ann" }, { kind: "agent", type: "autonomous" }], txt: "x" } })
+    expect(fieldPeopleOf(r, fields)).toEqual({ Reviewer: ["user:u1", "agent:autonomous"] })
+    expect(taskIndexRecords([r], undefined, fields)[0].field_people).toEqual({ Reviewer: ["user:u1", "agent:autonomous"] })
+    expect(taskIndexRecords([row({ id: "b" })], undefined, fields)[0].field_people).toEqual({})
+  })
+
+  it("puts a person-field task under Assigned to me with the field name", async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [{ doc_id: "abc", row_id: "a", title: "T", status: "Todo", status_group: "todo", priority: "Med", due: null, owner_key: null, creator_key: null, assignee_keys: [], follower_keys: [], field_people: { Reviewer: ["user:me"], Approver: ["user:x"] }, room_title: "R" }],
+    })
+    const [t] = await tasksInvolving("user:me")
+    expect(queryMock.mock.calls[0][0]).toContain("jsonb_each(t.field_people)")
+    expect(t.roles).toEqual(["assignee"])
+    expect(t.fields).toEqual(["Reviewer"])
   })
 
   it("maps roles for the caller", async () => {

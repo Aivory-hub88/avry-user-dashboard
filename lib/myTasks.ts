@@ -19,6 +19,8 @@ export type MyTask = {
   /** YYYY-MM-DD or "" */
   due: string
   roles: MyTaskRole[]
+  /** Person fields (e.g. "Reviewer") that name me; such tasks count as "Assigned to me". */
+  fields?: string[]
 }
 
 export type MyTaskGroup = "Overdue" | "Today" | "This week" | "Later" | "No date"

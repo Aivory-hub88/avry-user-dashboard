@@ -56,6 +56,11 @@ import {
   deleteStatusRefs,
   resolveStatus,
   sortStatusDefs,
+  cellsMatchSearch,
+  compareFieldCells,
+  fieldSortId,
+  fieldSortValue,
+  isSortableField,
   statusDefsProblem,
   type StatusDefsProblem,
   type StatusRefProps,
@@ -1707,7 +1712,7 @@ export default function WorkspaceDatabase({
     const statusOk = statusFilter === "All" || r.status === statusFilter
     const prioOk = priorityFilter === "All" || r.priority === priorityFilter
     const needle = q.trim().toLowerCase()
-    const searchOk = !needle || r.title.toLowerCase().includes(needle) || r.assignee.toLowerCase().includes(needle) || r.id.toLowerCase().includes(needle)
+    const searchOk = !needle || r.title.toLowerCase().includes(needle) || r.assignee.toLowerCase().includes(needle) || r.id.toLowerCase().includes(needle) || cellsMatchSearch(r.cells, fields, needle)
     const dueOk = dueFilter === "All" || matchesDueFilter(r.due, r.status, dueFilter, new Date().toISOString().slice(0, 10), statuses)
     const peopleOk = matchesPeopleFilter(r, peopleFilter, selfKey)
     const fieldsOk = personFields.every((f) => matchesPersonCellFilter(cellPeople(r.cells[f.id]), activeFieldFilters[f.id] ?? "All", selfKey))
@@ -1717,6 +1722,9 @@ export default function WorkspaceDatabase({
   const priorityRank: Record<string, number> = { High: 3, Med: 2, Low: 1 }
   // Sort by the room's status order (grouped: to do → in progress → done → canceled).
   const statusRank: Record<string, number> = Object.fromEntries(statusNames.map((n, i) => [n, i]))
+  // A custom-field sort whose field was deleted falls back to the title.
+  const sortFieldId = fieldSortId(sortField)
+  const sortDef = sortFieldId ? fields.find((f) => f.id === sortFieldId && isSortableField(f)) ?? null : null
   const filtered = [...baseFiltered].sort((a, b) => {
     const dir = sortDir === "asc" ? 1 : -1
     if (sortField === "priority") return (priorityRank[a.priority] - priorityRank[b.priority]) * dir
@@ -1724,6 +1732,7 @@ export default function WorkspaceDatabase({
     if (sortField === "start") return ((a.start || "") < (b.start || "") ? -1 : (a.start || "") > (b.start || "") ? 1 : 0) * dir
     if (sortField === "due") return ((a.due || "") < (b.due || "") ? -1 : (a.due || "") > (b.due || "") ? 1 : 0) * dir
     if (sortField === "assignee") return a.assignee.localeCompare(b.assignee) * dir
+    if (sortDef) return compareFieldCells(sortDef, a.cells[sortDef.id], b.cells[sortDef.id], sortDir) || a.title.localeCompare(b.title)
     // title default
     return a.title.localeCompare(b.title) * dir
   })
@@ -1886,6 +1895,11 @@ export default function WorkspaceDatabase({
                 <option value="start">Start</option>
                 <option value="due">Due</option>
                 <option value="assignee">Assignee</option>
+                {fields.filter(isSortableField).map((f) => (
+                  <option key={f.id} value={fieldSortValue(f.id)}>
+                    {f.name}
+                  </option>
+                ))}
               </select>
               <button onClick={() => setSortDir(sortDir === "asc" ? "desc" : "asc")} title={sortDir === "asc" ? "Ascending" : "Descending"} className="rounded-full bg-white/[0.06] p-1 text-white/50 hover:text-white/80">
                 <ArrowUpNarrowWide className={`h-3.5 w-3.5 transition ${sortDir === "desc" ? "rotate-180" : ""}`} />
