@@ -27,12 +27,15 @@ export async function POST(req: NextRequest) {
 
   const { token, secret } = newWebhookCredentials()
   const url = publicWebhookUrl(req, token)
+  let signingSecret = secret
   if (provider.autoRegister) {
     const reg = await provider.autoRegister(creds, url, secret)
     if (!reg.ok) return NextResponse.json({ error: reg.code === 'bad_key' ? `${meta.label} rejected those credentials.` : reg.message }, { status: reg.code === 'unavailable' ? 502 : 400 })
+    // Some providers choose the signing secret themselves; theirs is the one that signs deliveries.
+    signingSecret = reg.secret ?? secret
   }
   try {
-    await saveConnection(gate.user.user_id, { provider: meta.id, creds, displayPhone: display || null, token, secret })
+    await saveConnection(gate.user.user_id, { provider: meta.id, creds, displayPhone: display || null, token, secret: signingSecret })
   } catch (e) {
     console.error('[whatsapp connect] save failed:', (e as Error).message)
     return NextResponse.json({ error: 'Could not save the connection. Try again.' }, { status: 500 })

@@ -4,6 +4,7 @@
  * here, and describe its credentials in providerMeta.ts. SERVER-ONLY.
  */
 import { INBOUND_EVENT, parseInbound, registerWebhook, sendText, verifySignature } from "../kapso"
+import { kirimParse, kirimRegister, kirimSend, kirimVerify, kirimWanted } from "./kirimdev"
 import { metaChallenge, metaParse, metaSend, metaVerify } from "./meta"
 import { twilioParse, twilioSend, twilioVerify } from "./twilio"
 import type { Creds, InboundCtx, Inbound, ProviderId, RegisterResult, SendResult } from "./types"
@@ -52,7 +53,16 @@ const twilio: Provider = {
   ack: { body: "<Response/>", type: "text/xml" },
 }
 
-const REGISTRY: Record<ProviderId, Provider> = { kapso, meta, twilio }
+const kirimdev: Provider = {
+  id: "kirimdev",
+  send: (c, to, text) => kirimSend(c, to, text),
+  autoRegister: (c, url) => kirimRegister(c, url),
+  verify: (ctx, _c, secret) => kirimVerify(ctx, secret),
+  wanted: kirimWanted,
+  parse: kirimParse,
+}
+
+const REGISTRY: Record<ProviderId, Provider> = { kapso, meta, twilio, kirimdev }
 
 export function getProvider(id: string): Provider | null {
   return (REGISTRY as Record<string, Provider | undefined>)[id] ?? null

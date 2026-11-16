@@ -30,6 +30,14 @@ export const PROVIDERS: ProviderMeta[] = [
     ],
   },
   {
+    id: "kirimdev",
+    label: "KirimDev",
+    blurb: "KirimDev, an Indonesian WhatsApp Business API platform. Aivory sets up the webhook for you.",
+    webhook: "auto",
+    steps: () => [],
+    fields: [{ key: "api_key", label: "API key", secret: true, placeholder: "KirimDev API key", pattern: /^\S{10,300}$/, hint: "KirimDev dashboard → API keys." }],
+  },
+  {
     id: "meta",
     label: "Meta Cloud API",
     blurb: "WhatsApp Business Platform straight from Meta, with no middleman.",

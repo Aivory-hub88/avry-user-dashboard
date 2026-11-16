@@ -1,6 +1,7 @@
 import { createHmac } from "crypto"
 import { describe, expect, it, vi } from "vitest"
 import { classifySendError } from "./errors"
+import { kirimParse, kirimRegister, kirimSend, kirimSign, kirimVerify, kirimWanted } from "./kirimdev"
 import { metaChallenge, metaParse, metaSend, metaSign, metaVerify } from "./meta"
 import { checkCreds, PROVIDERS } from "./providerMeta"
 import { getProvider } from "./providers"
@@ -98,5 +99,50 @@ describe("classifySendError", () => {
     expect(classifySendError(401, {}).code).toBe("bad_key")
     expect(classifySendError(500, {}).code).toBe("unavailable")
     expect(classifySendError(400, { message: "Invalid 'To' number" })).toMatchObject({ code: "rejected", message: "Invalid 'To' number" })
+  })
+})
+
+describe("kirimdev", () => {
+  const secret = "whsec_test_secret"
+  const raw = JSON.stringify({ object: "whatsapp_business_account", entry: [{ changes: [{ field: "messages", value: { metadata: { phone_number_id: "1" }, contacts: [{ wa_id: "6285887130408", profile: { name: "Dewi" } }], messages: [{ id: "wamid.k1", from: "6285887130408", timestamp: "1730092800", type: "text", text: { body: "Halo" } }] } }] }] })
+  const now = 1_730_092_800_000
+  const h = (sig: string) => ctx(raw, { "x-kirim-signature": sig })
+
+  it("accepts the timestamped t=,v1= form and the plain raw-body HMAC", () => {
+    expect(kirimVerify(h(kirimSign(raw, secret, 1_730_092_800)), secret, now)).toBe(true)
+    expect(kirimVerify(h(kirimSign(raw, secret)), secret, now)).toBe(true)
+    expect(kirimVerify(ctx(raw, { "x-hub-signature-256": `sha256=${kirimSign(raw, secret)}` }), secret, now)).toBe(true)
+  })
+  it("accepts any of several v1 values (secret rotation)", () => {
+    const good = kirimSign(raw, secret, 1_730_092_800).split("v1=")[1]
+    expect(kirimVerify(h(`t=1730092800,v1=${"0".repeat(64)},v1=${good}`), secret, now)).toBe(true)
+  })
+  it("rejects a wrong secret, a changed body, junk, no header, and a stale timestamp", () => {
+    expect(kirimVerify(h(kirimSign(raw, "other", 1_730_092_800)), secret, now)).toBe(false)
+    expect(kirimVerify(ctx(raw + " ", { "x-kirim-signature": kirimSign(raw, secret) }), secret, now)).toBe(false)
+    expect(kirimVerify(h("t=1730092800,v1=zz"), secret, now)).toBe(false)
+    expect(kirimVerify(ctx(raw), secret, now)).toBe(false)
+    expect(kirimVerify(h(kirimSign(raw, secret, 1_730_092_800)), secret, now + 6 * 60_000)).toBe(false)
+  })
+  it("reads Meta-shaped payloads and only wants message.received", () => {
+    expect(kirimParse(ctx(raw)).map((m) => [m.id, m.name, m.text])).toEqual([["wamid.k1", "Dewi", "Halo"]])
+    expect(kirimWanted(ctx(raw, { "x-kirim-event": "message.status" }))).toBe(false)
+    expect(kirimWanted(ctx(raw, { "x-kirim-event": "message.received" }))).toBe(true)
+  })
+  it("sends a Meta-style body with a Bearer key", async () => {
+    const f = reply(200, { message_id: "message_abc123" })
+    expect(await kirimSend({ api_key: "key-key-key-key" }, "6281", "hi", f)).toEqual({ ok: true, id: "message_abc123" })
+    const [url, init] = calls(f)[0]
+    expect(url).toBe("https://api.kirimdev.com/v1/messages")
+    expect((init.headers as Record<string, string>).authorization).toBe("Bearer key-key-key-key")
+    expect(JSON.parse(init.body as string)).toEqual({ to: "6281", type: "text", text: { body: "hi" } })
+    expect(await kirimSend({ api_key: "k" }, "6281", "hi", reply(401, {}))).toMatchObject({ code: "bad_key" })
+  })
+  it("registers the webhook and hands back the secret KirimDev chose", async () => {
+    const f = reply(201, { data: { id: "wbs_1", initial_secret: "whsec_abcdef123" } })
+    expect(await kirimRegister({ api_key: "key-key-key-key" }, "https://x.test/hook", f)).toEqual({ ok: true, secret: "whsec_abcdef123" })
+    expect(JSON.parse(calls(f)[0][1].body as string)).toMatchObject({ url: "https://x.test/hook", events: ["message.received"] })
+    expect(await kirimRegister({ api_key: "k" }, "u", reply(201, { data: {} }))).toMatchObject({ ok: false, code: "rejected" })
+    expect(await kirimRegister({ api_key: "k" }, "u", reply(401, {}))).toMatchObject({ ok: false, code: "bad_key" })
   })
 })
