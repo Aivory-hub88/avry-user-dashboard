@@ -23,7 +23,8 @@ import {
   cleanFieldFilters,
   cellPeople,
   matchesPersonCellFilter,
-  MAX_PERSON_CELL,
+  personCellLimit,
+  cleanRuleFieldTarget,
   personKey,
   rowFollowers,
   addFollowers,
@@ -217,7 +218,8 @@ function CellEditor({
         people={people}
         agents={agents}
         readOnly={readOnly}
-        max={MAX_PERSON_CELL}
+        max={personCellLimit(def)}
+        single={!!def.single}
         dialogLabel={`Choose ${def.name}`}
         countNoun="picked"
         title={list.length ? `${def.name}: ${namesOf(list, people)}` : readOnly ? def.name : `Set ${def.name}`}
@@ -648,6 +650,10 @@ export default function WorkspaceDatabase({
   const [newRuleAssignee, setNewRuleAssignee] = useState("")
   const [newRuleComment, setNewRuleComment] = useState("")
   const [newRuleMoveTo, setNewRuleMoveTo] = useState("")
+  // "Set <person field> to owner / creator / a person" action of a new rule.
+  const [newRuleField, setNewRuleField] = useState("")
+  const [newRuleFieldTo, setNewRuleFieldTo] = useState("owner")
+  const [newFieldSingle, setNewFieldSingle] = useState(false)
   // Target-doc rows for relation pickers (cached per doc; read-gated server-side).
   const [targetRows, setTargetRows] = useState<Record<string, Row[]>>({})
   // …and their rooms' statuses (donePct counts the TARGET room's done group).
@@ -807,12 +813,26 @@ export default function WorkspaceDatabase({
     if (newRuleMoveTo && statusNames.includes(newRuleMoveTo) && newRuleMoveTo !== ruleWhen) {
       rule.moveTo = newRuleMoveTo
     }
-    if (rule.setAssignee === undefined && rule.addComment === undefined && rule.moveTo === undefined) return
+    const fieldTo = cleanRuleFieldTarget(newRuleFieldTo)
+    if (newRuleField && fieldTo && personFields.some((f) => f.id === newRuleField)) rule.setField = { fieldId: newRuleField, to: fieldTo }
+    if (rule.setAssignee === undefined && rule.addComment === undefined && rule.moveTo === undefined && rule.setField === undefined) return
     void persistAutomations([...automations, rule])
     setNewRuleName("")
     setNewRuleAssignee("")
     setNewRuleComment("")
     setNewRuleMoveTo("")
+    setNewRuleField("")
+  }
+
+  const ruleFieldLabel = (a: { fieldId: string; to: string }): string => {
+    const name = fields.find((f) => f.id === a.fieldId)?.name ?? "field removed"
+    const who = a.to === "owner" ? "owner" : a.to === "creator" ? "creator" : ruleAssigneeLabel(a.to.startsWith("agent:") ? a.to.slice(6) : a.to)
+    return `${name} = ${who}`
+  }
+
+  const toggleFieldSingle = (fieldId: string) => {
+    if (readOnlyRef.current) return
+    void persistFields(fields.map((f) => (f.id === fieldId ? (f.single ? { ...f, single: undefined } : { ...f, single: true }) : f)))
   }
 
   const ruleAssigneeLabel = (v: string): string => {
@@ -834,6 +854,7 @@ export default function WorkspaceDatabase({
         ? newFieldOptions.split(",").map((o) => o.trim().slice(0, 24)).filter(Boolean).filter((o, i, a) => a.indexOf(o) === i).slice(0, 20)
         : []
     const def: FieldDef = { id: `f-${uid()}`, name, type: newFieldType, options }
+    if (newFieldType === "person" && newFieldSingle) def.single = true
     if (newFieldType === "relation") {
       const target = newFieldTarget.trim().replace(/^workspace:(room:|db:)?/, "").slice(0, 64)
       if (!target) return
@@ -851,6 +872,7 @@ export default function WorkspaceDatabase({
       }
     }
     void persistFields([...fields, def])
+    setNewFieldSingle(false)
     setNewFieldName("")
     setNewFieldOptions("")
     setNewFieldTarget("")
@@ -2036,9 +2058,19 @@ export default function WorkspaceDatabase({
                       · {f.type}
                       {f.type === "relation" && f.targetDocId ? ` → ${f.targetDocId}` : ""}
                       {f.type === "rollup" && f.relationFieldId ? ` · ${f.rollupOp}` : ""}
+                      {f.type === "person" && f.single ? " · single person" : ""}
                       {f.options.length ? ` · ${f.options.join(", ")}` : ""}
                     </span>
                   </span>
+                  {f.type === "person" && (
+                    <button
+                      onClick={() => toggleFieldSingle(f.id)}
+                      title={f.single ? "Allow several people in this field" : "Allow only one person in this field"}
+                      className="ml-auto shrink-0 rounded-full border border-line px-2 py-0.5 text-[11px] text-white/45 opacity-0 hover:text-white/80 group-hover:opacity-100"
+                    >
+                      {f.single ? "Allow several" : "Single person"}
+                    </button>
+                  )}
                   <button onClick={() => removeField(f.id)} title="Delete field (values stay on rows but hide)" className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-white/20 opacity-0 hover:text-red-300 group-hover:opacity-100">
                     ✕
                   </button>
@@ -2074,6 +2106,12 @@ export default function WorkspaceDatabase({
                 placeholder="Options, comma separated"
                 className="w-[220px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/80 placeholder:text-white/30 outline-none"
               />
+            )}
+            {newFieldType === "person" && (
+              <label className="flex items-center gap-1.5 text-[12px] text-white/50">
+                <input type="checkbox" checked={newFieldSingle} onChange={(e) => setNewFieldSingle(e.target.checked)} />
+                Single person
+              </label>
             )}
             {newFieldType === "relation" && (
               <input
@@ -2133,7 +2171,7 @@ export default function WorkspaceDatabase({
             Automations · {automations.length}/20
           </div>
           <div className="mb-3 text-[12px] leading-relaxed text-white/35">
-            When a card enters a status, assign it, comment, or move it on. Chained moves never re-trigger.
+            When a card enters a status, assign it, set a person field, comment, or move it on. Chained moves never re-trigger.
           </div>
           {automations.length > 0 && (
             <div className="mb-3 flex flex-col gap-1.5">
@@ -2144,6 +2182,7 @@ export default function WorkspaceDatabase({
                     <span className="text-white/25">
                       · on {r.whenStatus}
                       {r.setAssignee ? ` → ${ruleAssigneeLabel(r.setAssignee)}` : ""}
+                      {r.setField ? ` · ${ruleFieldLabel(r.setField)}` : ""}
                       {r.addComment ? " + comment" : ""}
                       {r.moveTo ? ` → ${r.moveTo}` : ""}
                     </span>
@@ -2209,6 +2248,46 @@ export default function WorkspaceDatabase({
                 <option key={s} value={s}>Move to {s}</option>
               ))}
             </select>
+            {personFields.length > 0 && (
+              <>
+                <select
+                  value={newRuleField}
+                  onChange={(e) => setNewRuleField(e.target.value)}
+                  title="Set a person field (optional)"
+                  className="max-w-[150px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70 outline-none"
+                >
+                  <option value="">No field</option>
+                  {personFields.map((f) => (
+                    <option key={f.id} value={f.id}>Set {f.name}</option>
+                  ))}
+                </select>
+                {newRuleField && (
+                  <select
+                    value={newRuleFieldTo}
+                    onChange={(e) => setNewRuleFieldTo(e.target.value)}
+                    title="Who to set"
+                    className="max-w-[150px] rounded-full border border-line bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/70 outline-none"
+                  >
+                    <option value="owner">to the owner</option>
+                    <option value="creator">to the creator</option>
+                    {people.length > 0 && (
+                      <optgroup label="People">
+                        {people.map((p) => (
+                          <option key={p.id} value={`user:${p.id}`}>{p.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {agents.length > 0 && (
+                      <optgroup label="Agents">
+                        {agents.map((a) => (
+                          <option key={a.type} value={`agent:${a.type}`}>{a.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                )}
+              </>
+            )}
             <button onClick={addAutomation} disabled={!newRuleName.trim() || automations.length >= 20} className="rounded-full bg-white px-4 py-1.5 text-[12px] font-medium text-black hover:bg-white/90 disabled:opacity-40">
               Add rule
             </button>

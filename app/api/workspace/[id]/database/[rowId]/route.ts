@@ -42,7 +42,7 @@ import {
   type PersonRef,
 } from "@/lib/workspaceDbModel"
 import { recordRowChanges } from "@/lib/workspaceTaskEvents"
-import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
+import { automatedFieldAdds, getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
 import { indexRow, removeRowIndex, rowText, workspaceOf } from "@/lib/workspaceIndex"
 
 export const runtime = "nodejs"
@@ -217,6 +217,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       actorName,
       origin: agentType,
       getRules: () => getAutomationRules(id),
+      getFields: () => getFieldDefs(id),
     })
     await saveDbDoc(id, doc, cred, agentType)
     // Diff after automations too (a rule may assign an agent on entry).
@@ -226,8 +227,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       await recordAssignments({ docId: id, rowId, credential: cred, agentType, added, title: afterRow.title })
     }
     // Person fields: tell the people newly set on them ("set you as Reviewer").
-    if (mergedCells) {
-      const fields = addedFieldPeople(prevRow.cells, afterRow.cells, cellDefs)
+    // (With cells in the patch the diff also covers what an automation set.)
+    {
+      const fields = mergedCells ? addedFieldPeople(prevRow.cells, afterRow.cells, cellDefs) : automatedFieldAdds(automated)
       if (fields.length > 0) await recordFieldAssignments({ docId: id, rowId, credential: cred, agentType, fields, title: afterRow.title })
     }
     // Status / due / owner get their own activity entries (+ follower
