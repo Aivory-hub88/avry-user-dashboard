@@ -8,11 +8,12 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowDown, ArrowUp, Bookmark, Clock, MessageCircle, Phone, X } from "lucide-react"
+import { ArrowDown, ArrowUp, Bookmark, Clock, Phone, X } from "lucide-react"
 import { fieldClass } from "@/components/requests/requestUi"
 import { AddButton, AddNoteLine, useAddForm } from "@/components/crm/AddForm"
 import { Empty, SamplePill } from "@/components/crm/CrmBits"
 import { LabelEditor, LabelList, LabelPill } from "@/components/crm/Labels"
+import WhatsappIcon from "@/components/crm/WhatsappIcon"
 import { crmHref } from "@/components/crm/crmUi"
 import { activityState, agentLabel, formatWhen } from "@/lib/crmActivity"
 import type { Activity, Company, Contact } from "@/lib/crmClient"
@@ -345,11 +346,11 @@ export default function ContactsTab({
                           {wa &&
                             (whatsappConnected ? (
                               <Link href={crmHref("contact", c.id)} aria-label={`Message ${c.name} on WhatsApp`} title="Message on WhatsApp (opens the contact)" className="text-white/35 hover:text-emerald-300">
-                                <MessageCircle size={13} />
+                                <WhatsappIcon size={14} />
                               </Link>
                             ) : (
                               <a href={wa} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${c.name}`} title="Open in your WhatsApp app" className="text-white/35 hover:text-emerald-300">
-                                <MessageCircle size={13} />
+                                <WhatsappIcon size={14} />
                               </a>
                             ))}
                           {tel && (

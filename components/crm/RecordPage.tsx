@@ -9,11 +9,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ChevronRight, MessageCircle, Phone, Plus, Trash2, X } from "lucide-react"
+import { ChevronRight, Phone, Plus, Trash2, X } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import ActivityTimeline from "@/components/crm/ActivityTimeline"
 import { AddButton, AddNoteLine, useAddForm } from "@/components/crm/AddForm"
 import { LabelEditor } from "@/components/crm/Labels"
+import WhatsappIcon from "@/components/crm/WhatsappIcon"
 import WhatsappSend from "@/components/crm/WhatsappSend"
 import { useWhatsappStatus } from "@/lib/whatsappClient"
 import { getLabels, getSource, labelCounts, RESERVED_FIELD_KEYS, SOURCES, telHref, whatsappHref, withLabels, withSource } from "@/lib/crmLabels"
@@ -380,7 +381,7 @@ function Details({ rec, companies, knownLabels, whatsappConnected, onSave }: { r
               {/* With WhatsApp connected the message box above is the way to write; the wa.me link would open the person's own app instead. */}
               {!whatsappConnected && whatsappHref(rec.r.phone) && (
                 <a href={whatsappHref(rec.r.phone) as string} target="_blank" rel="noopener noreferrer" aria-label="Open in WhatsApp" title="Open in WhatsApp" className="shrink-0 rounded-md p-1 text-white/40 hover:bg-white/[0.06] hover:text-emerald-300">
-                  <MessageCircle size={14} />
+                  <WhatsappIcon size={15} />
                 </a>
               )}
               {telHref(rec.r.phone) && (
