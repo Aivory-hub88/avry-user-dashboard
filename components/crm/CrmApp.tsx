@@ -10,18 +10,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowRightLeft, ChevronDown, Clock, LayoutGrid, Plus, Search, SlidersHorizontal, Sparkles, Upload, X } from "lucide-react"
+import { ArrowRightLeft, ChevronDown, Clock, LayoutGrid, MessageCircle, Phone, Plus, Search, SlidersHorizontal, Sparkles, Upload, X } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import { AddButton, AddNoteLine, useAddForm } from "@/components/crm/AddForm"
 import AgentAccess from "@/components/crm/AgentAccess"
 import ActivityFeed from "@/components/crm/ActivityFeed"
 import CrmWelcome, { SetupChecklist } from "@/components/crm/CrmWelcome"
 import ImportDialog from "@/components/crm/ImportDialog"
+import { LabelEditor, LabelList, LabelPill } from "@/components/crm/Labels"
 import { loadSampleData, removeSampleData } from "@/components/crm/onboardingActions"
 import { CRM_TABS, STAGE_DOT, STAGE_LABEL, crmHref, type CrmTab } from "@/components/crm/crmUi"
 import { activityState, agentLabel, formatWhen } from "@/lib/crmActivity"
 import { crmApi, DEAL_STAGES, type Activity, type Company, type Contact, type Deal, type DealStage, type Grant } from "@/lib/crmClient"
 import { agentRecent, isSample, setupChecklist, type ChecklistItem } from "@/lib/crmOnboarding"
+import { getLabels, getSource, hasLabel, isPlausiblePhone, labelCounts, SOURCES, telHref, whatsappHref, withLabels, withSource } from "@/lib/crmLabels"
 import { daysUntil, formatMoney, isPastClose, OPEN_STAGES, pipelineSummary, sharedCurrency, stageTotals } from "@/lib/crmPipeline"
 
 function ownerInitial(o: { owner_agent: string | null }): { label: string; title: string; agent: boolean } {
@@ -157,6 +159,7 @@ export default function CrmApp() {
   }, [followUps])
   const overdue = useMemo(() => followUps.filter((a) => activityState(a) === "overdue").length, [followUps])
 
+  const knownLabels = useMemo(() => labelCounts([...(companies ?? []), ...(contacts ?? []), ...(deals ?? [])]).map((x) => x.label), [companies, contacts, deals])
   const needle = q.trim().toLowerCase()
   const hit = (...parts: (string | null | undefined)[]) => !needle || parts.some((p) => p?.toLowerCase().includes(needle))
 
@@ -412,7 +415,7 @@ export default function CrmApp() {
           <ActivityFeed names={names} query={q} version={0} onOpen={(s) => router.push(crmHref(s.type, s.id))} onError={setError} />
         ) : tab === "deals" ? (
           <DealsTab
-            deals={deals.filter((d) => hit(d.title, companyName.get(d.company_id ?? "")))}
+            deals={deals.filter((d) => hit(d.title, companyName.get(d.company_id ?? ""), ...getLabels(d.custom_fields)))}
             allDeals={deals}
             companies={companies}
             companyName={companyName}
@@ -424,16 +427,18 @@ export default function CrmApp() {
           />
         ) : tab === "companies" ? (
           <CompaniesTab
-            companies={companies.filter((c) => hit(c.name, c.domain, c.industry))}
+            companies={companies.filter((c) => hit(c.name, c.domain, c.industry, ...getLabels(c.custom_fields)))}
             contacts={contacts}
             deals={deals}
+            knownLabels={knownLabels}
             onCreate={(b) => run(() => crmApi.companies.create(b))}
           />
         ) : (
           <ContactsTab
-            contacts={contacts.filter((c) => hit(c.name, c.email, c.title, companyName.get(c.company_id ?? "")))}
+            contacts={contacts.filter((c) => hit(c.name, c.email, c.phone, c.title, getSource(c.custom_fields), ...getLabels(c.custom_fields), companyName.get(c.company_id ?? "")))}
             companies={companies}
             companyName={companyName}
+            knownLabels={knownLabels}
             onCreate={(b) => run(() => crmApi.contacts.create(b))}
           />
         )}
@@ -698,6 +703,11 @@ function DealCard({
           {isSample(d) && <SamplePill />}
         </div>
       )}
+      {getLabels(d.custom_fields).length > 0 && (
+        <div className="mt-2">
+          <LabelList labels={getLabels(d.custom_fields)} max={2} />
+        </div>
+      )}
       <div className="mt-2 flex items-center justify-between gap-2 text-[12px]">
         <span className="text-white/85">{d.value !== null ? formatMoney(d.value, d.currency) : <span className="text-white/35">No value</span>}</span>
         {d.expected_close_date && (
@@ -736,16 +746,19 @@ function CompaniesTab({
   companies,
   contacts,
   deals,
+  knownLabels,
   onCreate,
 }: {
   companies: Company[]
   contacts: Contact[]
   deals: Deal[]
-  onCreate: (b: { name: string; domain?: string; industry?: string }) => Promise<boolean>
+  knownLabels: string[]
+  onCreate: (b: { name: string; domain?: string; industry?: string; custom_fields?: Record<string, unknown> }) => Promise<boolean>
 }) {
   const [name, setName] = useState("")
   const [domain, setDomain] = useState("")
   const [industry, setIndustry] = useState("")
+  const [labels, setLabels] = useState<string[]>([])
   const form = useAddForm()
   const nameRef = useRef<HTMLInputElement>(null)
   const people = useMemo(() => {
@@ -766,12 +779,13 @@ function CompaniesTab({
           void form.submit({
             problem: name.trim().length < 2 ? "Enter the company name first." : null,
             focus: nameRef.current,
-            create: () => onCreate({ name: name.trim(), domain, industry }),
+            create: () => onCreate({ name: name.trim(), domain, industry, custom_fields: withLabels({}, labels) }),
             added: `Added ${name.trim()}.`,
             reset: () => {
               setName("")
               setDomain("")
               setIndustry("")
+              setLabels([])
             },
           })
         }}
@@ -780,6 +794,9 @@ function CompaniesTab({
         <input ref={nameRef} value={name} onChange={(e) => { setName(e.target.value); form.clearHint() }} placeholder="Company name" aria-label="Company name" className={`w-[220px] ${fieldClass}`} />
         <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="domain.com" aria-label="Domain" className={`w-[180px] ${fieldClass}`} />
         <input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="Industry" aria-label="Industry" className={`w-[160px] ${fieldClass}`} />
+        <span className={`flex min-h-[38px] min-w-[170px] items-center ${fieldClass} py-1`}>
+          <LabelEditor labels={labels} known={knownLabels} onChange={setLabels} compact />
+        </span>
         <AddButton saving={form.saving} label="Add company" />
         <AddNoteLine note={form.note} />
       </form>
@@ -787,11 +804,12 @@ function CompaniesTab({
         <Empty>No companies yet. Add one above, or let an agent like Lex add them as it qualifies leads.</Empty>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-line">
-          <table className="w-full min-w-[640px] text-left text-[13px]">
+          <table className="w-full min-w-[760px] text-left text-[13px]">
             <thead className="text-[11px] text-white/50">
               <tr className="border-b border-line">
                 <th className="px-4 py-2.5 font-normal">Company</th>
                 <th className="px-4 py-2.5 font-normal">Industry</th>
+                <th className="px-4 py-2.5 font-normal">Labels</th>
                 <th className="px-4 py-2.5 font-normal">People</th>
                 <th className="px-4 py-2.5 font-normal">Open deals</th>
                 <th className="px-4 py-2.5 font-normal">Owner</th>
@@ -811,6 +829,7 @@ function CompaniesTab({
                       {c.domain && <span className="block text-[11px] text-white/45">{c.domain}</span>}
                     </td>
                     <td className="px-4 py-3 text-white/65">{c.industry ?? <span className="text-white/25">—</span>}</td>
+                    <td className="px-4 py-3"><LabelList labels={getLabels(c.custom_fields)} /></td>
                     <td className="px-4 py-3 text-white/65">{people.get(c.id) ?? 0}</td>
                     <td className="px-4 py-3 text-white/65">{od.length ? `${od.length} · ${formatMoney(sum, sharedCurrency(od))}` : <span className="text-white/25">—</span>}</td>
                     <td className="px-4 py-3 text-white/65">{c.owner_agent ? agentLabel(c.owner_agent) : "You"}</td>
@@ -829,47 +848,61 @@ function ContactsTab({
   contacts,
   companies,
   companyName,
+  knownLabels,
   onCreate,
 }: {
   contacts: Contact[]
   companies: Company[]
   companyName: Map<string, string>
-  onCreate: (b: { name: string; email?: string; phone?: string; title?: string; company_id?: string }) => Promise<boolean>
+  knownLabels: string[]
+  onCreate: (b: { name: string; email?: string; phone?: string; title?: string; company_id?: string; custom_fields?: Record<string, unknown> }) => Promise<boolean>
 }) {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
   const [title, setTitle] = useState("")
   const [companyId, setCompanyId] = useState("")
+  const [source, setSource] = useState("")
+  const [labels, setLabels] = useState<string[]>([])
+  const [filter, setFilter] = useState<string | null>(null)
   const form = useAddForm()
   const nameRef = useRef<HTMLInputElement>(null)
   const emailRef = useRef<HTMLInputElement>(null)
+  const phoneRef = useRef<HTMLInputElement>(null)
+  const contactLabels = useMemo(() => labelCounts(contacts), [contacts])
+  const shown = filter ? contacts.filter((c) => hasLabel(c.custom_fields, filter)) : contacts
   return (
-    <div className="mx-auto max-w-[1000px] space-y-5">
+    <div className="mx-auto max-w-[1100px] space-y-5">
       <form
         noValidate
         onSubmit={(e) => {
           e.preventDefault()
           const badName = name.trim().length < 2
           const badEmail = email.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+          const badPhone = phone.trim() !== "" && !isPlausiblePhone(phone)
           void form.submit({
-            problem: badName ? "Enter the contact’s name first." : badEmail ? "That email doesn’t look right." : null,
-            focus: badName ? nameRef.current : emailRef.current,
-            create: () => onCreate({ name: name.trim(), email: email.trim(), title: title.trim(), company_id: companyId || undefined }),
+            problem: badName ? "Enter the contact’s name first." : badEmail ? "That email doesn’t look right." : badPhone ? "That phone number doesn’t look right. Use digits, like 0812 3456 7890 or +62 812 3456 7890." : null,
+            focus: badName ? nameRef.current : badEmail ? emailRef.current : phoneRef.current,
+            create: () => onCreate({ name: name.trim(), email: email.trim(), phone: phone.trim(), title: title.trim(), company_id: companyId || undefined, custom_fields: withSource(withLabels({}, labels), source) }),
             added: `Added ${name.trim()}.`,
             reset: () => {
               setName("")
               setEmail("")
+              setPhone("")
               setTitle("")
               setCompanyId("")
+              setSource("")
+              setLabels([])
             },
           })
         }}
         className="flex flex-wrap items-center gap-2"
       >
-        <input ref={nameRef} value={name} onChange={(e) => { setName(e.target.value); form.clearHint() }} placeholder="Full name" aria-label="Full name" className={`w-[180px] ${fieldClass}`} />
+        <input ref={nameRef} value={name} onChange={(e) => { setName(e.target.value); form.clearHint() }} placeholder="Full name" aria-label="Full name" className={`w-[170px] ${fieldClass}`} />
         <input ref={emailRef} type="email" value={email} onChange={(e) => { setEmail(e.target.value); form.clearHint() }} placeholder="Email" aria-label="Email" className={`w-[200px] ${fieldClass}`} />
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" aria-label="Title" className={`w-[140px] ${fieldClass}`} />
-        <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} aria-label="Company" className={`w-[170px] ${fieldClass}`}>
+        <input ref={phoneRef} type="tel" inputMode="tel" value={phone} onChange={(e) => { setPhone(e.target.value); form.clearHint() }} placeholder="Phone / WhatsApp" aria-label="Phone" className={`w-[160px] ${fieldClass}`} />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" aria-label="Title" className={`w-[130px] ${fieldClass}`} />
+        <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} aria-label="Company" className={`w-[160px] ${fieldClass}`}>
           <option value="">No company</option>
           {companies.map((c) => (
             <option key={c.id} value={c.id}>
@@ -877,45 +910,108 @@ function ContactsTab({
             </option>
           ))}
         </select>
+        <select value={source} onChange={(e) => setSource(e.target.value)} aria-label="Lead source" className={`w-[140px] ${fieldClass} ${source ? "" : "text-white/35"}`}>
+          <option value="">Lead source</option>
+          {SOURCES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <span className={`flex min-h-[38px] min-w-[170px] items-center ${fieldClass} py-1`}>
+          <LabelEditor labels={labels} known={knownLabels} onChange={setLabels} compact />
+        </span>
         <AddButton saving={form.saving} label="Add contact" />
         <AddNoteLine note={form.note} />
       </form>
+      {contactLabels.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5" aria-label="Filter by label">
+          <span className="mr-1 text-[11px] text-white/40">Labels</span>
+          <button
+            type="button"
+            onClick={() => setFilter(null)}
+            aria-pressed={filter === null}
+            className={`rounded-full px-2.5 py-0.5 text-[11px] transition-colors ${filter === null ? "bg-white/[0.18] text-white" : "bg-white/[0.07] text-white/65 hover:bg-white/[0.12]"}`}
+          >
+            All
+          </button>
+          {contactLabels.map(({ label, count }) => (
+            <span key={label} className="inline-flex items-center gap-1">
+              <LabelPill label={label} active={filter === label} onClick={() => setFilter(filter === label ? null : label)} />
+              <span className="text-[10px] text-white/35">{count}</span>
+            </span>
+          ))}
+        </div>
+      )}
       {contacts.length === 0 ? (
         <Empty>No contacts yet.</Empty>
+      ) : shown.length === 0 ? (
+        <Empty>No contacts with the label “{filter}”.</Empty>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-line">
-          <table className="w-full min-w-[640px] text-left text-[13px]">
+          <table className="w-full min-w-[860px] text-left text-[13px]">
             <thead className="text-[11px] text-white/50">
               <tr className="border-b border-line">
                 <th className="px-4 py-2.5 font-normal">Name</th>
                 <th className="px-4 py-2.5 font-normal">Company</th>
                 <th className="px-4 py-2.5 font-normal">Email</th>
                 <th className="px-4 py-2.5 font-normal">Phone</th>
+                <th className="px-4 py-2.5 font-normal">Labels</th>
+                <th className="px-4 py-2.5 font-normal">Source</th>
                 <th className="px-4 py-2.5 font-normal">Owner</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {contacts.map((c) => (
-                <tr key={c.id} className="hover:bg-white/[0.025]">
-                  <td className="px-4 py-3">
-                    <span className="flex items-center gap-2">
-                      <Link href={crmHref("contact", c.id)} className="text-white/90 hover:underline hover:decoration-white/25 hover:underline-offset-2">{c.name}</Link>
-                      {isSample(c) && <SamplePill />}
-                    </span>
-                    {c.title && <span className="block text-[11px] text-white/45">{c.title}</span>}
-                  </td>
-                  <td className="px-4 py-3 text-white/65">
-                    {c.company_id && companyName.has(c.company_id) ? (
-                      <Link href={crmHref("company", c.company_id)} className="hover:text-white/90">{companyName.get(c.company_id)}</Link>
-                    ) : (
-                      <span className="text-white/25">—</span>
-                    )}
-                  </td>
-                  <td className="max-w-[220px] truncate px-4 py-3 text-white/65">{c.email ?? <span className="text-white/25">—</span>}</td>
-                  <td className="px-4 py-3 text-white/65">{c.phone ?? <span className="text-white/25">—</span>}</td>
-                  <td className="px-4 py-3 text-white/65">{c.owner_agent ? agentLabel(c.owner_agent) : "You"}</td>
-                </tr>
-              ))}
+              {shown.map((c) => {
+                const tel = telHref(c.phone)
+                const wa = whatsappHref(c.phone)
+                const rowLabels = getLabels(c.custom_fields)
+                return (
+                  <tr key={c.id} className="hover:bg-white/[0.025]">
+                    <td className="px-4 py-3">
+                      <span className="flex items-center gap-2">
+                        <Link href={crmHref("contact", c.id)} className="text-white/90 hover:underline hover:decoration-white/25 hover:underline-offset-2">{c.name}</Link>
+                        {isSample(c) && <SamplePill />}
+                      </span>
+                      {c.title && <span className="block text-[11px] text-white/45">{c.title}</span>}
+                    </td>
+                    <td className="px-4 py-3 text-white/65">
+                      {c.company_id && companyName.has(c.company_id) ? (
+                        <Link href={crmHref("company", c.company_id)} className="hover:text-white/90">{companyName.get(c.company_id)}</Link>
+                      ) : (
+                        <span className="text-white/25">—</span>
+                      )}
+                    </td>
+                    <td className="max-w-[220px] truncate px-4 py-3 text-white/65">
+                      {c.email ? <a href={`mailto:${c.email}`} className="hover:text-white/90">{c.email}</a> : <span className="text-white/25">—</span>}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-white/65">
+                      {c.phone ? (
+                        <span className="flex items-center gap-2">
+                          {tel ? <a href={tel} className="hover:text-white/90">{c.phone}</a> : c.phone}
+                          {wa && (
+                            <a href={wa} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${c.name}`} title="Open in WhatsApp" className="text-white/35 hover:text-emerald-300">
+                              <MessageCircle size={13} />
+                            </a>
+                          )}
+                          {tel && (
+                            <a href={tel} aria-label={`Call ${c.name}`} title="Call" className="text-white/35 hover:text-white/85">
+                              <Phone size={12} />
+                            </a>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-white/25">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <LabelList labels={rowLabels} />
+                    </td>
+                    <td className="px-4 py-3 text-white/65">{getSource(c.custom_fields) || <span className="text-white/25">—</span>}</td>
+                    <td className="px-4 py-3 text-white/65">{c.owner_agent ? agentLabel(c.owner_agent) : "You"}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

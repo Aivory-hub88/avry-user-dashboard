@@ -7,6 +7,7 @@
  * not touch (stage, contacts, custom fields) is reset.
  */
 import type { Company, Contact, Deal, DealStage } from "./crmClient"
+import { RESERVED_FIELD_KEYS } from "./crmLabels"
 
 export const OPEN_STAGES: readonly DealStage[] = ["lead", "qualified", "proposal"]
 
@@ -137,5 +138,7 @@ export function validFieldName(name: string, existing: Record<string, unknown>):
   const t = name.trim()
   if (t.length < 1 || t.length > 40) return null
   if (Object.prototype.hasOwnProperty.call(existing, t)) return null
+  // "Labels" and "Lead source" have their own controls and use these keys.
+  if (RESERVED_FIELD_KEYS.includes(t.toLowerCase())) return null
   return t
 }
