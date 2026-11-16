@@ -23,6 +23,7 @@ import {
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { indexRow, rowText, workspaceOf } from "@/lib/workspaceIndex"
 import { automatedFieldAdds, getAutomationRules, mergeFieldAdds, runStatusAutomations } from "@/lib/workspaceAutomations"
+import { unknownRoomPerson, notMemberResponse } from "@/lib/workspaceRoomPeople"
 import { recordAssignments, recordFieldAssignments } from "@/lib/workspaceMentions"
 import {
   addFollowers,
@@ -157,6 +158,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const creator = actorRef(cred, agentType)
     const cells = cleanCells(body.cells, fieldDefs)
     const fieldPeople = addedFieldPeople({}, cells, fieldDefs)
+    // Everyone named must be a room member / invited agent (a new row: all refs are new).
+    const stranger = await unknownRoomPerson(
+      id,
+      [...input.assignees, ...(input.owner ? [input.owner] : []), ...fieldPeople.flatMap((f) => f.added)],
+      cred,
+    )
+    if (stranger) return notMemberResponse(stranger, { assignees: input.assignees, owner: input.owner, fieldPeople })
     // A person creating a task owns it unless they named another owner.
     const owner = input.owner ?? (creator?.kind === "user" ? creator : null)
     const newRow: DbRow = {

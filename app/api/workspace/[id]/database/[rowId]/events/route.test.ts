@@ -24,6 +24,7 @@ import { POST as eventsPOST } from './route'
 import { PATCH } from '../route'
 import { POST as commentsPOST } from '../comments/route'
 import { POST as movePOST } from '../move/route'
+import { rosterResult } from '@/lib/testRoster'
 
 process.env.COLLAB_SERVICE_TOKEN = 'test-service-token'
 const svc = { 'x-service-token': 'test-service-token', 'Content-Type': 'application/json' }
@@ -60,6 +61,8 @@ beforeEach(() => {
   commentAt = new Date().toISOString()
   queryMock.mockReset()
   queryMock.mockImplementation((sql: string) => {
+    const roster = rosterResult(sql)
+    if (roster) return Promise.resolve(roster)
     if (sql.includes('SELECT id, yjs_update')) return Promise.resolve({ rows: [{ id: 'workspace:doc-1', yjs_update: dbBytes() }] })
     if (sql.includes('SELECT props')) return Promise.resolve({ rows: [{ props: {} }] })
     if (sql.includes('SELECT workspace_id')) return Promise.resolve({ rows: [] })

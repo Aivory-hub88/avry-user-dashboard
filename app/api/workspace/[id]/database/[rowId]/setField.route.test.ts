@@ -24,6 +24,7 @@ vi.mock('@/lib/serverAuth', () => ({ getAuthUserWithToken: () => null }))
 import { POST as movePOST } from './move/route'
 import { PATCH } from './route'
 import { POST as createPOST } from '../route'
+import { rosterResult } from '@/lib/testRoster'
 
 process.env.COLLAB_SERVICE_TOKEN = 'test-service-token'
 const svc = { 'x-service-token': 'test-service-token', 'Content-Type': 'application/json' }
@@ -54,6 +55,8 @@ const stored = build()
 beforeEach(() => {
   queryMock.mockReset()
   queryMock.mockImplementation((sql: string) => {
+    const roster = rosterResult(sql)
+    if (roster) return Promise.resolve(roster)
     if (sql.includes('SELECT id, yjs_update')) return Promise.resolve({ rows: [{ id: 'workspace:doc-1', yjs_update: stored }] })
     if (sql.includes('SELECT props')) return Promise.resolve({ rows: [{ props: { dbFields: FIELDS, dbAutomations: rules } }] })
     if (sql.includes('SELECT workspace_id')) return Promise.resolve({ rows: [] })

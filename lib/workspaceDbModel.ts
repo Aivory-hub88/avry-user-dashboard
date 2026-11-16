@@ -1367,3 +1367,73 @@ export function cellsMatchSearch(cells: Record<string, CellValue>, defs: readonl
   if (!needle) return true
   return defs.some((d) => d.type !== "relation" && d.type !== "rollup" && cellText(d, cells[d.id]).toLowerCase().includes(needle))
 }
+
+// ---------------------------------------------------------------------------
+// Deleting a custom field: what else was keyed by its id.
+// ---------------------------------------------------------------------------
+
+/** Ids of fields in `prev` that `next` no longer lists. */
+export function removedFieldIds(prev: readonly FieldDef[], next: readonly FieldDef[]): string[] {
+  const keep = new Set(next.map((f) => f.id))
+  return prev.filter((f) => !keep.has(f.id)).map((f) => f.id)
+}
+
+/** `cells` without the given field ids; null when nothing was in there (no write needed). */
+export function dropCellKeys(cells: unknown, ids: ReadonlySet<string>): Record<string, unknown> | null {
+  if (!cells || typeof cells !== "object" || Array.isArray(cells)) return null
+  const src = cells as Record<string, unknown>
+  if (!Object.keys(src).some((k) => ids.has(k))) return null
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(src)) if (!ids.has(k)) out[k] = v
+  return out
+}
+
+/**
+ * Saved views without the deleted fields: their per-field filters go, a sort
+ * on one falls back to the title. Null when no view mentioned them.
+ */
+export function dropFieldsFromViews(views: unknown, ids: ReadonlySet<string>): unknown[] | null {
+  if (!Array.isArray(views)) return null
+  let changed = false
+  const out = views.map((v) => {
+    if (!v || typeof v !== "object" || Array.isArray(v)) return v
+    const view = { ...(v as Record<string, unknown>) }
+    if (typeof view.sortField === "string") {
+      const sid = fieldSortId(view.sortField)
+      if (sid && ids.has(sid)) {
+        view.sortField = "title"
+        changed = true
+      }
+    }
+    const ff = view.fieldFilters
+    if (ff && typeof ff === "object" && !Array.isArray(ff)) {
+      const kept = Object.fromEntries(Object.entries(ff as Record<string, unknown>).filter(([k]) => !ids.has(k)))
+      if (Object.keys(kept).length !== Object.keys(ff as object).length) {
+        changed = true
+        if (Object.keys(kept).length > 0) view.fieldFilters = kept
+        else delete view.fieldFilters
+      }
+    }
+    return view
+  })
+  return changed ? out : null
+}
+
+/**
+ * Automation rules without a `setField` action on a deleted field; a rule
+ * left with no action at all goes too. Null when no rule used them.
+ */
+export function dropFieldsFromRules(rules: readonly AutomationRule[], ids: ReadonlySet<string>): AutomationRule[] | null {
+  if (!rules.some((r) => r.setField && ids.has(r.setField.fieldId))) return null
+  const out: AutomationRule[] = []
+  for (const r of rules) {
+    if (!r.setField || !ids.has(r.setField.fieldId)) {
+      out.push(r)
+      continue
+    }
+    const { setField: _gone, ...rest } = r
+    void _gone
+    if (rest.setAssignee !== undefined || rest.addComment !== undefined || rest.moveTo !== undefined) out.push(rest)
+  }
+  return out
+}
