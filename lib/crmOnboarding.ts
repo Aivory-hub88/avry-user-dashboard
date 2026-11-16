@@ -4,6 +4,7 @@
  * CSV import (parse, guess the column mapping, turn rows into records).
  */
 import type { Activity, Company, Contact, Deal, DealStage, Grant } from "./crmClient"
+import { emailKey, phoneKey } from "./crmContacts"
 
 // ── Sample data ────────────────────────────────────────────────────────────
 
@@ -206,6 +207,8 @@ export type ImportPlan = {
   companies: { name: string; domain: string | null; industry: string | null }[]
   contacts: { name: string; email: string | null; phone: string | null; title: string | null; company: string | null }[]
   skipped: number
+  /** Rows left out because the same email or phone is already in the CRM or earlier in the file. */
+  duplicates: number
 }
 
 const cleanCell = (v: string | undefined) => {
@@ -225,13 +228,16 @@ export function toDomain(v: string | null): string | null {
  * that already exist) and contacts. A row with a company but no person
  * becomes just the company; a row with neither is skipped.
  */
-export function buildImportPlan(rows: string[][], mapping: (ImportField | null)[], existingCompanies: string[] = []): ImportPlan {
+export function buildImportPlan(rows: string[][], mapping: (ImportField | null)[], existingCompanies: string[] = [], existingContacts: { email: string | null; phone: string | null }[] = []): ImportPlan {
   const col = (f: ImportField) => mapping.indexOf(f)
   const get = (r: string[], f: ImportField) => (col(f) >= 0 ? cleanCell(r[col(f)]) : null)
   const existing = new Set(existingCompanies.map((n) => n.trim().toLowerCase()))
   const companies = new Map<string, ImportPlan["companies"][number]>()
   const contacts: ImportPlan["contacts"] = []
   let skipped = 0
+  let duplicates = 0
+  const seenEmail = new Set(existingContacts.map((c) => emailKey(c.email)).filter(Boolean))
+  const seenPhone = new Set(existingContacts.map((c) => phoneKey(c.phone)).filter(Boolean))
   for (const r of rows.slice(0, MAX_IMPORT_ROWS)) {
     const full = get(r, "name") ?? ([get(r, "first_name"), get(r, "last_name")].filter(Boolean).join(" ") || null)
     const company = get(r, "company")
@@ -242,9 +248,17 @@ export function buildImportPlan(rows: string[][], mapping: (ImportField | null)[
     }
     const name = full ?? email
     if (name && name.length >= 2) {
+      const ek = emailKey(email)
+      const pk = phoneKey(get(r, "phone"))
+      if ((ek && seenEmail.has(ek)) || (pk && seenPhone.has(pk))) {
+        duplicates++
+        continue
+      }
+      if (ek) seenEmail.add(ek)
+      if (pk) seenPhone.add(pk)
       contacts.push({ name, email, phone: get(r, "phone"), title: get(r, "title"), company: company && company.length >= 2 ? company : null })
     } else if (!company) skipped++
   }
   skipped += Math.max(0, rows.length - MAX_IMPORT_ROWS)
-  return { companies: [...companies.values()], contacts, skipped }
+  return { companies: [...companies.values()], contacts, skipped, duplicates }
 }
