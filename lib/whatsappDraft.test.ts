@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { lastChunkText } from "./aivoryAssistantServer"
+import { parseAgentTurn, runAgentTurn } from "./agentTurnServer"
 import { buildDraftPrompt, cleanDraft, historyFromNotes, shouldDraftFor } from "./whatsappDraftPrompt"
 import { draftForEntry, latestPerContact, type DraftDeps } from "./whatsappDraftRunner"
 import type { LoggedEntry } from "./whatsappInbound"
@@ -45,34 +46,77 @@ describe("draftForEntry", () => {
   const deps = (o: Partial<DraftDeps> = {}) => {
     const saved: unknown[][] = []
     const d: DraftDeps = {
-      enabled: async () => true,
+      mode: async () => ({ kind: "assistant" }),
       notes: async () => [note("WhatsApp received: Halo, apa itu Aivory?", "2026-11-16T00:00:00Z")],
-      ask: vi.fn(async () => "Aivory adalah platform AI untuk bisnis."),
+      askAssistant: vi.fn(async () => "Aivory adalah platform AI untuk bisnis."),
+      askAgent: vi.fn(async () => ({ reply: "Halo Irfan, kami bantu ya.", pendingApproval: false })),
       save: async (...a) => void saved.push(a),
       ...o,
     }
     return { d, saved }
   }
-  it("saves a draft, without repeating the question in the history", async () => {
+  it("assistant mode saves a draft, without repeating the question in the history", async () => {
     const { d, saved } = deps()
     expect(await draftForEntry("t1", entry(), d)).toBe("drafted")
     expect(saved).toEqual([["t1", "c1", "Aivory adalah platform AI untuk bisnis.", "w1"]])
-    expect((d.ask as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual([])
+    expect((d.askAssistant as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual([])
+    expect(d.askAgent).not.toHaveBeenCalled()
+  })
+  it("agent mode asks the customer's agent in a per-contact conversation, never the assistant", async () => {
+    const { d, saved } = deps({ mode: async () => ({ kind: "agent", agent: "leads_qualifier" }) })
+    expect(await draftForEntry("t1", entry(), d)).toBe("drafted")
+    const call = (d.askAgent as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(call).toMatchObject({ tenantId: "t1", agent: "leads_qualifier", conversationId: "wa_c1" })
+    expect(call.text).toMatch(/do NOT send anything/)
+    expect(call.text).toContain("Halo, apa itu Aivory?")
+    expect(d.askAssistant).not.toHaveBeenCalled()
+    expect(saved).toEqual([["t1", "c1", "Halo Irfan, kami bantu ya.", "w1"]])
+  })
+  it("an agent that parks an approval (tries to act) produces no draft", async () => {
+    const { d, saved } = deps({ mode: async () => ({ kind: "agent", agent: "leads_qualifier" }), askAgent: async () => ({ reply: "Balas Ya untuk mengirim email", pendingApproval: true }) })
+    expect(await draftForEntry("t1", entry(), d)).toBe("empty")
+    expect(saved).toHaveLength(0)
   })
   it("does nothing when drafts are off, the message is an opt-out, or the answer is empty", async () => {
-    const off = deps({ enabled: async () => false })
+    const off = deps({ mode: async () => ({ kind: "off" }) })
     expect(await draftForEntry("t1", entry(), off.d)).toBe("off")
-    expect(off.d.ask).not.toHaveBeenCalled()
+    expect(off.d.askAssistant).not.toHaveBeenCalled()
     const stop = deps()
     expect(await draftForEntry("t1", entry("STOP"), stop.d)).toBe("skipped")
-    expect(stop.d.ask).not.toHaveBeenCalled()
-    const empty = deps({ ask: async () => null })
+    expect(stop.d.askAssistant).not.toHaveBeenCalled()
+    const empty = deps({ askAssistant: async () => null })
     expect(await draftForEntry("t1", entry(), empty.d)).toBe("empty")
     expect(empty.saved).toHaveLength(0)
   })
   it("keeps only the latest message per contact", () => {
     const out = latestPerContact([entry("a", "w1"), entry("b", "w2"), entry("c", "w3", "c2")])
     expect(out.map((e) => e.message.id)).toEqual(["w2", "w3"])
+  })
+})
+
+describe("agent turn", () => {
+  it("reads the reply after the backend's keep-alive spaces and treats an error body as no reply", () => {
+    expect(parseAgentTurn('   {"reply":"Halo!","pending_approval":null}')).toEqual({ reply: "Halo!", pendingApproval: false })
+    expect(parseAgentTurn('{"reply":"Balas Ya","pending_approval":{"id":"pa_1"}}')).toEqual({ reply: "Balas Ya", pendingApproval: true })
+    expect(parseAgentTurn(' {"detail":"Agent request failed","status_code":500}')).toEqual({ reply: null, pendingApproval: false })
+    expect(parseAgentTurn("not json")).toEqual({ reply: null, pendingApproval: false })
+  })
+  it("does nothing without the token", async () => {
+    const f = vi.fn() as unknown as typeof fetch
+    delete process.env.DASHBOARD_AGENT_TURN_TOKEN
+    expect(await runAgentTurn({ tenantId: "t", agentType: "leads_qualifier", conversationId: "wa_1", text: "x" }, f)).toEqual({ reply: null, pendingApproval: false })
+    expect(f).not.toHaveBeenCalled()
+  })
+  it("posts to the internal endpoint with the dedicated token", async () => {
+    process.env.DASHBOARD_AGENT_TURN_TOKEN = "tok-123"
+    const f = vi.fn(async () => new Response('{"reply":"ok"}')) as unknown as typeof fetch
+    const out = await runAgentTurn({ tenantId: "t", agentType: "leads_qualifier", conversationId: "wa_1", text: "hi" }, f)
+    expect(out.reply).toBe("ok")
+    const [url, init] = (f as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0]
+    expect(url).toMatch(/\/api\/v1\/telegram\/internal\/agent-turn$/)
+    expect((init.headers as Record<string, string>)["x-agent-turn-token"]).toBe("tok-123")
+    expect(JSON.parse(init.body as string)).toEqual({ tenant_user_id: "t", agent_type: "leads_qualifier", text: "hi", conversation_id: "wa_1" })
+    delete process.env.DASHBOARD_AGENT_TURN_TOKEN
   })
 })
 
