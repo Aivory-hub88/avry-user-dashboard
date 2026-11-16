@@ -16,7 +16,7 @@ import { AgentAvatar } from "@/components/office/AgentAvatar"
 import { AGENT_ROSTER } from "@/lib/agentRoster"
 import { personKey, type PersonRef } from "@/lib/workspaceDbModel"
 
-export type TaskPerson = { id: string; name: string }
+export type TaskPerson = { id: string; name: string; email?: string }
 export type TaskAgent = { type: string; name: string }
 
 export function nameOf(p: PersonRef, people: TaskPerson[]): string {

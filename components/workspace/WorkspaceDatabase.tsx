@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
-import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload, LayoutTemplate, Zap, Bell, BellOff, ChevronRight, ListChecks, Ban, CornerDownRight } from "lucide-react"
+import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload, Download, LayoutTemplate, Zap, Bell, BellOff, ChevronRight, ListChecks, Ban, CornerDownRight } from "lucide-react"
 import TaskFilters from "@/components/workspace/TaskFilters"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 import {
@@ -24,6 +24,7 @@ import {
   cellPeople,
   matchesPersonCellFilter,
   personCellLimit,
+  missingOnDone,
   cleanRuleFieldTarget,
   personKey,
   rowFollowers,
@@ -74,6 +75,7 @@ import {
   type PersonRef,
 } from "@/lib/workspaceDbModel"
 import { AGENT_ROSTER } from "@/lib/agentRoster"
+import { CSV_BUILTIN_COLUMNS, MAX_CSV_IMPORT_ROWS, csvRowCells, csvUnguard, exportRowsCsv, fieldColumns, parseCsv, resolveCsvPerson } from "@/lib/workspaceCsv"
 import { AvatarStack, PeoplePicker, PersonAvatar, nameOf, namesOf, type TaskAgent, type TaskPerson } from "@/components/workspace/TaskPeople"
 import { CommentComposer, CommentText, TaskActivity } from "@/components/workspace/TaskComments"
 import { TaskStatuses } from "@/components/workspace/TaskStatuses"
@@ -835,6 +837,11 @@ export default function WorkspaceDatabase({
     void persistFields(fields.map((f) => (f.id === fieldId ? (f.single ? { ...f, single: undefined } : { ...f, single: true }) : f)))
   }
 
+  const toggleFieldRequired = (fieldId: string) => {
+    if (readOnlyRef.current) return
+    void persistFields(fields.map((f) => (f.id === fieldId ? (f.requiredForDone ? { ...f, requiredForDone: undefined } : { ...f, requiredForDone: true }) : f)))
+  }
+
   const ruleAssigneeLabel = (v: string): string => {
     const ref = v.startsWith("user:") ? refFromKey(v, people) : cleanPersonRef({ kind: "agent", type: v })
     return ref ? nameOf(ref, people) : v
@@ -1480,6 +1487,11 @@ export default function WorkspaceDatabase({
         setNotice(`“${prev.title || "Untitled"}” is still blocked by ${what} — moved to ${patch.status} anyway.`)
       }
     }
+    // Same idea for a done-group status while a "required before Done" field is empty.
+    if (patch.status !== undefined) {
+      const missing = missingOnDone(statuses, fields, prev.status, patch.status, patch.cells ?? prev.cells)
+      if (missing.length > 0) setNotice(`“${prev.title || "Untitled"}” moved to ${patch.status} without: ${missing.map((m) => m.name).join(", ")}.`)
+    }
     // Tracked changes → activity + follower notices (server verifies them).
     if (patch.status !== undefined && patch.status !== prev.status) postEvent(id, { kind: "status", from: prev.status })
     if (patch.due !== undefined && (patch.due || "") !== (prev.due || "")) postEvent(id, { kind: "due", from: prev.due })
@@ -1612,60 +1624,29 @@ export default function WorkspaceDatabase({
     if (selfRef) postEvent(selectedRow.id, { kind: "comment", commentId: comment.id })
   }
 
-  /** Minimal CSV parser (quotes + embedded commas/newlines). Returns rows of cells. */
-  const parseCsv = (text: string): string[][] => {
-    const rows: string[][] = []
-    let cur: string[] = []
-    let cell = ""
-    let quoted = false
-    for (let i = 0; i < text.length; i++) {
-      const ch = text[i]
-      if (quoted) {
-        if (ch === '"') {
-          if (text[i + 1] === '"') {
-            cell += '"'
-            i++
-          } else {
-            quoted = false
-          }
-        } else {
-          cell += ch
-        }
-      } else if (ch === '"') {
-        quoted = true
-      } else if (ch === ",") {
-        cur.push(cell)
-        cell = ""
-      } else if (ch === "\n" || ch === "\r") {
-        if (ch === "\r" && text[i + 1] === "\n") i++
-        cur.push(cell)
-        cell = ""
-        if (cur.length > 1 || cur[0].trim() !== "") rows.push(cur)
-        cur = []
-      } else {
-        cell += ch
-      }
+  /** CSV assignee cell → typed refs when every token resolves (email / name / agent), else legacy text. */
+  const csvAssignee = (text: string): { assignees: PersonRef[] } | { assignee: string } => {
+    const parts = text.includes(";") || text.includes("<") ? text.split(";") : text.split(/[;,]/)
+    const tokens = parts.map((t) => t.trim()).filter(Boolean)
+    const refs: PersonRef[] = []
+    for (const t of tokens) {
+      const ref = resolveCsvPerson(t, people)
+      if (ref && !refs.some((r) => personKey(r) === personKey(ref))) refs.push(ref)
     }
-    cur.push(cell)
-    if (cur.length > 1 || cur[0].trim() !== "") rows.push(cur)
-    return rows
+    return refs.length > 0 && refs.length === tokens.length ? { assignees: refs.slice(0, 5) } : { assignee: text.slice(0, 100) }
   }
 
-  /** CSV assignee cell → typed refs when names match people/agents, else legacy text. */
-  const csvAssignee = (text: string): { assignees: PersonRef[] } | { assignee: string } => {
-    const parts = text.split(/[;,]/).map((t) => t.trim()).filter(Boolean)
-    const refs: PersonRef[] = []
-    for (const part of parts) {
-      const t = part.toLowerCase()
-      const person = people.find((p) => p.name.toLowerCase() === t || p.id === part)
-      if (person) {
-        refs.push({ kind: "user", id: person.id, name: person.name })
-        continue
-      }
-      const agent = rowAssignees(undefined, part)[0]
-      if (agent) refs.push(agent)
-    }
-    return refs.length > 0 && refs.length === parts.length ? { assignees: refs } : { assignee: text.slice(0, 100) }
+  const exportCsv = () => {
+    const csv = exportRowsCsv(rows, fields, people)
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }))
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `tasks-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    setNotice(`Exported ${rows.length} task${rows.length === 1 ? "" : "s"}.`)
   }
 
   const importCsv = async (file: File) => {
@@ -1674,12 +1655,12 @@ export default function WorkspaceDatabase({
     setNotice(null)
     try {
       const text = await file.text()
-      const parsed = parseCsv(text).slice(0, 201)
+      const parsed = parseCsv(text).slice(0, MAX_CSV_IMPORT_ROWS + 1)
       if (parsed.length === 0) {
         setNotice("CSV is empty.")
         return
       }
-      const KNOWN = new Set(["title", "status", "priority", "assignee", "start", "due", "description"])
+      const KNOWN = new Set<string>(CSV_BUILTIN_COLUMNS)
       const first = parsed[0].map((c) => c.trim().toLowerCase())
       const hasHeader = first.includes("title")
       const idx: Record<string, number> = {}
@@ -1693,16 +1674,21 @@ export default function WorkspaceDatabase({
           idx[h] = i
         })
       }
+      // Custom-field columns (header = field name, or "field:<name>").
+      const fieldCols = hasHeader ? fieldColumns(parsed[0], fields) : {}
       const body = hasHeader ? parsed.slice(1) : parsed
       let ok = 0
       let skipped = 0
-      for (const cells of body.slice(0, 200)) {
-        const at = (k: string) => (idx[k] !== undefined ? (cells[idx[k]] ?? "").trim() : "")
+      let badCells = 0
+      for (const cells of body.slice(0, MAX_CSV_IMPORT_ROWS)) {
+        const at = (k: string) => (idx[k] !== undefined ? csvUnguard((cells[idx[k]] ?? "").trim()) : "")
         const title = at("title")
         if (!title && !at("description")) {
           skipped++
           continue
         }
+        const custom = csvRowCells(cells, fieldCols, fields, people)
+        badCells += custom.problems.length
         try {
           const r = await fetch(`/api/workspace/${docId}/database`, {
             method: "POST",
@@ -1715,6 +1701,7 @@ export default function WorkspaceDatabase({
               start: at("start").slice(0, 20),
               due: at("due").slice(0, 20),
               description: at("description").slice(0, 4000),
+              ...(Object.keys(custom.cells).length > 0 ? { cells: custom.cells } : {}),
             }),
           })
           if (r.ok) ok++
@@ -1723,7 +1710,7 @@ export default function WorkspaceDatabase({
           skipped++
         }
       }
-      setNotice(`Imported ${ok} task${ok === 1 ? "" : "s"}${skipped ? ` · ${skipped} skipped` : ""}.`)
+      setNotice(`Imported ${ok} task${ok === 1 ? "" : "s"}${skipped ? ` · ${skipped} skipped` : ""}${badCells ? ` · ${badCells} field value${badCells === 1 ? "" : "s"} skipped (no match)` : ""}.`)
     } catch {
       setNotice("Could not read that CSV file.")
     }
@@ -2007,11 +1994,20 @@ export default function WorkspaceDatabase({
                 <button
                   onClick={() => importRef.current?.click()}
                   disabled={importing}
-                  title="Import tasks from CSV (title,status,priority,assignee,due,description,start)"
+                  title="Import tasks from CSV (title,status,priority,assignee,start,due,description + one column per custom field; people by email or name)"
                   className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-4 py-2 text-[12.5px] font-medium text-white/70 hover:bg-white/[0.08] hover:text-white disabled:opacity-40"
                 >
                   <Upload className="h-3.5 w-3.5" />
                   {importing ? "Importing…" : "Import"}
+                </button>
+                <button
+                  onClick={exportCsv}
+                  disabled={rows.length === 0}
+                  title="Export all tasks, with custom fields, to CSV"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.04] px-4 py-2 text-[12.5px] font-medium text-white/70 hover:bg-white/[0.08] hover:text-white disabled:opacity-40"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Export
                 </button>
                 <button
                   onClick={addRow}
@@ -2059,6 +2055,7 @@ export default function WorkspaceDatabase({
                       {f.type === "relation" && f.targetDocId ? ` → ${f.targetDocId}` : ""}
                       {f.type === "rollup" && f.relationFieldId ? ` · ${f.rollupOp}` : ""}
                       {f.type === "person" && f.single ? " · single person" : ""}
+                      {f.requiredForDone ? " · required for Done" : ""}
                       {f.options.length ? ` · ${f.options.join(", ")}` : ""}
                     </span>
                   </span>
@@ -2069,6 +2066,15 @@ export default function WorkspaceDatabase({
                       className="ml-auto shrink-0 rounded-full border border-line px-2 py-0.5 text-[11px] text-white/45 opacity-0 hover:text-white/80 group-hover:opacity-100"
                     >
                       {f.single ? "Allow several" : "Single person"}
+                    </button>
+                  )}
+                  {f.type !== "rollup" && (
+                    <button
+                      onClick={() => toggleFieldRequired(f.id)}
+                      title={f.requiredForDone ? "Stop warning when a task is moved to Done without this" : "Warn when a task is moved to Done while this is empty"}
+                      className={`${f.type === "person" ? "" : "ml-auto "}shrink-0 rounded-full border border-line px-2 py-0.5 text-[11px] text-white/45 hover:text-white/80 ${f.requiredForDone ? "" : "opacity-0 group-hover:opacity-100"}`}
+                    >
+                      {f.requiredForDone ? "Not required" : "Require for Done"}
                     </button>
                   )}
                   <button onClick={() => removeField(f.id)} title="Delete field (values stay on rows but hide)" className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-white/20 opacity-0 hover:text-red-300 group-hover:opacity-100">
@@ -3169,7 +3175,7 @@ export default function WorkspaceDatabase({
                   <div className="mt-2 flex flex-col gap-2.5">
                     {fields.map((f) => (
                       <label key={f.id} className="block rounded-xl border border-line bg-white/[0.02] px-3 py-2">
-                        <span className="mb-1 block text-[11px] text-white/40">{f.name} <span className="text-white/20">· {f.type}</span></span>
+                        <span className="mb-1 block text-[11px] text-white/40">{f.name} <span className="text-white/20">· {f.type}</span>{f.requiredForDone && <span className="ml-1 text-white/30" title="Required before Done">· required for Done</span>}</span>
                         <CellEditor def={f} value={selectedRow.cells[f.id]} readOnly={readOnly} onChange={(v) => updateCell(selectedRow.id, f.id, v)} relationRows={f.targetDocId ? targetRows[f.targetDocId] : undefined} onEnsureRelationRows={() => ensureTargetRows(f.targetDocId)} people={people} agents={agents} />
                       </label>
                     ))}
