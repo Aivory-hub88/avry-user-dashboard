@@ -2,9 +2,10 @@
 
 /** One activity row, shared by the record panel (deletable) and the feed (shows its subject). */
 import { useState } from "react"
-import { Check } from "lucide-react"
+import { ArrowDownLeft, ArrowUpRight, Check } from "lucide-react"
 import type { Activity } from "@/lib/crmClient"
 import { activityState, agentLabel, DUE_TONE, formatWhen, isCompletable, KIND_META, SUBJECT_LABEL } from "@/lib/crmActivity"
+import { whatsappDirection, whatsappText } from "@/lib/crmWhatsapp"
 
 export default function ActivityItem({
   a,
@@ -26,6 +27,7 @@ export default function ActivityItem({
   const done = state === "done"
   const actor = a.owner_agent ? agentLabel(a.owner_agent) : "You"
   const canTick = !!onToggleDone && isCompletable(a)
+  const wa = whatsappDirection(a)
 
   return (
     <li className="flex gap-3 px-4 py-3">
@@ -44,9 +46,15 @@ export default function ActivityItem({
       )}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-white/40">
-          <span className={`h-2 w-2 rounded-full ${meta.dot}`} />
-          <span className="font-medium text-white/70">{meta.label}</span>
-          <span>{actor}</span>
+          <span className={`h-2 w-2 rounded-full ${wa ? "bg-emerald-400" : meta.dot}`} />
+          <span className="font-medium text-white/70">{wa ? "WhatsApp" : meta.label}</span>
+          {wa && (
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-400/10 px-1.5 py-px text-[10.5px] font-medium text-emerald-300/90">
+              {wa === "in" ? <ArrowDownLeft size={10} /> : <ArrowUpRight size={10} />}
+              {wa === "in" ? "Received" : "Sent"}
+            </span>
+          )}
+          {(!wa || a.owner_agent) && <span>{actor}</span>}
           <span>{formatWhen(a.occurred_at)}</span>
           {done && a.completed_at ? (
             <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-medium ${DUE_TONE.done}`}>Done {formatWhen(a.completed_at)}</span>
@@ -65,7 +73,7 @@ export default function ActivityItem({
           </button>
         )}
         {a.body && (
-          <div className={`mt-1 whitespace-pre-wrap break-words text-[13px] leading-relaxed ${done ? "text-white/40 line-through decoration-white/25" : "text-white/80"}`}>{a.body}</div>
+          <div className={`mt-1 whitespace-pre-wrap break-words text-[13px] leading-relaxed ${done ? "text-white/40 line-through decoration-white/25" : "text-white/80"}`}>{wa ? whatsappText(a.body) : a.body}</div>
         )}
         {onDelete && (
           <div className="mt-1.5 text-[11px]">

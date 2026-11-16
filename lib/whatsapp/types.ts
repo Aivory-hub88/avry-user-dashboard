@@ -15,3 +15,18 @@ export type RegisterResult = { ok: true; secret?: string } | { ok: false; code: 
 export type InboundCtx = { raw: string; headers: Headers; url: string }
 
 export const MAX_TEXT = 4096
+
+/** An approved WhatsApp template a person can send outside the 24-hour window. */
+export type WaTemplate = {
+  name: string
+  language: string
+  category: string
+  /** BODY text with its {{1}}, {{2}} placeholders. */
+  body: string
+  /** How many positional variables the body takes. */
+  params: number
+  /** False for templates that need media, buttons with variables, etc., which we can't fill from a text box. */
+  usable: boolean
+}
+
+export type TemplateList = { ok: true; templates: WaTemplate[] } | { ok: false; code: "unsupported" | "bad_key" | "unavailable" | "rejected"; message: string }

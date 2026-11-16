@@ -3,11 +3,11 @@
  * so the CRM never branches on the vendor. To add one: write its adapter, add it
  * here, and describe its credentials in providerMeta.ts. SERVER-ONLY.
  */
-import { INBOUND_EVENT, parseInbound, registerWebhook, sendText, verifySignature } from "../kapso"
+import { INBOUND_EVENT, kapsoListTemplates, kapsoSendTemplate, parseInbound, registerWebhook, sendText, verifySignature } from "../kapso"
 import { kirimParse, kirimRegister, kirimSend, kirimVerify, kirimWanted } from "./kirimdev"
-import { metaChallenge, metaParse, metaSend, metaVerify } from "./meta"
+import { metaChallenge, metaListTemplates, metaParse, metaSend, metaSendTemplate, metaVerify } from "./meta"
 import { twilioParse, twilioSend, twilioVerify } from "./twilio"
-import type { Creds, InboundCtx, Inbound, ProviderId, RegisterResult, SendResult } from "./types"
+import type { Creds, InboundCtx, Inbound, ProviderId, RegisterResult, SendResult, TemplateList } from "./types"
 
 export interface Provider {
   id: ProviderId
@@ -21,6 +21,11 @@ export interface Provider {
   parse(ctx: InboundCtx): Inbound[]
   /** Setup handshake for providers that do one over GET. */
   challenge?(params: URLSearchParams, secret: string): string | null
+  /** Approved templates, for starting a chat outside the 24-hour window. Absent when the adapter does not support them yet. */
+  templates?: {
+    list(c: Creds): Promise<TemplateList>
+    send(c: Creds, toDigits: string, name: string, language: string, params: string[]): Promise<SendResult>
+  }
   /** What to answer a delivery with (Twilio expects TwiML). */
   ack?: { body: string; type: string }
 }
@@ -35,6 +40,10 @@ const kapso: Provider = {
     return !e || e === INBOUND_EVENT
   },
   parse: (ctx) => parseInbound(JSON.parse(ctx.raw)),
+  templates: {
+    list: (c) => kapsoListTemplates({ apiKey: c.api_key, phoneNumberId: c.phone_number_id }),
+    send: (c, to, name, lang, params) => kapsoSendTemplate({ apiKey: c.api_key, phoneNumberId: c.phone_number_id }, to, name, lang, params),
+  },
 }
 
 const meta: Provider = {
@@ -43,6 +52,7 @@ const meta: Provider = {
   verify: (ctx, c) => metaVerify(ctx, c),
   parse: metaParse,
   challenge: metaChallenge,
+  templates: { list: (c) => metaListTemplates(c), send: (c, to, name, lang, params) => metaSendTemplate(c, to, name, lang, params) },
 }
 
 const twilio: Provider = {

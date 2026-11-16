@@ -19,7 +19,7 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
   const [error, setError] = useState<string | null>(null)
   const [setup, setSetup] = useState<string[]>([])
   const meta = providerMeta(provider) ?? PROVIDERS[0]
-  const ready = meta.fields.every((f) => (values[f.key] ?? "").trim() !== "")
+  const ready = meta.fields.every((f) => f.optional || (values[f.key] ?? "").trim() !== "")
 
   const act = async (fn: () => Promise<void>) => {
     setBusy(true)
@@ -105,7 +105,7 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
           {meta.fields.map((f) => (
             <label key={f.key} className="block">
               <span className="mb-1 block text-[11px] text-white/45">
-                {f.label} <span className="text-white/30">· {f.hint}</span>
+                {f.label}{f.optional ? " (optional)" : ""} <span className="text-white/30">· {f.hint}</span>
               </span>
               <input
                 value={values[f.key] ?? ""}
