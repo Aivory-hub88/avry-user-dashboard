@@ -33,6 +33,7 @@ import {
   cleanParentId,
   defaultStatus,
   parentProblem,
+  personCellsProblem,
   resolveStatus,
   rowAssignees,
   MAX_BLOCKED_BY,
@@ -137,6 +138,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (limited !== null) {
       return NextResponse.json({ error: "wip-exceeded", limit: limited }, { status: 409 })
     }
+    const badCell = personCellsProblem(body.cells, fieldDefs)
+    if (badCell) return NextResponse.json({ error: "invalid cells", field: badCell.fieldId, reason: badCell.reason }, { status: 400 })
     const input = cleanRowInput(body, status)
     const newId = newDbRowId()
     // Sub-task / dependencies: same-doc rows only, validated before writing.

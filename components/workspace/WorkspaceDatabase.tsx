@@ -19,6 +19,10 @@ import {
   addedAssignees,
   matchesPeopleFilter,
   cleanPeopleFilter,
+  cleanFieldFilters,
+  cellPeople,
+  matchesPersonCellFilter,
+  MAX_PERSON_CELL,
   personKey,
   rowFollowers,
   addFollowers,
@@ -184,6 +188,8 @@ function CellEditor({
   onChange,
   relationRows,
   onEnsureRelationRows,
+  people = [],
+  agents = [],
 }: {
   def: FieldDef
   value: CellValue | undefined
@@ -191,8 +197,37 @@ function CellEditor({
   onChange: (v: CellValue | undefined) => void
   relationRows?: Array<{ id: string; title: string; status: string }>
   onEnsureRelationRows?: () => void
+  /** Person fields: the room's people + invited agents for the picker. */
+  people?: TaskPerson[]
+  agents?: TaskAgent[]
 }) {
   const str = typeof value === "string" ? value : ""
+  if (def.type === "person") {
+    const list = cellPeople(value)
+    return (
+      <PeoplePicker
+        value={list}
+        onChange={(next) => onChange(next.length ? next : undefined)}
+        people={people}
+        agents={agents}
+        readOnly={readOnly}
+        max={MAX_PERSON_CELL}
+        dialogLabel={`Choose ${def.name}`}
+        countNoun="picked"
+        title={list.length ? `${def.name}: ${namesOf(list, people)}` : readOnly ? def.name : `Set ${def.name}`}
+        className="flex min-h-[24px] max-w-full items-center gap-1.5 rounded-full text-left disabled:cursor-default"
+      >
+        {list.length > 0 ? (
+          <>
+            <AvatarStack list={list} people={people} size={20} />
+            {list.length === 1 && <span className="min-w-0 truncate text-[12px] text-white/60">{nameOf(list[0], people)}</span>}
+          </>
+        ) : (
+          <span className="text-[12px] text-white/25">{readOnly ? "—" : "Pick…"}</span>
+        )}
+      </PeoplePicker>
+    )
+  }
   if (def.type === "relation") {
     const linked = Array.isArray(value) ? value.filter((x): x is string => typeof x === "string") : []
     const titleOf = (id: string) => relationRows?.find((r) => r.id === id)?.title || id
@@ -377,6 +412,10 @@ function newCommentId(): string {
   return `c-${Date.now().toString(36)}`
 }
 
+function newViewId(): string {
+  return `view-${Date.now().toString(36)}`
+}
+
 function StatusPill({ s, statuses }: { s: string; statuses: readonly StatusDef[] }) {
   const style = GROUP_STYLE[statusGroup(statuses, s)]
   return (
@@ -460,6 +499,8 @@ type SavedView = {
   sortDir: "asc" | "desc"
   dueFilter?: string
   peopleFilter?: string
+  /** Person custom fields: { fieldId: "me" | "unassigned" | person key }. */
+  fieldFilters?: Record<string, string>
 }
 
 type DbTemplate = {
@@ -532,6 +573,8 @@ export default function WorkspaceDatabase({
   const [groupBy, setGroupBy] = useState<"status" | "assignee" | "priority">("status")
   // People filter: "All" | "me" | "unassigned" | person key (saved in views).
   const [peopleFilter, setPeopleFilter] = useState<string>("All")
+  // One filter per person custom field (saved in views as fieldFilters).
+  const [fieldFilters, setFieldFilters] = useState<Record<string, string>>({})
   // Swimlanes (status board only): second dimension splitting columns into lanes.
   const [laneBy, setLaneBy] = useState<"none" | "assignee" | "priority">("none")
   const [quickLane, setQuickLane] = useState<string | null>(null)
@@ -560,6 +603,11 @@ export default function WorkspaceDatabase({
   const [showGallery, setShowGallery] = useState(false)
   // Custom fields (Fase 3b): definitions in pg props.dbFields, values in row cells.
   const [fields, setFields] = useState<FieldDef[]>([])
+  const personFields = fields.filter((f) => f.type === "person")
+  // Filters of person fields that still exist (a deleted field's filter is ignored).
+  const activeFieldFilters: Record<string, string> = Object.fromEntries(
+    personFields.map((f) => [f.id, fieldFilters[f.id] ?? "All"]).filter(([, v]) => v !== "All"),
+  )
   const [showFields, setShowFields] = useState(false)
   const [newFieldName, setNewFieldName] = useState("")
   const [newFieldType, setNewFieldType] = useState<FieldDef["type"]>("text")
@@ -999,6 +1047,7 @@ export default function WorkspaceDatabase({
     setSortDir(v.sortDir)
     setDueFilter(typeof v.dueFilter === "string" && (DUE_FILTERS as string[]).includes(v.dueFilter) ? v.dueFilter : "All")
     setPeopleFilter(cleanPeopleFilter(v.peopleFilter))
+    setFieldFilters(cleanFieldFilters(v.fieldFilters))
   }
 
   const saveCurrentAsView = async () => {
@@ -1007,7 +1056,7 @@ export default function WorkspaceDatabase({
     if (!name || !name.trim()) return
     setSavingView(true)
     const next: SavedView = {
-      id: `view-${Date.now().toString(36)}`,
+      id: newViewId(),
       name: name.trim().slice(0, 24),
       kind: view,
       statusFilter,
@@ -1017,6 +1066,7 @@ export default function WorkspaceDatabase({
       sortDir,
       dueFilter,
       peopleFilter,
+      ...(Object.keys(activeFieldFilters).length ? { fieldFilters: activeFieldFilters } : {}),
     }
     await persistViews([...savedViews, next])
     setActiveViewId(next.id)
@@ -1649,7 +1699,8 @@ export default function WorkspaceDatabase({
     const searchOk = !needle || r.title.toLowerCase().includes(needle) || r.assignee.toLowerCase().includes(needle) || r.id.toLowerCase().includes(needle)
     const dueOk = dueFilter === "All" || matchesDueFilter(r.due, r.status, dueFilter, new Date().toISOString().slice(0, 10), statuses)
     const peopleOk = matchesPeopleFilter(r, peopleFilter, selfKey)
-    return statusOk && prioOk && searchOk && dueOk && peopleOk
+    const fieldsOk = personFields.every((f) => matchesPersonCellFilter(cellPeople(r.cells[f.id]), activeFieldFilters[f.id] ?? "All", selfKey))
+    return statusOk && prioOk && searchOk && dueOk && peopleOk && fieldsOk
   })
 
   const priorityRank: Record<string, number> = { High: 3, Med: 2, Low: 1 }
@@ -1866,6 +1917,36 @@ export default function WorkspaceDatabase({
                   </optgroup>
                 )}
               </select>
+              {personFields.map((f) => (
+                <span key={f.id} className="contents">
+                  <span className="text-white/10">|</span>
+                  <select
+                    value={activeFieldFilters[f.id] ?? "All"}
+                    onChange={(e) => setFieldFilters((prev) => ({ ...prev, [f.id]: e.target.value }))}
+                    title={`Filter by ${f.name}`}
+                    aria-label={`Filter by ${f.name}`}
+                    className="max-w-[130px] bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none"
+                  >
+                    <option value="All">Any {f.name}</option>
+                    {selfId && <option value="me">{f.name}: Me</option>}
+                    <option value="unassigned">No {f.name}</option>
+                    {people.length > 0 && (
+                      <optgroup label="People">
+                        {people.map((p) => (
+                          <option key={p.id} value={`user:${p.id}`}>{p.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {agents.length > 0 && (
+                      <optgroup label="Agents">
+                        {agents.map((a) => (
+                          <option key={a.type} value={`agent:${a.type}`}>{a.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </span>
+              ))}
               <span className="text-white/10">|</span>
               <select value={sortField} onChange={(e) => setSortField(e.target.value)} className="bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none">
                 <option value="title">Title</option>
@@ -2023,6 +2104,7 @@ export default function WorkspaceDatabase({
               <option value="url">URL</option>
               <option value="relation">Relation</option>
               <option value="rollup">Rollup</option>
+              <option value="person">Person</option>
             </select>
             {(newFieldType === "select" || newFieldType === "multi") && (
               <input
@@ -2369,7 +2451,7 @@ export default function WorkspaceDatabase({
                     </td>
                     {fields.map((f) => (
                       <td key={f.id} className="max-w-[180px] px-3 py-3">
-                        <CellEditor def={f} value={r.cells[f.id]} readOnly={readOnly} onChange={(v) => updateCell(r.id, f.id, v)} relationRows={f.targetDocId ? targetRows[f.targetDocId] : undefined} onEnsureRelationRows={() => ensureTargetRows(f.targetDocId)} />
+                        <CellEditor def={f} value={r.cells[f.id]} readOnly={readOnly} onChange={(v) => updateCell(r.id, f.id, v)} relationRows={f.targetDocId ? targetRows[f.targetDocId] : undefined} onEnsureRelationRows={() => ensureTargetRows(f.targetDocId)} people={people} agents={agents} />
                       </td>
                     ))}
                     <td className="px-2 py-3 text-right">
@@ -2596,6 +2678,20 @@ export default function WorkspaceDatabase({
                           </span>
                         )}
                       </div>
+                      {personFields.some((f) => cellPeople(r.cells[f.id]).length > 0) && (
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                          {personFields.map((f) => {
+                            const list = cellPeople(r.cells[f.id])
+                            if (list.length === 0) return null
+                            return (
+                              <span key={f.id} className="inline-flex items-center gap-1.5 text-[11px] text-white/35" title={`${f.name}: ${namesOf(list, people)}`}>
+                                {f.name}
+                                <AvatarStack list={list} people={people} size={16} />
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )}
                       {(r.due || r.start) && (
                         <div className={`mt-2 flex items-center gap-1 text-[11px] ${isOverdue(r, statuses) ? "font-medium text-red-300" : "text-white/35"}`}>
                           <Calendar className="h-3 w-3" />
@@ -3035,7 +3131,7 @@ export default function WorkspaceDatabase({
                     {fields.map((f) => (
                       <label key={f.id} className="block rounded-xl border border-line bg-white/[0.02] px-3 py-2">
                         <span className="mb-1 block text-[11px] text-white/40">{f.name} <span className="text-white/20">· {f.type}</span></span>
-                        <CellEditor def={f} value={selectedRow.cells[f.id]} readOnly={readOnly} onChange={(v) => updateCell(selectedRow.id, f.id, v)} relationRows={f.targetDocId ? targetRows[f.targetDocId] : undefined} onEnsureRelationRows={() => ensureTargetRows(f.targetDocId)} />
+                        <CellEditor def={f} value={selectedRow.cells[f.id]} readOnly={readOnly} onChange={(v) => updateCell(selectedRow.id, f.id, v)} relationRows={f.targetDocId ? targetRows[f.targetDocId] : undefined} onEnsureRelationRows={() => ensureTargetRows(f.targetDocId)} people={people} agents={agents} />
                       </label>
                     ))}
                   </div>

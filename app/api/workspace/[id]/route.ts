@@ -3,7 +3,7 @@ import { query } from '@/lib/db'
 import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from '@/lib/workspaceAuth'
 import { getDocRole, canWrite } from '@/lib/workspaceAccess'
 import { parseFieldDefs } from '@/lib/workspaceDb'
-import { parseAutomationRules, cleanPeopleFilter, parseStatusDefs, statusDefsProblem, type StatusDef } from '@/lib/workspaceDbModel'
+import { parseAutomationRules, cleanPeopleFilter, cleanFieldFilters, parseStatusDefs, statusDefsProblem, type StatusDef } from '@/lib/workspaceDbModel'
 import { restampTaskIndexGroups } from '@/lib/workspaceTaskIndex'
 import { recordWorkspaceActivity } from '@/lib/workspaceActivity'
 
@@ -149,7 +149,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const sortDir = sortDirs.has(vv.sortDir as string) ? (vv.sortDir as string) : "asc"
         const dueFilter = dueFilters.has(vv.dueFilter as string) ? (vv.dueFilter as string) : "All"
         const peopleFilter = cleanPeopleFilter(vv.peopleFilter)
-        cleanedViews.push({ id, name, kind, statusFilter, priorityFilter, q, sortField, sortDir, dueFilter, peopleFilter })
+        // Person custom fields: one filter per field ({ fieldId: "me" | "unassigned" | key }).
+        const fieldFilters = cleanFieldFilters(vv.fieldFilters)
+        cleanedViews.push({ id, name, kind, statusFilter, priorityFilter, q, sortField, sortDir, dueFilter, peopleFilter, ...(Object.keys(fieldFilters).length ? { fieldFilters } : {}) })
       }
       propsPatch.dbViews = cleanedViews
     } else if (src.dbViews === undefined) {

@@ -34,7 +34,9 @@ import {
   parentProblem,
   rowAssignees,
   rowChanges,
+  personCellsProblem,
   MAX_BLOCKED_BY,
+  type CellValue,
   type PersonRef,
 } from "@/lib/workspaceDbModel"
 import { recordRowChanges } from "@/lib/workspaceTaskEvents"
@@ -172,9 +174,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // Custom cells merge (never replace): concurrent editors on different
     // fields must not clobber each other. Defs load BEFORE the transaction
     // (yrs transactions are sync-only, no awaits inside).
-    let mergedCells: Record<string, string | number | boolean | string[]> | null = null
+    let mergedCells: Record<string, CellValue> | null = null
     if (patch.cells !== undefined) {
-      mergedCells = { ...parseDbRow(m).cells, ...cleanCells(patch.cells, await getFieldDefs(id)) }
+      const defs = await getFieldDefs(id)
+      // Person fields are strict (a typo'd ref must not silently clear a reviewer).
+      const bad = personCellsProblem(patch.cells, defs)
+      if (bad) return NextResponse.json({ error: "invalid cells", field: bad.fieldId, reason: bad.reason }, { status: 400 })
+      mergedCells = { ...parseDbRow(m).cells, ...cleanCells(patch.cells, defs) }
     }
     const prevRow = parseDbRow(m)
     const prevAssignees = prevRow.assignees

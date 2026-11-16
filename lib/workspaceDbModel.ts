@@ -8,7 +8,7 @@
 
 import { AGENT_ROSTER } from './agentRoster'
 
-export type FieldType = "text" | "number" | "select" | "multi" | "checkbox" | "date" | "url" | "relation" | "rollup"
+export type FieldType = "text" | "number" | "select" | "multi" | "checkbox" | "date" | "url" | "relation" | "rollup" | "person"
 export type RollupOp = "count" | "donePct" | "sum"
 export type FieldDef = {
   id: string
@@ -24,9 +24,10 @@ export type FieldDef = {
   /** rollup sum: custom number field id in the TARGET doc to total. */
   rollupFieldId?: string
 }
-export type CellValue = string | number | boolean | string[]
+/** `person` cells hold PersonRef[] (people + agents, like assignees). */
+export type CellValue = string | number | boolean | string[] | PersonRef[]
 
-const VALID_FIELD_TYPES: ReadonlySet<string> = new Set(["text", "number", "select", "multi", "checkbox", "date", "url", "relation", "rollup"])
+const VALID_FIELD_TYPES: ReadonlySet<string> = new Set(["text", "number", "select", "multi", "checkbox", "date", "url", "relation", "rollup", "person"])
 const VALID_ROLLUP_OPS: ReadonlySet<string> = new Set(["count", "donePct", "sum"])
 export const MAX_FIELDS_PER_DOC = 20
 export const MAX_FIELD_OPTIONS = 20
@@ -127,6 +128,9 @@ function cleanCellValue(def: FieldDef, v: unknown): CellValue | undefined {
     case "rollup":
       // Computed server-side on read; client values are never stored.
       return undefined
+    case "person":
+      // Lenient on write: bad entries drop (REST rejects them first via personCellsProblem).
+      return cleanPersonList(Array.isArray(v) ? v : v === undefined || v === null || v === "" ? [] : [v], MAX_PERSON_CELL)
   }
 }
 
@@ -150,7 +154,11 @@ export function readCells(v: unknown): Record<string, CellValue> {  if (!v || ty
     if (typeof val === "string") out[k] = val.slice(0, MAX_CELL_TEXT)
     else if (typeof val === "number" && Number.isFinite(val)) out[k] = val
     else if (typeof val === "boolean") out[k] = val
-    else if (Array.isArray(val)) out[k] = val.filter((x): x is string => typeof x === "string").slice(0, MAX_FIELD_OPTIONS)
+    else if (Array.isArray(val)) {
+      // Person cells are lists of refs; everything else is a list of strings.
+      if (val.some((x) => x && typeof x === "object")) out[k] = cleanPersonList(val, MAX_PERSON_CELL)
+      else out[k] = val.filter((x): x is string => typeof x === "string").slice(0, MAX_FIELD_OPTIONS)
+    }
   }
   return out
 }
@@ -500,21 +508,26 @@ export function cleanPersonRef(v: unknown): PersonRef | null {
   return null
 }
 
-/** Validate a raw assignee list: deduped by key, capped at MAX_ASSIGNEES. */
-export function cleanAssignees(v: unknown): PersonRef[] {
-  if (!Array.isArray(v)) return []
+/** Deduped (by key) list of valid refs, capped at `max`. */
+function cleanPersonList(v: unknown[], max: number): PersonRef[] {
   const out: PersonRef[] = []
   const seen = new Set<string>()
   for (const raw of v) {
-    const p = cleanPersonRef(raw)
+    const p = cleanPersonRef(typeof raw === "string" ? personRefFromKey(raw) : raw)
     if (!p) continue
     const k = personKey(p)
     if (seen.has(k)) continue
     seen.add(k)
     out.push(p)
-    if (out.length >= MAX_ASSIGNEES) break
+    if (out.length >= max) break
   }
   return out
+}
+
+/** Validate a raw assignee list: deduped by key, capped at MAX_ASSIGNEES. */
+export function cleanAssignees(v: unknown): PersonRef[] {
+  if (!Array.isArray(v)) return []
+  return cleanPersonList(v.filter((x) => typeof x !== "string"), MAX_ASSIGNEES)
 }
 
 /** Owner must be a person, never an agent (an agent is a delegate). */
@@ -1088,4 +1101,82 @@ export function deleteStatusRefs(props: StatusRefProps, name: string, moveTo: st
     out.dbTemplates = props.dbTemplates.map((t) => (t.status === name ? { ...t, status: moveTo } : t))
   }
   return out
+}
+
+// ---------------------------------------------------------------------------
+// Person fields (P2): a custom field whose cell is a list of people/agents
+// ("Reviewer", "QA"). Same refs and picker as assignees, max MAX_PERSON_CELL.
+// Writes accept refs or `user:<id>` / `agent:<type>` keys; stored as refs (with
+// the user's name as a fallback label, like assignees). Each person field has
+// its own filter (All | me | unassigned | key), kept in saved views as
+// `fieldFilters: { [fieldId]: filter }`.
+// ---------------------------------------------------------------------------
+
+export const MAX_PERSON_CELL = 5
+
+/** `user:<id>` / `agent:<type>` → raw ref (validated by cleanPersonRef). */
+export function personRefFromKey(key: string): PersonRef | null {
+  const s = key.trim()
+  if (s.startsWith("agent:")) return cleanPersonRef({ kind: "agent", type: s.slice(6) })
+  if (s.startsWith("user:")) return cleanPersonRef({ kind: "user", id: s.slice(5) })
+  return null
+}
+
+export type PersonCellProblem = { fieldId: string; reason: "shape" | "too_many" }
+
+/**
+ * Strict check of the person cells in a REST write: each must be null/[] (clear)
+ * or a list of valid refs/keys, at most MAX_PERSON_CELL. Other field types keep
+ * their lenient cleaning in cleanCells.
+ */
+export function personCellsProblem(cells: unknown, defs: FieldDef[]): PersonCellProblem | null {
+  if (!cells || typeof cells !== "object" || Array.isArray(cells)) return null
+  const src = cells as Record<string, unknown>
+  for (const def of defs) {
+    if (def.type !== "person" || !(def.id in src)) continue
+    const v = src[def.id]
+    if (v === null || v === undefined) continue
+    if (!Array.isArray(v)) return { fieldId: def.id, reason: "shape" }
+    if (v.length > MAX_PERSON_CELL) return { fieldId: def.id, reason: "too_many" }
+    for (const raw of v) {
+      const p = typeof raw === "string" ? personRefFromKey(raw) : cleanPersonRef(raw)
+      if (!p) return { fieldId: def.id, reason: "shape" }
+    }
+  }
+  return null
+}
+
+/** The people in a stored cell (non-person values read as nobody). */
+export function cellPeople(v: CellValue | undefined): PersonRef[] {
+  if (!Array.isArray(v)) return []
+  return cleanPersonList(v.filter((x) => typeof x !== "string"), MAX_PERSON_CELL)
+}
+
+/** Person-field filter: "All" | "me" | "unassigned" (nobody set) | a person key. */
+export function matchesPersonCellFilter(list: PersonRef[], filter: string, selfKey: string | null): boolean {
+  if (!filter || filter === "All") return true
+  if (filter === "unassigned") return list.length === 0
+  const key = filter === "me" ? selfKey : filter
+  if (!key) return false
+  return list.some((p) => personKey(p) === key)
+}
+
+/** Saved-view per-field person filters: `{ fieldId: filter }`, "All" dropped. */
+export function cleanFieldFilters(v: unknown): Record<string, string> {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {}
+  const out: Record<string, string> = {}
+  for (const [k, raw] of Object.entries(v as Record<string, unknown>).slice(0, MAX_FIELDS_PER_DOC)) {
+    const id = k.slice(0, 16)
+    const f = cleanPeopleFilter(raw)
+    if (id && f !== "All") out[id] = f
+  }
+  return out
+}
+
+/** Plain text of a cell (room context for agents, exports): person → names. */
+export function cellText(def: Pick<FieldDef, "type">, v: CellValue | undefined): string {
+  if (v === undefined || v === "") return ""
+  if (def.type === "person") return cellPeople(v).map(personLabel).join(", ")
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string").join(", ")
+  return String(v)
 }
