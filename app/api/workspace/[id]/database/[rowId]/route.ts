@@ -39,10 +39,12 @@ import {
   rowAssignees,
   rowChanges,
   personCellsProblem,
+  personKey,
   MAX_BLOCKED_BY,
   type CellValue,
   type PersonRef,
 } from "@/lib/workspaceDbModel"
+import { unknownRoomPerson, notMemberResponse } from "@/lib/workspaceRoomPeople"
 import { recordRowChanges } from "@/lib/workspaceTaskEvents"
 import { automatedFieldAdds, getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
 import { indexRow, removeRowIndex, rowText, workspaceOf } from "@/lib/workspaceIndex"
@@ -190,6 +192,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     const prevRow = parseDbRow(m)
     const prevAssignees = prevRow.assignees
+    // Only people this write ADDS must belong to the room: refs already on the
+    // row (legacy data, someone who left) never block an unrelated edit.
+    const addedToAssignees = Array.isArray(people.assignees) ? addedAssignees(prevAssignees, people.assignees) : []
+    const addedOwner = people.owner && (!prevRow.owner || personKey(prevRow.owner) !== personKey(people.owner)) ? [people.owner] : []
+    const addedInCells = mergedCells ? addedFieldPeople(prevRow.cells, mergedCells, cellDefs) : []
+    const stranger = await unknownRoomPerson(id, [...addedToAssignees, ...addedOwner, ...addedInCells.flatMap((f) => f.added)], cred)
+    if (stranger) return notMemberResponse(stranger, { assignees: addedToAssignees, owner: addedOwner[0], fieldPeople: addedInCells })
     doc.transact(() => {
       for (const [k, v] of Object.entries(clean)) m.set(k, v)
       if (mergedCells) m.set("cells", mergedCells)

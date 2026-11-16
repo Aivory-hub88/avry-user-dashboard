@@ -28,6 +28,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/serverAuth', () => ({ getAuthUserWithToken: () => null }))
 
 import { POST } from './route'
+import { rosterResult } from '@/lib/testRoster'
 
 process.env.COLLAB_SERVICE_TOKEN = 'test-service-token'
 
@@ -56,6 +57,8 @@ function dbBytes(statuses: string[]): Buffer {
 beforeEach(() => {
   queryMock.mockReset()
   queryMock.mockImplementation((sql: string) => {
+    const roster = rosterResult(sql)
+    if (roster) return Promise.resolve(roster)
     if (sql.includes('SELECT id, yjs_update')) {
       return Promise.resolve({ rows: [{ id: 'workspace:doc-1', yjs_update: dbBytes(['Todo']) }] })
     }

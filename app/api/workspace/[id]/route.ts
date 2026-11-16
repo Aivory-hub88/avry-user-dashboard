@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
-import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from '@/lib/workspaceAuth'
+import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden, workspacePlanDenied } from '@/lib/workspaceAuth'
 import { getDocRole, canWrite } from '@/lib/workspaceAccess'
-import { parseFieldDefs } from '@/lib/workspaceDb'
+import { parseFieldDefs, getFieldDefs } from '@/lib/workspaceDb'
+import { purgeFieldCells, readRoomProps } from '@/lib/workspaceFieldCleanup'
 import type { FieldDef } from '@/lib/workspaceDbModel'
-import { parseAutomationRules, cleanPeopleFilter, cleanFieldFilters, cleanSortField, parseStatusDefs, statusDefsProblem, type StatusDef } from '@/lib/workspaceDbModel'
+import { removedFieldIds, dropFieldsFromViews, dropFieldsFromRules, parseAutomationRules, cleanPeopleFilter, cleanFieldFilters, cleanSortField, parseStatusDefs, statusDefsProblem, type StatusDef, type AutomationRule } from '@/lib/workspaceDbModel'
 import { restampTaskIndexGroups } from '@/lib/workspaceTaskIndex'
 import { recordWorkspaceActivity } from '@/lib/workspaceActivity'
 
@@ -36,6 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   let props: Record<string, unknown> | undefined
   let icon: string | null | undefined
   let statusDefs: StatusDef[] | undefined
+  let removedFields: string[] = []
   if (body.title !== undefined) {
     title = (body.title ?? '').toString().slice(0, 200).trim()
     if (!title) return NextResponse.json({ error: 'title required' }, { status: 400 })
@@ -202,6 +204,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     } else if (src.dbAutomations !== undefined) {
       return NextResponse.json({ error: 'props.dbAutomations must be array' }, { status: 400 })
     }
+    // Deleting a custom field also deletes what hangs off its id: saved-view
+    // filters/sorts and automation rules go here (same patch, so they never
+    // dangle); the row values are purged from the Yjs doc after the update.
+    if (Array.isArray(propsPatch.dbFields)) {
+      try {
+        removedFields = removedFieldIds(await getFieldDefs(id), propsPatch.dbFields as FieldDef[])
+        if (removedFields.length > 0) {
+          const gone = new Set(removedFields)
+          const stored = await readRoomProps(id)
+          const views = dropFieldsFromViews(propsPatch.dbViews ?? stored.dbViews, gone)
+          if (views) propsPatch.dbViews = views
+          const rules = dropFieldsFromRules(
+            (propsPatch.dbAutomations as AutomationRule[] | undefined) ?? parseAutomationRules(stored.dbAutomations),
+            gone,
+          )
+          if (rules) propsPatch.dbAutomations = rules
+        }
+      } catch (e) {
+        console.error('[workspace patch] field cleanup lookup', e)
+        removedFields = []
+      }
+    }
     if (Object.keys(propsPatch).length === 0) {
       return NextResponse.json({ error: 'props has no known keys' }, { status: 400 })
     }
@@ -236,6 +260,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const mergedProps = (upd.rows[0]?.props as Record<string, unknown> | null) ?? props ?? undefined
     // "My tasks" / reminders read the group stored per index line.
     if (statusDefs) await restampTaskIndexGroups(id, statusDefs)
+    // Values of the deleted fields leave every row (best effort: the defs are
+    // already gone, so a failure only leaves hidden orphans like before).
+    if (removedFields.length > 0) {
+      try {
+        await purgeFieldCells(id, removedFields, cred, cred.kind === 'service' ? true : await authorizeDocFallback(cred, id))
+      } catch (e) {
+        console.error('[workspace patch] field cell purge', e)
+      }
+    }
     if (title !== undefined) {
       await recordWorkspaceActivity({
         docId: id,

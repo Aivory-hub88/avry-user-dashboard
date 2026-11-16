@@ -31,6 +31,7 @@ import { PATCH } from './route'
 import { POST as movePOST } from './move/route'
 import { GET as commentsGET, POST as commentsPOST } from './comments/route'
 import { POST as assignedPOST } from './assigned/route'
+import { rosterResult } from '@/lib/testRoster'
 
 process.env.COLLAB_SERVICE_TOKEN = 'test-service-token'
 
@@ -67,6 +68,8 @@ function dbBytes(): Buffer {
 beforeEach(() => {
   queryMock.mockReset()
   queryMock.mockImplementation((sql: string) => {
+    const roster = rosterResult(sql)
+    if (roster) return Promise.resolve(roster)
     if (sql.includes('SELECT id, yjs_update')) {
       return Promise.resolve({ rows: [{ id: 'workspace:doc-1', yjs_update: dbBytes() }] })
     }

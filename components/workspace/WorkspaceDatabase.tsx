@@ -2077,7 +2077,7 @@ export default function WorkspaceDatabase({
                       {f.requiredForDone ? "Not required" : "Require for Done"}
                     </button>
                   )}
-                  <button onClick={() => removeField(f.id)} title="Delete field (values stay on rows but hide)" className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-white/20 opacity-0 hover:text-red-300 group-hover:opacity-100">
+                  <button onClick={() => removeField(f.id)} title="Delete field (its values are removed from every task)" className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-white/20 opacity-0 hover:text-red-300 group-hover:opacity-100">
                     ✕
                   </button>
                 </div>
