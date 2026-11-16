@@ -7,6 +7,7 @@ import { whatsappDigits } from '@/lib/crmLabels'
 import { WA_OUT } from '@/lib/crmWhatsapp'
 import { crmFor } from '@/lib/crmServer'
 import { getConnection } from '@/lib/whatsappConnection'
+import { deleteDraft } from '@/lib/whatsappDrafts'
 
 export const runtime = 'nodejs'
 
@@ -56,5 +57,7 @@ export async function POST(req: NextRequest) {
     logged = false
     console.error('[whatsapp send] sent but not logged:', (e as Error).message)
   }
+  // A reply went out, so the suggestion it was based on is stale.
+  await deleteDraft(tenant, contact.id).catch(() => {})
   return NextResponse.json({ ok: true, logged })
 }

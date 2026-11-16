@@ -7,7 +7,7 @@
  * usable number.
  */
 import { useEffect, useMemo, useState } from "react"
-import { Check, MessageCircle } from "lucide-react"
+import { Check, MessageCircle, Sparkles } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import { whatsappDigits } from "@/lib/crmLabels"
 import { renderTemplate } from "@/lib/whatsapp/templates"
@@ -25,7 +25,28 @@ export default function WhatsappSend({ contactId, name, phone, onSent }: { conta
   const [listError, setListError] = useState<string | null>(null)
   const [picked, setPicked] = useState("")
   const [vars, setVars] = useState<string[]>([])
+  const [draft, setDraft] = useState<string | null>(null)
   const usable = whatsappDigits(phone) !== null
+
+  // An AI draft shows up a few seconds after a customer message arrives (when the account turned drafts on).
+  // Look for one while the page is open; stop once there is one.
+  useEffect(() => {
+    if (!usable || draft !== null) return
+    let alive = true
+    const look = () =>
+      waApi.draft(contactId).then((d) => {
+        if (!alive || !d) return
+        setDraft(d.text)
+        // Never overwrite something the person is already typing.
+        setText((cur) => (cur.trim() === "" ? d.text : cur))
+      })
+    void look()
+    const t = setInterval(() => void look(), 10_000)
+    return () => {
+      alive = false
+      clearInterval(t)
+    }
+  }, [contactId, usable, draft])
 
   useEffect(() => {
     if (mode !== "template" || listing || listError) return
@@ -54,6 +75,7 @@ export default function WhatsappSend({ contactId, name, phone, onSent }: { conta
     try {
       const r = await waApi.send(contactId, text.trim())
       setText("")
+      setDraft(null)
       done(r, "Sent")
     } catch (e) {
       if (e instanceof WaError && e.code === "window_closed") {
@@ -108,6 +130,29 @@ export default function WhatsappSend({ contactId, name, phone, onSent }: { conta
         <div className="text-[12px] text-white/45">Add a phone number to this contact to message them on WhatsApp.</div>
       ) : mode === "text" ? (
         <div className="space-y-2">
+          {draft !== null && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-sky-200/80">
+              <Sparkles size={12} className="shrink-0" />
+              <span>Draft from the Aivory assistant. Review it, then Send.</span>
+              {text !== draft && (
+                <button type="button" onClick={() => setText(draft)} className="underline decoration-sky-200/30 underline-offset-2 hover:text-sky-100">
+                  Use draft
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={async () => {
+                  // Wait for the delete: clearing first would let the next look-up bring the same draft back.
+                  await waApi.discardDraft(contactId)
+                  if (text === draft) setText("")
+                  setDraft(null)
+                }}
+                className="ml-auto text-white/40 underline decoration-white/15 underline-offset-2 hover:text-white/75"
+              >
+                Discard
+              </button>
+            </div>
+          )}
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}

@@ -14,7 +14,9 @@ export type CrmPort = {
   createActivity(b: { kind: "note"; subject_type: "contact"; subject_id: string; body: string }): Promise<unknown>
 }
 
-export type InboundResult = { logged: number; created: number; duplicates: number }
+/** A message that was just logged, with the contact it landed on. */
+export type LoggedEntry = { contactId: string; contactName: string; message: Inbound }
+export type InboundResult = { logged: number; created: number; duplicates: number; entries: LoggedEntry[] }
 
 /** Message ids already handled; Kapso retries a delivery that was not answered with 200. */
 export class SeenIds {
@@ -31,7 +33,7 @@ export class SeenIds {
 }
 
 export async function logInbound(crm: CrmPort, msgs: Inbound[], seen: SeenIds): Promise<InboundResult> {
-  const out: InboundResult = { logged: 0, created: 0, duplicates: 0 }
+  const out: InboundResult = { logged: 0, created: 0, duplicates: 0, entries: [] }
   const fresh = msgs.filter((m) => !seen.has(m.id))
   out.duplicates = msgs.length - fresh.length
   if (fresh.length === 0) return out
@@ -51,6 +53,7 @@ export async function logInbound(crm: CrmPort, msgs: Inbound[], seen: SeenIds): 
     await crm.createActivity({ kind: "note", subject_type: "contact", subject_id: contact.id, body: `${WA_IN}${m.text}` })
     seen.add(m.id)
     out.logged++
+    out.entries.push({ contactId: contact.id, contactName: contact.name, message: m })
   }
   return out
 }

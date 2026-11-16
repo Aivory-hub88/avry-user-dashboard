@@ -9,8 +9,10 @@ vi.mock("@/lib/crmServer", () => ({
     createContact: async () => ({ id: "n1", name: "x", phone: "x" }),
     createActivity: async (b: unknown) => void created.push(b),
     getContact: async () => null,
+    listContactActivities: async () => [],
   }),
 }))
+vi.mock("@/lib/whatsappDrafts", () => ({ getDraftSetting: async () => false, saveDraft: async () => {} }))
 
 import { POST } from "./route"
 

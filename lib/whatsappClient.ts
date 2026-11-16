@@ -48,6 +48,23 @@ export const waApi = {
     if (!r.ok) throw new WaError(j.error ?? "Could not send. Try again.", j.code)
     return { logged: j.logged !== false }
   },
+  settings: async (): Promise<{ draft_replies: boolean }> => {
+    const r = await authedFetch(`${BASE_PATH}/api/whatsapp/settings`)
+    if (!r.ok) throw new Error("settings")
+    return (await r.json()) as { draft_replies: boolean }
+  },
+  setDraftReplies: async (on: boolean): Promise<void> => {
+    const r = await authedFetch(`${BASE_PATH}/api/whatsapp/settings`, { method: "PUT", body: JSON.stringify({ draft_replies: on }) })
+    if (!r.ok) throw new Error((await json(r)).error ?? "Could not save. Try again.")
+  },
+  draft: async (contactId: string): Promise<{ text: string; createdAt: string } | null> => {
+    const r = await authedFetch(`${BASE_PATH}/api/whatsapp/draft?contact_id=${encodeURIComponent(contactId)}`)
+    if (!r.ok) return null
+    return ((await r.json()) as { draft: { text: string; createdAt: string } | null }).draft
+  },
+  discardDraft: async (contactId: string): Promise<void> => {
+    await authedFetch(`${BASE_PATH}/api/whatsapp/draft?contact_id=${encodeURIComponent(contactId)}`, { method: "DELETE" })
+  },
   templates: async (): Promise<TemplateListing> => {
     const r = await authedFetch(`${BASE_PATH}/api/whatsapp/templates`)
     const j = await json(r)
