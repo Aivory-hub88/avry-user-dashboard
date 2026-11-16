@@ -88,13 +88,16 @@ type PickerProps = {
   children: ReactNode
   className?: string
   title?: string
+  /** Dialog label + footer noun (person fields: "Choose Reviewer", "picked"). */
+  dialogLabel?: string
+  countNoun?: string
 }
 
 /**
  * Popover picker. Rendered in a portal with fixed positioning so table and
  * board scroll containers can't clip it.
  */
-export function PeoplePicker({ value, onChange, people, agents, single = false, readOnly = false, max = 5, unlinked, children, className = "", title }: PickerProps) {
+export function PeoplePicker({ value, onChange, people, agents, single = false, readOnly = false, max = 5, unlinked, children, className = "", title, dialogLabel, countNoun = "assigned" }: PickerProps) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState("")
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
@@ -195,7 +198,7 @@ export function PeoplePicker({ value, onChange, people, agents, single = false, 
           <div
             ref={popRef}
             role="dialog"
-            aria-label={single ? "Choose owner" : "Choose assignees"}
+            aria-label={dialogLabel ?? (single ? "Choose owner" : "Choose assignees")}
             className="fixed z-[60] w-[260px] rounded-xl border border-line bg-[#1f1f1d] p-2 shadow-2xl"
             style={{ top: pos.top, left: pos.left }}
           >
@@ -229,7 +232,7 @@ export function PeoplePicker({ value, onChange, people, agents, single = false, 
             </div>
             {!single && (
               <div className="mt-1 border-t border-line px-2 pt-1.5 text-[10.5px] text-white/30">
-                {value.length}/{max} assigned
+                {value.length}/{max} {countNoun}
               </div>
             )}
           </div>,

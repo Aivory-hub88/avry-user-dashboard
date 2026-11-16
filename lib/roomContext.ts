@@ -17,6 +17,7 @@ import { chunkText, rankChunks } from "@/lib/roomChunks"
 import { MAX_FILE_BYTES } from "@/lib/workspaceFiles"
 import { canonicalRoomId, legacyDocId, mergeYjsUpdates } from "@/lib/workspaceDoc"
 import { rowsFromDbDoc } from "@/lib/workspaceDb"
+import { cellText, parseFieldDefs } from "@/lib/workspaceDbModel"
 
 const INGEST_FILES_PER_CALL = 3
 const MAX_EMBEDDED_CHUNKS = 60
@@ -108,10 +109,13 @@ async function taskText(roomId: string, props: Record<string, unknown>): Promise
   Y.applyUpdate(doc, new Uint8Array(merged))
   const rows = rowsFromDbDoc(doc)
   if (rows.length === 0) return ""
-  const fields = (Array.isArray(props.dbFields) ? props.dbFields : []) as { id?: string; name?: string }[]
+  const fields = parseFieldDefs(props.dbFields)
   const lines = rows.slice(0, MAX_TASK_ROWS).map((row) => {
     const extra = fields
-      .map((f) => (f.id && f.name && row.cells[f.id] !== undefined && row.cells[f.id] !== "" ? `${f.name}: ${String(row.cells[f.id])}` : ""))
+      .map((f) => {
+        const text = cellText(f, row.cells[f.id])
+        return text ? `${f.name}: ${text}` : ""
+      })
       .filter(Boolean)
     const bits = [row.status, row.priority !== "Med" ? `${row.priority} priority` : "", row.assignee ? `assigned to ${row.assignee}` : "", row.due ? `due ${row.due}` : "", ...extra].filter(Boolean)
     return `- ${row.title}${bits.length ? ` (${bits.join(", ")})` : ""}`
