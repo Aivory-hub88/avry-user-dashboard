@@ -12,7 +12,7 @@ vi.mock("@/lib/crmServer", () => ({
     listContactActivities: async () => [],
   }),
 }))
-vi.mock("@/lib/whatsappDrafts", () => ({ getDraftSetting: async () => false, saveDraft: async () => {} }))
+vi.mock("@/lib/whatsappDrafts", () => ({ getDraftConfig: async () => ({ draftReplies: false, agent: null, replyMode: "approval" }), saveDraft: async () => {}, deleteDraft: async () => {}, countAutoReplies: async () => ({ contactCount: 0, accountCount: 0 }), recordAutoReply: async () => {} }))
 
 import { POST } from "./route"
 

@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
 let mode: "aivory" | "own" | null = "aivory"
-let cfg = { draftReplies: false, agent: null as string | null }
+let cfg = { draftReplies: false, agent: null as string | null, replyMode: "approval" as "approval" | "autonomous" }
 vi.mock("@/lib/planGate", () => ({ ANY_MODULE: "*", requirePaidPlan: async () => ({ ok: true, user: { user_id: "t1" } }) }))
 vi.mock("@/lib/whatsappConnection", () => ({ getConnection: async () => (mode ? { mode } : null) }))
 vi.mock("@/lib/whatsappDrafts", () => ({
   getDraftConfig: async () => cfg,
-  setDraftConfig: async (_u: string, c: { draftReplies?: boolean; agent?: string | null }) => {
-    cfg = { draftReplies: c.draftReplies ?? cfg.draftReplies, agent: c.agent === undefined ? cfg.agent : c.agent }
+  setDraftConfig: async (_u: string, c: { draftReplies?: boolean; agent?: string | null; replyMode?: "approval" | "autonomous" }) => {
+    cfg = { draftReplies: c.draftReplies ?? cfg.draftReplies, agent: c.agent === undefined ? cfg.agent : c.agent, replyMode: c.replyMode ?? cfg.replyMode }
   },
 }))
 
@@ -20,7 +20,7 @@ const get = async () => (await GET(new NextRequest("http://x.test/dashboard/api/
 describe("whatsapp settings: who writes reply drafts", () => {
   beforeEach(() => {
     mode = "aivory"
-    cfg = { draftReplies: false, agent: null }
+    cfg = { draftReplies: false, agent: null, replyMode: "approval" }
   })
 
   it("lists the customer's agents and says whether Aivory's assistant is an option", async () => {
@@ -48,15 +48,27 @@ describe("whatsapp settings: who writes reply drafts", () => {
 
   it("reports a stale 'on' with no writer as off, and turning off is always allowed", async () => {
     mode = "own"
-    cfg = { draftReplies: true, agent: null }
+    cfg = { draftReplies: true, agent: null, replyMode: "approval" }
     expect((await get()).draft_replies).toBe(false)
     expect((await put({ draft_replies: false })).status).toBe(200)
   })
 
   it("clearing the agent while on (customer number) is refused", async () => {
     mode = "own"
-    cfg = { draftReplies: true, agent: "leads_qualifier" }
+    cfg = { draftReplies: true, agent: "leads_qualifier", replyMode: "approval" }
     expect((await put({ agent: null })).status).toBe(400)
+  })
+
+  it("defaults to approval, and the reply mode can be switched to autonomous and back", async () => {
+    expect((await get()).reply_mode).toBe("approval")
+    expect((await put({ reply_mode: "autonomous" })).status).toBe(200)
+    expect((await get()).reply_mode).toBe("autonomous")
+    expect((await put({ reply_mode: "approval" })).status).toBe(200)
+    expect((await get()).reply_mode).toBe("approval")
+  })
+
+  it("rejects an unknown mode", async () => {
+    expect((await put({ reply_mode: "yolo" })).status).toBe(400)
   })
 
   it("rejects an unknown agent, a non-boolean and an empty change", async () => {

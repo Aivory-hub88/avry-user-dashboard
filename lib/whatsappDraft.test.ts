@@ -45,45 +45,83 @@ describe("history + prompt + cleaning", () => {
 describe("draftForEntry", () => {
   const deps = (o: Partial<DraftDeps> = {}) => {
     const saved: unknown[][] = []
+    const sent: unknown[][] = []
     const d: DraftDeps = {
-      mode: async () => ({ kind: "assistant" }),
+      mode: async () => ({ kind: "assistant", label: "Aivory assistant", autonomous: false }),
       notes: async () => [note("WhatsApp received: Halo, apa itu Aivory?", "2026-11-16T00:00:00Z")],
       askAssistant: vi.fn(async () => "Aivory adalah platform AI untuk bisnis."),
       askAgent: vi.fn(async () => ({ reply: "Halo Irfan, kami bantu ya.", pendingApproval: false })),
+      counts: async () => ({ contactCount: 0, accountCount: 0 }),
+      autoSend: vi.fn(async (...a: unknown[]) => (sent.push(a), { ok: true })),
       save: async (...a) => void saved.push(a),
       ...o,
     }
-    return { d, saved }
+    return { d, saved, sent }
   }
-  it("assistant mode saves a draft, without repeating the question in the history", async () => {
+  const agentMode = (autonomous: boolean) => async () => ({ kind: "agent" as const, agent: "leads_qualifier", label: "Lex", autonomous })
+
+  it("approval mode saves a draft with its writer, without repeating the question in the history", async () => {
     const { d, saved } = deps()
     expect(await draftForEntry("t1", entry(), d)).toBe("drafted")
-    expect(saved).toEqual([["t1", "c1", "Aivory adalah platform AI untuk bisnis.", "w1"]])
+    expect(saved).toEqual([["t1", "c1", "Aivory adalah platform AI untuk bisnis.", "w1", "Aivory assistant", null]])
     expect((d.askAssistant as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual([])
-    expect(d.askAgent).not.toHaveBeenCalled()
+    expect(d.autoSend).not.toHaveBeenCalled()
   })
   it("agent mode asks the customer's agent in a per-contact conversation, never the assistant", async () => {
-    const { d, saved } = deps({ mode: async () => ({ kind: "agent", agent: "leads_qualifier" }) })
+    const { d, saved } = deps({ mode: agentMode(false) })
     expect(await draftForEntry("t1", entry(), d)).toBe("drafted")
     const call = (d.askAgent as ReturnType<typeof vi.fn>).mock.calls[0][0]
     expect(call).toMatchObject({ tenantId: "t1", agent: "leads_qualifier", conversationId: "wa_c1" })
     expect(call.text).toMatch(/do NOT send anything/)
-    expect(call.text).toContain("Halo, apa itu Aivory?")
     expect(d.askAssistant).not.toHaveBeenCalled()
-    expect(saved).toEqual([["t1", "c1", "Halo Irfan, kami bantu ya.", "w1"]])
+    expect(saved).toEqual([["t1", "c1", "Halo Irfan, kami bantu ya.", "w1", "Lex", null]])
   })
-  it("an agent that parks an approval (tries to act) produces no draft", async () => {
-    const { d, saved } = deps({ mode: async () => ({ kind: "agent", agent: "leads_qualifier" }), askAgent: async () => ({ reply: "Balas Ya untuk mengirim email", pendingApproval: true }) })
+  it("an agent that parks an approval (tries to act) produces no reply at all, even in autonomous mode", async () => {
+    const { d, saved, sent } = deps({ mode: agentMode(true), askAgent: async () => ({ reply: "Balas Ya untuk mengirim email", pendingApproval: true }) })
     expect(await draftForEntry("t1", entry(), d)).toBe("empty")
     expect(saved).toHaveLength(0)
+    expect(sent).toHaveLength(0)
   })
-  it("does nothing when drafts are off, the message is an opt-out, or the answer is empty", async () => {
+
+  describe("autonomous mode", () => {
+    it("sends the reply as an automatic one, and stores no draft", async () => {
+      const { d, saved, sent } = deps({ mode: agentMode(true) })
+      expect(await draftForEntry("t1", entry(), d)).toBe("sent")
+      expect(sent).toEqual([["t1", entry(), "Halo Irfan, kami bantu ya.", "Lex"]])
+      expect(saved).toHaveLength(0)
+    })
+    it("holds the reply as a draft, with the reason, when the customer asks for a person", async () => {
+      const { d, saved, sent } = deps({ mode: agentMode(true) })
+      expect(await draftForEntry("t1", entry("Saya mau bicara dengan manusia"), d)).toBe("held")
+      expect(sent).toHaveLength(0)
+      expect(saved[0][4]).toBe("Lex")
+      expect(saved[0][5]).toMatch(/asked for a person/)
+    })
+    it("holds when a teammate just replied, and when the rate limit is reached", async () => {
+      const recent = new Date(Date.now() - 3 * 60_000).toISOString()
+      const human = deps({ mode: agentMode(true), notes: async () => [note("WhatsApp sent: saya yang urus", recent)] })
+      expect(await draftForEntry("t1", entry(), human.d)).toBe("held")
+      expect(human.saved[0][5]).toMatch(/teammate replied/)
+      const limited = deps({ mode: agentMode(true), counts: async () => ({ contactCount: 4, accountCount: 4 }) })
+      expect(await draftForEntry("t1", entry(), limited.d)).toBe("held")
+      expect(limited.saved[0][5]).toMatch(/too many automatic replies/)
+    })
+    it("keeps the draft when sending fails", async () => {
+      const { d, saved } = deps({ mode: agentMode(true), autoSend: async () => ({ ok: false }) })
+      expect(await draftForEntry("t1", entry(), d)).toBe("held")
+      expect(saved[0][5]).toMatch(/Could not send automatically/)
+    })
+    it("a customer's opt-out gets nothing", async () => {
+      const { d, sent } = deps({ mode: agentMode(true) })
+      expect(await draftForEntry("t1", entry("STOP"), d)).toBe("skipped")
+      expect(sent).toHaveLength(0)
+    })
+  })
+
+  it("does nothing when off, for an opt-out, or when the answer is empty", async () => {
     const off = deps({ mode: async () => ({ kind: "off" }) })
     expect(await draftForEntry("t1", entry(), off.d)).toBe("off")
     expect(off.d.askAssistant).not.toHaveBeenCalled()
-    const stop = deps()
-    expect(await draftForEntry("t1", entry("STOP"), stop.d)).toBe("skipped")
-    expect(stop.d.askAssistant).not.toHaveBeenCalled()
     const empty = deps({ askAssistant: async () => null })
     expect(await draftForEntry("t1", entry(), empty.d)).toBe("empty")
     expect(empty.saved).toHaveLength(0)

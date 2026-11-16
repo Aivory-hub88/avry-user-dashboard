@@ -9,7 +9,7 @@ import { useEffect, useState } from "react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import { PROVIDERS, providerMeta } from "@/lib/whatsapp/providerMeta"
 import type { ProviderId } from "@/lib/whatsapp/types"
-import { waApi, type WaSettings, type WaStatus } from "@/lib/whatsappClient"
+import { waApi, type ReplyMode, type WaSettings, type WaStatus } from "@/lib/whatsappClient"
 
 export default function WhatsappSettings({ status, onChanged }: { status: WaStatus | null; onChanged: () => void }) {
   const [provider, setProvider] = useState<ProviderId>("kapso")
@@ -21,6 +21,7 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
   const meta = providerMeta(provider) ?? PROVIDERS[0]
   const ready = meta.fields.every((f) => f.optional || (values[f.key] ?? "").trim() !== "")
   const [settings, setSettings] = useState<WaSettings | null>(null)
+  const [confirmAuto, setConfirmAuto] = useState(false)
   const connected = !!status?.connected
   useEffect(() => {
     if (!connected) return
@@ -33,10 +34,10 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
       alive = false
     }
   }, [connected])
-  const saveSettings = async (change: { draft_replies?: boolean; agent?: string | null }) => {
+  const saveSettings = async (change: { draft_replies?: boolean; agent?: string | null; reply_mode?: ReplyMode }) => {
     if (!settings) return
     const before = settings
-    setSettings({ ...settings, ...("draft_replies" in change ? { draft_replies: !!change.draft_replies } : {}), ...("agent" in change ? { agent: change.agent ?? null } : {}) })
+    setSettings({ ...settings, ...("draft_replies" in change ? { draft_replies: !!change.draft_replies } : {}), ...("agent" in change ? { agent: change.agent ?? null } : {}), ...(change.reply_mode ? { reply_mode: change.reply_mode } : {}) })
     setError(null)
     try {
       await waApi.saveSettings(change)
@@ -154,12 +155,12 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
       {status.connected && settings && (
         <div className="space-y-3 rounded-2xl border border-line px-4 py-4">
           <div className="flex items-center gap-3">
-            <span className="text-[13px] text-white/90">Draft replies to incoming messages</span>
+            <span className="text-[13px] text-white/90">Reply to incoming messages</span>
             <button
               type="button"
               role="switch"
               aria-checked={settings.draft_replies}
-              aria-label="Draft replies to incoming messages"
+              aria-label="Reply to incoming messages"
               disabled={!canDraft && !settings.draft_replies}
               onClick={() => void saveSettings({ draft_replies: !settings.draft_replies })}
               className={`ml-auto flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-40 ${settings.draft_replies ? "bg-emerald-400/80" : "bg-white/15"}`}
@@ -168,11 +169,11 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
             </button>
           </div>
           <label className="block">
-            <span className="mb-1 block text-[11px] text-white/45">Who writes the drafts</span>
+            <span className="mb-1 block text-[11px] text-white/45">Who writes the replies</span>
             <select
               value={settings.agent ?? ""}
               onChange={(e) => void saveSettings({ agent: e.target.value || null })}
-              aria-label="Agent that writes the drafts"
+              aria-label="Agent that writes the replies"
               className={`w-full ${fieldClass}`}
             >
               {settings.assistant_available ? <option value="">Aivory assistant</option> : <option value="">Choose one of your agents</option>}
@@ -183,8 +184,60 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
               ))}
             </select>
           </label>
+          <div role="radiogroup" aria-label="What happens to the reply" className="space-y-1.5">
+            {(
+              [
+                { mode: "approval", title: "Ask me first", text: "The agent writes a draft in the contact’s WhatsApp box. Nothing goes out until you press Send." },
+                { mode: "autonomous", title: "Reply automatically", text: "The agent answers right away, on its own, inside the 24-hour window." },
+              ] as const
+            ).map((o) => (
+              <button
+                key={o.mode}
+                type="button"
+                role="radio"
+                aria-checked={settings.reply_mode === o.mode}
+                disabled={o.mode === "autonomous" && !canDraft}
+                onClick={() => {
+                  if (o.mode === "autonomous") setConfirmAuto(true)
+                  else {
+                    setConfirmAuto(false)
+                    void saveSettings({ reply_mode: "approval" })
+                  }
+                }}
+                className={`flex w-full items-start gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-colors disabled:opacity-40 ${settings.reply_mode === o.mode ? "border-white/25 bg-white/[0.06]" : "border-line hover:bg-white/[0.03]"}`}
+              >
+                <span className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border ${settings.reply_mode === o.mode ? "border-emerald-300" : "border-white/30"}`}>
+                  {settings.reply_mode === o.mode && <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[12.5px] text-white/90">{o.title}</span>
+                  <span className="block text-[11.5px] leading-snug text-white/50">{o.text}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          {confirmAuto && settings.reply_mode !== "autonomous" && (
+            <div className="space-y-2 rounded-xl border border-amber-400/25 bg-amber-500/[0.07] px-3 py-3">
+              <div className="text-[12.5px] text-amber-100">Let the agent reply to your customers by itself?</div>
+              <div className="text-[11.5px] leading-relaxed text-amber-100/70">
+                Replies go out immediately and can be wrong. It holds a reply back for your review (as a draft) when the customer asks for a person or complains, when a teammate wrote to them in the last 15 minutes, or after 4 automatic replies to the same contact in an hour (60 an hour overall). Automatic replies are marked in the timeline. You can switch back any time.
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  tone="primary"
+                  onClick={() => {
+                    setConfirmAuto(false)
+                    void saveSettings({ reply_mode: "autonomous" })
+                  }}
+                >
+                  Turn on automatic replies
+                </Button>
+                <Button onClick={() => setConfirmAuto(false)}>Cancel</Button>
+              </div>
+            </div>
+          )}
           <div className="text-[12px] leading-relaxed text-white/50">
-            When someone messages you, the agent writes a suggested reply and puts it in that contact’s WhatsApp box. Your own agent knows your business and runs on your plan. Nothing is ever sent for you: you read it, edit it and press Send. The customer’s message text is processed by your agent and Aivory’s AI service. Off by default.
+            Your own agent knows your business and runs on your plan. The customer’s message text is processed by your agent and Aivory’s AI service. Off by default.
           </div>
         </div>
       )}

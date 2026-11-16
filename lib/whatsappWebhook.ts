@@ -3,10 +3,14 @@ import { after, NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { crmFor } from '@/lib/crmServer'
 import { askAssistant } from '@/lib/aivoryAssistantServer'
+import { AGENT_NAMES } from '@/lib/agentRoster'
 import { runAgentTurn } from '@/lib/agentTurnServer'
-import { aivoryTenant } from '@/lib/whatsappConnection'
-import { getDraftConfig, saveDraft } from '@/lib/whatsappDrafts'
+import { sentBody } from '@/lib/crmWhatsapp'
+import { getProvider } from '@/lib/whatsapp/providers'
+import { aivoryTenant, getConnection } from '@/lib/whatsappConnection'
+import { countAutoReplies, deleteDraft, getDraftConfig, recordAutoReply, saveDraft } from '@/lib/whatsappDrafts'
 import { draftForEntry, latestPerContact, type DraftMode } from '@/lib/whatsappDraftRunner'
+import type { LoggedEntry } from '@/lib/whatsappInbound'
 import { logInbound, SeenIds } from '@/lib/whatsappInbound'
 import type { Provider } from '@/lib/whatsapp/providers'
 import type { Creds } from '@/lib/whatsapp/types'
@@ -59,7 +63,7 @@ function scheduleDrafts(tenantId: string, crm: ReturnType<typeof crmFor>, entrie
   const work = async () => {
     for (const e of latestPerContact(entries)) {
       try {
-        await draftForEntry(tenantId, e, { mode: draftMode, notes: (id) => crm.listContactActivities(id), askAssistant, askAgent: (a) => runAgentTurn({ tenantId: a.tenantId, agentType: a.agent, conversationId: a.conversationId, text: a.text }), save: saveDraft })
+        await draftForEntry(tenantId, e, { mode: draftMode, notes: (id) => crm.listContactActivities(id), askAssistant, askAgent: (a) => runAgentTurn({ tenantId: a.tenantId, agentType: a.agent, conversationId: a.conversationId, text: a.text }), counts: countAutoReplies, autoSend: (t, entry, text, label) => autoSend(crm, t, entry, text, label), save: saveDraft })
       } catch (err) {
         console.error('[whatsapp draft] failed:', (err as Error).message)
       }
@@ -73,10 +77,33 @@ function scheduleDrafts(tenantId: string, crm: ReturnType<typeof crmFor>, entrie
   }
 }
 
-/** Switch off -> nobody. An agent chosen -> that agent (the customer's own). No agent -> Aivory's assistant, on Aivory's own number only. */
+/**
+ * Switch off -> nobody. An agent chosen -> that agent (the customer's own). No agent -> Aivory's assistant, on Aivory's
+ * own number only. Approval mode drafts for a person; autonomous mode sends within the guardrails in whatsappAutoRules.
+ */
 async function draftMode(tenantId: string): Promise<DraftMode> {
   const c = await getDraftConfig(tenantId)
   if (!c.draftReplies) return { kind: 'off' }
-  if (c.agent) return { kind: 'agent', agent: c.agent }
-  return tenantId === aivoryTenant() ? { kind: 'assistant' } : { kind: 'off' }
+  const autonomous = c.replyMode === 'autonomous'
+  if (c.agent) return { kind: 'agent', agent: c.agent, label: (AGENT_NAMES as Record<string, string>)[c.agent] ?? c.agent, autonomous }
+  return tenantId === aivoryTenant() ? { kind: 'assistant', label: 'Aivory assistant', autonomous } : { kind: 'off' }
+}
+
+/** Sends an automatic reply through the account's own connection and logs it as automatic. Never throws. */
+async function autoSend(crm: ReturnType<typeof crmFor>, tenantId: string, e: LoggedEntry, text: string, label: string): Promise<{ ok: boolean }> {
+  try {
+    const conn = await getConnection(tenantId)
+    const provider = conn ? getProvider(conn.provider) : null
+    if (!conn || !provider) return { ok: false }
+    const sent = await provider.send(conn.creds, e.message.from, text)
+    if (!sent.ok) return { ok: false }
+    // The message is out; bookkeeping failures must not turn it into a "not sent".
+    await crm.createActivity({ kind: 'note', subject_type: 'contact', subject_id: e.contactId, body: sentBody(text, { autoBy: label }) }).catch((err) => console.error('[whatsapp auto] sent but not logged:', (err as Error).message))
+    await recordAutoReply(tenantId, e.contactId).catch((err) => console.error('[whatsapp auto] counter failed:', (err as Error).message))
+    await deleteDraft(tenantId, e.contactId).catch(() => {})
+    return { ok: true }
+  } catch (err) {
+    console.error('[whatsapp auto] send failed:', (err as Error).message)
+    return { ok: false }
+  }
 }

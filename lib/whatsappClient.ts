@@ -24,7 +24,9 @@ export class WaError extends Error {
 }
 
 export type WaAgentOption = { type: string; name: string; title: string }
-export type WaSettings = { draft_replies: boolean; agent: string | null; agents: WaAgentOption[]; assistant_available: boolean }
+export type ReplyMode = "approval" | "autonomous"
+export type WaSettings = { draft_replies: boolean; agent: string | null; reply_mode: ReplyMode; agents: WaAgentOption[]; assistant_available: boolean }
+export type WaDraft = { text: string; createdAt: string; writer: string | null; note: string | null }
 
 export type TemplateListing = { templates: WaTemplate[]; hidden: number } | { unsupported: string }
 
@@ -57,14 +59,14 @@ export const waApi = {
     return (await r.json()) as WaSettings
   },
   /** Change the drafts switch and/or which agent writes them (`null` clears the agent). */
-  saveSettings: async (change: { draft_replies?: boolean; agent?: string | null }): Promise<void> => {
+  saveSettings: async (change: { draft_replies?: boolean; agent?: string | null; reply_mode?: ReplyMode }): Promise<void> => {
     const r = await authedFetch(`${BASE_PATH}/api/whatsapp/settings`, { method: "PUT", body: JSON.stringify(change) })
     if (!r.ok) throw new Error((await json(r)).error ?? "Could not save. Try again.")
   },
-  draft: async (contactId: string): Promise<{ text: string; createdAt: string } | null> => {
+  draft: async (contactId: string): Promise<WaDraft | null> => {
     const r = await authedFetch(`${BASE_PATH}/api/whatsapp/draft?contact_id=${encodeURIComponent(contactId)}`)
     if (!r.ok) return null
-    return ((await r.json()) as { draft: { text: string; createdAt: string } | null }).draft
+    return ((await r.json()) as { draft: WaDraft | null }).draft
   },
   discardDraft: async (contactId: string): Promise<void> => {
     await authedFetch(`${BASE_PATH}/api/whatsapp/draft?contact_id=${encodeURIComponent(contactId)}`, { method: "DELETE" })
