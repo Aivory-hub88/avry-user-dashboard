@@ -5,7 +5,7 @@
  * number when the account has it, or lets a customer connect their own account
  * with the provider of their choice. Text lives in span/div only (see CrmApp).
  */
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import { PROVIDERS, providerMeta } from "@/lib/whatsapp/providerMeta"
 import type { ProviderId } from "@/lib/whatsapp/types"
@@ -19,6 +19,28 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
   const [error, setError] = useState<string | null>(null)
   const [setup, setSetup] = useState<string[]>([])
   const meta = providerMeta(provider) ?? PROVIDERS[0]
+  const [drafts, setDrafts] = useState<boolean | null>(null)
+  const connected = !!status?.connected
+  useEffect(() => {
+    if (!connected) return
+    let alive = true
+    waApi.settings().then((s) => alive && setDrafts(s.draft_replies), () => alive && setDrafts(false))
+    return () => {
+      alive = false
+    }
+  }, [connected])
+  const toggleDrafts = async () => {
+    if (drafts === null) return
+    const next = !drafts
+    setDrafts(next)
+    setError(null)
+    try {
+      await waApi.setDraftReplies(next)
+    } catch (e) {
+      setDrafts(!next)
+      setError((e as Error).message)
+    }
+  }
   const ready = meta.fields.every((f) => f.optional || (values[f.key] ?? "").trim() !== "")
 
   const act = async (fn: () => Promise<void>) => {
@@ -123,6 +145,28 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
             {busy ? "Connecting…" : "Connect"}
           </Button>
         </form>
+      )}
+
+      {status.connected && (
+        <div className="space-y-2 rounded-2xl border border-line px-4 py-4">
+          <div className="flex items-center gap-3">
+            <span className="text-[13px] text-white/90">Draft replies with the Aivory assistant</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={drafts === true}
+              aria-label="Draft replies with the Aivory assistant"
+              disabled={drafts === null}
+              onClick={() => void toggleDrafts()}
+              className={`ml-auto flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-40 ${drafts ? "bg-emerald-400/80" : "bg-white/15"}`}
+            >
+              <span className={`h-4 w-4 rounded-full bg-white transition-transform ${drafts ? "translate-x-4" : ""}`} />
+            </button>
+          </div>
+          <div className="text-[12px] leading-relaxed text-white/50">
+            When someone messages you, the assistant writes a suggested reply and puts it in that contact’s WhatsApp box. Nothing is ever sent for you: you read it, edit it and press Send. The assistant only knows about Aivory, and the customer’s message text is processed by Aivory’s AI service. Off by default.
+          </div>
+        </div>
       )}
 
       <div className="text-[11px] leading-relaxed text-white/40">

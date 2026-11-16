@@ -7,6 +7,7 @@ import { crmFor } from '@/lib/crmServer'
 import { getProvider } from '@/lib/whatsapp/providers'
 import { renderTemplate } from '@/lib/whatsapp/templates'
 import { getConnection } from '@/lib/whatsappConnection'
+import { deleteDraft } from '@/lib/whatsappDrafts'
 import { listTemplates } from '@/lib/whatsappTemplatesServer'
 
 export const runtime = 'nodejs'
@@ -65,5 +66,6 @@ export async function POST(req: NextRequest) {
     logged = false
     console.error('[whatsapp send-template] sent but not logged:', (e as Error).message)
   }
+  await deleteDraft(tenant, contact.id).catch(() => {})
   return NextResponse.json({ ok: true, logged })
 }

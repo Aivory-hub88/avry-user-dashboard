@@ -5,6 +5,7 @@ const sent: unknown[] = []
 const logged: { body: string }[] = []
 const approved = { data: [{ name: "order_update", language: "id", category: "UTILITY", status: "APPROVED", components: [{ type: "BODY", text: "Halo {{1}}, pesanan {{2}} dikirim." }] }, { name: "promo_img", language: "id", status: "APPROVED", components: [{ type: "HEADER", format: "IMAGE" }, { type: "BODY", text: "Promo" }] }] }
 
+vi.mock("@/lib/whatsappDrafts", () => ({ deleteDraft: async () => {} }))
 vi.mock("@/lib/planGate", () => ({ ANY_MODULE: "*", requirePaidPlan: async () => ({ ok: true, user: { user_id: "t1" } }) }))
 vi.mock("@/lib/whatsappConnection", () => ({ getConnection: async () => ({ mode: "aivory", provider: "kapso", creds: { api_key: "k".repeat(12), phone_number_id: "999" }, webhookSecret: "s", displayPhone: null }) }))
 vi.mock("@/lib/crmServer", () => ({

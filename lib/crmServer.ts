@@ -24,11 +24,14 @@ async function call<T>(tenantId: string, path: string, init?: { method?: string;
   return { data: (text ? JSON.parse(text) : {}) as T, next: r.headers.get(NEXT_CURSOR_HEADER) }
 }
 
-export function crmFor(tenantId: string): CrmPort & { getContact(id: string): Promise<CrmContact | null> } {
+export type CrmNote = { kind: string; body: string | null; occurred_at: string }
+
+export function crmFor(tenantId: string): CrmPort & { getContact(id: string): Promise<CrmContact | null>; listContactActivities(contactId: string): Promise<CrmNote[]> } {
   return {
     listContacts: () => collectPages((cursor) => call<CrmContact[]>(tenantId, `contacts?${pageQuery(undefined, cursor)}`)),
     createContact: async (b) => (await call<CrmContact>(tenantId, 'contacts', { method: 'POST', json: b })).data,
     createActivity: async (b) => (await call(tenantId, 'activities', { method: 'POST', json: b })).data,
+    listContactActivities: async (contactId) => (await call<CrmNote[]>(tenantId, `activities?subject_type=contact&subject_id=${encodeURIComponent(contactId)}&limit=50`)).data,
     getContact: async (id) => {
       try {
         return (await call<CrmContact>(tenantId, `contacts/${encodeURIComponent(id)}`)).data

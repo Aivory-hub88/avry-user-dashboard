@@ -90,13 +90,14 @@ describe("logInbound", () => {
 
   it("logs on the existing contact whatever the phone format", async () => {
     const f = fake([{ id: "c1", name: "Maya Lestari", phone: "0812-3456-7890" }])
-    expect(await logInbound(f.crm, [msg("a")], new SeenIds())).toEqual({ logged: 1, created: 0, duplicates: 0 })
+    expect(await logInbound(f.crm, [msg("a")], new SeenIds())).toMatchObject({ logged: 1, created: 0, duplicates: 0, entries: [{ contactId: "c1", contactName: "Maya Lestari", message: { id: "a" } }] })
     expect(f.acts).toEqual([{ subject_id: "c1", body: "WhatsApp received: Halo" }])
   })
   it("creates a labelled contact for an unknown number, once for several messages", async () => {
     const f = fake()
     const r = await logInbound(f.crm, [msg("a"), msg("b", "6281234567890", "Lagi")], new SeenIds())
-    expect(r).toEqual({ logged: 2, created: 1, duplicates: 0 })
+    expect(r).toMatchObject({ logged: 2, created: 1, duplicates: 0 })
+    expect(r.entries.map((e) => e.message.id)).toEqual(["a", "b"])
     expect(f.contacts).toHaveLength(1)
     expect(f.contacts[0]).toMatchObject({ name: "Maya", phone: "+6281234567890" })
   })
@@ -104,7 +105,7 @@ describe("logInbound", () => {
     const f = fake()
     const seen = new SeenIds()
     await logInbound(f.crm, [msg("a")], seen)
-    expect(await logInbound(f.crm, [msg("a")], seen)).toEqual({ logged: 0, created: 0, duplicates: 1 })
+    expect(await logInbound(f.crm, [msg("a")], seen)).toEqual({ logged: 0, created: 0, duplicates: 1, entries: [] })
     expect(f.acts).toHaveLength(1)
   })
   it("does not mark a message handled when the CRM fails, so a retry can succeed", async () => {
