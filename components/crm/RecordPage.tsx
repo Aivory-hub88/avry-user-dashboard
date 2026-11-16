@@ -236,7 +236,7 @@ export default function RecordPage({ type, id }: { type: SubjectType; id: string
                   <LinkCard label="Company" href={crmHref("company", rec.r.company_id)} name={companyName.get(rec.r.company_id) as string} />
                 )}
                 {rec.type === "contact" && waStatus?.connected && <WhatsappSend contactId={rec.r.id} name={rec.r.name} phone={rec.r.phone} onSent={() => setTimelineKey((k) => k + 1)} />}
-                <Details rec={rec} companies={companies} knownLabels={knownLabels} onSave={save} />
+                <Details rec={rec} companies={companies} knownLabels={knownLabels} whatsappConnected={!!waStatus?.connected} onSave={save} />
               </aside>
             </div>
           </>
@@ -345,7 +345,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   )
 }
 
-function Details({ rec, companies, knownLabels, onSave }: { rec: Rec; companies: Company[]; knownLabels: string[]; onSave: (ch: Record<string, unknown>) => void }) {
+function Details({ rec, companies, knownLabels, whatsappConnected, onSave }: { rec: Rec; companies: Company[]; knownLabels: string[]; whatsappConnected: boolean; onSave: (ch: Record<string, unknown>) => void }) {
   const [newField, setNewField] = useState("")
   const custom = rec.r.custom_fields ?? {}
   const t = "w-full text-[13px] text-white/90"
@@ -377,7 +377,8 @@ function Details({ rec, companies, knownLabels, onSave }: { rec: Rec; companies:
           <Row label="Phone">
             <span className="flex items-center gap-1">
               <InlineText type="tel" value={rec.r.phone ?? ""} onSave={(v) => onSave({ phone: v })} ariaLabel="Phone" placeholder="0812 3456 7890" className={t} />
-              {whatsappHref(rec.r.phone) && (
+              {/* With WhatsApp connected the message box above is the way to write; the wa.me link would open the person's own app instead. */}
+              {!whatsappConnected && whatsappHref(rec.r.phone) && (
                 <a href={whatsappHref(rec.r.phone) as string} target="_blank" rel="noopener noreferrer" aria-label="Open in WhatsApp" title="Open in WhatsApp" className="shrink-0 rounded-md p-1 text-white/40 hover:bg-white/[0.06] hover:text-emerald-300">
                   <MessageCircle size={14} />
                 </a>

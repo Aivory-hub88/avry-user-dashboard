@@ -453,6 +453,7 @@ export default function CrmApp() {
             companies={companies}
             companyName={companyName}
             knownLabels={knownLabels}
+            whatsappConnected={!!wa.status?.connected}
             onCreate={(b) => run(() => crmApi.contacts.create(b))}
           />
         )}

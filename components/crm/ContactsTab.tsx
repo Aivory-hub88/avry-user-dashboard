@@ -61,6 +61,7 @@ export default function ContactsTab({
   companies,
   companyName,
   knownLabels,
+  whatsappConnected,
   onCreate,
 }: {
   /** Already narrowed by the page search. */
@@ -72,6 +73,8 @@ export default function ContactsTab({
   companies: Company[]
   companyName: Map<string, string>
   knownLabels: string[]
+  /** When true the chat icon opens the contact page (send from the connected number) instead of the person's own WhatsApp app. */
+  whatsappConnected: boolean
   onCreate: (b: { name: string; email?: string; phone?: string; title?: string; company_id?: string; custom_fields?: Record<string, unknown> }) => Promise<boolean>
 }) {
   const [name, setName] = useState("")
@@ -339,11 +342,16 @@ export default function ContactsTab({
                       {c.phone ? (
                         <span className="flex items-center gap-2">
                           {tel ? <a href={tel} className="hover:text-white/90">{c.phone}</a> : c.phone}
-                          {wa && (
-                            <a href={wa} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${c.name}`} title="Open in WhatsApp" className="text-white/35 hover:text-emerald-300">
-                              <MessageCircle size={13} />
-                            </a>
-                          )}
+                          {wa &&
+                            (whatsappConnected ? (
+                              <Link href={crmHref("contact", c.id)} aria-label={`Message ${c.name} on WhatsApp`} title="Message on WhatsApp (opens the contact)" className="text-white/35 hover:text-emerald-300">
+                                <MessageCircle size={13} />
+                              </Link>
+                            ) : (
+                              <a href={wa} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${c.name}`} title="Open in your WhatsApp app" className="text-white/35 hover:text-emerald-300">
+                                <MessageCircle size={13} />
+                              </a>
+                            ))}
                           {tel && (
                             <a href={tel} aria-label={`Call ${c.name}`} title="Call" className="text-white/35 hover:text-white/85">
                               <Phone size={12} />
