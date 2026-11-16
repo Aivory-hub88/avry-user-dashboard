@@ -14,6 +14,8 @@ import { ArrowRightLeft, ChevronDown, Clock, LayoutGrid, MessageCircle, Phone, P
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import { AddButton, AddNoteLine, useAddForm } from "@/components/crm/AddForm"
 import AgentAccess from "@/components/crm/AgentAccess"
+import WhatsappSettings from "@/components/crm/WhatsappSettings"
+import { useWhatsappStatus } from "@/lib/whatsappClient"
 import ActivityFeed from "@/components/crm/ActivityFeed"
 import CrmWelcome, { SetupChecklist } from "@/components/crm/CrmWelcome"
 import ImportDialog from "@/components/crm/ImportDialog"
@@ -107,6 +109,8 @@ export default function CrmApp() {
   const [error, setError] = useState<string | null>(null)
   const [q, setQ] = useState("")
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [waOpen, setWaOpen] = useState(false)
+  const wa = useWhatsappStatus()
 
   const load = useCallback(async () => {
     try {
@@ -317,6 +321,15 @@ export default function CrmApp() {
             </span>
           )}
           <button
+            type="button"
+            onClick={() => setWaOpen(true)}
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] text-white/55 hover:bg-white/[0.06] hover:text-white/85"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            WhatsApp
+            {wa.status?.connected && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-label="Connected" />}
+          </button>
+          <button
           type="button"
           onClick={() => setSettingsOpen(true)}
           className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] text-white/55 hover:bg-white/[0.06] hover:text-white/85"
@@ -456,13 +469,17 @@ export default function CrmApp() {
           }}
         />
       )}
+      {waOpen && (
+        <Drawer title="WhatsApp" onClose={() => setWaOpen(false)}>
+          <WhatsappSettings status={wa.status} onChanged={wa.refresh} />
+        </Drawer>
+      )}
       {importOpen && companies && <ImportDialog companies={companies} contacts={contacts ?? []} onClose={() => setImportOpen(false)} onImported={() => void load()} />}
     </div>
   )
 }
 
-function AgentDrawer({ onClose }: { onClose: () => void }) {
-  const [error, setError] = useState<string | null>(null)
+function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose()
     window.addEventListener("keydown", onKey)
@@ -471,19 +488,26 @@ function AgentDrawer({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-40">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
-      <aside role="dialog" aria-modal="true" aria-label="Agent access" className="absolute right-0 top-0 flex h-full w-full max-w-[640px] flex-col border-l border-line bg-surface-1 shadow-2xl">
+      <aside role="dialog" aria-modal="true" aria-label={title} className="absolute right-0 top-0 flex h-full w-full max-w-[640px] flex-col border-l border-line bg-surface-1 shadow-2xl">
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <span className="text-[15px] font-medium text-white/90">Agent access</span>
+          <span className="text-[15px] font-medium text-white/90">{title}</span>
           <button onClick={onClose} aria-label="Close" className="text-white/45 hover:text-white/85">
             <X size={16} />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-          {error && <div className="mb-4 rounded-xl bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>}
-          <AgentAccess onError={setError} />
-        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
       </aside>
     </div>
+  )
+}
+
+function AgentDrawer({ onClose }: { onClose: () => void }) {
+  const [error, setError] = useState<string | null>(null)
+  return (
+    <Drawer title="Agent access" onClose={onClose}>
+      {error && <div className="mb-4 rounded-xl bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>}
+      <AgentAccess onError={setError} />
+    </Drawer>
   )
 }
 

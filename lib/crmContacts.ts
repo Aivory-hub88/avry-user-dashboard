@@ -4,17 +4,18 @@
  */
 import type { Activity, Contact } from "./crmClient"
 import { whatsappDigits } from "./crmLabels"
+import { isWhatsappNote } from "./crmWhatsapp"
 
-/** Activity kinds that count as having actually spoken to the person (notes and tasks don't). */
+/** Activity kinds that count as having actually spoken to the person (plain notes and tasks don't; WhatsApp messages, stored as notes, do). */
 const CONTACT_KINDS = new Set(["call", "email", "meeting"])
 
 const DAY_MS = 86_400_000
 
 /** Most recent call/email/meeting per contact, ignoring ones dated in the future. */
-export function lastContactMap(activities: Pick<Activity, "kind" | "subject_type" | "subject_id" | "occurred_at">[], now: Date = new Date()): Map<string, string> {
+export function lastContactMap(activities: (Pick<Activity, "kind" | "subject_type" | "subject_id" | "occurred_at"> & { body?: string | null })[], now: Date = new Date()): Map<string, string> {
   const m = new Map<string, string>()
   for (const a of activities) {
-    if (a.subject_type !== "contact" || !CONTACT_KINDS.has(a.kind)) continue
+    if (a.subject_type !== "contact" || !(CONTACT_KINDS.has(a.kind) || isWhatsappNote({ kind: a.kind, body: a.body ?? null }))) continue
     const t = new Date(a.occurred_at).getTime()
     if (!Number.isFinite(t) || t > now.getTime()) continue
     const cur = m.get(a.subject_id)

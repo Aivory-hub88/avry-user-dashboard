@@ -9,11 +9,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ChevronRight, MessageCircle, Plus, Trash2, X } from "lucide-react"
+import { ChevronRight, MessageCircle, Phone, Plus, Trash2, X } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import ActivityTimeline from "@/components/crm/ActivityTimeline"
 import { AddButton, AddNoteLine, useAddForm } from "@/components/crm/AddForm"
 import { LabelEditor } from "@/components/crm/Labels"
+import WhatsappSend from "@/components/crm/WhatsappSend"
+import { useWhatsappStatus } from "@/lib/whatsappClient"
 import { getLabels, getSource, labelCounts, RESERVED_FIELD_KEYS, SOURCES, telHref, whatsappHref, withLabels, withSource } from "@/lib/crmLabels"
 import { agentLabel, SUBJECT_LABEL, type SubjectType } from "@/lib/crmActivity"
 import { crmApi, DEAL_STAGES, type Company, type Contact, type Deal, type DealStage } from "@/lib/crmClient"
@@ -41,6 +43,8 @@ export default function RecordPage({ type, id }: { type: SubjectType; id: string
   const [tab, setTab] = useState<Tab>("timeline")
   const [activityCount, setActivityCount] = useState<number | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const { status: waStatus } = useWhatsappStatus()
+  const [timelineKey, setTimelineKey] = useState(0)
 
   const load = useCallback(async () => {
     try {
@@ -195,7 +199,7 @@ export default function RecordPage({ type, id }: { type: SubjectType; id: string
             <div className="flex flex-wrap items-start gap-6 px-8 pb-12 pt-6">
               <div className="min-w-0 flex-[999_1_520px] space-y-4">
                 {error && <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>}
-                {tab === "timeline" && <ActivityTimeline subjectType={type} subjectId={id} subjectName={recName(rec)} onCount={setActivityCount} />}
+                {tab === "timeline" && <ActivityTimeline key={timelineKey} subjectType={type} subjectId={id} subjectName={recName(rec)} onCount={setActivityCount} />}
                 {tab === "deals" && (
                   <RelatedDeals
                     deals={related.deals}
@@ -231,6 +235,7 @@ export default function RecordPage({ type, id }: { type: SubjectType; id: string
                 {rec.type === "deal" && rec.r.company_id && companyName.has(rec.r.company_id) && (
                   <LinkCard label="Company" href={crmHref("company", rec.r.company_id)} name={companyName.get(rec.r.company_id) as string} />
                 )}
+                {rec.type === "contact" && waStatus?.connected && <WhatsappSend contactId={rec.r.id} name={rec.r.name} phone={rec.r.phone} onSent={() => setTimelineKey((k) => k + 1)} />}
                 <Details rec={rec} companies={companies} knownLabels={knownLabels} onSave={save} />
               </aside>
             </div>
@@ -378,8 +383,8 @@ function Details({ rec, companies, knownLabels, onSave }: { rec: Rec; companies:
                 </a>
               )}
               {telHref(rec.r.phone) && (
-                <a href={telHref(rec.r.phone) as string} className="shrink-0 rounded-md px-1.5 py-1 text-[11px] text-white/40 hover:bg-white/[0.06] hover:text-white/85">
-                  Call
+                <a href={telHref(rec.r.phone) as string} aria-label="Call" title="Call" className="shrink-0 rounded-md p-1 text-white/40 hover:bg-white/[0.06] hover:text-white/85">
+                  <Phone size={13} />
                 </a>
               )}
             </span>
