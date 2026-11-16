@@ -5,7 +5,7 @@
  */
 import type { Creds, ProviderId } from "./types"
 
-export type FieldDef = { key: string; label: string; secret: boolean; placeholder: string; pattern: RegExp; hint: string }
+export type FieldDef = { key: string; label: string; secret: boolean; placeholder: string; pattern: RegExp; hint: string; /** Allowed to be left empty (it enables an extra feature). */ optional?: boolean }
 export type ProviderMeta = {
   id: ProviderId
   label: string
@@ -52,6 +52,7 @@ export const PROVIDERS: ProviderMeta[] = [
       { key: "access_token", label: "Access token", secret: true, placeholder: "Permanent access token", pattern: /^\S{20,600}$/, hint: "A system-user token with whatsapp_business_messaging." },
       { key: "phone_number_id", label: "Phone number ID", secret: false, placeholder: "Phone number ID", pattern: /^\d{5,30}$/, hint: "WhatsApp → API Setup → Phone number ID." },
       { key: "app_secret", label: "App secret", secret: true, placeholder: "App secret", pattern: /^[0-9a-fA-F]{16,64}$/, hint: "App settings → Basic. Used to check that webhooks really come from Meta." },
+      { key: "waba_id", label: "WhatsApp Business Account ID", secret: false, placeholder: "Optional, needed for templates", pattern: /^\d{5,30}$/, hint: "WhatsApp → API Setup. Lets you send approved templates.", optional: true },
     ],
   },
   {
@@ -78,6 +79,7 @@ export function checkCreds(id: ProviderId, raw: Record<string, unknown>): { cred
   for (const f of meta.fields) {
     const v = typeof raw[f.key] === "string" ? (raw[f.key] as string).trim() : ""
     creds[f.key] = v
+    if (f.optional && v === "") continue
     if (!f.pattern.test(v)) return { creds, problem: `${meta.label}: the ${f.label.toLowerCase()} doesn’t look right. ${f.hint}` }
   }
   return { creds, problem: null }

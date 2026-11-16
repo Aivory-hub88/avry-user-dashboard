@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { BASE_PATH } from "@/lib/asset"
 import { authedFetch } from "@/lib/deployAuth"
-import type { ProviderId } from "@/lib/whatsapp/types"
+import type { ProviderId, WaTemplate } from "@/lib/whatsapp/types"
 
 export type WaStatus = { connected: boolean; mode: "own" | "aivory" | null; provider: ProviderId | null; phone: string | null }
 
@@ -15,6 +15,15 @@ async function json(r: Response): Promise<{ error?: string; code?: string } & Re
     return {}
   }
 }
+
+/** An error with the server's machine-readable `code` (e.g. "window_closed"). */
+export class WaError extends Error {
+  constructor(message: string, public code?: string) {
+    super(message)
+  }
+}
+
+export type TemplateListing = { templates: WaTemplate[]; hidden: number } | { unsupported: string }
 
 export const waApi = {
   status: async (): Promise<WaStatus> => {
@@ -36,7 +45,20 @@ export const waApi = {
   send: async (contactId: string, text: string): Promise<{ logged: boolean }> => {
     const r = await authedFetch(`${BASE_PATH}/api/whatsapp/send`, { method: "POST", body: JSON.stringify({ contact_id: contactId, text }) })
     const j = await json(r)
-    if (!r.ok) throw new Error(j.error ?? "Could not send. Try again.")
+    if (!r.ok) throw new WaError(j.error ?? "Could not send. Try again.", j.code)
+    return { logged: j.logged !== false }
+  },
+  templates: async (): Promise<TemplateListing> => {
+    const r = await authedFetch(`${BASE_PATH}/api/whatsapp/templates`)
+    const j = await json(r)
+    if (!r.ok) throw new WaError(j.error ?? "Could not load templates. Try again.", j.code)
+    if (j.code === "unsupported") return { unsupported: j.error ?? "Templates are not supported for this provider yet." }
+    return { templates: (j.templates as WaTemplate[]) ?? [], hidden: Number(j.hidden ?? 0) }
+  },
+  sendTemplate: async (contactId: string, t: { name: string; language: string }, params: string[]): Promise<{ logged: boolean }> => {
+    const r = await authedFetch(`${BASE_PATH}/api/whatsapp/send-template`, { method: "POST", body: JSON.stringify({ contact_id: contactId, name: t.name, language: t.language, params }) })
+    const j = await json(r)
+    if (!r.ok) throw new WaError(j.error ?? "Could not send the template. Try again.", j.code)
     return { logged: j.logged !== false }
   },
 }

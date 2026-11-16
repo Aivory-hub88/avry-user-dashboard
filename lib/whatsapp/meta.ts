@@ -5,7 +5,8 @@
  */
 import { createHmac, timingSafeEqual } from "crypto"
 import { classifySendError, readJson } from "./errors"
-import { MAX_TEXT, type Creds, type Inbound, type InboundCtx, type SendResult } from "./types"
+import { listMetaTemplates, sendMetaTemplate } from "./templateApi"
+import { MAX_TEXT, type Creds, type Inbound, type InboundCtx, type SendResult, type TemplateList } from "./types"
 
 export const META_BASE = "https://graph.facebook.com/v21.0"
 
@@ -72,4 +73,13 @@ export async function metaSend(c: Creds, toDigits: string, text: string, f: type
   const j = await readJson(r)
   if (!r.ok) return classifySendError(r.status, j)
   return { ok: true, id: asStr(asObj((asObj(j).messages as unknown[] | undefined)?.[0]).id) }
+}
+
+export async function metaListTemplates(c: Creds, f: typeof fetch = fetch): Promise<TemplateList> {
+  if (!c.waba_id) return { ok: false, code: "unsupported", message: "Add your WhatsApp Business Account ID in the WhatsApp settings (disconnect and reconnect) to use templates." }
+  return listMetaTemplates(META_BASE, c.waba_id, { authorization: `Bearer ${c.access_token}` }, f)
+}
+
+export function metaSendTemplate(c: Creds, toDigits: string, name: string, language: string, params: string[], f: typeof fetch = fetch): Promise<SendResult> {
+  return sendMetaTemplate(`${META_BASE}/${encodeURIComponent(c.phone_number_id)}/messages`, { authorization: `Bearer ${c.access_token}` }, toDigits, name, language, params, f)
 }

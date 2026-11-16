@@ -9,7 +9,8 @@
  */
 import { createHmac, timingSafeEqual } from "crypto"
 import { classifySendError, readJson } from "./whatsapp/errors"
-import { MAX_TEXT as LIMIT, type Inbound, type RegisterResult, type SendResult } from "./whatsapp/types"
+import { listMetaTemplates, sendMetaTemplate } from "./whatsapp/templateApi"
+import { MAX_TEXT as LIMIT, type Inbound, type RegisterResult, type SendResult, type TemplateList } from "./whatsapp/types"
 
 export type { Inbound, SendResult }
 export const classifyError = classifySendError
@@ -95,4 +96,34 @@ export async function registerWebhook(cfg: KapsoConfig, url: string, secret: str
   if (r.ok) return { ok: true }
   const e = classifyError(r.status, await readJson(r))
   return { ok: false, code: e.code === "window_closed" ? "rejected" : e.code, message: e.message }
+}
+
+const wabaCache = new Map<string, string>()
+
+/** The WhatsApp Business Account behind a number (needed to list templates), from Kapso's platform API. */
+export async function kapsoWabaId(cfg: KapsoConfig, f: Fetch = fetch): Promise<string | null> {
+  const hit = wabaCache.get(cfg.phoneNumberId)
+  if (hit) return hit
+  try {
+    const r = await f(`${KAPSO_BASE}/platform/v1/whatsapp/phone_numbers/${encodeURIComponent(cfg.phoneNumberId)}`, { headers: { "x-api-key": cfg.apiKey }, signal: AbortSignal.timeout(10_000) })
+    if (!r.ok) return null
+    const id = ((await readJson(r)) as { data?: { business_account_id?: unknown } }).data?.business_account_id
+    if (typeof id !== "string" && typeof id !== "number") return null
+    wabaCache.set(cfg.phoneNumberId, String(id))
+    return String(id)
+  } catch {
+    return null
+  }
+}
+
+const KAPSO_META = `${KAPSO_BASE}/meta/whatsapp/v24.0`
+
+export async function kapsoListTemplates(cfg: KapsoConfig, f: Fetch = fetch): Promise<TemplateList> {
+  const waba = await kapsoWabaId(cfg, f)
+  if (!waba) return { ok: false, code: "rejected", message: "Could not find the WhatsApp Business Account for this number in Kapso." }
+  return listMetaTemplates(KAPSO_META, waba, { "x-api-key": cfg.apiKey }, f)
+}
+
+export function kapsoSendTemplate(cfg: KapsoConfig, toDigits: string, name: string, language: string, params: string[], f: Fetch = fetch): Promise<SendResult> {
+  return sendMetaTemplate(`${KAPSO_META}/${encodeURIComponent(cfg.phoneNumberId)}/messages`, { "x-api-key": cfg.apiKey }, toDigits, name, language, params, f)
 }
