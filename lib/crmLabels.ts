@@ -103,7 +103,7 @@ export function labelHue(label: string): number {
  */
 export function whatsappDigits(phone: string | null | undefined): string | null {
   if (!phone) return null
-  const raw = phone.trim()
+  const raw = cleanPhone(phone)
   let d = raw.replace(/\D/g, "")
   if (d.length < 7 || d.length > 15) return null
   if (raw.startsWith("+")) return d
@@ -120,16 +120,30 @@ export function whatsappHref(phone: string | null | undefined): string | null {
 /** `tel:` target: keeps a leading + and digits only. */
 export function telHref(phone: string | null | undefined): string | null {
   if (!phone) return null
-  const raw = phone.trim()
+  const raw = cleanPhone(phone)
   const d = raw.replace(/\D/g, "")
   if (d.length < 5) return null
   return `tel:${raw.startsWith("+") ? "+" : ""}${d}`
 }
 
+/**
+ * Tidies a pasted phone number: drops invisible direction/zero-width marks (WhatsApp and contact cards add them
+ * around numbers), turns non-breaking spaces and Unicode dashes into plain ones, and trims.
+ */
+export function cleanPhone(phone: string): string {
+  return phone
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF\u00AD]/g, "")
+    .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, " ")
+    .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, "-")
+    .replace(/[\uFF0B]/g, "+")
+    .replace(/[\uFF10-\uFF19]/g, (c) => String(c.charCodeAt(0) - 0xff10))
+    .trim()
+}
+
 /** A phone number a person could plausibly dial: 7-15 digits once spaces, dashes and brackets are ignored. */
 export function isPlausiblePhone(phone: string): boolean {
-  const t = phone.trim()
-  if (!/^[+\d][\d\s().-]*$/.test(t)) return false
+  const t = cleanPhone(phone)
+  if (!/^\+?[\d(][\d\s().-]*$/.test(t)) return false
   const n = t.replace(/\D/g, "").length
   return n >= 7 && n <= 15
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { addLabel, getLabels, hasLabel, isPlausiblePhone, labelCounts, MAX_LABELS, normalizeLabel, removeLabel, telHref, whatsappDigits, whatsappHref, withLabels, withSource } from "./crmLabels"
+import { addLabel, getLabels, hasLabel, cleanPhone, isPlausiblePhone, labelCounts, MAX_LABELS, normalizeLabel, removeLabel, telHref, whatsappDigits, whatsappHref, withLabels, withSource } from "./crmLabels"
 
 describe("labels", () => {
   it("normalizes: trims, drops a leading #, caps length", () => {
@@ -56,5 +56,24 @@ describe("phone", () => {
   it("keeps the + in tel links", () => {
     expect(telHref("+62 812-3456")).toBe("tel:+628123456")
     expect(telHref("0812 3456")).toBe("tel:08123456")
+  })
+})
+
+describe("phone formats", () => {
+  const good = ["+62 877-2858-9845", "0877-2858-9845", "62877 2858 9845", "(0877) 2858 9845", "0877.2858.9845", "+62.877.2858.9845", "08772858 9845"]
+  it.each(good)("accepts %s and maps it to 628772858 9845", (n) => {
+    expect(isPlausiblePhone(n)).toBe(true)
+    expect(whatsappDigits(n)).toBe("6287728589845")
+  })
+  it("accepts pasted numbers with invisible marks, nbsp and Unicode dashes", () => {
+    for (const n of ["\u202A+62 877-2858-9845\u202C", "\u200E+62\u00A0877\u20112858\u20139845", "+62 877\u20132858\u20149845\u200F"]) {
+      expect(isPlausiblePhone(n)).toBe(true)
+      expect(whatsappDigits(n)).toBe("6287728589845")
+      expect(telHref(n)).toBe("tel:+6287728589845")
+    }
+    expect(cleanPhone("\u202A+62 877\u201128\u202C")).toBe("+62 877-28")
+  })
+  it("still rejects letters, too short and too long", () => {
+    for (const n of ["abc", "0812 345 abc", "12345", "+62 877 2858 9845 1234 5", "0877-2858-9845 ext 2", "++62877", "62-"]) expect(isPlausiblePhone(n)).toBe(false)
   })
 })
