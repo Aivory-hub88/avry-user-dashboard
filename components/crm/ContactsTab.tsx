@@ -30,7 +30,7 @@ import {
   type SavedView,
   type SmartView,
 } from "@/lib/crmContacts"
-import { getLabels, getSource, hasLabel, isPlausiblePhone, labelCounts, SOURCES, telHref, whatsappHref, withLabels, withSource } from "@/lib/crmLabels"
+import { cleanPhone, getLabels, getSource, hasLabel, isPlausiblePhone, labelCounts, SOURCES, telHref, whatsappHref, withLabels, withSource } from "@/lib/crmLabels"
 import { isSample } from "@/lib/crmOnboarding"
 
 const VIEWS_KEY = "aivory.crm.contactViews"
@@ -168,7 +168,7 @@ export default function ContactsTab({
     void form.submit({
       problem: badName ? "Enter the contact’s name first." : badEmail ? "That email doesn’t look right." : badPhone ? "That phone number doesn’t look right. Use digits, like 0812 3456 7890 or +62 812 3456 7890." : null,
       focus: badName ? nameRef.current : badEmail ? emailRef.current : phoneRef.current,
-      create: () => onCreate({ name: name.trim(), email: email.trim(), phone: phone.trim(), title: title.trim(), company_id: companyId || undefined, custom_fields: withSource(withLabels({}, labels), source) }),
+      create: () => onCreate({ name: name.trim(), email: email.trim(), phone: cleanPhone(phone), title: title.trim(), company_id: companyId || undefined, custom_fields: withSource(withLabels({}, labels), source) }),
       added: `Added ${name.trim()}.`,
       reset: () => {
         setName("")
