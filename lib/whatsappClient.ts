@@ -23,6 +23,9 @@ export class WaError extends Error {
   }
 }
 
+export type WaAgentOption = { type: string; name: string; title: string }
+export type WaSettings = { draft_replies: boolean; agent: string | null; agents: WaAgentOption[]; assistant_available: boolean }
+
 export type TemplateListing = { templates: WaTemplate[]; hidden: number } | { unsupported: string }
 
 export const waApi = {
@@ -48,13 +51,14 @@ export const waApi = {
     if (!r.ok) throw new WaError(j.error ?? "Could not send. Try again.", j.code)
     return { logged: j.logged !== false }
   },
-  settings: async (): Promise<{ draft_replies: boolean; available: boolean }> => {
+  settings: async (): Promise<WaSettings> => {
     const r = await authedFetch(`${BASE_PATH}/api/whatsapp/settings`)
     if (!r.ok) throw new Error("settings")
-    return (await r.json()) as { draft_replies: boolean; available: boolean }
+    return (await r.json()) as WaSettings
   },
-  setDraftReplies: async (on: boolean): Promise<void> => {
-    const r = await authedFetch(`${BASE_PATH}/api/whatsapp/settings`, { method: "PUT", body: JSON.stringify({ draft_replies: on }) })
+  /** Change the drafts switch and/or which agent writes them (`null` clears the agent). */
+  saveSettings: async (change: { draft_replies?: boolean; agent?: string | null }): Promise<void> => {
+    const r = await authedFetch(`${BASE_PATH}/api/whatsapp/settings`, { method: "PUT", body: JSON.stringify(change) })
     if (!r.ok) throw new Error((await json(r)).error ?? "Could not save. Try again.")
   },
   draft: async (contactId: string): Promise<{ text: string; createdAt: string } | null> => {

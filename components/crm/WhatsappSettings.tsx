@@ -9,7 +9,7 @@ import { useEffect, useState } from "react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import { PROVIDERS, providerMeta } from "@/lib/whatsapp/providerMeta"
 import type { ProviderId } from "@/lib/whatsapp/types"
-import { waApi, type WaStatus } from "@/lib/whatsappClient"
+import { waApi, type WaSettings, type WaStatus } from "@/lib/whatsappClient"
 
 export default function WhatsappSettings({ status, onChanged }: { status: WaStatus | null; onChanged: () => void }) {
   const [provider, setProvider] = useState<ProviderId>("kapso")
@@ -19,37 +19,33 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
   const [error, setError] = useState<string | null>(null)
   const [setup, setSetup] = useState<string[]>([])
   const meta = providerMeta(provider) ?? PROVIDERS[0]
-  const [drafts, setDrafts] = useState<boolean | null>(null)
-  const [draftsAvailable, setDraftsAvailable] = useState(false)
+  const ready = meta.fields.every((f) => f.optional || (values[f.key] ?? "").trim() !== "")
+  const [settings, setSettings] = useState<WaSettings | null>(null)
   const connected = !!status?.connected
   useEffect(() => {
     if (!connected) return
     let alive = true
     waApi.settings().then(
-      (s) => {
-        if (!alive) return
-        setDrafts(s.draft_replies)
-        setDraftsAvailable(s.available)
-      },
-      () => alive && setDrafts(false),
+      (s) => alive && setSettings(s),
+      () => undefined,
     )
     return () => {
       alive = false
     }
   }, [connected])
-  const toggleDrafts = async () => {
-    if (drafts === null) return
-    const next = !drafts
-    setDrafts(next)
+  const saveSettings = async (change: { draft_replies?: boolean; agent?: string | null }) => {
+    if (!settings) return
+    const before = settings
+    setSettings({ ...settings, ...("draft_replies" in change ? { draft_replies: !!change.draft_replies } : {}), ...("agent" in change ? { agent: change.agent ?? null } : {}) })
     setError(null)
     try {
-      await waApi.setDraftReplies(next)
+      await waApi.saveSettings(change)
     } catch (e) {
-      setDrafts(!next)
+      setSettings(before)
       setError((e as Error).message)
     }
   }
-  const ready = meta.fields.every((f) => f.optional || (values[f.key] ?? "").trim() !== "")
+  const canDraft = !!settings && (!!settings.agent || settings.assistant_available)
 
   const act = async (fn: () => Promise<void>) => {
     setBusy(true)
@@ -155,24 +151,40 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
         </form>
       )}
 
-      {status.connected && draftsAvailable && (
-        <div className="space-y-2 rounded-2xl border border-line px-4 py-4">
+      {status.connected && settings && (
+        <div className="space-y-3 rounded-2xl border border-line px-4 py-4">
           <div className="flex items-center gap-3">
-            <span className="text-[13px] text-white/90">Draft replies with the Aivory assistant</span>
+            <span className="text-[13px] text-white/90">Draft replies to incoming messages</span>
             <button
               type="button"
               role="switch"
-              aria-checked={drafts === true}
-              aria-label="Draft replies with the Aivory assistant"
-              disabled={drafts === null}
-              onClick={() => void toggleDrafts()}
-              className={`ml-auto flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-40 ${drafts ? "bg-emerald-400/80" : "bg-white/15"}`}
+              aria-checked={settings.draft_replies}
+              aria-label="Draft replies to incoming messages"
+              disabled={!canDraft && !settings.draft_replies}
+              onClick={() => void saveSettings({ draft_replies: !settings.draft_replies })}
+              className={`ml-auto flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-40 ${settings.draft_replies ? "bg-emerald-400/80" : "bg-white/15"}`}
             >
-              <span className={`h-4 w-4 rounded-full bg-white transition-transform ${drafts ? "translate-x-4" : ""}`} />
+              <span className={`h-4 w-4 rounded-full bg-white transition-transform ${settings.draft_replies ? "translate-x-4" : ""}`} />
             </button>
           </div>
+          <label className="block">
+            <span className="mb-1 block text-[11px] text-white/45">Who writes the drafts</span>
+            <select
+              value={settings.agent ?? ""}
+              onChange={(e) => void saveSettings({ agent: e.target.value || null })}
+              aria-label="Agent that writes the drafts"
+              className={`w-full ${fieldClass}`}
+            >
+              {settings.assistant_available ? <option value="">Aivory assistant</option> : <option value="">Choose one of your agents</option>}
+              {settings.agents.map((a) => (
+                <option key={a.type} value={a.type}>
+                  {a.name} · {a.title}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="text-[12px] leading-relaxed text-white/50">
-            When someone messages you, the assistant writes a suggested reply and puts it in that contact’s WhatsApp box. Nothing is ever sent for you: you read it, edit it and press Send. The assistant only knows about Aivory, and the customer’s message text is processed by Aivory’s AI service. Off by default.
+            When someone messages you, the agent writes a suggested reply and puts it in that contact’s WhatsApp box. Your own agent knows your business and runs on your plan. Nothing is ever sent for you: you read it, edit it and press Send. The customer’s message text is processed by your agent and Aivory’s AI service. Off by default.
           </div>
         </div>
       )}
