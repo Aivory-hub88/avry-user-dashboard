@@ -4,8 +4,9 @@
 import { useCallback, useEffect, useState } from "react"
 import { BASE_PATH } from "@/lib/asset"
 import { authedFetch } from "@/lib/deployAuth"
+import type { ProviderId } from "@/lib/whatsapp/types"
 
-export type WaStatus = { connected: boolean; mode: "own" | "aivory" | null; phone: string | null }
+export type WaStatus = { connected: boolean; mode: "own" | "aivory" | null; provider: ProviderId | null; phone: string | null }
 
 async function json(r: Response): Promise<{ error?: string; code?: string } & Record<string, unknown>> {
   try {
@@ -21,9 +22,12 @@ export const waApi = {
     if (!r.ok) throw new Error("status")
     return (await r.json()) as WaStatus
   },
-  connect: async (b: { api_key: string; phone_number_id: string; display_phone?: string }): Promise<void> => {
+  /** `setup` lists what to do in the provider's console (empty when Aivory wired the webhook itself). */
+  connect: async (b: { provider: ProviderId; credentials: Record<string, string>; display_phone?: string }): Promise<{ setup: string[] }> => {
     const r = await authedFetch(`${BASE_PATH}/api/whatsapp/connection`, { method: "POST", body: JSON.stringify(b) })
-    if (!r.ok) throw new Error((await json(r)).error ?? "Could not connect. Try again.")
+    const j = await json(r)
+    if (!r.ok) throw new Error(j.error ?? "Could not connect. Try again.")
+    return { setup: Array.isArray(j.setup) ? (j.setup as string[]) : [] }
   },
   disconnect: async (): Promise<void> => {
     const r = await authedFetch(`${BASE_PATH}/api/whatsapp/connection`, { method: "DELETE" })

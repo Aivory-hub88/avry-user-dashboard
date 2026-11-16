@@ -1,7 +1,8 @@
 /** Send a WhatsApp text to a CRM contact and log it on their timeline. */
 import { NextRequest, NextResponse } from 'next/server'
 import { ANY_MODULE, requirePaidPlan } from '@/lib/planGate'
-import { MAX_TEXT, sendText } from '@/lib/kapso'
+import { MAX_TEXT } from '@/lib/whatsapp/types'
+import { getProvider } from '@/lib/whatsapp/providers'
 import { whatsappDigits } from '@/lib/crmLabels'
 import { WA_OUT } from '@/lib/crmWhatsapp'
 import { crmFor } from '@/lib/crmServer'
@@ -42,7 +43,9 @@ export async function POST(req: NextRequest) {
   const to = whatsappDigits(contact.phone)
   if (!to) return fail('This contact has no valid phone number.', 400, 'no_phone')
 
-  const sent = await sendText(conn, to, text)
+  const provider = getProvider(conn.provider)
+  if (!provider) return fail('WhatsApp is not connected.', 409, 'not_connected')
+  const sent = await provider.send(conn.creds, to, text)
   if (!sent.ok) return fail(sent.message, sent.code === 'unavailable' ? 502 : sent.code === 'window_closed' ? 409 : 400, sent.code)
 
   // The message is out; a logging failure must not look like a send failure.

@@ -1,11 +1,13 @@
-/** Inbound webhook for a customer's own Kapso number. The token in the path picks the account; the signature authenticates. */
+/** Inbound webhook for a customer's own provider account. The token in the path picks the account; the provider's signature authenticates. */
 import type { NextRequest } from 'next/server'
 import { getConnectionByToken } from '@/lib/whatsappConnection'
 import { handleWebhook } from '@/lib/whatsappWebhook'
+import { getProvider } from '@/lib/whatsapp/providers'
+import { publicWebhookUrl } from '@/lib/whatsapp/url'
 
 export const runtime = 'nodejs'
 
-export async function POST(req: NextRequest, ctx: { params: Promise<{ token: string }> }) {
+async function handle(req: NextRequest, ctx: { params: Promise<{ token: string }> }) {
   const { token } = await ctx.params
   let found = null
   try {
@@ -14,5 +16,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
     console.error('[whatsapp webhook] lookup failed:', (e as Error).message)
     return new Response(JSON.stringify({ error: 'unavailable' }), { status: 503, headers: { 'content-type': 'application/json' } })
   }
-  return handleWebhook(req, found ? { tenantId: found.userId, secret: found.conn.webhookSecret } : null)
+  const provider = found ? getProvider(found.conn.provider) : null
+  return handleWebhook(req, found && provider ? { tenantId: found.userId, provider, creds: found.conn.creds, secret: found.conn.webhookSecret, url: publicWebhookUrl(req, token) } : null)
 }
+
+export { handle as POST, handle as GET }

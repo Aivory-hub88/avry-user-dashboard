@@ -5,7 +5,7 @@ import { useState } from "react"
 import { Check, MessageCircle } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import { whatsappDigits } from "@/lib/crmLabels"
-import { MAX_TEXT } from "@/lib/kapsoLimits"
+import { MAX_TEXT } from "@/lib/whatsapp/types"
 import { waApi } from "@/lib/whatsappClient"
 
 export default function WhatsappSend({ contactId, name, phone, onSent }: { contactId: string; name: string; phone: string | null; onSent: () => void }) {

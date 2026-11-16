@@ -1,7 +1,7 @@
 /**
  * Which Kapso number a CRM account uses. SERVER-ONLY (Node runtime).
  *
- *   own     a customer's own Kapso key, stored encrypted in
+ *   own     a customer's own provider account (Kapso, Meta Cloud API, Twilio), stored encrypted in
  *           dashboard.whatsapp_connections (migrations/dashboard-whatsapp-connections.sql)
  *   aivory  the number Aivory owns, from env (KAPSO_API_KEY, KAPSO_PHONE_NUMBER_ID,
  *           KAPSO_WEBHOOK_SECRET), available only to the account KAPSO_CRM_TENANT_ID
@@ -11,8 +11,9 @@
 import { randomBytes } from 'crypto'
 import { query } from '@/lib/db'
 import { decryptSecret, encryptSecret } from '@/lib/crypto'
+import type { Creds, ProviderId } from '@/lib/whatsapp/types'
 
-export type WaConnection = { mode: 'own' | 'aivory'; apiKey: string; phoneNumberId: string; webhookSecret: string; displayPhone: string | null }
+export type WaConnection = { mode: 'own' | 'aivory'; provider: ProviderId; creds: Creds; webhookSecret: string; displayPhone: string | null }
 
 export function aivoryTenant(): string | null {
   return process.env.KAPSO_CRM_TENANT_ID?.trim() || null
@@ -23,14 +24,14 @@ export function aivoryConnection(): WaConnection | null {
   const phoneNumberId = process.env.KAPSO_PHONE_NUMBER_ID?.trim()
   const webhookSecret = process.env.KAPSO_WEBHOOK_SECRET?.trim()
   if (!apiKey || !phoneNumberId || !webhookSecret || !aivoryTenant()) return null
-  return { mode: 'aivory', apiKey, phoneNumberId, webhookSecret, displayPhone: process.env.KAPSO_DISPLAY_PHONE?.trim() || null }
+  return { mode: 'aivory', provider: 'kapso', creds: { api_key: apiKey, phone_number_id: phoneNumberId }, webhookSecret, displayPhone: process.env.KAPSO_DISPLAY_PHONE?.trim() || null }
 }
 
-type Row = { user_id: string; phone_number_id: string; display_phone: string | null; api_key_enc: Buffer; webhook_secret_enc: Buffer }
+type Row = { user_id: string; provider: string; display_phone: string | null; credentials_enc: Buffer; webhook_secret_enc: Buffer }
 const fromRow = (r: Row): WaConnection => ({
   mode: 'own',
-  apiKey: decryptSecret(r.api_key_enc),
-  phoneNumberId: r.phone_number_id,
+  provider: r.provider as ProviderId,
+  creds: JSON.parse(decryptSecret(r.credentials_enc)) as Creds,
   webhookSecret: decryptSecret(r.webhook_secret_enc),
   displayPhone: r.display_phone,
 })
@@ -51,13 +52,13 @@ export function newWebhookCredentials(): { token: string; secret: string } {
   return { token: randomBytes(18).toString('hex'), secret: randomBytes(24).toString('hex') }
 }
 
-export async function saveConnection(userId: string, c: { apiKey: string; phoneNumberId: string; displayPhone: string | null; token: string; secret: string }): Promise<void> {
+export async function saveConnection(userId: string, c: { provider: ProviderId; creds: Creds; displayPhone: string | null; token: string; secret: string }): Promise<void> {
   await query(
-    `INSERT INTO dashboard.whatsapp_connections (user_id, phone_number_id, display_phone, api_key_enc, webhook_secret_enc, webhook_token)
+    `INSERT INTO dashboard.whatsapp_connections (user_id, provider, display_phone, credentials_enc, webhook_secret_enc, webhook_token)
      VALUES ($1, $2, $3, $4, $5, $6)
-     ON CONFLICT (user_id) DO UPDATE SET phone_number_id = EXCLUDED.phone_number_id, display_phone = EXCLUDED.display_phone,
-       api_key_enc = EXCLUDED.api_key_enc, webhook_secret_enc = EXCLUDED.webhook_secret_enc, webhook_token = EXCLUDED.webhook_token`,
-    [userId, c.phoneNumberId, c.displayPhone, encryptSecret(c.apiKey), encryptSecret(c.secret), c.token],
+     ON CONFLICT (user_id) DO UPDATE SET provider = EXCLUDED.provider, display_phone = EXCLUDED.display_phone,
+       credentials_enc = EXCLUDED.credentials_enc, webhook_secret_enc = EXCLUDED.webhook_secret_enc, webhook_token = EXCLUDED.webhook_token`,
+    [userId, c.provider, c.displayPhone, encryptSecret(JSON.stringify(c.creds)), encryptSecret(c.secret), c.token],
   )
 }
 

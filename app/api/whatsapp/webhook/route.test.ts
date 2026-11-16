@@ -54,7 +54,7 @@ describe("POST /api/whatsapp/webhook (Aivory number)", () => {
   it("ignores other event types", async () => {
     const raw = body("wamid.300")
     const res = await POST(req(raw, signBody(raw, "s3cret"), "whatsapp.message.delivered"))
-    expect(await res.json()).toMatchObject({ ignored: "whatsapp.message.delivered" })
+    expect(await res.json()).toMatchObject({ ignored: true })
     expect(created).toHaveLength(0)
   })
 })

@@ -8,10 +8,14 @@
  * signed with HMAC-SHA256 (hex, header `X-Webhook-Signature`) over the raw body.
  */
 import { createHmac, timingSafeEqual } from "crypto"
+import { classifySendError, readJson } from "./whatsapp/errors"
+import { MAX_TEXT as LIMIT, type Inbound, type RegisterResult, type SendResult } from "./whatsapp/types"
+
+export type { Inbound, SendResult }
+export const classifyError = classifySendError
 
 export const KAPSO_BASE = "https://api.kapso.ai"
 export const INBOUND_EVENT = "whatsapp.message.received"
-import { MAX_TEXT as LIMIT } from "./kapsoLimits"
 export const MAX_TEXT = LIMIT
 
 export type KapsoConfig = { apiKey: string; phoneNumberId: string }
@@ -29,8 +33,6 @@ export function verifySignature(raw: string, header: string | null, secret: stri
 export function signBody(raw: string, secret: string): string {
   return createHmac("sha256", secret).update(raw).digest("hex")
 }
-
-export type Inbound = { id: string; from: string; name: string | null; text: string; at: string }
 
 const asObj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" ? (v as Record<string, unknown>) : {})
 const asStr = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v : null)
@@ -59,28 +61,6 @@ export function parseInbound(body: unknown): Inbound[] {
   return items.map(one).filter((x): x is Inbound => x !== null)
 }
 
-export type SendResult = { ok: true; id: string | null } | { ok: false; status: number; code: "window_closed" | "bad_key" | "rejected" | "unavailable"; message: string }
-
-/** Meta error 131047 = "re-engagement message": outside the 24-hour window, a template is required. */
-export function classifyError(status: number, body: unknown): Extract<SendResult, { ok: false }> {
-  const err = asObj(asObj(body).error)
-  const message = asStr(err.message) ?? asStr(asObj(body).message) ?? `Kapso answered ${status}`
-  if (err.code === 131047 || /24.?hour|re-?engagement/i.test(message)) {
-    return { ok: false, status, code: "window_closed", message: "WhatsApp only allows free-form messages within 24 hours of their last message. Use an approved template to start the chat again." }
-  }
-  if (status === 401 || status === 403) return { ok: false, status, code: "bad_key", message: "Kapso rejected the API key." }
-  if (status >= 500) return { ok: false, status, code: "unavailable", message: "Kapso is unavailable right now. Try again shortly." }
-  return { ok: false, status, code: "rejected", message }
-}
-
-async function readJson(r: Response): Promise<unknown> {
-  try {
-    return await r.json()
-  } catch {
-    return {}
-  }
-}
-
 export async function sendText(cfg: KapsoConfig, toDigits: string, text: string, f: Fetch = fetch): Promise<SendResult> {
   let r: Response
   try {
@@ -100,7 +80,7 @@ export async function sendText(cfg: KapsoConfig, toDigits: string, text: string,
 }
 
 /** Subscribe `url` to inbound messages for the number. A 401/403 here also tells us the key is wrong. */
-export async function registerWebhook(cfg: KapsoConfig, url: string, secret: string, f: Fetch = fetch): Promise<{ ok: true } | { ok: false; code: "bad_key" | "rejected" | "unavailable"; message: string }> {
+export async function registerWebhook(cfg: KapsoConfig, url: string, secret: string, f: Fetch = fetch): Promise<RegisterResult> {
   let r: Response
   try {
     r = await f(`${KAPSO_BASE}/platform/v1/whatsapp/phone_numbers/${encodeURIComponent(cfg.phoneNumberId)}/webhooks`, {

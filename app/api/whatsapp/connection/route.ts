@@ -1,43 +1,43 @@
 /**
- * Connect (POST) or disconnect (DELETE) a customer's own Kapso number. The
- * webhook is registered with Kapso using the key they give, which also proves
- * the key works; nothing is saved when that fails.
+ * Connect (POST) or disconnect (DELETE) a customer's own WhatsApp provider account.
+ * Providers Aivory can wire up (Kapso) get their webhook registered with the key the
+ * customer gave, which also proves it works; nothing is saved when that fails. For the
+ * others the response carries the steps (and URL/token) to paste into the provider's console.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { ANY_MODULE, requirePaidPlan } from '@/lib/planGate'
-import { registerWebhook } from '@/lib/kapso'
+import { checkCreds, providerMeta } from '@/lib/whatsapp/providerMeta'
+import { getProvider } from '@/lib/whatsapp/providers'
+import { publicWebhookUrl } from '@/lib/whatsapp/url'
+import type { ProviderId } from '@/lib/whatsapp/types'
 import { deleteConnection, newWebhookCredentials, saveConnection } from '@/lib/whatsappConnection'
 
 export const runtime = 'nodejs'
 
-function webhookUrl(req: NextRequest, token: string): string {
-  const base = process.env.WHATSAPP_WEBHOOK_BASE?.replace(/\/$/, '')
-  if (base) return `${base}/api/whatsapp/webhook/${token}`
-  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? 'localhost'
-  const proto = req.headers.get('x-forwarded-proto') ?? 'https'
-  return `${proto}://${host}${req.nextUrl.basePath}/api/whatsapp/webhook/${token}`
-}
-
 export async function POST(req: NextRequest) {
   const gate = await requirePaidPlan(req, ANY_MODULE)
   if (!gate.ok) return gate.response
-  const b = (await req.json().catch(() => ({}))) as { api_key?: unknown; phone_number_id?: unknown; display_phone?: unknown }
-  const apiKey = typeof b.api_key === 'string' ? b.api_key.trim() : ''
-  const phoneNumberId = typeof b.phone_number_id === 'string' ? b.phone_number_id.trim() : ''
+  const b = (await req.json().catch(() => ({}))) as { provider?: unknown; credentials?: unknown; display_phone?: unknown }
+  const meta = typeof b.provider === 'string' ? providerMeta(b.provider) : undefined
+  const provider = meta ? getProvider(meta.id) : null
+  if (!meta || !provider) return NextResponse.json({ error: 'Choose a WhatsApp provider.' }, { status: 400 })
+  const { creds, problem } = checkCreds(meta.id as ProviderId, (b.credentials && typeof b.credentials === 'object' ? b.credentials : {}) as Record<string, unknown>)
+  if (problem) return NextResponse.json({ error: problem }, { status: 400 })
   const display = typeof b.display_phone === 'string' ? b.display_phone.trim().slice(0, 30) : ''
-  if (apiKey.length < 10 || apiKey.length > 300 || /\s/.test(apiKey)) return NextResponse.json({ error: 'That API key doesn’t look right.' }, { status: 400 })
-  if (!/^\d{5,30}$/.test(phoneNumberId)) return NextResponse.json({ error: 'The phone number ID is the digits shown next to your number in Kapso.' }, { status: 400 })
 
   const { token, secret } = newWebhookCredentials()
-  const reg = await registerWebhook({ apiKey, phoneNumberId }, webhookUrl(req, token), secret)
-  if (!reg.ok) return NextResponse.json({ error: reg.code === 'bad_key' ? 'Kapso rejected that API key or phone number ID.' : reg.message }, { status: reg.code === 'unavailable' ? 502 : 400 })
+  const url = publicWebhookUrl(req, token)
+  if (provider.autoRegister) {
+    const reg = await provider.autoRegister(creds, url, secret)
+    if (!reg.ok) return NextResponse.json({ error: reg.code === 'bad_key' ? `${meta.label} rejected those credentials.` : reg.message }, { status: reg.code === 'unavailable' ? 502 : 400 })
+  }
   try {
-    await saveConnection(gate.user.user_id, { apiKey, phoneNumberId, displayPhone: display || null, token, secret })
+    await saveConnection(gate.user.user_id, { provider: meta.id, creds, displayPhone: display || null, token, secret })
   } catch (e) {
     console.error('[whatsapp connect] save failed:', (e as Error).message)
     return NextResponse.json({ error: 'Could not save the connection. Try again.' }, { status: 500 })
   }
-  return NextResponse.json({ connected: true, mode: 'own', phone: display || null })
+  return NextResponse.json({ connected: true, mode: 'own', provider: meta.id, phone: display || null, setup: meta.webhook === 'manual' ? meta.steps(url, secret) : [] })
 }
 
 export async function DELETE(req: NextRequest) {
