@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { workspaceCredential, authorizeDocFallback, unauthorized, forbidden, workspacePlanDenied, type WorkspaceCredential } from "@/lib/workspaceAuth"
 import { checkAgentAccess } from "@/lib/workspaceAccess"
-import { WorkspaceDenied, getStatusDefs, loadDbDoc, rowsFromDbDoc, type DbRow } from "@/lib/workspaceDb"
-import { cleanOwner, personKey, type RowChange } from "@/lib/workspaceDbModel"
+import { WorkspaceDenied, getFieldDefs, getStatusDefs, loadDbDoc, rowsFromDbDoc, type DbRow } from "@/lib/workspaceDb"
+import { addedFieldPeople, cleanOwner, cleanPersonRef, personKey, personRefFromKey, type FieldDef, type FieldPeopleAdded, type PersonRef, type RowChange } from "@/lib/workspaceDbModel"
+import { recordFieldAssignments } from "@/lib/workspaceMentions"
 import { recordComment, recordRowChanges, recordRowCreated } from "@/lib/workspaceTaskEvents"
 
 export const runtime = "nodejs"
@@ -13,6 +14,9 @@ export const runtime = "nodejs"
  *   { kind: "status" | "due", from: string }
  *   { kind: "owner", from: PersonRef | null }
  *   { kind: "comment", commentId: string }
+ *   { kind: "field", fieldId: string, from: Array<PersonRef | "user:<id>" | "agent:<type>"> }
+ *      (a person field: who was set before; the people now in the cell and
+ *      not in `from` are told "set you as <field>")
  *
  * The Tasks UI edits rows straight through Yjs, so the server never sees the
  * diff. After a local edit the client reports what it changed; this writes
@@ -26,7 +30,7 @@ export const runtime = "nodejs"
 const RECENT_MS = 10 * 60_000
 const RECHECK_MS = 1500
 
-type Body = { kind?: unknown; from?: unknown; commentId?: unknown }
+type Body = { kind?: unknown; from?: unknown; commentId?: unknown; fieldId?: unknown }
 
 /** The row and all of the doc's rows (closing it may unblock others). */
 async function loadRow(
@@ -51,7 +55,7 @@ function selfKeyOf(cred: WorkspaceCredential, agentType: string): string {
 }
 
 /** The change the client claims, resolved against the stored row (null = not (yet) true). */
-function verify(row: DbRow, body: Body, selfKey: string): RowChange | "created" | { comment: string } | null {
+function verify(row: DbRow, body: Body, selfKey: string, defs: FieldDef[]): RowChange | "created" | { comment: string } | { fields: FieldPeopleAdded[] } | null {
   switch (body.kind) {
     case "created":
       return recent(row.createdAt) ? "created" : null
@@ -76,12 +80,24 @@ function verify(row: DbRow, body: Body, selfKey: string): RowChange | "created" 
       if (!c.authorRef || personKey(c.authorRef) !== selfKey) return null
       return { comment: c.id }
     }
+    case "field": {
+      const fieldId = typeof body.fieldId === "string" ? body.fieldId.slice(0, 16) : ""
+      const def = defs.find((d) => d.id === fieldId && d.type === "person")
+      if (!def || !Array.isArray(body.from)) return null
+      const from = (body.from as unknown[])
+        .slice(0, 20)
+        .map((x) => (typeof x === "string" ? personRefFromKey(x) : cleanPersonRef(x)))
+        .filter((p): p is PersonRef => !!p)
+      // Only people really in the stored cell and not in `from` count.
+      const fields = addedFieldPeople({ [def.id]: from }, row.cells, [def])
+      return fields.length > 0 ? { fields } : null
+    }
     default:
       return null
   }
 }
 
-const KINDS = new Set(["created", "status", "due", "owner", "comment"])
+const KINDS = new Set(["created", "status", "due", "owner", "comment", "field"])
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string; rowId: string }> }) {
   const { id, rowId } = await params
@@ -102,12 +118,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const allowPg = cred.kind === "service" ? true : await authorizeDocFallback(cred, id)
     const selfKey = selfKeyOf(cred, agentType)
+    const defs = body.kind === "field" ? await getFieldDefs(id) : []
     let { row, rows } = await loadRow(id, rowId, cred, agentType, allowPg)
-    let claim = row ? verify(row, body, selfKey) : null
+    let claim = row ? verify(row, body, selfKey, defs) : null
     if (!claim) {
       await new Promise((r) => setTimeout(r, RECHECK_MS))
       ;({ row, rows } = await loadRow(id, rowId, cred, agentType, allowPg))
-      claim = row ? verify(row, body, selfKey) : null
+      claim = row ? verify(row, body, selfKey, defs) : null
     }
     if (!row) return NextResponse.json({ error: "not found" }, { status: 404 })
     if (!claim) return NextResponse.json({ error: "no such change" }, { status: 409 })
@@ -115,6 +132,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const statuses = body.kind === "status" ? await getStatusDefs(id) : undefined
     const ctx = { docId: id, rowId, credential: cred, agentType, title: row.title, followers: row.followers, rows, statuses }
     if (claim === "created") await recordRowCreated(ctx)
+    else if ("fields" in claim) await recordFieldAssignments({ docId: id, rowId, credential: cred, agentType, fields: claim.fields, title: row.title })
     else if ("comment" in claim) {
       const c = row.comments.find((x) => x.id === claim.comment)
       if (c) await recordComment(ctx, c)

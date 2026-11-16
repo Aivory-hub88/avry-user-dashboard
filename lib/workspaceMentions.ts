@@ -1,5 +1,5 @@
 import { query } from "@/lib/db"
-import { mentionPlainText, parseMentions, personKey, personLabel, type PersonRef } from "@/lib/workspaceDbModel"
+import { fieldNoticeExcerpt, mentionPlainText, parseMentions, personKey, personLabel, type FieldPeopleAdded, type PersonRef } from "@/lib/workspaceDbModel"
 import type { WorkspaceCredential } from "@/lib/workspaceAuth"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { workspaceOf } from "@/lib/workspaceIndex"
@@ -201,6 +201,76 @@ export async function recordAssignments(input: AssignInput): Promise<void> {
     })
   } catch (e) {
     console.error("[workspace assignments]", e)
+  }
+}
+
+type FieldAssignInput = {
+  docId: string
+  rowId: string
+  credential: WorkspaceCredential
+  agentType?: string
+  /** Newly set people per person field (already diffed by the caller). */
+  fields: FieldPeopleAdded[]
+  title: string
+}
+
+/**
+ * "X set you as Reviewer on <task>": each person newly set on a person field
+ * gets an inbox row (source 'field_assigned', excerpt "<field>\n<title>"). The
+ * actor never notifies themself, and the same notice isn't repeated to a
+ * person within 10 minutes (a replayed client report). Returns how many rows
+ * were asked for. Fire-and-forget: a failure is logged, never thrown.
+ */
+export async function recordFieldAssignments(input: FieldAssignInput): Promise<number> {
+  const { docId, rowId, credential } = input
+  const agentType = input.agentType ?? "user"
+  const actor = actorOf(credential, agentType)
+  const selfKey = actor.actorType === "user" ? `user:${actor.actorId}` : `agent:${actor.actorId}`
+  const kinds: string[] = []
+  const ids: string[] = []
+  const excerpts: string[] = []
+  const summaries: string[] = []
+  for (const f of input.fields) {
+    const targets = f.added.filter((p) => personKey(p) !== selfKey)
+    if (targets.length === 0) continue
+    const excerpt = fieldNoticeExcerpt(f.fieldName, input.title)
+    for (const p of targets) {
+      kinds.push(p.kind)
+      ids.push(p.kind === "user" ? p.id : p.type)
+      excerpts.push(excerpt)
+    }
+    summaries.push(`${targets.map(personLabel).join(", ")} as ${f.fieldName}`)
+  }
+  if (ids.length === 0) return 0
+  try {
+    const workspaceId = await workspaceOf(docId)
+    await query(
+      `INSERT INTO dashboard.workspace_mentions
+        (workspace_id, doc_id, row_id, actor_type, actor_id, actor_name, mentioned_kind, mentioned_id, source, excerpt)
+       SELECT $1, $2, $3, $4, $5, $6, m.kind, m.id, 'field_assigned', m.excerpt
+       FROM unnest($7::text[], $8::text[], $9::text[]) AS m(kind, id, excerpt)
+       WHERE NOT EXISTS (
+         SELECT 1 FROM dashboard.workspace_mentions w
+         WHERE w.doc_id = $2 AND w.row_id = $3 AND w.source = 'field_assigned' AND w.excerpt = m.excerpt
+           AND w.mentioned_kind = m.kind AND w.mentioned_id = m.id
+           AND w.created_at > now() - interval '10 minutes'
+       )`,
+      [workspaceId, docId, rowId, actor.actorType, actor.actorId, actor.actorName, kinds, ids, excerpts],
+    )
+    await recordWorkspaceActivity({
+      docId,
+      credential,
+      agentType,
+      action: "database.field_assigned",
+      summary: `${actor.actorName} set ${summaries.join("; ")} on “${input.title.trim() || "Untitled"}”`.slice(0, 300),
+      targetType: "database-row",
+      targetId: rowId,
+      metadata: { fields: input.fields.map((f) => ({ field: f.fieldId, added: f.added.map(personKey) })) },
+    })
+    return ids.length
+  } catch (e) {
+    console.error("[workspace field assignments]", e)
+    return 0
   }
 }
 

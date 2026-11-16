@@ -14,6 +14,7 @@ import { Bell } from "lucide-react"
 import { collabAuthHeaders } from "@/lib/collabClient"
 import { personName } from "@/lib/roomChat"
 import { AGENT_ROSTER } from "@/lib/agentRoster"
+import { parseFieldNotice } from "@/lib/workspaceDbModel"
 
 type InboxItem = {
   id: number | string
@@ -35,8 +36,12 @@ function actorLabel(m: InboxItem): string {
 }
 
 /** What the notice says after the actor's name (per inbox source). */
-export function inboxVerb(source: string): string {
+export function inboxVerb(source: string, excerpt = ""): string {
   switch (source) {
+    case "field_assigned": {
+      const f = parseFieldNotice(excerpt)
+      return f ? `set you as ${f.field} on a task` : "set you on a task field"
+    }
     case "assigned":
       return "assigned you a task"
     case "commented":
@@ -54,6 +59,11 @@ export function inboxVerb(source: string): string {
     default:
       return "mentioned you"
   }
+}
+
+/** The line under the notice: a field notice shows just the task title. */
+function inboxExcerpt(m: InboxItem): string {
+  return (m.source === "field_assigned" ? parseFieldNotice(m.excerpt)?.title : null) ?? m.excerpt
 }
 
 /** Reminders come from the system, not a person. */
@@ -167,16 +177,16 @@ export default function WorkspaceInbox() {
                   <div className="flex items-baseline justify-between gap-2 text-[12.5px] text-white/75">
                     <span className="min-w-0 truncate">
                       {isReminder(m.source) ? (
-                        <span className={`font-medium ${m.source === "overdue" ? "text-red-300" : "text-amber-200"}`}>{inboxVerb(m.source)}</span>
+                        <span className={`font-medium ${m.source === "overdue" ? "text-red-300" : "text-amber-200"}`}>{inboxVerb(m.source, m.excerpt)}</span>
                       ) : (
                         <>
-                          <span className="font-medium text-white/85">{actorLabel(m)}</span> {inboxVerb(m.source)}
+                          <span className="font-medium text-white/85">{actorLabel(m)}</span> {inboxVerb(m.source, m.excerpt)}
                         </>
                       )}
                     </span>
                     <span className="shrink-0 text-[10.5px] text-white/30">{ago(m.created_at)}</span>
                   </div>
-                  {m.excerpt && <div className="mt-0.5 truncate text-[12px] text-white/40">{m.excerpt}</div>}
+                  {m.excerpt && <div className="mt-0.5 truncate text-[12px] text-white/40">{inboxExcerpt(m)}</div>}
                 </Link>
               ))}
             </div>
