@@ -10,18 +10,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowRightLeft, ChevronDown, Clock, LayoutGrid, Plus, Search, SlidersHorizontal, Sparkles, Upload, X } from "lucide-react"
+import { ArrowRightLeft, ChevronDown, Clock, LayoutGrid, MessageCircle, Phone, Plus, Search, SlidersHorizontal, Sparkles, Upload, X } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import { AddButton, AddNoteLine, useAddForm } from "@/components/crm/AddForm"
 import AgentAccess from "@/components/crm/AgentAccess"
+import WhatsappSettings from "@/components/crm/WhatsappSettings"
+import { useWhatsappStatus } from "@/lib/whatsappClient"
 import ActivityFeed from "@/components/crm/ActivityFeed"
 import CrmWelcome, { SetupChecklist } from "@/components/crm/CrmWelcome"
 import ImportDialog from "@/components/crm/ImportDialog"
+import ContactsTab from "@/components/crm/ContactsTab"
+import { Empty, SamplePill } from "@/components/crm/CrmBits"
+import { LabelEditor, LabelList, LabelPill } from "@/components/crm/Labels"
 import { loadSampleData, removeSampleData } from "@/components/crm/onboardingActions"
 import { CRM_TABS, STAGE_DOT, STAGE_LABEL, crmHref, type CrmTab } from "@/components/crm/crmUi"
 import { activityState, agentLabel, formatWhen } from "@/lib/crmActivity"
 import { crmApi, DEAL_STAGES, type Activity, type Company, type Contact, type Deal, type DealStage, type Grant } from "@/lib/crmClient"
 import { agentRecent, isSample, setupChecklist, type ChecklistItem } from "@/lib/crmOnboarding"
+import { getLabels, getSource, hasLabel, isPlausiblePhone, labelCounts, SOURCES, telHref, whatsappHref, withLabels, withSource } from "@/lib/crmLabels"
 import { daysUntil, formatMoney, isPastClose, OPEN_STAGES, pipelineSummary, sharedCurrency, stageTotals } from "@/lib/crmPipeline"
 
 function ownerInitial(o: { owner_agent: string | null }): { label: string; title: string; agent: boolean } {
@@ -69,10 +75,6 @@ function MenuItem({ icon, title, hint, onClick, disabled }: { icon: React.ReactN
   )
 }
 
-function SamplePill() {
-  return <span className="shrink-0 rounded-full bg-white/[0.08] px-1.5 py-px text-[10px] font-medium text-white/60">Sample</span>
-}
-
 function shortDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
   const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso)
@@ -107,6 +109,8 @@ export default function CrmApp() {
   const [error, setError] = useState<string | null>(null)
   const [q, setQ] = useState("")
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [waOpen, setWaOpen] = useState(false)
+  const wa = useWhatsappStatus()
 
   const load = useCallback(async () => {
     try {
@@ -157,6 +161,7 @@ export default function CrmApp() {
   }, [followUps])
   const overdue = useMemo(() => followUps.filter((a) => activityState(a) === "overdue").length, [followUps])
 
+  const knownLabels = useMemo(() => labelCounts([...(companies ?? []), ...(contacts ?? []), ...(deals ?? [])]).map((x) => x.label), [companies, contacts, deals])
   const needle = q.trim().toLowerCase()
   const hit = (...parts: (string | null | undefined)[]) => !needle || parts.some((p) => p?.toLowerCase().includes(needle))
 
@@ -316,6 +321,15 @@ export default function CrmApp() {
             </span>
           )}
           <button
+            type="button"
+            onClick={() => setWaOpen(true)}
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] text-white/55 hover:bg-white/[0.06] hover:text-white/85"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            WhatsApp
+            {wa.status?.connected && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-label="Connected" />}
+          </button>
+          <button
           type="button"
           onClick={() => setSettingsOpen(true)}
           className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] text-white/55 hover:bg-white/[0.06] hover:text-white/85"
@@ -412,7 +426,7 @@ export default function CrmApp() {
           <ActivityFeed names={names} query={q} version={0} onOpen={(s) => router.push(crmHref(s.type, s.id))} onError={setError} />
         ) : tab === "deals" ? (
           <DealsTab
-            deals={deals.filter((d) => hit(d.title, companyName.get(d.company_id ?? "")))}
+            deals={deals.filter((d) => hit(d.title, companyName.get(d.company_id ?? ""), ...getLabels(d.custom_fields)))}
             allDeals={deals}
             companies={companies}
             companyName={companyName}
@@ -424,16 +438,21 @@ export default function CrmApp() {
           />
         ) : tab === "companies" ? (
           <CompaniesTab
-            companies={companies.filter((c) => hit(c.name, c.domain, c.industry))}
+            companies={companies.filter((c) => hit(c.name, c.domain, c.industry, ...getLabels(c.custom_fields)))}
             contacts={contacts}
             deals={deals}
+            knownLabels={knownLabels}
             onCreate={(b) => run(() => crmApi.companies.create(b))}
           />
         ) : (
           <ContactsTab
-            contacts={contacts.filter((c) => hit(c.name, c.email, c.title, companyName.get(c.company_id ?? "")))}
+            contacts={contacts.filter((c) => hit(c.name, c.email, c.phone, c.title, getSource(c.custom_fields), ...getLabels(c.custom_fields), companyName.get(c.company_id ?? "")))}
+            allContacts={contacts}
+            activities={activities}
+            followUps={followUps}
             companies={companies}
             companyName={companyName}
+            knownLabels={knownLabels}
             onCreate={(b) => run(() => crmApi.contacts.create(b))}
           />
         )}
@@ -450,13 +469,17 @@ export default function CrmApp() {
           }}
         />
       )}
-      {importOpen && companies && <ImportDialog companies={companies} onClose={() => setImportOpen(false)} onImported={() => void load()} />}
+      {waOpen && (
+        <Drawer title="WhatsApp" onClose={() => setWaOpen(false)}>
+          <WhatsappSettings status={wa.status} onChanged={wa.refresh} />
+        </Drawer>
+      )}
+      {importOpen && companies && <ImportDialog companies={companies} contacts={contacts ?? []} onClose={() => setImportOpen(false)} onImported={() => void load()} />}
     </div>
   )
 }
 
-function AgentDrawer({ onClose }: { onClose: () => void }) {
-  const [error, setError] = useState<string | null>(null)
+function Drawer({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose()
     window.addEventListener("keydown", onKey)
@@ -465,19 +488,26 @@ function AgentDrawer({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-40">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
-      <aside role="dialog" aria-modal="true" aria-label="Agent access" className="absolute right-0 top-0 flex h-full w-full max-w-[640px] flex-col border-l border-line bg-surface-1 shadow-2xl">
+      <aside role="dialog" aria-modal="true" aria-label={title} className="absolute right-0 top-0 flex h-full w-full max-w-[640px] flex-col border-l border-line bg-surface-1 shadow-2xl">
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <span className="text-[15px] font-medium text-white/90">Agent access</span>
+          <span className="text-[15px] font-medium text-white/90">{title}</span>
           <button onClick={onClose} aria-label="Close" className="text-white/45 hover:text-white/85">
             <X size={16} />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-          {error && <div className="mb-4 rounded-xl bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>}
-          <AgentAccess onError={setError} />
-        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
       </aside>
     </div>
+  )
+}
+
+function AgentDrawer({ onClose }: { onClose: () => void }) {
+  const [error, setError] = useState<string | null>(null)
+  return (
+    <Drawer title="Agent access" onClose={onClose}>
+      {error && <div className="mb-4 rounded-xl bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">{error}</div>}
+      <AgentAccess onError={setError} />
+    </Drawer>
   )
 }
 
@@ -698,6 +728,11 @@ function DealCard({
           {isSample(d) && <SamplePill />}
         </div>
       )}
+      {getLabels(d.custom_fields).length > 0 && (
+        <div className="mt-2">
+          <LabelList labels={getLabels(d.custom_fields)} max={2} />
+        </div>
+      )}
       <div className="mt-2 flex items-center justify-between gap-2 text-[12px]">
         <span className="text-white/85">{d.value !== null ? formatMoney(d.value, d.currency) : <span className="text-white/35">No value</span>}</span>
         {d.expected_close_date && (
@@ -736,16 +771,19 @@ function CompaniesTab({
   companies,
   contacts,
   deals,
+  knownLabels,
   onCreate,
 }: {
   companies: Company[]
   contacts: Contact[]
   deals: Deal[]
-  onCreate: (b: { name: string; domain?: string; industry?: string }) => Promise<boolean>
+  knownLabels: string[]
+  onCreate: (b: { name: string; domain?: string; industry?: string; custom_fields?: Record<string, unknown> }) => Promise<boolean>
 }) {
   const [name, setName] = useState("")
   const [domain, setDomain] = useState("")
   const [industry, setIndustry] = useState("")
+  const [labels, setLabels] = useState<string[]>([])
   const form = useAddForm()
   const nameRef = useRef<HTMLInputElement>(null)
   const people = useMemo(() => {
@@ -766,12 +804,13 @@ function CompaniesTab({
           void form.submit({
             problem: name.trim().length < 2 ? "Enter the company name first." : null,
             focus: nameRef.current,
-            create: () => onCreate({ name: name.trim(), domain, industry }),
+            create: () => onCreate({ name: name.trim(), domain, industry, custom_fields: withLabels({}, labels) }),
             added: `Added ${name.trim()}.`,
             reset: () => {
               setName("")
               setDomain("")
               setIndustry("")
+              setLabels([])
             },
           })
         }}
@@ -780,6 +819,9 @@ function CompaniesTab({
         <input ref={nameRef} value={name} onChange={(e) => { setName(e.target.value); form.clearHint() }} placeholder="Company name" aria-label="Company name" className={`w-[220px] ${fieldClass}`} />
         <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="domain.com" aria-label="Domain" className={`w-[180px] ${fieldClass}`} />
         <input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="Industry" aria-label="Industry" className={`w-[160px] ${fieldClass}`} />
+        <span className={`flex min-h-[38px] min-w-[170px] items-center ${fieldClass} py-1`}>
+          <LabelEditor labels={labels} known={knownLabels} onChange={setLabels} compact />
+        </span>
         <AddButton saving={form.saving} label="Add company" />
         <AddNoteLine note={form.note} />
       </form>
@@ -787,11 +829,12 @@ function CompaniesTab({
         <Empty>No companies yet. Add one above, or let an agent like Lex add them as it qualifies leads.</Empty>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-line">
-          <table className="w-full min-w-[640px] text-left text-[13px]">
+          <table className="w-full min-w-[760px] text-left text-[13px]">
             <thead className="text-[11px] text-white/50">
               <tr className="border-b border-line">
                 <th className="px-4 py-2.5 font-normal">Company</th>
                 <th className="px-4 py-2.5 font-normal">Industry</th>
+                <th className="px-4 py-2.5 font-normal">Labels</th>
                 <th className="px-4 py-2.5 font-normal">People</th>
                 <th className="px-4 py-2.5 font-normal">Open deals</th>
                 <th className="px-4 py-2.5 font-normal">Owner</th>
@@ -811,6 +854,7 @@ function CompaniesTab({
                       {c.domain && <span className="block text-[11px] text-white/45">{c.domain}</span>}
                     </td>
                     <td className="px-4 py-3 text-white/65">{c.industry ?? <span className="text-white/25">—</span>}</td>
+                    <td className="px-4 py-3"><LabelList labels={getLabels(c.custom_fields)} /></td>
                     <td className="px-4 py-3 text-white/65">{people.get(c.id) ?? 0}</td>
                     <td className="px-4 py-3 text-white/65">{od.length ? `${od.length} · ${formatMoney(sum, sharedCurrency(od))}` : <span className="text-white/25">—</span>}</td>
                     <td className="px-4 py-3 text-white/65">{c.owner_agent ? agentLabel(c.owner_agent) : "You"}</td>
@@ -823,107 +867,4 @@ function CompaniesTab({
       )}
     </div>
   )
-}
-
-function ContactsTab({
-  contacts,
-  companies,
-  companyName,
-  onCreate,
-}: {
-  contacts: Contact[]
-  companies: Company[]
-  companyName: Map<string, string>
-  onCreate: (b: { name: string; email?: string; phone?: string; title?: string; company_id?: string }) => Promise<boolean>
-}) {
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [title, setTitle] = useState("")
-  const [companyId, setCompanyId] = useState("")
-  const form = useAddForm()
-  const nameRef = useRef<HTMLInputElement>(null)
-  const emailRef = useRef<HTMLInputElement>(null)
-  return (
-    <div className="mx-auto max-w-[1000px] space-y-5">
-      <form
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault()
-          const badName = name.trim().length < 2
-          const badEmail = email.trim() !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
-          void form.submit({
-            problem: badName ? "Enter the contact’s name first." : badEmail ? "That email doesn’t look right." : null,
-            focus: badName ? nameRef.current : emailRef.current,
-            create: () => onCreate({ name: name.trim(), email: email.trim(), title: title.trim(), company_id: companyId || undefined }),
-            added: `Added ${name.trim()}.`,
-            reset: () => {
-              setName("")
-              setEmail("")
-              setTitle("")
-              setCompanyId("")
-            },
-          })
-        }}
-        className="flex flex-wrap items-center gap-2"
-      >
-        <input ref={nameRef} value={name} onChange={(e) => { setName(e.target.value); form.clearHint() }} placeholder="Full name" aria-label="Full name" className={`w-[180px] ${fieldClass}`} />
-        <input ref={emailRef} type="email" value={email} onChange={(e) => { setEmail(e.target.value); form.clearHint() }} placeholder="Email" aria-label="Email" className={`w-[200px] ${fieldClass}`} />
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" aria-label="Title" className={`w-[140px] ${fieldClass}`} />
-        <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} aria-label="Company" className={`w-[170px] ${fieldClass}`}>
-          <option value="">No company</option>
-          {companies.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <AddButton saving={form.saving} label="Add contact" />
-        <AddNoteLine note={form.note} />
-      </form>
-      {contacts.length === 0 ? (
-        <Empty>No contacts yet.</Empty>
-      ) : (
-        <div className="overflow-x-auto rounded-2xl border border-line">
-          <table className="w-full min-w-[640px] text-left text-[13px]">
-            <thead className="text-[11px] text-white/50">
-              <tr className="border-b border-line">
-                <th className="px-4 py-2.5 font-normal">Name</th>
-                <th className="px-4 py-2.5 font-normal">Company</th>
-                <th className="px-4 py-2.5 font-normal">Email</th>
-                <th className="px-4 py-2.5 font-normal">Phone</th>
-                <th className="px-4 py-2.5 font-normal">Owner</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {contacts.map((c) => (
-                <tr key={c.id} className="hover:bg-white/[0.025]">
-                  <td className="px-4 py-3">
-                    <span className="flex items-center gap-2">
-                      <Link href={crmHref("contact", c.id)} className="text-white/90 hover:underline hover:decoration-white/25 hover:underline-offset-2">{c.name}</Link>
-                      {isSample(c) && <SamplePill />}
-                    </span>
-                    {c.title && <span className="block text-[11px] text-white/45">{c.title}</span>}
-                  </td>
-                  <td className="px-4 py-3 text-white/65">
-                    {c.company_id && companyName.has(c.company_id) ? (
-                      <Link href={crmHref("company", c.company_id)} className="hover:text-white/90">{companyName.get(c.company_id)}</Link>
-                    ) : (
-                      <span className="text-white/25">—</span>
-                    )}
-                  </td>
-                  <td className="max-w-[220px] truncate px-4 py-3 text-white/65">{c.email ?? <span className="text-white/25">—</span>}</td>
-                  <td className="px-4 py-3 text-white/65">{c.phone ?? <span className="text-white/25">—</span>}</td>
-                  <td className="px-4 py-3 text-white/65">{c.owner_agent ? agentLabel(c.owner_agent) : "You"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-2xl border border-dashed border-line px-5 py-10 text-center text-[12px] text-white/40">{children}</div>
 }

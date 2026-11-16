@@ -9,14 +9,14 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Upload, X } from "lucide-react"
 import { Button } from "@/components/requests/requestUi"
 import { runImport, type ImportResult } from "@/components/crm/onboardingActions"
-import type { Company } from "@/lib/crmClient"
+import type { Company, Contact } from "@/lib/crmClient"
 import { buildImportPlan, guessMapping, IMPORT_FIELD_LABEL, IMPORT_FIELDS, MAX_IMPORT_ROWS, parseCsv, type ImportField } from "@/lib/crmOnboarding"
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024
 
 type Step = { kind: "pick" } | { kind: "map"; file: string; header: string[]; rows: string[][] } | { kind: "running"; done: number; total: number } | { kind: "done"; result: ImportResult }
 
-export default function ImportDialog({ companies, onClose, onImported }: { companies: Company[]; onClose: () => void; onImported: () => void }) {
+export default function ImportDialog({ companies, contacts, onClose, onImported }: { companies: Company[]; contacts: Contact[]; onClose: () => void; onImported: () => void }) {
   const [step, setStep] = useState<Step>({ kind: "pick" })
   const [mapping, setMapping] = useState<(ImportField | null)[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -41,8 +41,8 @@ export default function ImportDialog({ companies, onClose, onImported }: { compa
   }
 
   const plan = useMemo(
-    () => (step.kind === "map" ? buildImportPlan(step.rows, mapping, companies.map((c) => c.name)) : null),
-    [step, mapping, companies],
+    () => (step.kind === "map" ? buildImportPlan(step.rows, mapping, companies.map((c) => c.name), contacts) : null),
+    [step, mapping, companies, contacts],
   )
   const hasPerson = mapping.some((m) => m === "name" || m === "first_name" || m === "last_name" || m === "email")
   const hasCompany = mapping.includes("company")
@@ -159,6 +159,7 @@ export default function ImportDialog({ companies, onClose, onImported }: { compa
                 <div className="rounded-xl bg-white/[0.04] px-4 py-3 text-[13px] text-white/80">
                   Will create <span className="font-medium text-white">{plan.contacts.length}</span> {plan.contacts.length === 1 ? "person" : "people"} and{" "}
                   <span className="font-medium text-white">{plan.companies.length}</span> new {plan.companies.length === 1 ? "company" : "companies"}
+                  {plan.duplicates > 0 && <span className="text-white/50"> · {plan.duplicates} already in your CRM (same email or phone), left out</span>}
                   {plan.skipped > 0 && <span className="text-white/50"> · {plan.skipped} rows skipped (empty or over the {MAX_IMPORT_ROWS}-row limit)</span>}.
                 </div>
               )}
