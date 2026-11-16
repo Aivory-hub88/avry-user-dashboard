@@ -15,7 +15,7 @@ vi.mock("@/lib/crmServer", () => ({
 }))
 vi.mock("@/lib/whatsappDrafts", () => ({ getDraftSetting: async () => false, saveDraft: async () => {} }))
 let stored: { userId: string; conn: unknown } | null = null
-vi.mock("@/lib/whatsappConnection", () => ({ getConnectionByToken: async () => stored }))
+vi.mock("@/lib/whatsappConnection", () => ({ getConnectionByToken: async () => stored, aivoryTenant: () => null }))
 
 import { GET, POST } from "./route"
 
