@@ -3,7 +3,7 @@ import { query } from '@/lib/db'
 import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from '@/lib/workspaceAuth'
 import { getDocRole, canWrite } from '@/lib/workspaceAccess'
 import { parseFieldDefs } from '@/lib/workspaceDb'
-import { parseAutomationRules, cleanPeopleFilter, cleanFieldFilters, parseStatusDefs, statusDefsProblem, type StatusDef } from '@/lib/workspaceDbModel'
+import { parseAutomationRules, cleanPeopleFilter, cleanFieldFilters, cleanSortField, parseStatusDefs, statusDefsProblem, type StatusDef } from '@/lib/workspaceDbModel'
 import { restampTaskIndexGroups } from '@/lib/workspaceTaskIndex'
 import { recordWorkspaceActivity } from '@/lib/workspaceActivity'
 
@@ -132,7 +132,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // Kept inside props so one JSONB column holds all per-doc UI state, no extra table.
     if (Array.isArray(src.dbViews)) {
       const kinds = new Set(["table","kanban","calendar"])
-      const sortFields = new Set(["title","status","priority","start","due","assignee"])
       const sortDirs = new Set(["asc","desc"])
       const dueFilters = new Set(["All","Overdue","Today","This week","Next 7 days","No date"])
       const cleanedViews: unknown[] = []
@@ -145,7 +144,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const statusFilter = typeof vv.statusFilter === "string" ? vv.statusFilter.slice(0, 16) : "All"
         const priorityFilter = typeof vv.priorityFilter === "string" ? vv.priorityFilter.slice(0, 16) : "All"
         const q = typeof vv.q === "string" ? vv.q.slice(0, 64) : ""
-        const sortField = sortFields.has(vv.sortField as string) ? (vv.sortField as string) : "title"
+        const sortField = cleanSortField(vv.sortField)
         const sortDir = sortDirs.has(vv.sortDir as string) ? (vv.sortDir as string) : "asc"
         const dueFilter = dueFilters.has(vv.dueFilter as string) ? (vv.dueFilter as string) : "All"
         const peopleFilter = cleanPeopleFilter(vv.peopleFilter)

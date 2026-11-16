@@ -1228,3 +1228,60 @@ export function activeFilterCount(f: { priority: string; due: string; people: st
   const on = (v: string | undefined) => !!v && v !== "All"
   return [f.priority, f.due, f.people].filter(on).length + Object.values(f.fieldFilters).filter(on).length
 }
+
+// ---------------------------------------------------------------------------
+// Sort and search by custom fields.
+// ---------------------------------------------------------------------------
+
+export const FIELD_SORT_PREFIX = "field:"
+const BUILTIN_SORTS: ReadonlySet<string> = new Set(["title", "status", "priority", "start", "due", "assignee"])
+
+/** Field types a table can be sorted by (relation ids and rollups have no useful order). */
+export function isSortableField(def: Pick<FieldDef, "type">): boolean {
+  return def.type !== "relation" && def.type !== "rollup"
+}
+
+/** `field:<id>` for a custom-field sort. */
+export function fieldSortValue(fieldId: string): string {
+  return `${FIELD_SORT_PREFIX}${fieldId}`
+}
+
+/** The field id of a custom-field sort value, or null for the built-in sorts. */
+export function fieldSortId(sortField: string): string | null {
+  return sortField.startsWith(FIELD_SORT_PREFIX) ? sortField.slice(FIELD_SORT_PREFIX.length) || null : null
+}
+
+/** Saved-view sort field: a built-in column or `field:<id>` (anything else → title). */
+export function cleanSortField(v: unknown): string {
+  if (typeof v !== "string") return "title"
+  if (BUILTIN_SORTS.has(v)) return v
+  const id = fieldSortId(v)
+  return id && /^[\w-]{1,16}$/.test(id) ? v : "title"
+}
+
+/**
+ * Compare two rows' cells of one field. Empty cells always sort last, in
+ * either direction. Person cells sort by the first person's name.
+ */
+export function compareFieldCells(def: Pick<FieldDef, "type">, a: CellValue | undefined, b: CellValue | undefined, dir: "asc" | "desc"): number {
+  const sign = dir === "asc" ? 1 : -1
+  const empty = (v: CellValue | undefined) => v === undefined || v === "" || v === false || (Array.isArray(v) && v.length === 0)
+  const ea = empty(a)
+  const eb = empty(b)
+  if (ea || eb) return ea === eb ? 0 : ea ? 1 : -1
+  if (def.type === "number") return (Number(a) - Number(b)) * sign || 0
+  if (def.type === "checkbox") return 0
+  if (def.type === "person") {
+    const fa = cellPeople(a)[0]
+    const fb = cellPeople(b)[0]
+    if (!fa || !fb) return fa === fb ? 0 : fa ? -1 : 1
+    return personLabel(fa).localeCompare(personLabel(fb)) * sign
+  }
+  return cellText(def, a).localeCompare(cellText(def, b)) * sign
+}
+
+/** Does the row's custom-field text (names for person fields) contain `needle` (lower-case)? */
+export function cellsMatchSearch(cells: Record<string, CellValue>, defs: readonly Pick<FieldDef, "id" | "type">[], needle: string): boolean {
+  if (!needle) return true
+  return defs.some((d) => d.type !== "relation" && d.type !== "rollup" && cellText(d, cells[d.id]).toLowerCase().includes(needle))
+}

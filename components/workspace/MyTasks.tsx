@@ -41,6 +41,11 @@ function TaskLine({ t, today }: { t: MyTask; today: string }) {
         <span className="block truncate text-[13px] text-white/85">{t.title}</span>
         <span className="block truncate text-[11.5px] text-white/35">{t.roomTitle}</span>
       </span>
+      {t.fields?.slice(0, 2).map((f) => (
+        <span key={f} className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10.5px] text-white/55" title={`You are set as ${f}`}>
+          {f}
+        </span>
+      ))}
       {t.priority === "High" && <span className="shrink-0 rounded-full bg-red-500/10 px-2 py-0.5 text-[10.5px] text-red-300">High</span>}
       {t.due && <span className={`shrink-0 text-[12px] tabular-nums ${overdue ? "text-red-300" : "text-white/45"}`}>{fmtDue(t.due, today)}</span>}
     </Link>
