@@ -10,13 +10,14 @@ import {
   rowsFromDbDoc,
   getWipLimits,
   getStatusDefs,
+  getFieldDefs,
   wipExceeded,
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
-import { notifyFollowers } from "@/lib/workspaceMentions"
+import { notifyFollowers, recordFieldAssignments } from "@/lib/workspaceMentions"
 import { recordUnblocked } from "@/lib/workspaceTaskEvents"
 import { entersClosed, entersDone, entersInProgress, openBlockers, resolveStatus } from "@/lib/workspaceDbModel"
-import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
+import { automatedFieldAdds, getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
 
 export const runtime = "nodejs"
 
@@ -72,6 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       actorName,
       origin: agentType,
       getRules: () => getAutomationRules(id),
+      getFields: () => getFieldDefs(id),
     })
     await saveDbDoc(id, doc, cred, agentType)
     await recordWorkspaceActivity({
@@ -95,6 +97,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         targetId: rowId,
         metadata: { applied: automated },
       })
+    }
+    // People an automation put on a person field hear about it ("set you as Reviewer").
+    const fieldAdds = automatedFieldAdds(automated)
+    if (fieldAdds.length > 0) {
+      await recordFieldAssignments({ docId: id, rowId, credential: cred, agentType, fields: fieldAdds, title: parseDbRow(m).title })
     }
     // Followers hear when the task lands in a done-group status (after
     // automations, which may move it on); closing it (done or canceled)

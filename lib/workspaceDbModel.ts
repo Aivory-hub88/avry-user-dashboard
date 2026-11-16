@@ -23,6 +23,8 @@ export type FieldDef = {
   rollupOp?: RollupOp
   /** rollup sum: custom number field id in the TARGET doc to total. */
   rollupFieldId?: string
+  /** person: at most one person (picking another replaces; REST rejects more). */
+  single?: boolean
 }
 /** `person` cells hold PersonRef[] (people + agents, like assignees). */
 export type CellValue = string | number | boolean | string[] | PersonRef[]
@@ -90,6 +92,7 @@ export function parseFieldDefs(raw: unknown): FieldDef[] {
     if (relationFieldId) def.relationFieldId = relationFieldId
     if (rollupOp) def.rollupOp = rollupOp
     if (rollupFieldId) def.rollupFieldId = rollupFieldId
+    if (type === "person" && r.single === true) def.single = true
     out.push(def)
   }
   return out
@@ -130,7 +133,7 @@ function cleanCellValue(def: FieldDef, v: unknown): CellValue | undefined {
       return undefined
     case "person":
       // Lenient on write: bad entries drop (REST rejects them first via personCellsProblem).
-      return cleanPersonList(Array.isArray(v) ? v : v === undefined || v === null || v === "" ? [] : [v], MAX_PERSON_CELL)
+      return cleanPersonList(Array.isArray(v) ? v : v === undefined || v === null || v === "" ? [] : [v], personCellLimit(def))
   }
 }
 
@@ -416,9 +419,32 @@ export type AutomationRule = {
   setAssignee?: string
   addComment?: string
   moveTo?: string
+  /** Set a person field on entry: the row's owner / creator, or a fixed person key. */
+  setField?: RuleFieldAction
 }
+export type RuleFieldAction = { fieldId: string; to: string }
 
 export const MAX_AUTOMATIONS = 20
+
+/** Who a `setField` rule resolves to: "owner" | "creator" | a `user:<id>` / `agent:<type>` key. */
+export function cleanRuleFieldTarget(v: unknown): string {
+  if (typeof v !== "string") return ""
+  const t = v.trim()
+  if (t === "owner" || t === "creator") return t
+  const ref = personRefFromKey(t)
+  return ref ? personKey(ref) : ""
+}
+
+function cleanRuleField(v: unknown, fields?: readonly FieldDef[]): RuleFieldAction | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined
+  const r = v as Record<string, unknown>
+  const fieldId = typeof r.fieldId === "string" ? r.fieldId.trim().slice(0, 16) : ""
+  const to = cleanRuleFieldTarget(r.to)
+  if (!fieldId || !to) return undefined
+  // With the room's fields the target must be a person field (a deleted one drops the action).
+  if (fields && !fields.some((f) => f.id === fieldId && f.type === "person")) return undefined
+  return { fieldId, to }
+}
 
 /**
  * Validate raw props.dbAutomations (used by REST + PATCH). With `statuses`,
@@ -426,7 +452,7 @@ export const MAX_AUTOMATIONS = 20
  * PATCH, which never reads before writing) any status-shaped name passes and
  * the runner re-validates against the room's statuses.
  */
-export function parseAutomationRules(raw: unknown, statuses?: readonly StatusDef[]): AutomationRule[] {
+export function parseAutomationRules(raw: unknown, statuses?: readonly StatusDef[], fields?: readonly FieldDef[]): AutomationRule[] {
   const known = (s: string) => (statuses ? statuses.some((d) => d.name === s) : s.length > 0)
   if (!Array.isArray(raw)) return []
   const out: AutomationRule[] = []
@@ -451,7 +477,9 @@ export function parseAutomationRules(raw: unknown, statuses?: readonly StatusDef
     if (moveTo && known(moveTo) && moveTo !== whenStatus) {
       rule.moveTo = moveTo
     }
-    if (rule.setAssignee === undefined && rule.addComment === undefined && rule.moveTo === undefined) continue
+    const setField = cleanRuleField(r.setField, fields)
+    if (setField) rule.setField = setField
+    if (rule.setAssignee === undefined && rule.addComment === undefined && rule.moveTo === undefined && rule.setField === undefined) continue
     seen.add(id)
     out.push(rule)
   }
@@ -1092,7 +1120,7 @@ export function deleteStatusRefs(props: StatusRefProps, name: string, moveTo: st
         delete rest.moveTo
         return rest
       })
-      .filter((r) => r.setAssignee !== undefined || r.addComment !== undefined || r.moveTo !== undefined)
+      .filter((r) => r.setAssignee !== undefined || r.addComment !== undefined || r.moveTo !== undefined || r.setField !== undefined)
   }
   if (props.dbViews?.some((v) => v.statusFilter === name)) {
     out.dbViews = props.dbViews.map((v) => (v.statusFilter === name ? { ...v, statusFilter: "All" } : v))
@@ -1113,6 +1141,11 @@ export function deleteStatusRefs(props: StatusRefProps, name: string, moveTo: st
 // ---------------------------------------------------------------------------
 
 export const MAX_PERSON_CELL = 5
+
+/** How many people a person field holds: 1 when the field is "single person", else MAX_PERSON_CELL. */
+export function personCellLimit(def: Pick<FieldDef, "single">): number {
+  return def.single ? 1 : MAX_PERSON_CELL
+}
 
 /** `user:<id>` / `agent:<type>` → raw ref (validated by cleanPersonRef). */
 export function personRefFromKey(key: string): PersonRef | null {
@@ -1137,7 +1170,7 @@ export function personCellsProblem(cells: unknown, defs: FieldDef[]): PersonCell
     const v = src[def.id]
     if (v === null || v === undefined) continue
     if (!Array.isArray(v)) return { fieldId: def.id, reason: "shape" }
-    if (v.length > MAX_PERSON_CELL) return { fieldId: def.id, reason: "too_many" }
+    if (v.length > personCellLimit(def)) return { fieldId: def.id, reason: "too_many" }
     for (const raw of v) {
       const p = typeof raw === "string" ? personRefFromKey(raw) : cleanPersonRef(raw)
       if (!p) return { fieldId: def.id, reason: "shape" }

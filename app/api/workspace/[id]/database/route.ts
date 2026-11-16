@@ -11,6 +11,7 @@ import {
   dbRowToYMap,
   getWipLimits,
   getFieldDefs,
+  parseDbRow,
   getStatusDefs,
   cleanCells,
   wipExceeded,
@@ -21,7 +22,7 @@ import {
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { indexRow, rowText, workspaceOf } from "@/lib/workspaceIndex"
-import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
+import { automatedFieldAdds, getAutomationRules, mergeFieldAdds, runStatusAutomations } from "@/lib/workspaceAutomations"
 import { recordAssignments, recordFieldAssignments } from "@/lib/workspaceMentions"
 import {
   addFollowers,
@@ -181,6 +182,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       actorName,
       origin: agentType,
       getRules: () => getAutomationRules(id),
+      getFields: () => getFieldDefs(id),
     })
     await saveDbDoc(id, doc, cred, agentType)
     await recordWorkspaceActivity({
@@ -206,8 +208,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
     }
     await recordAssignments({ docId: id, rowId: newRow.id, credential: cred, agentType, added: newRow.assignees, title: newRow.title })
-    if (fieldPeople.length > 0) await recordFieldAssignments({ docId: id, rowId: newRow.id, credential: cred, agentType, fields: fieldPeople, title: newRow.title })
-    const [resolved] = await withResolvedRollups([newRow], fieldDefs, cred, agentType, allowPg)
+    // People set on person fields (by the caller or by an automation) hear about it.
+    const noticed = mergeFieldAdds(fieldPeople, automatedFieldAdds(automated))
+    if (noticed.length > 0) await recordFieldAssignments({ docId: id, rowId: newRow.id, credential: cred, agentType, fields: noticed, title: newRow.title })
+    // Respond with the stored row: an automation may have changed it on entry.
+    const stored = doc.getArray<Y.Map<unknown>>("database").toArray().find((m) => (m.get("id") as string) === newRow.id)
+    const [resolved] = await withResolvedRollups([stored ? parseDbRow(stored) : newRow], fieldDefs, cred, agentType, allowPg)
     // Semantic index (best-effort, never blocks the response).
     void indexRow(id, newRow.id, await workspaceOf(id), rowText(newRow)).catch(() => {})
     return NextResponse.json({ id: newRow.id, row: resolved ?? newRow, agentType }, { status: 201 })

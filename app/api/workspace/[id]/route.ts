@@ -3,6 +3,7 @@ import { query } from '@/lib/db'
 import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from '@/lib/workspaceAuth'
 import { getDocRole, canWrite } from '@/lib/workspaceAccess'
 import { parseFieldDefs } from '@/lib/workspaceDb'
+import type { FieldDef } from '@/lib/workspaceDbModel'
 import { parseAutomationRules, cleanPeopleFilter, cleanFieldFilters, cleanSortField, parseStatusDefs, statusDefsProblem, type StatusDef } from '@/lib/workspaceDbModel'
 import { restampTaskIndexGroups } from '@/lib/workspaceTaskIndex'
 import { recordWorkspaceActivity } from '@/lib/workspaceActivity'
@@ -197,7 +198,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // Automation rules (Fase 4e): validated structurally here; the runner
     // enforces WIP + writes activity at execution time.
     if (Array.isArray(src.dbAutomations)) {
-      propsPatch.dbAutomations = parseAutomationRules(src.dbAutomations, statusDefs)
+      propsPatch.dbAutomations = parseAutomationRules(src.dbAutomations, statusDefs, Array.isArray(propsPatch.dbFields) ? (propsPatch.dbFields as FieldDef[]) : undefined)
     } else if (src.dbAutomations !== undefined) {
       return NextResponse.json({ error: 'props.dbAutomations must be array' }, { status: 400 })
     }
