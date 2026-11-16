@@ -7,8 +7,9 @@
  * usable number.
  */
 import { useEffect, useMemo, useState } from "react"
-import { Check, MessageCircle, Sparkles } from "lucide-react"
+import { Check, Sparkles } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
+import WhatsappIcon from "@/components/crm/WhatsappIcon"
 import { whatsappDigits } from "@/lib/crmLabels"
 import { renderTemplate } from "@/lib/whatsapp/templates"
 import { MAX_TEXT, type WaTemplate } from "@/lib/whatsapp/types"
@@ -111,7 +112,7 @@ export default function WhatsappSend({ contactId, name, phone, onSent }: { conta
   return (
     <div className="rounded-2xl border border-line px-4 py-4">
       <div className="mb-3 flex items-center gap-2 text-[13px] font-medium text-white/85">
-        <MessageCircle size={14} className="text-emerald-300/80" />
+        <WhatsappIcon size={16} brand />
         WhatsApp
         {usable && (
           <button

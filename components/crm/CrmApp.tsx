@@ -10,10 +10,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowRightLeft, ChevronDown, Clock, LayoutGrid, MessageCircle, Phone, Plus, Search, SlidersHorizontal, Sparkles, Upload, X } from "lucide-react"
+import { ArrowRightLeft, ChevronDown, Clock, LayoutGrid, Phone, Plus, Search, SlidersHorizontal, Sparkles, Upload, X } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import { AddButton, AddNoteLine, useAddForm } from "@/components/crm/AddForm"
 import AgentAccess from "@/components/crm/AgentAccess"
+import WhatsappIcon from "@/components/crm/WhatsappIcon"
 import WhatsappSettings from "@/components/crm/WhatsappSettings"
 import { useWhatsappStatus } from "@/lib/whatsappClient"
 import ActivityFeed from "@/components/crm/ActivityFeed"
@@ -325,7 +326,7 @@ export default function CrmApp() {
             onClick={() => setWaOpen(true)}
             className="flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] text-white/55 hover:bg-white/[0.06] hover:text-white/85"
           >
-            <MessageCircle className="h-3.5 w-3.5" />
+            <WhatsappIcon size={14} />
             WhatsApp
             {wa.status?.connected && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-label="Connected" />}
           </button>
