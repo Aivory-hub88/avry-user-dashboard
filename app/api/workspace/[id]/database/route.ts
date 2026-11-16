@@ -22,9 +22,10 @@ import {
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { indexRow, rowText, workspaceOf } from "@/lib/workspaceIndex"
 import { getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
-import { recordAssignments } from "@/lib/workspaceMentions"
+import { recordAssignments, recordFieldAssignments } from "@/lib/workspaceMentions"
 import {
   addFollowers,
+  addedFieldPeople,
   assigneeMirror,
   blockedByProblem,
   cleanAssignees,
@@ -153,6 +154,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const blockedErr = blockedByProblem(rows, newId, blockedBy)
     if (blockedErr) return NextResponse.json({ error: "invalid blockedBy", reason: blockedErr }, { status: 400 })
     const creator = actorRef(cred, agentType)
+    const cells = cleanCells(body.cells, fieldDefs)
+    const fieldPeople = addedFieldPeople({}, cells, fieldDefs)
     // A person creating a task owns it unless they named another owner.
     const owner = input.owner ?? (creator?.kind === "user" ? creator : null)
     const newRow: DbRow = {
@@ -164,9 +167,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       createdBy: creator,
       createdAt: new Date().toISOString(),
       // Creator, owner and assignees follow the task from the start.
-      followers: addFollowers([], [creator, owner, ...input.assignees]),
+      followers: addFollowers([], [creator, owner, ...input.assignees, ...fieldPeople.flatMap((f) => f.added)]),
       comments: [],
-      cells: cleanCells(body.cells, fieldDefs),
+      cells,
     }
     doc.transact(() => doc.getArray<Y.Map<unknown>>("database").push([dbRowToYMap(newRow)]), agentType)
     const actorName = cred.kind === "service" ? agentType.replace(/_/g, " ") : (cred.user.email ?? cred.user.user_id)
@@ -203,6 +206,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
     }
     await recordAssignments({ docId: id, rowId: newRow.id, credential: cred, agentType, added: newRow.assignees, title: newRow.title })
+    if (fieldPeople.length > 0) await recordFieldAssignments({ docId: id, rowId: newRow.id, credential: cred, agentType, fields: fieldPeople, title: newRow.title })
     const [resolved] = await withResolvedRollups([newRow], fieldDefs, cred, agentType, allowPg)
     // Semantic index (best-effort, never blocks the response).
     void indexRow(id, newRow.id, await workspaceOf(id), rowText(newRow)).catch(() => {})

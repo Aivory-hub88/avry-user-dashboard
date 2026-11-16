@@ -17,9 +17,11 @@ import {
   MAX_DESCRIPTION_LEN,
 } from "@/lib/workspaceDb"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
-import { syncDescriptionMentions, recordAssignments } from "@/lib/workspaceMentions"
+import { syncDescriptionMentions, recordAssignments, recordFieldAssignments } from "@/lib/workspaceMentions"
 import {
   addFollowers,
+  addedFieldPeople,
+  type FieldDef,
   addedAssignees,
   assigneeMirror,
   blockedByProblem,
@@ -175,8 +177,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // fields must not clobber each other. Defs load BEFORE the transaction
     // (yrs transactions are sync-only, no awaits inside).
     let mergedCells: Record<string, CellValue> | null = null
+    let cellDefs: FieldDef[] = []
     if (patch.cells !== undefined) {
       const defs = await getFieldDefs(id)
+      cellDefs = defs
       // Person fields are strict (a typo'd ref must not silently clear a reviewer).
       const bad = personCellsProblem(patch.cells, defs)
       if (bad) return NextResponse.json({ error: "invalid cells", field: bad.fieldId, reason: bad.reason }, { status: 400 })
@@ -197,9 +201,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (people.owner !== undefined) m.set("owner", people.owner)
       if (parentId !== undefined) m.set("parentId", parentId)
       if (blockedBy !== undefined) m.set("blockedBy", blockedBy)
-      // New owner / assignees start following the task.
-      if (people.owner || (Array.isArray(people.assignees) && people.assignees.length > 0)) {
-        const add = [people.owner ?? null, ...(Array.isArray(people.assignees) ? people.assignees : [])]
+      // New owner / assignees / person-field people start following the task.
+      const fieldAdds = mergedCells ? addedFieldPeople(prevRow.cells, mergedCells, cellDefs).flatMap((f) => f.added) : []
+      if (people.owner || (Array.isArray(people.assignees) && people.assignees.length > 0) || fieldAdds.length > 0) {
+        const add = [people.owner ?? null, ...(Array.isArray(people.assignees) ? people.assignees : []), ...fieldAdds]
         m.set("followers", addFollowers(prevRow.followers, add))
       }
     }, agentType)
@@ -219,6 +224,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const added = addedAssignees(prevAssignees, afterRow.assignees)
     if (added.length > 0) {
       await recordAssignments({ docId: id, rowId, credential: cred, agentType, added, title: afterRow.title })
+    }
+    // Person fields: tell the people newly set on them ("set you as Reviewer").
+    if (mergedCells) {
+      const fields = addedFieldPeople(prevRow.cells, afterRow.cells, cellDefs)
+      if (fields.length > 0) await recordFieldAssignments({ docId: id, rowId, credential: cred, agentType, fields, title: afterRow.title })
     }
     // Status / due / owner get their own activity entries (+ follower
     // notices); the generic "updated" entry covers the remaining fields.

@@ -1180,3 +1180,51 @@ export function cellText(def: Pick<FieldDef, "type">, v: CellValue | undefined):
   if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string").join(", ")
   return String(v)
 }
+
+// ---------------------------------------------------------------------------
+// "Set you as Reviewer" notices (inbox source `field_assigned`). The inbox row
+// has one text column, so the excerpt carries "<field name>\n<task title>".
+// ---------------------------------------------------------------------------
+
+export type FieldPeopleAdded = { fieldId: string; fieldName: string; added: PersonRef[] }
+
+/**
+ * People newly set on each person field between two cell maps (`prev` may be
+ * empty for a new task). Order follows `defs`; fields with nobody new are left out.
+ */
+export function addedFieldPeople(
+  prev: Record<string, CellValue> | undefined,
+  next: Record<string, CellValue> | undefined,
+  defs: readonly FieldDef[],
+): FieldPeopleAdded[] {
+  const out: FieldPeopleAdded[] = []
+  for (const def of defs) {
+    if (def.type !== "person") continue
+    const added = addedAssignees(cellPeople(prev?.[def.id]), cellPeople(next?.[def.id]))
+    if (added.length > 0) out.push({ fieldId: def.id, fieldName: def.name, added })
+  }
+  return out
+}
+
+/** Inbox excerpt of a `field_assigned` notice. */
+export function fieldNoticeExcerpt(fieldName: string, title: string): string {
+  const f = fieldName.replace(/\s+/g, " ").trim().slice(0, 60) || "a field"
+  return `${f}\n${(title.trim() || "Untitled").replace(/\s+/g, " ").slice(0, 138)}`
+}
+
+/** Splits a `field_assigned` excerpt back into field name and task title (no field → null). */
+export function parseFieldNotice(excerpt: string): { field: string; title: string } | null {
+  const i = excerpt.indexOf("\n")
+  if (i <= 0) return null
+  return { field: excerpt.slice(0, i), title: excerpt.slice(i + 1) }
+}
+
+/**
+ * How many of the secondary task filters (priority, due, people, one per
+ * person field) are set — the badge on the toolbar's "Filters" button.
+ * Status and search live outside the popover and aren't counted.
+ */
+export function activeFilterCount(f: { priority: string; due: string; people: string; fieldFilters: Record<string, string> }): number {
+  const on = (v: string | undefined) => !!v && v !== "All"
+  return [f.priority, f.due, f.people].filter(on).length + Object.values(f.fieldFilters).filter(on).length
+}

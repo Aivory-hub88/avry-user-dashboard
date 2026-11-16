@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react"
 import * as Y from "yjs"
 import { WebsocketProvider } from "y-websocket"
 import { Table, Kanban, Plus, GripVertical, Calendar, User, Search, ArrowUpNarrowWide, BookmarkPlus, Trash2, Upload, LayoutTemplate, Zap, Bell, BellOff, ChevronRight, ListChecks, Ban, CornerDownRight } from "lucide-react"
+import TaskFilters from "@/components/workspace/TaskFilters"
 import { collabAuthHeaders, collabWsParams } from "@/lib/collabClient"
 import {
   readCells,
@@ -604,6 +605,12 @@ export default function WorkspaceDatabase({
   // Custom fields (Fase 3b): definitions in pg props.dbFields, values in row cells.
   const [fields, setFields] = useState<FieldDef[]>([])
   const personFields = fields.filter((f) => f.type === "person")
+  const clearSecondaryFilters = () => {
+    setPriorityFilter("All")
+    setDueFilter("All")
+    setPeopleFilter("All")
+    setFieldFilters({})
+  }
   // Filters of person fields that still exist (a deleted field's filter is ignored).
   const activeFieldFilters: Record<string, string> = Object.fromEntries(
     personFields.map((f) => [f.id, fieldFilters[f.id] ?? "All"]).filter(([, v]) => v !== "All"),
@@ -858,7 +865,11 @@ export default function WorkspaceDatabase({
     const cells = { ...row.cells }
     if (value === undefined) delete cells[fieldId]
     else cells[fieldId] = value
-    updateRow(rowId, { cells })
+    // People newly set on a person field follow the task and hear about it.
+    const def = fields.find((f) => f.id === fieldId)
+    const added = def?.type === "person" ? addedAssignees(cellPeople(row.cells[fieldId]), cellPeople(value)) : []
+    updateRow(rowId, { cells, ...(added.length > 0 ? { followers: addFollowers(row.followers, added) } : {}) })
+    if (added.length > 0) postEvent(rowId, { kind: "field", fieldId, from: cellPeople(row.cells[fieldId]) })
   }
 
   const persistTemplates = async (next: DbTemplate[]) => {
@@ -1769,7 +1780,7 @@ export default function WorkspaceDatabase({
       {viewsLoaded && (
         <div className="mb-3 flex items-center gap-1.5 overflow-x-auto pb-1">
           <button
-            onClick={() => { setActiveViewId(null); setView("table"); setStatusFilter("All"); setPriorityFilter("All"); setDueFilter("All"); setPeopleFilter("All"); setQ(""); setSortField("title"); setSortDir("asc") }}
+            onClick={() => { setActiveViewId(null); setView("table"); setStatusFilter("All"); clearSecondaryFilters(); setQ(""); setSortField("title"); setSortDir("asc") }}
             className={`shrink-0 rounded-full border px-3 py-1 text-[12px] ${activeViewId === null ? "border-white bg-white text-black" : "border-line bg-white/[0.04] text-white/50 hover:text-white/80"}`}
           >
             All
@@ -1868,86 +1879,6 @@ export default function WorkspaceDatabase({
                 ))}
               </select>
               <span className="text-white/10">|</span>
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                className="bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none"
-              >
-                <option value="All">All priority</option>
-                {PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-              <span className="text-white/10">|</span>
-              <select
-                value={dueFilter}
-                onChange={(e) => setDueFilter(e.target.value)}
-                title="Filter by due date"
-                className="bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none"
-              >
-                {DUE_FILTERS.map((d) => (
-                  <option key={d} value={d}>{d === "All" ? "All dates" : d}</option>
-                ))}
-              </select>
-              <span className="text-white/10">|</span>
-              <select
-                value={peopleFilter}
-                onChange={(e) => setPeopleFilter(e.target.value)}
-                title="Filter by assignee — Me also matches tasks you own"
-                aria-label="Filter by person"
-                className="max-w-[130px] bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none"
-              >
-                <option value="All">All people</option>
-                {selfId && <option value="me">Me</option>}
-                <option value="unassigned">Unassigned</option>
-                {people.length > 0 && (
-                  <optgroup label="People">
-                    {people.map((p) => (
-                      <option key={p.id} value={`user:${p.id}`}>{p.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {agents.length > 0 && (
-                  <optgroup label="Agents">
-                    {agents.map((a) => (
-                      <option key={a.type} value={`agent:${a.type}`}>{a.name}</option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-              {personFields.map((f) => (
-                <span key={f.id} className="contents">
-                  <span className="text-white/10">|</span>
-                  <select
-                    value={activeFieldFilters[f.id] ?? "All"}
-                    onChange={(e) => setFieldFilters((prev) => ({ ...prev, [f.id]: e.target.value }))}
-                    title={`Filter by ${f.name}`}
-                    aria-label={`Filter by ${f.name}`}
-                    className="max-w-[130px] bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none"
-                  >
-                    <option value="All">Any {f.name}</option>
-                    {selfId && <option value="me">{f.name}: Me</option>}
-                    <option value="unassigned">No {f.name}</option>
-                    {people.length > 0 && (
-                      <optgroup label="People">
-                        {people.map((p) => (
-                          <option key={p.id} value={`user:${p.id}`}>{p.name}</option>
-                        ))}
-                      </optgroup>
-                    )}
-                    {agents.length > 0 && (
-                      <optgroup label="Agents">
-                        {agents.map((a) => (
-                          <option key={a.type} value={`agent:${a.type}`}>{a.name}</option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </select>
-                </span>
-              ))}
-              <span className="text-white/10">|</span>
               <select value={sortField} onChange={(e) => setSortField(e.target.value)} className="bg-transparent px-2 py-1 text-[12px] text-white/60 outline-none">
                 <option value="title">Title</option>
                 <option value="status">Status</option>
@@ -1960,6 +1891,21 @@ export default function WorkspaceDatabase({
                 <ArrowUpNarrowWide className={`h-3.5 w-3.5 transition ${sortDir === "desc" ? "rotate-180" : ""}`} />
               </button>
             </div>
+            <TaskFilters
+              priority={priorityFilter}
+              due={dueFilter}
+              people={peopleFilter}
+              fieldFilters={activeFieldFilters}
+              personFields={personFields}
+              members={people}
+              agents={agents}
+              selfId={selfId}
+              onPriority={setPriorityFilter}
+              onDue={setDueFilter}
+              onPeople={setPeopleFilter}
+              onFieldFilter={(id, v) => setFieldFilters((prev) => ({ ...prev, [id]: v }))}
+              onClear={clearSecondaryFilters}
+            />
             {!readOnly && templates.length > 0 && (
               <select
                 onChange={(e) => {
