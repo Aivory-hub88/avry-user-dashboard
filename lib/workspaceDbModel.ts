@@ -25,6 +25,13 @@ export type FieldDef = {
   rollupFieldId?: string
   /** person: at most one person (picking another replaces; REST rejects more). */
   single?: boolean
+  /**
+   * "Required before Done": moving a task into a done-group status while this
+   * cell is empty is allowed but warned about (`warning: "required_fields"` on
+   * REST move/PATCH, a notice in the UI) — a soft rule like "blocked", not a 400.
+   * Not for rollups (computed).
+   */
+  requiredForDone?: boolean
 }
 /** `person` cells hold PersonRef[] (people + agents, like assignees). */
 export type CellValue = string | number | boolean | string[] | PersonRef[]
@@ -93,6 +100,7 @@ export function parseFieldDefs(raw: unknown): FieldDef[] {
     if (rollupOp) def.rollupOp = rollupOp
     if (rollupFieldId) def.rollupFieldId = rollupFieldId
     if (type === "person" && r.single === true) def.single = true
+    if (type !== "rollup" && r.requiredForDone === true) def.requiredForDone = true
     out.push(def)
   }
   return out
@@ -1050,6 +1058,47 @@ export function resolveStatus(statuses: readonly StatusDef[], input: unknown): s
 /** Entering the done group from outside it (follower notice, unblocked notice). */
 export function entersDone(statuses: readonly StatusDef[], from: string, to: string): boolean {
   return isDoneStatus(statuses, to) && !isDoneStatus(statuses, from)
+}
+
+/**
+ * Is a custom cell filled in? Text/url non-blank, number finite (0 counts),
+ * date/select non-empty, checkbox ticked, multi/relation/person non-empty.
+ */
+export function isCellFilled(def: Pick<FieldDef, "type">, v: CellValue | undefined): boolean {
+  if (v === undefined || v === null) return false
+  switch (def.type) {
+    case "checkbox":
+      return v === true
+    case "number":
+      return typeof v === "number" && Number.isFinite(v)
+    case "person":
+      return cellPeople(v).length > 0
+    case "multi":
+    case "relation":
+      return Array.isArray(v) && v.length > 0
+    case "rollup":
+      return true
+    default:
+      return typeof v === "string" && v.trim() !== ""
+  }
+}
+
+/** Fields marked "required before Done" whose cell is still empty. */
+export function missingRequiredFields(defs: readonly FieldDef[], cells: Record<string, CellValue> | undefined): { id: string; name: string }[] {
+  return defs
+    .filter((d) => d.requiredForDone && d.type !== "rollup" && !isCellFilled(d, cells?.[d.id]))
+    .map((d) => ({ id: d.id, name: d.name }))
+}
+
+/** Required fields still empty when a task enters the done group (empty otherwise). */
+export function missingOnDone(
+  statuses: readonly StatusDef[],
+  defs: readonly FieldDef[],
+  from: string,
+  to: string,
+  cells: Record<string, CellValue> | undefined,
+): { id: string; name: string }[] {
+  return entersDone(statuses, from, to) ? missingRequiredFields(defs, cells) : []
 }
 
 /** Entering a closed group (done or canceled) from an open one: frees blocked tasks. */

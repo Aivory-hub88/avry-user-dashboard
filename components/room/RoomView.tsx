@@ -175,9 +175,9 @@ export default function RoomView({
 
   const people: RoomPerson[] = useMemo(() => {
     const out = new Map<string, RoomPerson>()
-    if (members?.owner) out.set(members.owner.id, { id: members.owner.id, name: nameById.get(members.owner.id) ?? "Owner", role: "Owner" })
+    if (members?.owner) out.set(members.owner.id, { id: members.owner.id, name: nameById.get(members.owner.id) ?? "Owner", role: "Owner", email: members.owner.email ?? undefined })
     for (const p of [...(members?.team ?? []), ...(members?.users ?? [])])
-      if (!out.has(p.id)) out.set(p.id, { id: p.id, name: nameById.get(p.id) ?? "Member", role: ROLE_LABEL[p.role] ?? p.role })
+      if (!out.has(p.id)) out.set(p.id, { id: p.id, name: nameById.get(p.id) ?? "Member", role: ROLE_LABEL[p.role] ?? p.role, email: p.email ?? undefined })
     return [...out.values()]
   }, [members, nameById])
 

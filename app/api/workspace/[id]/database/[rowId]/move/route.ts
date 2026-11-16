@@ -16,7 +16,7 @@ import {
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { notifyFollowers, recordFieldAssignments } from "@/lib/workspaceMentions"
 import { recordUnblocked } from "@/lib/workspaceTaskEvents"
-import { entersClosed, entersDone, entersInProgress, openBlockers, resolveStatus } from "@/lib/workspaceDbModel"
+import { entersClosed, entersDone, entersInProgress, missingOnDone, openBlockers, resolveStatus } from "@/lib/workspaceDbModel"
 import { automatedFieldAdds, getAutomationRules, runStatusAutomations } from "@/lib/workspaceAutomations"
 
 export const runtime = "nodejs"
@@ -115,13 +115,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
     // Moving a blocked task into an in-progress status is allowed, but the caller is told.
     const waitingOn = entersInProgress(statuses, from, after.status) ? openBlockers(rowsFromDbDoc(doc), after, statuses).map((b) => ({ id: b.id, title: b.title, status: b.status })) : []
+    // Same for a done-group status while a "required before Done" field is empty
+    // (soft on purpose: UI edits write Yjs directly and can't be gated, and a 400
+    // would strand agents/MCP callers). `warning: "blocked"` wins when both apply.
+    const missing = entersDone(statuses, from, after.status) ? missingOnDone(statuses, await getFieldDefs(id), from, after.status, after.cells) : []
     return NextResponse.json({
       id: rowId,
       status,
       moved: true,
       from,
       automated: automated.length > 0 ? automated : undefined,
-      ...(waitingOn.length > 0 ? { warning: "blocked", blockedBy: waitingOn } : {}),
+      ...(waitingOn.length > 0 ? { warning: "blocked", blockedBy: waitingOn } : missing.length > 0 ? { warning: "required_fields" } : {}),
+      ...(missing.length > 0 ? { missingFields: missing } : {}),
     })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })

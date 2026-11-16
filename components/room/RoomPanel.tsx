@@ -32,6 +32,8 @@ const AUTONOMY: { value: Autonomy; label: string; hint: string }[] = [
 export interface RoomPerson {
   id: string
   name: string
+  /** For CSV export/import of person cells. */
+  email?: string
   role: string
 }
 

@@ -30,7 +30,9 @@ import {
   cleanOwner,
   cleanParentId,
   descendantIds,
+  entersDone,
   entersInProgress,
+  missingRequiredFields,
   openBlockers,
   resolveStatus,
   parentProblem,
@@ -293,6 +295,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       changes.some((c) => c.kind === "status" && entersInProgress(statuses, c.from, c.to))
         ? openBlockers(rowsFromDbDoc(doc), afterRow, statuses).map((b) => ({ id: b.id, title: b.title, status: b.status }))
         : []
+    // A done-group status with a "required before Done" field empty: allowed, but flagged.
+    const missing = changes.some((c) => c.kind === "status" && entersDone(statuses, c.from, c.to))
+      ? missingRequiredFields(await getFieldDefs(id), afterRow.cells)
+      : []
     return NextResponse.json({ id: rowId, patched: {
       ...clean,
       ...(people.assignees !== undefined ? { assignee: afterRow.assignee, assignees: afterRow.assignees } : {}),
@@ -300,7 +306,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ...(parentId !== undefined ? { parentId: afterRow.parentId } : {}),
       ...(blockedBy !== undefined ? { blockedBy: afterRow.blockedBy } : {}),
     }, ...(mergedCells ? { cells: mergedCells } : {}), rollups: resolved?.cells ?? {},
-    ...(waitingOn.length > 0 ? { warning: "blocked", blockedBy: waitingOn } : {}) })
+    ...(waitingOn.length > 0 ? { warning: "blocked", blockedBy: waitingOn } : missing.length > 0 ? { warning: "required_fields" } : {}),
+    ...(missing.length > 0 ? { missingFields: missing } : {}) })
   } catch (e) {
     if (e instanceof WorkspaceDenied) return NextResponse.json({ error: "forbidden" }, { status: e.status })
     console.error("[workspace/database PATCH]", e)
