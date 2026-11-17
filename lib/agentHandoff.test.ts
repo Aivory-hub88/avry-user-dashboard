@@ -96,3 +96,29 @@ describe("linkAgentMentions", () => {
     expect(linkAgentMentions("@geno lalu @LEX", team)).toBe("[@geno](#agent:autonomous) lalu [@LEX](#agent:leads_qualifier)")
   })
 })
+
+describe("extractReportTargets", () => {
+  const cs = [
+    { type: "leads_qualifier", name: "Lex" },
+    { type: "chief_of_staff", name: "Aira" },
+    { type: "finance_invoice_ops", name: "Finn" },
+  ]
+  it("finds who the human asked to be informed", async () => {
+    const { extractReportTargets } = await import("./agentHandoff")
+    expect(extractReportTargets("@Lex riset page CRM Aivory dan lapor ke Aira ya", cs, "leads_qualifier")).toEqual(["chief_of_staff"])
+    expect(extractReportTargets("Lex, research it and report back to Aira", cs, "leads_qualifier")).toEqual(["chief_of_staff"])
+    expect(extractReportTargets("tolong kabari Finn kalau selesai", cs, "leads_qualifier")).toEqual(["finance_invoice_ops"])
+  })
+  it("ignores the agent itself, unknown names and plain mentions", async () => {
+    const { extractReportTargets } = await import("./agentHandoff")
+    expect(extractReportTargets("lapor ke Lex", cs, "leads_qualifier")).toEqual([])
+    expect(extractReportTargets("lapor ke Budi", cs, "leads_qualifier")).toEqual([])
+    expect(extractReportTargets("Aira lagi apa?", cs, "leads_qualifier")).toEqual([])
+  })
+  it("planHandoffs hands to implied targets without an @ in the reply", async () => {
+    const { planHandoffs } = await import("./agentHandoff")
+    const st = { depth: 0, usedPerAgent: { leads_qualifier: 1 }, usedTotal: 1, implied: ["chief_of_staff"] }
+    expect(planHandoffs("Aira, gue baru buka page CRM", cs, "leads_qualifier", st)).toEqual(["chief_of_staff"])
+    expect(planHandoffs("selesai", cs, "leads_qualifier", { ...st, depth: 2 })).toEqual([])
+  })
+})

@@ -9,7 +9,7 @@ import { buildUserContextState, formatUserContextForAI } from "@/lib/userContext
 import { sendAgentMessage, toolStatusLabel, type ConsolePendingApproval } from '@/lib/agentChat'
 import { applyToolEvent, closeSteps, type ActivityStep } from '@/lib/agentActivity'
 import { notifyApprovalsChanged } from '@/lib/agentApprovals'
-import { planHandoffs } from '@/lib/agentHandoff'
+import { extractReportTargets, planHandoffs } from '@/lib/agentHandoff'
 import { isIndependentRound, MAX_PARALLEL_TURNS, roundRunsInParallel, runRoundTurns } from '@/lib/roomRound'
 import { agentAwaitingApproval, agentNameOf, buildRoomPayload, candidateOf, roomTurnText, type MentionCandidate, type RoomHistoryEntry, type RoundIntent } from '@/lib/agentMentions'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
@@ -593,6 +593,10 @@ export function useChat({
             usedPerAgent,
             usedTotal: turns.length,
             queued: turns.slice(qi + 1).map(x => x.agent),
+            // "lapor ke Aira": the human's own turns only, and never someone already answering this round.
+            implied: turn.depth === 0 && !turn.handoff
+              ? extractReportTargets(displayText, roomMembersRef.current, t).filter(x => !turns.some(y => y.agent === x))
+              : [],
           })
           for (const agent of next) {
             const handed: RoomTurn = {
