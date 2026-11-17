@@ -496,6 +496,7 @@ export default function CustomizeAgentModal({
   // channel goes live, not as a competing entry point.
   const [deployView, setDeployView] = useState<'channels' | 'telegram' | 'slack' | 'discord' | 'api'>('channels');
   const [deployLink, setDeployLink] = useState<DeployLink | null>(null);
+  const [telegramTarget, setTelegramTarget] = useState<'private' | 'group'>('private');
   const [slackLink, setSlackLink] = useState<SlackDeployLink | null>(null);
   const [slackTeamId, setSlackTeamId] = useState<string | null>(null);
   const [discordLink, setDiscordLink] = useState<DiscordDeployLink | null>(null);
@@ -624,12 +625,12 @@ export default function CustomizeAgentModal({
     }
   };
 
-  const startTelegramDeploy = async () => {
+  const startTelegramDeploy = async (target: 'private' | 'group' = telegramTarget) => {
     if (!agentType) return;
     setDeployLoading(true);
     setDeployError(null);
     try {
-      const link = await createDeployLink(agentType as any);
+      const link = await createDeployLink(agentType as any, target);
       setDeployLink(link);
       setLinkStatus('pending');
       setDeployView('telegram');
@@ -1879,7 +1880,7 @@ export default function CustomizeAgentModal({
                   </button>
 
                   <button
-                    onClick={startTelegramDeploy}
+                    onClick={() => startTelegramDeploy()}
                     disabled={!agentType || deployLoading}
                     className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -2064,6 +2065,27 @@ export default function CustomizeAgentModal({
                     : <>{t('telegramScanPre')}<strong className="text-white font-medium">{deployLink.agent_name}</strong>{t('telegramScanPost')}</>}
                 </p>
 
+                {linkStatus !== 'connected' && (
+                  <div className="flex p-0.5 mb-4 rounded-lg bg-white/5 border border-white/5 w-full" role="tablist" aria-label={t('telegramTargetLabel')}>
+                    {(['private', 'group'] as const).map((target) => (
+                      <button
+                        key={target}
+                        role="tab"
+                        aria-selected={telegramTarget === target}
+                        disabled={deployLoading}
+                        onClick={() => {
+                          if (target === telegramTarget) return;
+                          setTelegramTarget(target);
+                          startTelegramDeploy(target);
+                        }}
+                        className={`flex-1 py-1.5 rounded-md text-[12px] transition-colors ${telegramTarget === target ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white/80'}`}
+                      >
+                        {target === 'private' ? t('telegramTargetPrivate') : t('telegramTargetGroup')}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className="flex flex-col items-center">
                   {linkStatus === 'connected' ? (
                     <div className="w-[216px] h-[216px] rounded-2xl bg-accent/10 border border-accent/30 flex flex-col items-center justify-center gap-3">
@@ -2080,7 +2102,7 @@ export default function CustomizeAgentModal({
                       {linkStatus === 'expired' && (
                         <div className="absolute inset-0 flex items-center justify-center">
                           <button
-                            onClick={startTelegramDeploy}
+                            onClick={() => startTelegramDeploy()}
                             disabled={deployLoading}
                             className="px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-accent/50 transition-all"
                           >
@@ -2105,6 +2127,9 @@ export default function CustomizeAgentModal({
                       >
                         {t('openInTelegramDevice')}
                       </a>
+                      {telegramTarget === 'group' && (
+                        <p className="mt-4 text-white/40 text-[12px] leading-relaxed text-center">{t('telegramGroupHint')}</p>
+                      )}
                     </>
                   )}
                 </div>
