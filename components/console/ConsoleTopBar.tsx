@@ -1,4 +1,4 @@
-import { Bot, Terminal } from "lucide-react"
+import { Bot, Plus, Terminal } from "lucide-react"
 import { useMode } from "@/contexts/ModeContext"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
 import type { AgentTeam } from "@/lib/agentTeams"
@@ -44,9 +44,10 @@ function GroupBar({
       <button
         type="button"
         onClick={onNewGroup}
-        className="shrink-0 rounded-full border border-[#b7cba6]/40 bg-[#b7cba6]/10 px-3 py-[3px] text-[11px] font-medium text-[#b7cba6] transition-colors hover:bg-[#b7cba6]/20"
+        className="flex shrink-0 items-center gap-1.5 rounded-full border border-dashed border-white/25 px-3 py-1 text-[11px] font-medium text-white/70 transition-all duration-200 hover:border-solid hover:border-white/40 hover:bg-white/[0.06] hover:text-white active:scale-95"
       >
-        + Create group of agents
+        <Plus size={12} strokeWidth={2.5} />
+        Create group
       </button>
       {teams.map((t) => {
         const on = t.id === teamId
@@ -57,10 +58,13 @@ function GroupBar({
               aria-pressed={on}
               onClick={() => onTeamChange(on ? null : t.id)}
               title={on ? "Back to all agents" : `Use ${t.name} in this room`}
-              className={`rounded-full border px-3 py-[3px] text-[11px] font-medium transition-colors ${
-                on ? "border-white bg-white text-black" : "border-white/10 bg-white/[0.04] text-white/60 hover:text-white/90"
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-all duration-200 active:scale-95 ${
+                on
+                  ? "border-white bg-white text-black shadow-[0_0_0_3px_rgba(255,255,255,0.08)]"
+                  : "border-white/10 bg-white/[0.03] text-white/60 hover:border-white/20 hover:bg-white/[0.06] hover:text-white/90"
               }`}
             >
+              <span className={`h-1.5 w-1.5 rounded-full ${on ? "bg-black/60" : "bg-white/25"}`} />
               {t.name}
             </button>
             {on && onEditGroup && (
@@ -102,7 +106,12 @@ export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, r
           </span>
         )}
         {onChatModeChange && (
-          <span className="ml-2 flex items-center rounded-full border border-white/10 bg-white/[0.04] p-[3px]" role="tablist" aria-label="Chat mode">
+          <span className="relative ml-2 grid grid-cols-2 items-center rounded-full border border-white/10 bg-black/30 p-[3px] shadow-inner" role="tablist" aria-label="Chat mode">
+            <span
+              aria-hidden
+              className="absolute inset-y-[3px] left-[3px] w-[calc(50%-3px)] rounded-full bg-white shadow-[0_1px_6px_rgba(0,0,0,0.45)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+              style={{ transform: chatMode === "room" ? "translateX(100%)" : "translateX(0)" }}
+            />
             {(["direct", "room"] as const).map((m) => (
               <button
                 key={m}
@@ -110,8 +119,8 @@ export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, r
                 aria-selected={chatMode === m}
                 onClick={() => onChatModeChange(m)}
                 title={m === "room" ? "Mission Control chat room — @mention deployed agents" : "Direct chat"}
-                className={`rounded-full px-3 py-[3px] text-[11px] font-medium transition-colors ${
-                  chatMode === m ? "bg-white text-black" : "text-white/50 hover:text-white/85"
+                className={`relative z-10 whitespace-nowrap rounded-full px-3.5 py-1 text-center text-[11px] font-semibold transition-colors duration-200 ${
+                  chatMode === m ? "text-black" : "text-white/50 hover:text-white/85"
                 }`}
               >
                 {m === "direct" ? "Direct" : `Room${roomCount > 0 ? ` · ${roomCount}` : ""}`}

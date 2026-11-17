@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { User as UserIcon } from 'lucide-react'
+import { ChevronsUpDown, User as UserIcon } from 'lucide-react'
 import { logout, getUser } from '@/lib/auth'
 import { getMarketingUrl } from '@/lib/config'
 import { planLabel } from '@/lib/tiers'
@@ -80,25 +80,26 @@ export function UserProfile() {
 
   return (
     <>
-      <button
-        onClick={() => openSettingsModal()}
-        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors border-t border-white/5 text-left group"
-      >
-        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 shrink-0">
-          <UserIcon size={16} strokeWidth={2} />
-        </div>
-        <div className="flex-1 min-w-0 overflow-hidden">
-          <p className="text-sm font-semibold text-white truncate">{displayUsername}</p>
-          <p className="text-[11px] font-bold text-accent uppercase tracking-wider">{displayTier}</p>
-        </div>
-        <div className="text-white/30 group-hover:text-white/70 transition-colors">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="1"></circle>
-            <circle cx="19" cy="12" r="1"></circle>
-            <circle cx="5" cy="12" r="1"></circle>
-          </svg>
-        </div>
-      </button>
+      <div className="border-t border-white/5 p-2">
+        <button
+          onClick={() => openSettingsModal()}
+          aria-label="Open account settings"
+          className="group flex w-full items-center gap-3 rounded-2xl border border-transparent px-2.5 py-2 text-left transition-all duration-200 hover:border-white/10 hover:bg-white/[0.05] active:scale-[0.99]"
+        >
+          <div className="shrink-0">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-white/20 to-white/[0.04] text-white/70 ring-1 ring-white/15">
+              <UserIcon size={16} strokeWidth={2} />
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-semibold leading-tight text-white">{displayUsername}</p>
+            <span className="mt-1 inline-block rounded-full bg-white/[0.08] px-2 py-px text-[9.5px] font-semibold uppercase tracking-[0.08em] text-white/60">
+              {displayTier}
+            </span>
+          </div>
+          <ChevronsUpDown size={15} strokeWidth={2} className="shrink-0 text-white/30 transition-colors group-hover:text-white/70" />
+        </button>
+      </div>
 
       <SettingsModal user={user} />
     </>
