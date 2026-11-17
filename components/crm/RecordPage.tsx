@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ChevronRight, Phone, Plus, Trash2, X } from "lucide-react"
+import { Archive, ChevronRight, Phone, Plus, Trash2, X } from "lucide-react"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import ActivityTimeline from "@/components/crm/ActivityTimeline"
 import { AddButton, AddNoteLine, useAddForm } from "@/components/crm/AddForm"
@@ -116,6 +116,19 @@ export default function RecordPage({ type, id }: { type: SubjectType; id: string
         ...(rec.type !== "contact" ? [{ key: "people" as Tab, label: "People", count: related.people.length }] : []),
       ]
 
+  const setArchived = async (archived: boolean) => {
+    if (!rec) return
+    setError(null)
+    try {
+      const api = rec.type === "company" ? crmApi.companies : rec.type === "contact" ? crmApi.contacts : crmApi.deals
+      await api.setArchived(rec.r.id, archived)
+      if (archived) router.push(crmHref(LIST_TAB[type]))
+      else await load()
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
   const remove = async () => {
     if (!rec) return
     setError(null)
@@ -151,7 +164,7 @@ export default function RecordPage({ type, id }: { type: SubjectType; id: string
         {missing ? (
           <div className="mx-auto mt-16 max-w-[420px] rounded-2xl border border-line px-6 py-10 text-center">
             <div className="text-[15px] text-white/85">This {SUBJECT_LABEL[type].toLowerCase()} no longer exists</div>
-            <div className="mt-2 text-[13px] text-white/45">It may have been deleted by you or one of your agents.</div>
+            <div className="mt-2 text-[13px] text-white/45">It may have been deleted by you or one of your agents. Archived records are under CRM, Archived.</div>
             <Link href={crmHref(LIST_TAB[type])} className="mt-5 inline-block rounded-full bg-white px-4 py-2 text-[12px] font-medium text-black">
               Back to {LIST_LABEL[type].toLowerCase()}
             </Link>
@@ -162,6 +175,14 @@ export default function RecordPage({ type, id }: { type: SubjectType; id: string
           </div>
         ) : (
           <>
+            {rec.r.archived_at && (
+              <div className="mx-8 mt-4 flex items-center gap-3 rounded-xl bg-amber-500/10 px-4 py-3 text-[12px] text-amber-200">
+                <Archive size={14} /> This {SUBJECT_LABEL[type].toLowerCase()} is archived, so it is hidden from the lists.
+                <button onClick={() => void setArchived(false)} className="ml-auto rounded-full bg-white px-3 py-1 text-[12px] font-medium text-black">
+                  Restore
+                </button>
+              </div>
+            )}
             <Header rec={rec} companyName={companyName} onRename={(name) => save(rec.type === "deal" ? { title: name } : { name })} />
 
             <div className="mt-4 flex flex-wrap items-center gap-1 border-b border-line px-8" role="tablist">
@@ -177,7 +198,12 @@ export default function RecordPage({ type, id }: { type: SubjectType; id: string
                   {t.count != null && <span className="ml-1.5 text-white/40">{t.count}</span>}
                 </button>
               ))}
-              <span className="ml-auto pb-1">
+              <span className="ml-auto flex items-center gap-4 pb-1">
+                {!rec.r.archived_at && (
+                  <button onClick={() => void setArchived(true)} className="flex items-center gap-1.5 text-[12px] text-white/40 hover:text-white/80">
+                    <Archive size={13} /> Archive
+                  </button>
+                )}
                 {confirmDelete ? (
                   <span className="text-[12px] text-white/55">
                     Delete for good?{" "}

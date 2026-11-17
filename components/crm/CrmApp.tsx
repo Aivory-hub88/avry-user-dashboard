@@ -24,6 +24,7 @@ import ContactsTab from "@/components/crm/ContactsTab"
 import { Empty, SamplePill } from "@/components/crm/CrmBits"
 import { LabelEditor, LabelList, LabelPill } from "@/components/crm/Labels"
 import { loadSampleData, removeSampleData } from "@/components/crm/onboardingActions"
+import ArchivedTab from "@/components/crm/ArchivedTab"
 import { CRM_TABS, STAGE_DOT, STAGE_LABEL, crmHref, type CrmTab } from "@/components/crm/crmUi"
 import { activityState, agentLabel, formatWhen } from "@/lib/crmActivity"
 import { crmApi, DEAL_STAGES, type Activity, type Company, type Contact, type Deal, type DealStage, type Grant } from "@/lib/crmClient"
@@ -197,6 +198,7 @@ export default function CrmApp() {
     { key: "companies", label: "Companies", count: companies?.length },
     { key: "contacts", label: "Contacts", count: contacts?.length },
     { key: "activity", label: "Activity" },
+    { key: "archived", label: "Archived" },
   ]
   const ready = companies !== null && contacts !== null && deals !== null
   const data = { companies: companies ?? [], contacts: contacts ?? [], deals: deals ?? [], activities }
@@ -423,6 +425,8 @@ export default function CrmApp() {
 
         {!ready ? (
           !error && <div className="h-40 animate-pulse rounded-2xl bg-white/[0.03]" />
+        ) : tab === "archived" ? (
+          <ArchivedTab onChanged={() => void load()} onOpen={(t, id) => router.push(crmHref(t, id))} />
         ) : tab === "activity" ? (
           <ActivityFeed names={names} query={q} version={0} onOpen={(s) => router.push(crmHref(s.type, s.id))} onError={setError} />
         ) : tab === "deals" ? (

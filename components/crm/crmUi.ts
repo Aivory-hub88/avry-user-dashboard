@@ -18,8 +18,8 @@ export const STAGE_DOT: Record<DealStage, string> = {
   lost: "bg-red-400/70",
 }
 
-export type CrmTab = "deals" | "companies" | "contacts" | "activity"
-export const CRM_TABS: readonly CrmTab[] = ["deals", "companies", "contacts", "activity"]
+export type CrmTab = "deals" | "companies" | "contacts" | "activity" | "archived"
+export const CRM_TABS: readonly CrmTab[] = ["deals", "companies", "contacts", "activity", "archived"]
 
 /** `/crm?tab=…` for a list, `/crm/<type>/<id>` for a record. */
 export function crmHref(tabOrType: CrmTab | string, id?: string): string {
