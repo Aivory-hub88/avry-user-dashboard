@@ -11,7 +11,7 @@
  */
 
 import { useMemo, useState, useCallback, type RefObject } from "react"
-import type { MentionCandidate } from "@/lib/agentMentions"
+import { withAllMention, type MentionCandidate } from "@/lib/agentMentions"
 
 /** The @token directly before `caret`, if any: "@", "@te", ... */
 const ACTIVE_TOKEN = /(^|\s)@([A-Za-z0-9_]*)$/
@@ -27,16 +27,7 @@ export function useAgentMention({ textareaRef, candidates, enabled }: UseAgentMe
   const [query, setQuery] = useState("")
   const [activeIndex, setActiveIndex] = useState(0)
 
-  const filtered = useMemo(() => {
-    const q = query.toLowerCase()
-    if (!q) return candidates
-    return candidates.filter(
-      (c) =>
-        c.name.toLowerCase().startsWith(q) ||
-        c.type.toLowerCase().includes(q) ||
-        c.title.toLowerCase().includes(q),
-    )
-  }, [candidates, query])
+  const filtered = useMemo(() => withAllMention(candidates, query), [candidates, query])
 
   const closeMenu = useCallback(() => {
     setMenuOpen(false)

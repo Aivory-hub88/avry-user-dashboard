@@ -7,7 +7,7 @@
  */
 
 import { AgentAvatar } from "@/components/office/AgentAvatar"
-import type { MentionCandidate } from "@/lib/agentMentions"
+import { ALL_MENTION_TYPE, type MentionCandidate } from "@/lib/agentMentions"
 
 interface AgentMentionMenuProps {
   candidates: MentionCandidate[]
@@ -37,10 +37,8 @@ export default function AgentMentionMenu({
   query,
 }: AgentMentionMenuProps) {
   if (candidates.length === 0) {
-    // Deliberately NOT offering a selectable "@all" row here: with an empty
-    // filtered list, Enter falls through and sends the raw text, which the
-    // parser expands to a broadcast. A selectable row would hijack Enter
-    // into inserting a single agent instead — the exact trap to avoid.
+    // "@all" has its own row (withAllMention) that inserts the text "@all ";
+    // the parser expands it to a broadcast. This is only the no-match hint.
     return (
       <div className="absolute bottom-full left-0 z-30 mb-2 w-[280px] rounded-2xl border border-white/10 bg-surface-2 p-4 shadow-2xl">
         {totalCandidates > 0 ? (
@@ -87,7 +85,11 @@ export default function AgentMentionMenu({
             i === activeIndex ? "bg-white/[0.08]" : "hover:bg-white/[0.05]"
           }`}
         >
-          <AgentAvatar type={c.type} size={30} />
+          {c.type === ALL_MENTION_TYPE ? (
+            <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-white/10 text-[13px] font-medium text-white/80">@</span>
+          ) : (
+            <AgentAvatar type={c.type} size={30} />
+          )}
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13.5px] font-medium text-white/90">
               @{c.name}

@@ -23,6 +23,21 @@ export interface MentionCandidate {
   channels: string[]
 }
 
+/** Menu entry that inserts `@all`; the parser expands it to every deployed agent. */
+export const ALL_MENTION_TYPE = "__all__"
+export const ALL_MENTION: MentionCandidate = { type: ALL_MENTION_TYPE, name: "all", title: "Everyone in the room", channels: [] }
+const ALL_ALIASES = ["all", "everyone", "team"]
+
+/** Candidates for the @ menu: the agents, plus an "@all" row when there is more than one agent to address. */
+export function withAllMention(candidates: MentionCandidate[], query: string): MentionCandidate[] {
+  const q = query.toLowerCase()
+  const agents = q
+    ? candidates.filter((c) => c.name.toLowerCase().startsWith(q) || c.type.toLowerCase().includes(q) || c.title.toLowerCase().includes(q))
+    : candidates
+  const showAll = candidates.length > 1 && (!q || ALL_ALIASES.some((a) => a.startsWith(q)))
+  return showAll ? [...agents, ALL_MENTION] : agents
+}
+
 /**
  * Unique deployed agent types, first-seen order, joined with the roster for
  * display names. Roster-less types (stale bindings) are dropped — there is
