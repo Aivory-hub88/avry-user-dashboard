@@ -416,7 +416,8 @@ export function buildRoomPayload({ me, peers, members = [], intent = null, simul
         "Do this only when you truly need their skills or tools. If part of the job needs something you do not have (for example support tickets belong to the Ticket Ops teammate), " +
         "do NOT search for a tool or keep retrying: finish your own part, then hand that part to the teammate whose role covers it. " +
         "Never @ someone just to greet or thank them or to repeat what they already said, " +
-        "and do not @ the person who just handed this to you unless you need something new from them. When you only talk ABOUT someone, use their plain name without @.",
+        "and do not @ the person who just handed this to you unless you need something new from them. When you only talk ABOUT someone, use their plain name without @. " +
+        "If the user asks you to report to, tell or update a teammate, finish your own part and end with @Name plus the result: a plain name notifies nobody.",
     )
   }
   if (simultaneous) {

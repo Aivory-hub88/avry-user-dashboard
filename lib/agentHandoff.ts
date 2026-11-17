@@ -77,6 +77,28 @@ export function extractAgentMentions(
   return out
 }
 
+// "lapor ke Aira", "report back to Aira", "kabari Aira", "tell Aira" ...: the user wants the result passed
+// on. An agent that writes the bare name ("Aira, gue baru ...") notifies nobody, so the room does it.
+const REPORT_VERB = String.raw`(?:lapor(?:kan|in)?(?:\s+(?:hasilnya|balik|kembali))?\s+(?:ke|kepada|sama|pada)|laporan(?:nya)?\s+(?:ke|kepada|sama|pada)|report(?:\s+back)?\s+(?:to|ke)|sampaikan(?:\s+(?:hasilnya|ini|itu))?\s+(?:ke|kepada|sama|pada)|kabari|kabarin|kasih\s+(?:tau|tahu)|beritahu(?:kan)?|tell|update|brief|inform|let)`
+
+/**
+ * Teammates the human asked this turn's agent to report to / inform. Only names in `candidates`
+ * count, `self` is excluded, and code is ignored. Used for the human's own message only.
+ */
+export function extractReportTargets(text: string, candidates: HandoffCandidate[], self?: string): string[] {
+  if (typeof text !== "string" || !text) return []
+  const masked = maskCode(text)
+  const out: string[] = []
+  const re = new RegExp(`${REPORT_VERB}\\s+@?([A-Za-z0-9][A-Za-z0-9_-]*)`, "gi")
+  let m: RegExpExecArray | null
+  while ((m = re.exec(masked)) !== null) {
+    const type = resolve(m[1], candidates)
+    if (!type || type === self || out.includes(type)) continue
+    out.push(type)
+  }
+  return out
+}
+
 export interface HandoffState {
   /** Depth of the turn whose reply is being examined (0 = answered the human directly). */
   depth: number
@@ -86,6 +108,8 @@ export interface HandoffState {
   usedTotal: number
   /** Agents that already have a turn waiting to run in this chain. */
   queued?: Iterable<string>
+  /** Teammates the human asked for by name (see extractReportTargets), handed to even without an @ in the reply. */
+  implied?: string[]
 }
 
 /**
@@ -102,7 +126,9 @@ export function planHandoffs(
   const queued = new Set(state.queued ?? [])
   const out: string[] = []
   let total = state.usedTotal
-  for (const type of extractAgentMentions(reply, candidates, self)) {
+  const wanted = [...extractAgentMentions(reply, candidates, self)]
+  for (const t of state.implied ?? []) if (t !== self && !wanted.includes(t)) wanted.push(t)
+  for (const type of wanted) {
     if (total >= HANDOFF_MAX_TURNS) break
     if (queued.has(type)) continue
     if ((state.usedPerAgent[type] ?? 0) >= HANDOFF_MAX_PER_AGENT) continue
