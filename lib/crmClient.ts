@@ -18,6 +18,7 @@ export type Company = Owned & {
   industry: string | null
   size: string | null
   custom_fields: Record<string, unknown>
+  archived_at?: string | null
   created_at?: string
 }
 export type Contact = Owned & {
@@ -28,6 +29,7 @@ export type Contact = Owned & {
   title: string | null
   company_id: string | null
   custom_fields: Record<string, unknown>
+  archived_at?: string | null
   created_at?: string
 }
 export type Deal = Owned & {
@@ -40,6 +42,7 @@ export type Deal = Owned & {
   contact_ids: string[]
   expected_close_date: string | null
   custom_fields: Record<string, unknown>
+  archived_at?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -122,6 +125,8 @@ export const crmApi = {
     /** PATCH replaces the whole record; `companyBody` keeps every field not in `ch`. */
     update: (c: Company, ch: CompanyChanges) => api<Company>(`companies/${c.id}`, { method: "PATCH", json: companyBody(c, ch) }),
     remove: (id: string) => api(`companies/${id}`, { method: "DELETE" }),
+    archived: () => api<Company[]>("companies/archived"),
+    setArchived: (id: string, archived: boolean) => api(`companies/${id}/archive`, { method: "PATCH", json: { archived } }),
   },
   contacts: {
     list: () => listAll<Contact>("contacts"),
@@ -130,6 +135,8 @@ export const crmApi = {
     get: (id: string) => api<Contact>(`contacts/${id}`),
     update: (c: Contact, ch: ContactChanges) => api<Contact>(`contacts/${c.id}`, { method: "PATCH", json: contactBody(c, ch) }),
     remove: (id: string) => api(`contacts/${id}`, { method: "DELETE" }),
+    archived: () => api<Contact[]>("contacts/archived"),
+    setArchived: (id: string, archived: boolean) => api(`contacts/${id}/archive`, { method: "PATCH", json: { archived } }),
   },
   deals: {
     list: () => listAll<Deal>("deals"),
@@ -148,6 +155,8 @@ export const crmApi = {
     update: (d: Deal, ch: DealChanges) => api<Deal>(`deals/${d.id}`, { method: "PATCH", json: dealBody(d, ch) }),
     setStage: (id: string, stage: DealStage) => api<Deal>(`deals/${id}/stage`, { method: "PATCH", json: { stage } }),
     remove: (id: string) => api(`deals/${id}`, { method: "DELETE" }),
+    archived: () => api<Deal[]>("deals/archived"),
+    setArchived: (id: string, archived: boolean) => api(`deals/${id}/archive`, { method: "PATCH", json: { archived } }),
   },
   activities: {
     list: (q: { subject_type?: SubjectType; subject_id?: string; has_due?: boolean; completed?: boolean } = {}) => {
