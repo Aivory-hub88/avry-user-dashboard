@@ -289,7 +289,7 @@ describe("POST messages with replyTo (rooms, ADR-019 P2)", () => {
     queryMock.mockImplementation((sql: string, params?: unknown[]) => {
       // ADR-021 queue drain / answer routing: nothing waits in these fixtures.
       if (sql.includes("queued") || sql.includes("routed_at")) return Promise.resolve({ rows: [], rowCount: 0 })
-      if (sql.includes("SELECT id, thread_root FROM dashboard.workspace_messages"))
+      if (sql.includes("SELECT id, thread_root, author_kind, agent_type FROM dashboard.workspace_messages"))
         return Promise.resolve({ rows: params?.[0] === "m-reply" ? [{ id: "m-reply", thread_root: "m-root" }] : [] })
       if (sql.includes("INSERT INTO dashboard.workspace_messages"))
         return Promise.resolve({ rows: [msgRow({ id: params?.[0] as string, thread_root: params?.[2] as string })], rowCount: 1 })
@@ -302,6 +302,28 @@ describe("POST messages with replyTo (rooms, ADR-019 P2)", () => {
     const values = insert[1] as unknown[]
     expect(values[2]).toBe("m-root")
     expect(values[13]).toBe("m-reply")
+  })
+
+
+  it("replying to an agent's bubble addresses that agent even when the text @mentions others", async () => {
+    authMock.mockReturnValue({ user: { user_id: "owner-1", email: "o@x.id", account_type: "member" }, token: "t" })
+    queryMock.mockImplementation((sql: string, params?: unknown[]) => {
+      if (sql.includes("FROM dashboard.workspace_docs"))
+        return Promise.resolve({ rows: [{ id: "space-1", owner: "owner-1", workspace_id: "ws-1" }] })
+      if (sql.includes("queued") || sql.includes("routed_at")) return Promise.resolve({ rows: [], rowCount: 0 })
+      if (sql.includes("SELECT id, thread_root, author_kind, agent_type FROM dashboard.workspace_messages"))
+        return Promise.resolve({ rows: [{ id: "m-aira", thread_root: "m-root", author_kind: "agent", agent_type: "chief_of_staff" }] })
+      if (sql.includes("INSERT INTO dashboard.workspace_messages"))
+        return Promise.resolve({ rows: [msgRow({ id: params?.[0] as string, thread_root: params?.[2] as string })], rowCount: 1 })
+      if (sql.includes("FROM dashboard.workspace_messages")) return Promise.resolve({ rows: [msgRow({ id: "m-root" })] })
+      return Promise.resolve({ rows: [], rowCount: 0 })
+    })
+    const res = await POST(post({ body: "ok, and [@Finn](#agent:finance_invoice_ops) too", replyTo: "m-aira" }, {}), { params: Promise.resolve({ id: "space-1" }) })
+    expect(res.status).toBe(201)
+    const insert = queryMock.mock.calls.find(([sql]) => String(sql).includes("INSERT INTO dashboard.workspace_messages"))!
+    const values = insert[1] as unknown[]
+    expect(values[8]).toEqual(["finance_invoice_ops", "chief_of_staff"])
+    expect(values[11]).toBe(true)
   })
 
   it("404 when the message replied to isn't in this room", async () => {

@@ -12,6 +12,7 @@ import { getDocRole, canWrite, checkAgentAccess } from "@/lib/workspaceAccess"
 import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { parseSpaceMentions } from "@/lib/spaceProtocol"
+import { isAgentType } from "@/lib/agentRoster"
 import { spaceMessageFromRow } from "@/lib/spaceThreads"
 import { requesterFrom, newId, cleanBody } from "@/lib/spaceWrite"
 import { enqueueAgentTasks } from "@/lib/spaceAgentStore"
@@ -46,12 +47,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let replyToId: string | null = null
     if (replyTarget) {
       const target = await query(
-        `SELECT id, thread_root FROM dashboard.workspace_messages WHERE id = $1 AND space_id = $2`,
+        `SELECT id, thread_root, author_kind, agent_type FROM dashboard.workspace_messages WHERE id = $1 AND space_id = $2`,
         [replyTarget, id],
       )
-      const t = target.rows[0] as { id: string; thread_root: string | null } | undefined
+      const t = target.rows[0] as
+        | { id: string; thread_root: string | null; author_kind: string | null; agent_type: string | null }
+        | undefined
       if (!t) return NextResponse.json({ error: "message not found" }, { status: 404 })
       replyToId = t.id
+      // Replying to an agent's bubble addresses that agent, even when the text @mentions others too.
+      if (me.kind === "user" && t.author_kind === "agent" && isAgentType(t.agent_type)) {
+        if (!stamps.agentTypes.includes(t.agent_type)) stamps.agentTypes.push(t.agent_type)
+        stamps.hasAgent = true
+      }
       threadRoot = t.thread_root ?? t.id
     }
     let rootId = msgId

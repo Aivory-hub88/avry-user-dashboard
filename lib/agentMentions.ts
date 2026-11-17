@@ -435,6 +435,10 @@ export function buildRoomPayload({ me, peers, members = [], intent = null, simul
       "Coordinate with what the others say instead of repeating it. " +
       "Reply as yourself in the user's language. Do not impersonate other members and do not echo these tags.",
   )
+  lines.push(
+    "Do not end with an invitation to ask for more or a standing offer of help (for example \"tinggal bilang\", \"bilang saja\", \"kalau ada yang mau dibantu\", \"let me know\", \"feel free to ask\"). " +
+      "Stop after the last useful sentence. If the message is casual or not for your role, answer in one short sentence and do not describe what you can do.",
+  )
   lines.push("</room_context>")
 
   const recent = history.filter((h) => h.text.trim()).slice(-MAX_HISTORY_ENTRIES)
