@@ -419,3 +419,24 @@ describe("handoff in the room payload", () => {
     expect(buildRoomPayload({ ...base, members: [teo] })).not.toContain("write @FirstName")
   })
 })
+
+describe("withAllMention", () => {
+  const cs = [
+    { type: "chief_of_staff", name: "Aira", title: "Chief of Staff", channels: [] },
+    { type: "finance_invoice_ops", name: "Finn", title: "Finance", channels: [] },
+  ]
+  it("adds an @all row after the agents when there are several", async () => {
+    const { withAllMention } = await import("./agentMentions")
+    expect(withAllMention(cs, "").map((c) => c.name)).toEqual(["Aira", "Finn", "all"])
+  })
+  it("matches all/everyone/team prefixes and not other text", async () => {
+    const { withAllMention } = await import("./agentMentions")
+    expect(withAllMention(cs, "all").map((c) => c.name)).toEqual(["all"])
+    expect(withAllMention(cs, "ev").map((c) => c.name)).toEqual(["all"])
+    expect(withAllMention(cs, "fi").map((c) => c.name)).toEqual(["Finn"])
+  })
+  it("omits @all for a single agent", async () => {
+    const { withAllMention } = await import("./agentMentions")
+    expect(withAllMention(cs.slice(0, 1), "").map((c) => c.name)).toEqual(["Aira"])
+  })
+})
