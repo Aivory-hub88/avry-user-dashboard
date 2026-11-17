@@ -250,7 +250,7 @@ export default function AgentRail({
 
   const title = agentTarget
     ? PREBUILT_AGENTS.find((a) => a.type === agentTarget)?.name ?? agentTarget
-    : "Aivory Console"
+    : "Notifications"
 
   const approvalItems = notifications.filter((n): n is Extract<Notification, { kind: "approval" }> => n.kind === "approval")
   const activityItems = notifications.filter((n): n is Extract<Notification, { kind: "activity" }> => n.kind === "activity")
