@@ -105,7 +105,7 @@ export default function ChatMessageCompact({
     <div className="mb-4">
       {role === 'user' ? (
         <div className="flex justify-end">
-          <div className="max-w-[85%] bg-[#282825] rounded-xl px-3.5 py-2.5 text-[13px] text-white/85 leading-[1.55] border border-white/[0.06]">
+          <div className="max-w-[85%] bg-white/[0.035] rounded-xl px-3.5 py-2.5 text-[13px] text-white/85 leading-[1.55] border border-white/[0.06]">
             {content}
           </div>
         </div>

@@ -345,7 +345,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, s
           </div>
           <div className="min-w-0 max-w-[80%] text-left">
             <div className="mb-1 text-[12px] text-[#a1a1aa]">{author.name}</div>
-            <div className="bg-[#282825] rounded-[20px] px-5 py-3.5 text-base text-white leading-[1.6] border border-line whitespace-pre-wrap break-words">
+            <div className="bg-white/[0.035] rounded-2xl px-5 py-3.5 text-base text-white leading-[1.6] border border-line whitespace-pre-wrap break-words">
               {ReplyQuote}
               {content}
             </div>
@@ -355,7 +355,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, s
       ) : role === 'user' ? (
         /* USER BUBBLE — right-aligned, subtle container */
         <div className="flex justify-end group relative">
-          <div className="max-w-[80%] bg-[#282825] rounded-[20px] px-5 py-3.5 text-base text-white leading-[1.6] border border-line text-left">
+          <div className="max-w-[80%] bg-white/[0.035] rounded-2xl px-5 py-3.5 text-base text-white leading-[1.6] border border-line text-left">
             {ReplyQuote}
             {attachments && attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
@@ -384,7 +384,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, s
               lighter surface, max-w-[720px] for readability */}
           <div className="flex-1 min-w-0 max-w-[720px] text-left">
             {showAgentName && <div className="mb-1 text-[12px] text-[#a1a1aa]">{agentName}</div>}
-            <div className="rounded-2xl border border-line bg-white/[0.035] px-5 py-3.5 text-base text-[#f7f7f7] leading-[1.6]">
+            <div className="py-1 text-base text-[#f7f7f7] leading-[1.6]">
               {ReplyQuote}
               {/* Thinking indicator */}
               {/* Agent activity: live timer + tool steps while the turn runs, a one-line summary after */}
