@@ -52,7 +52,9 @@ function one(item: unknown): Inbound | null {
   const text = asStr(asObj(m.text).body) ?? asStr(typed.caption) ?? asStr(kapso.content) ?? `(${type})`
   const secs = Number(m.timestamp)
   const at = Number.isFinite(secs) && secs > 0 ? new Date(secs * 1000).toISOString() : new Date().toISOString()
-  return { id, from, name: asStr(conv.contact_name), text: text.slice(0, MAX_TEXT), at }
+  const mediaId = asStr(typed.id)
+  const media = type !== "text" ? { kind: type, ...(mediaId ? { mediaId } : {}), ...(asStr(typed.mime_type) ? { mime: asStr(typed.mime_type)! } : {}), ...(asStr(typed.filename) ? { filename: asStr(typed.filename)! } : {}) } : {}
+  return { id, from, name: asStr(conv.contact_name), text: text.slice(0, MAX_TEXT), at, ...media }
 }
 
 /** Inbound messages in a webhook body, whether single or in Kapso's `batch` envelope. Outbound echoes are dropped. */

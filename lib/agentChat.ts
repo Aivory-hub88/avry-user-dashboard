@@ -158,8 +158,8 @@ async function readAgentStream(
 }
 
 export interface AgentDeployment {
-  kind: 'telegram' | 'slack' | 'api'
-  /** binding_id (telegram), team_id (slack), or key id (api) — used for disconnect */
+  kind: 'telegram' | 'slack' | 'whatsapp' | 'api'
+  /** binding_id (telegram/whatsapp), team_id (slack), or key id (api) — used for disconnect */
   id: string
   agentType: string
   /** Chat title / workspace name / key label shown to the user */
@@ -167,8 +167,9 @@ export interface AgentDeployment {
 }
 
 export async function listDeployments(): Promise<AgentDeployment[]> {
-  const [tgRes, slackRes, apiRes] = await Promise.allSettled([
+  const [tgRes, waRes, slackRes, apiRes] = await Promise.allSettled([
     authedFetch(`${BACKEND_URL}/api/v1/telegram/bindings`),
+    authedFetch(`${BACKEND_URL}/api/v1/whatsapp/bindings`),
     authedFetch(`${BACKEND_URL}/api/v1/slack/installations`),
     authedFetch(`${BACKEND_URL}/api/v1/agent-api-keys`),
   ])
@@ -193,6 +194,19 @@ export async function listDeployments(): Promise<AgentDeployment[]> {
         id: b.binding_id,
         agentType: b.agent_type,
         label,
+      })
+    }
+  }
+
+  if (waRes.status === 'fulfilled' && waRes.value.ok) {
+    const data = await waRes.value.json().catch(() => null)
+    for (const b of data?.bindings ?? []) {
+      out.push({
+        kind: 'whatsapp',
+        id: b.binding_id,
+        agentType: b.agent_type,
+        // The number is masked by the backend; fall back to the contact's WhatsApp name.
+        label: b.masked_number || b.wa_name || 'WhatsApp',
       })
     }
   }
@@ -229,9 +243,11 @@ export async function deleteDeployment(d: AgentDeployment): Promise<void> {
   const url =
     d.kind === 'telegram'
       ? `${BACKEND_URL}/api/v1/telegram/bindings/${encodeURIComponent(d.id)}`
-      : d.kind === 'slack'
-        ? `${BACKEND_URL}/api/v1/slack/installations/${encodeURIComponent(d.id)}`
-        : `${BACKEND_URL}/api/v1/agent-api-keys/${encodeURIComponent(d.id)}`
+      : d.kind === 'whatsapp'
+        ? `${BACKEND_URL}/api/v1/whatsapp/bindings/${encodeURIComponent(d.id)}`
+        : d.kind === 'slack'
+          ? `${BACKEND_URL}/api/v1/slack/installations/${encodeURIComponent(d.id)}`
+          : `${BACKEND_URL}/api/v1/agent-api-keys/${encodeURIComponent(d.id)}`
   const res = await authedFetch(url, { method: 'DELETE' })
   if (!res.ok) {
     const detail = await res.json().then((x) => x?.detail).catch(() => null)
