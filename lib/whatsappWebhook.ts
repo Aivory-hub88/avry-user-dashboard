@@ -8,6 +8,7 @@ import { runAgentTurn } from '@/lib/agentTurnServer'
 import { sentBody } from '@/lib/crmWhatsapp'
 import { getProvider } from '@/lib/whatsapp/providers'
 import { aivoryTenant, getConnection } from '@/lib/whatsappConnection'
+import { withoutAgentMessages } from '@/lib/whatsappAgentForward'
 import { countAutoReplies, deleteDraft, getDraftConfig, recordAutoReply, saveDraft } from '@/lib/whatsappDrafts'
 import { draftForEntry, latestPerContact, type DraftMode } from '@/lib/whatsappDraftRunner'
 import type { LoggedEntry } from '@/lib/whatsappInbound'
@@ -42,6 +43,8 @@ export async function handleWebhook(req: NextRequest, target: WebhookTarget | nu
   } catch {
     return NextResponse.json({ error: 'bad_payload' }, { status: 400 })
   }
+  // Agent deploys live on Aivory's shared number only; a tenant's own number is all CRM.
+  if (target.tenantId === aivoryTenant()) msgs = await withoutAgentMessages(msgs)
   try {
     const crm = crmFor(target.tenantId)
     const result = await logInbound(crm, msgs, seen)

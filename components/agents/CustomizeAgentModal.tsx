@@ -45,6 +45,13 @@ import {
   SlackDeployLink,
 } from '@/lib/slackDeploy';
 import {
+  createWhatsappDeployLink,
+  getWhatsappLinkStatus,
+  WhatsappAddonRequired,
+  WhatsappDeployLink,
+  WhatsappLinkStatus,
+} from '@/lib/whatsappDeploy';
+import {
   createDiscordDeployLink,
   getDiscordLinkStatus,
   DiscordDeployLink,
@@ -494,11 +501,13 @@ export default function CustomizeAgentModal({
   // Deploy tab — was a separate modal (app/agents/page.tsx's DeployModal),
   // merged in so identity/connections/tools/MCP are configured before a
   // channel goes live, not as a competing entry point.
-  const [deployView, setDeployView] = useState<'channels' | 'telegram' | 'slack' | 'discord' | 'api'>('channels');
+  const [deployView, setDeployView] = useState<'channels' | 'telegram' | 'slack' | 'discord' | 'whatsapp' | 'api'>('channels');
   const [deployLink, setDeployLink] = useState<DeployLink | null>(null);
   const [telegramTarget, setTelegramTarget] = useState<'private' | 'group'>('private');
   const [slackLink, setSlackLink] = useState<SlackDeployLink | null>(null);
   const [slackTeamId, setSlackTeamId] = useState<string | null>(null);
+  const [whatsappLink, setWhatsappLink] = useState<WhatsappDeployLink | null>(null);
+  const [whatsappStatus, setWhatsappStatus] = useState<WhatsappLinkStatus>('pending');
   const [discordLink, setDiscordLink] = useState<DiscordDeployLink | null>(null);
   const [discordLinkStatus, setDiscordLinkStatus] = useState<DiscordLinkStatus>('pending');
   const [linkStatus, setLinkStatus] = useState<LinkStatus>('pending');
@@ -559,6 +568,8 @@ export default function CustomizeAgentModal({
     setSlackTeamId(null);
     setDiscordLink(null);
     setDiscordLinkStatus('pending');
+    setWhatsappLink(null);
+    setWhatsappStatus('pending');
     setLinkStatus('pending');
     setDeployLoading(false);
     setDeployError(null);
@@ -646,6 +657,32 @@ export default function CustomizeAgentModal({
       }, 2500);
     } catch (e: any) {
       setDeployError(e?.message || t('telegramDeployStartFailed'));
+    } finally {
+      setDeployLoading(false);
+    }
+  };
+
+  const startWhatsappDeploy = async () => {
+    if (!agentType) return;
+    setDeployLoading(true);
+    setDeployError(null);
+    try {
+      const link = await createWhatsappDeployLink(agentType as any);
+      setWhatsappLink(link);
+      setWhatsappStatus('pending');
+      setDeployView('whatsapp');
+      stopDeployPolling();
+      deployPollRef.current = setInterval(async () => {
+        try {
+          const res = await getWhatsappLinkStatus(link.token);
+          if (res.status === 'connected' || res.status === 'expired') {
+            setWhatsappStatus(res.status);
+            stopDeployPolling();
+          }
+        } catch { /* keep polling */ }
+      }, 2500);
+    } catch (e: any) {
+      setDeployError(e instanceof WhatsappAddonRequired ? t('whatsappAddonRequired') : (e?.message || t('whatsappDeployStartFailed')));
     } finally {
       setDeployLoading(false);
     }
@@ -1944,23 +1981,29 @@ export default function CustomizeAgentModal({
                     </div>
                   </button>
 
-                  {/* No onClick on purpose: there is no WhatsApp deploy flow or
-                      backend endpoint yet (listDeployments()/deleteDeployment()
-                      in lib/agentChat.ts only know telegram/slack/api) — this
-                      used to render identically to the working buttons above
-                      it with no handler at all, a silent dead click. disabled
-                      + "Coming soon" copy makes the real state visible instead. */}
                   <button
-                    disabled
-                    title={t('whatsappConnectDesc')}
-                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-left opacity-50 cursor-not-allowed"
+                    onClick={startWhatsappDeploy}
+                    disabled={!agentType || deployLoading}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="w-10 h-10 rounded-full flex items-center justify-center overflow-hidden shrink-0">
                       <Image src={asset('/integrations/icons/whatsapp.svg')} alt="WhatsApp" width={40} height={40} />
                     </div>
                     <div>
-                      <div className="text-white/90 font-medium text-[14px]">{t('whatsapp')}</div>
-                      <div className="text-white/40 text-[12px] mt-0.5">{t('whatsappConnectDesc')}</div>
+                      <div className="text-white/90 font-medium text-[14px]">
+                        {t('whatsapp')}
+                        <span className="ml-2 align-middle text-[9px] uppercase tracking-wider font-medium text-amber-warn/90 border border-amber-warn/30 rounded px-1.5 py-0.5">{t('whatsappAddonBadge')}</span>
+                      </div>
+                      <div className="text-white/40 text-[12px] mt-0.5">{deployLoading ? t('whatsappGeneratingQr') : t('whatsappConnectDesc')}</div>
+                    </div>
+                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                      {deployLoading ? (
+                        <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-accent">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                      )}
                     </div>
                   </button>
                 </div>
@@ -2130,6 +2173,75 @@ export default function CustomizeAgentModal({
                       {telegramTarget === 'group' && (
                         <p className="mt-4 text-white/40 text-[12px] leading-relaxed text-center">{t('telegramGroupHint')}</p>
                       )}
+                    </>
+                  )}
+                </div>
+              </>
+            ) : deployView === 'whatsapp' && whatsappLink ? (
+              <>
+                <button onClick={() => { stopDeployPolling(); setDeployView('channels'); }} className="flex items-center gap-1.5 text-white/40 hover:text-white text-[12px] transition-colors mb-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                  </svg>
+                  {t('back')}
+                </button>
+
+                <h4 className="text-white text-[15px] font-normal mb-1.5">
+                  {whatsappStatus === 'connected' ? t('agentConnected') : t('deployToWhatsapp')}
+                </h4>
+                <p className="text-white/60 text-[13px] leading-relaxed mb-5">
+                  {whatsappStatus === 'connected'
+                    ? <>{t('whatsappConnectedPre')}<strong className="text-white font-medium">{whatsappLink.agent_name}</strong>{t('whatsappConnectedPost')}</>
+                    : whatsappStatus === 'expired'
+                    ? t('whatsappExpired')
+                    : <>{t('whatsappScanPre')}<strong className="text-white font-medium">{whatsappLink.agent_name}</strong>{t('whatsappScanPost')}</>}
+                </p>
+
+                <div className="flex flex-col items-center">
+                  {whatsappStatus === 'connected' ? (
+                    <div className="w-[216px] h-[216px] rounded-2xl bg-accent/10 border border-accent/30 flex flex-col items-center justify-center gap-3">
+                      <div className="w-14 h-14 rounded-full bg-accent/20 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7 text-accent">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      </div>
+                      <span className="text-accent text-[13px] font-medium">{t('connectedBadge')}</span>
+                    </div>
+                  ) : (
+                    <div className={`relative p-4 bg-white rounded-2xl ${whatsappStatus === 'expired' ? 'opacity-30' : ''}`}>
+                      <QRCode value={whatsappLink.deep_link} size={184} level="M" />
+                      {whatsappStatus === 'expired' && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <button
+                            onClick={startWhatsappDeploy}
+                            disabled={deployLoading}
+                            className="px-4 py-2 rounded-lg bg-[#242424] text-white text-[12px] font-medium border border-white/20 hover:border-accent/50 transition-all"
+                          >
+                            {deployLoading ? t('generating') : t('generateNewQr')}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {whatsappStatus === 'pending' && (
+                    <>
+                      <div className="mt-4 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/80 text-[13px] font-mono tracking-wider">
+                        LINK-{whatsappLink.token}
+                      </div>
+                      <p className="mt-2 text-white/40 text-[12px] leading-relaxed text-center">{t('whatsappCodeHint', { phone: `+${whatsappLink.display_phone}` })}</p>
+                      <div className="flex items-center gap-2 mt-4 text-white/50 text-[12px]">
+                        <div className="w-3.5 h-3.5 border-2 border-white/20 border-t-accent rounded-full animate-spin" />
+                        {t('waitingScan')}
+                      </div>
+                      <a
+                        href={whatsappLink.deep_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 text-accent/80 hover:text-accent text-[12px] underline underline-offset-2 transition-colors"
+                      >
+                        {t('openInWhatsappDevice')}
+                      </a>
                     </>
                   )}
                 </div>

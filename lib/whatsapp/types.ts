@@ -2,7 +2,8 @@
 export type ProviderId = "kapso" | "meta" | "twilio" | "kirimdev"
 export type Creds = Record<string, string>
 
-export type Inbound = { id: string; from: string; name: string | null; text: string; at: string }
+/** Media fields are set only for non-text messages; the agent path needs them, the CRM does not. */
+export type Inbound = { id: string; from: string; name: string | null; text: string; at: string; kind?: string; mediaId?: string; mime?: string; filename?: string }
 
 export type SendResult =
   | { ok: true; id: string | null }
