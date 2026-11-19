@@ -3,7 +3,15 @@ import { useMode } from "@/contexts/ModeContext"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
 import type { AgentTeam } from "@/lib/agentTeams"
 
-export type ConsoleChatMode = "direct" | "room"
+/** direct = regular Aivory Console chat, agents = a chat with one agent,
+ *  room = the multi-agent group. */
+export type ConsoleChatMode = "direct" | "agents" | "room"
+
+const MODES: { key: ConsoleChatMode; title: string }[] = [
+  { key: "direct", title: "Regular chat with Aivory Console" },
+  { key: "agents", title: "Chat with one agent" },
+  { key: "room", title: "Group chat — @mention deployed agents" },
+]
 
 interface ConsoleTopBarProps {
   onNewChat: () => void
@@ -106,24 +114,24 @@ export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, r
           </span>
         )}
         {onChatModeChange && (
-          <span className="relative ml-2 grid grid-cols-2 items-center rounded-full border border-white/10 bg-black/30 p-[3px] shadow-inner" role="tablist" aria-label="Chat mode">
+          <span className="relative ml-2 grid grid-cols-3 items-center rounded-full border border-white/10 bg-black/30 p-[3px] shadow-inner" role="tablist" aria-label="Chat mode">
             <span
               aria-hidden
-              className="absolute inset-y-[3px] left-[3px] w-[calc(50%-3px)] rounded-full bg-white shadow-[0_1px_6px_rgba(0,0,0,0.45)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
-              style={{ transform: chatMode === "room" ? "translateX(100%)" : "translateX(0)" }}
+              className="absolute inset-y-[3px] left-[3px] w-[calc((100%-6px)/3)] rounded-full bg-white shadow-[0_1px_6px_rgba(0,0,0,0.45)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+              style={{ transform: `translateX(${Math.max(0, MODES.findIndex((m) => m.key === chatMode)) * 100}%)` }}
             />
-            {(["direct", "room"] as const).map((m) => (
+            {MODES.map((m) => (
               <button
-                key={m}
+                key={m.key}
                 role="tab"
-                aria-selected={chatMode === m}
-                onClick={() => onChatModeChange(m)}
-                title={m === "room" ? "Mission Control chat room — @mention deployed agents" : "Direct chat"}
+                aria-selected={chatMode === m.key}
+                onClick={() => onChatModeChange(m.key)}
+                title={m.title}
                 className={`relative z-10 whitespace-nowrap rounded-full px-3.5 py-1 text-center text-[11px] font-semibold transition-colors duration-200 ${
-                  chatMode === m ? "text-black" : "text-white/50 hover:text-white/85"
+                  chatMode === m.key ? "text-black" : "text-white/50 hover:text-white/85"
                 }`}
               >
-                {m === "direct" ? "Direct" : `Room${roomCount > 0 ? ` · ${roomCount}` : ""}`}
+                {m.key === "direct" ? "Direct" : m.key === "agents" ? "Agents" : `Group${roomCount > 0 ? ` · ${roomCount}` : ""}`}
               </button>
             ))}
           </span>
