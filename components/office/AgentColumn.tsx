@@ -36,6 +36,8 @@ interface AgentColumnProps {
   setAgentTarget: (agent: string | null) => void
   switchSession: (sessionId: string) => void
   handleNewChat: () => void
+  /** The group Room's session: never a Direct thread, whichever row is clicked. */
+  roomSessionId?: string | null
   deleteThread: (sessionId: string) => void
   /** Whether Mission Control (the cross-agent overview) is the active view. */
   missionControlActive?: boolean
@@ -73,6 +75,7 @@ export default function AgentColumn({
   setAgentTarget,
   switchSession,
   handleNewChat,
+  roomSessionId,
   deleteThread,
   missionControlActive = false,
   onOpenMissionControl,
@@ -137,7 +140,7 @@ export default function AgentColumn({
     }
     setExpanded(row.key)
     onExitMissionControl?.()
-    const own = pickDirectThread(threads, row.type)
+    const own = pickDirectThread(threads, row.type, roomSessionId)
     if (own) {
       switchSession(own.id)
       // switchSession no-ops when that thread is already open, and a shared

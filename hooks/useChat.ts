@@ -817,6 +817,7 @@ export function useChat({
     handleNewChat,
     startDirectChat,
     inRoom,
+    roomSessionId,
     enterRoom,
     leaveRoom,
     switchSession,

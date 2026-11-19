@@ -10,6 +10,10 @@
 export function pickDirectThread<T extends { id: string; agentType?: string | null }>(
   threads: T[],
   agentType: string | null,
+  /** The group Room's session. It carries no session-level agentType (it is
+   *  multi-agent), so without this the Aivory Console row (null) matched it
+   *  and a click on the Aivory icon opened the Room instead of a normal chat. */
+  excludeId?: string | null,
 ): T | undefined {
-  return threads.find((t) => (t.agentType ?? null) === agentType)
+  return threads.find((t) => t.id !== excludeId && (t.agentType ?? null) === agentType)
 }

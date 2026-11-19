@@ -19,7 +19,11 @@ describe("pickDirectThread", () => {
     expect(pickDirectThread([lexOwn, older], "leads_qualifier")?.id).toBe("lex")
   })
 
-  it("the Console row (null) still opens a console-owned thread", () => {
-    expect(pickDirectThread([lexOwn, room], null)?.id).toBe("room")
+  it("the Console row (null) opens a console thread, never the group Room", () => {
+    expect(pickDirectThread([lexOwn, room, consoleWithLex], null, "room")?.id).toBe("console")
+  })
+
+  it("the Console row with only the Room around starts a fresh chat", () => {
+    expect(pickDirectThread([lexOwn, room], null, "room")).toBeUndefined()
   })
 })

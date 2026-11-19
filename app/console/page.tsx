@@ -243,6 +243,7 @@ export default function ConsolePage() {
     handleNewChat,
     startDirectChat,
     inRoom,
+    roomSessionId,
     enterRoom,
     leaveRoom,
     switchSession,
@@ -590,7 +591,7 @@ export default function ConsolePage() {
     // Only a thread the agent OWNS: sessionsByAgent also lists Room and Console
     // threads under every agent that spoke in them, and the newest of those is
     // usually the group Room — "Go to Lex" used to land back in it.
-    const own = pickDirectThread(sessionsByAgent[type ?? "null"] ?? [], type)
+    const own = pickDirectThread(sessionsByAgent[type ?? "null"] ?? [], type, roomSessionId)
     if (own) {
       switchSession(own.id)
       setAgentTarget(type)
@@ -616,6 +617,7 @@ export default function ConsolePage() {
           switchSession={switchSession}
           deleteThread={deleteThread}
           handleNewChat={startDirectChat}
+          roomSessionId={roomSessionId}
           missionControlActive={showMissionControl}
           onOpenMissionControl={() => setShowMissionControl(true)}
           onExitMissionControl={() => setShowMissionControl(false)}
