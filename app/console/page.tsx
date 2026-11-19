@@ -19,6 +19,7 @@ import { useIntentRouter } from "@/hooks/useIntentRouter"
 import { useFileUpload } from "@/hooks/useFileUpload"
 import { useAgentMention } from "@/hooks/useAgentMention"
 import { useChat } from "@/hooks/useChat"
+import { pickDirectThread } from "@/lib/agentThreads"
 import { useNotificationFeed } from "@/hooks/useNotificationFeed"
 import { useAgentDeployments } from "@/hooks/useAgentDeployments"
 import { useActiveRuns } from "@/hooks/useActiveRuns"
@@ -242,6 +243,7 @@ export default function ConsolePage() {
     handleNewChat,
     startDirectChat,
     inRoom,
+    roomSessionId,
     enterRoom,
     leaveRoom,
     switchSession,
@@ -586,12 +588,15 @@ export default function ConsolePage() {
 
   const openAgentFromMissionControl = (type: string | null) => {
     setShowMissionControl(false)
-    const key = type ?? "null"
-    const threads = sessionsByAgent[key] ?? []
-    if (threads.length > 0) {
-      switchSession(threads[0].id)
+    // Only a thread the agent OWNS: sessionsByAgent also lists Room and Console
+    // threads under every agent that spoke in them, and the newest of those is
+    // usually the group Room — "Go to Lex" used to land back in it.
+    const own = pickDirectThread(sessionsByAgent[type ?? "null"] ?? [], type, roomSessionId)
+    if (own) {
+      switchSession(own.id)
+      setAgentTarget(type)
     } else {
-      handleNewChat()
+      startDirectChat()
       setAgentTarget(type)
     }
   }
@@ -612,6 +617,7 @@ export default function ConsolePage() {
           switchSession={switchSession}
           deleteThread={deleteThread}
           handleNewChat={startDirectChat}
+          roomSessionId={roomSessionId}
           missionControlActive={showMissionControl}
           onOpenMissionControl={() => setShowMissionControl(true)}
           onExitMissionControl={() => setShowMissionControl(false)}
