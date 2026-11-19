@@ -17,7 +17,7 @@
  * Errors are swallowed like the other alert hooks: a missing alert must
  * never break the rail.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { authedFetch } from '@/lib/deployAuth'
 import type { EnrichedTask } from '@/lib/airaTasks'
 
@@ -63,30 +63,26 @@ export function taskAlertsFrom(tasks: EnrichedTask[]): TaskAlert[] {
 export function useTaskAlerts(): { stuckByAgent: Record<string, TaskAlert[]> } {
   const [alerts, setAlerts] = useState<TaskAlert[]>([])
 
-  const load = useCallback(async (isAlive: () => boolean) => {
-    try {
-      const r = await authedFetch('/api/aira/tasks?limit=100')
-      if (!r.ok) return
-      const j = (await r.json()) as { tasks?: EnrichedTask[] }
-      if (isAlive()) setAlerts(taskAlertsFrom(j.tasks ?? []))
-    } catch {
-      // Deliberately swallowed — see the module doc.
+  useEffect(() => {
+    let cancelled = false
+    const load = () =>
+      authedFetch('/api/aira/tasks?limit=100')
+        .then((r) => (r.ok ? (r.json() as Promise<{ tasks?: EnrichedTask[] }>) : null))
+        .then((j) => {
+          if (!cancelled && j) setAlerts(taskAlertsFrom(j.tasks ?? []))
+        })
+        .catch(() => {
+          // Deliberately swallowed — see the module doc.
+        })
+    load()
+    const t = setInterval(load, POLL_MS)
+    window.addEventListener(TASKS_CHANGED_EVENT, load)
+    return () => {
+      cancelled = true
+      clearInterval(t)
+      window.removeEventListener(TASKS_CHANGED_EVENT, load)
     }
   }, [])
-
-  useEffect(() => {
-    let alive = true
-    const isAlive = () => alive
-    load(isAlive)
-    const t = setInterval(() => load(isAlive), POLL_MS)
-    const onChanged = () => load(isAlive)
-    window.addEventListener(TASKS_CHANGED_EVENT, onChanged)
-    return () => {
-      alive = false
-      clearInterval(t)
-      window.removeEventListener(TASKS_CHANGED_EVENT, onChanged)
-    }
-  }, [load])
 
   const stuckByAgent = useMemo(
     () =>
