@@ -111,7 +111,7 @@ describe("summarizeAgentNotifications titles and tones", () => {
   it("several unread threads open the agent, not a thread", () => {
     const w = summarizeAgentNotifications("leads_qualifier", "Lex", [activity("s1", "a"), activity("s2", "b")])!
     expect(w.title).toBe("New replies from Lex")
-    expect(w.subtitle).toMatch(/^New replies in 2 threads\. Open Lex/)
+    expect(w.subtitle).toBe("New replies in 2 threads.")
     expect(w.sessionId).toBeUndefined()
   })
 })

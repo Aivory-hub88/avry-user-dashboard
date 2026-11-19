@@ -52,6 +52,7 @@ export function summarizeAgentNotifications(
   const connections = items.filter((n): n is Of<'connection'> => n.kind === 'connection')
   const statuses = items.filter((n): n is Of<'status'> => n.kind === 'status')
   const activity = items.filter((n): n is Of<'activity'> => n.kind === 'activity')
+  const tasks = items.filter((n): n is Of<'task'> => n.kind === 'task')
 
   const flagged = approvals.some((a) => readVerifierFinding(a.approval)?.verdict === 'flag')
   const failedConnection = connections.some((c) => c.state === 'failed')
@@ -64,17 +65,18 @@ export function summarizeAgentNotifications(
   }
   for (const c of connections) parts.push(describeConnection(c))
   for (const s of statuses) parts.push(`scheduled run “${s.title}” isn’t running`)
+  if (tasks.length > 0) parts.push(`${plural(tasks.length, 'task', 'tasks')} stuck on the board`)
   if (activity.length === 1) parts.push(`new reply in “${activity[0].title}”`)
   else if (activity.length > 1) parts.push(`new replies in ${activity.length} threads`)
 
   let title: string
   if (approvals.length > 0) title = `${name} needs your approval`
-  else if (failedConnection || statuses.length > 0) title = `${name} needs attention`
+  else if (failedConnection || statuses.length > 0 || tasks.length > 0) title = `${name} needs attention`
   else if (connections.length > 0) title = `${name}: ${describeConnection(connections[0])}`
   else title = activity.length === 1 ? `New reply from ${name}` : `New replies from ${name}`
 
   const tone: ElsewhereWaiting['tone'] =
-    flagged || failedConnection || statuses.length > 0
+    flagged || failedConnection || statuses.length > 0 || tasks.length > 0
       ? 'error'
       : approvals.length > 0 || connections.length > 0
         ? 'warn'
@@ -82,9 +84,8 @@ export function summarizeAgentNotifications(
 
   const onlyOneThread = activity.length === 1 && items.length === 1
   const detail = parts.join(' · ')
-  const subtitle = onlyOneThread
-    ? `${detail[0].toUpperCase()}${detail.slice(1)}. Tap to open it.`
-    : `${detail[0].toUpperCase()}${detail.slice(1)}. Open ${name} to see it.`
+  // The card's own "Open …" action says where to go; the sentence only says what.
+  const subtitle = `${detail[0].toUpperCase()}${detail.slice(1)}.`
 
   return {
     agentType,

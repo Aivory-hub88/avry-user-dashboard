@@ -22,6 +22,7 @@ import { authedFetch } from "@/lib/deployAuth"
 import { relativeTime } from "@/lib/officeRows"
 import type { EnrichedTask, Orchestration } from "@/lib/airaTasks"
 import { useAgentApprovals } from "@/hooks/useAgentApprovals"
+import { notifyTasksChanged } from "@/hooks/useTaskAlerts"
 import {
   describeTool,
   notifyApprovalsChanged,
@@ -65,13 +66,15 @@ const OPEN_STATUSES = new Set(["todo", "in_progress", "blocked"])
 
 const PRESSABLE = "transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.97] disabled:opacity-50"
 
-async function stopTask(taskId: string): Promise<void> {
+export async function stopTask(taskId: string): Promise<void> {
   const r = await authedFetch(`/api/aira/tasks/${encodeURIComponent(taskId)}`, {
     method: "PATCH",
     body: JSON.stringify({ action: "stop" }),
   })
   // 409 = already terminal: the board is just stale, not an error.
   if (!r.ok && r.status !== 409) throw new Error(`HTTP ${r.status}`)
+  // The rail's notification for this task clears with it.
+  notifyTasksChanged()
 }
 
 /** Two-step so a stray click never ends someone's task. */
