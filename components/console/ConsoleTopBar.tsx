@@ -48,7 +48,7 @@ function GroupBar({
   onEditGroup?: () => void
 }) {
   return (
-    <div className="ml-1 flex min-w-0 items-center gap-1.5">
+    <div className="ml-1 flex min-w-0 items-center gap-1.5 overflow-x-auto scrollbar-invisible">
       <button
         type="button"
         onClick={onNewGroup}
@@ -99,7 +99,7 @@ export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, r
 
   return (
     <div className="flex h-12 shrink-0 items-center justify-between border-b border-transparent bg-surface-1/70 px-6 sticky top-0 z-10 backdrop-blur-xl">
-      <div className="flex items-center gap-2 text-[13px] font-medium text-white/80">
+      <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] font-medium text-white/80">
         {inRoom ? (
           <span className="text-[13px] font-medium text-white/80">Mission Control Room</span>
         ) : (
@@ -140,13 +140,16 @@ export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, r
           <GroupBar teams={teams} teamId={teamId} onTeamChange={onTeamChange} onNewGroup={onNewGroup} onEditGroup={onEditGroup} />
         )}
       </div>
-      <div className="flex items-center">
+      <div className="ml-3 flex shrink-0 items-center">
         <button
-          className="console-pill !py-2"
+          type="button"
           onClick={onNewChat}
           title="Start a new conversation"
+          aria-label="New chat"
+          className="flex items-center gap-1.5 rounded-[9px] px-2.5 py-1.5 text-[12.5px] font-medium text-white/75 transition-[background-color,color,transform] duration-150 ease-out hover:bg-white/[0.08] hover:text-white active:scale-[0.97]"
         >
-          New chat
+          <Plus size={15} strokeWidth={2} />
+          New
         </button>
       </div>
     </div>
