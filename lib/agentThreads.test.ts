@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { pickDirectThread } from "./agentThreads"
+import { pickDirectThread, isRoomThread } from "./agentThreads"
 
 describe("pickDirectThread", () => {
   const room = { id: "room", agentType: null }
@@ -25,5 +25,14 @@ describe("pickDirectThread", () => {
 
   it("the Console row with only the Room around starts a fresh chat", () => {
     expect(pickDirectThread([lexOwn, room], null, "room")).toBeUndefined()
+  })
+
+  it("recognises an OLD group thread by its per-bubble agent attribution", () => {
+    const oldRoom = { id: "old-room", agentType: null, messages: [{ role: "user" }, { role: "assistant", agentType: "leads_qualifier" }] }
+    const plainConsole = { id: "c", agentType: null, messages: [{ role: "user" }, { role: "assistant" }] }
+    expect(isRoomThread(oldRoom)).toBe(true)
+    expect(isRoomThread(plainConsole)).toBe(false)
+    expect(isRoomThread({ id: "lex", agentType: "leads_qualifier", messages: [{ role: "assistant", agentType: "x" }] })).toBe(false)
+    expect(pickDirectThread([oldRoom, plainConsole], null)?.id).toBe("c")
   })
 })

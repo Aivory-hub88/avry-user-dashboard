@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { isRoomThread } from '@/lib/agentThreads'
 import { getSessionId, clearSession, generateSessionId, saveSession, getRoomSessionId, saveRoomSessionId } from '@/lib/session'
 import { streamConsoleResponse, typewriterStream } from '@/lib/streaming'
 import { saveSessionMessages, loadSessionMessages, listSessions, getSession, deleteSession, ChatStorageError } from '@/lib/chatPersistence'
@@ -179,12 +180,19 @@ export function useChat({
     // React Compiler style rule; see other documented instances of this.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentSessionId(sid)
-    setRoomSessionId(getRoomSessionId())
     const restored = loadSessionMessages(sid)
+    const restoredType = getSession(sid)?.agentType ?? null
+    // A reload that lands on a group thread must come back in the Room.
+    if (isRoomThread({ id: sid, agentType: restoredType, messages: restored })) {
+      saveRoomSessionId(sid)
+      setRoomSessionId(sid)
+    } else {
+      setRoomSessionId(getRoomSessionId())
+    }
     if (restored.length > 0) setMessages(restored)
     // Restore which agent this thread belongs to — otherwise a refresh
     // always lands back on the Generalist regardless of what was selected.
-    setAgentTarget(getSession(sid)?.agentType ?? null)
+    setAgentTarget(restoredType)
     setSessions(listSessions())
     // Only ever runs once, on mount — setAgentTarget is stable from context.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -758,13 +766,25 @@ export function useChat({
       session.save(currentSessionId, messages, agentTarget)
     }
     const loaded = session.load(targetSessionId)
+    const targetType = session.getAgentType(targetSessionId)
     setMessages(loaded)
     setCurrentSessionId(targetSessionId)
-    // A thread keeps the agent it was started under — restore it so the
-    // next message doesn't silently go to whatever was selected before.
-    setAgentTarget(session.getAgentType(targetSessionId))
+    if (isRoomThread({ id: targetSessionId, agentType: targetType, messages: loaded }, roomSessionId)) {
+      // Opening a group thread (even an old one) puts the user in the Room;
+      // otherwise a multi-agent thread rendered as "Direct".
+      if (!inRoom) directPointerRef.current = { sid: currentSessionId, agent: agentTarget }
+      if (targetSessionId !== roomSessionId) {
+        saveRoomSessionId(targetSessionId)
+        setRoomSessionId(targetSessionId)
+      }
+      setAgentTarget(null)
+    } else {
+      // A thread keeps the agent it was started under — restore it so the
+      // next message doesn't silently go to whatever was selected before.
+      setAgentTarget(targetType)
+    }
     setSessions(listSessions())
-  }, [currentSessionId, messages, session, agentTarget, setAgentTarget])
+  }, [currentSessionId, messages, session, agentTarget, setAgentTarget, roomSessionId, inRoom])
 
   // Deletes a thread outright. If it's the one currently open, start a
   // fresh empty thread under the same agent rather than leaving the view
@@ -791,7 +811,9 @@ export function useChat({
   // already updatedAt-desc from listSessions(), so each group stays
   // most-recent-first too.
   const sessionsByAgent = sessions.reduce<Record<string, ChatSession[]>>((acc, s) => {
-    const keys = new Set<string>([s.agentType ?? 'null'])
+    // A group thread is not the Console's: it is listed only under the agents
+    // that spoke in it.
+    const keys = new Set<string>(isRoomThread(s, roomSessionId) ? [] : [s.agentType ?? 'null'])
     for (const m of s.messages) {
       if (m.agentType) keys.add(m.agentType)
     }

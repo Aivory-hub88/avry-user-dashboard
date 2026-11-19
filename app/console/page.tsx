@@ -245,7 +245,6 @@ export default function ConsolePage() {
     inRoom,
     roomSessionId,
     enterRoom,
-    leaveRoom,
     switchSession,
     deleteThread,
     replyTo,
@@ -285,14 +284,15 @@ export default function ConsolePage() {
   // mentionable — @ expands to this list, sends fan out in parallel.
   // The Room is its own thread (a group chat with the deployed agents), not a
   // composer mode over the Direct thread — so the mode simply follows which thread is open.
-  const chatMode: ConsoleChatMode = inRoom ? "room" : "direct"
+  // Derived from the open thread, never stored: Group = the multi-agent Room,
+  // Agents = a thread with one agent, Direct = the regular Aivory Console chat.
+  const chatMode: ConsoleChatMode = inRoom ? "room" : agentTarget ? "agents" : "direct"
 
-  const changeChatMode = useCallback((mode: ConsoleChatMode) => {
-    // No toast here — entering Room is announced by the Room card in the
-    // rail notification feed instead (a top toast overlapped the header).
-    if (mode === "room") enterRoom()
-    else leaveRoom()
-  }, [enterRoom, leaveRoom])
+  // The agent the "Agents" tab returns to: the last one the user was on.
+  const lastAgentRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (agentTarget && !inRoom) lastAgentRef.current = agentTarget
+  }, [agentTarget, inRoom])
 
   // @mention tracking for the empty-state composer (the threaded view uses
   // ChatInput's own built-in mention support).
@@ -598,6 +598,19 @@ export default function ConsolePage() {
     } else {
       startDirectChat()
       setAgentTarget(type)
+    }
+  }
+
+  const changeChatMode = (mode: ConsoleChatMode) => {
+    // No toast here — entering Room is announced by the Room card in the
+    // rail notification feed instead (a top toast overlapped the header).
+    if (mode === "room") {
+      setShowMissionControl(false)
+      enterRoom()
+    } else if (mode === "direct") {
+      openAgentFromMissionControl(null)
+    } else {
+      openAgentFromMissionControl(lastAgentRef.current ?? mentionCandidates[0]?.type ?? null)
     }
   }
 
