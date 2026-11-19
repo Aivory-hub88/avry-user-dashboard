@@ -48,39 +48,41 @@ function GroupBar({
   onEditGroup?: () => void
 }) {
   return (
-    <div className="ml-1 flex min-w-0 items-center gap-1.5 overflow-x-auto scrollbar-invisible">
+    <div className="ml-1 flex min-w-0 items-center gap-1.5">
       <button
         type="button"
         onClick={onNewGroup}
-        className="flex shrink-0 items-center gap-1.5 rounded-full border border-dashed border-white/25 px-3 py-1 text-[11px] font-medium text-white/70 transition-all duration-200 hover:border-solid hover:border-white/40 hover:bg-white/[0.06] hover:text-white active:scale-95"
+        aria-label="Create group"
+        title="Create group"
+        className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-dashed border-white/25 px-2.5 py-1 text-[11px] font-medium text-white/70 transition-all duration-200 hover:border-solid hover:border-white/40 hover:bg-white/[0.06] hover:text-white active:scale-95"
       >
         <Plus size={12} strokeWidth={2.5} />
-        Create group
+        <span className="hidden xl:inline">Create group</span>
       </button>
       {teams.map((t) => {
         const on = t.id === teamId
         return (
-          <span key={t.id} className="flex shrink-0 items-center gap-0.5">
+          <span key={t.id} className="flex min-w-0 items-center gap-0.5">
             <button
               type="button"
               aria-pressed={on}
               onClick={() => onTeamChange(on ? null : t.id)}
               title={on ? "Back to all agents" : `Use ${t.name} in this room`}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-all duration-200 active:scale-95 ${
+              className={`flex min-w-0 max-w-[11rem] items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-all duration-200 active:scale-95 ${
                 on
                   ? "border-white bg-white text-black shadow-[0_0_0_3px_rgba(255,255,255,0.08)]"
                   : "border-white/10 bg-white/[0.03] text-white/60 hover:border-white/20 hover:bg-white/[0.06] hover:text-white/90"
               }`}
             >
-              <span className={`h-1.5 w-1.5 rounded-full ${on ? "bg-black/60" : "bg-white/25"}`} />
-              {t.name}
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${on ? "bg-black/60" : "bg-white/25"}`} />
+              <span className="truncate">{t.name}</span>
             </button>
             {on && onEditGroup && (
               <button
                 type="button"
                 onClick={onEditGroup}
                 aria-label="Group info"
-                className="rounded-full px-2 py-[3px] text-[11px] text-white/45 hover:bg-white/[0.06] hover:text-white/85"
+                className="shrink-0 whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] text-white/45 hover:bg-white/[0.06] hover:text-white/85"
               >
                 Info
               </button>
@@ -101,11 +103,11 @@ export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, r
     <div className="flex h-12 shrink-0 items-center justify-between border-b border-transparent bg-surface-1/70 px-6 sticky top-0 z-10 backdrop-blur-xl">
       <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] font-medium text-white/80">
         {inRoom ? (
-          <span className="text-[13px] font-medium text-white/80">Mission Control Room</span>
+          <span className="hidden shrink-0 whitespace-nowrap text-[13px] font-medium text-white/80 2xl:inline">Mission Control Room</span>
         ) : (
           <>
             {activeAgent ? <Bot className="w-3.5 h-3.5 text-accent" /> : <Terminal className="w-3.5 h-3.5 text-accent" />}
-            {activeAgent ? activeAgent.name : "Aivory Console"}
+            <span className="whitespace-nowrap">{activeAgent ? activeAgent.name : "Aivory Console"}</span>
           </>
         )}
         {agentTarget && !inRoom && (
@@ -114,7 +116,7 @@ export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, r
           </span>
         )}
         {onChatModeChange && (
-          <span className="relative ml-2 grid grid-cols-3 items-center rounded-full border border-white/10 bg-black/30 p-[3px] shadow-inner" role="tablist" aria-label="Chat mode">
+          <span className="relative ml-2 grid shrink-0 grid-cols-3 items-center rounded-full border border-white/10 bg-black/30 p-[3px] shadow-inner" role="tablist" aria-label="Chat mode">
             <span
               aria-hidden
               className="absolute inset-y-[3px] left-[3px] w-[calc((100%-6px)/3)] rounded-full bg-white shadow-[0_1px_6px_rgba(0,0,0,0.45)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
