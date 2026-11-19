@@ -132,9 +132,14 @@ export default function AgentColumn({
   const channelsFor = (type: string | null) =>
     type ? [...new Set(deployments.filter((d) => d.agentType === type).map((d) => d.kind))] : []
 
+  // The Room has no agent of its own (agentTarget is null there), which equals
+  // the Aivory Console row's type: without this the Aivory click read as "already
+  // here" and only toggled the dropdown instead of leaving the Room.
+  const inRoom = roomSessionId != null && currentSessionId === roomSessionId
+
   const openAgent = (row: Row) => {
     const threads = sessionsByAgent[row.key] ?? []
-    if (row.type === agentTarget && !missionControlActive) {
+    if (row.type === agentTarget && !missionControlActive && !inRoom) {
       setExpanded((e) => (e === row.key ? "" : row.key))
       return
     }
@@ -190,7 +195,7 @@ export default function AgentColumn({
         </button>
         <div className="flex flex-1 flex-col items-center gap-[6px] overflow-y-auto pb-4">
           {ROWS.map((row) => {
-            const isActiveAgent = !missionControlActive && row.type === agentTarget
+            const isActiveAgent = !missionControlActive && !inRoom && row.type === agentTarget
             const pending = notificationsByAgent[row.key]?.length ?? 0
             const isConsole = row.type === null
             const isThinkingHere = row.type === streamingAgentType
@@ -287,7 +292,7 @@ export default function AgentColumn({
           const threads = sessionsByAgent[row.key] ?? []
           if (!matchesQuery(row, threads)) return null
           const isOpen = expanded === row.key
-          const isActiveAgent = !missionControlActive && row.type === agentTarget
+          const isActiveAgent = !missionControlActive && !inRoom && row.type === agentTarget
           const channels = channelsFor(row.type)
           const pending = notificationsByAgent[row.key]?.length ?? 0
           const mostRecent = threads[0]
