@@ -10,6 +10,7 @@ import { useMemo } from 'react'
 import { useAgentApprovals } from './useAgentApprovals'
 import { useScheduleAlerts } from './useScheduleAlerts'
 import { useConnectionAlerts } from '@/hooks/useConnectionAlerts'
+import { useTaskAlerts } from '@/hooks/useTaskAlerts'
 import { useThreadActivity } from './useThreadActivity'
 import type { ChatSession } from './useChat'
 import type { Notification } from '@/types/notifications'
@@ -31,6 +32,9 @@ export function useNotificationFeed({
   // happening" is the failure this whole feature was built around.
   const { failedByAgent } = useScheduleAlerts()
   const { alertsByAgent } = useConnectionAlerts()
+  // Mission Control's Waiting column: a task parked there raised no approval,
+  // so without this it sat on the board for days with nothing pointing at it.
+  const { stuckByAgent } = useTaskAlerts()
 
   const byAgent = useMemo(() => {
     const result: Record<string, Notification[]> = {}
@@ -39,6 +43,7 @@ export function useNotificationFeed({
       ...Object.keys(activityByAgent),
       ...Object.keys(failedByAgent),
       ...Object.keys(alertsByAgent),
+      ...Object.keys(stuckByAgent),
     ])
     for (const key of keys) {
       const items: Notification[] = [
@@ -72,11 +77,21 @@ export function useNotificationFeed({
           daysLeft: a.daysLeft,
           detail: a.detail,
         })),
+        ...(stuckByAgent[key] ?? []).map((t): Notification => ({
+          id: `task:${t.taskId}`,
+          kind: 'task',
+          agentType: key,
+          taskId: t.taskId,
+          title: t.title,
+          reason: t.reason,
+          blocked: t.blocked,
+          updatedAt: t.updatedAt,
+        })),
       ]
       if (items.length > 0) result[key] = items
     }
     return result
-  }, [approvals.byAgent, activityByAgent, failedByAgent, alertsByAgent])
+  }, [approvals.byAgent, activityByAgent, failedByAgent, alertsByAgent, stuckByAgent])
 
   return {
     byAgent,

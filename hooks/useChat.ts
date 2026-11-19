@@ -687,6 +687,24 @@ export function useChat({
     setSessions(listSessions())
   }, [currentSessionId, messages, session, agentTarget, inRoom, resetAgentic, clearAttachments])
 
+  // A fresh Direct thread even when called from inside the Room. handleNewChat
+  // deliberately keeps the Room's "new chat" in the Room, so an agent clicked
+  // in the column with no thread of its own used to open yet another Room
+  // thread and leave the user stuck in the group.
+  const startDirectChat = useCallback(() => {
+    if (messages.length > 0) {
+      session.save(currentSessionId, messages, agentTarget)
+    }
+    clearSession()
+    const sid = generateSessionId()
+    saveSession(sid)
+    setCurrentSessionId(sid)
+    setMessages([])
+    clearAttachments()
+    resetAgentic()
+    setSessions(listSessions())
+  }, [currentSessionId, messages, session, agentTarget, resetAgentic, clearAttachments])
+
   // Open the Room: its own thread, separate from Direct. Nothing is mentioned yet, so a
   // plain message goes to Aivory and @Agent calls a teammate in.
   const enterRoom = useCallback(() => {
@@ -797,6 +815,7 @@ export function useChat({
     handleSendRoom,
     stopStreaming,
     handleNewChat,
+    startDirectChat,
     inRoom,
     enterRoom,
     leaveRoom,

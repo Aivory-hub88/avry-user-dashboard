@@ -49,6 +49,7 @@ import type { ActiveAgentRun } from "@/lib/agentRuns"
 import { describeTool, toolkitIconPath, readVerifierFinding, type PendingApproval } from "@/lib/agentApprovals"
 import type { Notification } from "@/types/notifications"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
+import { stopTask } from "@/components/office/MissionTimeline"
 import { NotificationCard } from "@/components/office/NotificationCard"
 import { MemoryModal } from "@/components/office/MemoryModal"
 import { useWorkspaceAwareness } from "@/hooks/useWorkspaceAwareness"
@@ -150,6 +151,14 @@ function ElsewhereSection({
           title={i.title}
           subtitle={i.subtitle}
           badge={formatBadgeCount(i.count)}
+          actions={
+            i.sessionId || onOpenAgent ? (
+              <span className="flex w-full items-center justify-between text-[11.5px] font-semibold text-white/85">
+                {i.sessionId ? "Open thread" : `Go to ${i.name}`}
+                <ChevronRight className="h-[14px] w-[14px] text-white/50" />
+              </span>
+            ) : undefined
+          }
           onClick={
             i.sessionId
               ? () => onOpenThread(i.sessionId!)
@@ -256,6 +265,7 @@ export default function AgentRail({
   const activityItems = notifications.filter((n): n is Extract<Notification, { kind: "activity" }> => n.kind === "activity")
   const statusItems = notifications.filter((n): n is Extract<Notification, { kind: "status" }> => n.kind === "status")
   const connectionItems = notifications.filter((n): n is Extract<Notification, { kind: "connection" }> => n.kind === "connection")
+  const taskItems = notifications.filter((n): n is Extract<Notification, { kind: "task" }> => n.kind === "task")
   const channels = agentTarget ? deployments.filter((d) => d.agentType === agentTarget) : []
   const notDeployed = agentTarget !== null && channels.length === 0
   const visibleAwarenessPeers = workspaceId ? awarenessPeers : []
@@ -500,6 +510,38 @@ export default function AgentRail({
                     item.state === "failed"
                       ? `${item.detail ?? "Its credentials were rejected."} Fix it under Customise agent → MCP.`
                       : "Create a longer-lived key in Odoo, then reconnect it under Customise agent → MCP."
+                  }
+                />
+              ))}
+
+              {/* Mission Control tasks parked in Waiting (or past SLA) with no
+                  approval behind them. Always `error`: nothing here can be
+                  approved, the work is simply not moving. */}
+              {taskItems.map((item) => (
+                <NotificationCard
+                  key={item.id}
+                  tone="error"
+                  badge={item.blocked ? "Stuck" : "Overdue"}
+                  icon={<IoWarning className="h-[16px] w-[16px]" />}
+                  title={item.title}
+                  subtitle={item.reason ?? "Open past its time limit. Check it on the Mission board."}
+                  meta={relativeTime(item.updatedAt)}
+                  actions={
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href="/console/missions"
+                        className="rounded-full bg-white/[0.9] px-3 py-1 text-[11px] font-semibold text-black hover:bg-white"
+                      >
+                        Open board
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => void stopTask(item.taskId).catch(() => {})}
+                        className="rounded-full border border-white/10 px-3 py-1 text-[11px] text-white/65 hover:bg-white/[0.06] hover:text-white/85"
+                      >
+                        Stop task
+                      </button>
+                    </div>
                   }
                 />
               ))}

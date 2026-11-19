@@ -240,6 +240,7 @@ export default function ConsolePage() {
     handleSendRoom,
     stopStreaming,
     handleNewChat,
+    startDirectChat,
     inRoom,
     enterRoom,
     leaveRoom,
@@ -311,22 +312,6 @@ export default function ConsolePage() {
     emptyMention.closeMenu()
     emptyMention.focusAndRestore(applied.caret)
   }, [emptyMention, inputValue])
-
-  // Room: clicking a member's avatar calls them into the message instead of switching
-  // thread. The empty-state composer is page-owned; the threaded ChatInput takes the
-  // token through `insertText` (nonce makes repeated clicks on one agent still fire).
-  const [mentionInsert, setMentionInsert] = useState<{ text: string; nonce: number } | null>(null)
-  const mentionAgent = useCallback((type: string) => {
-    const c = mentionCandidates.find((m) => m.type === type)
-    if (!c) return
-    const token = `@${c.name} `
-    if (messages.length === 0) {
-      setInputValue((v) => (v && !/\s$/.test(v) ? `${v} ` : v) + token)
-      requestAnimationFrame(() => textareaRef.current?.focus())
-    } else {
-      setMentionInsert({ text: token, nonce: Date.now() })
-    }
-  }, [mentionCandidates, messages.length])
 
   // Empty-state composer keys: mention menu first (↑/↓/Enter/Tab/Esc),
   // plain Enter sends (room-aware via handleSendWithWorkspace).
@@ -624,11 +609,9 @@ export default function ConsolePage() {
           streamingAgentType={streamingAgentType}
           activeRunsByAgentType={activeRunsByAgentType}
           setAgentTarget={setAgentTarget}
-          roomMode={inRoom}
-          onMentionAgent={mentionAgent}
           switchSession={switchSession}
           deleteThread={deleteThread}
-          handleNewChat={handleNewChat}
+          handleNewChat={startDirectChat}
           missionControlActive={showMissionControl}
           onOpenMissionControl={() => setShowMissionControl(true)}
           onExitMissionControl={() => setShowMissionControl(false)}
@@ -1002,7 +985,6 @@ export default function ConsolePage() {
                   onRemoveAttachment={(i) => setAttachments(prev => prev.filter((_, idx) => idx !== i))}
                   enableMentions={inRoom}
                   mentionCandidates={mentionCandidates}
-                  insertText={mentionInsert}
                   placeholder={inRoom ? t('sendPlaceholderRoom') : undefined}
                   isStreaming={isStreaming}
                   onStop={stopStreaming}

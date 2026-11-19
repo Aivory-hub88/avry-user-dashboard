@@ -25,3 +25,8 @@ export type Notification =
   /** A connected tool that needs the user: credential rejected, or an Odoo
    *  API key about to expire (see hooks/useConnectionAlerts.ts). */
   | { id: string; kind: 'connection'; agentType: string; serverName: string; state: 'failed' | 'expiring'; daysLeft: number | null; detail: string | null }
+  /** A Mission Control ledger task that is stuck: parked `blocked` (a failed
+   *  delegation, a missing input) or open past its SLA. Standing condition like
+   *  `status` — it clears when the task moves or is stopped. Approval waits are
+   *  NOT repeated here; the `approval` kind already carries them. */
+  | { id: string; kind: 'task'; agentType: string; taskId: string; title: string; reason: string | null; blocked: boolean; updatedAt: number }
