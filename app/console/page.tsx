@@ -11,6 +11,7 @@ import ChatInput, { SendArrowIcon } from "@/components/ChatInput"
 import CreditUsageRing from "@/components/credits/CreditUsageRing"
 import ConsoleTopBar, { type ConsoleChatMode } from "@/components/console/ConsoleTopBar"
 import AgentMentionMenu from "@/components/console/AgentMentionMenu"
+import MicButton from "@/components/console/MicButton"
 import SuggestionChips from "@/components/chat/SuggestionChips"
 import ActionList from "@/components/chat/ActionList"
 import { RoutingSuggestBanner } from "@/components/chat/RoutingSuggestBanner"
@@ -798,6 +799,21 @@ export default function ConsolePage() {
                       <path d="M12 5v14M5 12h14"/>
                     </svg>
                   </button>
+                  <div className="flex items-center gap-2">
+                  <MicButton
+                    disabled={isStreaming}
+                    onError={(msg) => addToast("error", msg)}
+                    onText={(text) => {
+                      setInputValue((v) => (v && !/\s$/.test(v) ? `${v} ` : v) + text)
+                      setTimeout(() => {
+                        const el = textareaRef.current
+                        if (!el) return
+                        el.style.height = "auto"
+                        el.style.height = `${Math.min(el.scrollHeight, 180)}px`
+                        el.focus()
+                      }, 0)
+                    }}
+                  />
                   <button
                     onClick={() => {
                       if (isStreaming) {
@@ -822,6 +838,7 @@ export default function ConsolePage() {
                       <SendArrowIcon size={16} />
                     )}
                   </button>
+                  </div>
                 </div>
                 <button
                   onClick={() => setConnectorsOpen(true)}
