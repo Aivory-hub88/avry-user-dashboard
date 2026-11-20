@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from "react"
 import UploadMenu, { Attachment } from "./UploadMenu"
 import { AttachmentCard } from "./AttachmentCard"
 import AgentMentionMenu from "./console/AgentMentionMenu"
+import MicButton from "./console/MicButton"
 import { useAgentMention } from "@/hooks/useAgentMention"
 import CreditUsageRing from "./credits/CreditUsageRing"
 import type { MentionCandidate } from "@/lib/agentMentions"
@@ -126,6 +127,17 @@ export default function ChatInput({ onSend, disabled = false, prefill, insertTex
     setTimeout(() => setToast(""), 3000)
   }
 
+  const appendTranscript = (text: string) => {
+    setMessage((m) => (m && !/\s$/.test(m) ? `${m} ` : m) + text)
+    setTimeout(() => {
+      const el = textareaRef.current
+      if (!el) return
+      el.style.height = 'auto'
+      el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+      el.focus()
+    }, 0)
+  }
+
   const handleSend = () => {
     console.log('[INPUT DEBUG] handleSend triggered')
     const trimmed = message.trim()
@@ -207,6 +219,9 @@ export default function ChatInput({ onSend, disabled = false, prefill, insertTex
 
   return (
     <div className="relative">
+      {toast && (
+        <div role="status" className="mb-2 px-1 text-[12.5px] text-red-400">{toast}</div>
+      )}
       {/* Pending attachments from drag & drop */}
       {pendingAttachments.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-3">
@@ -303,6 +318,13 @@ export default function ChatInput({ onSend, disabled = false, prefill, insertTex
             disabled={disabled}
             rows={1}
             className="console-textarea console-textarea--inline flex-1 min-w-0 text-[15px]"
+          />
+          {/* Speak-to-prompt: transcript lands in the draft, editable before send */}
+          <MicButton
+            onText={appendTranscript}
+            onError={showToast}
+            disabled={disabled}
+            className="console-icon-btn mb-[2px]"
           />
           {/* Send button — morphs into stop while a turn is in flight */}
           {isStreaming && onStop ? (
