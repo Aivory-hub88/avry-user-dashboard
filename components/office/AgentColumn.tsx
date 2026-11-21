@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import { ChevronRight, ChevronLeft, Lock, Plus, Trash2, LayoutGrid, Search } from "lucide-react"
 import { asset } from "@/lib/asset"
-import type { AgentDeployment } from "@/lib/agentChat"
+import { isExternalDeployment, type AgentDeployment } from "@/lib/agentChat"
 import type { ActiveAgentRun } from "@/lib/agentRuns"
 import type { ChatSession } from "@/hooks/useChat"
 import type { Notification } from "@/types/notifications"
@@ -130,7 +130,7 @@ export default function AgentColumn({
   }, [agentTarget])
 
   const channelsFor = (type: string | null) =>
-    type ? [...new Set(deployments.filter((d) => d.agentType === type).map((d) => d.kind))] : []
+    type ? [...new Set(deployments.filter((d) => d.agentType === type && isExternalDeployment(d)).map((d) => d.kind))] : []
 
   // The Room has no agent of its own (agentTarget is null there), which equals
   // the Aivory Console row's type: without this the Aivory click read as "already

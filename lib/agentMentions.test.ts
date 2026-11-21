@@ -15,7 +15,7 @@ import {
   resolveNamedAgents,
   stripAgentMentions,
 } from "@/lib/agentMentions"
-import type { AgentDeployment } from "@/lib/agentChat"
+import { PREBUILT_AGENTS, withConsoleDeployments, type AgentDeployment } from "@/lib/agentChat"
 
 const deployments: AgentDeployment[] = [
   { kind: "telegram", id: "b1", agentType: "customer_service", label: "Support" },
@@ -438,5 +438,19 @@ describe("withAllMention", () => {
   it("omits @all for a single agent", async () => {
     const { withAllMention } = await import("./agentMentions")
     expect(withAllMention(cs.slice(0, 1), "").map((c) => c.name)).toEqual(["Aira"])
+  })
+})
+
+describe("Console + Workspace deployment", () => {
+  it("makes every roster agent mentionable without any external channel", () => {
+    const all = getMentionCandidates(withConsoleDeployments([]))
+    expect(all.map((c) => c.type).sort()).toEqual(PREBUILT_AGENTS.map((a) => a.type).sort())
+    expect(all.every((c) => c.channels.includes("console"))).toBe(true)
+  })
+
+  it("keeps external channels alongside console", () => {
+    const ds = withConsoleDeployments(deployments)
+    const teo = getMentionCandidates(ds).find((c) => c.type === "customer_service")
+    expect(teo?.channels).toEqual(expect.arrayContaining(["telegram", "slack", "console"]))
   })
 })

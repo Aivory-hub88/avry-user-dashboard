@@ -295,6 +295,21 @@ function DeploymentRow({ deployment, onDisconnect }: { deployment: AgentDeployme
   );
 }
 
+/** Built-in, always-on deployment: Console chat, Agents mode and Group rooms. Nothing to disconnect. */
+function ConsoleDeploymentRow() {
+  const t = useTranslations('agents');
+  return (
+    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-accent/[0.05] border border-accent/[0.12]">
+      <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3 shrink-0 text-white/60" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3M5.25 20.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+      </svg>
+      <span className="text-[10.5px] text-white/65 truncate flex-1">{t('consoleDeployment')}</span>
+      <span className="text-[9.5px] uppercase tracking-wider text-white/30 shrink-0">{t('consoleDeploymentAlwaysOn')}</span>
+    </div>
+  );
+}
+
 function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: typeof AGENTS[0], deployments: AgentDeployment[], onConfigure: () => void, onDisconnect: (d: AgentDeployment) => void }) {
   const t = useTranslations('agents');
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -412,13 +427,12 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
         )}
 
         {/* Live deployments (with disconnect) */}
-        {deployments.length > 0 && (
-          <div className="flex flex-col gap-1.5 mt-3.5">
-            {deployments.map((d) => (
-              <DeploymentRow key={`${d.kind}_${d.id}`} deployment={d} onDisconnect={onDisconnect} />
-            ))}
-          </div>
-        )}
+        <div className="flex flex-col gap-1.5 mt-3.5">
+          <ConsoleDeploymentRow />
+          {deployments.map((d) => (
+            <DeploymentRow key={`${d.kind}_${d.id}`} deployment={d} onDisconnect={onDisconnect} />
+          ))}
+        </div>
 
         <div className="mt-auto pt-5 flex items-center gap-2">
           <button

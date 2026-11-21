@@ -43,7 +43,7 @@ import { ChevronLeft, ChevronRight, Brain } from "lucide-react"
 // legitimately-licensed way to get that same visual language.
 import { IoWarning, IoCheckmarkCircle, IoChatbubbleEllipses, IoAt } from "react-icons/io5"
 import { asset } from "@/lib/asset"
-import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
+import { PREBUILT_AGENTS, isExternalDeployment, type AgentDeployment } from "@/lib/agentChat"
 import type { MentionCandidate } from "@/lib/agentMentions"
 import type { ActiveAgentRun } from "@/lib/agentRuns"
 import { describeTool, toolkitIconPath, readVerifierFinding, type PendingApproval } from "@/lib/agentApprovals"
@@ -267,7 +267,9 @@ export default function AgentRail({
   const connectionItems = notifications.filter((n): n is Extract<Notification, { kind: "connection" }> => n.kind === "connection")
   const taskItems = notifications.filter((n): n is Extract<Notification, { kind: "task" }> => n.kind === "task")
   const channels = agentTarget ? deployments.filter((d) => d.agentType === agentTarget) : []
-  const notDeployed = agentTarget !== null && channels.length === 0
+  // Console + Workspace always counts as deployed; this only flags an agent
+  // that has no channel *outside* Console yet, as a gentle prompt.
+  const noExternalChannel = agentTarget !== null && !channels.some(isExternalDeployment)
   const visibleAwarenessPeers = workspaceId ? awarenessPeers : []
 
   // NOTE (conversational approval protocol): the agent asks in plain language
@@ -371,23 +373,22 @@ export default function AgentRail({
                   onClick={onRetryApprovals}
                 />
               )}
-              {notDeployed && (
+              {noExternalChannel && (
                 <NotificationCard
-                  tone="warn"
                   icon={<IoWarning className="h-[15px] w-[15px]" />}
-                  title="Not deployed anywhere yet"
-                  subtitle="Connect it to Telegram or Slack to reach it outside Console."
+                  title="Live in Console + Workspace"
+                  subtitle="Connect it to Telegram, Slack or WhatsApp to reach it outside Console."
                   actions={
                     <Link
                       href="/agents"
                       className="text-[12px] font-medium text-[#FFB454] underline underline-offset-2 transition-colors hover:text-[#ffc57a]"
                     >
-                      Deploy this agent
+                      Add a channel
                     </Link>
                   }
                 />
               )}
-              {!approvalsError && notifications.length === 0 && !notDeployed && (
+              {!approvalsError && notifications.length === 0 && !noExternalChannel && (
                 <div className="px-0.5 text-[12.5px] font-light text-white/70">Nothing new right now.</div>
               )}
 
