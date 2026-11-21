@@ -759,6 +759,7 @@
     "disconnectDeployment": "Disconnect deployment",
     "openInSlack": "Open chat with {label} in Slack",
     "enterpriseBadge": "Enterprise",
+    "businessBadge": "Business",
     "configure": "Configure",
     "agentActivityTitle": "Agent Activity",
     "agentActivitySubtitle": "actions your deployed agents took",
@@ -838,6 +839,14 @@
       "Channel drafts",
       "Campaign links",
       "Competitor research"
+    ],
+    "researchTitle": "Research & Evidence Agent",
+    "researchDesc": "Source-cited research on companies, markets, regulations and topics, with contradictions flagged and confidence stated. Read-only: it never sends messages or changes your data.",
+    "researchTools": [
+      "Cited research",
+      "Competitor and market briefs",
+      "Regulation checks",
+      "Contradiction flags"
     ],
     "chiefOfStaffTitle": "Chief of Staff Agent",
     "chiefOfStaffDesc": "Coordinate your AI team, route work to the right specialist, and receive one coherent outcome with approvals kept in the loop.",

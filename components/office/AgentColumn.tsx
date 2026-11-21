@@ -346,7 +346,7 @@ export default function AgentColumn({
                     >
                       {row.title}
                     </span>
-                    {row.enterprise && <Lock className="h-[10.5px] w-[10.5px] shrink-0 text-amber-warn/90" />}
+                    {(row.enterprise || row.minTier) && <Lock className="h-[10.5px] w-[10.5px] shrink-0 text-amber-warn/90" />}
                     {mostRecent && (
                       <span className="shrink-0 text-[10.5px] font-light tabular-nums text-white/30">
                         {relativeTime(mostRecent.updatedAt)}

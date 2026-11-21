@@ -29,17 +29,29 @@ export interface AgentRosterEntry {
   /** First name shown in the Console/rail — see docs/AGENT-NAMING (11 Sep 2026). */
   name: string
   title: string
+  /** True only for Enterprise-only agents (kept for the existing lock/badge UI). */
   enterprise?: boolean
+  /** Lowest plan that can use this agent; unset = every paid plan. The backend
+   *  enforces it (avry-backend AGENT_MIN_TIER); this is for display only. */
+  minTier?: AgentMinTier
 }
 
 // Dashboard-only tier gating — not part of Cerveau's own roster metadata,
 // so it can't be generated from the backend endpoint. Update by hand if a
-// new agent needs an Enterprise-only gate.
-const ENTERPRISE_AGENT_TYPES = new Set<AgentType>(['office_assistant'])
+// new agent needs a minimum plan.
+export type AgentMinTier = 'business' | 'enterprise'
 
-export const AGENT_ROSTER: readonly AgentRosterEntry[] = AGENT_ROSTER_RAW.map((a) =>
-  ENTERPRISE_AGENT_TYPES.has(a.type) ? { ...a, enterprise: true } : { ...a },
-)
+// Must mirror AGENT_MIN_TIER in avry-backend (app/services/telegram_service.py).
+const MIN_TIER_BY_AGENT: Partial<Record<AgentType, AgentMinTier>> = {
+  office_assistant: 'enterprise',
+  deep_researcher: 'business', // Nara
+}
+
+export const AGENT_ROSTER: readonly AgentRosterEntry[] = AGENT_ROSTER_RAW.map((a) => {
+  const minTier = MIN_TIER_BY_AGENT[a.type]
+  if (!minTier) return { ...a }
+  return minTier === 'enterprise' ? { ...a, minTier, enterprise: true } : { ...a, minTier }
+})
 
 export const AGENT_NAMES: Record<AgentType, string> = Object.fromEntries(
   AGENT_ROSTER.map((a) => [a.type, a.name]),

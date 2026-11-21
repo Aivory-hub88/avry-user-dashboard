@@ -16,5 +16,6 @@ export const AGENT_ROSTER_RAW = [
   { type: "data_analyst", name: "Ivo", title: "Data & Reporting Analyst" },
   { type: "operations_inventory", name: "Juno", title: "Operations & Inventory Agent" },
   { type: "marketing_content", name: "Mira", title: "Marketing & Content Agent" },
+  { type: "deep_researcher", name: "Nara", title: "Research & Evidence Agent" },
   { type: "chief_of_staff", name: "Aira", title: "Chief of Staff Agent" },
 ] as const
