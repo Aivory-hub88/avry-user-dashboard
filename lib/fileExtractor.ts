@@ -40,7 +40,9 @@ export async function extractTextFromFile(file: File): Promise<string> {
       console.log(`[fileExtractor] plain text read: ${text.length} chars`)
     }
 
-    const result = truncate(text)
+    // A truncated data URL is corrupt base64 — images are passed through whole
+    // (size is already capped by validateFileSize).
+    const result = file.type.startsWith('image/') ? text : truncate(text)
     console.log(`[fileExtractor] extraction complete: ${result.length} chars, preview: "${result.substring(0, 100)}"`)
     return result
   } catch (err) {
