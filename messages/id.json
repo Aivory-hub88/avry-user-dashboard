@@ -759,6 +759,7 @@
     "disconnectDeployment": "Putuskan deployment",
     "openInSlack": "Buka chat dengan {label} di Slack",
     "enterpriseBadge": "Enterprise",
+    "businessBadge": "Business",
     "configure": "Konfigurasi",
     "agentActivityTitle": "Aktivitas Agen",
     "agentActivitySubtitle": "tindakan yang dilakukan agen yang Anda deploy",
@@ -838,6 +839,14 @@
       "Draf per kanal",
       "Tautan kampanye",
       "Riset kompetitor"
+    ],
+    "researchTitle": "Research & Evidence Agent",
+    "researchDesc": "Riset bersitasi tentang perusahaan, pasar, regulasi, dan topik, dengan kontradiksi ditandai dan tingkat keyakinan dinyatakan. Hanya membaca: tidak pernah mengirim pesan atau mengubah data Anda.",
+    "researchTools": [
+      "Riset bersitasi",
+      "Ringkasan kompetitor dan pasar",
+      "Cek regulasi",
+      "Penanda kontradiksi"
     ],
     "chiefOfStaffTitle": "Chief of Staff Agent",
     "chiefOfStaffDesc": "Mengatur tim AI, meneruskan pekerjaan ke spesialis yang tepat, dan memberi satu hasil terpadu dengan approval tetap terjaga.",
