@@ -205,7 +205,7 @@ export default function MissionControl({
                     <div className="min-w-0">
                       <div className="flex items-center gap-[6px]">
                         <span className="truncate text-[14px] font-medium text-white">{row.title}</span>
-                        {row.enterprise && <Lock className="h-[11px] w-[11px] shrink-0 text-amber-warn/90" />}
+                        {(row.enterprise || row.minTier) && <Lock className="h-[11px] w-[11px] shrink-0 text-amber-warn/90" />}
                       </div>
                       <span className={`text-[11.5px] font-light ${statusColor}`}>{status}</span>
                     </div>

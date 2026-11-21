@@ -29,11 +29,13 @@ export interface OfficeRow {
    *  "ticket" should still find Teo) and for any surface that wants it. */
   role: string
   enterprise?: boolean
+  /** Minimum plan, for the lock icon (Business or Enterprise). */
+  minTier?: 'business' | 'enterprise'
 }
 
 export const OFFICE_ROWS: OfficeRow[] = [
   { key: "null", type: null, title: "Aivory Console", role: "Aivory Console" },
-  ...PREBUILT_AGENTS.map((a) => ({ key: a.type, type: a.type, title: a.name, role: a.title, enterprise: a.enterprise })),
+  ...PREBUILT_AGENTS.map((a) => ({ key: a.type, type: a.type, title: a.name, role: a.title, enterprise: a.enterprise, minTier: a.minTier })),
 ]
 
 /** Per-agent glow color for the active/interacting ring (AgentColumn,
@@ -50,6 +52,7 @@ export const AGENT_GLOW_COLOR: Record<string, string> = {
   data_analyst: "#2d6bad", // Ivo — blue card header
   operations_inventory: "#c8962b", // Juno — amber card header
   marketing_content: "#a24d9c", // Mira — orchid card header
+  deep_researcher: "#4f6d7a", // Nara — slate card header
   chief_of_staff: "#d6c2ad", // Aira — Silver card header
 }
 

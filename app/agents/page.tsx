@@ -60,6 +60,7 @@ const AGENT_HEADER_IMAGES = {
   analyst: '/agent-card-headers/blue.svg',
   operations: '/agent-card-headers/amber.svg',
   marketing: '/agent-card-headers/orchid.svg',
+  research: '/agent-card-headers/slate.svg',
 };
 
 const AGENTS = [
@@ -165,6 +166,20 @@ const AGENTS = [
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+      </svg>
+    )
+  },
+  {
+    agentType: 'deep_researcher' as TelegramAgentType,
+    name: AGENT_NAMES.deep_researcher,
+    titleKey: 'researchTitle',
+    descKey: 'researchDesc',
+    toolsKey: 'researchTools',
+    minTier: 'business',
+    headerImage: AGENT_HEADER_IMAGES.research,
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
       </svg>
     )
   },
@@ -358,12 +373,12 @@ function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: t
           className="object-cover pointer-events-none select-none"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/0 to-black/0" />
-        {(agent as any).enterprise && (
+        {((agent as any).enterprise || (agent as any).minTier) && (
           <span className="absolute top-2.5 right-2.5 z-10 inline-flex items-center gap-1 px-2 py-[3px] rounded-full bg-black/35 backdrop-blur-md border border-white/25 text-white text-[9px] font-semibold uppercase tracking-[0.1em]">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5 shrink-0">
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
             </svg>
-            {t('enterpriseBadge')}
+            {(agent as any).minTier === 'business' ? t('businessBadge') : t('enterpriseBadge')}
           </span>
         )}
         <div className="absolute left-4 right-4 bottom-3 z-10 flex items-center gap-2.5">
