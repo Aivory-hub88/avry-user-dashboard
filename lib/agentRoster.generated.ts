@@ -8,7 +8,7 @@
  */
 
 export const AGENT_ROSTER_RAW = [
-  { type: "autonomous", name: "Geno", title: "Generalist Agent" },
+  { type: "autonomous", name: "Geno", title: "Task & Follow-up Agent" },
   { type: "customer_service", name: "Teo", title: "Ticket Ops Agent" },
   { type: "leads_qualifier", name: "Lex", title: "Sales and Lead Agent" },
   { type: "finance_invoice_ops", name: "Finn", title: "Finance & Invoice Ops Agent" },

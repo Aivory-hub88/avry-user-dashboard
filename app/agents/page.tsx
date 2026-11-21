@@ -16,6 +16,7 @@ import CreditUsageMeter, { useCreditStatus } from '@/components/credits/CreditUs
 import { useSettingsModal } from '@/contexts/SettingsModalContext';
 import CustomizeAgentModal from '@/components/agents/CustomizeAgentModal';
 import { AgentAvatar } from '@/components/office/AgentAvatar';
+import { groupByDepartment } from '@/lib/departments';
 
 const NoiseOverlay = () => (
   <>
@@ -324,6 +325,19 @@ function ConsoleDeploymentRow() {
     </div>
   );
 }
+
+const DEPARTMENT_LABEL_KEYS = {
+  executive: 'departmentsExecutive',
+  sales: 'departmentsSales',
+  support: 'departmentsSupport',
+  finance: 'departmentsFinance',
+  marketing: 'departmentsMarketing',
+  operations: 'departmentsOperations',
+  data: 'departmentsData',
+  admin: 'departmentsAdmin',
+  shared: 'departmentsShared',
+  other: 'departmentsOther',
+} as const;
 
 function AgentCard({ agent, deployments, onConfigure, onDisconnect }: { agent: typeof AGENTS[0], deployments: AgentDeployment[], onConfigure: () => void, onDisconnect: (d: AgentDeployment) => void }) {
   const t = useTranslations('agents');
@@ -760,16 +774,26 @@ export default function AgentsPage() {
         {/* Integrations Row */}
         <IntegrationsRow />
 
-        {/* 4-Column Grid for Agent Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
-          {allAgents.map((agent, idx) => (
-            <AgentCard
-              key={idx}
-              agent={agent}
-              deployments={deployments.filter((d) => d.agentType === (agent as any).agentType)}
-              onConfigure={() => setCustomizingAgent({ title: (agent as any).titleKey ? t((agent as any).titleKey) : (agent as any).title, agentType: (agent as any).agentType })}
-              onDisconnect={handleDisconnect}
-            />
+        {/* Agents grouped by department (ADR-025 D1): read-only, leader first, shared services last. */}
+        <p className="mb-4 text-[12px] text-[#a1a1aa]">{t('departmentsHint')}</p>
+        <div className="flex flex-col gap-10">
+          {groupByDepartment(allAgents as Array<{ agentType?: string }>).map((group) => (
+            <section key={group.key} aria-labelledby={`dept-${group.key}`}>
+              <h2 id={`dept-${group.key}`} className="mb-3 text-[12px] font-medium uppercase tracking-wider text-[#a1a1aa]">
+                {t(DEPARTMENT_LABEL_KEYS[group.key])}
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+                {group.items.map((agent, idx) => (
+                  <AgentCard
+                    key={(agent as any).agentType ?? `${group.key}-${idx}`}
+                    agent={agent as any}
+                    deployments={deployments.filter((d) => d.agentType === (agent as any).agentType)}
+                    onConfigure={() => setCustomizingAgent({ title: (agent as any).titleKey ? t((agent as any).titleKey) : (agent as any).title, agentType: (agent as any).agentType })}
+                    onDisconnect={handleDisconnect}
+                  />
+                ))}
+              </div>
+            </section>
           ))}
         </div>
 

@@ -185,7 +185,7 @@ describe("buildRoomPayload", () => {
     const p = buildRoomPayload({ ...base, me: teo, peers: [], members: [geno, teo, lex] })
     // Roles come from the roster, not from ids: Teo is Ticket Ops, never "customer service".
     expect(p).toContain("Teo, Ticket Ops Agent [id: customer_service]")
-    expect(p).toContain("Geno, Generalist Agent [id: autonomous]")
+    expect(p).toContain("Geno, Task & Follow-up Agent [id: autonomous]")
     expect(p).toContain("Lex, Sales and Lead Agent [id: leads_qualifier]")
     expect(p).toContain("delegate to them by id")
     expect(p).toContain("only agent answering")
