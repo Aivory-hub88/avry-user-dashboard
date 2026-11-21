@@ -4,7 +4,7 @@
 
 ^ Revisi 21 November 2026 (draf awal 18 November) · Basis: repo Orkas-AI/Orkas (MIT) dan dokumen internal docs/ (ADR-008, 009, 014, 020, 021, CERVEAU-NEW-AGENTS-PLAN, CERVEAU-WEB-RESEARCH-TOOLS-PLAN, CERVEAU-N8N-ORCHESTRATION-PLAN)
 
-^ Perubahan di revisi ini: Geno menjadi shared service dengan scope baru (task dan follow-up keeper), bukan staf "Floating"; D4, bagian 7.2, 7.3, 7.7, 7.8, G7, roadmap dan risiko disesuaikan; angka roster dashboard dikoreksi dari 6 menjadi 9 agent. DeepResearcher tersedia mulai tier Business (D3). Verifikasi kode dashboard 2026-11-21: G1, G2, dan G6 terkonfirmasi sebagai celah di sisi UI dan API (G6 naik ke ukuran M karena butuh backend); catatan batas jadwal agent dan n8n (6.3) diperbarui. Revisi lanjutan: depth leader dari penghitungan di delegate.rs, nama Nara (D2), temuan catch-up dan posisi Geno sebagai hub saat ini.
+^ Perubahan di revisi ini: Geno menjadi shared service dengan scope baru (task dan follow-up keeper), bukan staf "Floating"; D4, bagian 7.2, 7.3, 7.7, 7.8, G7, roadmap dan risiko disesuaikan; angka roster dashboard dikoreksi dari 6 menjadi 9 agent. DeepResearcher tersedia mulai tier Business (D3). Verifikasi kode dashboard 2026-11-21: G1, G2, dan G6 terkonfirmasi sebagai celah di sisi UI dan API (G6 naik ke ukuran M karena butuh backend); catatan batas jadwal agent dan n8n (6.3) diperbarui. Revisi lanjutan: depth leader dari penghitungan di delegate.rs, nama Nara (D2), temuan catch-up dan posisi Geno sebagai hub saat ini. Revisi akhir: D1 diputuskan (agent ke-10 Nara diizinkan) berdasarkan eval routing yang sudah dijalankan.
 
 ## 1. Ringkasan
 
@@ -55,7 +55,7 @@ Beberapa hal yang disampaikan di diskusi sebelumnya ternyata tidak sesuai dengan
 Setiap butir punya rekomendasi. Tidak ada pekerjaan besar yang sebaiknya dimulai sebelum D1 dan D4 diputuskan.
 
 | # | Pertanyaan | Rekomendasi |
-| D1 | Batas 9 agent: dilonggarkan menjadi berapa, dan kapan? | Izinkan agent ke-10 (DeepResearcher) dengan syarat eval routing Aira tidak turun dari baseline. Setelah departemen aktif, Aira hanya memilih di antara leader dan shared service, sehingga batas lama tidak lagi relevan. |
+| D1 | Batas 9 agent: dilonggarkan menjadi berapa, dan kapan? | **Diputuskan owner 2026-11-21: izinkan agent ke-10 (Nara).** Eval routing sudah dijalankan (ADR-025 Q1): penambahan Nara lulus gate (regresi 1,9 poin dari batas 3), kombinasi dengan re-scope Geno meleset satu percobaan dari batas dan diterima owner. Riset masuk ke Nara, bukan Geno. Setelah departemen aktif, Aira hanya memilih di antara leader dan shared service. |
 | D2 | Nama dan agent_type untuk DeepResearcher | **Diputuskan: nama Nara**, agent_type deep_researcher, judul usulan "Research & Evidence Agent". Catatan: akhiran "-ra" mirip Aira dan Mira; nama dipakai untuk @mention dan routing, jadi eval routing memuat kasus nama mirip dan @mention (lihat risiko). |
 | D3 | Gating tier untuk DeepResearcher | **Mulai dari tier Business ($99) ke atas** (Business dan Enterprise); Operational tidak mendapat akses. Alasan: riset adalah kebutuhan enterprise yang harus terakomodasi, sementara biaya pencarian dan fetch serta risiko routing Aira dibatasi ke tenant berbayar tinggi. Tambahkan batas pencarian per run. Perluasan ke Operational ditinjau setelah satu bulan data biaya per run (D5). Catatan teknis: gating dashboard sekarang hanya punya flag boolean `enterprise` (ENTERPRISE_AGENT_TYPES), jadi perlu penanda tier minimum (misalnya minTier) dan penegakan di sisi server, bukan hanya ikon kunci di UI. |
 | D4 | Posisi Geno dan DeepResearcher dalam departemen | **Keduanya shared service** yang melapor ke Aira dan dapat dipanggil leader mana pun. DeepResearcher: riset berbasis bukti. Geno: task dan follow-up keeper (bagian 7.8), berupa eksekutor tanpa delegasi lanjutan. Dengan ini aturan 7.3 tidak butuh pengecualian. agent_type Geno tetap autonomous. |
@@ -261,7 +261,7 @@ Ditahan sesuai keputusan. Yang dikerjakan sekarang hanya memastikan desain tidak
 
 | Fase | Isi | Bergantung pada | Selesai bila |
 | P0 | Keputusan D1 sampai D6; ADR departemen | - | Keputusan tercatat |
-| P1 | Fondasi: audit kondisi produksi (scheduler, officecli, rollout Ivo/Juno/Mira, harness eval routing: jalankan evals/aira-routing), Tavily (web research P0), probe harian (P4), status bug officecli, semantik catch-up dan depth, cek pembungkus untrusted | - | Web search berhasil di produksi; hasil cek terdokumentasi |
+| P1 | Fondasi: audit kondisi produksi (scheduler, officecli, rollout Ivo/Juno/Mira, harness eval routing: sudah dijalankan, ADR-025 Q1), Tavily (web research P0), probe harian (P4), status bug officecli, semantik catch-up dan depth, cek pembungkus untrusted | - | Web search berhasil di produksi; hasil cek terdokumentasi |
 | P2 | Skill pack Office untuk Ofira | P1 (bug sandbox) | Set golden lulus, batch aman |
 | P3 | DeepResearcher (dan feed_read) | P0 (D1 sampai D3), P1 | Eval riset dan eval routing lulus |
 | P4 | Celah scheduler G1, G3, G6, lalu G2 dan G4 | P1 (G3) | Tes per celah lulus |
@@ -313,7 +313,7 @@ Dari review awal, ide berikut tidak masuk keputusan owner tetapi layak dicatat. 
 - Halaman workflow builder n8n hanya dicek lewat pencarian kata kunci (bukan pembacaan penuh), dan satu file (components/workflow/AddWithAivoryPanel.tsx) cocok dengan kata kunci agent tetapi belum dibaca.
 - Sisi backend dan runtime untuk jadwal: apakah ada data hasil run terakhir yang belum diekspos ke dashboard, dan apakah runtime membawa state antar-run (dashboard memastikan UI dan API-nya tidak mengekspos keduanya).
 - ADR-004, 013, 016, 024 (memory) dan bagian akhir ADR-008 dan ADR-014.
-- Harness eval routing: tidak ditemukan saat pencarian 2026-11-21 (evals/ hanya berisi typesafe-jev). Harness awal diajukan di AVRY-V2-Main#70 (evals/aira-routing), belum dijalankan ke model; gate D1 menunggu hasilnya.
+- Harness eval routing: dibangun (AVRY-V2-Main#70) dan dijalankan 2026-11-21 pada model Aira (deepseek/deepseek-v4.1-flash), 468 panggilan; hasil dan keputusan di ADR-025 Q1. Prompt sintetis dan satu model, jadi baca selisih antar roster, bukan akurasi absolut.
 - Apakah tool agent_tasks dan team_delegate dapat dipakai Geno sebagai shared service tanpa perubahan depth.
 - Semua klaim 'live' berasal dari tanggal di dokumen (sebagian besar September 2026); kondisi produksi hari ini belum dicek.
 
