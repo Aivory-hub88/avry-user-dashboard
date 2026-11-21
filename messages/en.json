@@ -657,6 +657,7 @@
     "createApiKey": "Create API key",
     "copied": "Copied ✓",
     "copy": "Copy",
+    "copyFailed": "Copy failed — select the key and press Cmd/Ctrl+C",
     "storeKeySafely": "Store this somewhere safe — Aivory never stores or shows the plaintext key again.",
     "exampleRequest": "Example request",
     "mcpToolUpdateFailed": "Could not update this tool.",

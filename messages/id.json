@@ -657,6 +657,7 @@
     "createApiKey": "Buat API key",
     "copied": "Disalin ✓",
     "copy": "Salin",
+    "copyFailed": "Gagal menyalin — pilih key lalu tekan Cmd/Ctrl+C",
     "storeKeySafely": "Simpan ini di tempat aman — Aivory tidak pernah menyimpan atau menampilkan key aslinya lagi.",
     "exampleRequest": "Contoh request",
     "mcpToolUpdateFailed": "Tidak dapat memperbarui tool ini.",

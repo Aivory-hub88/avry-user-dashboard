@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { ChevronDown, ChevronRight, Plug } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { useTranslations } from 'next-intl';
+import CopySecretRow from '@/components/ui/CopySecretRow';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AgentProfile,
@@ -516,7 +517,6 @@ export default function CustomizeAgentModal({
   const deployPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [apiKeyLabel, setApiKeyLabel] = useState('');
   const [createdKey, setCreatedKey] = useState<CreatedApiKey | null>(null);
-  const [apiKeyCopied, setApiKeyCopied] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !agentType) return;
@@ -575,7 +575,6 @@ export default function CustomizeAgentModal({
     setDeployError(null);
     setApiKeyLabel('');
     setCreatedKey(null);
-    setApiKeyCopied(false);
   }, [isOpen, agentType]);
 
   // Stop deploy polling on unmount too, not just on modal-reopen.
@@ -2356,19 +2355,12 @@ export default function CustomizeAgentModal({
                   </>
                 ) : (
                   <>
-                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 mb-2">
-                      <code className="flex-1 text-[12px] text-[var(--color-accent-text)] break-all">{createdKey.key}</code>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(createdKey.key);
-                          setApiKeyCopied(true);
-                          setTimeout(() => setApiKeyCopied(false), 2000);
-                        }}
-                        className="shrink-0 px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/10 text-white/70 text-[11px] transition-colors"
-                      >
-                        {apiKeyCopied ? t('copied') : t('copy')}
-                      </button>
-                    </div>
+                    <CopySecretRow
+                      value={createdKey.key}
+                      copyLabel={t('copy')}
+                      copiedLabel={t('copied')}
+                      failedLabel={t('copyFailed')}
+                    />
                     <p className="text-white/35 text-[11px] mb-4">
                       {t('storeKeySafely')}
                     </p>
