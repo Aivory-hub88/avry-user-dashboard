@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { validateFileSize } from '@/lib/streaming'
 import { extractTextFromFile } from '@/lib/fileExtractor'
+import { makeImageThumb } from '@/lib/imageThumb'
 import type { Attachment } from '@/components/UploadMenu'
 
 const ALLOWED_TYPES = [
@@ -22,7 +23,8 @@ export function useFileUpload(addToast: (type: "error" | "success", msg: string)
       if (err) { addToast("error", err); continue }
       const text = await extractTextFromFile(file)
       const attType: Attachment["type"] = file.type.startsWith("image/") ? "image" : "file"
-      setAttachments(p => [...p, { type: attType, label: file.name, filename: file.name, content: text }])
+      const thumb = attType === "image" ? await makeImageThumb(file) : undefined
+      setAttachments(p => [...p, { type: attType, label: file.name, filename: file.name, content: text, ...(thumb ? { thumb } : {}) }])
     }
   }, [addToast])
 
