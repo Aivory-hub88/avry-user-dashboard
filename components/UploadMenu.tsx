@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState } from "react"
 import { extractTextFromFile } from "@/lib/fileExtractor"
+import { makeImageThumb } from "@/lib/imageThumb"
 
 export type AttachmentType = 'json_schema' | 'file' | 'image' | 'blueprint'
 
@@ -13,6 +14,8 @@ export interface Attachment {
   content?: string
   // image
   base64?: string
+  /** Small JPEG data URL for the attachment tile; survives persistence, unlike `content`. */
+  thumb?: string
   // blueprint
   version?: string
   data?: unknown
@@ -120,11 +123,13 @@ export default function UploadMenu({ isOpen, onClose, onAttach, onToast, onExtra
 
     try {
       const text = await extractTextFromFile(file)
+      const thumb = await makeImageThumb(file)
       onAttach({
         type: 'file',
         label: `${file.name}`,
         filename: file.name,
         content: text,
+        ...(thumb ? { thumb } : {}),
       })
     } catch {
       showSizeWarning('Could not read file content. Try a different format.')
