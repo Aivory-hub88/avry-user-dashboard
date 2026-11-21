@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { logout } from '@/lib/auth'
+import CopySecretRow from '@/components/ui/CopySecretRow'
 import { getMarketingUrl } from '@/lib/config'
 import { useSettingsModal, SettingsTab } from '@/contexts/SettingsModalContext'
 import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
@@ -53,7 +54,6 @@ export function SettingsModal({ user }: SettingsModalProps) {
   const [newTokenLabel, setNewTokenLabel] = useState('')
   const [tokenCreateLoading, setTokenCreateLoading] = useState(false)
   const [createdToken, setCreatedToken] = useState<CreatedMcpImageToken | null>(null)
-  const [tokenCopied, setTokenCopied] = useState(false)
   const [userIdCopied, setUserIdCopied] = useState(false)
   const [revokingTokenId, setRevokingTokenId] = useState<string | null>(null)
 
@@ -516,19 +516,12 @@ export function SettingsModal({ user }: SettingsModalProps) {
                         <p className="text-white/60 text-[13px] leading-relaxed mb-3">
                           Store this somewhere safe — Aivory never stores or shows the plaintext credential again.
                         </p>
-                        <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 mb-2">
-                          <code className="flex-1 text-[12px] text-[var(--color-accent-text)] break-all">{createdToken.token}</code>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(createdToken.token)
-                              setTokenCopied(true)
-                              setTimeout(() => setTokenCopied(false), 2000)
-                            }}
-                            className="shrink-0 px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/10 text-white/70 text-[11px] transition-colors"
-                          >
-                            {tokenCopied ? 'Copied ✓' : 'Copy'}
-                          </button>
-                        </div>
+                        <CopySecretRow
+                          value={createdToken.token}
+                          copyLabel="Copy"
+                          copiedLabel="Copied ✓"
+                          failedLabel="Copy failed — select the key and press Cmd/Ctrl+C"
+                        />
 
                         <label className="block text-white/70 text-[12px] font-medium mt-4 mb-1.5">Download command</label>
                         <pre className="w-full px-3.5 py-3 rounded-lg bg-black/30 border border-white/10 text-white/60 text-[10.5px] overflow-x-auto whitespace-pre-wrap break-all">
