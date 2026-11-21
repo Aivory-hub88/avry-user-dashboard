@@ -583,6 +583,9 @@
     "slack": "Slack",
     "slackPreparing": "Menyiapkan instalasi…",
     "slackConnectDesc": "Hubungkan ke workspace Slack",
+    "consoleDeployTitle": "AI Console + Workspace",
+    "consoleDeployDesc": "Chat dengan agent ini di Console, mode Agents, dan room Group",
+    "consoleDeployActive": "Aktif",
     "telegram": "Telegram",
     "telegramGeneratingQr": "Membuat kode QR…",
     "telegramConnectDesc": "Deploy sebagai bot Telegram — pindai kode QR",
@@ -792,7 +795,7 @@
     "departmentsAdmin": "Admin & Office",
     "departmentsShared": "Layanan bersama",
     "departmentsOther": "Agent lain",
-    "departmentsHint": "Agent dikelompokkan per departemen, leader di urutan pertama. Permintaan masuk lewat Aira.",
+    "departmentsHint": "Agent diurutkan per departemen, leader dulu dan shared service terakhir. Permintaan masuk lewat Aira.",
     "ticketOpsTitle": "Ticket Ops Agent",
     "ticketOpsDesc": "Mentriase tiket dukungan masuk 24/7 di semua saluran Anda dan menyerahkan ke tim Anda semua yang dibutuhkan untuk menyelesaikannya dengan cepat.",
     "ticketOpsTools": [

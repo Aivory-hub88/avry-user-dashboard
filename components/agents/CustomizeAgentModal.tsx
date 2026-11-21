@@ -1892,6 +1892,23 @@ export default function CustomizeAgentModal({
                   </div>
                 )}
                 <div className="space-y-2">
+                  {/* Built in for every agent (see withConsoleDeployments): nothing to connect, so a status row, not a button. */}
+                  <div className="w-full flex items-center gap-4 p-4 rounded-xl bg-accent/[0.06] border border-accent/[0.15] text-left">
+                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-5 h-5 text-white/80" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3M5.25 20.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-white/90 font-medium text-[14px]">{t('consoleDeployTitle')}</div>
+                      <div className="text-white/40 text-[12px] mt-0.5">{t('consoleDeployDesc')}</div>
+                    </div>
+                    <div className="ml-auto flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-accent shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+                      {t('consoleDeployActive')}
+                    </div>
+                  </div>
+
                   <button
                     onClick={startSlackDeploy}
                     disabled={!agentType || deployLoading}
