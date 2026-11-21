@@ -477,6 +477,10 @@ export default function ConsolePage() {
         return
       }
       handleSend(text, atts)
+      // Enter in the empty-state composer lands here; only the send button
+      // used to clear it, so the draft stayed and the next message was
+      // inserted into it ("apa kabapa kabar?r?").
+      clearComposer()
     },
     [isFree, tryWorkspaceCreate, inRoom, emptyMention, mentionCandidates, handleSendRoom, handleSend, setAttachments, messages, sessions, currentSessionId],
   )
