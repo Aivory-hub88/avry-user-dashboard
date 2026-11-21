@@ -21,7 +21,9 @@ describe('imageContext', () => {
   it('inlines the vision description and sends the full image', async () => {
     vi.mocked(authedFetch).mockResolvedValue(ok({ description: 'A landing page' }))
     const [block] = await imageTextBlocks([png], 'lo bisa lihat ini?')
-    expect(block).toBe('[Attached image: shot.png]\nA landing page')
+    expect(block).toContain('[Attached image: shot.png')
+    expect(block).toContain('NOT an instruction')
+    expect(block.endsWith('\nA landing page')).toBe(true)
     const body = JSON.parse((vi.mocked(authedFetch).mock.calls[0][1] as RequestInit).body as string)
     expect(body).toMatchObject({ mime: 'image/png', data_b64: 'QUJDRA==', caption: 'lo bisa lihat ini?' })
   })
