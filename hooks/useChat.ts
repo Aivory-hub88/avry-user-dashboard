@@ -98,6 +98,23 @@ interface UseChatParams {
   roomMembers?: MentionCandidate[]
 }
 
+/**
+ * History saves run inside setState updaters, where a thrown error is not caught by the
+ * surrounding try/catch and takes the whole page down ("This page couldn't load").
+ * A full localStorage must never do that: the chat keeps working, only history is skipped.
+ */
+function safeSaveSession(...args: Parameters<typeof saveSessionMessages>): boolean {
+  try {
+    return saveSessionMessages(...args)
+  } catch (e) {
+    if (e instanceof ChatStorageError) {
+      console.warn("[useChat] chat history not saved: storage is full")
+      return false
+    }
+    throw e
+  }
+}
+
 export function useChat({
   attachments,
   clearAttachments,
@@ -335,7 +352,7 @@ export function useChat({
                 const updated = prev.map(m =>
                   m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, ...(m.startedAt ? { endedAt: Date.now(), activity: closeSteps(m.activity ?? [], Date.now()) } : {}), pendingApproval } : m
                 )
-                saveSessionMessages(sentSessionId, updated, sentAgentTarget)
+                safeSaveSession(sentSessionId, updated, sentAgentTarget)
                 setSessions(listSessions())
                 return updated
               })
@@ -345,7 +362,7 @@ export function useChat({
               const finalList = sentMessagesSnapshot.map(m =>
                 m.id === assistantId ? { ...m, content: finalContent, isStreaming: false, statusText: undefined, ...(m.startedAt ? { endedAt: Date.now(), activity: closeSteps(m.activity ?? [], Date.now()) } : {}), pendingApproval } : m
               )
-              saveSessionMessages(sentSessionId, finalList, sentAgentTarget)
+              safeSaveSession(sentSessionId, finalList, sentAgentTarget)
               setSessions(listSessions())
             }
           } catch (e) {
@@ -426,7 +443,7 @@ export function useChat({
                   ? { ...m, content: finalContent, isStreaming: false }
                   : m
               )
-              saveSessionMessages(sentSessionId, updated, sentAgentTarget)
+              safeSaveSession(sentSessionId, updated, sentAgentTarget)
               setSessions(listSessions())
               return updated
             })
@@ -434,7 +451,7 @@ export function useChat({
             const finalList = sentMessagesSnapshot.map(m =>
               m.id === assistantId ? { ...m, content: finalContent, isStreaming: false } : m
             )
-            saveSessionMessages(sentSessionId, finalList, sentAgentTarget)
+            safeSaveSession(sentSessionId, finalList, sentAgentTarget)
             setSessions(listSessions())
           }
         } catch (e) {
@@ -665,13 +682,13 @@ export function useChat({
       if (currentSessionIdRef.current === sentSessionId) {
         setMessages(prev => {
           const updated = applyRoomResults(prev)
-          saveSessionMessages(sentSessionId, updated, agentTarget)
+          safeSaveSession(sentSessionId, updated, agentTarget)
           setSessions(listSessions())
           return updated
         })
       } else {
         const finalList = applyRoomResults([...baseMessages, userMsg, ...placeholders])
-        saveSessionMessages(sentSessionId, finalList, agentTarget)
+        safeSaveSession(sentSessionId, finalList, agentTarget)
         setSessions(listSessions())
       }
     } catch (e) {

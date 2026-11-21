@@ -67,9 +67,33 @@ function loadAllSessions(): PersistedSession[] {
  * Throws ChatStorageError on QuotaExceededError.
  * Returns false if quota exceeded, true on success.
  */
+/**
+ * Image attachments carry their full data URL (megabytes) for the one send that
+ * needs it. Persisting that would fill the ~5 MB localStorage quota in a couple of
+ * screenshots, so history keeps only the attachment's name/type. The card never
+ * renders the pixels.
+ */
+type WithAttachments = { attachments?: Array<{ content?: string; base64?: string }> }
+
+export function stripHeavyAttachments(sessions: PersistedSession[]): PersistedSession[] {
+  const heavy = (c?: string) => typeof c === "string" && c.startsWith("data:image/")
+  const isHeavy = (m: WithAttachments) => !!m.attachments?.some(a => heavy(a.content) || a.base64)
+  return sessions.map(s => {
+    if (!s.messages.some(m => isHeavy(m as WithAttachments))) return s
+    return {
+      ...s,
+      messages: s.messages.map(m => {
+        const w = m as WithAttachments
+        if (!isHeavy(w)) return m
+        return { ...m, attachments: w.attachments!.map(a => ({ ...a, content: heavy(a.content) ? undefined : a.content, base64: undefined })) }
+      }),
+    }
+  })
+}
+
 function persistSessions(sessions: PersistedSession[]): boolean {
   try {
-    localStorage.setItem(claimLegacyKey(SESSIONS_KEY_BASE), JSON.stringify(sessions))
+    localStorage.setItem(claimLegacyKey(SESSIONS_KEY_BASE), JSON.stringify(stripHeavyAttachments(sessions)))
     return true
   } catch (err: unknown) {
     if (err instanceof DOMException && err.name === "QuotaExceededError") {
