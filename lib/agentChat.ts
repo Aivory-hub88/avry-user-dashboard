@@ -158,13 +158,40 @@ async function readAgentStream(
 }
 
 export interface AgentDeployment {
-  kind: 'telegram' | 'slack' | 'whatsapp' | 'api'
-  /** binding_id (telegram/whatsapp), team_id (slack), or key id (api) — used for disconnect */
+  kind: 'telegram' | 'slack' | 'whatsapp' | 'api' | 'console'
+  /** binding_id (telegram/whatsapp), team_id (slack), key id (api), or `console:<agentType>` — used for disconnect (not for console) */
   id: string
   agentType: string
   /** Chat title / workspace name / key label shown to the user */
   label: string
 }
+
+/** Label of the built-in Console + Workspace deployment. */
+export const CONSOLE_DEPLOYMENT_LABEL = 'AI Console + Workspace'
+
+/**
+ * Console + Workspace is an official, always-on deployment target: every
+ * agent can be chatted with directly, used in Agents mode and added to a
+ * Group room without any external channel. It has no backend record (nothing
+ * to connect or disconnect), so it is synthesised here and merged in by
+ * withConsoleDeployments(). Telegram/Slack/WhatsApp/API stay optional extras.
+ */
+export function consoleDeployments(): AgentDeployment[] {
+  return PREBUILT_AGENTS.map((a) => ({
+    kind: 'console' as const,
+    id: `console:${a.type}`,
+    agentType: a.type,
+    label: CONSOLE_DEPLOYMENT_LABEL,
+  }))
+}
+
+/** External deployments plus the built-in Console deployment of every agent. */
+export function withConsoleDeployments(external: AgentDeployment[]): AgentDeployment[] {
+  return [...external.filter((d) => d.kind !== 'console'), ...consoleDeployments()]
+}
+
+/** True for a channel outside Console (Telegram, Slack, WhatsApp, API key). */
+export const isExternalDeployment = (d: AgentDeployment): boolean => d.kind !== 'console'
 
 export async function listDeployments(): Promise<AgentDeployment[]> {
   const [tgRes, waRes, slackRes, apiRes] = await Promise.allSettled([
@@ -240,6 +267,7 @@ export async function listDeployments(): Promise<AgentDeployment[]> {
 }
 
 export async function deleteDeployment(d: AgentDeployment): Promise<void> {
+  if (d.kind === 'console') throw new Error('Console + Workspace is built in and cannot be disconnected')
   const url =
     d.kind === 'telegram'
       ? `${BACKEND_URL}/api/v1/telegram/bindings/${encodeURIComponent(d.id)}`

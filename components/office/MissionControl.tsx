@@ -14,7 +14,7 @@ import Image from "next/image"
 import { Lock } from "lucide-react"
 import { useEffect, useState } from "react"
 import { asset } from "@/lib/asset"
-import type { AgentDeployment } from "@/lib/agentChat"
+import { isExternalDeployment, type AgentDeployment } from "@/lib/agentChat"
 import type { ActiveAgentRun } from "@/lib/agentRuns"
 import type { ChatSession } from "@/hooks/useChat"
 import { readVerifierFinding } from "@/lib/agentApprovals"
@@ -160,7 +160,7 @@ export default function MissionControl({
               (n) => n.kind === "approval" && readVerifierFinding(n.approval)?.verdict === "flag",
             )
             const channels = row.type
-              ? [...new Set(deployments.filter((d) => d.agentType === row.type).map((d) => d.kind))]
+              ? [...new Set(deployments.filter((d) => d.agentType === row.type && isExternalDeployment(d)).map((d) => d.kind))]
               : []
             const isThinking = row.type === streamingAgentType
             // `streamingAgentType` only ever reflects this tab's own open SSE
@@ -222,7 +222,7 @@ export default function MissionControl({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-[6px]">
                     {channels.length === 0 ? (
-                      <span className="text-[10.5px] font-light text-white/25">Not deployed</span>
+                      <span className="text-[10.5px] font-light text-white/25">Console</span>
                     ) : (
                       channels.map((k) =>
                         CHANNEL_ICON[k] ? (

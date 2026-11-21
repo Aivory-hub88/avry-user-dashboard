@@ -751,6 +751,8 @@
     "whatsappAddonOnly": "Paid add-on",
     "revokeApiKeyConfirm": "Revoke API key \"{label}\"? Any integration using it will stop working immediately.",
     "disconnectAgentConfirm": "Disconnect this agent from {channel} \"{label}\"?",
+    "consoleDeployment": "AI Console + Workspace",
+    "consoleDeploymentAlwaysOn": "Always on",
     "channelTelegram": "Telegram chat",
     "channelSlack": "Slack workspace",
     "channelWhatsapp": "WhatsApp number",

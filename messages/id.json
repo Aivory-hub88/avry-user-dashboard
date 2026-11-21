@@ -751,6 +751,8 @@
     "whatsappAddonOnly": "Add-on berbayar",
     "revokeApiKeyConfirm": "Cabut API key \"{label}\"? Integrasi apa pun yang menggunakannya akan langsung berhenti berfungsi.",
     "disconnectAgentConfirm": "Putuskan agen ini dari {channel} \"{label}\"?",
+    "consoleDeployment": "AI Console + Workspace",
+    "consoleDeploymentAlwaysOn": "Selalu aktif",
     "channelTelegram": "chat Telegram",
     "channelSlack": "workspace Slack",
     "channelWhatsapp": "nomor WhatsApp",

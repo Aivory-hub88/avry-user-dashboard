@@ -6,10 +6,10 @@
  * UI-free core: who can be mentioned (deployed agents only) and how raw
  * input text maps to agent types.
  *
- * Deployments come from lib/agentChat.listDeployments() (Telegram bindings,
- * Slack installations, API keys). Only agent types with >= 1 deployment are
- * mentionable — an undeployed agent has nowhere to run, so offering it in
- * the menu would be a dead end.
+ * Deployments come from useAgentDeployments(): external channels (Telegram,
+ * Slack, WhatsApp, API keys) plus the built-in Console + Workspace deployment
+ * every agent has, so every roster agent is mentionable. Only agent types with
+ * >= 1 deployment are offered — a type with none has nowhere to run.
  */
 
 import { PREBUILT_AGENTS, type AgentDeployment } from "@/lib/agentChat"
