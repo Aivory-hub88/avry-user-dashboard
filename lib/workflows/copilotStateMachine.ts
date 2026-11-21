@@ -205,6 +205,13 @@ export interface CopilotConversationState {
    * that canvas on apply rather than forking a new draft.
    */
   canvasTarget?: { workflowId: string; title: string } | null
+  /**
+   * An edit replaced every step of the open canvas; waiting for the user to
+   * pick "new" (save as a new workflow) or "replace" (overwrite the canvas).
+   */
+  pendingRewriteChoice?: boolean
+  /** Apply the proposal as a new workflow, even though a canvas is open. */
+  applyAsNew?: boolean
 }
 
 // ============================================================
@@ -472,6 +479,34 @@ class BridgeClient {
 // STATE MACHINE
 // ============================================================
 
+/** Non-trigger step ids anywhere in the step tree. */
+function nonTriggerIds(steps: GeneratedWorkflowStep[]): string[] {
+  return steps.flatMap((s) => [
+    ...(s.type === 'trigger' ? [] : [s.id]),
+    ...nonTriggerIds((s.branches || []).flatMap((b) => b.steps)),
+  ])
+}
+
+/**
+ * The edit kept none of the canvas's (at least two) non-trigger steps — ids
+ * are reconciled first, so a kept id means the step survived the edit.
+ */
+export function isNearTotalRewrite(before: GeneratedWorkflowStep[], after: GeneratedWorkflowStep[]): boolean {
+  const orig = nonTriggerIds(before)
+  if (orig.length < 2) return false
+  const now = new Set(nonTriggerIds(after))
+  return !orig.some((id) => now.has(id))
+}
+
+/** A short reply choosing how to apply a full rewrite. */
+export function matchRewriteChoice(message: string): 'new' | 'replace' | null {
+  const text = message.trim().toLowerCase()
+  if (!text || text.split(/\s+/).length > 4) return null
+  if (/\b(new|baru)\b/.test(text)) return 'new'
+  if (/\b(replace|overwrite|ganti|timpa)\b/.test(text)) return 'replace'
+  return null
+}
+
 export class CopilotStateMachine {
   private state: CopilotConversationState
   private bridge: BridgeClient
@@ -646,6 +681,8 @@ export class CopilotStateMachine {
       workflowName: title,
     }
     this.state.canvasTarget = { workflowId: canvas.workflowId, title }
+    this.state.pendingRewriteChoice = false
+    this.state.applyAsNew = false
     this.state.userRequest = `Edit the existing workflow "${title}"`
     this.state.testResults = null
     this.state.testAttempts = 0
@@ -826,6 +863,8 @@ export class CopilotStateMachine {
 
   async generateWorkflow(): Promise<CopilotConversationState> {
     this.state.stage = 'GENERATING'
+    this.state.pendingRewriteChoice = false
+    this.state.applyAsNew = false
     this.updateTimestamp()
 
     try {
@@ -967,6 +1006,22 @@ export class CopilotStateMachine {
 
   private async handleConfirmation(userMessage: string): Promise<CopilotConversationState> {
     const intent = detectUserIntent(userMessage)
+
+    if (this.state.pendingRewriteChoice) {
+      const choice = matchRewriteChoice(userMessage)
+      if (choice || intent === 'confirm' || intent === 'apply') {
+        this.state.pendingRewriteChoice = false
+        if (choice !== 'replace') {
+          // Default (and recommended): keep the open workflow untouched.
+          this.state.canvasTarget = null
+          this.state.applyAsNew = true
+        }
+        return this.handleConfirmation('yes')
+      }
+      // Anything else (an edit, cancel, a question) is handled as usual; a
+      // new edit re-checks whether it still replaces everything.
+      if (intent !== 'question') this.state.pendingRewriteChoice = false
+    }
 
     switch (intent) {
       case 'confirm': {
@@ -1268,10 +1323,16 @@ export class CopilotStateMachine {
       }
 
       // The server, not the model, owns step identity (see reconcileEditedIds).
+      const beforeSteps = this.state.generatedWorkflow.steps
       this.state.generatedWorkflow.steps = reconcileEditedIds(
-        this.state.generatedWorkflow.steps,
+        beforeSteps,
         sanitizeWorkflow(editedWorkflow.steps).steps,
       ).steps
+      // An "edit" of the open canvas that keeps none of its steps is a new
+      // workflow in disguise — ask before overwriting the canvas.
+      const rewroteCanvas =
+        !!this.state.canvasTarget && isNearTotalRewrite(beforeSteps, this.state.generatedWorkflow.steps)
+      this.state.pendingRewriteChoice = rewroteCanvas
       if (typeof editedWorkflow.workflowName === 'string' && editedWorkflow.workflowName.trim()) {
         this.state.generatedWorkflow.workflowName = editedWorkflow.workflowName
       }
@@ -1286,6 +1347,14 @@ export class CopilotStateMachine {
 
       // Same as generate: never surface result.message (raw model JSON) —
       // show the structured "workflow updated" step list instead.
+      if (rewroteCanvas && this.state.canvasTarget) {
+        const stepList = formatStepList(this.state.generatedWorkflow.steps).join('\n')
+        return this.setAssistantMessage(
+          `⚠️ **This replaces every step of "${this.state.canvasTarget.title}".**\n\n${stepList}\n\n` +
+            `Reply **new** to save it as a new workflow (recommended) or **replace** to overwrite it.`,
+        )
+      }
+
       const displayMessage = this.buildWorkflowSummaryMessage(
         this.state.generatedWorkflow.steps,
         this.state.generatedWorkflow.workflowName,
@@ -1309,7 +1378,7 @@ export class CopilotStateMachine {
       this.state.stage = 'AWAITING_APPLY_APPROVAL'
       return this.setAssistantMessage(
         this.state.canvasTarget
-          ? `The workflow has passed the sandbox test. Click **Update canvas** to apply the changes to "${this.state.canvasTarget.title}".`
+          ? `The new steps passed the sandbox test. Check the connection check in the panel, then click **Update canvas** to apply the changes to "${this.state.canvasTarget.title}".`
           : `The workflow has passed the sandbox test. Click the **Apply to canvas** button to place the workflow "${this.state.generatedWorkflow?.workflowName}" onto the canvas.`,
       )
     }
@@ -1402,14 +1471,22 @@ export class CopilotStateMachine {
           .join('\n\n')
     }
 
+    // Canvas edit: the sandbox ran the edited step list, not the merged canvas
+    // (kept nodes keep their own settings). Don't imply the canvas result was
+    // tested — the connection check of the real merge is shown in the panel.
+    const headline = this.state.canvasTarget
+      ? `✅ **Sandbox tested the new steps: ${passed} succeeded, ${skipped} skipped, out of ${total}.**\n` +
+        `_The sandbox tests the steps on their own, not the merged canvas. The connection check for "${this.state.canvasTarget.title}" is shown in the panel below._\n\n`
+      : `✅ **Sandbox testing complete! ${passed} succeeded, ${skipped} skipped, out of ${total} total steps.**\n_Validation: ${wf.dummyTest?.validationMode || 'sandbox'}_\n\n`
+
     return (
-      `✅ **Sandbox testing complete! ${passed} succeeded, ${skipped} skipped, out of ${total} total steps.**\n_Validation: ${wf.dummyTest?.validationMode || 'sandbox'}_\n\n` +
+      headline +
       attemptNote +
       `${testSummary}\n\n` +
       `---\n📌 **Workflow Summary:**\n${wf.summary}` +
       nodeDetails +
       (this.state.canvasTarget
-        ? `\n\n---\n🚀 **The changes to "${this.state.canvasTarget.title}" are ready. Review them below, then click Update canvas.**`
+        ? `\n\n---\n🚀 **The changes to "${this.state.canvasTarget.title}" are ready. Review them and the connection check below, then click Update canvas.**`
         : `\n\n---\n🚀 **The workflow "${wf.workflowName}" is ready to be applied. Click the Apply to canvas button to place it onto the canvas.**`) +
       `\n\n_Note: once deployed to n8n, you can open any node there and adjust its exact configuration — credentials, field mappings, the precise data source — yourself; I set up the workflow's structure, but node-level details are easiest to finish directly in n8n._`
     )

@@ -51,6 +51,8 @@ export interface UseWorkflowCopilotReturn {
   markApplied: () => void
   /** Non-null when the proposal edits the workflow open on the canvas. */
   canvasTarget: { workflowId: string; title: string } | null
+  /** Apply the proposal as a new workflow (no merge/replace dialog). */
+  applyAsNew: boolean
 }
 
 // The copilot's backend reply arrives as one blocking JSON response (it also
@@ -301,5 +303,6 @@ export function useWorkflowCopilot(options: UseWorkflowCopilotOptions = {}): Use
     reset,
     markApplied,
     canvasTarget: serverState?.canvasTarget ?? null,
+    applyAsNew: !!serverState?.applyAsNew,
   }
 }
