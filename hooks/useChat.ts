@@ -7,6 +7,7 @@ import { saveSessionMessages, loadSessionMessages, listSessions, getSession, del
 import { normalizeAssistantText } from '@/lib/normalizeAssistantText'
 import { parseLLMResponse } from '@/lib/parseLLMResponse'
 import { buildUserContextState, formatUserContextForAI } from "@/lib/userContextState"
+import { imageTextBlocks } from '@/lib/imageContext'
 import { sendAgentMessage, toolStatusLabel, type ConsolePendingApproval } from '@/lib/agentChat'
 import { applyToolEvent, closeSteps, type ActivityStep } from '@/lib/agentActivity'
 import { notifyApprovalsChanged } from '@/lib/agentApprovals'
@@ -215,20 +216,9 @@ export function useChat({
       ...imageAtts.map(a => `[Attached image: ${a.filename} — image preview shown above]`),
     ].join('\n\n')
     const userContent = attachmentText ? `${text}\n\n${attachmentText}` : text
-    // What the agent actually receives for this turn — the bubble itself
-    // stays clean (userContent), the quote renders separately via
-    // replyPreview, but the model gets an explicit pointer to which earlier
-    // message this is about.
-    const agentInputText = withReplyContext(userContent, activeReplyTo)
-
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: userContent, attachments: atts.length > 0 ? atts : undefined, replyPreview: activeReplyTo ?? undefined }
     const assistantId = (Date.now() + 1).toString()
     const placeholderMsg: Message = { id: assistantId, role: "assistant", content: "", isStreaming: true, ...(agentTarget ? { startedAt: Date.now(), activity: [] } : {}) }
-
-    const allMessages = [...messagesRef.current, userMsg].map(m => ({
-      role: m.role,
-      content: m.id === userMsg.id ? agentInputText : m.content,
-    }))
 
     // This request belongs to whichever thread/agent is active right now —
     // captured once, so a later switch can't make the reply land somewhere
@@ -254,6 +244,29 @@ export function useChat({
 
     let finalContent = ""
     let streamError = false
+
+    // What the agent actually receives for this turn — the bubble itself
+    // stays clean (userContent), the quote renders separately via
+    // replyPreview, but the model gets an explicit pointer to which earlier
+    // message this is about. Images are described by a vision model first
+    // (the agent is text-only); the placeholder bubble is already showing.
+    let agentInputText = withReplyContext(userContent, activeReplyTo)
+    if (imageAtts.length > 0) {
+      try {
+        const blocks = await imageTextBlocks(imageAtts, text, signal)
+        const agentAttachmentText = [...textAtts.map(a => `[Attached file: ${a.filename}]\n${a.content}`), ...blocks].join('\n\n')
+        agentInputText = withReplyContext(`${text}\n\n${agentAttachmentText}`, activeReplyTo)
+      } catch {
+        // Stopped by the user while the image was being read: nothing was sent.
+        setMessages(p => p.filter(m => m.id !== assistantId))
+        setIsStreaming(false)
+        return
+      }
+    }
+    const allMessages = [...messagesRef.current.filter(m => m.id !== assistantId && m.id !== userMsg.id), userMsg].map(m => ({
+      role: m.role,
+      content: m.id === userMsg.id ? agentInputText : m.content,
+    }))
 
     // Deployable-agent chat: the reply streams in as the agent writes it (the agent
     // may run tools first, so the placeholder keeps the typing UI until text arrives).
@@ -460,7 +473,7 @@ export function useChat({
     const displayContent = attachmentText ? `${displayText}\n\n${attachmentText}` : displayText
     // Same split as handleSend: peer agents get the explicit quote pointer,
     // the bubble and shared transcript stay on the clean display text.
-    const userText = withReplyContext(displayContent, activeReplyTo)
+    let userText = withReplyContext(displayContent, activeReplyTo)
 
     // Shared transcript, oldest-first — author-tagged like LobeHub's
     // <author_name> history markers. Placeholders carry no content yet.
@@ -517,6 +530,17 @@ export function useChat({
     const controller = new AbortController()
     abortRef.current = controller
     const signal = controller.signal
+
+    // The agents are text-only: describe attached images with a vision model and
+    // hand them that text instead of the "[Attached image]" placeholder. A user
+    // stop during this makes every runTurn return early (signal.aborted).
+    if (imageAtts.length > 0) {
+      try {
+        const blocks = await imageTextBlocks(imageAtts, displayText, signal)
+        const agentAttachmentText = [...textAtts.map(a => `[Attached file: ${a.filename}]\n${a.content}`), ...blocks].join('\n\n')
+        userText = withReplyContext(`${displayText}\n\n${agentAttachmentText}`, activeReplyTo)
+      } catch { /* aborted */ }
+    }
 
     // Sequential by default: each speaker sees this round's earlier replies.
     // A roll call runs every turn at once (lib/roomRound): each agent answers
