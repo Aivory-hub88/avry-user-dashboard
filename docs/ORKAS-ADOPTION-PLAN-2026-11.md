@@ -4,7 +4,7 @@
 
 ^ Revisi 21 November 2026 (draf awal 18 November) · Basis: repo Orkas-AI/Orkas (MIT) dan dokumen internal docs/ (ADR-008, 009, 014, 020, 021, CERVEAU-NEW-AGENTS-PLAN, CERVEAU-WEB-RESEARCH-TOOLS-PLAN, CERVEAU-N8N-ORCHESTRATION-PLAN)
 
-^ Perubahan di revisi ini: Geno menjadi shared service dengan scope baru (task dan follow-up keeper), bukan staf "Floating"; D4, bagian 7.2, 7.3, 7.7, 7.8, G7, roadmap dan risiko disesuaikan; angka roster dashboard dikoreksi dari 6 menjadi 9 agent. DeepResearcher tersedia mulai tier Business (D3). Verifikasi kode dashboard 2026-11-21: G1, G2, dan G6 terkonfirmasi sebagai celah di sisi UI dan API (G6 naik ke ukuran M karena butuh backend); catatan batas jadwal agent dan n8n (6.3) diperbarui.
+^ Perubahan di revisi ini: Geno menjadi shared service dengan scope baru (task dan follow-up keeper), bukan staf "Floating"; D4, bagian 7.2, 7.3, 7.7, 7.8, G7, roadmap dan risiko disesuaikan; angka roster dashboard dikoreksi dari 6 menjadi 9 agent. DeepResearcher tersedia mulai tier Business (D3). Verifikasi kode dashboard 2026-11-21: G1, G2, dan G6 terkonfirmasi sebagai celah di sisi UI dan API (G6 naik ke ukuran M karena butuh backend); catatan batas jadwal agent dan n8n (6.3) diperbarui. Revisi lanjutan: depth leader dari penghitungan di delegate.rs, nama Nara (D2), temuan catch-up dan posisi Geno sebagai hub saat ini.
 
 ## 1. Ringkasan
 
@@ -12,7 +12,7 @@ Dokumen ini menerjemahkan lima keputusan owner menjadi rencana kerja yang bisa d
 
 ### Keputusan owner yang menjadi dasar
 
-- **DeepResearcher** dibuat sebagai agent baru yang terpisah, supaya Lex tidak kelebihan job desk dan tool. Tersedia mulai tier Business ($99) ke atas, karena riset adalah kebutuhan enterprise yang harus terakomodasi (D3).
+- **DeepResearcher** (nama agent: **Nara**, D2) dibuat sebagai agent baru yang terpisah, supaya Lex tidak kelebihan job desk dan tool. Tersedia mulai tier Business ($99) ke atas, karena riset adalah kebutuhan enterprise yang harus terakomodasi (D3).
 - **OfficeWorker** dari Orkas diambil dan diserap oleh **Ofira** (sebagai skill, bukan agent baru).
 - **Sistem automation** Orkas layak diadopsi, dan harus rapi bersanding dengan workflow builder n8n yang sudah ada.
 - **Custom agent ditunda (hold)**.
@@ -56,7 +56,7 @@ Setiap butir punya rekomendasi. Tidak ada pekerjaan besar yang sebaiknya dimulai
 
 | # | Pertanyaan | Rekomendasi |
 | D1 | Batas 9 agent: dilonggarkan menjadi berapa, dan kapan? | Izinkan agent ke-10 (DeepResearcher) dengan syarat eval routing Aira tidak turun dari baseline. Setelah departemen aktif, Aira hanya memilih di antara leader dan shared service, sehingga batas lama tidak lagi relevan. |
-| D2 | Nama dan agent_type untuk DeepResearcher | Ikuti pola nama depan singkat plus judul (seperti Geno, Teo, Lex). agent_type: deep_researcher. Nama: ditentukan owner. |
+| D2 | Nama dan agent_type untuk DeepResearcher | **Diputuskan: nama Nara**, agent_type deep_researcher, judul usulan "Research & Evidence Agent". Catatan: akhiran "-ra" mirip Aira dan Mira; nama dipakai untuk @mention dan routing, jadi eval routing memuat kasus nama mirip dan @mention (lihat risiko). |
 | D3 | Gating tier untuk DeepResearcher | **Mulai dari tier Business ($99) ke atas** (Business dan Enterprise); Operational tidak mendapat akses. Alasan: riset adalah kebutuhan enterprise yang harus terakomodasi, sementara biaya pencarian dan fetch serta risiko routing Aira dibatasi ke tenant berbayar tinggi. Tambahkan batas pencarian per run. Perluasan ke Operational ditinjau setelah satu bulan data biaya per run (D5). Catatan teknis: gating dashboard sekarang hanya punya flag boolean `enterprise` (ENTERPRISE_AGENT_TYPES), jadi perlu penanda tier minimum (misalnya minTier) dan penegakan di sisi server, bukan hanya ikon kunci di UI. |
 | D4 | Posisi Geno dan DeepResearcher dalam departemen | **Keduanya shared service** yang melapor ke Aira dan dapat dipanggil leader mana pun. DeepResearcher: riset berbasis bukti. Geno: task dan follow-up keeper (bagian 7.8), berupa eksekutor tanpa delegasi lanjutan. Dengan ini aturan 7.3 tidak butuh pengecualian. agent_type Geno tetap autonomous. |
 | D5 | Kuota jadwal per tier (1, 5, 20 per agent) setelah ada lebih banyak agent | Tahan dulu. Tinjau setelah satu bulan data biaya per run dari ledger. |
@@ -146,7 +146,7 @@ Orkas menyimpan tiap task sebagai direktori (config.json, attachments, handoff),
 | # | Celah | Di Orkas | Di Aivory | Usulan | Uk. |
 | G1 | Jadwal sekali jalan dan batas berhenti | one_time; end_condition berdasarkan tanggal atau jumlah kemunculan (run manual tidak dihitung) | Runtime mendukung one-shot dan delete_after_run; UI hanya 4 cadence; dikonfirmasi di kode dashboard (2026-11-21): tidak ada opsi Sekali dan tidak ada field end condition di API create/update | Tambah opsi Sekali dan Berhenti setelah (tanggal atau N kali). Untuk pengingat murni tetap pakai team_remind. | S |
 | G2 | Kontinuitas antar-run | Percakapan dipakai ulang dan handoff/note.md membawa state ke run berikutnya | Tiap run sesi baru (cron-run-N); ada flag uses_memory; API dan UI dashboard tidak punya opsi carry-over (input hanya name, prompt, cron_expression, timezone; dikonfirmasi 2026-11-21), perilaku runtime belum dicek | Sisipkan ringkasan hasil run terakhir (dari run history, dibatasi panjangnya, dibingkai sebagai data lama yang mungkin basi) ke prompt run berikutnya. | M |
-| G3 | Kebijakan catch-up | Hanya kemunculan terbaru, maksimal 12 jam, sekali jalan, diabaikan bila jadwal diedit setelahnya | catch_up_on_startup = true; semantik persisnya belum diverifikasi | Baca scheduler.rs dan uji: jika menjalankan semua boundary yang terlewat, ganti ke aturan Orkas. Mencegah lonjakan biaya setelah deploy. | S |
+| G3 | Kebijakan catch-up | Hanya kemunculan terbaru, maksimal 12 jam, sekali jalan, diabaikan bila jadwal diedit setelahnya | catch_up_on_startup = true (config). Dibaca di scheduler.rs (2026-11-21): saat startup tiap job overdue dijalankan satu kali (bukan semua boundary yang terlewat), tanpa batas umur, dan mengabaikan max_tasks; semua job overdue lintas tenant bisa jalan serentak setelah restart. Konkurensi claim_due_jobs dan process_due_jobs belum dibaca. | Tambahkan jendela umur maksimum (aturan Orkas: 12 jam) dan batasi konkurensi catch-up; uji dengan job yang overdue berhari-hari. Risiko yang ditutup adalah lonjakan serentak dan run basi, bukan run berulang. | S |
 | G4 | Agent membuat jadwal dari chat | Tool auto_tasks (list, get, create, update, delete), validasi ketat, tanpa konfirmasi | Ditandai paling akhir di ADR-009 Fase 4; tool cron_add tidak dibuka ke tenant | Tool schedule_propose: agent mengusulkan, baris dibuat belum aktif, pengguna menyetujui di tab Schedules. Wajib ada persetujuan karena risiko biaya (ADR-009 §6). | M |
 | G5 | Status run waiting_input | Ada | Sudah ada lewat InputRequired dan approval yang kedaluwarsa | Tidak ada celah. | - |
 | G6 | Riwayat run dan biaya per run terlihat pengguna | Kartu hasil di chat | ADR-009 Keputusan 6 mensyaratkannya. Dikonfirmasi di kode dashboard (2026-11-21): tipe ScheduledRun tidak punya field hasil, waktu run terakhir, atau biaya; hanya last_synced_at (waktu sinkronisasi, bukan waktu run). Tab Schedules hanya menampilkan status, kuota, kredit, dan approval yang kedaluwarsa. | Celah nyata. Tambahkan field atau endpoint di backend (hasil, waktu, dan biaya run terakhir), lalu tampilkan di tab Schedules. | M |
@@ -187,15 +187,15 @@ Dua mesin penjadwal dengan semantik berbeda akan membingungkan pengguna dan meny
 | Operations | Juno | Status rilis perlu dicek. |
 | Data & Reporting | Ivo | Forecast sudah dipindah dari Geno ke Ivo (keputusan 2026-11-09). Status rilis perlu dicek. |
 | Admin / Office | Ofira | Menyerap skill pack Office. |
-| Shared service | DeepResearcher, Geno | Melapor ke Aira, dapat dipanggil leader mana pun (D4). DeepResearcher: riset berbasis bukti. Geno: task dan follow-up keeper lintas departemen (bagian 7.8). Keduanya eksekutor, tanpa delegasi lanjutan. |
+| Shared service | Nara (DeepResearcher), Geno | Melapor ke Aira, dapat dipanggil leader mana pun (D4). Nara: riset berbasis bukti. Geno: task dan follow-up keeper lintas departemen (bagian 7.8). Keduanya eksekutor, tanpa delegasi lanjutan. |
 
 ### 7.3 Aturan delegasi
 
 - Aira mendelegasikan ke leader dan shared service, tidak langsung ke staf departemen.
 - Leader mendelegasikan ke staf departemennya sendiri dan ke shared service.
 - Staf tidak mendelegasikan ke siapa pun. Permintaan lintas departemen naik lewat leader atau Aira, dicatat sebagai handoff packet di ledger. Artinya staf tidak bisa memanggil shared service secara langsung; itu disengaja.
-- Shared service yang dipanggil leader berada di kedalaman dua, sehingga **tidak mendelegasikan lagi**. Shared service harus punya tool sendiri untuk menyelesaikan tugasnya.
-- Kedalaman maksimum tetap dua lompatan (Aira ke leader ke staf atau shared service). Setting sekarang: Aira depth 2, spesialis depth 1. **Perlu diverifikasi** apakah itu sudah cukup memuat rantai ini atau perlu penyesuaian.
+- Shared service tidak mendelegasikan lagi. Itu ditegakkan lewat dua hal: delegation_policy di risk profile tidak mengizinkan delegasi (tanpa [[delegates]]) dan runtime profile max_delegation_depth = 1. Shared service harus punya tool sendiri untuk menyelesaikan tugasnya.
+- Kedalaman maksimum tetap dua lompatan (Aira ke leader ke staf atau shared service). **Dibaca dari delegate.rs (2026-11-21, tes belum dijalankan):** batas yang dibawa tiap hop adalah min(batas parent, batas profil target), jadi rantai hanya bisa makin ketat. Akibatnya Aira (batas 2) ke leader yang batasnya 1 membawa batas 1, dan delegasi leader ditolak. Nilai yang dibutuhkan: Aira 2 (sudah), **leader 2 (sekarang 1; dinaikkan di D1)**, staf dan shared service 1 dengan policy delegasi yang tidak mengizinkan. Jangan pakai 0 untuk 'tidak boleh delegasi': nilai 0 difilter dan jatuh ke default 3 (ADR-025 §2 dan §3).
 - Guardrail yang sudah ada dipakai ulang, bukan dibuat baru: max_delegation_depth, budget per jam dan per hari per agent, context_turn_cap, loop detector, velocity_gate, dan pembingkaian output peer sebagai untrusted (ADR-008 dan ADR-014).
 
 ### 7.4 Izin, approval, dan budget
@@ -222,8 +222,8 @@ Tambahkan scope **department** (fakta bersama departemen) di atas memory per age
 
 | Fase | Isi | Uk. |
 | D0 | ADR baru: definisi, edge, data model, keputusan D1 sampai D6 | S |
-| D1 | Mapping statis: delegates di config, IDENTITY.md (daftar rekan), roster, pengelompokan di halaman Agents; re-scope Geno sebagai shared service (prompt, title, tool scope; agent_type tetap) | M |
-| D2 | Enforcement edge di Cerveau (irisan roster di skema dan di admission, bukan hanya filter prompt) plus tes header hilang dan set kosong | M |
+| D1 | Mapping statis: delegates di config, IDENTITY.md (daftar rekan), roster, pengelompokan di halaman Agents; re-scope Geno sebagai shared service (prompt, title, tool scope; agent_type tetap); naikkan max_delegation_depth leader dari 1 ke 2 (staf dan shared service tetap 1) | M |
+| D2 | Enforcement edge di Cerveau (irisan roster di skema dan di admission, bukan hanya filter prompt) plus tes header hilang dan set kosong; kasus leader lewat Aira, leader dipanggil langsung (berhenti di staf), dan staf atau shared service yang mencoba mendelegasikan | M |
 | D3 | Scope memory departemen dan budget agregat | M |
 | D4 | UI org chart sederhana dan indikator biaya per rantai delegasi dari ledger | M |
 
@@ -234,9 +234,9 @@ Setelah departemen aktif, setiap domain punya leader, sehingga peran generalis m
 - **Posisi:** shared service, melapor ke Aira, dapat dipanggil leader mana pun (D4). Tidak menambah jumlah agent, sehingga tidak kena batas 9 agent.
 - **Scope:** memiliki tugas lintas departemen yang tidak punya rumah, mengejar tindak lanjut, menyusun ringkasan status dan laporan progres. Menjadi eksekutor untuk G7 (auto-advance papan tugas) setelah departemen stabil.
 - **Tool:** memakai yang sudah ada: agent_tasks, team_remind, team_delegate (hanya untuk membuat dan melacak tugas, bukan untuk melempar pekerjaan ke agent lain), recall memory, dan hasil run dari ledger. Tidak ada tool tulis baru ke sistem bisnis.
-- **Batas:** tidak mendelegasikan lagi (kedalaman dua terpakai). Bila delegasi lanjutan dibutuhkan, itu mengubah batas dua lompatan dan harus lewat ADR terpisah.
+- **Batas:** tidak mendelegasikan lagi (policy delegasi tidak mengizinkan, depth 1). Bila delegasi lanjutan dibutuhkan, itu mengubah batas dua lompatan dan harus lewat ADR terpisah.
 - **Yang berubah:** title, prompt, dan tool scope. **agent_type tetap autonomous** karena nilai itu masih hardcode di banyak titik sentuh (bagian 4). Nama Geno tidak berubah.
-- **Yang dilepas:** peran generalis penjawab apa saja. Permintaan yang tidak cocok ke departemen mana pun tetap ditangani Aira sebagai Chief of Staff.
+- **Yang dilepas:** peran generalis penjawab apa saja. Permintaan yang tidak cocok ke departemen mana pun tetap ditangani Aira sebagai Chief of Staff. Saat ini Geno adalah hub (config 2026-11-21): delegasi bounded keluar ke Teo, Lex, Finn, dan Ofira, dan Finn serta Ofira mendelegasikan balik. Delegasi keluar itu dihapus; edge balik dari leader ke Geno tetap sah sebagai leader ke shared service. Ini perubahan perilaku untuk pengguna Geno yang ada; ukur dulu dengan geno_usage.sql (ADR-025 Q2).
 - **Alternatif yang ditolak:** personal assistant atau inbox (tumpang tindih dengan Ofira), penulis atau drafter (tumpang tindih dengan Mira), triage atau fallback murni (sudah tugas Aira).
 
 ### Kriteria selesai
@@ -261,7 +261,7 @@ Ditahan sesuai keputusan. Yang dikerjakan sekarang hanya memastikan desain tidak
 
 | Fase | Isi | Bergantung pada | Selesai bila |
 | P0 | Keputusan D1 sampai D6; ADR departemen | - | Keputusan tercatat |
-| P1 | Fondasi: audit kondisi produksi (scheduler, officecli, rollout Ivo/Juno/Mira, harness eval routing), Tavily (web research P0), probe harian (P4), status bug officecli, semantik catch-up dan depth, cek pembungkus untrusted | - | Web search berhasil di produksi; hasil cek terdokumentasi |
+| P1 | Fondasi: audit kondisi produksi (scheduler, officecli, rollout Ivo/Juno/Mira, harness eval routing: jalankan evals/aira-routing), Tavily (web research P0), probe harian (P4), status bug officecli, semantik catch-up dan depth, cek pembungkus untrusted | - | Web search berhasil di produksi; hasil cek terdokumentasi |
 | P2 | Skill pack Office untuk Ofira | P1 (bug sandbox) | Set golden lulus, batch aman |
 | P3 | DeepResearcher (dan feed_read) | P0 (D1 sampai D3), P1 | Eval riset dan eval routing lulus |
 | P4 | Celah scheduler G1, G3, G6, lalu G2 dan G4 | P1 (G3) | Tes per celah lulus |
@@ -276,6 +276,8 @@ Ditahan sesuai keputusan. Yang dikerjakan sekarang hanya memastikan desain tidak
 | Agent ke-10 menurunkan akurasi routing Aira | Permintaan salah alamat, biaya naik | Eval routing sebelum dan sesudah; DeepResearcher hanya memiliki edge sempit; departemen mempersempit pilihan Aira |
 | Rantai delegasi tiga lapis melipatgandakan panggilan LLM | Biaya kejutan, timeout 180 detik | Batas dua lompatan, budget per permintaan di Aira, delegate latar belakang untuk riset besar |
 | Gating tier hanya di UI (flag enterprise sekarang hanya ikon kunci) | Tenant Operational bisa memanggil DeepResearcher lewat jalur lain dan menanggung biaya riset | Penegakan tier minimum di server (active_agents dan admission), bukan hanya di dashboard; tes akses per tier |
+| Depth leader tidak dinaikkan, atau 0 dipakai sebagai 'tidak boleh delegasi' | Rantai Aira ke leader ke staf ditolak, atau shared service justru boleh mendelegasikan sampai depth 3 | Leader 2, staf dan shared service 1 plus policy delegasi; tes admission per kombinasi (ADR-025 §3) |
+| Nama Nara mirip Aira dan Mira (akhiran -ra) | @mention dan routing keliru | Kasus nama mirip dan @mention di eval routing; tinjau lagi nama bila eval menunjukkan salah rute |
 | Hasil riset memuat teks berbahaya dari web | Prompt injection ke turn yang auto-approve | Verifikasi pembungkus untrusted sebelum rilis; DeepResearcher tanpa tool tulis |
 | Re-scope Geno mengubah perilaku untuk pengguna yang sudah memakainya sebagai generalis | Keluhan, permintaan umum tidak terjawab | agent_type tetap; permintaan umum ditangani Aira; bandingkan perilaku sebelum dan sesudah; umumkan perubahan scope |
 | Shared service dipanggil leader tapi butuh delegasi lanjutan | Tugas macet di batas depth | Geno dan DeepResearcher dirancang sebagai eksekutor; kebutuhan delegasi lanjutan lewat ADR terpisah |
@@ -302,15 +304,16 @@ Dari review awal, ide berikut tidak masuk keputusan owner tetapi layak dicatat. 
 - Orkas: README, memory.ts, reflection-orchestrator.ts, auto_tasks.ts (hampir penuh, 6.992 karakter terakhir tidak terbaca), auto_tasks_tool.ts, builtin_marketplace.ts. Nama agent bawaan diambil dari README karena folder agent di repo memakai id heksadesimal dan agent.json tidak dibuka.
 - Aivory: ADR-009 (hampir penuh), ADR-020, ADR-021, ADR-008 (bagian awal), ADR-014 (bagian awal), CERVEAU-N8N-ORCHESTRATION-PLAN, CERVEAU-NEW-AGENTS-PLAN, CERVEAU-WEB-RESEARCH-TOOLS-PLAN, CERVEAU-STATUS (bagian awal), agent_roster.py, teams.py (kepala berkas), tenantScheduledRuns.ts (kepala berkas).
 - Repo dashboard (dicek 2026-11-21): lib/agentRoster.ts dan lib/agentRoster.generated.ts (9 agent; ENTERPRISE_AGENT_TYPES berisi office_assistant); components/agents/SchedulesTab.tsx dan lib/tenantScheduledRuns.ts (tipe ScheduledRun, cadence, kuota, kredit, approval kedaluwarsa); ScheduleForm.tsx di workflow builder; app/workflows/page.tsx hanya lewat pencarian kata kunci.
+- Monorepo (dicek 2026-11-21): ops/cerveau-config/config.redacted.toml (cermin, bukan config produksi), cron/scheduler.rs (jalur catch-up saat startup), tools/delegate.rs (penghitungan depth), dan ADR-025 (draf).
 
 ### Belum diverifikasi
 
-- Kode Rust Cerveau (scheduler.rs, delegate.rs, semantik catch_up_on_startup dan max_delegation_depth).
+- Kode Rust Cerveau selain bagian yang sudah dibaca: jalur admission di delegate.rs dan konkurensi catch-up (claim_due_jobs, process_due_jobs). Tes delegate.rs belum dijalankan.
 - Status terkini bug sandbox officecli dan status rollout Ivo, Juno, dan Mira.
 - Halaman workflow builder n8n hanya dicek lewat pencarian kata kunci (bukan pembacaan penuh), dan satu file (components/workflow/AddWithAivoryPanel.tsx) cocok dengan kata kunci agent tetapi belum dibaca.
 - Sisi backend dan runtime untuk jadwal: apakah ada data hasil run terakhir yang belum diekspos ke dashboard, dan apakah runtime membawa state antar-run (dashboard memastikan UI dan API-nya tidak mengekspos keduanya).
 - ADR-004, 013, 016, 024 (memory) dan bagian akhir ADR-008 dan ADR-014.
-- Apakah harness eval routing (ERP-SCALING-PLAN Fase 0) benar-benar ada dan bisa dijalankan; gate D1 bergantung padanya.
+- Harness eval routing: tidak ditemukan saat pencarian 2026-11-21 (evals/ hanya berisi typesafe-jev). Harness awal diajukan di AVRY-V2-Main#70 (evals/aira-routing), belum dijalankan ke model; gate D1 menunggu hasilnya.
 - Apakah tool agent_tasks dan team_delegate dapat dipakai Geno sebagai shared service tanpa perubahan depth.
 - Semua klaim 'live' berasal dari tanggal di dokumen (sebagian besar September 2026); kondisi produksi hari ini belum dicek.
 
