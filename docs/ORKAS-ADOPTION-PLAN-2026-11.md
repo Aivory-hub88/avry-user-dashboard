@@ -4,7 +4,7 @@
 
 ^ Revisi 21 November 2026 (draf awal 18 November) · Basis: repo Orkas-AI/Orkas (MIT) dan dokumen internal docs/ (ADR-008, 009, 014, 020, 021, CERVEAU-NEW-AGENTS-PLAN, CERVEAU-WEB-RESEARCH-TOOLS-PLAN, CERVEAU-N8N-ORCHESTRATION-PLAN)
 
-^ Perubahan di revisi ini: Geno menjadi shared service dengan scope baru (task dan follow-up keeper), bukan staf "Floating"; D4, bagian 7.2, 7.3, 7.7, 7.8, G7, roadmap dan risiko disesuaikan; angka roster dashboard dikoreksi dari 6 menjadi 9 agent.
+^ Perubahan di revisi ini: Geno menjadi shared service dengan scope baru (task dan follow-up keeper), bukan staf "Floating"; D4, bagian 7.2, 7.3, 7.7, 7.8, G7, roadmap dan risiko disesuaikan; angka roster dashboard dikoreksi dari 6 menjadi 9 agent. DeepResearcher tersedia mulai tier Business (D3). Verifikasi kode dashboard 2026-11-21: G1, G2, dan G6 terkonfirmasi sebagai celah di sisi UI dan API (G6 naik ke ukuran M karena butuh backend); catatan batas jadwal agent dan n8n (6.3) diperbarui.
 
 ## 1. Ringkasan
 
@@ -144,12 +144,12 @@ Catatan: Ofira saat ini dikunci untuk tier Enterprise (ENTERPRISE_AGENT_TYPES di
 Orkas menyimpan tiap task sebagai direktori (config.json, attachments, handoff), menjadwalkan lewat timer per task, dan mengeksekusi lewat chat bus. Sebagian besar mekanisme itu khas desktop (powerMonitor, device binding) dan **tidak** perlu ditiru. Yang relevan:
 
 | # | Celah | Di Orkas | Di Aivory | Usulan | Uk. |
-| G1 | Jadwal sekali jalan dan batas berhenti | one_time; end_condition berdasarkan tanggal atau jumlah kemunculan (run manual tidak dihitung) | Runtime mendukung one-shot dan delete_after_run; UI hanya 4 cadence; end condition tidak terlihat | Tambah opsi Sekali dan Berhenti setelah (tanggal atau N kali). Untuk pengingat murni tetap pakai team_remind. | S |
-| G2 | Kontinuitas antar-run | Percakapan dipakai ulang dan handoff/note.md membawa state ke run berikutnya | Tiap run sesi baru (cron-run-N); ada flag uses_memory; carry-over eksplisit belum terlihat | Sisipkan ringkasan hasil run terakhir (dari run history, dibatasi panjangnya, dibingkai sebagai data lama yang mungkin basi) ke prompt run berikutnya. | M |
+| G1 | Jadwal sekali jalan dan batas berhenti | one_time; end_condition berdasarkan tanggal atau jumlah kemunculan (run manual tidak dihitung) | Runtime mendukung one-shot dan delete_after_run; UI hanya 4 cadence; dikonfirmasi di kode dashboard (2026-11-21): tidak ada opsi Sekali dan tidak ada field end condition di API create/update | Tambah opsi Sekali dan Berhenti setelah (tanggal atau N kali). Untuk pengingat murni tetap pakai team_remind. | S |
+| G2 | Kontinuitas antar-run | Percakapan dipakai ulang dan handoff/note.md membawa state ke run berikutnya | Tiap run sesi baru (cron-run-N); ada flag uses_memory; API dan UI dashboard tidak punya opsi carry-over (input hanya name, prompt, cron_expression, timezone; dikonfirmasi 2026-11-21), perilaku runtime belum dicek | Sisipkan ringkasan hasil run terakhir (dari run history, dibatasi panjangnya, dibingkai sebagai data lama yang mungkin basi) ke prompt run berikutnya. | M |
 | G3 | Kebijakan catch-up | Hanya kemunculan terbaru, maksimal 12 jam, sekali jalan, diabaikan bila jadwal diedit setelahnya | catch_up_on_startup = true; semantik persisnya belum diverifikasi | Baca scheduler.rs dan uji: jika menjalankan semua boundary yang terlewat, ganti ke aturan Orkas. Mencegah lonjakan biaya setelah deploy. | S |
 | G4 | Agent membuat jadwal dari chat | Tool auto_tasks (list, get, create, update, delete), validasi ketat, tanpa konfirmasi | Ditandai paling akhir di ADR-009 Fase 4; tool cron_add tidak dibuka ke tenant | Tool schedule_propose: agent mengusulkan, baris dibuat belum aktif, pengguna menyetujui di tab Schedules. Wajib ada persetujuan karena risiko biaya (ADR-009 §6). | M |
 | G5 | Status run waiting_input | Ada | Sudah ada lewat InputRequired dan approval yang kedaluwarsa | Tidak ada celah. | - |
-| G6 | Riwayat run dan biaya per run terlihat pengguna | Kartu hasil di chat | ADR-009 Keputusan 6 mensyaratkannya; apakah tab Schedules menampilkan hasil run terakhir belum diverifikasi | Verifikasi. Jika belum, tampilkan hasil dan status run terakhir. | S |
+| G6 | Riwayat run dan biaya per run terlihat pengguna | Kartu hasil di chat | ADR-009 Keputusan 6 mensyaratkannya. Dikonfirmasi di kode dashboard (2026-11-21): tipe ScheduledRun tidak punya field hasil, waktu run terakhir, atau biaya; hanya last_synced_at (waktu sinkronisasi, bukan waktu run). Tab Schedules hanya menampilkan status, kuota, kredit, dan approval yang kedaluwarsa. | Celah nyata. Tambahkan field atau endpoint di backend (hasil, waktu, dan biaya run terakhir), lalu tampilkan di tab Schedules. | M |
 | G7 | Auto-advance (tim mengambil to-do berikutnya sendiri) | Per project, nyala atau mati | Ada papan agent_tasks, team_delegate, dan Aira | Jangan bangun subsistem baru. Setelah departemen aktif, implementasikan sebagai jadwal Aira yang meninjau papan dan merutekan ke **Geno** (task keeper, bagian 7.8) atau leader terkait, dengan budget. Tahan sampai itu. | Hold |
 
 ### 6.3 Batas antara jadwal agent dan n8n
@@ -162,7 +162,7 @@ Dua mesin penjadwal dengan semantik berbeda akan membingungkan pengguna dan meny
 | Saling memanggil | Jadwal agent boleh memicu workflow lewat tool trigger_\* (CERVEAU-N8N-ORCHESTRATION-PLAN) | n8n memanggil agent lewat webhook; tidak membuat jadwal agent sendiri |
 | Approval | Gerbang F-1 sekali per pemicu | Tidak menambah gerbang kedua di dalam alur |
 
-^ Catatan: halaman workflow builder di dashboard (app/workflows) ada di repo tetapi isinya belum diperiksa. Batas di atas perlu dicek terhadap apa yang sebenarnya sudah dibangun di sana sebelum diumumkan ke pengguna.
+^ Catatan (dicek di kode dashboard 2026-11-21, lewat pencarian kata kunci, bukan pembacaan penuh 2.271 baris app/workflows/page.tsx): builder berbasis n8n; workflow aktif hanya bila sudah di-deploy ke n8n. Node Schedule di builder mendukung interval menit, jam, hari, dan minggu tanpa batas frekuensi, sedangkan tab Schedules agent menolak frekuensi berbahaya. Komponen workflow tidak punya referensi ke agent Cerveau, jadi pola trigger_\* dan webhook ke agent belum punya sisi dashboard. Batas di atas perlu dicek terhadap backend dan n8n sebelum diumumkan ke pengguna.
 
 ### Kriteria selesai
 
@@ -281,7 +281,7 @@ Ditahan sesuai keputusan. Yang dikerjakan sekarang hanya memastikan desain tidak
 | Shared service dipanggil leader tapi butuh delegasi lanjutan | Tugas macet di batas depth | Geno dan DeepResearcher dirancang sebagai eksekutor; kebutuhan delegasi lanjutan lewat ADR terpisah |
 | Lonjakan run susulan setelah deploy atau restart | Biaya tiba-tiba dan duplikasi hasil | Aturan catch-up G3 diuji sebelum fitur jadwal diperluas |
 | Agent membuat jadwal sendiri tanpa kendali | Biaya berulang tanpa pengawasan | schedule_propose wajib persetujuan; kuota per tier; penolakan frekuensi berbahaya tetap berlaku |
-| Dua penjadwal (Cerveau dan n8n) membingungkan pengguna | Debug dan penagihan sulit | Aturan batas 6.3 dan satu halaman dokumentasi pengguna |
+| Dua penjadwal (Cerveau dan n8n) membingungkan pengguna | Debug dan penagihan sulit; node Schedule workflow mengizinkan interval menit tanpa batas frekuensi | Aturan batas 6.3, satu halaman dokumentasi pengguna, dan batas frekuensi minimum di node Schedule workflow |
 | Sandbox officecli masih rusak | Skill pack Office tidak berfungsi | Cek dan perbaiki di P1 sebelum P2 dimulai |
 | Konfigurasi produksi di luar git menyimpang antar-lingkungan | Perilaku tidak konsisten | Ikuti ADR-011 (drift konfigurasi) dan cermin redacted di ops/cerveau-config |
 
@@ -301,13 +301,14 @@ Dari review awal, ide berikut tidak masuk keputusan owner tetapi layak dicatat. 
 
 - Orkas: README, memory.ts, reflection-orchestrator.ts, auto_tasks.ts (hampir penuh, 6.992 karakter terakhir tidak terbaca), auto_tasks_tool.ts, builtin_marketplace.ts. Nama agent bawaan diambil dari README karena folder agent di repo memakai id heksadesimal dan agent.json tidak dibuka.
 - Aivory: ADR-009 (hampir penuh), ADR-020, ADR-021, ADR-008 (bagian awal), ADR-014 (bagian awal), CERVEAU-N8N-ORCHESTRATION-PLAN, CERVEAU-NEW-AGENTS-PLAN, CERVEAU-WEB-RESEARCH-TOOLS-PLAN, CERVEAU-STATUS (bagian awal), agent_roster.py, teams.py (kepala berkas), tenantScheduledRuns.ts (kepala berkas).
-- Repo dashboard (dicek 2026-11-21): lib/agentRoster.ts dan lib/agentRoster.generated.ts (9 agent; ENTERPRISE_AGENT_TYPES berisi office_assistant); keberadaan app/workflows dan app/agents.
+- Repo dashboard (dicek 2026-11-21): lib/agentRoster.ts dan lib/agentRoster.generated.ts (9 agent; ENTERPRISE_AGENT_TYPES berisi office_assistant); components/agents/SchedulesTab.tsx dan lib/tenantScheduledRuns.ts (tipe ScheduledRun, cadence, kuota, kredit, approval kedaluwarsa); ScheduleForm.tsx di workflow builder; app/workflows/page.tsx hanya lewat pencarian kata kunci.
 
 ### Belum diverifikasi
 
 - Kode Rust Cerveau (scheduler.rs, delegate.rs, semantik catch_up_on_startup dan max_delegation_depth).
-- Status terkini bug sandbox officecli, status rollout Ivo, Juno, dan Mira, serta isi halaman workflow builder n8n.
-- Apakah tab Schedules menampilkan hasil run terakhir, dan apakah ada carry-over antar-run.
+- Status terkini bug sandbox officecli dan status rollout Ivo, Juno, dan Mira.
+- Halaman workflow builder n8n hanya dicek lewat pencarian kata kunci (bukan pembacaan penuh), dan satu file (components/workflow/AddWithAivoryPanel.tsx) cocok dengan kata kunci agent tetapi belum dibaca.
+- Sisi backend dan runtime untuk jadwal: apakah ada data hasil run terakhir yang belum diekspos ke dashboard, dan apakah runtime membawa state antar-run (dashboard memastikan UI dan API-nya tidak mengekspos keduanya).
 - ADR-004, 013, 016, 024 (memory) dan bagian akhir ADR-008 dan ADR-014.
 - Apakah harness eval routing (ERP-SCALING-PLAN Fase 0) benar-benar ada dan bisa dijalankan; gate D1 bergantung padanya.
 - Apakah tool agent_tasks dan team_delegate dapat dipakai Geno sebagai shared service tanpa perubahan depth.
