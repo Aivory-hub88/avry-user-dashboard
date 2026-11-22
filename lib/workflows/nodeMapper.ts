@@ -113,7 +113,12 @@ const INTENT_PATTERNS: Record<NodeIntent, RegExp> = {
  * Exported for Aivory Copilot preview use.
  */
 export function detectNodeIntent(action: string, tool?: string): NodeIntent {
-  const text = `${action} ${tool || ''}`.toLowerCase()
+  // Generated steps often carry camelCase action ids ("respondToWebhook",
+  // "sendEmail"); `\brespond\b` and friends never match those. Match against
+  // the text as written AND with camelCase split, so brand names that carry
+  // inner capitals ("HubSpot" -> "hubspot", not "hub spot") still match.
+  const raw = `${action} ${tool || ''}`
+  const text = `${raw} ${raw.replace(/([a-z0-9])([A-Z])/g, '$1 $2')}`.toLowerCase()
 
   // Check patterns in priority order
   // Email & messaging checked BEFORE respond — "Send Email Reply" must map to email, not respond

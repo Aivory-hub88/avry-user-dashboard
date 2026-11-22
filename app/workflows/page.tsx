@@ -1296,7 +1296,7 @@ function WorkflowsPageInner() {
         // exactly this same NO_CREDENTIALS/wrong-instance bug, permanently,
         // not just for workflows deployed before today's fix.
         await patchWorkflow(selected.workflow_id, {
-          status: 'active',
+          status: data.active === false ? 'draft' : 'active',
           n8n_workflow_id: data.n8n_workflow_id,
           n8n_url: data.n8n_url,
           n8nWebhookPath: data.n8nWebhookUrl || null,
@@ -1305,7 +1305,7 @@ function WorkflowsPageInner() {
         await refreshWorkflows()
       } else {
         updateWorkflow(selected.workflow_id, {
-          status: 'active',
+          status: data.active === false ? 'draft' : 'active',
           n8n_workflow_id: data.n8n_workflow_id,
           n8n_url: data.n8n_url,
           n8nWebhookPath: data.n8nWebhookUrl || null,
@@ -1320,7 +1320,14 @@ function WorkflowsPageInner() {
       }
 
       setActivationModalOpen(false)
-      showToast('Workflow deployed to n8n', 'success')
+      if (data.active === false) {
+        // Created in n8n, but n8n would not switch it on (typically: no trigger
+        // node, or a node that is not configured). Say so; do not claim it runs.
+        const why = typeof data.activation_error === 'string' && data.activation_error ? ` n8n said: ${data.activation_error}` : ''
+        showToast(`Deployed to n8n, but n8n did not activate it, so it is not running.${why}`, 'error')
+      } else {
+        showToast('Workflow deployed to n8n', 'success')
+      }
     } catch (err) {
       showToast(t('activationModal.errorNetwork'), 'error')
       console.error('[activate]', err)
@@ -1576,7 +1583,7 @@ function WorkflowsPageInner() {
 
   // ── Generation apply handler ─────────────────────────────
   // ALWAYS creates a NEW workflow — never appends to existing canvas
-  const handleGenerationApply = async (nodes: any[], edges: any[]) => {
+  const handleGenerationApply = async (nodes: any[], edges: any[], name?: string) => {
     console.log('[Generation] Creating NEW workflow → nodes:', nodes.length, 'edges:', edges.length)
 
     // Convert nodes to steps format for the workflow record
@@ -1592,7 +1599,7 @@ function WorkflowsPageInner() {
 
     // Generate a meaningful title from the first node
     const firstNode = nodes[0]
-    const title = firstNode?.data?.title || firstNode?.data?.label || `Generated Workflow ${new Date().toLocaleTimeString()}`
+    const title = name || firstNode?.data?.title || firstNode?.data?.label || `Generated Workflow ${new Date().toLocaleTimeString()}`
 
     const newWorkflow: SavedWorkflow = {
       workflow_id: `workflow_${Date.now()}`,

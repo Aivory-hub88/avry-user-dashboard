@@ -13,11 +13,11 @@
 import React, { useCallback, useState, useEffect } from 'react'
 import { WorkflowGenerationPanel } from './WorkflowGenerationPanel'
 import { useWorkflowGeneration } from '@/hooks/useWorkflowGeneration'
-import { stepsToNodes, edgesToReactFlowEdges } from './WorkflowNodeComponent'
+import { specToCanvas } from '@/lib/workflows/specToCanvas'
 import styles from './WorkflowGenerationFlow.module.css'
 
 export interface WorkflowGenerationFlowProps {
-  onApply: (nodes: any[], edges: any[]) => void
+  onApply: (nodes: any[], edges: any[], name?: string) => void
   onCancel: () => void
   availableApps?: any[]
   initialPrompt?: string
@@ -65,10 +65,10 @@ export const WorkflowGenerationFlow: React.FC<WorkflowGenerationFlowProps> = ({
 
   const handleApply = useCallback(() => {
     if (!spec) return
-    const nodes = stepsToNodes(spec.steps)
-    const rfEdges = edgesToReactFlowEdges(edges)
-    onApply(nodes, rfEdges)
-  }, [spec, edges, onApply])
+    // Typed through the real converter so deploy ships real n8n node types.
+    const { nodes, edges: rfEdges } = specToCanvas(spec)
+    onApply(nodes, rfEdges, spec.name)
+  }, [spec, onApply])
 
   const handleCancel = useCallback(() => {
     clearGeneration()
