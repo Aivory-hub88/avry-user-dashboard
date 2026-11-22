@@ -686,7 +686,10 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       setErrorMsg(null);
       try {
         const res = await authedFetch(asset(`/api/n8n/workflow/${fetchId}${instanceQuery}`));
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          throw new Error(body?.error || `HTTP ${res.status}`);
+        }
         const wf = await res.json();
         if (cancelled) return;
         setRawWorkflow(wf);
