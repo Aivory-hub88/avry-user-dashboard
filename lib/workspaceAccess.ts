@@ -31,8 +31,9 @@ export async function getAgentDocRole(docId: string, agentType: string): Promise
 
 /**
  * Owner-or-admin gate shared by the acl + agents management routes.
- * Mirrors the closed-by-default model: service creds and admins bypass,
- * otherwise only the doc owner may manage grants.
+ * Mirrors the closed-by-default model: service creds and platform admins
+ * bypass; otherwise the doc owner, or a room admin (an ACL grant with role
+ * 'admin', like a WhatsApp group admin), may manage grants.
  */
 export async function canManageDoc(docId: string, accountType?: string, userId?: string): Promise<boolean> {
   if (accountType === 'admin' || accountType === 'superadmin') return true
@@ -42,6 +43,24 @@ export async function canManageDoc(docId: string, accountType?: string, userId?:
     // database-type docs and could wrongly deny the real owner. See the same
     // fix in workspaceAuth.ts's authorizeDocFallback for the fail-open sibling
     // of this bug.
+    const r = await query(
+      `SELECT 1 FROM dashboard.workspace_docs WHERE id = ANY($1::text[]) AND owner = $2`,
+      [[docId, `workspace:${docId}`, `workspace:db:${docId}`, `db:${docId}`], userId],
+    )
+    if ((r.rowCount ?? 0) > 0) return true
+    const a = await query(
+      `SELECT 1 FROM dashboard.workspace_doc_acl WHERE doc_id = $1 AND user_id = $2 AND role = 'admin'`,
+      [docId, userId],
+    )
+    return (a.rowCount ?? 0) > 0
+  } catch {
+    return false
+  }
+}
+
+/** The room's owner can't be demoted or removed through grants. */
+export async function isDocOwner(docId: string, userId: string): Promise<boolean> {
+  try {
     const r = await query(
       `SELECT 1 FROM dashboard.workspace_docs WHERE id = ANY($1::text[]) AND owner = $2`,
       [[docId, `workspace:${docId}`, `workspace:db:${docId}`, `db:${docId}`], userId],
@@ -134,6 +153,9 @@ export async function getDocRolesBatch(
       if (!row) { out.set(id, 'editor'); continue } // new doc claimable
       if (!row.owner) { out.set(id, 'editor'); continue } // ownerless claimable
       const aclRole = aclByDoc.get(id)
+      // A room admin works like an editor; the extra power (managing people
+      // and agents) is checked by canManageDoc, not by DocRole.
+      if (aclRole === 'admin') { out.set(id, 'editor'); continue }
       if (aclRole === 'editor' || aclRole === 'viewer' || aclRole === 'owner') {
         out.set(id, aclRole as DocRole); continue
       }

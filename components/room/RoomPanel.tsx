@@ -8,6 +8,8 @@
  */
 import Link from "next/link"
 import { useState } from "react"
+import { MoreHorizontal, Plus } from "lucide-react"
+import { personActions, type PersonAction } from "@/lib/roomPeople"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import FileAttachments from "@/components/requests/FileAttachments"
 import { formatDate } from "@/components/requests/requestUi"
@@ -35,6 +37,10 @@ export interface RoomPerson {
   /** For CSV export/import of person cells. */
   email?: string
   role: string
+  /** Where the person's access comes from: the room's owner, the team, or a grant on this room. */
+  source?: "owner" | "team" | "room"
+  /** Raw role ("admin" | "editor" | "viewer") for grants on this room. */
+  grantRole?: string
 }
 
 const PRIORITY_LABEL: Record<string, string> = { Low: "Low", Med: "Medium", High: "High" }
@@ -44,6 +50,20 @@ function agentStatus(type: string, tasks: SpaceAgentTask[]): { label: string; to
   if (mine.some((t) => t.status === "blocked")) return { label: "Needs approval", tone: "text-[#FFB454]" }
   if (mine.some((t) => t.status === "todo" || t.status === "in_progress")) return { label: "Working", tone: "text-[#b7cba6]" }
   return { label: "Idle", tone: "text-white/30" }
+}
+
+function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="flex h-6 w-6 items-center justify-center rounded-full text-white/45 transition-[transform,background-color,color] duration-150 ease-out hover:bg-white/[0.08] hover:text-white/85 active:scale-[0.92]"
+    >
+      <Plus className="h-3.5 w-3.5" />
+    </button>
+  )
 }
 
 function Block({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
@@ -69,6 +89,11 @@ export default function RoomPanel({
   filesReloadKey,
   autonomy = "suggest",
   onAutonomyChange,
+  onAddAgent,
+  onAddPerson,
+  canManage = false,
+  selfId,
+  onPersonAction,
 }: {
   roomId: string
   brief: RoomBrief | null
@@ -81,7 +106,15 @@ export default function RoomPanel({
   autonomy?: Autonomy
   /** Present for the room owner only; others see the setting read-only. */
   onAutonomyChange?: (next: Autonomy) => void
+  /** Present for the room owner only: opens the add-agent / add-person picker. */
+  onAddAgent?: () => void
+  onAddPerson?: () => void
+  /** Owner or room admin: may promote, demote and remove people granted on this room. */
+  canManage?: boolean
+  selfId?: string | null
+  onPersonAction?: (person: RoomPerson, action: PersonAction) => void
 }) {
+  const [menuFor, setMenuFor] = useState<string | null>(null)
   const [goalOpen, setGoalOpen] = useState(false)
   const goal = brief?.goal?.trim() ?? ""
   const longGoal = goal.length > 220
@@ -134,9 +167,9 @@ export default function RoomPanel({
         )}
       </Block>
 
-      <Block title="Agents">
+      <Block title="Agents" action={onAddAgent ? <AddButton label="Add an agent" onClick={onAddAgent} /> : null}>
         {agents.length === 0 ? (
-          <div className="text-[12px] text-white/30">No agents in this room yet.</div>
+          <div className="text-[12px] text-white/30">{onAddAgent ? "No agents yet. Add one with +." : "No agents in this room yet."}</div>
         ) : (
           <div className="space-y-2.5">
             {agents.map((a) => {
@@ -178,17 +211,53 @@ export default function RoomPanel({
         </div>
       </Block>
 
-      <Block title="People">
+      <Block title="People" action={onAddPerson ? <AddButton label="Add a person" onClick={onAddPerson} /> : null}>
         <div className="space-y-2">
-          {people.map((p) => (
-            <div key={p.id} className="flex items-center gap-2.5">
-              <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[11px] font-medium text-white/65">
-                {p.name.slice(0, 1).toUpperCase()}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-[13px] text-white/75">{p.name}</span>
-              <span className="text-[11px] text-white/30">{p.role}</span>
-            </div>
-          ))}
+          {people.map((p) => {
+            const actions = onPersonAction
+              ? personActions({ canManage, source: p.source ?? "team", role: p.grantRole ?? p.role, isSelf: p.id === selfId })
+              : []
+            return (
+              <div key={p.id} className="relative">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[11px] font-medium text-white/65">
+                    {p.name.slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-white/75">{p.name}</span>
+                  <span className="text-[11px] text-white/30">{p.role}</span>
+                  {actions.length > 0 && (
+                    <button
+                      type="button"
+                      aria-label={`Actions for ${p.name}`}
+                      aria-expanded={menuFor === p.id}
+                      onClick={() => setMenuFor((v) => (v === p.id ? null : p.id))}
+                      className="flex h-6 w-6 items-center justify-center rounded-full text-white/40 hover:bg-white/[0.08] hover:text-white/80"
+                    >
+                      <MoreHorizontal className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                {menuFor === p.id && actions.length > 0 && (
+                  <div role="menu" className="absolute right-0 top-7 z-10 min-w-[150px] rounded-xl border border-line bg-[#1b1b1e] p-1 shadow-xl">
+                    {actions.map((a) => (
+                      <button
+                        key={a}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMenuFor(null)
+                          onPersonAction?.(p, a)
+                        }}
+                        className={`block w-full rounded-lg px-3 py-1.5 text-left text-[12px] hover:bg-white/[0.06] ${a === "remove" ? "text-[#FF8A80]" : "text-white/75"}`}
+                      >
+                        {a === "makeAdmin" ? "Make admin" : a === "removeAdmin" ? "Remove as admin" : "Remove from room"}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </Block>
 
