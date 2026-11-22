@@ -22,6 +22,7 @@ import { useWorkflowCopilot } from '@/hooks/useWorkflowCopilot'
 import type { CopilotMessage } from '@/hooks/useWorkflowCopilot'
 import type { GeneratedWorkflow } from '@/lib/workflows/copilotClient'
 import type { CanvasEditContext, ChangePreview } from '@/lib/workflows/canvasCopilot'
+import { getAetherStatus, getStageBadge, type AetherStatus } from '@/lib/workflows/aetherStatus'
 import { ThinkingDots } from '@/components/ui/ThinkingDots'
 import { SendArrowIcon } from '@/components/ChatInput'
 
@@ -165,34 +166,6 @@ export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, getC
 }
 
 /* ── Status shown on the pill and the minimized chip ──── */
-
-const STAGE_LABEL: Record<string, string> = {
-  CLARIFYING: 'Understanding your request...',
-  GENERATING: 'Building workflow...',
-  TESTING: 'Testing workflow...',
-  FIXING: 'Fixing automatically...',
-  APPLYING: 'Applying to canvas...',
-}
-
-interface AetherStatus {
-  text: string
-  /** Aether is working in the background. */
-  busy: boolean
-  /** A validated proposal is waiting for the user. */
-  ready: boolean
-}
-
-function getAetherStatus(p: {
-  stage: string; loading: boolean; isStreamingReply: boolean; isTesting: boolean
-  canApply: boolean; isCompleted: boolean; canvasTarget?: CopilotApplyTarget
-}): AetherStatus {
-  if (STAGE_LABEL[p.stage]) return { text: STAGE_LABEL[p.stage].replace('...', '…'), busy: true, ready: false }
-  if (p.isTesting) return { text: 'Testing workflow…', busy: true, ready: false }
-  if (p.loading || p.isStreamingReply) return { text: 'Thinking…', busy: true, ready: false }
-  if (p.canApply) return { text: p.canvasTarget ? 'Changes ready · Update canvas' : 'Workflow ready · Apply', busy: false, ready: true }
-  if (p.isCompleted) return { text: p.canvasTarget ? 'Canvas updated' : 'Applied to canvas', busy: false, ready: false }
-  return { text: 'Ask Aether', busy: false, ready: false }
-}
 
 function StatusDot({ status }: { status: AetherStatus }) {
   if (!status.busy && !status.ready) return null
@@ -535,7 +508,7 @@ function CopilotPanelExpanded({
     setAttachedFiles(prev => prev.filter((_, i) => i !== index))
   }
 
-  const stageLabel = STAGE_LABEL
+  const stageBadge = getStageBadge(stage, loading || isStreamingReply)
 
   return (
     <div
@@ -555,13 +528,13 @@ function CopilotPanelExpanded({
           <WindowDots onClose={onClose} onMinimize={onMinimize} />
           <AetherLogo />
           {/* Active stage badge */}
-          {stageLabel[stage] && (
+          {stageBadge && (
             <span className="text-[10px] text-[#a1a1aa] font-light animate-pulse">
-              {stageLabel[stage]}
+              {stageBadge}
             </span>
           )}
           {/* isTesting indicator — shown during SANDBOX_TESTING / FIXING */}
-          {isTesting && !stageLabel[stage] && (
+          {isTesting && !stageBadge && (
             <span className="text-[10px] text-amber-400 font-light animate-pulse">
               Testing workflow...
             </span>
