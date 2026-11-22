@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm'
 import type { AgenticWorkflowState } from '@/types/agenticWorkflow'
 import dynamic from 'next/dynamic'
 import MessageActions from './chat/MessageActions'
+import ApprovalCard from './chat/ApprovalCard'
 import { RoutingSuggestBanner } from './chat/RoutingSuggestBanner'
 import { AttachmentCard } from '@/components/AttachmentCard'
 import type { Attachment } from '@/components/UploadMenu'
@@ -45,6 +46,18 @@ interface ChatMessageProps {
   /** Which agent's avatar to show — same visual identity as the agent
    *  column and rail, so the chat header isn't the odd one out. */
   agentType?: string | null
+  /** The tool call this agent turn parked for a decision. Renders an
+   *  Approve/Deny card under the text; the conversational "Ya" path and the
+   *  rail resolve the same approval. Omit to render no card. */
+  approval?: {
+    toolName: string
+    riskTier: string
+    outcome?: 'approved' | 'denied' | null
+    busy?: boolean
+    error?: string | null
+    onApprove: () => void
+    onDeny: () => void
+  }
   /** WhatsApp-style reply: quotes an earlier bubble at the top of this one. */
   replyPreview?: { role: 'user' | 'assistant'; content: string; agentName?: string; name?: string }
   /** "Reply" action on this bubble — hands its own role/content up so the
@@ -317,7 +330,7 @@ const markdownComponents = {
 
 /* ── Main component ────────────────────────────────────────────────────────── */
 
-export default memo(function ChatMessage({ role, content, isStreaming = false, statusText, startedAt, endedAt, activity, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null, replyPreview, onReply, author, showAgentName = false }: ChatMessageProps) {
+export default memo(function ChatMessage({ role, content, isStreaming = false, statusText, startedAt, endedAt, activity, agenticState, onRegenerate, onEdit, pendingRoute, onAcceptRoute, onDismissRoute, attachments, agentName = 'Aivory', agentType = null, replyPreview, onReply, author, showAgentName = false, approval }: ChatMessageProps) {
   const noop = useCallback(() => {}, [])
   const hasAgenticPhases = !!(agenticState && agenticState.phases.length > 0)
   const hasTextContent = !!content
@@ -430,10 +443,7 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, s
                 </div>
               )}
 
-              {/* No approval card: the reply text already carries the
-                  conversational protocol hint ("Balas Ya / Reply Yes...").
-                  pendingApproval stays on the message only so the rail
-                  notification feed can hide this same approval there. */}
+              {approval && <ApprovalCard {...approval} />}
             </div>
           </div>
           <MessageActions role="ai" content={content} onRegenerate={onRegenerate} onReply={onReply} />
