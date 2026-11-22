@@ -700,7 +700,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
         // Trigger upstream so the workflow is startable and visible instead
         // of silently broken.
         const hasTrigger = wf.nodes.some((n: any) =>
-          typeof n?.type === 'string' && n.type.includes('Trigger'));
+          typeof n?.type === 'string' && /trigger|webhook|n8n-nodes-base\.(cron|start|interval)$/i.test(n.type));
         if (!hasTrigger) {
           console.warn('[WorkflowCanvas] workflow has no trigger node — injecting Manual Trigger', fetchId);
           wf.nodes = [
