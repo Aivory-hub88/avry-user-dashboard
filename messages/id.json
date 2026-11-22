@@ -919,5 +919,89 @@
     "perCredit": "1 credit ≈ {peak} token di jam sibuk, hingga {offpeak} di luar jam sibuk.",
     "unlimited": "Credit tak terbatas",
     "ringLabel": "Limit credit bulanan: {pct}% terpakai"
+  },
+  "n8nMcp": {
+    "title": "Sambungkan n8n lewat MCP",
+    "summary": "Biarkan agent Anda menemukan dan menjalankan workflow n8n yang Anda pilih, tanpa URL webhook atau ID workflow. Ini terpisah dari URL + API key di atas, yang tetap dipakai untuk men-deploy workflow.",
+    "open": "Atur",
+    "close": "Tutup",
+    "noCredit": {
+      "title": "Butuh credit yang bisa dipakai",
+      "body": "Agent memakai credit saat memanggil workflow n8n Anda, jadi opsi ini terbuka setelah akun punya credit. Top up atau upgrade untuk mengaktifkannya.",
+      "cta": "Top up atau upgrade"
+    },
+    "creditsLowConnected": "Credit Anda habis. Koneksi tetap tersimpan, tetapi tools-nya tidak akan jalan sampai credit tersedia lagi.",
+    "help": {
+      "title": "Cara mengambil token MCP",
+      "tokenIsNotApiKey": "Token MCP BUKAN API key n8n yang dipakai di atas. Keduanya kredensial berbeda, dan API key akan ditolak di sini.",
+      "step1": "Di n8n, buka Settings → Instance-level MCP lalu aktifkan akses MCP (hanya owner atau admin instance).",
+      "step2": "Buka tab \"Access token\" dan buat token. Nama label bisa berbeda antar versi n8n. Salin segera: n8n hanya menampilkannya sekali, dan token baru menggantikan yang lama.",
+      "step3": "Untuk setiap workflow yang boleh dipakai agent, aktifkan \"Available in MCP\" di pengaturan workflow itu. Workflow tanpa pengaturan ini tidak bisa dijalankan.",
+      "step4": "URL MCP Anda adalah yang tertera di halaman itu, berakhiran /mcp-server/http.",
+      "dedicatedAccount": "Gunakan akun n8n khusus dengan hak terbatas. Token membawa semua hak akun yang membuatnya.",
+      "https": "URL wajib diawali https:// dan bisa dijangkau dari internet. Instance di jaringan privat atau tanpa TLS tidak bisa tersambung.",
+      "aivoryInstance": "Instance n8n milik Aivory tidak bisa disambungkan di sini."
+    },
+    "fields": {
+      "url": "URL MCP n8n",
+      "urlPlaceholder": "https://n8n.contoh.com/mcp-server/http",
+      "token": "Token akses MCP",
+      "tokenPlaceholder": "Tempel token (dengan atau tanpa \"Bearer \")",
+      "showToken": "Tampilkan token",
+      "hideToken": "Sembunyikan token"
+    },
+    "actions": {
+      "connect": "Sambungkan dan verifikasi",
+      "connecting": "Memverifikasi…",
+      "reverify": "Verifikasi ulang",
+      "replaceToken": "Ganti token",
+      "saveToken": "Simpan token dan verifikasi",
+      "cancel": "Batal",
+      "disconnect": "Putuskan",
+      "confirmDisconnect": "Putuskan n8n? Agent akan kehilangan akses ke workflow Anda.",
+      "confirmYes": "Ya, putuskan"
+    },
+    "status": {
+      "label": "Status",
+      "pending_verification": "Menunggu verifikasi",
+      "verified": "Terhubung",
+      "verification_failed": "Verifikasi gagal",
+      "lastVerified": "Terakhir diverifikasi {date}",
+      "neverVerified": "Belum diverifikasi",
+      "toolCount": "{count} tools ditemukan"
+    },
+    "failure": {
+      "title": "Verifikasi gagal",
+      "saved": "Koneksi sudah tersimpan, jadi Anda bisa memperbaiki masalahnya lalu verifikasi ulang.",
+      "hints": "Penyebab umum: token yang dipakai adalah API key REST, bukan token MCP; MCP dimatikan di n8n; versi n8n terlalu lama; atau reverse proxy menjatuhkan header Authorization."
+    },
+    "tools": {
+      "title": "Tools yang boleh dipakai agent",
+      "help": "Hanya lima tools ini yang bisa diaktifkan. Fungsinya mencari, membaca, dan menjalankan workflow, serta membaca hasil eksekusi.",
+      "enabledCount": "{enabled} dari {total} aktif",
+      "locked": "Terkunci",
+      "lockedTitle": "{count} tools lain terkunci",
+      "lockedHelp": "Tools ini bisa mengubah atau menghapus data di n8n, jadi Aivory membiarkannya mati. Tidak bisa diaktifkan.",
+      "empty": "Tidak ada tools yang ditemukan. Pastikan akses MCP aktif di n8n dan minimal satu workflow memiliki \"Available in MCP\"."
+    },
+    "agents": {
+      "title": "Agent yang boleh memakai koneksi ini",
+      "help": "Pilih agent yang boleh mencari dan menjalankan workflow Anda. Hanya agent yang berjalan di Cerveau yang bisa dipilih.",
+      "none": "Belum ada agent yang dipilih, jadi belum ada yang bisa memakai koneksi ini.",
+      "save": "Simpan agent",
+      "saved": "Tersimpan"
+    },
+    "errors": {
+      "https": "URL harus diawali https://. http biasa dan alamat jaringan privat tidak didukung.",
+      "noCredit": "Credit Anda habis. Top up atau upgrade, lalu coba lagi.",
+      "forbiddenHost": "Ini adalah instance n8n milik Aivory sendiri yang tidak bisa disambungkan. Gunakan n8n milik Anda.",
+      "forbiddenAgent": "Salah satu agent yang dipilih belum berjalan di Cerveau, jadi belum bisa memakai koneksi ini. Batalkan pilihannya atau deploy dulu.",
+      "notFound": "Belum ada koneksi n8n. Sambungkan dulu.",
+      "verification": "Koneksi tidak bisa diverifikasi: {reason}",
+      "rateLimited": "Terlalu banyak percobaan verifikasi. Tunggu beberapa menit lalu coba lagi.",
+      "unavailable": "Penyimpanan sedang tidak tersedia. Coba lagi sebentar lagi.",
+      "generic": "Terjadi kesalahan. Silakan coba lagi.",
+      "load": "Tidak bisa memuat koneksi n8n Anda."
+    }
   }
 }

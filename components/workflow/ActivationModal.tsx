@@ -11,6 +11,7 @@ import {
 import { authedFetch } from '@/lib/deployAuth'
 import { logout } from '@/lib/auth'
 import { asset } from '@/lib/asset'
+import { N8nMcpConnectPanel } from './N8nMcpConnectPanel'
 import styles from './ActivationModal.module.css'
 
 export interface ActivationModalProps {
@@ -312,6 +313,10 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
             </button>
           </div>
         </form>
+        {/* Separate, per-user connection through n8n's own MCP server. Sits
+            outside the form on purpose: the URL + API key flow above keeps
+            its exact behaviour, and this has its own submit buttons. */}
+        <N8nMcpConnectPanel />
       </div>
     </div>
   )

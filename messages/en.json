@@ -919,5 +919,89 @@
     "perCredit": "1 credit = about {peak} tokens at peak hours, up to {offpeak} off-peak.",
     "unlimited": "Unlimited credits",
     "ringLabel": "Monthly credit limit: {pct}% used"
+  },
+  "n8nMcp": {
+    "title": "Connect n8n through MCP",
+    "summary": "Let your agents find and run the n8n workflows you choose, with no webhook URLs or workflow IDs. This is separate from the URL + API key above, which is still how workflows are deployed.",
+    "open": "Set up",
+    "close": "Hide",
+    "noCredit": {
+      "title": "Needs usable credits",
+      "body": "Agents spend credits when they call your n8n workflows, so this option opens once your account has credits. Top up or upgrade to turn it on.",
+      "cta": "Top up or upgrade"
+    },
+    "creditsLowConnected": "Your credits have run out. The connection stays saved, but its tools will not run until you have credits again.",
+    "help": {
+      "title": "How to get the MCP token",
+      "tokenIsNotApiKey": "The MCP token is NOT the n8n API key used above. They are different credentials, and the API key will be rejected here.",
+      "step1": "In n8n, open Settings → Instance-level MCP and switch MCP access on (instance owner or admin only).",
+      "step2": "Open the \"Access token\" tab and create a token. Labels can differ between n8n versions. Copy it right away: n8n shows it once, and a new token replaces the old one.",
+      "step3": "For each workflow you want agents to use, turn on \"Available in MCP\" in that workflow's settings. Workflows without it cannot be run.",
+      "step4": "Your MCP URL is the one shown on that page, ending in /mcp-server/http.",
+      "dedicatedAccount": "Use a dedicated n8n account with limited rights. The token carries all the rights of the account that created it.",
+      "https": "The URL must start with https:// and be reachable from the internet. Instances on a private network or without TLS cannot connect.",
+      "aivoryInstance": "Aivory's own n8n instance cannot be connected here."
+    },
+    "fields": {
+      "url": "n8n MCP URL",
+      "urlPlaceholder": "https://n8n.example.com/mcp-server/http",
+      "token": "MCP access token",
+      "tokenPlaceholder": "Paste the token (with or without \"Bearer \")",
+      "showToken": "Show token",
+      "hideToken": "Hide token"
+    },
+    "actions": {
+      "connect": "Connect and verify",
+      "connecting": "Verifying…",
+      "reverify": "Verify again",
+      "replaceToken": "Replace token",
+      "saveToken": "Save token and verify",
+      "cancel": "Cancel",
+      "disconnect": "Disconnect",
+      "confirmDisconnect": "Disconnect n8n? Agents will lose access to your workflows.",
+      "confirmYes": "Yes, disconnect"
+    },
+    "status": {
+      "label": "Status",
+      "pending_verification": "Waiting for verification",
+      "verified": "Connected",
+      "verification_failed": "Verification failed",
+      "lastVerified": "Last verified {date}",
+      "neverVerified": "Not verified yet",
+      "toolCount": "{count, plural, one {# tool found} other {# tools found}}"
+    },
+    "failure": {
+      "title": "Verification failed",
+      "saved": "The connection is saved, so you can fix the problem and verify again.",
+      "hints": "Common causes: the token is the REST API key instead of an MCP token; MCP is switched off in n8n; the n8n version is too old; or a reverse proxy drops the Authorization header."
+    },
+    "tools": {
+      "title": "Tools agents can use",
+      "help": "Only these five tools can be turned on. They search, read and run workflows, and read run results.",
+      "enabledCount": "{enabled} of {total} on",
+      "locked": "Locked",
+      "lockedTitle": "{count, plural, one {# other tool is locked} other {# other tools are locked}}",
+      "lockedHelp": "These tools can change or delete things in n8n, so Aivory keeps them off. They cannot be enabled.",
+      "empty": "No tools were found. Check that MCP access is on in n8n and that at least one workflow has \"Available in MCP\" turned on."
+    },
+    "agents": {
+      "title": "Agents that can use this connection",
+      "help": "Pick the agents allowed to find and run your workflows. Only agents running on Cerveau can be chosen.",
+      "none": "No agent selected yet, so nobody can use this connection.",
+      "save": "Save agents",
+      "saved": "Saved"
+    },
+    "errors": {
+      "https": "The URL must start with https://. Plain http and private-network addresses are not supported.",
+      "noCredit": "Your credits have run out. Top up or upgrade, then try again.",
+      "forbiddenHost": "This is one of Aivory's own n8n instances, which cannot be connected. Use your own n8n.",
+      "forbiddenAgent": "One of the selected agents is not running on Cerveau yet, so it cannot use this connection. Deselect it or deploy it first.",
+      "notFound": "There is no n8n connection yet. Connect one first.",
+      "verification": "Could not verify the connection: {reason}",
+      "rateLimited": "Too many verification attempts. Wait a few minutes and try again.",
+      "unavailable": "Storage is temporarily unavailable. Try again in a moment.",
+      "generic": "Something went wrong. Please try again.",
+      "load": "Could not load your n8n connection."
+    }
   }
 }
