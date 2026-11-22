@@ -130,6 +130,17 @@ export interface ResolveApprovalResult {
   reply: string | null
 }
 
+/** `status` lets callers tell "already decided elsewhere" (404/409) from a
+ *  transient failure worth retrying. */
+export class ApprovalResolveError extends Error {
+  status: number
+  constructor(status: number) {
+    super(`Failed to resolve approval (${status})`)
+    this.name = 'ApprovalResolveError'
+    this.status = status
+  }
+}
+
 export async function resolveApproval(
   approval: Pick<PendingApproval, 'id' | '_gateway_base' | '_agent_type'>,
   decision: 'approve' | 'deny',
@@ -142,7 +153,7 @@ export async function resolveApproval(
       agent_type: approval._agent_type ?? null,
     }),
   })
-  if (!res.ok) throw new Error(`Failed to resolve approval (${res.status})`)
+  if (!res.ok) throw new ApprovalResolveError(res.status)
   return res.json()
 }
 

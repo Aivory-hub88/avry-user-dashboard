@@ -10,7 +10,7 @@ import { buildUserContextState, formatUserContextForAI } from "@/lib/userContext
 import { imageTextBlocks } from '@/lib/imageContext'
 import { sendAgentMessage, toolStatusLabel, type ConsolePendingApproval } from '@/lib/agentChat'
 import { applyToolEvent, closeSteps, type ActivityStep } from '@/lib/agentActivity'
-import { notifyApprovalsChanged } from '@/lib/agentApprovals'
+import { ApprovalResolveError, notifyApprovalsChanged, resolveApproval } from '@/lib/agentApprovals'
 import { extractReportTargets, planHandoffs } from '@/lib/agentHandoff'
 import { isIndependentRound, MAX_PARALLEL_TURNS, roundRunsInParallel, runRoundTurns } from '@/lib/roomRound'
 import { agentAwaitingApproval, agentNameOf, buildRoomPayload, candidateOf, roomTurnText, type MentionCandidate, type RoomHistoryEntry, type RoundIntent } from '@/lib/agentMentions'
@@ -36,6 +36,8 @@ interface Message {
   /** Set once the user acts on pendingApproval — hides the buttons, no re-resolve. */
   approvalOutcome?: 'approved' | 'denied' | null
   approvalBusy?: boolean
+  /** Set when the decision could not be recorded (shown on the card). */
+  approvalError?: string | null
   /** Room mode (Mission Control chat): which deployed agent answered this
    *  bubble. Undefined = direct thread, falls back to the global agentTarget.
    *  Carried per message so one thread can hold several agents' replies. */
@@ -707,13 +709,43 @@ export function useChat({
     }
   }, [currentSessionId, agentTarget, handleSend, addToast, clearAttachments, replyTo])
 
-  // NOTE (conversational approval protocol): approvals used to be resolved
-  // from inline Approve/Deny buttons via resolveConsoleApproval here. Those
-  // buttons are gone — the agent asks in plain language and the user's next
-  // short reply ("Ya"/"Batal", multilingual) IS the decision, resolved
-  // server-side by avry-backend before any LLM roundtrip. This hook keeps
-  // carrying pendingApproval on messages only so the rail notification feed
-  // can hide approvals already visible in the open thread.
+  // Approval from the chat bubble itself (the card under the agent's message).
+  // The conversational path still works — replying "Ya"/"Batal" is resolved
+  // server-side — and the rail still lists the same approval; all three hit
+  // the same resolve endpoint, so whichever the user uses first wins and the
+  // others report "already decided". The backend's reply to an approval (the
+  // resumed turn) is appended as a normal assistant message.
+  const decideApproval = useCallback(async (messageId: string, decision: 'approve' | 'deny') => {
+    const target = messages.find(m => m.id === messageId)
+    if (!target?.pendingApproval || target.approvalBusy || target.approvalOutcome) return
+    const sessionId = currentSessionIdRef.current
+    const agent = target.agentType ?? agentTarget
+    const patch = (fields: Partial<Message>, extra: Message[] = []) =>
+      setMessages(prev => {
+        const updated = [...prev.map(m => (m.id === messageId ? { ...m, ...fields } : m)), ...extra]
+        safeSaveSession(sessionId, updated, agent)
+        return updated
+      })
+    patch({ approvalBusy: true, approvalError: null })
+    try {
+      const result = await resolveApproval({ id: target.pendingApproval.id, _agent_type: agent ?? undefined }, decision)
+      const reply = decision === 'approve' && result.reply ? result.reply.trim() : ''
+      patch(
+        { approvalBusy: false, approvalOutcome: decision === 'approve' ? 'approved' : 'denied' },
+        reply ? [{ id: `${messageId}-resumed`, role: 'assistant', content: reply, agentType: target.agentType, agentName: target.agentName }] : [],
+      )
+      notifyApprovalsChanged()
+    } catch (err) {
+      const gone = err instanceof ApprovalResolveError && (err.status === 404 || err.status === 409)
+      if (gone) notifyApprovalsChanged()
+      patch({
+        approvalBusy: false,
+        approvalError: gone
+          ? 'This was already decided somewhere else (the notification panel or a reply).'
+          : "Couldn't send your decision. Try again.",
+      })
+    }
+  }, [messages, agentTarget])
 
   const inRoom = roomSessionId !== null && currentSessionId === roomSessionId
 
@@ -887,5 +919,6 @@ export function useChat({
     deleteThread,
     replyTo,
     setReplyTo,
+    decideApproval,
   }
 }

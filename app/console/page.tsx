@@ -250,6 +250,7 @@ export default function ConsolePage() {
     deleteThread,
     replyTo,
     setReplyTo,
+    decideApproval,
   } = useChat({
     attachments,
     clearAttachments: () => setAttachments([]),
@@ -975,6 +976,15 @@ export default function ConsolePage() {
                         agentType={m.agentType ?? agentTarget}
                         replyPreview={m.replyPreview}
                         onReply={() => setReplyTo({ id: m.id, role: m.role, content: m.content, agentName: displayAgentName })}
+                        approval={m.pendingApproval ? {
+                          toolName: m.pendingApproval.tool_name,
+                          riskTier: m.pendingApproval.risk_tier,
+                          outcome: m.approvalOutcome,
+                          busy: m.approvalBusy,
+                          error: m.approvalError,
+                          onApprove: () => decideApproval(m.id, 'approve'),
+                          onDeny: () => decideApproval(m.id, 'deny'),
+                        } : undefined}
                       />
                     </div>
                   )
