@@ -16,6 +16,8 @@ export interface Attachment {
   base64?: string
   /** Small JPEG data URL for the attachment tile; survives persistence, unlike `content`. */
   thumb?: string
+  /** The original File, kept only where it is uploaded as-is (Workspace rooms); never persisted. */
+  file?: File
   // blueprint
   version?: string
   data?: unknown

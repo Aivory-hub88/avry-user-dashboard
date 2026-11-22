@@ -172,6 +172,12 @@ export async function completeUpload(req: NextRequest, ownerId: string, fileId: 
     // always, plus a summary by the lead agent when the file had text (P4).
     if (scope.kind === "room") {
       const who = me.kind === "user" ? me.name.split("@")[0] : me.name
+      // ?quiet=1: the file rides on a message the sender is posting, so no "added" note —
+      // but wait for ingestion so an agent answering that message can already read it.
+      if (req.nextUrl.searchParams.get("quiet") === "1") {
+        await ingestRoomFiles(ownerId).catch((e) => console.error("[workspace/files ingest]", fileId, e))
+        return NextResponse.json({ file })
+      }
       void (async () => {
         await ingestRoomFiles(ownerId)
         if (await fileHasText(ownerId, fileId)) await onFileAdded(ownerId, file.name, who)

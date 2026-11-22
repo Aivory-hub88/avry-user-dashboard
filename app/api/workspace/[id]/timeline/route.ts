@@ -18,6 +18,7 @@ import { fireDueReminders } from "@/lib/teamReminders"
 import { startIdleQueuedTurns } from "@/lib/spaceAgentRun"
 import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { clampLimit, spaceMessageFromRow } from "@/lib/spaceThreads"
+import { cleanAttachments } from "@/lib/spaceWrite"
 import { spaceAgentTaskFromRow } from "@/lib/spaceAgent"
 
 export const runtime = "nodejs"
@@ -70,6 +71,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       messages.push({
         ...m,
         authorName: typeof row.author_name === "string" ? row.author_name : "",
+        attachments: cleanAttachments(row.attachments),
         replyTo:
           m.threadRoot && typeof row.q_body === "string"
             ? {

@@ -360,6 +360,13 @@ export default memo(function ChatMessage({ role, content, isStreaming = false, s
             <div className="mb-1 text-[12px] text-[#a1a1aa]">{author.name}</div>
             <div className="bg-white/[0.035] rounded-2xl px-5 py-3.5 text-base text-white leading-[1.6] border border-line whitespace-pre-wrap break-words">
               {ReplyQuote}
+              {attachments && attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {attachments.map((att, i) => (
+                    <AttachmentCard key={i} attachment={att} onRemove={() => {}} readOnly={true} />
+                  ))}
+                </div>
+              )}
               {content}
             </div>
           </div>

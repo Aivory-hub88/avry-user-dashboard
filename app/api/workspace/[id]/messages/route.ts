@@ -14,7 +14,7 @@ import { recordWorkspaceActivity } from "@/lib/workspaceActivity"
 import { parseSpaceMentions } from "@/lib/spaceProtocol"
 import { isAgentType } from "@/lib/agentRoster"
 import { spaceMessageFromRow } from "@/lib/spaceThreads"
-import { requesterFrom, newId, cleanBody } from "@/lib/spaceWrite"
+import { requesterFrom, newId, cleanBody, cleanAttachments } from "@/lib/spaceWrite"
 import { enqueueAgentTasks } from "@/lib/spaceAgentStore"
 import { runAgentTask } from "@/lib/spaceAgentRun"
 
@@ -34,6 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let threadRoot = typeof payload.threadRoot === "string" ? payload.threadRoot.slice(0, 128) : null
   const replyTarget = typeof payload.replyTo === "string" ? payload.replyTo.slice(0, 128) : null
   const body = cleanBody(payload.body)
+  const attachments = cleanAttachments(payload.attachments)
   if (!body) return NextResponse.json({ error: "body required (1..8000 chars)" }, { status: 400 })
 
   const me = requesterFrom(req, credential)
@@ -96,11 +97,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       )
     }
 
+    // The attachments column is only written when there are attachments, so plain
+    // messages keep working before migrations/workspace-message-attachments.sql is applied.
+    const withAtt = attachments.length > 0
     const inserted = await query(
       `INSERT INTO dashboard.workspace_messages
          (id, space_id, thread_root, author_kind, author_id, author_name, agent_type,
-          body, mentions, member_ids, here, has_agent, doc_refs, reply_to)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          body, mentions, member_ids, here, has_agent, doc_refs, reply_to${withAtt ? ", attachments" : ""})
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14${withAtt ? ", $15::jsonb" : ""})
        RETURNING *`,
       [
         msgId,
@@ -117,6 +121,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         stamps.hasAgent,
         stamps.docRefs,
         replyToId,
+        ...(withAtt ? [JSON.stringify(attachments)] : []),
       ],
     )
     const message = spaceMessageFromRow(inserted.rows[0] as Record<string, unknown>, id)
