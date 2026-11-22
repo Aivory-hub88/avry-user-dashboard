@@ -1,0 +1,63 @@
+/* Collapsible "Connect n8n through MCP" section under the activation form.
+   Mirrors ActivationModal's dark warm tokens so it reads as the same surface. */
+.panel {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 20px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.title { margin: 0; font-size: 14px; font-weight: 500; color: #e8e6e1; }
+.summary { margin: 0; font-size: 12.5px; line-height: 1.5; color: #a8a6a2; }
+.body { display: flex; flex-direction: column; gap: 16px; }
+.field { display: flex; flex-direction: column; gap: 8px; }
+.label { font-size: 11px; font-weight: 600; color: #a8a6a2; text-transform: uppercase; letter-spacing: 0.5px; }
+.input {
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px; color: #d4d2ce; font-size: 13px; padding: 11px 14px; outline: none;
+  font-family: inherit; width: 100%; box-sizing: border-box;
+}
+.input:focus { border-color: #52525b; }
+.input::placeholder { color: #6b6a67; }
+.row { display: flex; align-items: center; gap: 8px; }
+.row .input { flex: 1; }
+.btn {
+  display: inline-block; text-decoration: none;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px; color: #a8a6a2; font-size: 13px; padding: 9px 16px; cursor: pointer; font-family: inherit;
+}
+.btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.07); color: #e8e6e1; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btnPrimary { background: var(--bg-elevated); border-color: #52525b; color: #e8e6e1; font-weight: 700; }
+.btnDanger { color: #e0807a; border-color: rgba(224, 128, 122, 0.3); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.notice {
+  margin: 0; padding: 10px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.5;
+  border: 1px solid rgba(224, 172, 82, 0.3); background: rgba(224, 172, 82, 0.08); color: #d8a44f;
+}
+.error {
+  margin: 0; padding: 10px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.5;
+  border: 1px solid rgba(192, 80, 74, 0.35); background: rgba(192, 80, 74, 0.08); color: #e0807a;
+}
+.help { font-size: 12.5px; line-height: 1.55; color: #a8a6a2; }
+.help summary { cursor: pointer; color: #d4d2ce; }
+.help ol { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.help p { margin: 8px 0 0; }
+.helpStrong { color: #e0b46a; }
+.statusLine { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 12.5px; color: #a8a6a2; }
+.badge { padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; border: 1px solid rgba(255,255,255,0.12); }
+.badgeVerified { color: #7fc99a; border-color: rgba(127, 201, 154, 0.35); background: rgba(127, 201, 154, 0.08); }
+.badgeFailed { color: #e0807a; border-color: rgba(224, 128, 122, 0.35); background: rgba(224, 128, 122, 0.08); }
+.badgePending { color: #d8a44f; border-color: rgba(216, 164, 79, 0.35); background: rgba(216, 164, 79, 0.08); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; font-size: 12px; color: #8a8f98; }
+.sectionTitle { margin: 0; font-size: 12px; font-weight: 600; color: #d4d2ce; }
+.muted { margin: 0; font-size: 12px; line-height: 1.5; color: #8a8f98; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.025); }
+.item input { margin-top: 3px; }
+.itemName { font-size: 12.5px; color: #e8e6e1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.itemDesc { font-size: 11.5px; color: #8a8f98; line-height: 1.4; }
+.locked { opacity: 0.65; }
+.lockTag { margin-left: auto; font-size: 11px; color: #8a8f98; white-space: nowrap; }
+.topUp { color: #e8e6e1; text-decoration: underline; }
