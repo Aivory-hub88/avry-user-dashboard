@@ -598,7 +598,7 @@ export async function runAgentTask(opts: {
         return { author: name, text: typeof r.body === "string" ? r.body : "" };
       })
       .filter((h) => h.text.trim());
-    await Promise.race([ingestRoomFiles(id), new Promise((r) => setTimeout(r, INGEST_WAIT_MS))]);
+    await Promise.race([ingestRoomFiles(id, credential.token), new Promise((r) => setTimeout(r, INGEST_WAIT_MS))]);
     const room = await loadRoomContext(id, instruction, task.agentType);
     const spaceAgents = await loadSpaceAgents(id);
     const teammates = spaceAgents.filter((a) => a !== task.agentType).map(agentDisplayName);
