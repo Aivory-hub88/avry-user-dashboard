@@ -158,6 +158,10 @@
   top: 50%;
   transform: translateY(-50%);
   z-index: 1;
+  /* Decorative only: it sits exactly on top of the real <Handle>, so without
+     this the mousedown lands here, bubbles to the node and drags it instead of
+     starting a connection. */
+  pointer-events: none;
   box-sizing: border-box;
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
@@ -180,6 +184,8 @@
   border: 2px solid #1b1c20 !important;
   border-radius: 50% !important;
   opacity: 0;
+  /* Above the node body / decorative dots so it wins the hit-test. */
+  z-index: 5 !important;
 }
 
 /* ── Branch output label (If/Switch/SplitInBatches, one per connectorDotRight) ── */
@@ -332,6 +338,7 @@
   border: none !important;
   transform: translate(50%, -50%) !important;
   opacity: 0;
+  z-index: 5 !important;
 }
 
 .branchAdd {

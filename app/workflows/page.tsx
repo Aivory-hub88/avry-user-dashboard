@@ -31,55 +31,10 @@ import { generatedWorkflowToN8n } from '@/lib/workflows/copilotToN8n'
 import { fetchTemplateById } from '@/lib/templates/resolveTemplate'
 import { templateToCanvas } from '@/lib/templates/templateToCanvas'
 import type { AivoryWorkflowSpec } from '@/types/workflow'
+import { specToSaved, savedToSpec } from '@/lib/workflows/savedAdapters'
 import { useRouterContext } from '@/contexts/RouterContext'
 import { ContinuedFromConsole } from '@/components/routing/ContinuedFromConsole'
 import styles from './workflows.module.css'
-
-// ── Adapter: AivoryWorkflowSpec → SavedWorkflow ──────────
-// Lets the canvas/editor work with either shape.
-function specToSaved(spec: AivoryWorkflowSpec): SavedWorkflow {
-  return {
-    workflow_id: spec.id,
-    title: spec.title,
-    status: spec.status,
-    source: spec.source,
-    company_name: spec.company_name,
-    trigger: spec.trigger,
-    steps: spec.steps,
-    integrations: spec.integrations,
-    estimated_time: spec.estimated_time,
-    automation_percentage: spec.automation_percentage,
-    error_handling: spec.error_handling,
-    notes: spec.notes,
-    blueprintId: spec.blueprintId,
-    n8nId: spec.n8nId,
-    n8n_workflow_id: spec.n8n_workflow_id,
-    n8n_url: spec.n8n_url,
-    created_by: spec.created_by,
-    access: spec.access,
-    created_at: spec.createdAt,
-  }
-}
-
-function savedToSpec(wf: SavedWorkflow): Partial<AivoryWorkflowSpec> {
-  return {
-    title: wf.title,
-    status: wf.status,
-    source: wf.source,
-    company_name: wf.company_name,
-    trigger: wf.trigger,
-    steps: wf.steps,
-    integrations: wf.integrations,
-    estimated_time: wf.estimated_time,
-    automation_percentage: wf.automation_percentage,
-    error_handling: wf.error_handling,
-    notes: wf.notes,
-    blueprintId: wf.blueprintId,
-    n8nId: wf.n8nId,
-    n8n_workflow_id: wf.n8n_workflow_id,
-    n8n_url: wf.n8n_url,
-  }
-}
 
 // ── Outline SVG icons ────────────────────────────────────
 // Most icons moved to WorkflowNodes.tsx, keeping only those used in toolbar/modals
