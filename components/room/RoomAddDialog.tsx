@@ -79,8 +79,11 @@ export default function RoomAddDialog({
     setBusy("person")
     setError(null)
     try {
-      if (target === "team" && workspaceId) await teamsApi.addMember(workspaceId, addr, role)
-      else await roomPeopleApi.grantRoom(roomId, addr, role)
+      if (target === "team" && workspaceId) {
+        // Team seats are enforced here. A room admin is a team member plus an admin grant on this room.
+        await teamsApi.addMember(workspaceId, addr, role === "viewer" ? "viewer" : "editor")
+        if (role === "admin") await roomPeopleApi.grantRoom(roomId, addr, "admin")
+      } else await roomPeopleApi.grantRoom(roomId, addr, role)
       onAdded()
       onClose()
     } catch (e) {
@@ -160,6 +163,7 @@ export default function RoomAddDialog({
             <label className="block">
               <span className="mb-1.5 block text-[12px] text-white/60">Access</span>
               <select value={role} onChange={(e) => setRole(e.target.value as PersonRole)} className={inputClass}>
+                <option value="admin">Admin: can also add and remove people and agents</option>
                 <option value="editor">Member: can chat and edit</option>
                 <option value="viewer">Viewer: read only</option>
               </select>

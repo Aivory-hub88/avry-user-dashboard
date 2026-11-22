@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
-import { canManageDoc } from "@/lib/workspaceAccess"
+import { canManageDoc, isDocOwner } from "@/lib/workspaceAccess"
 
 export const runtime = "nodejs"
 
-const ROLES = new Set(["editor", "viewer"])
+const ROLES = new Set(["admin", "editor", "viewer"])
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; userId: string }> }) {
   const { id, userId } = await params
@@ -17,6 +17,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const accountType = cred.kind === "service" ? "superadmin" : cred.user.account_type
   if (!(await canManageDoc(id, accountType, actor))) return forbidden()
 
+  if (await isDocOwner(id, userId)) return NextResponse.json({ error: "the room owner can't be changed" }, { status: 400 })
+
   let body: { role?: string }
   try {
     body = await req.json()
@@ -24,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "invalid json" }, { status: 400 })
   }
   const role = (body.role ?? "").toString()
-  if (!ROLES.has(role)) return NextResponse.json({ error: "invalid role (editor|viewer)" }, { status: 400 })
+  if (!ROLES.has(role)) return NextResponse.json({ error: "invalid role (admin|editor|viewer)" }, { status: 400 })
 
   try {
     await query(
@@ -47,6 +49,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const actor = cred.kind === "service" ? undefined : cred.user.user_id
   const accountType = cred.kind === "service" ? "superadmin" : cred.user.account_type
   if (!(await canManageDoc(id, accountType, actor))) return forbidden()
+
+  if (await isDocOwner(id, userId)) return NextResponse.json({ error: "the room owner can't be removed" }, { status: 400 })
 
   try {
     await query("DELETE FROM dashboard.workspace_doc_acl WHERE doc_id = $1 AND user_id = $2", [id, userId])

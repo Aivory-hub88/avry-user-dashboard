@@ -5,7 +5,7 @@
 import { AGENT_ROSTER, type AgentRosterEntry } from "@/lib/agentRoster"
 import { LEGACY_WORKSPACE } from "@/lib/teams"
 
-export type PersonRole = "editor" | "viewer"
+export type PersonRole = "admin" | "editor" | "viewer"
 
 /** Roster agents not yet invited to the room, in roster order. */
 export function addableAgents(inRoom: readonly string[]): AgentRosterEntry[] {
@@ -47,4 +47,23 @@ export function addPersonError(status: number, message: string, target: "team" |
 export function addAgentError(status: number, message: string): string {
   if (status === 403) return "Only the room owner can add agents."
   return message || "Couldn't add the agent. Try again."
+}
+
+/** Label for a person's role in the panel. */
+export function roleLabel(role: string): string {
+  return ({ owner: "Owner", admin: "Admin", editor: "Member", viewer: "Viewer" } as Record<string, string>)[role] ?? role
+}
+
+export type PersonAction = "makeAdmin" | "removeAdmin" | "remove"
+
+/**
+ * What the caller may do to one person in the panel, like a WhatsApp group:
+ * managers promote, demote and remove; nobody changes the owner. Team members
+ * (who reach the room through the team) are managed in Teams, not here.
+ */
+export function personActions(opts: { canManage: boolean; source: "owner" | "team" | "room"; role: string; isSelf: boolean }): PersonAction[] {
+  if (!opts.canManage || opts.source !== "room") return []
+  const out: PersonAction[] = [opts.role === "admin" ? "removeAdmin" : "makeAdmin"]
+  if (!opts.isSelf) out.push("remove")
+  return out
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { addableAgents, addAgentError, addPersonError, alreadyInRoom, parseEmail, personTarget } from "@/lib/roomPeople"
+import { personActions, roleLabel, addableAgents, addAgentError, addPersonError, alreadyInRoom, parseEmail, personTarget } from "@/lib/roomPeople"
 import { AGENT_ROSTER } from "@/lib/agentRoster"
 
 describe("roomPeople", () => {
@@ -36,5 +36,21 @@ describe("roomPeople", () => {
     expect(addPersonError(500, "", "room")).toMatch(/Try again/)
     expect(addAgentError(403, "forbidden")).toMatch(/room owner/)
     expect(addAgentError(500, "db")).toBe("db")
+  })
+
+  it("offers WhatsApp-style actions only to managers, never on the owner or team", () => {
+    const base = { canManage: true, source: "room" as const, role: "editor", isSelf: false }
+    expect(personActions(base)).toEqual(["makeAdmin", "remove"])
+    expect(personActions({ ...base, role: "admin" })).toEqual(["removeAdmin", "remove"])
+    expect(personActions({ ...base, isSelf: true, role: "admin" })).toEqual(["removeAdmin"])
+    expect(personActions({ ...base, canManage: false })).toEqual([])
+    expect(personActions({ ...base, source: "owner" })).toEqual([])
+    expect(personActions({ ...base, source: "team" })).toEqual([])
+  })
+
+  it("labels roles", () => {
+    expect(roleLabel("admin")).toBe("Admin")
+    expect(roleLabel("editor")).toBe("Member")
+    expect(roleLabel("x")).toBe("x")
   })
 })

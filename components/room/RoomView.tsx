@@ -23,6 +23,8 @@ import { PanelRight } from "lucide-react"
 import ChatMessage from "@/components/ChatMessage"
 import ChatInput from "@/components/ChatInput"
 import { NotificationCard } from "@/components/office/NotificationCard"
+import { roleLabel, type PersonAction } from "@/lib/roomPeople"
+import { roomPeopleApi } from "@/lib/requestsClient"
 import RoomAddDialog, { type RoomAddKind } from "@/components/room/RoomAddDialog"
 import RoomPanel, { type Autonomy, type RoomBrief, type RoomPerson } from "@/components/room/RoomPanel"
 import RoomNotes from "@/components/room/RoomNotes"
@@ -57,6 +59,7 @@ interface MembersPayload {
   owner: { id: string; email: string | null; name: string | null } | null
   users: { id: string; email: string | null; name: string | null; role: string }[]
   team?: { id: string; email: string | null; name: string | null; role: string }[]
+  canManage?: boolean
   agents: { type: string; role: string }[]
 }
 
@@ -194,11 +197,28 @@ export default function RoomView({
 
   const people: RoomPerson[] = useMemo(() => {
     const out = new Map<string, RoomPerson>()
-    if (members?.owner) out.set(members.owner.id, { id: members.owner.id, name: nameById.get(members.owner.id) ?? "Owner", role: "Owner", email: members.owner.email ?? undefined })
-    for (const p of [...(members?.team ?? []), ...(members?.users ?? [])])
-      if (!out.has(p.id)) out.set(p.id, { id: p.id, name: nameById.get(p.id) ?? "Member", role: ROLE_LABEL[p.role] ?? p.role, email: p.email ?? undefined })
+    if (members?.owner) out.set(members.owner.id, { id: members.owner.id, name: nameById.get(members.owner.id) ?? "Owner", role: "Owner", source: "owner", email: members.owner.email ?? undefined })
+    // Grants on this room win over team membership (same precedence as access).
+    for (const p of members?.users ?? [])
+      if (!out.has(p.id)) out.set(p.id, { id: p.id, name: nameById.get(p.id) ?? "Member", role: roleLabel(p.role), source: "room", grantRole: p.role, email: p.email ?? undefined })
+    for (const p of members?.team ?? [])
+      if (!out.has(p.id)) out.set(p.id, { id: p.id, name: nameById.get(p.id) ?? "Member", role: ROLE_LABEL[p.role] ?? p.role, source: "team", email: p.email ?? undefined })
     return [...out.values()]
   }, [members, nameById])
+
+  // The owner and room admins manage people and agents; autonomy stays owner-only.
+  const canManage = isOwner || members?.canManage === true
+
+  const onPersonAction = async (p: RoomPerson, action: PersonAction) => {
+    try {
+      if (action === "remove") await roomPeopleApi.removePerson(roomId, p.id)
+      else await roomPeopleApi.setRole(roomId, p.id, action === "makeAdmin" ? "admin" : "editor")
+      setNotice(null)
+      await loadMembers()
+    } catch (e) {
+      setNotice((e as Error).message || "That change couldn't be saved. Try again.")
+    }
+  }
 
   const whoIs = useCallback(
     (m: Pick<TimelineMessage, "author" | "authorName">): string =>
@@ -587,8 +607,11 @@ export default function RoomView({
             filesReloadKey={filesReloadKey}
             autonomy={autonomy}
             onAutonomyChange={isOwner ? changeAutonomy : undefined}
-            onAddAgent={isOwner ? () => setAdding("agent") : undefined}
-            onAddPerson={isOwner ? () => setAdding("person") : undefined}
+            onAddAgent={canManage ? () => setAdding("agent") : undefined}
+            onAddPerson={canManage ? () => setAdding("person") : undefined}
+            canManage={canManage}
+            selfId={selfId}
+            onPersonAction={(p, a) => void onPersonAction(p, a)}
           />
         )}
       </div>

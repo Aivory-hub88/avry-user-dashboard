@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { getDocRole, canRead, checkAgentAccess } from "@/lib/workspaceAccess"
+import { getDocRole, canRead, canManageDoc, checkAgentAccess } from "@/lib/workspaceAccess"
 import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 
 export const runtime = "nodejs"
@@ -57,7 +57,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
        WHERE doc_id = $1 ORDER BY agent_type`,
       [id],
     )
+    const actor = credential.kind === "service" ? undefined : credential.user.user_id
+    const accountType = credential.kind === "service" ? "superadmin" : credential.user.account_type
     return NextResponse.json({
+      /** Whether the caller may add/remove people and agents (owner or room admin). */
+      canManage: await canManageDoc(id, accountType, actor),
       owner: docRow.owner
         ? {
             id: String(docRow.owner),
