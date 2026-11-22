@@ -159,10 +159,13 @@ export async function resolveApproval(
 
 export function describeTool(toolName: string): string {
   const [server, action] = toolName.includes('__') ? toolName.split('__') : [null, toolName]
-  const toolkit = server
-    ?.replace(/^composio-/, '')
-    .replace(/-[a-z]+$/, '')
-    .replace(/^\w/, (c) => c.toUpperCase()) ?? null
+  // A tenant's own MCP server arrives as `tenant_<server>__<tool>`, and Aivory's
+  // first-party ones as `tenant_aivory-<name>`; neither prefix is something the
+  // person deciding needs to read.
+  const bare = server?.startsWith('tenant_') ? server.slice('tenant_'.length).replace(/^aivory-/, '') : server
+  const name = bare?.replace(/^composio-/, '').replace(/-[a-z]+$/, '') ?? null
+  // n8n is a product name, not a sentence: keep it lower case.
+  const toolkit = name === 'n8n' ? name : (name?.replace(/^\w/, (c) => c.toUpperCase()) ?? null)
   const readable = action
     .replace(/^[A-Z]+_/, '')
     .toLowerCase()
