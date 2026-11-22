@@ -737,7 +737,7 @@ export function WorkflowCanvas({ workflowId, isActive = false, n8nWorkflowId, fa
       // 2026-08-25: never ship a trigger-less workflow to n8n — activation
       // fails with "No node to start the workflow from could be found" and
       // the retry loop that followed produced duplicate workflows on prod.
-      if (!payload.nodes?.some((n: any) => typeof n?.type === 'string' && n.type.includes('Trigger'))) {
+      if (!payload.nodes?.some((n: any) => typeof n?.type === 'string' && /trigger|webhook|n8n-nodes-base\.(cron|start|interval)$/i.test(n.type))) {
         const triggerNode = {
           id: `trigger-save-${Date.now()}`,
           name: 'Manual Trigger',
