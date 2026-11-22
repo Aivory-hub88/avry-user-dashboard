@@ -54,3 +54,37 @@ export function cleanBody(body: unknown, max = 8000): string | null {
   if (t.length === 0 || t.length > max) return null
   return body.slice(0, max)
 }
+
+export interface MessageAttachment {
+  fileId: string
+  name: string
+  mime: string
+  size: number
+  /** Small JPEG data URL for image tiles. */
+  thumb?: string
+}
+
+const MAX_ATTACHMENTS = 10
+const MAX_THUMB_CHARS = 120_000
+
+/** Validates the attachments of a message payload: ≤10, well-formed, thumbs only if a small JPEG data URL. */
+export function cleanAttachments(raw: unknown): MessageAttachment[] {
+  if (!Array.isArray(raw)) return []
+  const out: MessageAttachment[] = []
+  for (const a of raw.slice(0, MAX_ATTACHMENTS)) {
+    if (!a || typeof a !== "object") continue
+    const r = a as Record<string, unknown>
+    if (typeof r.fileId !== "string" || !r.fileId || r.fileId.length > 128) continue
+    if (typeof r.name !== "string" || !r.name) continue
+    const thumb =
+      typeof r.thumb === "string" && r.thumb.startsWith("data:image/jpeg;base64,") && r.thumb.length <= MAX_THUMB_CHARS ? r.thumb : undefined
+    out.push({
+      fileId: r.fileId,
+      name: r.name.slice(0, 255),
+      mime: typeof r.mime === "string" ? r.mime.slice(0, 128) : "",
+      size: typeof r.size === "number" && Number.isFinite(r.size) ? r.size : 0,
+      ...(thumb ? { thumb } : {}),
+    })
+  }
+  return out
+}

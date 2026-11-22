@@ -104,7 +104,7 @@ export function uploadProblem(file: File): string | null {
 }
 
 /** presign → PUT to R2 (with progress) → complete. Resolves with the ready file. */
-export async function uploadFile(base: FileBase, file: File, onProgress?: (fraction: number) => void): Promise<WorkspaceFile> {
+export async function uploadFile(base: FileBase, file: File, onProgress?: (fraction: number) => void, opts?: { quiet?: boolean }): Promise<WorkspaceFile> {
   const mime = mimeFor(file)
   if (!mime) throw new ApiError(400, "This file type isn't supported")
   const { file: pending, upload } = await api<{ file: WorkspaceFile; upload: { url: string; headers: Record<string, string> } }>(base, {
@@ -122,7 +122,7 @@ export async function uploadFile(base: FileBase, file: File, onProgress?: (fract
     xhr.onerror = () => reject(new ApiError(0, "The upload didn't go through. Check your connection and try again."))
     xhr.send(file)
   })
-  const done = await api<{ file: WorkspaceFile }>(`${base}/${pending.id}/complete`, { method: "POST", json: {} })
+  const done = await api<{ file: WorkspaceFile }>(`${base}/${pending.id}/complete${opts?.quiet ? "?quiet=1" : ""}`, { method: "POST", json: {} })
   return done.file
 }
 

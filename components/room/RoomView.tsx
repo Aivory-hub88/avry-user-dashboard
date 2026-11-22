@@ -36,6 +36,9 @@ import { AGENT_ROSTER } from "@/lib/agentRoster"
 import { agentDisplayName, type SpaceAgentTask } from "@/lib/spaceAgent"
 import { resolveApproval, describeTool } from "@/lib/agentApprovals"
 import { uploadFile, uploadProblem } from "@/lib/requestsClient"
+import { useFileUpload } from "@/hooks/useFileUpload"
+import type { Attachment } from "@/components/UploadMenu"
+import type { MessageAttachment } from "@/lib/spaceWrite"
 import {
   displayBody,
   mentionedAgents,
@@ -56,7 +59,15 @@ interface MembersPayload {
   agents: { type: string; role: string }[]
 }
 
-type Pending = { tempId: string; body: string; replyTo: TimelineMessage["replyTo"]; status: "sending" | "failed" }
+type Pending = { tempId: string; body: string; replyTo: TimelineMessage["replyTo"]; status: "sending" | "failed"; atts: Attachment[] }
+
+/** A stored room attachment as the tile shape ChatMessage renders. */
+const toTile = (a: NonNullable<TimelineMessage["attachments"]>[number]): Attachment => ({
+  type: a.mime.startsWith("image/") ? "image" : "file",
+  label: a.name,
+  filename: a.name,
+  ...(a.thumb ? { thumb: a.thumb } : {}),
+})
 type ReplyTarget = { message: TimelineMessage; name: string; isAgent: boolean }
 
 const ROLE_LABEL: Record<string, string> = { owner: "Admin", editor: "Member", viewer: "Viewer" }
@@ -124,8 +135,14 @@ export default function RoomView({
   }
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const endRef = useRef<HTMLDivElement | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const pickerRef = useRef<HTMLInputElement | null>(null)
+  const uploadedRef = useRef(new Map<string, MessageAttachment[]>())
   const stickToBottom = useRef(true)
+
+  const { attachments, setAttachments, isDragging, handleFileSelect } = useFileUpload(
+    useCallback((_t: "error" | "success", msg: string) => setNotice(msg), []),
+    { enabled: canWrite && tab === "chat", keepFile: true, validate: uploadProblem },
+  )
 
   const messages = useMemo(() => timeline.data?.messages ?? [], [timeline.data])
   const tasks = useMemo(() => timeline.data?.tasks ?? [], [timeline.data])
@@ -210,12 +227,23 @@ export default function RoomView({
   const post = useCallback(
     async (p: Pending) => {
       try {
+        // Files go to the room's store first (the same path as the Files panel); the message then
+        // carries them. A retry skips the ones that already made it.
+        const done = uploadedRef.current.get(p.tempId) ?? []
+        for (const a of p.atts) {
+          if (!a.file || done.some((d) => d.name === a.file!.name && d.size === a.file!.size)) continue
+          const f = await uploadFile(`/api/workspace/${roomId}/files`, a.file, undefined, { quiet: true })
+          done.push({ fileId: f.id, name: a.file.name, mime: f.mime, size: a.file.size, ...(a.thumb ? { thumb: a.thumb } : {}) })
+          uploadedRef.current.set(p.tempId, done)
+        }
+        if (done.length > 0) setFilesReloadKey((k) => k + 1)
         const r = await fetch(`/api/workspace/${roomId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...collabAuthHeaders() },
-          body: JSON.stringify({ body: p.body, ...(p.replyTo ? { replyTo: p.replyTo.id } : {}) }),
+          body: JSON.stringify({ body: p.body, ...(done.length > 0 ? { attachments: done } : {}), ...(p.replyTo ? { replyTo: p.replyTo.id } : {}) }),
         })
         if (!r.ok) throw new Error(String(r.status))
+        uploadedRef.current.delete(p.tempId)
         await timeline.refresh()
       } catch {
         setPending((cur) => cur.map((x) => (x.tempId === p.tempId ? { ...x, status: "failed" } : x)))
@@ -224,7 +252,7 @@ export default function RoomView({
     [roomId, timeline],
   )
 
-  const send = (text: string) => {
+  const send = (text: string, atts: Attachment[] = []) => {
     const raw = text.trim()
     if (!raw || !canWrite) return
     let body = tokenizeMentions(raw, agents)
@@ -237,6 +265,7 @@ export default function RoomView({
       tempId: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       body,
       status: "sending",
+      atts,
       replyTo: replyTo
         ? { id: replyTo.message.id, kind: replyTo.isAgent ? "agent" : "user", authorId: replyTo.message.author.memberId, name: replyTo.name, agentType: replyTo.message.author.agentType ?? null, body: replyTo.message.body }
         : null,
@@ -291,27 +320,6 @@ export default function RoomView({
     }
     setBusyTask(null)
     await timeline.refresh()
-  }
-
-  const uploadFromComposer = async (list: FileList | null) => {
-    if (!list || !canWrite) return
-    for (const f of Array.from(list)) {
-      const problem = uploadProblem(f)
-      if (problem) {
-        setNotice(problem)
-        continue
-      }
-      setNotice(`Uploading ${f.name}…`)
-      try {
-        await uploadFile(`/api/workspace/${roomId}/files`, f)
-        setFilesReloadKey((k) => k + 1)
-        setNotice(null)
-        // The server posts "<you> added <file>" to the room (and the lead agent may summarise it).
-        void timeline.refresh()
-      } catch (e) {
-        setNotice((e as Error).message)
-      }
-    }
   }
 
   const replyPreviewOf = (r: TimelineMessage["replyTo"]) =>
@@ -430,6 +438,7 @@ export default function RoomView({
                     key={m.id}
                     role={isAgent ? "assistant" : "user"}
                     content={displayBody(m.body)}
+                    attachments={m.attachments?.map(toTile)}
                     agentName={name}
                     agentType={isAgent ? m.author.agentType ?? null : null}
                     showAgentName
@@ -442,7 +451,7 @@ export default function RoomView({
 
               {pending.map((p) => (
                 <div key={p.tempId} className={p.status === "sending" ? "opacity-60" : ""}>
-                  <ChatMessage role="user" content={displayBody(p.body)} author={{ name: "You", self: true }} replyPreview={replyPreviewOf(p.replyTo)} />
+                  <ChatMessage role="user" content={displayBody(p.body)} attachments={p.atts} author={{ name: "You", self: true }} replyPreview={replyPreviewOf(p.replyTo)} />
                   {p.status === "failed" && (
                     <div className="-mt-6 mb-6 flex justify-end gap-2 text-[12px]">
                       <span className="text-amber-300/85">Not sent.</span>
@@ -535,24 +544,27 @@ export default function RoomView({
               {notice && <div className="mb-2 text-[12px] text-white/50" aria-live="polite">{notice}</div>}
               {canWrite ? (
                 <ChatInput
-                  onSend={(text) => send(text)}
+                  onSend={(text, atts) => send(text, atts)}
+                  pendingAttachments={attachments}
+                  onClearPendingAttachments={() => setAttachments([])}
+                  onRemoveAttachment={(i) => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
                   enableMentions
                   mentionCandidates={candidates}
                   placeholder={agents.length > 0 ? `Message the room, @${agents[0].name} to bring in an agent` : "Message the room"}
                   replyTo={replyTo ? { role: replyTo.isAgent ? "assistant" : "user", content: quoteText(replyTo.message.body), name: replyTo.name } : null}
                   onCancelReply={() => setReplyTo(null)}
-                  onAttachClick={() => fileInputRef.current?.click()}
+                  onAttachClick={() => pickerRef.current?.click()}
                 />
               ) : (
                 <div className="rounded-[20px] border border-line px-5 py-4 text-center text-[13px] text-white/40">You can read this room but not post in it.</div>
               )}
               <input
-                ref={fileInputRef}
+                ref={pickerRef}
                 type="file"
                 multiple
                 hidden
                 onChange={(e) => {
-                  void uploadFromComposer(e.target.files)
+                  void handleFileSelect(e.target.files)
                   e.target.value = ""
                 }}
               />
@@ -576,6 +588,11 @@ export default function RoomView({
           />
         )}
       </div>
+      {isDragging && (
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="rounded-2xl border-2 border-dashed border-emerald-400 px-6 py-4 text-lg text-emerald-300">Drop files to attach</div>
+        </div>
+      )}
     </div>
   )
 }

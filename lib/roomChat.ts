@@ -24,6 +24,7 @@ export interface TimelineMessage {
   body: string
   createdAt: string
   deletedAt?: string | null
+  attachments?: { fileId: string; name: string; mime: string; size: number; thumb?: string }[]
   replyTo: { id: string; kind: string; authorId?: string; name: string; agentType: string | null; body: string } | null
 }
 
