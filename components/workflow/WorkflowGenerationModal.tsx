@@ -14,7 +14,7 @@ import styles from './WorkflowGenerationModal.module.css'
 export interface WorkflowGenerationModalProps {
   isOpen: boolean
   onClose: () => void
-  onApply: (nodes: any[], edges: any[]) => void
+  onApply: (nodes: any[], edges: any[], name?: string) => void
   availableApps?: any[]
   initialPrompt?: string
 }
@@ -32,8 +32,8 @@ export const WorkflowGenerationModal: React.FC<WorkflowGenerationModalProps> = (
   initialPrompt,
 }) => {
   const handleApply = useCallback(
-    (nodes: any[], edges: any[]) => {
-      onApply(nodes, edges)
+    (nodes: any[], edges: any[], name?: string) => {
+      onApply(nodes, edges, name)
       onClose()
     },
     [onApply, onClose]

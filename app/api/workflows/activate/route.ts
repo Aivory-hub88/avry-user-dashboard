@@ -250,6 +250,9 @@ export async function POST(req: NextRequest) {
   const n8nId = created?.id ?? created?.data?.id
   // 2) activate it (best-effort — deploy still counts as success if activate is unsupported)
   let active = false
+  // Why n8n refused to activate, so the page can say so instead of reporting
+  // "deployed" for a workflow that is not running (e.g. no trigger node).
+  let activationError: string | undefined
   if (n8nId) {
     try {
       const act = await fetch(`${url}/api/v1/workflows/${n8nId}/activate`, {
@@ -258,8 +261,13 @@ export async function POST(req: NextRequest) {
         signal: AbortSignal.timeout(15_000),
       })
       active = act.ok
+      if (!act.ok) {
+        const txt = await act.text().catch(() => '')
+        activationError = txt.slice(0, 300) || `n8n returned ${act.status}`
+      }
     } catch {
       /* leave inactive; deploy succeeded */
+      activationError = 'Could not reach n8n to activate the workflow'
     }
   }
 
@@ -283,6 +291,7 @@ export async function POST(req: NextRequest) {
     success: true,
     n8n_workflow_id: n8nId,
     active,
+    ...(activationError ? { activation_error: activationError } : {}),
     workflow_id: body?.workflow_id,
     n8n_url: n8nUrl,
     instance: useAivoryInstance ? 'aivory' : 'byo',
