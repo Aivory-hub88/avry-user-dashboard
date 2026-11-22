@@ -21,7 +21,8 @@ import { useCopilotPanel, type CopilotPanelMode } from '@/hooks/useCopilotPanel'
 import { useWorkflowCopilot } from '@/hooks/useWorkflowCopilot'
 import type { CopilotMessage } from '@/hooks/useWorkflowCopilot'
 import type { GeneratedWorkflow } from '@/lib/workflows/copilotClient'
-import type { CanvasEditContext, ChangePreview } from '@/lib/workflows/canvasCopilot'
+import type { CanvasEditContext } from '@/lib/workflows/canvasCopilot'
+import { connectionCheckSummary, type CanvasEditPreview } from '@/lib/workflows/canvasEditPlan'
 import { ThinkingDots } from '@/components/ui/ThinkingDots'
 import { SendArrowIcon } from '@/components/ChatInput'
 
@@ -58,11 +59,11 @@ interface CopilotTogglePanelProps {
   /** Live snapshot of the workflow open on the canvas — enables edit mode. */
   getCanvasContext?: () => CanvasEditContext | null
   /** What applying `workflow` would change on the open canvas (edit mode). */
-  getChangePreview?: (workflow: GeneratedWorkflow) => ChangePreview | null
+  getChangePreview?: (workflow: GeneratedWorkflow) => CanvasEditPreview | null
   /** The open workflow is deployed to n8n — Update also saves it there. */
   isDeployed?: boolean
-  onApplyWorkflow?: (workflow: GeneratedWorkflow, target: CopilotApplyTarget) => void
-  onApplySuggestion?: (workflow: GeneratedWorkflow, target: CopilotApplyTarget) => void
+  onApplyWorkflow?: (workflow: GeneratedWorkflow, target: CopilotApplyTarget, asNew?: boolean) => void
+  onApplySuggestion?: (workflow: GeneratedWorkflow, target: CopilotApplyTarget, asNew?: boolean) => void
 }
 
 export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, getChangePreview, isDeployed, onApplyWorkflow, onApplySuggestion }: CopilotTogglePanelProps) {
@@ -84,12 +85,13 @@ export function CopilotTogglePanel({ currentWorkflowName, getCanvasContext, getC
     reset,
     markApplied,
     canvasTarget,
+    applyAsNew,
   } = useWorkflowCopilot({ getCanvasContext })
 
   // Support both prop names for backward compatibility
   const rawApply = onApplyWorkflow || onApplySuggestion
   const applyHandler = rawApply
-    ? (wf: GeneratedWorkflow) => { rawApply(wf, canvasTarget); markApplied() }
+    ? (wf: GeneratedWorkflow) => { rawApply(wf, canvasTarget, applyAsNew); markApplied() }
     : undefined
 
   // Don't reset on open/close — messages persist via localStorage.
@@ -439,7 +441,7 @@ interface CopilotPanelExpandedProps {
   onApplyWorkflow?: (workflow: GeneratedWorkflow) => void
   onClear?: () => void
   canvasTarget?: CopilotApplyTarget
-  getChangePreview?: (workflow: GeneratedWorkflow) => ChangePreview | null
+  getChangePreview?: (workflow: GeneratedWorkflow) => CanvasEditPreview | null
   isDeployed?: boolean
   /** Name of the workflow open on the canvas, when Aether can edit it. */
   canvasName?: string
@@ -491,6 +493,8 @@ function CopilotPanelExpanded({
   // Recomputed each render while the banner is up — cheap, and it reads the
   // live canvas, so a manual edit made after the proposal is reflected.
   const preview = canApply && workflow && canvasTarget && getChangePreview ? getChangePreview(workflow) : null
+  // The connection check failed: applying would leave steps unconnected.
+  const applyBlocked = !!preview && preview.issues.length > 0
 
   const hasMessages = messages.length > 0 || loading
   const hasContent = input.trim().length > 0 || attachedFiles.length > 0
@@ -641,7 +645,9 @@ function CopilotPanelExpanded({
             </span>
           </div>
           <button
-            className="text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-[#f2f2f3] text-[#1a1a1d] cursor-pointer hover:bg-white transition-colors duration-150"
+            className="text-[13px] font-semibold px-4 py-1.5 rounded-lg bg-[#f2f2f3] text-[#1a1a1d] cursor-pointer hover:bg-white transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#f2f2f3]"
+            disabled={applyBlocked}
+            title={applyBlocked ? 'Some steps would be left unconnected — ask Aether to fix the connections first.' : undefined}
             onClick={() => onApplyWorkflow(workflow)}
           >
             {canvasTarget ? (isDeployed ? 'Update & save' : 'Update canvas') : 'Apply to canvas'}
@@ -917,7 +923,34 @@ function MessageRow({
 
 /* ── Change preview (edit mode) ───────────────────────── */
 
-function ChangePreviewList({ preview }: { preview: ChangePreview }) {
+/** Result of the connection check on the canvas "Update canvas" would apply. */
+function ConnectionCheck({ preview }: { preview: CanvasEditPreview }) {
+  const check = connectionCheckSummary(preview)
+  if (check.ok && !check.lines.length) {
+    return (
+      <span className="text-[11px] text-emerald-400/90" data-testid="aether-connection-check">
+        ✓ {check.headline}
+      </span>
+    )
+  }
+  return (
+    <div
+      role={check.ok ? 'status' : 'alert'}
+      data-testid="aether-connection-check"
+      className={
+        'flex flex-col gap-0.5 text-[11px] rounded-md px-2 py-1.5 border ' +
+        (check.ok ? 'text-amber-300/90 border-amber-400/20 bg-amber-400/[0.06]' : 'text-red-300 border-red-400/25 bg-red-400/[0.07]')
+      }
+    >
+      <span className="font-medium">⚠ {check.headline}</span>
+      <ul className="m-0 pl-3.5 list-disc flex flex-col gap-0.5">
+        {check.lines.map((line, i) => <li key={i} className="break-words">{line}</li>)}
+      </ul>
+    </div>
+  )
+}
+
+function ChangePreviewList({ preview }: { preview: CanvasEditPreview }) {
   const summary = [
     preview.added ? `${preview.added} added` : '',
     preview.removed ? `${preview.removed} removed` : '',
@@ -951,6 +984,7 @@ function ChangePreviewList({ preview }: { preview: ChangePreview }) {
           </li>
         ))}
       </ul>
+      <ConnectionCheck preview={preview} />
       {preview.removed > 0 && (
         <span className="text-[11px] text-red-400/90">
           {preview.removed === 1 ? '1 step will be deleted' : `${preview.removed} steps will be deleted`} — you can Undo on the canvas.

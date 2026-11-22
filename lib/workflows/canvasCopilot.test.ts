@@ -9,6 +9,16 @@ const bridgeCalls: { op: string; body: any }[] = []
 vi.mock('./bridgeCopilot', () => ({
   callCopilotOperation: vi.fn(async (op: string, body: any) => {
     bridgeCalls.push({ op, body: JSON.parse(JSON.stringify(body)) })
+    if (op === 'edit' && /ubah total/i.test(body.edit_request)) {
+      // A full rewrite: every step is new (the trigger keeps its id).
+      const [trigger] = body.current_workflow.steps
+      const steps = [
+        trigger,
+        { id: 'x1', type: 'action', title: 'Read invoice emails', app: 'gmail', testable: true },
+        { id: 'x2', type: 'action', title: 'Add row to Google Sheets', app: 'googleSheets', testable: true },
+      ]
+      return { workflow: { ...body.current_workflow, steps } }
+    }
     if (op === 'edit') {
       const steps = [...body.current_workflow.steps, { id: 'new', type: 'action', title: 'Notify team on Slack', app: 'slack', testable: true }]
       return { workflow: { ...body.current_workflow, steps } }
@@ -19,7 +29,7 @@ vi.mock('./bridgeCopilot', () => ({
 }))
 
 import { canvasToGeneratedWorkflow, mergeEditedNodes, normalizeStepTitle, countSteps, stepIdAliases, diffSteps } from './canvasCopilot'
-import { CopilotStateMachine, isNewWorkflowRequest, matchEditCapabilityQuestion, buildUserContext } from './copilotStateMachine'
+import { CopilotStateMachine, isNewWorkflowRequest, matchEditCapabilityQuestion, buildUserContext, isNearTotalRewrite, matchRewriteChoice } from './copilotStateMachine'
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
 import { n8nToReactFlow } from '@/lib/n8nMapper'
 
@@ -616,5 +626,191 @@ describe('checkCanvasIntegrity / applyEditToCanvas', () => {
     expect(issues[2].title).toBe('Log')
     // No trigger -> reachability is not checked.
     expect(checkCanvasIntegrity(nodes.slice(1, 3), [])).toEqual([])
+  })
+})
+
+describe('planCanvasEdit — preview and apply share one merge', () => {
+  const drive = (id: string, name: string, x: number) =>
+    ({ id, name, type: 'n8n-nodes-base.googleDrive', typeVersion: 3, position: [x, 0], parameters: {} })
+  const backup = {
+    name: 'Blank Workflow',
+    nodes: [
+      { id: 't', name: 'Schedule Trigger', type: 'n8n-nodes-base.scheduleTrigger', typeVersion: 1.2, position: [0, 0], parameters: {} },
+      drive('r', 'Step 1: Read', 200), drive('c', 'Step 2: Check', 400), drive('p', 'Step 3: Process', 600),
+    ],
+    connections: {
+      'Schedule Trigger': { main: [[{ node: 'Step 1: Read', type: 'main', index: 0 }]] },
+      'Step 1: Read': { main: [[{ node: 'Step 2: Check', type: 'main', index: 0 }]] },
+      'Step 2: Check': { main: [[{ node: 'Step 3: Process', type: 'main', index: 0 }]] },
+    },
+  } as any
+
+  it('runs the connection check on the canvas that would be applied', async () => {
+    const { planCanvasEdit } = await import('./canvasEditPlan')
+    const snap = { ...n8nToReactFlow(backup), n8n: backup } as any
+    const before = canvasToGeneratedWorkflow(backup)
+    const edited = {
+      ...before,
+      steps: [
+        { ...before.steps[0] },
+        { id: 'r', type: 'action' as const, title: 'Read', app: 'google drive', testable: true },
+        {
+          id: 'c', type: 'condition' as const, title: 'Check if Data Exists', testable: true,
+          branches: [
+            { key: 'true', label: 'Yes', steps: [{ id: 'p', type: 'action' as const, title: 'Process', app: 'google drive', testable: true }] },
+            { key: 'false', label: 'No', steps: [{ id: 'n', type: 'action' as const, title: 'Log Nothing Found', app: 'google drive', testable: true }] },
+          ],
+        },
+      ],
+    }
+    const { merged, preview } = planCanvasEdit(snap, edited, { workflowId: 'x', title: 'Blank Workflow' })
+    expect(preview.issues).toBe(merged.issues)
+    expect(preview.reset).toBe(merged.reset)
+    expect(merged.issues).toEqual([])
+    expect(preview.steps).toBe(5)
+    const check = merged.nodes.find((n) => /check if data exists/i.test(n.data.title))!
+    expect(check.data.rawN8n.type).toBe('n8n-nodes-base.if')
+    expect(merged.edges.filter((e) => e.source === check.id)).toHaveLength(2)
+    // The canvas is not touched.
+    expect(snap.nodes).toHaveLength(4)
+  })
+})
+
+describe('connectionCheckSummary', () => {
+  const issue = (kind: 'missing-handle' | 'unreachable', nodeId: string, message: string) =>
+    ({ kind, nodeId, title: nodeId, message })
+
+  it('says every step is connected when nothing is wrong', async () => {
+    const { connectionCheckSummary } = await import('./canvasEditPlan')
+    expect(connectionCheckSummary({ issues: [], reset: [], steps: 5 })).toEqual({ ok: true, headline: 'All 5 steps connected', lines: [] })
+    expect(connectionCheckSummary({ issues: [], reset: [], steps: 1 }).headline).toBe('All 1 step connected')
+  })
+
+  it('names steps whose settings auto-repair resets, and still allows applying', async () => {
+    const { connectionCheckSummary } = await import('./canvasEditPlan')
+    const r = connectionCheckSummary({ issues: [], reset: ['Check if Data Exists'], steps: 5 })
+    expect(r.ok).toBe(true)
+    expect(r.headline).toBe('All 5 steps connected, with settings reset')
+    expect(r.lines).toEqual(['Settings will be reset for "Check if Data Exists" so it stays connected.'])
+  })
+
+  it('lists each remaining problem once and blocks applying', async () => {
+    const { connectionCheckSummary } = await import('./canvasEditPlan')
+    const r = connectionCheckSummary({
+      issues: [
+        issue('missing-handle', 'c', '"Check" has no "out-yes" output.'),
+        issue('missing-handle', 'c', '"Check" has no "out-yes" output.'),
+        issue('unreachable', 'p', '"Process" is not connected to the trigger, so it would never run.'),
+      ],
+      reset: ['Read'],
+      steps: 4,
+    })
+    expect(r.ok).toBe(false)
+    expect(r.headline).toBe('2 connection problems — Update canvas is disabled. Ask Aether to fix it.')
+    expect(r.lines).toEqual([
+      '"Check" has no "out-yes" output.',
+      '"Process" is not connected to the trigger, so it would never run.',
+      'Settings will be reset for "Read" so it stays connected.',
+    ])
+  })
+})
+
+describe('CopilotStateMachine — approval message', () => {
+  const tested = (canvasTarget: { workflowId: string; title: string } | null) => ({
+    sessionId: 's', stage: 'TESTING' as const, userRequest: 'x', conversationHistory: [],
+    generatedWorkflow: {
+      workflowName: 'Drive backup', steps: [{ id: 't', type: 'trigger' as const, title: 'Schedule', testable: false }],
+      estimate_hours: 0, automation_score: 0, summary: 'Backs up Drive.', nodeConfigs: [],
+    },
+    testResults: [
+      { stepId: 'a', status: 'success', message: 'ok' },
+      { stepId: 'b', status: 'skipped', message: 'no creds' },
+    ],
+    testAttempts: 1, userApprovals: { confirmedWorkflow: true, approvedTest: false, appliedToCanvas: false },
+    lastMessage: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    canvasTarget,
+  }) as any
+
+  it('a canvas edit says only the new steps were sandbox-tested and points to the connection check', () => {
+    const msg: string = (new CopilotStateMachine('s', tested({ workflowId: 'wf-1', title: 'Drive backup' })) as any).buildApprovalMessage(1)
+    expect(msg).toContain('Sandbox tested the new steps: 1 succeeded, 1 skipped, out of 2.')
+    expect(msg).toContain('not the merged canvas')
+    expect(msg).toContain('connection check for "Drive backup" is shown in the panel')
+    expect(msg).not.toContain('Sandbox testing complete')
+  })
+
+  it('a new workflow keeps the full sandbox wording', () => {
+    const msg: string = (new CopilotStateMachine('s', tested(null)) as any).buildApprovalMessage(1)
+    expect(msg).toContain('Sandbox testing complete! 1 succeeded, 1 skipped, out of 2 total steps.')
+    expect(msg).not.toContain('connection check')
+  })
+})
+
+describe('CopilotStateMachine — a near-total rewrite asks first', () => {
+  const canvas = () => ({ workflowId: 'wf-1', title: 'Drive backup', workflow: canvasToGeneratedWorkflow(driveBackup) })
+  beforeEach(() => { bridgeCalls.length = 0 })
+
+  const rewrite = async () => {
+    const m = new CopilotStateMachine('s1')
+    const st = await m.processMessage('ubah total jadi rekap invoice dari Gmail ke Sheets', canvas())
+    // Don't hit the sandbox from these tests.
+    ;(m as any).runTests = vi.fn(async () => (m as any).state)
+    return { m, st }
+  }
+
+  it('asks new or replace instead of going straight to confirmation', async () => {
+    const { st } = await rewrite()
+    expect(st.stage).toBe('AWAITING_CONFIRMATION')
+    expect(st.pendingRewriteChoice).toBe(true)
+    expect(st.lastMessage).toContain('This replaces every step of "Drive backup"')
+    expect(st.lastMessage).toContain('Reply **new** to save it as a new workflow (recommended) or **replace** to overwrite it.')
+  })
+
+  it.each(['new', 'baru', 'yes', 'ok'])('"%s" saves it as a new workflow', async (reply) => {
+    const { m } = await rewrite()
+    const st = await m.processMessage(reply, canvas())
+    expect(st.canvasTarget).toBeNull()
+    expect(st.applyAsNew).toBe(true)
+    expect(st.pendingRewriteChoice).toBe(false)
+    expect((m as any).runTests).toHaveBeenCalledOnce()
+  })
+
+  it.each(['replace', 'ganti', 'timpa aja'])('"%s" keeps the canvas as the target', async (reply) => {
+    const { m } = await rewrite()
+    const st = await m.processMessage(reply, canvas())
+    expect(st.canvasTarget).toEqual({ workflowId: 'wf-1', title: 'Drive backup' })
+    expect(st.applyAsNew).toBe(false)
+    expect((m as any).runTests).toHaveBeenCalledOnce()
+  })
+
+  it('a partial edit does not ask', async () => {
+    const st = await new CopilotStateMachine('s1').processMessage('tambah step kirim notifikasi Slack di akhir', canvas())
+    expect(st.pendingRewriteChoice).toBe(false)
+    expect(st.lastMessage).not.toContain('replaces every step')
+  })
+
+  it('a new edit instead of a choice clears the question and re-checks', async () => {
+    const { m } = await rewrite()
+    const st = await m.processMessage('tambah step kirim notifikasi Slack di akhir', canvas())
+    expect(bridgeCalls.filter((c) => c.op === 'edit')).toHaveLength(2)
+    // The second edit kept the rewritten steps, so nothing new to ask.
+    expect(st.pendingRewriteChoice).toBe(false)
+    expect(st.canvasTarget?.workflowId).toBe('wf-1')
+  })
+})
+
+describe('isNearTotalRewrite / matchRewriteChoice', () => {
+  const s = (id: string, type: any = 'action') => ({ id, type, title: id, testable: true })
+  it('needs at least two non-trigger steps, none kept', () => {
+    expect(isNearTotalRewrite([s('t', 'trigger'), s('a'), s('b')], [s('t', 'trigger'), s('x'), s('y')])).toBe(true)
+    expect(isNearTotalRewrite([s('t', 'trigger'), s('a'), s('b')], [s('t', 'trigger'), s('a'), s('y')])).toBe(false)
+    expect(isNearTotalRewrite([s('t', 'trigger'), s('a')], [s('x')])).toBe(false)
+  })
+  it('reads short replies only', () => {
+    expect(matchRewriteChoice('New')).toBe('new')
+    expect(matchRewriteChoice('simpan baru')).toBe('new')
+    expect(matchRewriteChoice('replace')).toBe('replace')
+    expect(matchRewriteChoice('replace the gmail step with outlook please')).toBeNull()
+    expect(matchRewriteChoice('yes')).toBeNull()
   })
 })
