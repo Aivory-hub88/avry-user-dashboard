@@ -3,7 +3,9 @@
  * No imports from the DB or the browser, so the rules are unit-testable.
  */
 import { AGENT_ROSTER, type AgentRosterEntry } from "@/lib/agentRoster"
-import { LEGACY_WORKSPACE } from "@/lib/teams"
+
+/** The shared workspace with no team (mirrors LEGACY_WORKSPACE in lib/teams, which pulls in the DB and can't reach the browser). */
+const DEFAULT_WORKSPACE = "default"
 
 export type PersonRole = "admin" | "editor" | "viewer"
 
@@ -19,7 +21,7 @@ export function addableAgents(inRoom: readonly string[]): AgentRosterEntry[] {
  * the person is granted this room only.
  */
 export function personTarget(workspaceId: string | null | undefined): "team" | "room" {
-  return !workspaceId || workspaceId === LEGACY_WORKSPACE ? "room" : "team"
+  return !workspaceId || workspaceId === DEFAULT_WORKSPACE ? "room" : "team"
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
