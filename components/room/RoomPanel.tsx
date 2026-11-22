@@ -8,6 +8,7 @@
  */
 import Link from "next/link"
 import { useState } from "react"
+import { Plus } from "lucide-react"
 import { AgentAvatar } from "@/components/office/AgentAvatar"
 import FileAttachments from "@/components/requests/FileAttachments"
 import { formatDate } from "@/components/requests/requestUi"
@@ -46,6 +47,20 @@ function agentStatus(type: string, tasks: SpaceAgentTask[]): { label: string; to
   return { label: "Idle", tone: "text-white/30" }
 }
 
+function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="flex h-6 w-6 items-center justify-center rounded-full text-white/45 transition-[transform,background-color,color] duration-150 ease-out hover:bg-white/[0.08] hover:text-white/85 active:scale-[0.92]"
+    >
+      <Plus className="h-3.5 w-3.5" />
+    </button>
+  )
+}
+
 function Block({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="border-b border-line px-5 py-4 last:border-b-0">
@@ -69,6 +84,8 @@ export default function RoomPanel({
   filesReloadKey,
   autonomy = "suggest",
   onAutonomyChange,
+  onAddAgent,
+  onAddPerson,
 }: {
   roomId: string
   brief: RoomBrief | null
@@ -81,6 +98,9 @@ export default function RoomPanel({
   autonomy?: Autonomy
   /** Present for the room owner only; others see the setting read-only. */
   onAutonomyChange?: (next: Autonomy) => void
+  /** Present for the room owner only: opens the add-agent / add-person picker. */
+  onAddAgent?: () => void
+  onAddPerson?: () => void
 }) {
   const [goalOpen, setGoalOpen] = useState(false)
   const goal = brief?.goal?.trim() ?? ""
@@ -134,9 +154,9 @@ export default function RoomPanel({
         )}
       </Block>
 
-      <Block title="Agents">
+      <Block title="Agents" action={onAddAgent ? <AddButton label="Add an agent" onClick={onAddAgent} /> : null}>
         {agents.length === 0 ? (
-          <div className="text-[12px] text-white/30">No agents in this room yet.</div>
+          <div className="text-[12px] text-white/30">{onAddAgent ? "No agents yet. Add one with +." : "No agents in this room yet."}</div>
         ) : (
           <div className="space-y-2.5">
             {agents.map((a) => {
@@ -178,7 +198,7 @@ export default function RoomPanel({
         </div>
       </Block>
 
-      <Block title="People">
+      <Block title="People" action={onAddPerson ? <AddButton label="Add a person" onClick={onAddPerson} /> : null}>
         <div className="space-y-2">
           {people.map((p) => (
             <div key={p.id} className="flex items-center gap-2.5">

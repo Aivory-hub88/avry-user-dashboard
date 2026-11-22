@@ -56,6 +56,15 @@ export const teamsApi = {
   removeMember: (id: string, userId: string) => api(`/api/workspaces/${id}/members/${userId}`, { method: "DELETE" }),
 }
 
+/** Add an agent or a person to a room from its side panel. */
+export const roomPeopleApi = {
+  addAgent: (roomId: string, agentType: string) =>
+    api(`/api/workspace/${roomId}/agents`, { method: "POST", json: { agentType, role: "editor" } }),
+  /** A grant on this room only (rooms without a team). */
+  grantRoom: (roomId: string, email: string, role: "editor" | "viewer") =>
+    api(`/api/workspace/${roomId}/acl`, { method: "POST", json: { email, role } }),
+}
+
 export const requestsApi = {
   list: (scope: "mine" | "inbox") =>
     api<{ requests: RequestWithTeam[] }>(`/api/workspace/requests?scope=${scope}`).then((j) => j.requests),
