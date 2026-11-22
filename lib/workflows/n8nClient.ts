@@ -448,6 +448,39 @@ export async function getWorkflowWithCreds(
 }
 
 /**
+ * Keys n8n's public API accepts on PUT /workflows/:id. The GET response also
+ * carries read-only fields (id, active, createdAt, updatedAt, versionId,
+ * tags, shared, ...) which n8n can reject with "must NOT have additional
+ * properties", so a read-modify-write must not echo them back. pinData and
+ * staticData stay: setWorkflowPinDataWithCreds relies on pinData persisting.
+ */
+const N8N_UPDATE_KEYS = ['name', 'nodes', 'connections', 'settings', 'staticData', 'pinData'] as const
+const N8N_SETTINGS_KEYS = [
+  'executionOrder', 'saveDataErrorExecution', 'saveDataSuccessExecution',
+  'saveManualExecutions', 'saveExecutionProgress', 'executionTimeout',
+  'errorWorkflow', 'timezone', 'callerPolicy', 'callerIds',
+]
+
+export function toN8nUpdateBody(workflow: Record<string, unknown>): Record<string, unknown> {
+  const body: Record<string, unknown> = {}
+  for (const k of N8N_UPDATE_KEYS) {
+    if (workflow[k] !== undefined) body[k] = workflow[k]
+  }
+  const settings = workflow.settings
+  if (settings && typeof settings === 'object') {
+    const clean: Record<string, unknown> = {}
+    for (const k of N8N_SETTINGS_KEYS) {
+      const v = (settings as Record<string, unknown>)[k]
+      if (v !== undefined) clean[k] = v
+    }
+    body.settings = clean
+  } else if (body.settings === undefined) {
+    body.settings = {}
+  }
+  return body
+}
+
+/**
  * Overwrite a workflow's n8n JSON using explicit user credentials.
  * Backs PUT /api/n8n/workflow/[id] — WorkflowCanvas.tsx's "Save" action for
  * an ACTIVE workflow (handleSave) writes back through this exact route.
@@ -461,7 +494,7 @@ export async function updateWorkflowWithCreds(
   return await n8nFetch(
     'update workflow (creds)',
     `${apiBase}/workflows/${n8nWorkflowId}`,
-    { method: 'PUT', headers: authHeaders(key), body: JSON.stringify(workflow) }
+    { method: 'PUT', headers: authHeaders(key), body: JSON.stringify(toN8nUpdateBody(workflow)) }
   ) as N8nWorkflowResponse
 }
 

@@ -109,6 +109,10 @@ export async function PUT(
     return NextResponse.json(updated)
   } catch (err) {
     const classified = classifyN8nError(err, creds.instanceUrl)
-    return NextResponse.json({ error: classified.message, code: classified.code }, { status: classified.status })
+    // n8n rejecting the payload is not a gateway failure. A 502 here is
+    // replaced by Cloudflare's own HTML page, which hides n8n's message from
+    // the canvas ("HTTP 502"); 422 reaches the browser intact.
+    const status = classified.code === 'DEPLOYMENT_FAILED' ? 422 : classified.status
+    return NextResponse.json({ error: classified.message, code: classified.code }, { status })
   }
 }
