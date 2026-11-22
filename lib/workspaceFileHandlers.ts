@@ -175,11 +175,11 @@ export async function completeUpload(req: NextRequest, ownerId: string, fileId: 
       // ?quiet=1: the file rides on a message the sender is posting, so no "added" note —
       // but wait for ingestion so an agent answering that message can already read it.
       if (req.nextUrl.searchParams.get("quiet") === "1") {
-        await ingestRoomFiles(ownerId).catch((e) => console.error("[workspace/files ingest]", fileId, e))
+        await ingestRoomFiles(ownerId, cred.kind === "user" ? cred.token : undefined).catch((e) => console.error("[workspace/files ingest]", fileId, e))
         return NextResponse.json({ file })
       }
       void (async () => {
-        await ingestRoomFiles(ownerId)
+        await ingestRoomFiles(ownerId, cred.kind === "user" ? cred.token : undefined)
         if (await fileHasText(ownerId, fileId)) await onFileAdded(ownerId, file.name, who)
         else await postSystemNote(ownerId, `${who} added ${file.name}.`)
       })().catch((e) => console.error("[workspace/files announce]", fileId, e))
