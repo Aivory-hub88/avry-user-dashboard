@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireModule } from '@/lib/teamAccess'
+import { AGENT_ROSTER } from '@/lib/agentRoster'
 
 /**
  * POST /api/console/transcribe
@@ -46,6 +47,9 @@ export async function POST(req: NextRequest) {
 
   const out = new FormData()
   out.append('file', file, file.name || 'voice.webm')
+  // Words Whisper should spell right: the agents people @-mention. The backend
+  // folds these into the recognition prompt (older backends ignore the field).
+  out.append('terms', AGENT_ROSTER.map((a) => a.name).join(','))
 
   try {
     const res = await fetch(`${BACKEND}/api/v1/transcribe`, {
