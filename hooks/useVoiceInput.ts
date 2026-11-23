@@ -36,29 +36,48 @@ function extFor(mime: string): string {
   return "webm"
 }
 
-/** Sample the mic level into a speech meter. null if Web Audio is unavailable. */
+/**
+ * Sample the mic level to judge whether a clip has speech in it. verdict() is
+ * true/false only when the meter could actually listen; null means "can't
+ * tell" and the clip is sent. The context is created after the mic permission
+ * prompt, when the browser may leave it suspended — it then reads pure silence
+ * for a perfectly good recording, so a suspended or barely-sampled meter must
+ * never veto a clip.
+ */
+const MIN_SAMPLED_FRAMES = 10
+
 function startMeter(
   stream: MediaStream,
   stopRef: { current: (() => void) | null },
-): ReturnType<typeof createSpeechMeter> | null {
+): { verdict: () => boolean | null } | null {
   try {
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!Ctx) return null
     const ctx = new Ctx()
+    void ctx.resume().catch(() => {})
     const analyser = ctx.createAnalyser()
     analyser.fftSize = 1024
     ctx.createMediaStreamSource(stream).connect(analyser)
     const buf = new Float32Array(analyser.fftSize)
     const meter = createSpeechMeter()
+    let frames = 0
+    let ranThroughout = true
     const id = setInterval(() => {
+      if (ctx.state !== "running") {
+        ranThroughout = false
+        return
+      }
       analyser.getFloatTimeDomainData(buf)
       meter.push(rmsOf(buf))
+      frames += 1
     }, METER_INTERVAL_MS)
     stopRef.current = () => {
       clearInterval(id)
       void ctx.close().catch(() => {})
     }
-    return meter
+    return {
+      verdict: () => (ranThroughout && frames >= MIN_SAMPLED_FRAMES ? meter.heardSpeech() : null),
+    }
   } catch {
     return null
   }
@@ -76,7 +95,7 @@ export function useVoiceInput(onText: (text: string) => void, onError?: (message
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cancelledRef = useRef(false)
-  const meterRef = useRef<ReturnType<typeof createSpeechMeter> | null>(null)
+  const meterRef = useRef<{ verdict: () => boolean | null } | null>(null)
   const meterStopRef = useRef<(() => void) | null>(null)
   // Latest callbacks without re-creating start/stop on every render.
   const cbRef = useRef({ onText, onError })
@@ -123,7 +142,8 @@ export function useVoiceInput(onText: (text: string) => void, onError?: (message
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
       rec.onstop = async () => {
-        const meter = meterRef.current
+        // Read the verdict before release() closes the audio context.
+        const heardSpeech = meterRef.current?.verdict() ?? null
         meterRef.current = null
         release()
         const type = rec.mimeType || mimeType || "audio/webm"
@@ -135,7 +155,7 @@ export function useVoiceInput(onText: (text: string) => void, onError?: (message
         }
         // Nothing but silence or hum: don't pay to transcribe it (Whisper tends
         // to invent a phrase from silence). If the meter couldn't start, send.
-        if (meter && !meter.heardSpeech()) {
+        if (heardSpeech === false) {
           cbRef.current.onError?.("Didn't hear anything — check your microphone and try again.")
           setState("idle")
           return
