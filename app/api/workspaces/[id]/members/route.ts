@@ -4,6 +4,7 @@ import { query } from "@/lib/db"
 import { workspaceCredential, unauthorized, forbidden, workspacePlanDenied } from "@/lib/workspaceAuth"
 import { LEGACY_WORKSPACE } from "@/lib/teams"
 import { normalizeModules } from "@/lib/workspaceModules"
+import { sendInviteEmail } from "@/lib/workspaceInviteEmail"
 import { canTakeSeat, holdsSeat, ownerSeatUsage, type SeatUsage } from "@/lib/seats"
 
 export const runtime = "nodejs"
@@ -125,14 +126,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   try {
-    await query(
+    const ins = await query(
       `INSERT INTO dashboard.workspace_members (workspace_id, user_id, role, added_by, modules)
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role, added_by = EXCLUDED.added_by,
-         modules = COALESCE(EXCLUDED.modules, dashboard.workspace_members.modules)`,
+         modules = COALESCE(EXCLUDED.modules, dashboard.workspace_members.modules)
+       RETURNING (xmax = 0) AS inserted`,
       [id, targetId, role, userId ?? "service", modules],
     )
-    return NextResponse.json({ workspace_id: id, user_id: targetId, role, modules })
+    // Only a brand-new member gets the email, not a role change. Service calls
+    // (agents) have no user JWT for the backend to check, so they stay silent.
+    const isNew = ins.rows?.[0]?.inserted === true
+    const emailed = isNew && cred.kind === "user" ? await sendInviteEmail(cred.token, id, targetId) : false
+    return NextResponse.json({ workspace_id: id, user_id: targetId, role, modules, emailed })
   } catch (e) {
     console.error("[workspaces/members POST]", e)
     return NextResponse.json({ error: "db" }, { status: 500 })

@@ -275,7 +275,7 @@ const markdownComponents = {
   ),
 
   a: ({ href, children }: any) => (
-    <a href={href} className="text-accent hover:text-accent/80 underline underline-offset-2 transition-colors" target="_blank" rel="noopener noreferrer">
+    <a href={href} className="text-[#79a9eb] hover:text-[#79a9eb]/80 underline underline-offset-2 transition-colors" target="_blank" rel="noopener noreferrer">
       {children}
     </a>
   ),
