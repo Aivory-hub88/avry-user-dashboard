@@ -6,9 +6,9 @@
  */
 
 /** Below this a frame is background noise, not a voice. */
-export const SPEECH_RMS_THRESHOLD = 0.012
+export const SPEECH_RMS_THRESHOLD = 0.005
 /** How many loud frames make a recording worth sending (≈ a short word). */
-export const MIN_SPEECH_FRAMES = 4
+export const MIN_SPEECH_FRAMES = 3
 
 export function createSpeechMeter(threshold = SPEECH_RMS_THRESHOLD, minFrames = MIN_SPEECH_FRAMES) {
   let loud = 0

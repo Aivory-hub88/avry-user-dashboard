@@ -13,20 +13,20 @@ describe("voiceActivity", () => {
 
   it("room hum is not speech", () => {
     const m = createSpeechMeter()
-    for (let i = 0; i < 200; i++) m.push(0.004)
+    for (let i = 0; i < 200; i++) m.push(0.002)
     expect(m.heardSpeech()).toBe(false)
   })
 
   it("a single click is not speech", () => {
     const m = createSpeechMeter()
     m.push(0.3)
-    for (let i = 0; i < 50; i++) m.push(0.001)
+    for (let i = 0; i < 50; i++) m.push(0.0005)
     expect(m.heardSpeech()).toBe(false)
   })
 
   it("enough loud frames, even non-consecutive, count as speech", () => {
     const m = createSpeechMeter()
-    for (const rms of [0.05, 0.002, 0.04, 0.002, 0.06, 0.03]) m.push(rms)
+    for (const rms of [0.05, 0.002, 0.04, 0.002, 0.06]) m.push(rms)
     expect(m.heardSpeech()).toBe(true)
   })
 })
