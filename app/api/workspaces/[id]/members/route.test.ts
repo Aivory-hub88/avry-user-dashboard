@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server'
 
 const { queryMock, cred } = vi.hoisted(() => ({
   queryMock: vi.fn(),
-  cred: { current: null as null | { kind: 'user'; user: { user_id: string; account_type: string } } },
+  cred: { current: null as null | { kind: 'user'; token: string; user: { user_id: string; account_type: string } } },
 }))
 
 vi.mock('@/lib/db', () => ({ query: queryMock }))
@@ -16,6 +16,9 @@ vi.mock('@/lib/workspaceAuth', () => ({
   unauthorized: () => new Response(null, { status: 401 }),
   forbidden: () => new Response(null, { status: 403 }),
 }))
+
+const { emailMock } = vi.hoisted(() => ({ emailMock: vi.fn() }))
+vi.mock('@/lib/workspaceInviteEmail', () => ({ sendInviteEmail: emailMock }))
 
 import { POST } from './route'
 
@@ -53,7 +56,9 @@ const inserted = () => queryMock.mock.calls.some(([sql]) => String(sql).includes
 
 beforeEach(() => {
   queryMock.mockReset()
-  cred.current = { kind: 'user', user: { user_id: 'u-owner', account_type: 'user' } }
+  emailMock.mockReset()
+  emailMock.mockResolvedValue(true)
+  cred.current = { kind: 'user', token: 'jwt', user: { user_id: 'u-owner', account_type: 'user' } }
 })
 
 describe('seat limit', () => {
@@ -85,7 +90,7 @@ describe('seat limit', () => {
   })
 
   it('platform admins are not limited', async () => {
-    cred.current = { kind: 'user', user: { user_id: 'u-admin', account_type: 'superadmin' } }
+    cred.current = { kind: 'user', token: 'jwt', user: { user_id: 'u-admin', account_type: 'superadmin' } }
     db({ tier: 'operational', members: 0 })
     expect((await invite()).status).toBe(200)
   })
@@ -99,5 +104,39 @@ describe('seat limit', () => {
     })
     expect((await invite()).status).toBe(500)
     expect(inserted()).toBe(false)
+  })
+})
+
+describe('invite email', () => {
+  const withInsert = (inserted: boolean) => {
+    db({ tier: 'business', members: 1 })
+    const base = queryMock.getMockImplementation()!
+    queryMock.mockImplementation(async (sql: string, p?: unknown[]) =>
+      String(sql).includes('INSERT INTO dashboard.workspace_members')
+        ? { rowCount: 1, rows: [{ inserted }] }
+        : base(sql, p),
+    )
+  }
+
+  it('emails a brand-new member and says so', async () => {
+    withInsert(true)
+    const res = await invite()
+    expect(emailMock).toHaveBeenCalledWith('jwt', 'ws1', 'u-new')
+    expect((await res.json()).emailed).toBe(true)
+  })
+
+  it('does not email again when only the role changed', async () => {
+    withInsert(false)
+    const res = await invite()
+    expect(emailMock).not.toHaveBeenCalled()
+    expect((await res.json()).emailed).toBe(false)
+  })
+
+  it('reports emailed:false but still adds the member when the mail fails', async () => {
+    withInsert(true)
+    emailMock.mockResolvedValue(false)
+    const res = await invite()
+    expect(res.status).toBe(200)
+    expect((await res.json()).emailed).toBe(false)
   })
 })
