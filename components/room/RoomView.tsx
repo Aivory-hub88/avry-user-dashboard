@@ -28,6 +28,7 @@ import { roomPeopleApi } from "@/lib/requestsClient"
 import RoomAddDialog, { type RoomAddKind } from "@/components/room/RoomAddDialog"
 import RoomPanel, { type Autonomy, type RoomBrief, type RoomPerson } from "@/components/room/RoomPanel"
 import RoomNotes from "@/components/room/RoomNotes"
+import ApprovalArguments from "@/components/room/ApprovalArguments"
 import ProjectTimeline from "@/components/timeline/ProjectTimeline"
 import WorkspaceDatabase from "@/components/workspace/WorkspaceDatabase"
 import WorkspaceInbox from "@/components/workspace/WorkspaceInbox"
@@ -516,7 +517,11 @@ export default function RoomView({
                             : `${name} is waiting for the space owner's go-ahead before running this.`
                         }
                         actions={
-                          canWrite && isOwner ? (
+                          <>
+                            {typeof row.task.approvalRef.id === "string" && (
+                              <ApprovalArguments approvalId={row.task.approvalRef.id} />
+                            )}
+                            {canWrite && isOwner ? (
                             <div className="mt-2 flex gap-2">
                               <button
                                 type="button"
@@ -535,7 +540,8 @@ export default function RoomView({
                                 Deny
                               </button>
                             </div>
-                          ) : undefined
+                            ) : null}
+                          </>
                         }
                       />
                     </div>
