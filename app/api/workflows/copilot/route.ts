@@ -11,6 +11,7 @@ import {
   type CopilotConversationState,
 } from '@/lib/workflows/copilotStateMachine'
 import { requirePaidPlan } from '@/lib/planGate'
+import { bridgeCallerHeadersFor } from '@/lib/bridgeCaller'
 import type { CanvasEditContext } from '@/lib/workflows/canvasCopilot'
 
 /** Accept the open canvas only in the expected shape and within a sane size. */
@@ -84,7 +85,8 @@ export async function POST(request: NextRequest) {
     const stateMachine = new CopilotStateMachine(
       currentSessionId,
       currentState as CopilotConversationState | undefined,
-      organizationId
+      organizationId,
+      bridgeCallerHeadersFor(request)
     )
 
     // ------------------------------------------------------------------

@@ -395,10 +395,12 @@ function workflowStepToBridgeStep(step: GeneratedWorkflowStep): BridgeStep {
 // ============================================================
 
 class BridgeClient {
+  constructor(private readonly callerHeaders: Record<string, string> = {}) {}
+
   private async call<T>(op: 'clarify' | 'generate' | 'repair' | 'edit' | 'draft-test', body: Record<string, unknown>): Promise<T> {
     const t0 = Date.now()
     try {
-      const result = await callCopilotOperation(op, body)
+      const result = await callCopilotOperation(op, body, this.callerHeaders)
       console.log('[BridgeClient]', op, { elapsedMs: Date.now() - t0 })
       return result as T
     } catch (error: unknown) {
@@ -479,9 +481,10 @@ export class CopilotStateMachine {
   constructor(
     sessionId: string,
     initialState?: CopilotConversationState,
-    organizationId?: string
+    organizationId?: string,
+    callerHeaders: Record<string, string> = {}
   ) {
-    this.bridge = new BridgeClient()
+    this.bridge = new BridgeClient(callerHeaders)
 
     if (initialState) {
       this.state = { ...initialState, organizationId: organizationId ?? initialState.organizationId }

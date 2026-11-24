@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       try {
         const dt = await fetch(`${VPS_BRIDGE_URL}/workflows/draft-test`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...bridgeCallerHeaders(planGate.user.user_id) },
           body: JSON.stringify({ description: workflowName, steps: rawSteps }),
           signal: AbortSignal.timeout(TIMEOUT_MS),
         })
