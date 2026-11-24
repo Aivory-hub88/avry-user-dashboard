@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
         // concurrently.
         try {
           const [llmResult, sandbox] = await Promise.all([
-            llmSemanticReview(planned, title, bridgeCallerHeaders(planGate.user.user_id)),
+            llmSemanticReview(planned, title, bridgeCallerHeaders(planGate.user?.user_id)),
             sandboxValidate(n8nWorkflow as unknown as Record<string, unknown>),
           ])
           sandboxResult = sandbox
