@@ -106,12 +106,12 @@ export default function ConsoleTopBar({ onNewChat, chatMode, onChatModeChange, r
           <span className="hidden shrink-0 whitespace-nowrap text-[13px] font-medium text-white/80 2xl:inline">Mission Control Room</span>
         ) : (
           <>
-            {activeAgent ? <Bot className="w-3.5 h-3.5 text-accent" /> : <Terminal className="w-3.5 h-3.5 text-accent" />}
+            {activeAgent ? <Bot className="w-3.5 h-3.5 text-white/60" /> : <Terminal className="w-3.5 h-3.5 text-white/60" />}
             <span className="whitespace-nowrap">{activeAgent ? activeAgent.name : "Aivory Console"}</span>
           </>
         )}
         {agentTarget && !inRoom && (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-accent-dim text-accent border border-accent/20 uppercase tracking-wider">
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/[0.06] text-white/70 border border-white/10 uppercase tracking-wider">
             Agent
           </span>
         )}
