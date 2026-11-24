@@ -19,8 +19,8 @@ import type { AgentType } from "@/lib/agentRoster"
 const CONSOLE_ICON_SRC = "/Aivory_Avatar.svg?v=20261104"
 
 // Portrait filenames stay the same across art refreshes, so browsers (and the
-// CDN) keep serving the old SVG. Bump this whenever public/agents/* changes.
-const PORTRAIT_VERSION = "20260919b"
+// CDN) keep serving the old image. Bump this whenever public/agents/* changes.
+const PORTRAIT_VERSION = "20261124"
 
 export interface AgentVisual {
   /** A full-bleed circular portrait (own background baked in) — rendered
@@ -38,16 +38,16 @@ export interface AgentVisual {
 // deployable agent and has no roster entry.
 export const AGENT_VISUALS: Record<AgentType | "null", AgentVisual> = {
   null: {}, // Aivory Console — brand mark, not a portrait
-  autonomous: { portraitSrc: "/agents/autonomous.svg" }, // Generalist Agent
-  customer_service: { portraitSrc: "/agents/customer_service.svg" }, // Ticket Ops Agent
-  leads_qualifier: { portraitSrc: "/agents/leads_qualifier.svg" }, // Leads Qualifier Agent
-  finance_invoice_ops: { portraitSrc: "/agents/finance_invoice_ops.svg" }, // Finance & Invoice Ops Agent
-  office_assistant: { portraitSrc: "/agents/office_assistant.svg" },
-  data_analyst: { portraitSrc: "/agents/data_analyst.svg" }, // Data & Reporting Analyst (placeholder portrait)
-  operations_inventory: { portraitSrc: "/agents/operations_inventory.svg" }, // Operations & Inventory Agent (placeholder portrait)
-  marketing_content: { portraitSrc: "/agents/marketing_content.svg" }, // Marketing & Content Agent (placeholder portrait)
-  deep_researcher: { portraitSrc: "/agents/deep_researcher.svg" }, // Research & Evidence Agent (placeholder portrait)
-  chief_of_staff: { portraitSrc: "/agents/chief_of_staff.svg" },
+  autonomous: { portraitSrc: "/agents/autonomous.webp" }, // Generalist Agent
+  customer_service: { portraitSrc: "/agents/customer_service.webp" }, // Ticket Ops Agent
+  leads_qualifier: { portraitSrc: "/agents/leads_qualifier.webp" }, // Leads Qualifier Agent
+  finance_invoice_ops: { portraitSrc: "/agents/finance_invoice_ops.webp" }, // Finance & Invoice Ops Agent
+  office_assistant: { portraitSrc: "/agents/office_assistant.webp" },
+  data_analyst: { portraitSrc: "/agents/data_analyst.webp" }, // Data & Reporting Analyst
+  operations_inventory: { portraitSrc: "/agents/operations_inventory.webp" }, // Operations & Inventory Agent
+  marketing_content: { portraitSrc: "/agents/marketing_content.webp" }, // Marketing & Content Agent
+  deep_researcher: { portraitSrc: "/agents/deep_researcher.webp" }, // Research & Evidence Agent
+  chief_of_staff: { portraitSrc: "/agents/chief_of_staff.webp" },
 }
 
 export function getAgentVisual(type: string | null | undefined): AgentVisual {
