@@ -17,6 +17,7 @@ import { NextRequest } from 'next/server'
 import { SERVICES } from '@/config/services'
 import { buildRoadmapPrompt } from '@/lib/roadmapGeneration'
 import { requireFeatureBought } from '@/lib/featureUses'
+import { bridgeCallerHeadersFor } from '@/lib/bridgeCaller'
 
 export const maxDuration = 30
 
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
     try {
       response = await fetch(`${SERVICES.VPS_BRIDGE}/roadmap/generate/async`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...bridgeCallerHeadersFor(request) },
         body: JSON.stringify({
           messages: [{ role: 'user', content: prompt }],
           context: { source, blueprintId, diagnosticContext, blueprintContext, locale },

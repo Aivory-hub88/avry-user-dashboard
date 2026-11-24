@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { VPS_BRIDGE_CONFIG } from '@/lib/config'
 import { requireRunLeft } from '@/lib/featureUses'
+import { bridgeCallerHeadersFor } from '@/lib/bridgeCaller'
 
 // Enqueue is fast; the long LLM work runs in the bridge worker and is polled
 // separately via /api/diagnostics/result/[jobId].
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     try {
       response = await fetch(`${VPS_BRIDGE_CONFIG.baseUrl}/diagnostics/run/async`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...bridgeCallerHeadersFor(request) },
         body: JSON.stringify({ organization_id, mode: 'deep', phases }),
         signal: controller.signal
       })

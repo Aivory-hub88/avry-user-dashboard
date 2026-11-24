@@ -18,6 +18,7 @@ import { getConfig } from '@/lib/config'
 import { createErrorResponse } from '@/types/errors'
 import { buildBlueprintPrompt } from '@/lib/blueprintGeneration'
 import { requireRunLeft } from '@/lib/featureUses'
+import { bridgeCallerHeadersFor } from '@/lib/bridgeCaller'
 
 export const maxDuration = 30
 
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
     try {
       response = await fetch(`${config.VPS_BRIDGE_URL}/blueprint/generate/async`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...bridgeCallerHeadersFor(request) },
         body: JSON.stringify({
           messages: [{ role: 'user', content: prompt }],
           diagnostic,

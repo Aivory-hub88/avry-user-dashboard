@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getConfig } from '@/lib/config'
 import { requirePaidPlan, ANY_MODULE } from '@/lib/planGate'
+import { bridgeCallerHeaders } from '@/lib/bridgeCaller'
 
 const FALLBACK = NextResponse.json(
   { rawagentresponse: '{"route":"console","confidence":0,"reason":"Staying in Console","tabLabel":"Console"}' },
@@ -22,6 +23,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...bridgeCallerHeaders(gate.user.user_id),
       },
       body: JSON.stringify({
         message: body.message ?? '',
