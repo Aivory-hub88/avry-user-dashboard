@@ -338,6 +338,7 @@ export class BridgeCopilotError extends Error {
 export async function callCopilotOperation(
   op: CopilotOperation,
   body: Record<string, unknown>,
+  callerHeaders: Record<string, string> = {},
 ): Promise<Record<string, unknown>> {
   if (!VPS_BRIDGE_URL) {
     // Fail hard — no hardcoded fallback host (the old fallback pointed at the
@@ -356,7 +357,9 @@ export async function callCopilotOperation(
   try {
     bridgeResponse = await fetch(targetUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // callerHeaders (lib/bridgeCaller.ts) tell the bridge which user this is,
+      // so it can run the call on the user's own provider key (BYOK).
+      headers: { 'Content-Type': 'application/json', ...callerHeaders },
       body: JSON.stringify(outbound),
       signal: controller.signal,
     })
