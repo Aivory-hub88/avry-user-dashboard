@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getConfig } from '@/lib/config'
 import { requirePaidPlan } from '@/lib/planGate'
+import { bridgeCallerHeaders } from '@/lib/bridgeCaller'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...bridgeCallerHeaders(user_id),
         },
         body: JSON.stringify(bridgePayload),
         signal: controller.signal,

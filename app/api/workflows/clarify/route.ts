@@ -1,4 +1,5 @@
 import { requirePaidPlan } from '@/lib/planGate'
+import { bridgeCallerHeaders } from '@/lib/bridgeCaller'
 /**
  * POST /api/workflows/clarify
  *
@@ -113,6 +114,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    ...bridgeCallerHeaders(planGate.user.user_id),
   }
 
   // ── Log outgoing VPS call ─────────────────────────────────────────────────

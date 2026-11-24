@@ -1,4 +1,5 @@
 import { requirePaidPlan } from '@/lib/planGate'
+import { bridgeCallerHeaders } from '@/lib/bridgeCaller'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireModule } from '@/lib/teamAccess'
 
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     const r = await fetch(`${BRIDGE}/console/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...bridgeCallerHeaders(planGate.user.user_id) },
       body: JSON.stringify({ message: prompt, session_id: `explain-${Date.now()}` }),
       signal: AbortSignal.timeout(115_000),
     })
