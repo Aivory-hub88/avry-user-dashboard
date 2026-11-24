@@ -7,6 +7,7 @@ import { getMarketingUrl } from '@/lib/config'
 import { useSettingsModal, SettingsTab } from '@/contexts/SettingsModalContext'
 import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
 import { TeamsManager } from '@/components/workspace/TeamsManager'
+import { PasskeysSection } from './PasskeysSection'
 import { CREDIT_PACKS, NOT_ACTIVATED_HINT, isActivated, planLabel } from '@/lib/tiers'
 import CreditUsageMeter, { useCreditStatus } from '@/components/credits/CreditUsageMeter'
 import {
@@ -276,6 +277,8 @@ export function SettingsModal({ user }: SettingsModalProps) {
                   </button>
                 </div>
               </div>
+
+              <PasskeysSection />
 
               {/* Subscription Card */}
               <div className="mb-10">
