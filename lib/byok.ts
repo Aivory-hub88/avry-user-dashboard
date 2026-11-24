@@ -32,15 +32,53 @@ export interface ByokKey {
   updated_at: string
 }
 
+/** The user's master switch and which provider chats should use first. */
+export interface ByokSettings {
+  enabled: boolean
+  /** null = automatic (first connected provider). */
+  preferred_provider: ByokProvider | null
+}
+
+export interface ByokOverview {
+  keys: ByokKey[]
+  settings: ByokSettings
+}
+
 async function parseErrorAndThrow(res: Response): Promise<never> {
   const detail = await res.json().then((d) => d?.detail).catch(() => null)
   throw new Error(typeof detail === 'string' ? detail : `Request failed (${res.status})`)
 }
 
-export async function listByokKeys(): Promise<ByokKey[]> {
+export async function listByokKeys(): Promise<ByokOverview> {
   const res = await authedFetch(`${BACKEND_URL}/api/v1/byok-keys`)
   if (!res.ok) return parseErrorAndThrow(res)
-  return (await res.json()).keys as ByokKey[]
+  const data = await res.json()
+  return {
+    keys: data.keys as ByokKey[],
+    // An older backend has no settings: BYOK behaves as on, automatic.
+    settings: (data.settings as ByokSettings | undefined) ?? { enabled: true, preferred_provider: null },
+  }
+}
+
+export async function updateByokSettings(patch: Partial<ByokSettings>): Promise<ByokSettings> {
+  const res = await authedFetch(`${BACKEND_URL}/api/v1/byok-keys/settings`, {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) return parseErrorAndThrow(res)
+  return res.json()
+}
+
+/**
+ * The provider a chat would run on, mirroring the backend's resolution so the
+ * UI can say so: nothing when switched off, else the primary provider if it
+ * still has an active key, else the first connected one.
+ */
+export function effectiveProvider(keys: ByokKey[], settings: ByokSettings): ByokProvider | null {
+  if (!settings.enabled) return null
+  const active = new Set(keys.filter((k) => k.status === 'active').map((k) => k.provider))
+  const order = [settings.preferred_provider, ...BYOK_PROVIDERS.map((p) => p.id)]
+  return order.find((p): p is ByokProvider => !!p && active.has(p)) ?? null
 }
 
 export async function saveByokKey(provider: ByokProvider, apiKey: string): Promise<ByokKey> {
