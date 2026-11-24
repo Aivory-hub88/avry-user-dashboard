@@ -24,6 +24,21 @@ export class PasskeyCancelledError extends Error {
   }
 }
 
+/**
+ * Marks this browser as having made a passkey, so the login page stops showing
+ * its "no passkey yet?" hint. Same origin as the landing, where login lives.
+ * Not "aivory_"-prefixed: logout clears those, and this must outlive it.
+ */
+const PASSKEY_HINT_KEY = 'passkey_hint'
+
+export function markPasskeyAdded(): void {
+  try {
+    localStorage.setItem(PASSKEY_HINT_KEY, '1')
+  } catch {
+    // storage disabled: the login hint just stays visible
+  }
+}
+
 export function passkeysSupported(): boolean {
   return typeof window !== 'undefined' && typeof window.PublicKeyCredential !== 'undefined'
 }
@@ -65,6 +80,7 @@ export async function addPasskey(name: string): Promise<void> {
     body: JSON.stringify({ challenge_token, credential, name }),
   })
   if (!res.ok) return failWith(res)
+  markPasskeyAdded()
 }
 
 export async function removePasskey(id: number): Promise<void> {
