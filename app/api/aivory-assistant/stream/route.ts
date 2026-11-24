@@ -13,6 +13,7 @@
 import { NextRequest } from 'next/server'
 import { getConfig } from '@/lib/config'
 import { requirePaidPlan, ANY_MODULE } from '@/lib/planGate'
+import { bridgeCallerHeaders } from '@/lib/bridgeCaller'
 
 // FIXED: TIMEOUT INCREASE — 120s to match bridge + Zeroclaw timeout
 export const maxDuration = 120
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...bridgeCallerHeaders(gate.user.user_id),
         },
         body: JSON.stringify({
         message: messages.filter((m: { role: string }) => m.role === 'user').at(-1)?.content ?? '',

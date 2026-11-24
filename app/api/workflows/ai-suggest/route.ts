@@ -1,4 +1,5 @@
 import { requirePaidPlan } from '@/lib/planGate'
+import { bridgeCallerHeaders } from '@/lib/bridgeCaller'
 import { NextRequest, NextResponse } from 'next/server'
 import type {
   WorkflowGenerationResult,
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
     // 1) LLM generation -> structured steps
     const upstream = await fetch(`${VPS_BRIDGE_URL}/workflows/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...bridgeCallerHeaders(planGate.user.user_id) },
       body: JSON.stringify({
         intent,
         entrypoint: 'workflow_generate',
