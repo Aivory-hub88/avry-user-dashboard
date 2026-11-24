@@ -9,6 +9,7 @@ import {
 import { convertToN8nWorkflow } from '@/lib/workflowConverter'
 import { llmSemanticReview } from '@/lib/workflows/blueprintLlmValidator'
 import { getAuthUser } from '@/lib/serverAuth'
+import { bridgeCallerHeaders } from '@/lib/bridgeCaller'
 import { requireModule } from '@/lib/teamAccess'
 
 /**
@@ -168,7 +169,7 @@ export async function POST(req: NextRequest) {
         // concurrently.
         try {
           const [llmResult, sandbox] = await Promise.all([
-            llmSemanticReview(planned, title),
+            llmSemanticReview(planned, title, bridgeCallerHeaders(planGate.user?.user_id)),
             sandboxValidate(n8nWorkflow as unknown as Record<string, unknown>),
           ])
           sandboxResult = sandbox

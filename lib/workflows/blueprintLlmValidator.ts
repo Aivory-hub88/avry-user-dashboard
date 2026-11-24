@@ -117,7 +117,11 @@ const NO_ISSUES_RE = /^ok\b|no issues|nothing (looks )?wrong|no findings|looks (
  * and return structured findings. Fails open — callers treat `ok: false` as
  * "skip the semantic pass", not as a validation failure.
  */
-export async function llmSemanticReview(planned: PlannedWorkflow, title: string): Promise<LlmSemanticResult> {
+export async function llmSemanticReview(
+  planned: PlannedWorkflow,
+  title: string,
+  callerHeaders: Record<string, string> = {},
+): Promise<LlmSemanticResult> {
   if (planned.steps.length === 0) return { ok: true, findings: [] }
 
   try {
@@ -139,7 +143,7 @@ export async function llmSemanticReview(planned: PlannedWorkflow, title: string)
       `If the workflow is semantically correct, reply with exactly: []\n\n` +
       `Workflow graph:\n${graph}`
 
-    const result = await callCopilotOperation('semantic-review', { review_request: request })
+    const result = await callCopilotOperation('semantic-review', { review_request: request }, callerHeaders)
     const message = typeof result?.message === 'string' ? result.message.trim() : ''
 
     if (!message) return { ok: true, findings: [] }
