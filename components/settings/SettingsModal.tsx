@@ -6,6 +6,7 @@ import CopySecretRow from '@/components/ui/CopySecretRow'
 import { getMarketingUrl } from '@/lib/config'
 import { useSettingsModal, SettingsTab } from '@/contexts/SettingsModalContext'
 import { ActivateFeaturesSection } from '@/components/settings/ActivateFeaturesSection'
+import { ByokSection } from '@/components/settings/ByokSection'
 import { TeamsManager } from '@/components/workspace/TeamsManager'
 import { PasskeysSection } from './PasskeysSection'
 import { CREDIT_PACKS, NOT_ACTIVATED_HINT, isActivated, planLabel } from '@/lib/tiers'
@@ -164,6 +165,7 @@ export function SettingsModal({ user }: SettingsModalProps) {
       title: 'Other',
       items: [
         { id: 'upgrade', label: 'Upgrade to Enterprise', icon: <><path d="M21.5 12H16c-.7 2-2 3-4 3s-3.3-1-4-3H2.5"/><path d="M5.5 5.1L2 12v6c0 1.1.9 2 2 2h16a2 2 0 002-2v-6l-3.4-6.9A2 2 0 0016.8 4H7.2a2 2 0 00-1.8 1.1z"/></> },
+        { id: 'byok', label: 'API Keys (BYOK)', icon: <><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.78 7.78 5.5 5.5 0 0 1 7.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></> },
         { id: 'downloads', label: 'Downloads', icon: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></> },
         { id: 'about', label: 'API Platform', icon: <><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></> },
       ]
@@ -601,8 +603,10 @@ docker load -i ${imageName}.tar.gz`}
             </div>
           )}
 
+          {activeTab === 'byok' && <ByokSection />}
+
           {/* GENERIC EMPTY STATE FOR OTHER TABS */}
-          {!['account', 'usage', 'memory', 'purchases', 'downloads', 'team'].includes(activeTab) && (
+          {!['account', 'usage', 'memory', 'purchases', 'downloads', 'team', 'byok'].includes(activeTab) && (
             <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
                <h2 className="text-2xl font-semibold mb-8 pb-4 border-b border-white/5 capitalize">{activeTab}</h2>
                <p className="text-white/50 text-sm">Content for {activeTab} is not available yet.</p>
