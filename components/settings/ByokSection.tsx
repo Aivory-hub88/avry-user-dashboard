@@ -23,11 +23,20 @@ const MONOGRAM: Record<ByokProvider, string> = {
   openrouter: 'OR',
   anthropic: 'A',
   openai: 'AI',
+  openai_compatible: '{ }',
 }
 
 const LABEL: Record<ByokProvider, string> = Object.fromEntries(
   BYOK_PROVIDERS.map((p) => [p.id, p.label])
 ) as Record<ByokProvider, string>
+
+function hostOf(url: string) {
+  try {
+    return new URL(url).host
+  } catch {
+    return url
+  }
+}
 
 const DEFAULT_SETTINGS: ByokSettings = { enabled: true, preferred_provider: null }
 
@@ -38,6 +47,8 @@ export function ByokSection() {
   const [notice, setNotice] = useState<Notice | null>(null)
   const [editing, setEditing] = useState<ByokProvider | null>(null)
   const [draft, setDraft] = useState('')
+  const [draftUrl, setDraftUrl] = useState('')
+  const [draftModel, setDraftModel] = useState('')
   const [reveal, setReveal] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -97,22 +108,32 @@ export function ByokSection() {
   }
 
   const openEditor = (provider: ByokProvider) => {
+    const existing = keys.find((k) => k.provider === provider)
     setEditing(provider)
     setDraft('')
+    setDraftUrl(existing?.base_url ?? '')
+    setDraftModel(existing?.model ?? '')
     setReveal(false)
     setNotice(null)
   }
   const closeEditor = () => {
     setEditing(null)
     setDraft('')
+    setDraftUrl('')
+    setDraftModel('')
     setReveal(false)
   }
 
   const handleSave = (provider: ByokProvider) =>
     run(`save:${provider}`, async () => {
-      await saveByokKey(provider, draft.trim())
+      const custom = BYOK_PROVIDERS.find((p) => p.id === provider)?.custom
+      const saved = await saveByokKey(
+        provider,
+        draft.trim(),
+        custom ? { base_url: draftUrl.trim(), model: draftModel.trim() } : undefined
+      )
       closeEditor()
-      setNotice({ kind: 'ok', text: 'Key verified and saved.' })
+      setNotice({ kind: 'ok', text: saved.note ?? 'Key verified and saved.' })
       await load()
     })
 
@@ -129,6 +150,12 @@ export function ByokSection() {
       setNotice({ kind: 'ok', text: 'Key removed.' })
       await load()
     })
+
+  const canSubmit = (provider: ByokProvider) => {
+    const custom = BYOK_PROVIDERS.find((p) => p.id === provider)?.custom
+    if (!custom) return draft.trim().length >= 20
+    return draft.trim().length >= 8 && /^https:\/\/[^\s/]+/i.test(draftUrl.trim()) && draftModel.trim().length > 0
+  }
 
   const connected = keys.filter((k) => k.status === 'active').map((k) => k.provider)
   const hasKey = connected.length > 0
@@ -268,7 +295,13 @@ export function ByokSection() {
                         )}
                       </div>
                       {saved ? (
-                        <p className="mt-1 font-mono text-[12px] text-white/40">
+                        <p className="mt-1 truncate font-mono text-[12px] text-white/40">
+                          {p.custom && saved.base_url && (
+                            <span className="mr-2 text-white/55">
+                              {hostOf(saved.base_url)}
+                              {saved.model ? ` · ${saved.model}` : ''}
+                            </span>
+                          )}
                           <span className="tracking-[0.2em]">••••••••</span>
                           {saved.key_hint.replace('…', '')}
                         </p>
@@ -315,19 +348,54 @@ export function ByokSection() {
                           className="border-t border-white/[0.06] px-4 pb-4 pt-4"
                           onSubmit={(e) => {
                             e.preventDefault()
-                            if (draft.trim().length >= 20 && busy === null) handleSave(p.id)
+                            if (canSubmit(p.id) && busy === null) handleSave(p.id)
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Escape') closeEditor()
                           }}
                         >
+                          {p.custom && (
+                            <div className="mb-4 grid gap-4 sm:grid-cols-[1.6fr_1fr]">
+                              <div>
+                                <label htmlFor={`byok-${p.id}-url`} className="mb-2 block text-[12px] font-medium text-white/60">
+                                  Base URL
+                                </label>
+                                <input
+                                  id={`byok-${p.id}-url`}
+                                  autoFocus
+                                  type="url"
+                                  inputMode="url"
+                                  autoComplete="off"
+                                  spellCheck={false}
+                                  value={draftUrl}
+                                  onChange={(e) => setDraftUrl(e.target.value)}
+                                  placeholder="https://api.together.xyz/v1"
+                                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3.5 py-3 font-mono text-[13px] text-white/90 placeholder-white/25 outline-none transition-[border-color,box-shadow] duration-150 focus:border-white/30 focus:ring-4 focus:ring-white/[0.06]"
+                                />
+                              </div>
+                              <div>
+                                <label htmlFor={`byok-${p.id}-model`} className="mb-2 block text-[12px] font-medium text-white/60">
+                                  Model
+                                </label>
+                                <input
+                                  id={`byok-${p.id}-model`}
+                                  autoComplete="off"
+                                  spellCheck={false}
+                                  value={draftModel}
+                                  onChange={(e) => setDraftModel(e.target.value)}
+                                  placeholder="meta-llama/Llama-3.3-70B"
+                                  className="w-full rounded-xl border border-white/10 bg-black/30 px-3.5 py-3 font-mono text-[13px] text-white/90 placeholder-white/25 outline-none transition-[border-color,box-shadow] duration-150 focus:border-white/30 focus:ring-4 focus:ring-white/[0.06]"
+                                />
+                              </div>
+                            </div>
+                          )}
                           <label htmlFor={`byok-${p.id}`} className="mb-2 block text-[12px] font-medium text-white/60">
-                            {p.label} API key
+                            {p.custom ? 'API key' : `${p.label} API key`}
                           </label>
                           <div className="relative">
                             <input
                               id={`byok-${p.id}`}
-                              autoFocus
+                              autoFocus={!p.custom}
                               type={reveal ? 'text' : 'password'}
                               autoComplete="off"
                               spellCheck={false}
@@ -359,12 +427,20 @@ export function ByokSection() {
                             </button>
                           </div>
                           <p className="mt-2 text-[12px] text-white/35">
-                            Starts with <span className="font-mono text-white/50">{p.placeholder.replace('…', '')}</span>. We check it with {p.label} before saving.
+                            {p.custom ? (
+                              <>
+                                Use the base URL your provider documents, usually ending in <span className="font-mono text-white/50">/v1</span>. Must be https and publicly reachable. We check the key before saving.
+                              </>
+                            ) : (
+                              <>
+                                Starts with <span className="font-mono text-white/50">{p.placeholder.replace('…', '')}</span>. We check it with {p.label} before saving.
+                              </>
+                            )}
                           </p>
                           <div className="mt-4 flex items-center gap-2">
                             <button
                               type="submit"
-                              disabled={busy !== null || draft.trim().length < 20}
+                              disabled={busy !== null || !canSubmit(p.id)}
                               className="rounded-lg bg-white px-4 py-2 text-[13px] font-medium text-black transition-[transform,background-color,opacity] duration-150 hover:bg-white/90 active:scale-[0.97] disabled:opacity-40 disabled:hover:bg-white disabled:active:scale-100 motion-reduce:transition-none"
                             >
                               {busy === `save:${p.id}` ? 'Verifying…' : 'Verify and save'}

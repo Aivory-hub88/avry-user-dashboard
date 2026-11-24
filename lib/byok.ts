@@ -11,17 +11,26 @@ import { authedFetch } from './deployAuth'
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.aivory.id'
 
-export type ByokProvider = 'openrouter' | 'anthropic' | 'openai'
+export type ByokProvider = 'openrouter' | 'anthropic' | 'openai' | 'openai_compatible'
 
 export const BYOK_PROVIDERS: {
   id: ByokProvider
   label: string
   placeholder: string
   help: string
+  /** The user supplies the endpoint (base URL + model) as well as a key. */
+  custom?: boolean
 }[] = [
   { id: 'openrouter', label: 'OpenRouter', placeholder: 'sk-or-…', help: 'One key covers every model on OpenRouter.' },
   { id: 'anthropic', label: 'Anthropic', placeholder: 'sk-ant-…', help: 'Claude models, billed to your Anthropic account.' },
   { id: 'openai', label: 'OpenAI', placeholder: 'sk-…', help: 'GPT models, billed to your OpenAI account.' },
+  {
+    id: 'openai_compatible',
+    label: 'OpenAI-compatible',
+    placeholder: 'API key',
+    help: 'Any OpenAI-style endpoint: Together, Groq, Fireworks, a vLLM gateway, and more.',
+    custom: true,
+  },
 ]
 
 export interface ByokKey {
@@ -30,6 +39,9 @@ export interface ByokKey {
   status: 'active' | 'invalid'
   last_verified_at: string | null
   updated_at: string
+  /** Only for openai_compatible. */
+  base_url?: string | null
+  model?: string | null
 }
 
 /** The user's master switch and which provider chats should use first. */
@@ -81,10 +93,14 @@ export function effectiveProvider(keys: ByokKey[], settings: ByokSettings): Byok
   return order.find((p): p is ByokProvider => !!p && active.has(p)) ?? null
 }
 
-export async function saveByokKey(provider: ByokProvider, apiKey: string): Promise<ByokKey> {
+export async function saveByokKey(
+  provider: ByokProvider,
+  apiKey: string,
+  endpoint?: { base_url: string; model: string }
+): Promise<ByokKey & { note?: string }> {
   const res = await authedFetch(`${BACKEND_URL}/api/v1/byok-keys/${provider}`, {
     method: 'PUT',
-    body: JSON.stringify({ api_key: apiKey }),
+    body: JSON.stringify({ api_key: apiKey, ...endpoint }),
   })
   if (!res.ok) return parseErrorAndThrow(res)
   return res.json()
