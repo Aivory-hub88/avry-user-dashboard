@@ -500,6 +500,7 @@
     "connected": "Connected",
     "notConnected": "Not connected",
     "connect": "Connect",
+    "reconnect": "Reconnect",
     "revoke": "Revoke",
     "connectFirst": "Connect first",
     "connectStartError": "Could not start {toolkit} connect.",
