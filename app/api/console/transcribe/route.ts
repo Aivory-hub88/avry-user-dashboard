@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireModule } from '@/lib/teamAccess'
 import { AGENT_ROSTER } from '@/lib/agentRoster'
+import { isLikelyHallucination } from '@/lib/transcriptFilter'
 
 /**
  * POST /api/console/transcribe
@@ -19,6 +20,9 @@ const BACKEND = (
 ).replace(/\/$/, '')
 
 const MAX_BYTES = 20 * 1024 * 1024 // matches the backend's MAX_AUDIO_BYTES
+
+/** Product words Whisper otherwise spells wrong; the backend caps terms at 20. */
+const PRODUCT_TERMS = ['Aivory', 'Cerveau', 'Aether', 'WhatsApp', 'Telegram']
 
 function token(req: NextRequest): string {
   return (
@@ -49,7 +53,8 @@ export async function POST(req: NextRequest) {
   out.append('file', file, file.name || 'voice.webm')
   // Words Whisper should spell right: the agents people @-mention. The backend
   // folds these into the recognition prompt (older backends ignore the field).
-  out.append('terms', AGENT_ROSTER.map((a) => a.name).join(','))
+  const terms = [...AGENT_ROSTER.map((a) => a.name), ...PRODUCT_TERMS]
+  out.append('terms', terms.join(','))
 
   try {
     const res = await fetch(`${BACKEND}/api/v1/transcribe`, {
@@ -65,7 +70,10 @@ export async function POST(req: NextRequest) {
         { status: res.status },
       )
     }
-    return NextResponse.json({ text: String(data?.text ?? '') })
+    const text = String(data?.text ?? '')
+    // Silence/hum comes back as a stock phrase or the prompt itself: report
+    // "nothing heard" rather than dropping invented words into the composer.
+    return NextResponse.json({ text: isLikelyHallucination(text, terms) ? '' : text })
   } catch {
     return NextResponse.json({ error: 'Transcription unavailable' }, { status: 502 })
   }
