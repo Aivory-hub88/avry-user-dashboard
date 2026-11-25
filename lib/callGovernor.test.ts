@@ -47,6 +47,16 @@ describe("CallGovernor", () => {
     expect(order).toEqual(["old-low", "new-high"])
   })
 
+  it("grants a same-tick burst by rank, not by who called first", async () => {
+    const g = new CallGovernor({ initial: 2, min: 1, max: 4 })
+    const started: number[] = []
+    const ranks = [5, 0, 3, 1]
+    ranks.forEach((r) => void g.acquire(r).then(() => started.push(r)))
+    await tick()
+    expect(started.sort((a, b) => a - b)).toEqual([0, 1])
+    expect(g.queued).toBe(2)
+  })
+
   it("halves the limit on a rate limit and wins it back after clean calls", async () => {
     const g = new CallGovernor({ initial: 8, min: 2, max: 10, recoverAfter: 2 })
     const s = await g.acquire(0)
@@ -74,9 +84,10 @@ describe("CallGovernor", () => {
     const ac = new AbortController()
     const waiting = g.acquire(2, { signal: ac.signal, onPosition: (p) => places.push(p) })
     void g.acquire(1)
+    await tick()
     ac.abort()
     await expect(waiting).rejects.toMatchObject({ name: "AbortError" })
-    expect(places[0]).toBe(1)
+    expect(places[0]).toBe(2) // registered behind the rank-1 caller that arrived in the same tick
     expect(g.queued).toBe(1)
     held.release("ok")
   })

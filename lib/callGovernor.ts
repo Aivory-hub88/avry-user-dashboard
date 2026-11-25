@@ -95,11 +95,6 @@ export class CallGovernor {
     if (signal?.aborted) return Promise.reject(abortError())
     return new Promise<Slot>((resolve, reject) => {
       const waiter: Waiter = { rank, since: this.now(), seq: this.seq++, resolve, reject, onPosition, signal }
-      if (this.active < this.limit && this.waiters.length === 0) {
-        this.active++
-        resolve(this.slot())
-        return
-      }
       if (signal) {
         waiter.onAbort = () => {
           this.waiters = this.waiters.filter((w) => w !== waiter)
@@ -109,7 +104,11 @@ export class CallGovernor {
         signal.addEventListener("abort", waiter.onAbort, { once: true })
       }
       this.waiters.push(waiter)
-      this.notifyPositions()
+      // Never hand out a free slot synchronously: a round starts all its turns in the same tick, in
+      // room order, so the first callers would take the slots whatever their rank (observed live:
+      // the agent that best fit the question waited while a poor fit ran). Draining on a microtask
+      // lets the whole burst register first, then slots go by rank.
+      queueMicrotask(() => this.drain())
     })
   }
 
