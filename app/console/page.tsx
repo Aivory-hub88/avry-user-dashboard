@@ -973,6 +973,7 @@ export default function ConsolePage() {
                         onAcceptRoute={acceptRoute}
                         onDismissRoute={dismissRoute}
                         agentName={displayAgentName}
+                        showAgentName={inRoom && m.role === 'assistant' && !!m.agentType}
                         agentType={m.agentType ?? agentTarget}
                         replyPreview={m.replyPreview}
                         onReply={() => setReplyTo({ id: m.id, role: m.role, content: m.content, agentName: displayAgentName })}
