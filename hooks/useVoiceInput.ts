@@ -49,6 +49,7 @@ const MIN_SAMPLED_FRAMES = 10
 function startMeter(
   stream: MediaStream,
   stopRef: { current: (() => void) | null },
+  levelRef: { current: number },
 ): { verdict: () => boolean | null } | null {
   try {
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
@@ -68,11 +69,14 @@ function startMeter(
         return
       }
       analyser.getFloatTimeDomainData(buf)
-      meter.push(rmsOf(buf))
+      const rms = rmsOf(buf)
+      levelRef.current = rms
+      meter.push(rms)
       frames += 1
     }, METER_INTERVAL_MS)
     stopRef.current = () => {
       clearInterval(id)
+      levelRef.current = 0
       void ctx.close().catch(() => {})
     }
     return {
@@ -95,6 +99,10 @@ export function useVoiceInput(onText: (text: string) => void, onError?: (message
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cancelledRef = useRef(false)
+  // Stop asked for before the recorder existed (hold-to-talk released early).
+  const stopRequestedRef = useRef(false)
+  const cancelRequestedRef = useRef(false)
+  const levelRef = useRef(0)
   const meterRef = useRef<{ verdict: () => boolean | null } | null>(null)
   const meterStopRef = useRef<(() => void) | null>(null)
   // Latest callbacks without re-creating start/stop on every render.
@@ -120,10 +128,23 @@ export function useVoiceInput(onText: (text: string) => void, onError?: (message
   const stop = useCallback(() => {
     const rec = recorderRef.current
     if (rec && rec.state !== "inactive") rec.stop()
+    else stopRequestedRef.current = true
   }, [])
+
+  /** Stop and drop the clip without transcribing (an accidental tap). */
+  const cancel = useCallback(() => {
+    cancelRequestedRef.current = true
+    cancelledRef.current = true
+    stop()
+  }, [stop])
+
+  /** Latest mic RMS (0..1) for a live meter; 0 when not recording. */
+  const getLevel = useCallback(() => levelRef.current, [])
 
   const start = useCallback(async () => {
     if (state !== "idle") return
+    stopRequestedRef.current = false
+    cancelRequestedRef.current = false
     if (!supported) {
       cbRef.current.onError?.("Voice input isn't supported in this browser.")
       return
@@ -135,8 +156,8 @@ export function useVoiceInput(onText: (text: string) => void, onError?: (message
       const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
       recorderRef.current = rec
       chunksRef.current = []
-      cancelledRef.current = false
-      meterRef.current = startMeter(stream, meterStopRef)
+      cancelledRef.current = cancelRequestedRef.current
+      meterRef.current = startMeter(stream, meterStopRef, levelRef)
 
       rec.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
@@ -180,6 +201,7 @@ export function useVoiceInput(onText: (text: string) => void, onError?: (message
       rec.start()
       setState("recording")
       timerRef.current = setTimeout(stop, MAX_RECORD_MS)
+      if (stopRequestedRef.current) stop()
     } catch (err) {
       release()
       setState("idle")
@@ -201,5 +223,5 @@ export function useVoiceInput(onText: (text: string) => void, onError?: (message
     [release],
   )
 
-  return { state, supported, start, stop }
+  return { state, supported, start, stop, cancel, getLevel }
 }
