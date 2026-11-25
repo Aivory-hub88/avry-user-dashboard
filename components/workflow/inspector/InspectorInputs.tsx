@@ -2,6 +2,7 @@
 
 import React, { memo } from 'react';
 import styles from './InspectorInputs.module.css';
+import GlassSwitch from '@/components/shared/GlassSwitch';
 
 // ── Dropdown ──
 interface DropdownProps {
@@ -78,9 +79,7 @@ export const InspectorToggle = memo(({ label, checked, onChange, description }: 
       <span className={styles.label}>{label}</span>
       {description && <span className={styles.toggleDesc}>{description}</span>}
     </div>
-    <button type="button" className={`${styles.toggle} ${checked ? styles.toggleOn : ''}`} onClick={() => onChange(!checked)} role="switch" aria-checked={checked}>
-      <span className={styles.toggleThumb} />
-    </button>
+    <GlassSwitch size="sm" checked={checked} onChange={onChange} aria-label={label} />
   </div>
 ));
 InspectorToggle.displayName = 'InspectorToggle';

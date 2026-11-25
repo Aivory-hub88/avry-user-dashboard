@@ -1,6 +1,6 @@
 'use client';
 
-import GlassSwitch from './GlassSwitch';
+import GlassSwitch from '@/components/shared/GlassSwitch';
 import Image from 'next/image';
 import { ChevronDown, ChevronRight, Plug } from 'lucide-react';
 import QRCode from 'react-qr-code';

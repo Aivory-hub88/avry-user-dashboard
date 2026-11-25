@@ -6,6 +6,7 @@
  * with the provider of their choice. Text lives in span/div only (see CrmApp).
  */
 import { useEffect, useState } from "react"
+import GlassSwitch from "@/components/shared/GlassSwitch"
 import { Button, fieldClass } from "@/components/requests/requestUi"
 import { PROVIDERS, providerMeta } from "@/lib/whatsapp/providerMeta"
 import type { ProviderId } from "@/lib/whatsapp/types"
@@ -156,17 +157,13 @@ export default function WhatsappSettings({ status, onChanged }: { status: WaStat
         <div className="space-y-3 rounded-2xl border border-line px-4 py-4">
           <div className="flex items-center gap-3">
             <span className="text-[13px] text-white/90">Reply to incoming messages</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={settings.draft_replies}
+            <GlassSwitch
+              className="ml-auto"
+              checked={settings.draft_replies}
               aria-label="Reply to incoming messages"
               disabled={!canDraft && !settings.draft_replies}
-              onClick={() => void saveSettings({ draft_replies: !settings.draft_replies })}
-              className={`ml-auto flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-40 ${settings.draft_replies ? "bg-emerald-400/80" : "bg-white/15"}`}
-            >
-              <span className={`h-4 w-4 rounded-full bg-white transition-transform ${settings.draft_replies ? "translate-x-4" : ""}`} />
-            </button>
+              onChange={(next) => void saveSettings({ draft_replies: next })}
+            />
           </div>
           <label className="block">
             <span className="mb-1 block text-[11px] text-white/45">Who writes the replies</span>

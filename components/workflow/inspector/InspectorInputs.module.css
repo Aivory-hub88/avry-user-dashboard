@@ -17,16 +17,6 @@
 .toggleRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .toggleInfo { display: flex; flex-direction: column; gap: 2px; }
 .toggleDesc { font-size: 10px; color: #a1a1aa; }
-.toggle {
-  width: 36px; height: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.06); cursor: pointer; position: relative; transition: all 0.2s; padding: 0; flex-shrink: 0;
-}
-.toggleOn { background: var(--bg-elevated); border-color: #52525b; }
-.toggleThumb {
-  position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
-  border-radius: 50%; background: #a8a6a2; transition: all 0.2s;
-}
-.toggleOn .toggleThumb { left: 18px; background: #dddac5; }
 
 /* Slider */
 .sliderHeader { display: flex; justify-content: space-between; align-items: center; }
