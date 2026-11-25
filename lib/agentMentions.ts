@@ -482,3 +482,14 @@ export function buildRoomPayload({ me, peers, members = [], intent = null, simul
   lines.push("</user_message>")
   return lines.join("\n")
 }
+
+/**
+ * True when the `@query` the user typed already spells the highlighted menu entry out in full
+ * ("@all" with "all" highlighted). Enter then should SEND, not re-select the mention: re-selecting
+ * only rewrote "@all" as "@all " and the message never went out (seen live on a message ending in @all).
+ * Tab still picks, and a partial query ("@mi" -> Mira) still completes on Enter.
+ */
+export function mentionIsComplete(query: string, pick: { name: string }): boolean {
+  const q = query.trim().replace(/^@/, "").toLowerCase()
+  return q.length > 0 && q === pick.name.trim().toLowerCase()
+}

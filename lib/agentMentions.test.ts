@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
+  mentionIsComplete,
   buildRoomPayload,
   detectRoundIntent,
   agentAwaitingApproval,
@@ -452,5 +453,17 @@ describe("Console + Workspace deployment", () => {
     const ds = withConsoleDeployments(deployments)
     const teo = getMentionCandidates(ds).find((c) => c.type === "customer_service")
     expect(teo?.channels).toEqual(expect.arrayContaining(["telegram", "slack", "console"]))
+  })
+})
+
+describe("mentionIsComplete", () => {
+  it("is true when the typed @query already spells the highlighted entry", () => {
+    expect(mentionIsComplete("all", { name: "all" })).toBe(true)
+    expect(mentionIsComplete("@All", { name: "all" })).toBe(true)
+    expect(mentionIsComplete("mira", { name: "Mira" })).toBe(true)
+  })
+  it("is false for a partial or empty query so Enter still completes the mention", () => {
+    expect(mentionIsComplete("mi", { name: "Mira" })).toBe(false)
+    expect(mentionIsComplete("", { name: "Mira" })).toBe(false)
   })
 })
