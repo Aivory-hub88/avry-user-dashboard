@@ -122,3 +122,15 @@ describe("extractReportTargets", () => {
     expect(planHandoffs("selesai", cs, "leads_qualifier", { ...st, depth: 2 })).toEqual([])
   })
 })
+
+describe("planHandoffs in a big round", () => {
+  const room = ["Lex", "Teo", "Mira"].map((n) => ({ type: n.toLowerCase(), name: n }))
+  it("the default total cap blocks a handoff once a round started 10 turns", () => {
+    expect(planHandoffs("@Mira tolong", room, "lex", { depth: 0, usedPerAgent: { lex: 1 }, usedTotal: 10 })).toEqual([])
+  })
+  it("a raised maxTotal lets the handoff through, still bounded", () => {
+    const state = { depth: 0, usedPerAgent: { lex: 1 }, usedTotal: 10, maxTotal: 14 }
+    expect(planHandoffs("@Mira tolong", room, "lex", state)).toEqual(["mira"])
+    expect(planHandoffs("@Mira tolong", room, "lex", { ...state, usedTotal: 14 })).toEqual([])
+  })
+})

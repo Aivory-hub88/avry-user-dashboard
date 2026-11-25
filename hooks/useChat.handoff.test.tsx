@@ -144,3 +144,29 @@ describe('Room handoff', () => {
     expect(calls[0].payload).toContain('Do not @mention anyone in this reply.')
   })
 })
+
+describe('Room handoff in a parallel round', () => {
+  it('an @Name from an agent reaches a teammate that already answered this round', async () => {
+    let releaseGeno!: () => void
+    const gate = new Promise<void>((r) => (releaseGeno = r))
+    const seen: string[] = []
+    sendAgentMessage.mockImplementation(async (agent: string) => {
+      seen.push(agent)
+      if (agent === 'autonomous') {
+        await gate // answers after the others, so Teo has already finished
+        return { reply: 'Soal tiket itu urusan @Teo, tolong lanjutkan.', pendingApproval: null }
+      }
+      if (agent === 'customer_service') {
+        setTimeout(releaseGeno, 0)
+        return { reply: seen.filter((a) => a === 'customer_service').length > 1 ? 'Siap, saya urus.' : 'Halo dari Teo.', pendingApproval: null }
+      }
+      return { reply: 'Halo.', pendingApproval: null }
+    })
+    const { result } = setup()
+    await act(async () => {
+      await result.current.handleSendRoom('apa kabar', [], ['autonomous', 'customer_service', 'leads_qualifier'])
+    })
+    expect(seen.filter((a) => a === 'customer_service')).toHaveLength(2)
+    expect(assistants(result.current.messages)).toContain('customer_service:Siap, saya urus.')
+  })
+})

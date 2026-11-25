@@ -17,6 +17,12 @@
 export const HANDOFF_MAX_DEPTH = 2
 /** All turns in one chain, the human-triggered ones included. */
 export const HANDOFF_MAX_TURNS = 8
+/**
+ * Handoff turns a chain may add on top of the turns the human started. A cap on the total alone
+ * blocked every handoff in a big round: `@all` to a 10-agent room already uses 10 turns, so the
+ * default total of 8 left no room for even one `@Name` handoff.
+ */
+export const HANDOFF_MAX_EXTRA_TURNS = 4
 /** One agent can speak at most this many times in one chain (stops A <-> B ping-pong). */
 export const HANDOFF_MAX_PER_AGENT = 2
 
@@ -106,6 +112,8 @@ export interface HandoffState {
   usedPerAgent: Record<string, number>
   /** Turns already used in this chain overall (the current turn included). */
   usedTotal: number
+  /** Overall cap for this chain; defaults to HANDOFF_MAX_TURNS. A round that started many turns raises it. */
+  maxTotal?: number
   /** Agents that already have a turn waiting to run in this chain. */
   queued?: Iterable<string>
   /** Teammates the human asked for by name (see extractReportTargets), handed to even without an @ in the reply. */
@@ -129,7 +137,7 @@ export function planHandoffs(
   const wanted = [...extractAgentMentions(reply, candidates, self)]
   for (const t of state.implied ?? []) if (t !== self && !wanted.includes(t)) wanted.push(t)
   for (const type of wanted) {
-    if (total >= HANDOFF_MAX_TURNS) break
+    if (total >= (state.maxTotal ?? HANDOFF_MAX_TURNS)) break
     if (queued.has(type)) continue
     if ((state.usedPerAgent[type] ?? 0) >= HANDOFF_MAX_PER_AGENT) continue
     out.push(type)
