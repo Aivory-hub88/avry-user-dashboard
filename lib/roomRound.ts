@@ -20,8 +20,40 @@ export function roundRunsInParallel(
   return intent === "rollcall" || independent
 }
 
-/** Upper bound on simultaneous agent turns in an independent (non roll-call) round. */
-export const MAX_PARALLEL_TURNS = 5
+/**
+ * Upper bound on simultaneous agent turns in an independent (non roll-call) round.
+ * Unbounded: a roll call already runs the whole room at once, and a cap made the agents
+ * past it sit behind the first batch with a spinner that looked identical to "working".
+ */
+export const MAX_PARALLEL_TURNS = Infinity
+
+/**
+ * Reorders one round's bubbles by arrival: the ones that answered first sit first, in the
+ * order they finished, and the ones still working stay below them in their original order.
+ * Without this a slow agent listed first kept a spinner on top and pushed every finished
+ * answer below it, so the room read as a queue even though the turns ran together.
+ *
+ * Pure. Bubbles outside `roundIds` (earlier history, the user's message) never move, and the
+ * round keeps the slot of its first bubble. `arrived` lists finished ids, oldest first.
+ */
+export function orderByArrival<T extends { id: string }>(
+  list: T[],
+  roundIds: ReadonlySet<string>,
+  arrived: readonly string[],
+): T[] {
+  const first = list.findIndex((m) => roundIds.has(m.id))
+  if (first === -1) return list
+  const round = list.filter((m) => roundIds.has(m.id))
+  const done = new Set(arrived)
+  const finished = arrived
+    .map((id) => round.find((m) => m.id === id))
+    .filter((m): m is T => m !== undefined)
+  const working = round.filter((m) => !done.has(m.id))
+  const rest = list.filter((m) => !roundIds.has(m.id))
+  // Re-insert the round where its first bubble was (counting only bubbles that stay put).
+  const at = list.slice(0, first).length
+  return [...rest.slice(0, at), ...finished, ...working, ...rest.slice(at)]
+}
 
 // Leading politeness before the addressees: "Hi Finn and Ofira, ..."
 const GREETING = /^\s*(?:hi|hai|halo|hello|hey|dear|kak|pak|bu|mas|mbak)\b[\s,]*/i
