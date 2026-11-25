@@ -646,6 +646,17 @@ export function classifyN8nError(error: unknown, instanceUrl: string): {
     }
   }
 
+  // Missing workflow/execution — n8nFetch throws "n8n <label> failed (404): ...".
+  // Must be 404, not 502: Cloudflare replaces origin 502/504 bodies with its
+  // own HTML page, hiding this message from the browser.
+  if (error instanceof Error && error.message.includes('(404)')) {
+    return {
+      status: 404,
+      code: 'WORKFLOW_NOT_FOUND',
+      message: 'This workflow no longer exists in n8n — it may have been deleted',
+    }
+  }
+
   // Fallback: deployment failed
   return {
     status: 502,
