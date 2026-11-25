@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import GlassSwitch from '@/components/shared/GlassSwitch'
 import {
   BYOK_PROVIDERS,
   ByokKey,
@@ -473,25 +474,7 @@ function Switch({
   label: string
   onChange: (next: boolean) => void
 }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`relative h-[26px] w-[46px] shrink-0 rounded-full outline-none transition-colors duration-200 focus-visible:ring-4 focus-visible:ring-white/10 disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none ${
-        checked ? 'bg-white' : 'bg-white/15'
-      }`}
-    >
-      <span
-        className={`absolute left-[3px] top-[3px] size-5 rounded-full shadow-sm transition-[transform,background-color] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
-          checked ? 'translate-x-5 bg-black' : 'translate-x-0 bg-white/80'
-        }`}
-      />
-    </button>
-  )
+  return <GlassSwitch checked={checked} disabled={disabled} aria-label={label} onChange={onChange} />
 }
 
 function Segmented<T extends string | null>({

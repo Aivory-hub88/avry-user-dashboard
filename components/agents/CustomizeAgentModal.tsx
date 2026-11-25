@@ -1,5 +1,6 @@
 'use client';
 
+import GlassSwitch from '@/components/shared/GlassSwitch';
 import Image from 'next/image';
 import { ChevronDown, ChevronRight, Plug } from 'lucide-react';
 import QRCode from 'react-qr-code';
@@ -169,6 +170,13 @@ function mcpServerIcon(s: { name: string; url: string }): string | null {
   if (host.includes('odoo') || name.includes('odoo')) return '/integrations/odoo.svg';
   return null;
 }
+
+// Re-points the sage accent to mint inside this dialog only; every bg-accent /
+// text-accent / border-accent utility below follows it.
+const MINT_THEME = {
+  '--color-accent': '#5eead4',
+  '--color-accent-text': '#c9f7ee',
+} as React.CSSProperties;
 
 const CONNECTION_STATUS_STYLES: Record<ConnectedApp['status'], { label: string; className: string }> = {
   connected: { label: 'Connected', className: 'bg-accent/15 border-accent/25 text-[var(--color-accent-text)]' },
@@ -1118,6 +1126,7 @@ export default function CustomizeAgentModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
         className="bg-[#242424] border border-white/10 rounded-[24px] w-full max-w-lg shadow-2xl relative flex flex-col max-h-[88vh]"
+        style={MINT_THEME}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-8 pt-8 pb-4 shrink-0">
@@ -1343,23 +1352,13 @@ export default function CustomizeAgentModal({
                               {t('revoke')}
                             </button>
                           )}
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={enabled}
+                          <GlassSwitch
+                            checked={enabled}
                             disabled={!connected || savingToolkit === slug}
                             title={connected ? undefined : t('connectFirst')}
-                            onClick={() => toggleToolkit(slug, !enabled)}
-                            className={`relative w-10 h-[22px] rounded-full transition-colors disabled:opacity-30 ${
-                              enabled ? 'bg-accent/70' : 'bg-white/10'
-                            }`}
-                          >
-                            <span
-                              className={`absolute left-[3px] top-[3px] w-4 h-4 rounded-full bg-white transition-transform ${
-                                enabled ? 'translate-x-[16px]' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
+                            aria-label={label}
+                            onChange={(next) => toggleToolkit(slug, next)}
+                          />
                         </span>
                       </div>
                       {isApiKey && formOpenForRow && !isTier2 && (
@@ -1519,22 +1518,12 @@ export default function CustomizeAgentModal({
                                             <div className="text-white/35 text-[11px] truncate">{tool.description}</div>
                                           )}
                                         </div>
-                                        <button
-                                          type="button"
-                                          role="switch"
-                                          aria-checked={toolEnabled}
+                                        <GlassSwitch
+                                          checked={toolEnabled}
                                           disabled={mcpBusyId === s.id}
-                                          onClick={() => handleToggleMcpTool(s, tool.name, !toolEnabled)}
-                                          className={`relative w-9 h-5 rounded-full shrink-0 transition-colors disabled:opacity-30 ${
-                                            toolEnabled ? 'bg-accent/70' : 'bg-white/10'
-                                          }`}
-                                        >
-                                          <span
-                                            className={`absolute left-[3px] top-[3px] w-3.5 h-3.5 rounded-full bg-white transition-transform ${
-                                              toolEnabled ? 'translate-x-[14px]' : 'translate-x-0'
-                                            }`}
-                                          />
-                                        </button>
+                                          aria-label={tool.name}
+                                          onChange={(next) => handleToggleMcpTool(s, tool.name, next)}
+                                        />
                                       </div>
                                     );
                                   })}

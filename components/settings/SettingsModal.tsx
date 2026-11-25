@@ -1,5 +1,6 @@
 'use client'
 
+import GlassSwitch from '@/components/shared/GlassSwitch'
 import { useState, useEffect, useCallback } from 'react'
 import { logout } from '@/lib/auth'
 import CopySecretRow from '@/components/ui/CopySecretRow'
@@ -620,12 +621,5 @@ docker load -i ${imageName}.tar.gz`}
 }
 
 function Toggle({ checked, onChange }: { checked: boolean, onChange: (v: boolean) => void }) {
-  return (
-    <button 
-      onClick={() => onChange(!checked)}
-      className={`w-10 h-6 rounded-full relative transition-colors duration-200 focus:outline-none ${checked ? 'bg-accent' : 'bg-white/20'}`}
-    >
-      <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-on-accent transition-transform duration-200 ${checked ? 'translate-x-4' : 'translate-x-0'}`}></div>
-    </button>
-  )
+  return <GlassSwitch checked={checked} onChange={onChange} />
 }
