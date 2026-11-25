@@ -11,7 +11,7 @@ import { imageTextBlocks } from '@/lib/imageContext'
 import { sendAgentMessage, toolStatusLabel, type ConsolePendingApproval } from '@/lib/agentChat'
 import { applyToolEvent, closeSteps, type ActivityStep } from '@/lib/agentActivity'
 import { ApprovalResolveError, notifyApprovalsChanged, resolveApproval } from '@/lib/agentApprovals'
-import { extractReportTargets, planHandoffs } from '@/lib/agentHandoff'
+import { extractReportTargets, HANDOFF_MAX_EXTRA_TURNS, HANDOFF_MAX_TURNS, planHandoffs } from '@/lib/agentHandoff'
 import { isIndependentRound, MAX_PARALLEL_TURNS, orderByArrival, roundRunsInParallel, runRoundTurns } from '@/lib/roomRound'
 import { backoffMs, CallGovernor, classifyFailure, type Slot } from '@/lib/callGovernor'
 import { rankTargets } from '@/lib/roomPriority'
@@ -691,7 +691,12 @@ export function useChat({
             depth: turn.depth,
             usedPerAgent,
             usedTotal: turns.length,
-            queued: turns.slice(qi + 1).map(x => x.agent),
+            // A big round (@all to ten agents) already uses more turns than the default chain cap.
+            maxTotal: Math.max(HANDOFF_MAX_TURNS, initialTurnCount + HANDOFF_MAX_EXTRA_TURNS),
+            // Turns that have not answered yet (running, waiting for a slot, or behind us). In a
+            // parallel round the turns after us in the array are mostly already running or done, so
+            // "later in the array" is the wrong test; an agent that has already answered CAN be handed more.
+            queued: turns.filter(x => x.id !== turn.id && !outcomes.has(x.id)).map(x => x.agent),
             // "lapor ke Aira": the human's own turns only, and never someone already answering this round.
             implied: turn.depth === 0 && !turn.handoff
               ? extractReportTargets(displayText, roomMembersRef.current, t).filter(x => !turns.some(y => y.agent === x))
