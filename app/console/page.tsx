@@ -30,7 +30,7 @@ import RoomGroupModal from "@/components/console/RoomGroupModal"
 import TodayTasksCard from "@/components/workspace/TodayTasksCard"
 import { useStuckTasks } from "@/hooks/useStuckTasks"
 import { PREBUILT_AGENTS } from "@/lib/agentChat"
-import { getMentionCandidates, parseAgentMentions, resolveNamedAgents, detectRoundIntent, expandToRoom, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
+import { getMentionCandidates, mentionIsComplete, parseAgentMentions, resolveNamedAgents, detectRoundIntent, expandToRoom, inferRoomFallback, isConsoleMention, saveRoomSticky, loadRoomSticky, type MentionCandidate } from "@/lib/agentMentions"
 import { fetchLedgerHint } from "@/lib/roomLedger"
 import { listConnections, APP_CATALOG } from "@/lib/integrations/store"
 import { collabAuthHeaders } from "@/lib/collabClient"
@@ -333,7 +333,10 @@ export default function ConsolePage() {
       }
       if (e.key === "Enter" || e.key === "Tab") {
         const pick = emptyMention.mentionList[emptyMention.mentionIndex]
-        if (pick) {
+        if (pick && e.key === "Enter" && mentionIsComplete(emptyMention.mentionQuery, pick)) {
+          // "@all" is already fully typed: Enter sends instead of re-selecting it.
+          emptyMention.closeMenu()
+        } else if (pick) {
           e.preventDefault()
           selectEmptyMention(pick)
           return

@@ -7,7 +7,7 @@ import AgentMentionMenu from "./console/AgentMentionMenu"
 import MicButton from "./console/MicButton"
 import { useAgentMention } from "@/hooks/useAgentMention"
 import CreditUsageRing from "./credits/CreditUsageRing"
-import type { MentionCandidate } from "@/lib/agentMentions"
+import { mentionIsComplete, type MentionCandidate } from "@/lib/agentMentions"
 
 interface ChatInputProps {
   onSend: (message: string, attachments: Attachment[]) => void
@@ -182,7 +182,10 @@ export default function ChatInput({ onSend, disabled = false, prefill, insertTex
       }
       if (e.key === 'Enter' || e.key === 'Tab') {
         const pick = mention.mentionList[mention.mentionIndex]
-        if (pick) {
+        if (pick && e.key === 'Enter' && mentionIsComplete(mention.mentionQuery, pick)) {
+          // "@all" is already fully typed: Enter sends instead of re-selecting it.
+          mention.closeMenu()
+        } else if (pick) {
           e.preventDefault()
           selectMention(pick)
           return
