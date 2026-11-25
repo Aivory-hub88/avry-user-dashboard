@@ -500,6 +500,7 @@
     "connected": "Terhubung",
     "notConnected": "Belum terhubung",
     "connect": "Hubungkan",
+    "reconnect": "Hubungkan Ulang",
     "revoke": "Cabut",
     "connectFirst": "Hubungkan dulu",
     "connectStartError": "Tidak dapat memulai koneksi {toolkit}.",
