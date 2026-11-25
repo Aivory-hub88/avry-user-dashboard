@@ -50,16 +50,27 @@ export default function MicButton({ onText, onError, disabled, className = "cons
       if (heldFor < MIN_HOLD_MS) live.current.cancel()
       else live.current.stop()
     }
-    const onDown = (e: KeyboardEvent) => {
-      const key = holdKeyOf(e)
-      if (!key) return
-      e.preventDefault()
-      if (e.repeat || heldSince) return
+    const begin = (key: HoldKey) => {
+      if (heldSince) return
       const { state: st, disabled: off } = live.current
       if (off || st !== "idle") return
       heldSince = Date.now()
       heldBy = key
       void live.current.start()
+    }
+    const onDown = (e: KeyboardEvent) => {
+      const key = holdKeyOf(e)
+      if (!key) return
+      e.preventDefault()
+      if (!e.repeat) begin(key)
+    }
+    // The Aivory desktop app watches the Fn modifier at the OS level (browsers
+    // can't see it) and forwards it as this event. Ignored unless the window is
+    // focused, so Fn pressed in another app never starts a recording here.
+    const onNativeFn = (e: Event) => {
+      if (!document.hasFocus()) return
+      if ((e as CustomEvent<string>).detail === "down") begin("fn")
+      else if (heldBy === "fn") release()
     }
     const onUp = (e: KeyboardEvent) => {
       if (heldBy && releasesHold(e, heldBy)) release()
@@ -67,10 +78,12 @@ export default function MicButton({ onText, onError, disabled, className = "cons
     window.addEventListener("keydown", onDown)
     window.addEventListener("keyup", onUp)
     window.addEventListener("blur", release)
+    window.addEventListener("aivory-fn", onNativeFn)
     return () => {
       window.removeEventListener("keydown", onDown)
       window.removeEventListener("keyup", onUp)
       window.removeEventListener("blur", release)
+      window.removeEventListener("aivory-fn", onNativeFn)
     }
   }, [supported])
 
