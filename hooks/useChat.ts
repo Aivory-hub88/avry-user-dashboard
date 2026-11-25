@@ -12,7 +12,9 @@ import { sendAgentMessage, toolStatusLabel, type ConsolePendingApproval } from '
 import { applyToolEvent, closeSteps, type ActivityStep } from '@/lib/agentActivity'
 import { ApprovalResolveError, notifyApprovalsChanged, resolveApproval } from '@/lib/agentApprovals'
 import { extractReportTargets, planHandoffs } from '@/lib/agentHandoff'
-import { isIndependentRound, MAX_PARALLEL_TURNS, roundRunsInParallel, runRoundTurns } from '@/lib/roomRound'
+import { isIndependentRound, MAX_PARALLEL_TURNS, orderByArrival, roundRunsInParallel, runRoundTurns } from '@/lib/roomRound'
+import { backoffMs, CallGovernor, classifyFailure, type Slot } from '@/lib/callGovernor'
+import { rankTargets } from '@/lib/roomPriority'
 import { agentAwaitingApproval, agentNameOf, buildRoomPayload, candidateOf, roomTurnText, type MentionCandidate, type RoomHistoryEntry, type RoundIntent } from '@/lib/agentMentions'
 import type { TelegramAgentType } from '@/lib/telegramDeploy'
 import { useMode } from '@/contexts/ModeContext'
@@ -117,6 +119,8 @@ function safeSaveSession(...args: Parameters<typeof saveSessionMessages>): boole
   }
 }
 
+const MAX_CALL_RETRIES = 2
+
 export function useChat({
   attachments,
   clearAttachments,
@@ -166,6 +170,8 @@ export function useChat({
   // treats an aborted turn as a user stop — partial content kept, no error
   // toast — rather than a failure.
   const abortRef = useRef<AbortController | null>(null)
+  // One gate for every Room agent call in this tab (priority, adaptive limit, honest queue position).
+  const governorRef = useRef(new CallGovernor({ initial: 6, min: 2, max: 10 }))
   const session = useSession(addToast)
   const { agentTarget, setAgentTarget } = useMode()
 
@@ -504,6 +510,10 @@ export function useChat({
         text: m.content,
       }))
 
+    // Admission order for this round: named agents, then the floor holder, then role match.
+    const floorAgent = [...messagesRef.current].reverse().find(m => m.role === 'assistant' && m.agentType)?.agentType ?? null
+    const ranks = rankTargets({ text: displayText, targets, candidates: roomMembersRef.current, floor: floorAgent })
+
     const ts = Date.now()
     const userMsg: Message = { id: `${ts}-room-user`, role: "user", content: displayText, attachments: atts.length > 0 ? atts : undefined, replyPreview: activeReplyTo ?? undefined }
     // One turn per bubble. The human's @mentions seed the queue (depth 0); a reply that
@@ -569,6 +579,11 @@ export function useChat({
     // dropped by the merge below, no error toast.
     const roundReplies: RoomHistoryEntry[] = []
     const outcomes = new Map<string, { reply: string; pendingApproval: ConsolePendingApproval | null }>()
+    // Turn ids in the order their replies arrived: bubbles are laid out by this, not by roster
+    // order, so whoever answers first reads first and slow agents stay below as "working".
+    const arrived: string[] = []
+    const inArrivalOrder = (list: Message[]): Message[] =>
+      orderByArrival(list, new Set(placeholders.map(ph => ph.id)), arrived)
     // Close the activity panel of a bubble that had one running ("Selesai dalam …").
     const finishedActivity = (m: Message): Partial<Message> =>
       m.startedAt && m.endedAt === undefined ? { endedAt: Date.now(), activity: closeSteps(m.activity ?? [], Date.now()) } : {}
@@ -585,30 +600,62 @@ export function useChat({
         wrapped,
         awaitingApproval: !turn.handoff && atts.length === 0 && agentAwaitingApproval(messagesRef.current, t),
       })
-      // Timer starts when this agent's turn begins (sequential rounds queue the rest).
-      if (currentSessionIdRef.current === sentSessionId) {
-        setMessages(p => p.map(m => m.id === turn.id ? { ...m, startedAt: Date.now(), activity: [], statusText: undefined } : m))
+      const paint = (patch: (m: Message) => Partial<Message>) => {
+        if (currentSessionIdRef.current === sentSessionId) {
+          setMessages(p => p.map(m => m.id === turn.id ? { ...m, ...patch(m) } : m))
+        }
       }
+      // Every agent call goes through the shared governor (lib/callGovernor): the agent the user
+      // named or who holds the floor is admitted first, the limit backs off on a rate limit, and
+      // a waiting agent says so instead of showing a spinner that looks like work. A teammate
+      // handed work (rank -1) and a retry jump the line: both are already mid-conversation.
+      const rank = turn.handoff ? -1 : (ranks[t] ?? 0)
+      const governor = governorRef.current
+      let slot: Slot
       try {
-        const result = await sendAgentMessage(
+        slot = await governor.acquire(rank, {
+          signal,
+          onPosition: pos => paint(m => (m.startedAt ? {} : { statusText: `${me.name} is waiting for a free slot (#${pos})...` })),
+        })
+      } catch {
+        return // stopped while waiting
+      }
+      // Timer starts when this agent's turn really begins (not while it waits for a slot).
+      paint(() => ({ startedAt: Date.now(), activity: [], statusText: undefined }))
+      try {
+        const callAgent = () => sendAgentMessage(
           t as TelegramAgentType,
           payload,
           sentSessionId,
           signal,
           teamIdRef.current,
-          replySoFar => {
-            if (currentSessionIdRef.current === sentSessionId) {
-              setMessages(p => p.map(m => m.id === turn.id ? { ...m, content: replySoFar, statusText: undefined } : m))
-            }
-          },
-          tool => {
-            if (currentSessionIdRef.current === sentSessionId) {
-              setMessages(p => p.map(m => m.id === turn.id
-                ? { ...m, statusText: tool.status === 'running' ? toolStatusLabel(tool.name) : m.statusText, activity: applyToolEvent(m.activity ?? [], tool, Date.now()) }
-                : m))
-            }
-          }
+          replySoFar => paint(() => ({ content: replySoFar, statusText: undefined })),
+          tool => paint(m => ({
+            statusText: tool.status === 'running' ? toolStatusLabel(tool.name) : m.statusText,
+            activity: applyToolEvent(m.activity ?? [], tool, Date.now()),
+          })),
         )
+        let result: Awaited<ReturnType<typeof callAgent>>
+        for (let attempt = 0; ; attempt++) {
+          try {
+            result = await callAgent()
+            slot.release('ok')
+            break
+          } catch (err) {
+            const kind = classifyFailure(err)
+            slot.release(kind === 'rate_limited' ? 'rate_limited' : 'error')
+            if (kind === 'fatal' || attempt >= MAX_CALL_RETRIES || signal.aborted) throw err
+            const wait = backoffMs(attempt + 1)
+            paint(() => ({ statusText: `${me.name} is busy, retrying in ${Math.ceil(wait / 1000)}s...` }))
+            await new Promise<void>(resolve => {
+              const timer = setTimeout(resolve, wait)
+              signal.addEventListener('abort', () => { clearTimeout(timer); resolve() }, { once: true })
+            })
+            if (signal.aborted) throw err
+            slot = await governor.acquire(-1, { signal })
+            paint(() => ({ statusText: undefined }))
+          }
+        }
         // Backend reply is unvalidated (Cerveau may return null/a non-string
         // on odd turns) — a non-string here used to flow into ChatMessage and
         // throw during render, killing the whole page. Treat it as a failed
@@ -618,6 +665,7 @@ export function useChat({
         }
         outcomes.set(turn.id, { reply: result.reply, pendingApproval: result.pendingApproval ?? null })
         roundReplies.push({ author: me.name, text: result.reply })
+        arrived.push(turn.id)
         // Paint progressively — the room feels alive while later agents
         // are still thinking, instead of going quiet for the whole chain.
         // NOTE: read `outcomes` directly. Spreading a Map ({...outcomes})
@@ -625,11 +673,11 @@ export function useChat({
         // the updater on the first reply and unmounted the page (the ~5s
         // crash). Never spread a Map for this.
         if (currentSessionIdRef.current === sentSessionId) {
-          setMessages(p => p.map(m => {
+          setMessages(p => inArrivalOrder(p.map(m => {
             if (m.id !== turn.id) return m
             const o = outcomes.get(turn.id)
             return o ? { ...m, content: o.reply, isStreaming: false, statusText: undefined, ...finishedActivity(m), pendingApproval: o.pendingApproval } : m
-          }))
+          })))
         }
         // ADR-020: an @mention in this reply hands work to a teammate, who answers in
         // their own bubble. A parked approval ends this branch; depth, total turns and
@@ -683,13 +731,13 @@ export function useChat({
     try {
       if (currentSessionIdRef.current === sentSessionId) {
         setMessages(prev => {
-          const updated = applyRoomResults(prev)
+          const updated = inArrivalOrder(applyRoomResults(prev))
           safeSaveSession(sentSessionId, updated, agentTarget)
           setSessions(listSessions())
           return updated
         })
       } else {
-        const finalList = applyRoomResults([...baseMessages, userMsg, ...placeholders])
+        const finalList = inArrivalOrder(applyRoomResults([...baseMessages, userMsg, ...placeholders]))
         safeSaveSession(sentSessionId, finalList, agentTarget)
         setSessions(listSessions())
       }

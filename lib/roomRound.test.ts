@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { isIndependentRound, roundRunsInParallel, runRoundTurns } from "./roomRound"
+import { isIndependentRound, orderByArrival, roundRunsInParallel, runRoundTurns } from "./roomRound"
 import type { MentionCandidate } from "./agentMentions"
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -167,5 +167,32 @@ describe("runRoundTurns", () => {
     })
     expect(log.slice(0, 2)).toEqual(["start a", "start b"])
     expect(log.slice(-4)).toEqual(["start h1", "end h1", "start h2", "end h2"])
+  })
+})
+
+describe("orderByArrival", () => {
+  const m = (id: string) => ({ id })
+  const ids = (l: { id: string }[]) => l.map((x) => x.id)
+  const round = new Set(["a", "b", "c", "d"])
+
+  it("puts the first finisher first and leaves the slow ones below", () => {
+    const list = [m("u"), m("a"), m("b"), m("c"), m("d")]
+    expect(ids(orderByArrival(list, round, ["c", "a"]))).toEqual(["u", "c", "a", "b", "d"])
+  })
+
+  it("keeps the original order while nobody has answered", () => {
+    const list = [m("u"), m("a"), m("b")]
+    expect(ids(orderByArrival(list, round, []))).toEqual(["u", "a", "b"])
+  })
+
+  it("never moves bubbles outside the round", () => {
+    const list = [m("old1"), m("old2"), m("u"), m("a"), m("b")]
+    expect(ids(orderByArrival(list, round, ["b"]))).toEqual(["old1", "old2", "u", "b", "a"])
+  })
+
+  it("ignores arrivals that are not in the list and is a no-op without a round", () => {
+    const list = [m("x"), m("y")]
+    expect(orderByArrival(list, round, ["a"])).toBe(list)
+    expect(ids(orderByArrival([m("a"), m("b")], round, ["zzz", "b"]))).toEqual(["b", "a"])
   })
 })
